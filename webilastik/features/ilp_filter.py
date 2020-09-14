@@ -13,7 +13,7 @@ FE = TypeVar("FE", bound="IlpFilter")
 
 
 class IlpFilter(ChannelwiseFilter):
-    REGISTRY: ClassVar[Mapping[str, Type[FE]]] = {}
+    REGISTRY: ClassVar[Dict[str, Type[FE]]] = {}
 
     @property
     @abstractmethod
@@ -22,7 +22,7 @@ class IlpFilter(ChannelwiseFilter):
 
     @classmethod
     @abstractmethod
-    def from_ilp_scale(cls: Type[FE], scale: float, compute_in_2d: bool, num_input_channels) -> FE:
+    def from_ilp_scale(cls: Type[FE], scale: float, num_input_channels:int, axis_2d: Optional[str] = None) -> FE:
         pass
 
     @property
@@ -33,13 +33,13 @@ class IlpFilter(ChannelwiseFilter):
         name += " in 2D" if self.axis_2d is not None else " in 3D"
         return name
 
-    @classmethod
-    def from_ilp_classifier_feature_name(cls, feature_name: bytes) -> "ChannelwiseFilter":
-        feature_name = feature_name.decode("utf8")
-        name = re.search(r"^(?P<name>[a-zA-Z \-]+)", description).group("name").strip()
-        klass = cls.REGISTRY[name.title().replace(" ", "")]
-        scale = float(re.search(r"σ=(?P<sigma>[0-9.]+)", description).group("sigma"))
-        return klass.from_ilp_scale(scale, axis_2d="z" if "in 2D" in description else None)
+    # @classmethod
+    # def from_ilp_classifier_feature_name(cls, feature_name: bytes) -> "ChannelwiseFilter":
+    #     description = feature_name.decode("utf8")
+    #     name = re.search(r"^(?P<name>[a-zA-Z \-]+)", description).group("name").strip()
+    #     klass = cls.REGISTRY[name.title().replace(" ", "")]
+    #     scale = float(re.search(r"σ=(?P<sigma>[0-9.]+)", description).group("sigma"))
+    #     return klass.from_ilp_scale(scale=scale, axis_2d="z" if "in 2D" in description else None)
 
     @classmethod
     def from_ilp_classifier_feature_names(cls, feature_names: List[bytes]) -> List["ChannelwiseFilter"]:

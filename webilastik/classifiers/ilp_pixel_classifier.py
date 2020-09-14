@@ -1,4 +1,4 @@
-from typing import Sequence, List, Dict
+from typing import Sequence, List, Dict, Iterator
 import multiprocessing
 import pickle
 import tempfile
@@ -15,7 +15,6 @@ import h5py
 from .pixel_classifier import VigraPixelClassifier
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.annotations import Annotation, Color
-
 from webilastik import Project
 
 
@@ -91,13 +90,13 @@ class IlpVigraPixelClassifier(VigraPixelClassifier):
             strict=strict,
         )
 
-    @classmethod
-    def from_ilp_data(cls, data: h5py.Group) -> "VigraPixelClassifier":
-        forest_groups = [data[key] for key in data.keys() if re.match("^Forest\d+$", key)]
-        forests = [VigraRandomForest(fg.file.filename, fg.name) for fg in forest_groups]
-        feature_extractors = ChannelwiseFilter.from_classifier_feature_names(data["feature_names"])
-        classes = list(data["known_labels"][()])
-        return cls(feature_extractors=feature_extractors, forests=forests, classes=classes, strict=True)
+    # @classmethod
+    # def from_ilp_data(cls, data: h5py.Group) -> "VigraPixelClassifier":
+    #     forest_groups = [data[key] for key in data.keys() if re.match("^Forest\d+$", key)]
+    #     forests = [VigraRandomForest(fg.file.filename, fg.name) for fg in forest_groups]
+    #     feature_extractors = ChannelwiseFilter.from_classifier_feature_names(data["feature_names"])
+    #     classes = list(data["known_labels"][()])
+    #     return cls(feature_extractors=feature_extractors, forests=forests, classes=classes, strict=True)
 
     def get_forest_data(self):
         tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5")
@@ -149,7 +148,4 @@ class IlpVigraPixelClassifier(VigraPixelClassifier):
 
     @property
     def ilp_classifier_factory(self) -> bytes:
-        num_trees = sum(f.treeCount() for f in self.forests)
-        return pickle.dumps(
-            ParallelVigraRfLazyflowClassifierFactory(num_trees_total=num_trees, num_forests=len(self.forests)), 0
-        )
+        return self.DEFAULT_ILP_CLASSIFIER_FACTORY
