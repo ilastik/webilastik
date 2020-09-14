@@ -20,7 +20,7 @@ class ConnectedComponents(ScalarData):
             data.raw(Point5D.LABELS), axiskeys=Point5D.LABELS, location=data.location, labels=labels
         )
 
-    def rebuild(self, arr: np.ndarray, axiskeys: str, location: Point5D = None) -> "Annotation":
+    def rebuild(self, arr: np.ndarray, axiskeys: str, location: Point5D = None) -> "ConnectedComponentsExtractor":
         location = self.location if location is None else location
         return self.__class__(arr, axiskeys=axiskeys, location=location, labels=None)  # FIXME
 
