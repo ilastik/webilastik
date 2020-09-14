@@ -77,7 +77,7 @@ class PixelClassifier(JsonSerializable):
     def __init__(
         self,
         *,
-        feature_extractors: List[FeatureExtractor],
+        feature_extractors: Sequence[FeatureExtractor],
         classes: List[int],
         strict: bool,
         color_map: Dict[Color, np.uint8],
@@ -178,7 +178,7 @@ class ScikitLearnPixelClassifier(PixelClassifier):
         if out is not None:
             assert out.shape == predictions.shape
             out.localSet(predictions)
-            return out, feature_data
+            return out
         else:
             return predictions
 

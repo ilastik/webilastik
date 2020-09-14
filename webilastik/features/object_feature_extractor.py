@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Union, Dict, cast
 
 import numpy as np
 import vigra
@@ -18,7 +18,7 @@ class ObjectFeatureExtractor(ABC):
         return True  # FIXME
 
     @abstractmethod
-    def compute(self, roi: DataSourceSlice) -> Array5D:
+    def compute(self, roi: DataSourceSlice, components_extractor: ConnectedComponentsExtractor) -> Array5D:
         pass
 
 
@@ -33,8 +33,7 @@ class VigraObjectFeatureExtractor(ObjectFeatureExtractor):
 
     def compute(
         self, roi: DataSourceSlice, components_extractor: ConnectedComponentsExtractor
-    ):  # -> Dict[Point5D, Array5D] ??
-        # import pydevd; pydevd.settrace()
+    ) -> Array5D:
         connected_comps = components_extractor.compute(roi).enlarged(radius=self.get_halo(), limits=roi.full())
         data = roi.datasource.retrieve(connected_comps.roi.with_coord(c=roi.c))
         timewise_features: List[Array5D] = []
@@ -52,7 +51,8 @@ class VigraObjectFeatureExtractor(ObjectFeatureExtractor):
 
             frame_features: List[Array5D] = []
             for fname in self.feature_names:
-                clean_raw = stats[fname]  # [good_indices]
+                clean_raw = cast(np.ndarray, stats[fname])  # [good_indices]
+                assert isinstance(clean_raw, np.ndarray)
                 xc_shape = (clean_raw.shape[0], int(np.prod(clean_raw.shape[1:])))
                 frame_features.append(Array5D(clean_raw.reshape(xc_shape), axiskeys="xc"))
 

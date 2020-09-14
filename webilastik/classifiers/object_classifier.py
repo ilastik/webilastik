@@ -40,3 +40,6 @@ class ObjectClassifier:
             train_forest(i)
 
         return cls(feature_extractor=feature_extractor, forests=forests)
+
+    def predict(self, roi: DataSourceSlice):
+        pass
