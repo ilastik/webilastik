@@ -5,16 +5,16 @@ from dataclasses import dataclass
 
 import flask
 
-from ilastik.workflows.pixelClassification.pixel_classification_workflow import (
+from webilastik.workflows.pixel_classification_workflow import (
     PixelClassificationWorkflow,
     DataLane,
     GuiDataSource,
 )
-from ilastik.server.WebContext import WebContext
-from ilastik.classifiers.ilp_pixel_classifier import IlpVigraPixelClassifier
-from ilastik.features.ilp_filter import IlpFilter
-from ilastik.annotations import Annotation
-from ilastik.filesystem import HttpPyFs
+from webilastik.server.WebContext import WebContext
+from webilastik.classifiers.ilp_pixel_classifier import IlpVigraPixelClassifier
+from webilastik.features.ilp_filter import IlpFilter
+from webilastik.annotations import Annotation
+from webilastik.filesystem import HttpPyFs
 
 from ndstructs.datasource import PrecomputedChunksDataSource
 from ndstructs.utils import to_json_data

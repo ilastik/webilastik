@@ -18,11 +18,11 @@ from ndstructs import Point5D, Slice5D, Shape5D, Array5D
 from ndstructs.datasource import DataSource, DataSourceSlice, SequenceDataSource, PrecomputedChunksDataSource
 from ndstructs.utils import JsonSerializable, from_json_data, to_json_data, JsonReference
 
-from ilastik.workflows.pixelClassification.pixel_classification_workflow import PixelClassificationWorkflow
-from ilastik.server.pixel_classification_web_adapter import PixelClassificationWorkflow2WebAdapter
-from ilastik.features.feature_extractor import FeatureDataMismatchException
-from ilastik.classifiers.pixel_classifier import Predictions, PixelClassifier
-from ilastik.server.WebContext import WebContext, EntityNotFoundException
+from webilastik.workflows.pixel_classification_workflow import PixelClassificationWorkflow
+from webilastik.server.pixel_classification_web_adapter import PixelClassificationWorkflow2WebAdapter
+from webilastik.features.feature_extractor import FeatureDataMismatchException
+from webilastik.classifiers.pixel_classifier import Predictions, PixelClassifier
+from webilastik.server.WebContext import WebContext, EntityNotFoundException
 
 
 parser = argparse.ArgumentParser(description="Runs ilastik prediction web server")

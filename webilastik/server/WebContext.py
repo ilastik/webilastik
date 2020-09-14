@@ -13,23 +13,23 @@ from ndstructs.datasource import (
 )
 from ndstructs.utils import JsonSerializable, from_json_data, JsonReference
 
-from ilastik.utility import flatten, unflatten, listify
-from ilastik.annotations import Annotation
-from ilastik.classifiers.pixel_classifier import (
+from webilastik.utility import flatten, unflatten, listify
+from webilastik.annotations import Annotation
+from webilastik.classifiers.pixel_classifier import (
     PixelClassifier,
     Predictions,
     VigraPixelClassifier,
     ScikitLearnPixelClassifier,
 )
-from ilastik.workflows.pixelClassification.pixel_classification_workflow import (
-    PixelClassificationWorkflow2,
+from webilastik.workflows.pixel_classification_workflow import (
+    PixelClassificationWorkflow,
     DataLane,
     GuiDataSource,
 )
-from ilastik.classifiers.ilp_pixel_classifier import IlpVigraPixelClassifier
+from webilastik.classifiers.ilp_pixel_classifier import IlpVigraPixelClassifier
 
-from ilastik.features.feature_extractor import FeatureExtractor, FeatureDataMismatchException
-from ilastik.features import (
+from webilastik.features.feature_extractor import FeatureExtractor, FeatureDataMismatchException
+from webilastik.features import (
     GaussianSmoothing,
     HessianOfGaussianEigenvalues,
     GaussianGradientMagnitude,
@@ -59,7 +59,7 @@ classifier_classes = [
     Annotation,
 ]
 
-workflow_classes = [PixelClassificationWorkflow2, DataLane, GuiDataSource]
+workflow_classes = [PixelClassificationWorkflow, DataLane, GuiDataSource]
 
 context_classes = {
     klass.__name__: klass

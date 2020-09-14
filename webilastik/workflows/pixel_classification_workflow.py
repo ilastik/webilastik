@@ -15,12 +15,12 @@ from ndstructs.datasource import DataSource, N5DataSource, DataSourceSlice
 from ndstructs.datasink import N5DataSink
 from ndstructs.utils import JsonSerializable, to_json_data, Dereferencer, Referencer
 
-from ilastik import Project
-from ilastik.classifiers.pixel_classifier import PixelClassifierDataSource, Predictions
-from ilastik.classifiers.ilp_pixel_classifier import IlpVigraPixelClassifier
-from ilastik.features.ilp_filter import IlpFilter
-from ilastik.annotations import Annotation, Color
-from ilastik.features.feature_extractor import FeatureExtractorCollection
+from webilastik import Project
+from webilastik.classifiers.pixel_classifier import PixelClassifierDataSource, Predictions
+from webilastik.classifiers.ilp_pixel_classifier import IlpVigraPixelClassifier
+from webilastik.features.ilp_filter import IlpFilter
+from webilastik.annotations import Annotation, Color
+from webilastik.features.feature_extractor import FeatureExtractorCollection
 
 
 class DisplayMode(enum.Enum):

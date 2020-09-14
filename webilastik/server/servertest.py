@@ -1,7 +1,7 @@
 import requests
 import json
 import numpy
-from ilastik.utility import flatten, unflatten, listify
+from webilastik.utility import flatten, unflatten, listify
 from ndstructs import Array5D
 import os
 import time
@@ -26,7 +26,7 @@ def get_data(endpoint: str, ref):
     return get(f"http://localhost:5000/{endpoint}/{ref['object_id']}").json()
 
 
-resp = post("http://localhost:5000/PixelClassificationWorkflow2/", data={})
+resp = post("http://localhost:5000/PixelClassificationWorkflow/", data={})
 workflow_ref = resp.json()
 print("~~~~~~~> Workflow ref: ", workflow_ref)
 
@@ -137,7 +137,7 @@ with open(ilp_filename, "wb") as f:
     f.write(ilp_contents)
 print(f"**********WROTE CONTENTS OF .ilp PROJECT TO {ilp_filename}")
 
-# workflow_data = get(f"http://localhost:5000/PixelClassificationWorkflow2/{workflow_ref}").json()
+# workflow_data = get(f"http://localhost:5000/PixelClassificationWorkflow/{workflow_ref}").json()
 # print(json.dumps(workflow_data, indent=4))
 
 resp = post(
