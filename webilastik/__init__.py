@@ -1,49 +1,18 @@
-from __future__ import absolute_import
-
-###############################################################################
-#   ilastik: interactive learning and segmentation toolkit
-#
-#       Copyright (C) 2011-2014, the ilastik developers
-#                                <team@ilastik.org>
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# In addition, as a special exception, the copyright holders of
-# ilastik give you permission to combine ilastik with applets,
-# workflows and plugins which are not covered under the GNU
-# General Public License.
-#
-# See the LICENSE file for details. License information is also available
-# on the ilastik web site at:
-#      http://ilastik.org/license.html
-###############################################################################
-import re
-
-################################
-# # Add Submodules to sys.path ##
-################################
+# pyright: reportUnusedImport=false
 import os
 import io
 import h5py
 import time
-import numpy as np
-from typing import Optional, Iterable, List, Dict, Any, Mapping, Tuple
+from typing import Optional, Iterable, List, Dict, Any, Mapping, Tuple, Union
 from pathlib import Path
 from pkg_resources import parse_version
+from pkg_resources.extern.packaging.version import Version
 from collections.abc import Mapping as BaseMapping
-
+import re
 import numpy as np
 import pickle
 
-##################
-# # Version info ##
-##################
-
-
-def _format_version(t):
+def _format_version(t: Iterable[Union[str, int]]) -> str:
     """converts a tuple to a string"""
     return ".".join(str(i) for i in t)
 
@@ -92,9 +61,9 @@ class Project:
         return self.file[key][()].decode("utf-8")
 
     @property
-    def ilastikVersion(self) -> Optional["Version"]:
+    def ilastikVersion(self) -> Optional[Version]:
         version_string = self._getString(self.ILASTIK_VERSION)
-        return version_string if version_string is None else parse_version(version_string)
+        return None if version_string is None else parse_version(version_string)
 
     @property
     def workflowName(self) -> Optional[str]:
@@ -117,12 +86,12 @@ class Project:
         return out
 
     @classmethod
-    def populate_h5_group(cls, group: h5py.Group, data: Dict[str, Any]) -> None:
+    def populate_h5_group(cls, group: h5py.Group, data: Mapping[str, Any]) -> None:
         for key, value in data.items():
             if value is None:
                 continue
             if not isinstance(value, BaseMapping):
-                value = {"__data__": value}
+                value : Dict[str, Any] = {"__data__": value}
             if "__data__" in value:
                 h5_value, extra_attributes = cls.to_h5_dataset_value(value["__data__"])
                 if isinstance(h5_value, np.ndarray):
@@ -149,7 +118,7 @@ class Project:
         return {"__data__": dataset[()], "__attrs__": {}}  # FIXME
 
     @classmethod
-    def from_ilp_data(cls, data: Mapping[str, Any], path: Optional[Path] = None) -> Tuple["Project", io.BytesIO]:
+    def from_ilp_data(cls, data: Mapping[str, Any], path: Optional[Path] = None) -> Tuple["Project", io.IOBase]:
         backing_file = open(path, "wb") if path else io.BytesIO()
         ilp = h5py.File(backing_file, "w")
         cls.populate_h5_group(group=ilp["/"], data=data)

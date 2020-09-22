@@ -46,7 +46,7 @@ class TrainingData:
     combined_extractor: FeatureExtractor
     strict: bool
     color_map: Dict[Color, np.uint8]
-    classes: List[int]
+    classes: List[np.uint8]
     X: np.ndarray  # shape is (num_samples, num_feature_channels)
     y: np.ndarray  # shape is (num_samples, 1)
 
@@ -78,7 +78,7 @@ class PixelClassifier(JsonSerializable):
         self,
         *,
         feature_extractors: Sequence[FeatureExtractor],
-        classes: List[int],
+        classes: List[np.uint8],
         strict: bool,
         color_map: Dict[Color, np.uint8],
     ):
@@ -138,7 +138,7 @@ class ScikitLearnPixelClassifier(PixelClassifier):
         *,
         feature_extractors: Sequence[FeatureExtractor],
         forest: ScikitRandomForestClassifier,
-        classes: List[int],
+        classes: List[np.uint8],
         strict: bool = False,
         color_map: Dict[Color, np.uint8],
     ):
@@ -189,7 +189,7 @@ class VigraPixelClassifier(PixelClassifier):
         *,
         feature_extractors: Sequence[FeatureExtractor],
         forests: List[VigraRandomForest],
-        classes: List[int],
+        classes: List[np.uint8],
         strict: bool = False,
         color_map: Dict[Color, np.uint8],
     ):

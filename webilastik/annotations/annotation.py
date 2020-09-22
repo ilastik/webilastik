@@ -31,13 +31,12 @@ class Color:
         self.name = name or f"Label {self.rgba}"
 
     @classmethod
-    def from_channels(cls, channels: List[Number]) -> "Color":
+    def from_channels(cls, channels: List[np.uint8], name: str = "") -> "Color":
         if len(channels) == 0 or len(channels) > 4:
             raise ValueError(f"Cannnot create color from {channels}")
         if len(channels) == 1:
-            gray = channels[0]
-            return cls(r=gray, g=gray, b=gray)
-        return cls(*channels)
+            channels = (channels[0] * 3) + [255]
+        return cls(r=channels[0], g=channels[1], b=channels[2], a=channels[3], name=name)
 
     @property
     def rgba(self) -> Tuple[np.uint8, np.uint8, np.uint8, np.uint8]:
