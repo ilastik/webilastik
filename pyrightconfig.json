@@ -1,0 +1,9 @@
+{
+  "venvPath": "/home/tomaz/miniconda3/envs",
+  "venv": "webilastik",
+
+  "strict": true,
+
+  "pythonVersion": "3.7",
+  "pythonPlatform": "Linux"
+}
