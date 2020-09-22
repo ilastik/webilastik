@@ -118,7 +118,7 @@ class Project:
         return {"__data__": dataset[()], "__attrs__": {}}  # FIXME
 
     @classmethod
-    def from_ilp_data(cls, data: Mapping[str, Any], path: Optional[Path] = None) -> Tuple["Project", io.IOBase]:
+    def from_ilp_data(cls, data: Mapping[str, Any], path: Optional[Path] = None) -> Tuple["Project", io.BufferedIOBase]:
         backing_file = open(path, "wb") if path else io.BytesIO()
         ilp = h5py.File(backing_file, "w")
         cls.populate_h5_group(group=ilp["/"], data=data)

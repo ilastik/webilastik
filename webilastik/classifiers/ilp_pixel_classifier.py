@@ -63,7 +63,7 @@ class IlpVigraPixelClassifier(VigraPixelClassifier):
         feature_extractors: Sequence[IlpFilter],
         forests: List[VigraRandomForest],
         strict: bool = False,
-        classes: List[int],
+        classes: List[np.uint8],
         color_map: Dict[Color, np.uint8],
     ):
         super().__init__(

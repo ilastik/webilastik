@@ -22,7 +22,7 @@ class IlpFilter(ChannelwiseFilter):
 
     @classmethod
     @abstractmethod
-    def from_ilp_scale(cls: Type[FE], scale: float, num_input_channels:int, axis_2d: Optional[str] = None) -> FE:
+    def from_ilp_scale(cls: Type[FE], *, scale: float, num_input_channels:int, axis_2d: Optional[str] = None) -> FE:
         pass
 
     @property
@@ -64,7 +64,7 @@ class IlpFilter(ChannelwiseFilter):
                 if selection_matrix[feature_idx][scale_idx]:
                     axis_2d = "z" if in_2d else None
                     extractor = feature_class.from_ilp_scale(
-                        scale, axis_2d=axis_2d, num_input_channels=num_input_channels
+                        scale=scale, axis_2d=axis_2d, num_input_channels=num_input_channels
                     )
                     feature_extractors.append(extractor)
         return feature_extractors

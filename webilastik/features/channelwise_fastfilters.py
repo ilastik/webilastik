@@ -146,7 +146,7 @@ class SigmaWindowFilter(ChannelwiseFastFilter):
 
     @classmethod
     def from_ilp_scale(
-        cls: SigmaFilter, scale: float, num_input_channels: int, axis_2d: Optional[str] = None
+        cls: SigmaFilter, *, scale: float, num_input_channels: int, axis_2d: Optional[str] = None
     ) -> SigmaFilter:
         return cls(
             sigma=min(scale, 1.0),
@@ -202,7 +202,7 @@ class DifferenceOfGaussians(ChannelwiseFastFilter):
 
     @classmethod
     def from_ilp_scale(
-        cls, scale: float, num_input_channels: int, axis_2d: Optional[str] = None
+        cls, *, scale: float, num_input_channels: int, axis_2d: Optional[str] = None
     ) -> "DifferenceOfGaussians":
         capped_scale = min(scale, 1.0)
         return cls(
@@ -240,7 +240,7 @@ class ScaleWindowFilter(ChannelwiseFastFilter):
 
     @classmethod
     def from_ilp_scale(
-        cls: ScaleFilter, scale: float, num_input_channels: int, axis_2d: Optional[str] = None
+        cls: ScaleFilter, *, scale: float, num_input_channels: int, axis_2d: Optional[str] = None
     ) -> ScaleFilter:
         return cls(
             scale=min(scale, 1.0),

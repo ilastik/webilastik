@@ -102,7 +102,7 @@ class ChannelwiseFilter(FeatureExtractor):
         return out
 
     @abstractmethod
-    def _compute_slice(self, raw_data: DataSourceSlice, out: FeatureData):
+    def _compute_slice(self, source_roi: DataSourceSlice, out: FeatureData):
         pass
 
     def _debug_show(self, rawData: DataSourceSlice, featureData: FeatureData):
@@ -115,8 +115,8 @@ class ChannelwiseFilter(FeatureExtractor):
 
 class FeatureExtractorCollection(FeatureExtractor):
     def __init__(self, extractors: Iterable[FeatureExtractor]):
-        assert len(extractors) > 0
         self.extractors = tuple(extractors)
+        assert len(self.extractors) > 0
 
         shape_params = {}
         for label in Point5D.LABELS:

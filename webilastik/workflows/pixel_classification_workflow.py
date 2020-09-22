@@ -98,10 +98,12 @@ class GuiDataSource(JsonSerializable):
     @classmethod
     def from_ilp_data(cls, data) -> "GuiDataSource":
         if "axistags" in data:
-            axistags = AxisTags.fromJSON(data["axistags"][()].decode("utf-8"))
+            axistags = vigra.AxisTags.fromJSON(data["axistags"][()].decode("utf-8"))
             axiskeys = "".join(tag.key for tag in axistags)
         elif "axisorder" in data:  # legacy support
             axiskeys = data["axisorder"][()].decode("utf-8")
+        else:
+            raise ValueError(f"Could not find axistags in data {data}")
         filePath = data["filePath"][()].decode("utf-8")
         params = {
             "datasource": DataSource.create(filePath, axiskeys=axiskeys),
@@ -184,12 +186,12 @@ class PixelClassificationWorkflow(JsonSerializable):
     def __init__(
         self,
         *,
-        lanes: Sequence[DataLane] = (),
-        feature_extractors: Sequence[IlpFilter] = (),
+        lanes: Iterable[DataLane] = (),
+        feature_extractors: Iterable[IlpFilter] = (),
         classifier: Optional[IlpVigraPixelClassifier] = None,
     ):
-        self.lanes = lanes or []
-        self.feature_extractors = feature_extractors or []
+        self.lanes = list(lanes)
+        self.feature_extractors = list(feature_extractors)
         self.classifier = classifier
 
         if classifier is None:
@@ -207,7 +209,6 @@ class PixelClassificationWorkflow(JsonSerializable):
                 data["FeatureSelections"], num_input_channels=num_input_channels
             ),
             classifier=IlpVigraPixelClassifier.from_ilp_data(data["PixelClassification"]["ClassifierForests"]),
-            annotations=[],  # FIXME
         )
 
     def add_lane(self, lane: DataLane):
@@ -331,7 +332,7 @@ class PixelClassificationWorkflow(JsonSerializable):
         }
 
     @property
-    def ilp_file(self) -> io.BytesIO:
+    def ilp_file(self) -> io.BufferedIOBase:
         project, backing_file = Project.from_ilp_data(self.ilp_data)
         project.close()
         backing_file.seek(0)
@@ -342,10 +343,12 @@ class PixelClassificationWorkflow(JsonSerializable):
             raise RuntimeError("Classifier is not trained yet")
 
         project_file = self.ilp_file
+        project_file.seek(0)
+        project_bytes = project_file.read()
 
         file_response = requests.post(
             "https://web.ilastik.org/v1/files/",
-            data=self.ilp_file.getvalue(),
+            data=project_bytes,
             headers={
                 "Authorization": f"Token {cloud_ilastik_token}",
                 "Content-Disposition": f'attachment; filename="{project_name}"',

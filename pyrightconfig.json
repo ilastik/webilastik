@@ -1,8 +1,8 @@
 {
-  "venvPath": "/home/tomaz/miniconda3/envs",
-  "venv": "webilastik",
 
-  "strict": true,
+  "typeCheckingMode": "basic",
+  "reportUnknownMemberType": false,
+  "reportIncompatibleMethodOverride": true,
 
   "pythonVersion": "3.7",
   "pythonPlatform": "Linux"
