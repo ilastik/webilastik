@@ -113,8 +113,23 @@ class Applet(ABC):
         output_slots: List["Slot"],
     ):
         self.output_slots = output_slots
+        self.ancestors : Set[Applet] = {in_slot.owner for in_slot in input_slots}
         for input_slot in input_slots:
+            self.ancestors.update(input_slot.owner.ancestors)
             input_slot.subscribe(self)
+
+    def get_descendants(self) -> Set["Applet"]:
+        out : Set[Applet] = set()
+        for output_slot in self.output_slots:
+            out.update(output_slot.downstream_applets)
+        return out
+
+    def __lt__(self, other: "Applet") -> bool:
+        return self in other.ancestors
+
+    def refresh(self, confirmer: CONFIRMER):
+        for output_slot in self.output_slots:
+            output_slot.refresh(confirmer)
 
 
 class FeatureSelectionApplet(Applet):
