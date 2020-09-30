@@ -14,6 +14,7 @@ conda create -n webilastik -c ilastik-forge -c conda-forge \
     typing_extensions \
     flask \
     flask-cors \
+    requests \
     ipython \
     #dask \
     #dask-image \
