@@ -35,7 +35,7 @@ class Color:
         if len(channels) == 0 or len(channels) > 4:
             raise ValueError(f"Cannnot create color from {channels}")
         if len(channels) == 1:
-            channels = (channels[0] * 3) + [255]
+            channels = [channels[0], channels[0], channels[0], np.uint8(255)]
         return cls(r=channels[0], g=channels[1], b=channels[2], a=channels[3], name=name)
 
     @property
