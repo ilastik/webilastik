@@ -56,7 +56,7 @@ parser.add_argument(
 parser.add_argument(
     "--num-workers", required=False, type=int, default=8, help="Number of process workers to run predictions"
 )
-parser.add_argument("--orchestrator", required=True, choices=["mpi", "thread-pool", "process-pool"])
+parser.add_argument("--orchestrator", required=True, choices=["sequential", "thread-pool", "process-pool"])
 args = parser.parse_args()
 
 
@@ -93,30 +93,17 @@ classifier = pickle.loads(pickled_classifier)
 
 predictions = classifier.allocate_predictions(datasource.roi)
 
+if args.orchestrator == "sequential":
+    def do_predict(datasource_slc: DataSourceSlice):
+        print(f">>>>>>>> Predicting on {datasource_slc.roi}")
+        pred_tile = classifier.predict(datasource_slc)
+        print(f"<<<<<<<< DONE Predicting on {datasource_slc.roi}")
+        predictions.set(pred_tile)
 
-if args.orchestrator == "mpi":
-    from lazyflow.distributed.TaskOrchestrator import TaskOrchestrator
+    for datasource_slc in DataSourceSlice(datasource).split():
+        do_predict(datasource_slc)
 
-    orchestrator = TaskOrchestrator()
-    if orchestrator.rank != 0:
-
-        def do_predict(slc: Slice5D, rank: int):
-            print(f">>>>>>>> Predicting on {slc}")
-            data_source_slice = DataSourceSlice(datasource, **slc.to_dict())
-            prediction_tile = classifier.predict(data_source_slice)
-            print(f">>>>>>>> Predicting on {slc}")
-            return prediction_tile
-
-        orchestrator.start_as_worker(do_predict)
-        exit(0)
-
-    def collect_predictions(prediction_tile: Predictions):
-        predictions.set(prediction_tile)
-
-    slc_generator = (raw_tile for raw_tile in datasource.roi.split(datasource.tile_shape))
-    orchestrator.orchestrate(slc_generator, collector=collect_predictions)
 elif args.orchestrator == "thread-pool":
-
     def do_predict(datasource_slc: DataSourceSlice):
         print(f">>>>>>>> Predicting on {datasource_slc.roi}")
         pred_tile = classifier.predict(datasource_slc)
@@ -126,8 +113,8 @@ elif args.orchestrator == "thread-pool":
     with ThreadPoolExecutor(max_workers=args.num_workers) as executor:
         for datasource_slc in DataSourceSlice(datasource).split():
             executor.submit(do_predict, datasource_slc)
-elif args.orchestrator == "process-pool":
 
+elif args.orchestrator == "process-pool":
     def do_predict(slice_batch: Tuple[PixelClassifier, Sequence[DataSourceSlice]]):
         print(f"Stating batch with {len(slice_batch[1])} items")
         classifier = slice_batch[0]
