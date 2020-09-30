@@ -7,6 +7,7 @@ from ndstructs.utils import from_json_data, Dereferencer
 
 
 from .feature_extractor import ChannelwiseFilter
+from webilastik.operator import Operator
 
 
 FE = TypeVar("FE", bound="IlpFilter")
@@ -15,6 +16,9 @@ FE = TypeVar("FE", bound="IlpFilter")
 class IlpFilter(ChannelwiseFilter):
     REGISTRY: ClassVar[Dict[str, Type[FE]]] = {}
 
+    def get_expected_dtype(self, input_dtype: np.dtype) -> np.dtype:
+        return np.dtype("float32")
+
     @property
     @abstractmethod
     def ilp_scale(self) -> float:
@@ -22,7 +26,9 @@ class IlpFilter(ChannelwiseFilter):
 
     @classmethod
     @abstractmethod
-    def from_ilp_scale(cls: Type[FE], *, scale: float, num_input_channels:int, axis_2d: Optional[str] = None) -> FE:
+    def from_ilp_scale(
+        cls: Type[FE], *, preprocessor: Optional[Operator] = None, scale: float, num_input_channels:int, axis_2d: Optional[str] = None
+    ) -> FE:
         pass
 
     @property

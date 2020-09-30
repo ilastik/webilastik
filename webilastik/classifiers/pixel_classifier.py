@@ -14,6 +14,7 @@ from ndstructs import Array5D, Slice5D, Point5D, Shape5D
 from webilastik.features.feature_extractor import FeatureExtractor, FeatureData, ChannelwiseFilter
 from webilastik.features.feature_extractor import FeatureExtractorCollection
 from webilastik.annotations import Annotation, FeatureSamples, Color
+from webilastik.operator import Operator
 from ndstructs.datasource import DataSourceSlice, DataSource
 from ndstructs.utils import JsonSerializable, from_json_data, Dereferencer
 
@@ -73,7 +74,7 @@ class TrainingData:
         assert self.X.shape[0] == self.y.shape[0]
 
 
-class PixelClassifier(JsonSerializable):
+class PixelClassifier(Operator, JsonSerializable):
     def __init__(
         self,
         *,
@@ -107,29 +108,12 @@ class PixelClassifier(JsonSerializable):
             self.feature_extractor.ensure_applicable(data_slice.datasource)
         return self._do_predict(data_slice=data_slice, out=out)
 
+    def compute(self, roi: DataSourceSlice) -> Array5D:
+        return self.predict(roi)
+
     @abstractmethod
     def _do_predict(self, data_slice: DataSourceSlice, out: Predictions = None) -> Predictions:
         pass
-
-
-class PixelClassifierDataSource(DataSource):
-    def __init__(self, classifier: PixelClassifier, raw_datasource: DataSource):
-        expected_roi = classifier.get_expected_roi(raw_datasource.roi)
-        super().__init__(
-            url=f"classification of {raw_datasource} via {classifier.__class__.__name__}",
-            tile_shape=raw_datasource.tile_shape,
-            dtype=np.dtype("float32"),
-            name=f"PixelClassifierDataSource[{raw_datasource.name}]",
-            shape=expected_roi.shape,
-            location=expected_roi.start,
-        )
-        self.classifier = classifier
-        self.raw_datasource = raw_datasource
-
-    def _get_tile(self, tile: Slice5D) -> Predictions:
-        raw_slice = tile.with_coord(c=self.raw_datasource.roi.c)
-        data_slice = DataSourceSlice(datasource=self.raw_datasource, **raw_slice.to_dict())
-        return self.classifier.predict(data_slice)
 
 
 class ScikitLearnPixelClassifier(PixelClassifier):
@@ -166,6 +150,9 @@ class ScikitLearnPixelClassifier(PixelClassifier):
             color_map=training_data.color_map,
         )
 
+    def get_expected_dtype(self, input_dtype: np.dtype) -> np.dtype:
+        return np.dtype("float32")
+
     @classmethod
     def from_json_data(cls, data: dict, dereferencer: Optional[Dereferencer] = None) -> "ScikitLearnPixelClassifier":
         return from_json_data(cls.train, data, dereferencer=dereferencer)
@@ -196,6 +183,9 @@ class VigraPixelClassifier(PixelClassifier):
         super().__init__(classes=classes, feature_extractors=feature_extractors, strict=strict, color_map=color_map)
         self.forests = forests
         self.num_trees = sum(f.treeCount() for f in forests)
+
+    def get_expected_dtype(self, input_dtype: np.dtype) -> np.dtype:
+        return np.dtype("float32")
 
     @classmethod
     def train(

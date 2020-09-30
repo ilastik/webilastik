@@ -9,6 +9,7 @@ from ndstructs import Array5D
 from ndstructs.datasource import DataSource, DataSourceSlice
 from ndstructs.utils import JsonSerializable
 
+from webilastik.operator import Operator
 
 class FeatureData(Array5D):
     def __init__(self, *args, **kwargs):
@@ -25,7 +26,7 @@ class FeatureDataMismatchException(Exception):
         super().__init__(f"Feature {feature_extractor} can't be cleanly applied to {data_source}")
 
 
-class FeatureExtractor(JsonSerializable):
+class FeatureExtractor(Operator, JsonSerializable):
     """A specification of how feature data is to be (reproducibly) computed"""
 
     def __hash__(self):
@@ -88,6 +89,15 @@ class ChannelwiseFilter(FeatureExtractor):
         "Number of channels emited by this feature extractor for each input channel"
         return 1
 
+    def get_expected_roi(self, data_slice: Slice5D) -> Slice5D:
+        num_input_channels = data_slice.shape.c
+        expected_roi_c = slice(
+            data_slice.c.start * self.channel_multiplier,
+            (data_slice.c.start + num_input_channels) * self.channel_multiplier
+        )
+        return data_slice.with_coord(c=expected_roi_c)
+
+    #FIXME: use get_expected_roi instead
     def get_expected_shape(self, input_shape: Shape5D) -> Shape5D:
         return input_shape.with_coord(c=input_shape.c * self.channel_multiplier)
 
@@ -123,6 +133,16 @@ class FeatureExtractorCollection(FeatureExtractor):
             shape_params[label] = max(f.kernel_shape[label] for f in extractors)
         self._kernel_shape = Shape5D(**shape_params)
 
+    def get_expected_roi(self, data_slice: Slice5D) -> Slice5D:
+        num_output_channels = sum(fx.get_expected_roi(data_slice).shape.c for fx in self.extractors)
+        expected_c_offset = (data_slice.start.c / data_slice.shape.c) * num_output_channels
+        roi_c = slice(expected_c_offset, expected_c_offset + num_output_channels)
+        return data_slice.with_coord(c=roi_c)
+
+    def get_expected_dtype(self, input_dtype: np.dtype) -> np.dtype:
+        #FIXME: what if one of the feature extractors outputs a different dtype?
+        return self.extractors[0].get_expected_dtype(input_dtype)
+
     def __repr__(self):
         return f"<{self.__class__.__name__} {[repr(f) for f in self.extractors]}>"
 
@@ -130,6 +150,7 @@ class FeatureExtractorCollection(FeatureExtractor):
     def kernel_shape(self):
         return self._kernel_shape
 
+    #FIXME: use get_expected_roi instead
     def get_expected_shape(self, input_shape: Shape5D) -> Shape5D:
         expected_c = sum(fx.get_expected_shape(input_shape).c for fx in self.extractors)
         return input_shape.with_coord(c=expected_c)

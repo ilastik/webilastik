@@ -8,6 +8,7 @@ import numpy
 
 from .feature_extractor import FeatureData
 from .ilp_filter import IlpFilter
+from webilastik.operator import Operator
 from ndstructs import Array5D, Image, ScalarImage
 from ndstructs import Point5D, Slice5D, Shape5D
 from ndstructs.datasource import DataSource, DataSourceSlice
@@ -15,7 +16,15 @@ from ndstructs.utils import from_json_data, Dereferencer
 
 
 class ChannelwiseFastFilter(IlpFilter):
-    def __init__(self, *, num_input_channels: int, axis_2d: Optional[str] = None, presmooth_sigma: float = 0):
+    def __init__(
+        self,
+        *,
+        preprocessor: Optional[Operator] = None,
+        num_input_channels: int,
+        axis_2d: Optional[str] = None,
+        presmooth_sigma: float = 0
+    ):
+        self.preprocessor = preprocessor
         self.presmooth_sigma = presmooth_sigma
         super().__init__(axis_2d=axis_2d, num_input_channels=num_input_channels)
 
@@ -62,11 +71,11 @@ class ChannelwiseFastFilter(IlpFilter):
         haloed_roi = source_roi.enlarged(self.halo)
         if self.presmooth_sigma > 0:
             gaussian_filter = GaussianSmoothing(
-                sigma=self.presmooth_sigma, axis_2d=self.axis_2d, window_size=3.5, num_input_channels=1
+                preprocessor=self.preprocessor, sigma=self.presmooth_sigma, axis_2d=self.axis_2d, window_size=3.5, num_input_channels=1
             )
             source_data = gaussian_filter.compute(haloed_roi)
         else:
-            source_data = haloed_roi.retrieve()
+            source_data = self.preprocessor.compute(haloed_roi) if self.preprocessor else haloed_roi.retrieve()
 
         source_axes = "zyx"
         if self.axis_2d:
@@ -85,6 +94,7 @@ class StructureTensorEigenvalues(ChannelwiseFastFilter):
     def __init__(
         self,
         *,
+        preprocessor: Optional[Operator] = None,
         innerScale: float,
         outerScale: float,
         num_input_channels: int,
@@ -92,7 +102,9 @@ class StructureTensorEigenvalues(ChannelwiseFastFilter):
         axis_2d: Optional[str] = None,
         presmooth_sigma: float = 0,
     ):
-        super().__init__(axis_2d=axis_2d, num_input_channels=num_input_channels, presmooth_sigma=presmooth_sigma)
+        super().__init__(
+            preprocessor=preprocessor, axis_2d=axis_2d, num_input_channels=num_input_channels, presmooth_sigma=presmooth_sigma
+        )
         self.innerScale = innerScale
         self.outerScale = outerScale
         self.window_size = window_size
@@ -108,10 +120,11 @@ class StructureTensorEigenvalues(ChannelwiseFastFilter):
 
     @classmethod
     def from_ilp_scale(
-        cls, *, scale: float, num_input_channels: int, axis_2d: Optional[str] = None
+        cls, *, preprocessor: Optional[Operator] = None, scale: float, num_input_channels: int, axis_2d: Optional[str] = None
     ) -> "StructureTensorEigenvalues":
         capped_scale = min(scale, 1.0)
         return cls(
+            preprocessor=preprocessor,
             innerScale=capped_scale,
             outerScale=0.5 * capped_scale,
             axis_2d=axis_2d,
@@ -134,6 +147,7 @@ class SigmaWindowFilter(ChannelwiseFastFilter):
     def __init__(
         self,
         *,
+        preprocessor: Optional[Operator] = None,
         sigma: float,
         num_input_channels: int,
         window_size: float = 0,
@@ -146,9 +160,10 @@ class SigmaWindowFilter(ChannelwiseFastFilter):
 
     @classmethod
     def from_ilp_scale(
-        cls: SigmaFilter, *, scale: float, num_input_channels: int, axis_2d: Optional[str] = None
+        cls: SigmaFilter, *, preprocessor: Optional[Operator] = None, scale: float, num_input_channels: int, axis_2d: Optional[str] = None
     ) -> SigmaFilter:
         return cls(
+            preprocessor=preprocessor,
             sigma=min(scale, 1.0),
             axis_2d=axis_2d,
             num_input_channels=num_input_channels,
@@ -180,6 +195,7 @@ class DifferenceOfGaussians(ChannelwiseFastFilter):
     def __init__(
         self,
         *,
+        preprocessor: Optional[Operator] = None,
         sigma0: float,
         sigma1: float,
         num_input_channels: int,
@@ -187,7 +203,9 @@ class DifferenceOfGaussians(ChannelwiseFastFilter):
         axis_2d: Optional[str] = None,
         presmooth_sigma: float = 0,
     ):
-        super().__init__(axis_2d=axis_2d, num_input_channels=num_input_channels, presmooth_sigma=presmooth_sigma)
+        super().__init__(
+            preprocessor=preprocessor, axis_2d=axis_2d, num_input_channels=num_input_channels, presmooth_sigma=presmooth_sigma
+        )
         self.sigma0 = sigma0
         self.sigma1 = sigma1
         self.window_size = window_size
@@ -202,10 +220,11 @@ class DifferenceOfGaussians(ChannelwiseFastFilter):
 
     @classmethod
     def from_ilp_scale(
-        cls, *, scale: float, num_input_channels: int, axis_2d: Optional[str] = None
+        cls, *, preprocessor: Optional[Operator] = None, scale: float, num_input_channels: int, axis_2d: Optional[str] = None
     ) -> "DifferenceOfGaussians":
         capped_scale = min(scale, 1.0)
         return cls(
+            preprocessor=preprocessor,
             sigma0=capped_scale,
             sigma1=capped_scale * 0.66,
             axis_2d=axis_2d,
@@ -228,21 +247,25 @@ class ScaleWindowFilter(ChannelwiseFastFilter):
     def __init__(
         self,
         *,
+        preprocessor: Optional[Operator] = None,
         scale: float,
         num_input_channels: int,
         window_size: float = 0,
         axis_2d: Optional[str] = None,
         presmooth_sigma: float = 0,
     ):
-        super().__init__(axis_2d=axis_2d, num_input_channels=num_input_channels, presmooth_sigma=presmooth_sigma)
+        super().__init__(
+            preprocessor=preprocessor, axis_2d=axis_2d, num_input_channels=num_input_channels, presmooth_sigma=presmooth_sigma
+        )
         self.scale = scale
         self.window_size = window_size
 
     @classmethod
     def from_ilp_scale(
-        cls: ScaleFilter, *, scale: float, num_input_channels: int, axis_2d: Optional[str] = None
+        cls: ScaleFilter, *, preprocessor: Optional[Operator] = None, scale: float, num_input_channels: int, axis_2d: Optional[str] = None
     ) -> ScaleFilter:
         return cls(
+            preprocessor=preprocessor,
             scale=min(scale, 1.0),
             axis_2d=axis_2d,
             num_input_channels=num_input_channels,

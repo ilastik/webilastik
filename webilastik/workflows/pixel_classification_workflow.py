@@ -16,7 +16,7 @@ from ndstructs.datasink import N5DataSink
 from ndstructs.utils import JsonSerializable, to_json_data, Dereferencer, Referencer
 
 from webilastik import Project
-from webilastik.classifiers.pixel_classifier import PixelClassifierDataSource, Predictions
+from webilastik.classifiers.pixel_classifier import Predictions
 from webilastik.classifiers.ilp_pixel_classifier import IlpVigraPixelClassifier
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.annotations import Annotation, Color
@@ -396,7 +396,7 @@ class PixelClassificationWorkflow(JsonSerializable):
         classifier = IlpVigraPixelClassifier.from_ilp_group(ilp["PixelClassification/ClassifierForests"])
         for raw_path in args.raw_data:
             datasource = DataSource.create(raw_path.as_posix())
-            predictions_datasource = PixelClassifierDataSource(classifier=classifier, raw_datasource=datasource)
+            predictions_datasource = classifier.as_datasource(datasource)
             data_slice = DataSourceSlice(
                 datasource=predictions_datasource, x=args.roi_x, y=args.roi_y, z=args.roi_z, t=args.roi_t, c=args.roi_c
             )
