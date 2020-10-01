@@ -80,7 +80,7 @@ class ConnectedComponents(ScalarData):
             labeled_raw, axiskeys=Point5D.LABELS, location=self.location, labels=center_roi_labels
         )
 
-class ConnectedComponentsExtractor:
+class ConnectedComponentsExtractor(Operator):
     def __init__(
         self,
         *,
@@ -109,3 +109,6 @@ class ConnectedComponentsExtractor:
                 break
             current_roi = current_roi.enlarged(radius=expansion_step).clamped(roi.full())
         return connected_comps.clean(roi)
+
+    def get_expected_dtype(self, input_dtype: np.dtype) -> np.dtype:
+        return np.dtype("int64")
