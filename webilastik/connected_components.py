@@ -5,7 +5,7 @@ from skimage import measure as skmeasure
 from ndstructs import Array5D, Slice5D, Shape5D, ScalarData, Point5D
 from ndstructs.datasource import DataSourceSlice
 
-from webilastik.operator import Operator
+from webilastik.operator import NoopOperator, Operator
 
 
 class ConnectedComponents(ScalarData):
@@ -84,7 +84,7 @@ class ConnectedComponentsExtractor(Operator):
     def __init__(
         self,
         *,
-        preprocessor: Optional[Operator] = None,
+        preprocessor: Operator = NoopOperator(),
         object_channel_idx: int,
         expansion_step: Optional[Point5D] = None
     ):

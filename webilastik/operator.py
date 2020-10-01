@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Optional
 
 import numpy as np
 
@@ -14,3 +15,10 @@ class Operator(ABC):
     @abstractmethod
     def get_expected_dtype(self, input_dtype: np.dtype) -> np.dtype:
         pass
+
+class NoopOperator(Operator):
+    def compute(self, roi: DataSourceSlice) -> Array5D:
+        return roi.retrieve()
+
+    def get_expected_dtype(self, input_dtype: np.dtype) -> np.dtype:
+        return input_dtype
