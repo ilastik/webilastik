@@ -3,6 +3,7 @@
   "typeCheckingMode": "basic",
   "reportUnknownMemberType": false,
   "reportIncompatibleMethodOverride": true,
+  "reportMissingTypeArgument": true,
 
   "pythonVersion": "3.7",
   "pythonPlatform": "Linux"
