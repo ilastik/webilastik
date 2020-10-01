@@ -2,8 +2,10 @@ import numpy as np
 from typing import Optional, Set
 
 from skimage import measure as skmeasure
-from ndstructs import Array5D, StaticLine, Slice5D, ScalarData, Point5D
-from ndstructs.datasource import DataSourceSlice, DataSource
+from ndstructs import Array5D, Slice5D, Shape5D, ScalarData, Point5D
+from ndstructs.datasource import DataSourceSlice
+
+from webilastik.operator import Operator
 
 
 class ConnectedComponents(ScalarData):
@@ -78,19 +80,16 @@ class ConnectedComponents(ScalarData):
             labeled_raw, axiskeys=Point5D.LABELS, location=self.location, labels=center_roi_labels
         )
 
-
-class Thresholder:
-    def __init__(self, threshold: float):
-        self.threshold = threshold
-
-    def compute(self, roi: DataSourceSlice) -> ScalarData:
-        return roi.retrieve().threshold(self.threshold)
-
-
 class ConnectedComponentsExtractor:
-    def __init__(self, *, object_channel_idx: int, thresholder: Thresholder, expansion_step: Optional[Point5D] = None):
+    def __init__(
+        self,
+        *,
+        preprocessor: Optional[Operator] = None,
+        object_channel_idx: int,
+        expansion_step: Optional[Point5D] = None
+    ):
+        self.preprocessor = preprocessor
         self.object_channel_idx = object_channel_idx
-        self.thresholder = thresholder
         self.expansion_step = expansion_step
 
     def compute(self, roi: DataSourceSlice) -> ConnectedComponents:
@@ -99,7 +98,10 @@ class ConnectedComponentsExtractor:
 
         current_roi = roi
         while True:
-            thresholded_data: ScalarData = self.thresholder.compute(current_roi)
+            if self.preprocessor:
+                thresholded_data: ScalarData = self.preprocessor.compute(current_roi)
+            else:
+                thresholded_data: ScalarData = current_roi.retrieve()
             connected_comps = ConnectedComponents.label(thresholded_data)
             if connected_comps.fully_contains_objects_in(roi):
                 break

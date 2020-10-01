@@ -11,25 +11,29 @@ import sys
 print(sys.path)
 
 from webilastik.classifiers.object_classifier import ObjectClassifier
-from webilastik.classifiers.connected_components import Thresholder, ConnectedComponentsExtractor
+from webilastik.connected_components import ConnectedComponentsExtractor
+from webilastik.thresholder import Thresholder
 from webilastik.features.object_feature_extractor import array5d_to_vigra, VigraObjectFeatureExtractor
 from webilastik.annotations.object_annotation import ObjectAnnotation
 
 
+
+thresholder_op = Thresholder(threshold=30)
 comps_op = ConnectedComponentsExtractor(
-    object_channel_idx=0, thresholder=Thresholder(30), expansion_step=Point5D(x=10, y=10)
+    preprocessor=thresholder_op, object_channel_idx=0, expansion_step=Point5D(x=10, y=10)
 )
 
-# ds = DataSource.create(Path("/home/tomaz/SampleData/c_cells/cropped/cropped1.png"))
+
 
 COLOR_ALIVE = 111
 COLOR_DEAD = 222
 
 ds = SkimageDataSource(
-    Path("/home/tomaz/SampleData/2d_cells_apoptotic_1c/2d_cells_apoptotic_1c.png"),
+    Path("sample_data/2d_cells_apoptotic_1c.png").absolute(),
     filesystem=OSFS("/"),
     tile_shape=Shape5D(x=100, y=100),
 )
+
 
 annotations = [
     ObjectAnnotation(

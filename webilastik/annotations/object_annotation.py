@@ -7,7 +7,7 @@ import numpy as np
 import vigra
 
 from webilastik.features.object_feature_extractor import array5d_to_vigra, ObjectFeatureExtractor
-from webilastik.classifiers.connected_components import ConnectedComponentsExtractor
+from webilastik.connected_components import ConnectedComponentsExtractor
 
 
 class ObjectAnnotation:

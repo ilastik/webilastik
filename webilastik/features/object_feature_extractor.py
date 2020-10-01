@@ -6,7 +6,7 @@ import vigra
 from ndstructs import Array5D, Point5D, ScalarData
 from ndstructs.datasource import DataSource, DataSourceSlice
 
-from webilastik.classifiers.connected_components import ConnectedComponentsExtractor, ConnectedComponents
+from webilastik.connected_components import ConnectedComponentsExtractor
 
 
 def array5d_to_vigra(arr: Array5D, axiskeys: str):
