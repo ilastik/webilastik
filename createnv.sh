@@ -18,6 +18,7 @@ conda create -n ${ENVIRONMENT_NAME} -c ilastik-forge -c conda-forge \
     flask \
     flask-cors \
     requests \
+    pytest \
     ipython \
 
 export YELLOW="\e[33m"
