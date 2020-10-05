@@ -12,10 +12,11 @@ CONFIRMER = Callable[[str], bool]
 def noop_confirmer(msg: str) -> bool:
     return True
 
-SV = TypeVar('SV')
+SV = TypeVar('SV', covariant=True)
 class Slot(Generic[SV]):
-    def __init__(self, *, owner: "Applet", value: Optional[SV] = None):
+    def __init__(self, *, owner: "Applet", value: Optional[SV] = None, refresher: Callable[[CONFIRMER], Optional[SV]]):
         self.owner = owner
+        self.refresher = refresher
         self.subscribers : List["Applet"] = []
         self._value : Optional[SV] = value
 
@@ -36,12 +37,24 @@ class Slot(Generic[SV]):
         self.subscribers.append(applet)
 
     def refresh(self, confirmer: CONFIRMER):
-        pass
+        self._value = self.refresher(confirmer)
 
     def __call__(self) -> Optional[SV]:
         return self._value
 
 class ValueSlot(Slot[SV]):
+    def __init__(
+        self,
+        *,
+        owner: "Applet",
+        value: Optional[SV] = None,
+        refresher: Optional[Callable[[CONFIRMER], Optional[SV]]] = None
+    ):
+        def dummy_refresher(confirmer: CONFIRMER):
+            return self._value
+
+        super().__init__(owner=owner, value=value, refresher=refresher or dummy_refresher)
+
     def set_value(self, new_value: Optional[SV], confirmer: CONFIRMER):
         old_value = self._value
         self._value = new_value
@@ -58,11 +71,7 @@ class ValueSlot(Slot[SV]):
 
 class DerivedSlot(Slot[SV]):
     def __init__(self, owner: "Applet", value_generator: Callable[[CONFIRMER], Optional[SV]]):
-        super().__init__(owner=owner)
-        self.value_generator = value_generator
-
-    def refresh(self, confirmer: CONFIRMER):
-        self._value = self.value_generator(confirmer)
+        super().__init__(owner=owner, refresher=value_generator)
 
 
 class Applet(ABC):
@@ -81,7 +90,7 @@ class Applet(ABC):
         for borrowed_slot in self.borrowed_slots:
             self.upstream_applets.update(borrowed_slot.owner.upstream_applets)
             borrowed_slot.subscribe(self)
-        self.refresh_derived_slots(confirmer=lambda msg: True)
+        #self.refresh_derived_slots(confirmer=lambda msg: True)
 
     def get_downstream_applets(self) -> List["Applet"]:
         """Returns a list of the topologically sorted descendants of this applet"""
@@ -103,5 +112,4 @@ class Applet(ABC):
     @typing_extensions.final
     def refresh_derived_slots(self, confirmer: CONFIRMER):
         for slot in self.owned_slots:
-            if isinstance(slot, DerivedSlot):
-                slot.refresh(confirmer)
+            slot.refresh(confirmer)

@@ -30,8 +30,11 @@ def test_applet_dirty_propagation():
                     raise CancelledException("User gave up")
             return int(thresh * 1000)
 
-    thresh_app = ThresholdingApplet(20)
+    thresh_app = ThresholdingApplet()
     components_app = ConnectedCompsApplet(threshold=thresh_app.threshold)
+
+    thresh_app.threshold.set_value(20, confirmer=lambda msg: True)
+
     assert components_app.number_of_objects() == 20000
 
     #gui sets some threshold
