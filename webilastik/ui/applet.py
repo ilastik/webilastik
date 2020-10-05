@@ -66,10 +66,19 @@ class DerivedSlot(Slot[SV]):
 
 
 class Applet(ABC):
-    def __init__(self, *, borrowed_slots: List["Slot"], owned_slots: List["Slot"]):
-        self.owned_slots = owned_slots
-        self.upstream_applets : Set[Applet] = {in_slot.owner for in_slot in borrowed_slots}
-        for borrowed_slot in borrowed_slots:
+    def __init__(self):
+        self.owned_slots = [
+            slot
+            for slot in self.__dict__.values()
+            if isinstance(slot, Slot) and slot.owner == self
+        ]
+        self.borrowed_slots = [
+            slot
+            for slot in self.__dict__.values()
+            if isinstance(slot, Slot) and slot.owner != self
+        ]
+        self.upstream_applets : Set[Applet] = {in_slot.owner for in_slot in self.borrowed_slots}
+        for borrowed_slot in self.borrowed_slots:
             self.upstream_applets.update(borrowed_slot.owner.upstream_applets)
             borrowed_slot.subscribe(self)
         self.refresh_derived_slots(confirmer=lambda msg: True)
