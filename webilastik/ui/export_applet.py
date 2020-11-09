@@ -9,19 +9,20 @@ from webilastik.features.ilp_filter import IlpFilter
 from webilastik.classifiers.pixel_classifier import PixelClassifier, VigraPixelClassifier
 
 class ExportApplet(Applet):
-    def __init__(self, operator: Slot[Operator], datasources: Slot[List[DataSource]]):
-        self.operator = operator
+    """Exports the outputs of an operator created by an upstream applet."""
+    def __init__(self, producer: Slot[Operator], datasources: Slot[List[DataSource]]):
+        self.producer = producer
         self.datasources = datasources
         super().__init__()
 
     def export_all(self) -> None:
-        operator = self.operator()
-        if not operator:
-            raise ValueError("No operator from upstream")
+        producer_op = self.producer()
+        if not producer_op:
+            raise ValueError("No producer from upstream")
         for ds in self.datasources() or []:
             #FIXME: get format/mapper/orchestrator/scheduler/whatever from slots or method args
             data_slice = DataSourceSlice(ds)
             for slc in data_slice.get_tiles():
                 #FIXME save this with a DataSink
-                print(f"Computing on {data_slice} with operator {operator}")
-                operator.compute(slc)
+                print(f"Computing on {data_slice} with producer {producer_op}")
+                producer_op.compute(slc)

@@ -12,7 +12,7 @@ class PixelClassificationWorkflow:
             feature_extractors=self.feature_selection_applet.feature_extractors,
             annotations=self.annotations_applet.annotations
         )
-        self.export_applet = ExportApplet(
+        self.predictions_export_applet = ExportApplet(
             datasources=self.data_selection_applet.datasources,
-            operator=self.pixel_classifier_applet.pixel_classifier
+            producer=self.pixel_classifier_applet.pixel_classifier
         )

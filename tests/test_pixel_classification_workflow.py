@@ -32,43 +32,44 @@ def test_pixel_classification_workflow():
     wf.feature_selection_applet.add_feature_extractors(extractors, confirmer=dummy_confirmer)
 
     # GUI creates some annotations
-    annotations = [
-        Annotation.interpolate_from_points(
-            color=Color(r=np.uint8(255)),
-            voxels=[
-                Point5D.zero(x=760, y=266),
-                Point5D.zero(x=761, y=267),
-            ],
-            raw_data=ds
-        ),
-        Annotation.interpolate_from_points(
-            color=Color(r=np.uint8(255)),
-            voxels=[
-                Point5D.zero(x=432, y=633),
-                Point5D.zero(x=433, y=634)
-            ],
-            raw_data=ds
-        ),
+    wf.annotations_applet.add_annotations(
+        [
+            Annotation.interpolate_from_points(
+                color=Color(r=np.uint8(255)),
+                voxels=[
+                    Point5D.zero(x=760, y=266),
+                    Point5D.zero(x=761, y=267),
+                ],
+                raw_data=ds
+            ),
+            Annotation.interpolate_from_points(
+                color=Color(r=np.uint8(255)),
+                voxels=[
+                    Point5D.zero(x=432, y=633),
+                    Point5D.zero(x=433, y=634)
+                ],
+                raw_data=ds
+            ),
 
-        Annotation.interpolate_from_points(
-            color=Color(g=np.uint8(255)),
-            voxels=[
-                Point5D.zero(x=1028, y=325),
-                Point5D.zero(x=1029, y=326)
-            ],
-            raw_data=ds
-        ),
-        Annotation.interpolate_from_points(
-            color=Color(g=np.uint8(255)),
-            voxels=[
-                Point5D.zero(x=234, y=238),
-                Point5D.zero(x=235, y=239)
-            ],
-            raw_data=ds
-        ),
-    ]
-
-    wf.annotations_applet.add_annotations(annotations, confirmer=dummy_confirmer)
+            Annotation.interpolate_from_points(
+                color=Color(g=np.uint8(255)),
+                voxels=[
+                    Point5D.zero(x=1028, y=325),
+                    Point5D.zero(x=1029, y=326)
+                ],
+                raw_data=ds
+            ),
+            Annotation.interpolate_from_points(
+                color=Color(g=np.uint8(255)),
+                voxels=[
+                    Point5D.zero(x=234, y=238),
+                    Point5D.zero(x=235, y=239)
+                ],
+                raw_data=ds
+            ),
+        ],
+        confirmer=dummy_confirmer
+    )
 
     # GUI clicks "export button"
-    wf.export_applet.export_all()
+    wf.predictions_export_applet.export_all()
