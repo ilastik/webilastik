@@ -13,7 +13,7 @@ from webilastik.ui.workflow.pixel_classification_workflow import PixelClassifica
 dummy_confirmer = lambda msg: True
 
 def crashing_confirmer(msg: str) -> bool:
-    raise ValueError("TTest failed! his was not supposed to be called!")
+    raise ValueError("Test failed! his was not supposed to be called!")
 
 def test_pixel_classification_workflow():
     wf = PixelClassificationWorkflow()
