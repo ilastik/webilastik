@@ -1,7 +1,9 @@
-from webilastik.ui.data_selection_applet import DataSelectionApplet
-from webilastik.ui.feature_selection_applet import FeatureSelectionApplet
-from webilastik.ui.pixel_classifier_applet import PixelAnnotationApplet, PixelClassificationApplet
-from webilastik.ui.export_applet import ExportApplet
+from ndstructs.datasource import DataSource
+
+from webilastik.ui.applet.data_selection_applet import DataSelectionApplet
+from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
+from webilastik.ui.applet.pixel_classifier_applet import PixelAnnotationApplet, PixelClassificationApplet
+from webilastik.ui.applet.export_applet import ExportApplet
 
 class PixelClassificationWorkflow:
     def __init__(self):
