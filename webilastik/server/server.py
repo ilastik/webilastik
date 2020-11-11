@@ -18,6 +18,7 @@ from ndstructs import Point5D, Slice5D, Shape5D, Array5D
 from ndstructs.datasource import DataSource, DataSourceSlice, SequenceDataSource, PrecomputedChunksDataSource
 from ndstructs.utils import JsonSerializable, from_json_data, to_json_data, JsonReference
 
+from webilastik.filesystem import HttpPyFs
 from webilastik.workflows.pixel_classification_workflow import PixelClassificationWorkflow
 from webilastik.server.pixel_classification_web_adapter import PixelClassificationWorkflow2WebAdapter
 from webilastik.features.feature_extractor import FeatureDataMismatchException
@@ -217,22 +218,42 @@ def get_predictions_shader(classifier_id: str):
 def ng_raw(datasource_id: str, xBegin: int, xEnd: int, yBegin: int, yEnd: int, zBegin: int, zEnd: int):
     requested_roi = Slice5D(x=slice(xBegin, xEnd), y=slice(yBegin, yEnd), z=slice(zBegin, zEnd))
     datasource = WebContext.load(datasource_id)
-    data = datasource.retrieve(requested_roi)
+    ds_url = datasource.url.lstrip("precomputed://").rstrip("/")
+    if isinstance(datasource, PrecomputedChunksDataSource) and urlparse(ds_url).netloc != get_base_netloc():
+        foreign_url = f"{ds_url}/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}"
+        return flask.redirect(foreign_url)
 
+    data = datasource.retrieve(requested_roi)
     resp = flask.make_response(data.raw("xyzc").tobytes("F"))
     resp.headers["Content-Type"] = "application/octet-stream"
     return resp
 
+def get_base_netloc() -> str:
+    host = request.headers.get("X-Forwarded-Host", args.host)
+    port = "" if "X-Forwarded-Host" in request.headers else f":{args.port}"
+    return f"{host}{port}"
 
 def get_base_url() -> str:
     protocol = request.headers.get("X-Forwarded-Proto", "http")
-    host = request.headers.get("X-Forwarded-Host", args.host)
-    port = "" if "X-Forwarded-Host" in request.headers else f":{args.port}"
+    netloc = get_base_netloc()
     prefix = request.headers.get("X-Forwarded-Prefix", "/")
-    return f"{protocol}://{host}{port}{prefix}"
+    return f"{protocol}://{netloc}{prefix}"
 
+def create_precomputed_chunks_datasource(url: str) -> PrecomputedChunksDataSource:
+    parsed_url = urlparse(url.lstrip("precomputed://"))
+    return PrecomputedChunksDataSource(
+        path=Path(parsed_url.path),
+        filesystem=HttpPyFs(parsed_url._replace(path="/").geturl())
+    )
 
-def get_sample_datasets() -> List[Dict]:
+@app.route("/open_remote", methods=["GET"])
+def open_remote():
+    url = request.args.get('url')
+    ds = create_precomputed_chunks_datasource(url)
+    WebContext.store(ds)
+    return flask.redirect(datasource_to_ng_url(ds))
+
+def datasource_to_ng_url(datasource: DataSource) -> str:
     rgb_shader = """void main() {
       emitRGB(vec3(
         toNormalized(getDataValue(0)),
@@ -247,26 +268,27 @@ def get_sample_datasets() -> List[Dict]:
     }
     """
     base_url = get_base_url()
-    links = []
-    for datasource in WebContext.get_all(DataSource):
-        datasource_id = WebContext.get_ref(datasource).to_str()
-        url_data = {
-            "layers": [
-                {
-                    "source": f"precomputed://{base_url}datasource/{datasource_id}",
-                    "type": "image",
-                    "blend": "default",
-                    "shader": grayscale_shader if datasource.shape.c == 1 else rgb_shader,
-                    "shaderControls": {},
-                    "name": datasource.name,
-                },
-                {"type": "annotation", "annotations": [], "voxelSize": [1, 1, 1], "name": "annotation"},
-            ],
-            "navigation": {"zoomFactor": 1},
-            "selectedLayer": {"layer": "annotation", "visible": True},
-            "layout": "xy",
-        }
-        yield {"url": f"{args.ngurl}#!" + urllib.parse.quote(str(json.dumps(url_data))), "name": datasource.name}
+    datasource_id = WebContext.get_ref(datasource).to_str()
+    url_data = {
+        "layers": [
+            {
+                "source": f"precomputed://{base_url}datasource/{datasource_id}",
+                "type": "image",
+                "blend": "default",
+                "shader": grayscale_shader if datasource.shape.c == 1 else rgb_shader,
+                "shaderControls": {},
+                "name": datasource.name,
+            },
+            {"type": "annotation", "annotations": [], "voxelSize": [1, 1, 1], "name": "annotation"},
+        ],
+        "navigation": {"zoomFactor": 1},
+        "selectedLayer": {"layer": "annotation", "visible": True},
+        "layout": "xy",
+    }
+    return f"{args.ngurl}#!" + urllib.parse.quote(str(json.dumps(url_data)))
+
+def get_sample_datasets() -> List[Dict]:
+    return [{"url": datasource_to_ng_url(ds), "name": ds.name} for ds in WebContext.get_all(DataSource)]
 
 
 @app.route("/datasets")
@@ -276,7 +298,7 @@ def get_datasets():
 
 @app.route("/neuroglancer-samples")
 def ng_samples():
-    link_tags = [f'<a href="{sample["url"]}">{sample["name"]}</a><br/>' for sample in get_sample_datasets()]
+    link_tags = [f'<a href="{datasource_to_ng_url(ds)}">{ds.name}</a><br/>' for ds in WebContext.get_all(DataSource)]
     links = "\n".join(link_tags)
     return f"""
         <html>
@@ -367,5 +389,11 @@ for sample_dir_path in args.sample_dirs or ():
             [_add_sample_datasource(dataset_path) for dataset_path in sample_path.iterdir() if dataset_path.is_dir()]
         if sample_path.is_file() and sample_path.suffix in (".png", ".jpg"):
             _add_sample_datasource(sample_path)
+
+WebContext.store(
+    create_precomputed_chunks_datasource(
+        "precomputed://https://neuroglancer.humanbrainproject.org/precomputed/BigBrainRelease.2015/8bit/20um"
+    )
+)
 
 app.run(host=args.host, port=args.port)
