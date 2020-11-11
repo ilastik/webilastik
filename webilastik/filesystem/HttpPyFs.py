@@ -28,9 +28,9 @@ class HttpPyFs(FS):
         parsed = urlparse(url)
         if parsed.scheme not in ("http", "https"):
             raise ValueError("Can only handle http procotols")
-        if not parsed.path:
-            parsed = urlparse(parsed.scheme + "://" + parsed.netloc + "/")
-        self.parsed_url = parsed
+        clean_path = Path(parsed.path or "/").resolve().as_posix()
+        self.parsed_url = parsed._replace(path=clean_path)
+        self.root_path = Path(self.parsed_url.path)
 
     def __getstate__(self) -> Dict[str, Any]:
         return {"url": self.url}
@@ -41,11 +41,12 @@ class HttpPyFs(FS):
     def desc(self, path: str) -> str:
         return self._make_full_path(path)
 
-    def _make_full_path(self, path: str, add_trailing_slash=False) -> str:
-        parsed_path = urlparse(path).path
-        clean_path = re.sub("^/", "", Path("/").joinpath(parsed_path).resolve(strict=False).as_posix())
-        full_path = Path(self.parsed_url.path).joinpath(clean_path).as_posix()
-        return f"{self.parsed_url.scheme}://{self.parsed_url.netloc}{full_path}"
+    def _make_full_path(self, path: str) -> str:
+        rel_path = urlparse(path).path.lstrip("/")
+        new_url = self.parsed_url._replace(
+            path=self.root_path.joinpath(rel_path).resolve(strict=False).as_posix()
+        )
+        return new_url.geturl()
 
     def _delete_object(self, path: str) -> None:
         full_path = self._make_full_path(path)
