@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Callable, Generic, TypeVar, Set, Dict, Any
+from typing import List, Sequence, Optional, Callable, Generic, TypeVar, Set, Dict, Any
 import typing_extensions
 
 
@@ -13,12 +13,25 @@ def noop_confirmer(msg: str) -> bool:
     return True
 
 SV = TypeVar('SV', covariant=True)
+SLOT_REFRESHER=Callable[[CONFIRMER], Optional[SV]]
 class Slot(Generic[SV]):
-    def __init__(self, *, owner: "Applet", value: Optional[SV] = None, refresher: Callable[[CONFIRMER], Optional[SV]]):
+    def __init__(
+        self,
+        *,
+        owner: "Applet",
+        value: Optional[SV] = None,
+        refresher: Optional[SLOT_REFRESHER]=None,
+    ):
         self.owner = owner
         self.refresher = refresher
         self.subscribers : List["Applet"] = []
         self._value : Optional[SV] = value
+
+    def __repr__(self) -> str:
+        for field_name, field_value in self.owner.__dict__.items():
+            if field_value == self:
+                return f"<Slot {self.owner}.{field_name}>"
+        raise Exception("Could not find self in {self.owner}")
 
     def take_snapshot(self) -> Optional[SV]:
         return self._value
@@ -37,23 +50,11 @@ class Slot(Generic[SV]):
         self.subscribers.append(applet)
 
     def refresh(self, confirmer: CONFIRMER):
-        self._value = self.refresher(confirmer)
+        if self.refresher is not None:
+            self._value = self.refresher(confirmer)
 
     def __call__(self) -> Optional[SV]:
         return self._value
-
-class ValueSlot(Slot[SV]):
-    def __init__(
-        self,
-        *,
-        owner: "Applet",
-        value: Optional[SV] = None,
-        refresher: Optional[Callable[[CONFIRMER], Optional[SV]]] = None
-    ):
-        def dummy_refresher(confirmer: CONFIRMER):
-            return self._value
-
-        super().__init__(owner=owner, value=value, refresher=refresher or dummy_refresher)
 
     def set_value(self, new_value: Optional[SV], confirmer: CONFIRMER):
         old_value = self._value
@@ -68,10 +69,6 @@ class ValueSlot(Slot[SV]):
                 applet.restore_snaphot(snap)
             self._value = old_value
             raise
-
-class DerivedSlot(Slot[SV]):
-    def __init__(self, owner: "Applet", value_generator: Callable[[CONFIRMER], Optional[SV]]):
-        super().__init__(owner=owner, refresher=value_generator)
 
 
 class Applet(ABC):
@@ -113,3 +110,29 @@ class Applet(ABC):
     def refresh_derived_slots(self, confirmer: CONFIRMER):
         for slot in self.owned_slots:
             slot.refresh(confirmer)
+
+
+Item_co = TypeVar("Item_co", covariant=True)
+class SequenceProviderApplet(Applet, Generic[Item_co]): #(DataSelectionApplet):
+    def __init__(self, refresher: Optional[SLOT_REFRESHER]=None):
+        self.items = Slot[Sequence[Item_co]](owner=self, refresher=refresher)
+        super().__init__()
+
+    def add(self, items: List[Item_co], confirmer: CONFIRMER) -> None:
+        current_items: List[Item_co] = list(self.items() or [])
+        for item in items:
+            if item in current_items:
+                raise ValueError(f"{item.__class__.__name__} {item} has already been added")
+        self.items.set_value(current_items + items, confirmer=confirmer)
+
+    def remove_at(self, idx: int, confirmer: CONFIRMER) -> None:
+        items: List[Item_co] = list(self.items() or [])
+        if idx >= len(items):
+            raise ValueError(f"There is no item at index {idx}")
+        items.pop(idx)
+        self.items.set_value(items, confirmer=confirmer)
+
+    def remove(self, item: Item_co, confirmer: CONFIRMER) -> None:
+        items: List[Item_co] = list(self.items() or [])
+        items.remove(item)
+        self.items.set_value(items, confirmer=confirmer)

@@ -1,20 +1,32 @@
+from typing import Optional
+
 from ndstructs.datasource import DataSource
 
-from webilastik.ui.applet.data_selection_applet import DataSelectionApplet
+from webilastik.ui.applet.data_selection_applet import DataSelectionApplet, ILane
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
-from webilastik.ui.applet.pixel_classifier_applet import PixelAnnotationApplet, PixelClassificationApplet
+from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
+from webilastik.ui.applet.brushing_applet import BrushingApplet
 from webilastik.ui.applet.export_applet import ExportApplet
+
+
+class PixelClassificationLane(ILane):
+    def __init__(self, raw_data: DataSource, prediction_mask: Optional[DataSource]=None):
+        self.raw_data = raw_data
+        self.prediction_mask = prediction_mask
+
+    def get_raw_data(self) -> DataSource:
+        return self.raw_data
 
 class PixelClassificationWorkflow:
     def __init__(self):
-        self.data_selection_applet = DataSelectionApplet()
-        self.feature_selection_applet = FeatureSelectionApplet(datasources=self.data_selection_applet.datasources)
-        self.annotations_applet = PixelAnnotationApplet(datasources=self.data_selection_applet.datasources)
+        self.data_selection_applet = DataSelectionApplet[PixelClassificationLane]()
+        self.feature_selection_applet = FeatureSelectionApplet(lanes=self.data_selection_applet.items)
+        self.brushing_applet = BrushingApplet(lanes=self.data_selection_applet.items)
         self.pixel_classifier_applet = PixelClassificationApplet(
-            feature_extractors=self.feature_selection_applet.feature_extractors,
-            annotations=self.annotations_applet.annotations
+            feature_extractors=self.feature_selection_applet.items,
+            annotations=self.brushing_applet.items
         )
         self.predictions_export_applet = ExportApplet(
-            datasources=self.data_selection_applet.datasources,
+            lanes=self.data_selection_applet.items,
             producer=self.pixel_classifier_applet.pixel_classifier
         )

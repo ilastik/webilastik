@@ -1,26 +1,40 @@
-from typing import List
+from typing import List, TypeVar, Sequence, Optional
 
 from ndstructs.datasource import DataSource
 
-from webilastik.ui.applet import Applet, ValueSlot, CONFIRMER, Slot
+from webilastik.ui.applet import Applet, SequenceProviderApplet, CONFIRMER, Slot, CancelledException
+from webilastik.ui.applet.data_selection_applet import ILane
 from webilastik.features.ilp_filter import IlpFilter
 
-class FeatureSelectionApplet(Applet):
-    def __init__(self, datasources: Slot[List[DataSource]]):
-        self.in_datasources = datasources
-        self.feature_extractors = ValueSlot[List[IlpFilter]](owner=self)
-        super().__init__()
+Lane = TypeVar("Lane", bound=ILane)
+class FeatureSelectionApplet(SequenceProviderApplet[IlpFilter]):
+    def __init__(self, lanes: Slot[Sequence[Lane]]):
+        self._in_lanes = lanes
+        super().__init__(refresher=self._refresh_extractors)
 
-    def clear_feature_extractors(self, *, confirmer: CONFIRMER) -> None:
-        self.feature_extractors.set_value(None, confirmer=confirmer)
+    def _refresh_extractors(self, confirmer: CONFIRMER) -> Optional[Sequence[IlpFilter]]:
+        current_extractors = list(self.items() or [])
+        new_extractors : List[IlpFilter] = []
+        current_datasources = [lane.get_raw_data() for lane in self._in_lanes() or []]
+        for ex in current_extractors:
+            for ds in current_datasources:
+                if not ex.is_applicable_to(ds):
+                    if confirmer(f"Feature {ex} is not compatible with {ds}. Drop feature extractor?"):
+                        break
+                    else:
+                        raise CancelledException("User did not drop feature extractor")
+            else:
+                new_extractors.append(ex)
 
-    def add_feature_extractors(self, extractors: List[IlpFilter], confirmer: CONFIRMER):
-        current_extractors = self.feature_extractors() or []
-        current_datasources = self.in_datasources() or []
-        for extractor in extractors:
-            if extractor in current_extractors:
-                raise ValueError(f"Feature Extractor {extractor} is already present in this Workflow")
+        return new_extractors
+
+    def clear(self, *, confirmer: CONFIRMER) -> None:
+        self.items.set_value(None, confirmer=confirmer)
+
+    def add(self, items: List[IlpFilter], confirmer: CONFIRMER):
+        current_datasources = [lane.get_raw_data() for lane in (self._in_lanes() or [])]
+        for extractor in items:
             for ds in current_datasources:
                 if not extractor.is_applicable_to(ds):
                     raise ValueError(f"Feature Extractor {extractor} is not applicable to datasource {ds}")
-        self.feature_extractors.set_value(current_extractors + extractors, confirmer=confirmer)
+        super().add(items, confirmer=confirmer)

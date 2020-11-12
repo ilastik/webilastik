@@ -1,16 +1,20 @@
 from pathlib import Path
+from webilastik.ui.applet import CancelledException
 from webilastik.annotations import annotation
 
+import pytest
 import numpy as np
 from ndstructs import Point5D
 from ndstructs.datasource import DataSource
 
 from webilastik.annotations import Annotation, Color
 from webilastik.features.channelwise_fastfilters import GaussianSmoothing, HessianOfGaussianEigenvalues
-from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
+from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow, PixelClassificationLane
 
 
-dummy_confirmer = lambda msg: True
+#dummy_confirmer = lambda msg: True
+def dummy_confirmer(msg: str) -> bool:
+    return input(msg + ": ") == "y"
 
 def crashing_confirmer(msg: str) -> bool:
     raise ValueError("Test failed! his was not supposed to be called!")
@@ -21,7 +25,10 @@ def test_pixel_classification_workflow():
     # GUI creates a datasource somewhere...
     ds = DataSource.create(Path("sample_data/2d_cells_apoptotic_1c.png"))
 
-    wf.data_selection_applet.add_datasources([ds], confirmer=dummy_confirmer)
+    wf.data_selection_applet.add(
+        [PixelClassificationLane(raw_data=ds)],
+        confirmer=dummy_confirmer
+    )
 
     # GUI creates some feature extractors
     extractors = [
@@ -29,10 +36,10 @@ def test_pixel_classification_workflow():
         HessianOfGaussianEigenvalues.from_ilp_scale(scale=0.7, axis_2d="z", num_input_channels=ds.shape.c),
     ]
 
-    wf.feature_selection_applet.add_feature_extractors(extractors, confirmer=dummy_confirmer)
+    wf.feature_selection_applet.add(extractors, confirmer=dummy_confirmer)
 
     # GUI creates some annotations
-    wf.annotations_applet.add_annotations(
+    wf.brushing_applet.add(
         [
             Annotation.interpolate_from_points(
                 color=Color(r=np.uint8(255)),
@@ -73,3 +80,10 @@ def test_pixel_classification_workflow():
 
     # GUI clicks "export button"
     wf.predictions_export_applet.export_all()
+
+    #check that removing a lane would drop the annotations:
+    with pytest.raises(CancelledException):
+        wf.data_selection_applet.remove_at(0, confirmer=lambda msg: False)
+
+    wf.data_selection_applet.remove_at(0, confirmer=lambda msg: True)
+    assert wf.brushing_applet.items() == []
