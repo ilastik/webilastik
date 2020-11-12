@@ -25,22 +25,23 @@ from webilastik.features.feature_extractor import FeatureDataMismatchException
 from webilastik.classifiers.pixel_classifier import Predictions, PixelClassifier
 from webilastik.server.WebContext import WebContext, EntityNotFoundException
 
+class ServerConfig(JsonSerializable):
+    def __init__(
+        self,
+        ngurl: str = "http://localhost:8080",
+        sample_dirs: Sequence[str] = (),
+        num_workers:int = 4
+    ):
+        self.ngurl = ngurl
+        self.sample_dirs = sample_dirs
+        self.num_workers = num_workers
 
-parser = argparse.ArgumentParser(description="Runs ilastik prediction web server")
-parser.add_argument("--host", default="localhost", help="ip or hostname where the server will listen")
-parser.add_argument("--port", default=5000, type=int, help="port to listen on")
-parser.add_argument("--ngurl", default="http://localhost:8080", help="url where neuroglancer is being served")
-parser.add_argument("--sample-dirs", type=Path, help="List of directories containing samples", nargs="+")
-parser.add_argument(
-    "--num-workers",
-    required=False,
-    type=int,
-    default=multiprocessing.cpu_count(),
-    help="Number of process workers to run predictions",
-)
-args = parser.parse_args()
 
-executors = [ProcessPoolExecutor(max_workers=1) for i in range(args.num_workers)]
+
+with open("serverconf.json") as conf_file:
+    config = ServerConfig.from_json(conf_file.read())
+
+executors = [ProcessPoolExecutor(max_workers=1) for i in range(config.num_workers)]
 
 app = Flask("WebserverHack")
 CORS(app)
@@ -108,7 +109,7 @@ def do_predictions(roi: Slice5D, classifier_id: str, datasource_id: str) -> Pred
     all_slices = list(backed_roi.get_tiles())
     slc_batches = defaultdict(list)
     for slc in backed_roi.get_tiles():
-        batch_idx = hash(slc) % args.num_workers
+        batch_idx = hash(slc) % config.num_workers
         slc_batches[batch_idx].append(slc)
 
     result_batch_futures = []
@@ -229,14 +230,12 @@ def ng_raw(datasource_id: str, xBegin: int, xEnd: int, yBegin: int, yEnd: int, z
     return resp
 
 def get_base_netloc() -> str:
-    host = request.headers.get("X-Forwarded-Host", args.host)
-    port = "" if "X-Forwarded-Host" in request.headers else f":{args.port}"
-    return f"{host}{port}"
+    return request.headers["X-Forwarded-Host"]
 
 def get_base_url() -> str:
-    protocol = request.headers.get("X-Forwarded-Proto", "http")
+    protocol = request.headers["X-Forwarded-Proto"]
     netloc = get_base_netloc()
-    prefix = request.headers.get("X-Forwarded-Prefix", "/")
+    prefix = request.headers["X-Forwarded-Prefix"]
     return f"{protocol}://{netloc}{prefix}"
 
 def create_precomputed_chunks_datasource(url: str) -> PrecomputedChunksDataSource:
@@ -380,11 +379,10 @@ def show_object(class_name: str, object_id: str):
 def _add_sample_datasource(path: Path):
     datasource = DataSource.create(path.absolute())
     ref = WebContext.store(datasource)
-    print(path.name, " ", f"http://{args.host}:{args.port}/datasource/{ref.to_str()}/data")
+    print(f"Added sample data {datasource}")
 
-
-for sample_dir_path in args.sample_dirs or ():
-    for sample_path in sample_dir_path.iterdir():
+for sample_dir_path in config.sample_dirs or ():
+    for sample_path in Path(sample_dir_path).expanduser().iterdir():
         if sample_path.is_dir() and sample_path.suffix in (".n5", ".N5"):
             [_add_sample_datasource(dataset_path) for dataset_path in sample_path.iterdir() if dataset_path.is_dir()]
         if sample_path.is_file() and sample_path.suffix in (".png", ".jpg"):
@@ -395,5 +393,3 @@ WebContext.store(
         "precomputed://https://neuroglancer.humanbrainproject.org/precomputed/BigBrainRelease.2015/8bit/20um"
     )
 )
-
-app.run(host=args.host, port=args.port)
