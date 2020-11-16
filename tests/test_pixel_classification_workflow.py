@@ -5,7 +5,7 @@ from webilastik.annotations import annotation
 import pytest
 import numpy as np
 from ndstructs import Point5D
-from ndstructs.datasource import DataSource
+from ndstructs.datasource import DataSource, DataSourceSlice
 
 from webilastik.annotations import Annotation, Color
 from webilastik.features.channelwise_fastfilters import GaussianSmoothing, HessianOfGaussianEigenvalues
@@ -77,6 +77,9 @@ def test_pixel_classification_workflow():
         ],
         confirmer=dummy_confirmer
     )
+
+    preds = wf.predictions_export_applet.compute(DataSourceSlice(ds))
+    preds.show_channels()
 
     # GUI clicks "export button"
     wf.predictions_export_applet.export_all()

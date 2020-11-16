@@ -1,5 +1,8 @@
-from typing import Sequence
+from typing import Sequence, List, Dict, Tuple
+from concurrent.futures import ProcessPoolExecutor
+from collections import defaultdict
 
+from ndstructs import Array5D, Slice5D
 from ndstructs.datasource import DataSource, DataSourceSlice
 
 from webilastik.operator import Operator
@@ -11,9 +14,10 @@ from webilastik.ui.applet.data_selection_applet import ILane
 
 class ExportApplet(Applet):
     """Exports the outputs of an operator created by an upstream applet."""
-    def __init__(self, producer: Slot[Operator], lanes: Slot[Sequence[ILane]]):
+    def __init__(self, producer: Slot[Operator], lanes: Slot[Sequence[ILane]], num_workers: int = 4):
         self.producer = producer
         self.lanes = lanes
+        self._executors = [ProcessPoolExecutor(max_workers=1) for i in range(num_workers)]
         super().__init__()
 
     def export_all(self) -> None:
@@ -27,3 +31,35 @@ class ExportApplet(Applet):
                 #FIXME save this with a DataSink
                 print(f"Computing on {data_slice} with producer {producer_op}")
                 producer_op.compute(slc)
+
+    def compute_lane(self, lane_index: int, slc: Slice5D) -> Array5D:
+        datasource = self.lanes()[lane_index].get_raw_data()
+        roi = DataSourceSlice(datasource, **slc.to_dict()).defined()
+        return self.compute(roi)
+
+    def compute(self, roi: DataSourceSlice) -> Array5D:
+        producer_op = self.producer()
+        if not producer_op:
+            raise ValueError("No producer from upstream")
+
+        slc_batches : Dict[int, List[DataSourceSlice]] = defaultdict(list)
+        for slc in roi.get_tiles():
+            batch_idx = hash(slc) % len(self._executors)
+            slc_batches[batch_idx].append(slc)
+
+        result_batch_futures = []
+        for idx, batch in slc_batches.items():
+            executor = self._executors[idx]
+            result_batch_futures.append(executor.submit(do_worker_compute, (producer_op, batch)))
+
+        tiles : Sequence[Array5D] = [tile for future in result_batch_futures for tile in future.result()]
+        return tiles[0].combine(tiles[1:])
+
+
+def do_worker_compute(slice_batch: Tuple[Operator, Sequence[DataSourceSlice]]) -> List[Array5D]:
+    op = slice_batch[0]
+    out = []
+    for datasource_slc in slice_batch[1]:
+        pred_tile = op.compute(datasource_slc)
+        out.append(pred_tile)
+    return out
