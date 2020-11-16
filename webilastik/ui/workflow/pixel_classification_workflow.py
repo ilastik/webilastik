@@ -2,7 +2,7 @@ from typing import Optional
 
 from ndstructs.datasource import DataSource
 
-from webilastik.ui.applet.data_selection_applet import DataSelectionApplet, ILane
+from webilastik.ui.applet.data_selection_applet import DataSelectionApplet, ILane, url_to_datasource
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
 from webilastik.ui.applet.brushing_applet import BrushingApplet
@@ -16,6 +16,13 @@ class PixelClassificationLane(ILane):
 
     def get_raw_data(self) -> DataSource:
         return self.raw_data
+
+    @classmethod
+    def from_json_value(cls, data) -> "PixelClassificationLane":
+        return cls(
+            raw_data=url_to_datasource(data['raw_data']),
+            prediction_mask=None
+        )
 
 class PixelClassificationWorkflow:
     def __init__(self):
