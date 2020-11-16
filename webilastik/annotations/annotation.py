@@ -94,7 +94,7 @@ class Annotation(ScalarData):
         return hash((self._data.tobytes(), self.color))
 
     def __eq__(self, other):
-        if isinstance(other, Annotation):
+        if not isinstance(other, Annotation):
             return False
         return self.color == other.color and np.all(self._data == other._data)
 
