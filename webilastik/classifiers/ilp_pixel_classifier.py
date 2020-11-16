@@ -119,7 +119,7 @@ class IlpVigraPixelClassifier(VigraPixelClassifier):
         out["known_labels"] = np.asarray(self.classes).astype(np.uint32)
         return out
 
-    @functools.lru_cache()
+    @functools.lru_cache() #FIMXE: double check classifier __hash__/__eq__
     def __getstate__(self):
         out = self.__dict__.copy()
         forest_data = self.get_forest_data()
