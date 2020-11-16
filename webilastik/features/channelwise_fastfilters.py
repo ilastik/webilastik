@@ -30,7 +30,7 @@ class ChannelwiseFastFilter(IlpFilter):
 
     @classmethod
     def from_json_data(cls, data, dereferencer: Optional[Dereferencer] = None):
-        return from_json_data(cls, data, dereferencer=dereferencer)
+        return from_json_data(cls, data, dereferencer=dereferencer, initOnly=True)
 
     @classmethod
     def calc_presmooth_sigma(cls, scale: float) -> float:
