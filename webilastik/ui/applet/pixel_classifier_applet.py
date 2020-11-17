@@ -1,10 +1,11 @@
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Dict
 
 from ndstructs.datasource import DataSource, DataSourceSlice
+import numpy as np
 
 from webilastik.ui.applet  import Applet, SequenceProviderApplet, Slot, CancelledException, CONFIRMER
 from webilastik.ui.applet.data_selection_applet import ILane
-from webilastik.annotations.annotation import Annotation
+from webilastik.annotations.annotation import Annotation, Color
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.classifiers.pixel_classifier import Predictions
 from webilastik.classifiers.ilp_pixel_classifier import IlpVigraPixelClassifier
@@ -24,6 +25,10 @@ class PixelClassificationApplet(Applet):
             owner=self,
             refresher=self._create_pixel_classifier
         )
+        self.color_map = Slot[Dict[Color, np.uint8]](
+            owner=self,
+            refresher=self._create_color_map
+        )
         super().__init__()
 
     def _create_pixel_classifier(self, confirmer: CONFIRMER) -> Optional[IlpVigraPixelClassifier]:
@@ -39,6 +44,12 @@ class PixelClassificationApplet(Applet):
             annotations=annotations,
             feature_extractors=feature_extractors
         )
+
+    def _create_color_map(self, confirmer: CONFIRMER) -> Optional[Dict[Color, np.uint8]]:
+        annotations = self._in_annotations()
+        if annotations is None:
+            return None
+        return Color.create_color_map([a.color for a in annotations])
 
     def predict(self, roi: DataSourceSlice) -> Predictions:
         classifier = self.pixel_classifier()

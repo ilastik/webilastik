@@ -132,7 +132,9 @@ class SequenceProviderApplet(Applet, Generic[Item_co]): #(DataSelectionApplet):
         items.pop(idx)
         self.items.set_value(items, confirmer=confirmer)
 
-    def remove(self, item: Item_co, confirmer: CONFIRMER) -> None:
-        items: List[Item_co] = list(self.items() or [])
-        items.remove(item)
-        self.items.set_value(items, confirmer=confirmer)
+    def remove(self, items: Sequence[Item_co], confirmer: CONFIRMER) -> None:
+        new_items = [item for item in (self.items() or []) if item not in items]
+        self.items.set_value(new_items, confirmer=confirmer)
+
+    def clear(self, confirmer: CONFIRMER) -> None:
+        self.items.set_value([], confirmer=confirmer)
