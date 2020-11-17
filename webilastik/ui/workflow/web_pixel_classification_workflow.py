@@ -72,6 +72,32 @@ expose_sequence_applet(applet_name="data_selection_applet", applet=wf.data_selec
 expose_sequence_applet(applet_name="feature_selection_applet", applet=wf.feature_selection_applet, item_class=IlpFilter)
 expose_sequence_applet(applet_name="brushing_applet", applet=wf.brushing_applet, item_class=Annotation)
 
+@app.route("/pixel_classifier_applet/predictions_shader", methods=["GET"])
+def get_predictions_shader():
+    color_map = wf.pixel_classifier_applet.color_map()
+    if color_map is None:
+        raise ValueError("Classifier is not ready yet")
+
+    color_lines: List[str] = []
+    colors_to_mix: List[str] = []
+
+    for idx, color in enumerate(color_map.keys()):
+        color_line = (
+            f"vec3 color{idx} = (vec3({color.r}, {color.g}, {color.b}) / 255.0) * toNormalized(getDataValue({idx}));"
+        )
+        color_lines.append(color_line)
+        colors_to_mix.append(f"color{idx}")
+
+    shader_lines = [
+        "void main() {",
+        "    " + "\n    ".join(color_lines),
+        "    emitRGBA(",
+        f"        vec4({' + '.join(colors_to_mix)}, 1.0)",
+        "    );",
+        "}",
+    ]
+    return flask.Response("\n".join(shader_lines), mimetype="text/plain")
+
 # https://github.com/google/neuroglancer/tree/master/src/neuroglancer/datasource/precomputed#unsharded-chunk-storage
 @app.route("/predictions_export_applet/<int:lane_index>/data/<int:xBegin>-<int:xEnd>_<int:yBegin>-<int:yEnd>_<int:zBegin>-<int:zEnd>")
 def ng_predict(lane_index: int, xBegin: int, xEnd: int, yBegin: int, yEnd: int, zBegin: int, zEnd: int):
@@ -113,7 +139,6 @@ def info_dict(lane_index: int) -> Dict:
         }
     )
     return resp
-
 
 if __name__ == "__main__":
     app.run()
