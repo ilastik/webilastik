@@ -32,8 +32,8 @@ def test_pixel_classification_workflow():
 
     # GUI creates some feature extractors
     extractors = [
-        GaussianSmoothing.from_ilp_scale(scale=0.3, axis_2d="z", num_input_channels=ds.shape.c),
-        HessianOfGaussianEigenvalues.from_ilp_scale(scale=0.7, axis_2d="z", num_input_channels=ds.shape.c),
+        GaussianSmoothing.from_ilp_scale(scale=0.3, axis_2d="z"),
+        HessianOfGaussianEigenvalues.from_ilp_scale(scale=0.7, axis_2d="z"),
     ]
 
     wf.feature_selection_applet.add(extractors, confirmer=dummy_confirmer)

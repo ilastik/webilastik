@@ -76,13 +76,12 @@ class ChannelwiseFilter(FeatureExtractor):
     """A Feature extractor that computes independently for every
     spatial slice and for every channel in its input"""
 
-    def __init__(self, *, axis_2d: Optional[str] = None, num_input_channels: int):
+    def __init__(self, *, axis_2d: Optional[str] = None):
         super().__init__()
         self.axis_2d = axis_2d
-        self.num_input_channels = num_input_channels
 
     def is_applicable_to(self, datasource: DataSource) -> bool:
-        return datasource.shape >= self.kernel_shape and datasource.shape.c == self.num_input_channels
+        return datasource.shape >= self.kernel_shape
 
     @property
     def channel_multiplier(self) -> int:

@@ -27,7 +27,7 @@ class IlpFilter(ChannelwiseFilter):
     @classmethod
     @abstractmethod
     def from_ilp_scale(
-        cls: Type[FE], *, preprocessor: Optional[Operator] = None, scale: float, num_input_channels:int, axis_2d: Optional[str] = None
+        cls: Type[FE], *, preprocessor: Optional[Operator] = None, scale: float, axis_2d: Optional[str] = None
     ) -> FE:
         pass
 
@@ -57,7 +57,7 @@ class IlpFilter(ChannelwiseFilter):
         return feature_extractors
 
     @classmethod
-    def from_ilp_data(cls, data: Mapping, num_input_channels: int) -> List["IlpFilter"]:
+    def from_ilp_data(cls, data: Mapping) -> List["IlpFilter"]:
         feature_names: List[str] = [feature_name.decode("utf-8") for feature_name in data["FeatureIds"][()]]
         compute_in_2d: List[bool] = list(data["ComputeIn2d"][()])
         scales: List[float] = list(data["Scales"][()])
@@ -70,7 +70,7 @@ class IlpFilter(ChannelwiseFilter):
                 if selection_matrix[feature_idx][scale_idx]:
                     axis_2d = "z" if in_2d else None
                     extractor = feature_class.from_ilp_scale(
-                        scale=scale, axis_2d=axis_2d, num_input_channels=num_input_channels
+                        scale=scale, axis_2d=axis_2d
                     )
                     feature_extractors.append(extractor)
         return feature_extractors
@@ -115,7 +115,7 @@ class IlpFilter(ChannelwiseFilter):
         out["StorageVersion"] = "0.1"
         return out
 
-    def to_ilp_feature_names(self) -> Iterator[bytes]:
-        for c in range(self.num_input_channels * self.channel_multiplier):
-            name_and_channel = self.ilp_name + f" [{c}]"
-            yield name_and_channel.encode("utf8")
+    # def to_ilp_feature_names(self) -> Iterator[bytes]:
+    #     for c in range(self.num_input_channels * self.channel_multiplier):
+    #         name_and_channel = self.ilp_name + f" [{c}]"
+    #         yield name_and_channel.encode("utf8")

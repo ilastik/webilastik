@@ -68,12 +68,12 @@ datasource = DataSource.create(Path(args.data_url))
 print(f"Processing {datasource}")
 
 extractors = [
-    GaussianSmoothing.from_ilp_scale(scale=0.3, axis_2d="z", num_input_channels=datasource.shape.c),
-    HessianOfGaussianEigenvalues.from_ilp_scale(scale=0.7, axis_2d="z", num_input_channels=datasource.shape.c),
-    GaussianGradientMagnitude.from_ilp_scale(scale=0.7, axis_2d="z", num_input_channels=datasource.shape.c),
-    LaplacianOfGaussian.from_ilp_scale(scale=0.7, axis_2d="z", num_input_channels=datasource.shape.c),
-    DifferenceOfGaussians.from_ilp_scale(scale=0.7, axis_2d="z", num_input_channels=datasource.shape.c),
-    StructureTensorEigenvalues.from_ilp_scale(scale=1.0, axis_2d="z", num_input_channels=datasource.shape.c),
+    GaussianSmoothing.from_ilp_scale(scale=0.3, axis_2d="z"),
+    HessianOfGaussianEigenvalues.from_ilp_scale(scale=0.7, axis_2d="z"),
+    GaussianGradientMagnitude.from_ilp_scale(scale=0.7, axis_2d="z"),
+    LaplacianOfGaussian.from_ilp_scale(scale=0.7, axis_2d="z"),
+    DifferenceOfGaussians.from_ilp_scale(scale=0.7, axis_2d="z"),
+    StructureTensorEigenvalues.from_ilp_scale(scale=1.0, axis_2d="z"),
 ]
 
 annotations = []
