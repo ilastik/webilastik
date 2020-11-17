@@ -11,7 +11,7 @@ from ndstructs import Slice5D, Point5D, Shape5D
 from ndstructs import Array5D, Image, ScalarData, StaticLine, LinearData
 from webilastik.features.feature_extractor import FeatureExtractor, FeatureData
 from ndstructs.datasource import DataSource, DataSourceSlice
-from ndstructs.utils import JsonSerializable, from_json_data, Dereferencer
+from ndstructs.utils import JsonSerializable, from_json_data, to_json_data, Dereferencer, Referencer
 from PIL import Image as PilImage
 
 
@@ -145,6 +145,15 @@ class Annotation(ScalarData):
     @classmethod
     def from_json_data(cls, data, dereferencer: Optional[Dereferencer] = None):
         return from_json_data(cls.interpolate_from_points, data, dereferencer=dereferencer)
+
+    def to_json_data(self, referencer: Referencer):
+        return {
+            "arr": "FIXME",
+            "axiskeys": self.axiskeys,
+            "location": self.location.to_json_data(referencer),
+            "color": to_json_data(self.color, referencer=referencer),
+            "raw_data": self.raw_data.to_json_data(referencer)
+        }
 
     def get_feature_samples(self, feature_extractor: FeatureExtractor) -> FeatureSamples:
         all_feature_samples = []
