@@ -137,4 +137,4 @@ class SequenceProviderApplet(Applet, Generic[Item_co]): #(DataSelectionApplet):
         self.items.set_value(new_items, confirmer=confirmer)
 
     def clear(self, confirmer: CONFIRMER) -> None:
-        self.items.set_value([], confirmer=confirmer)
+        self.items.set_value(None, confirmer=confirmer)

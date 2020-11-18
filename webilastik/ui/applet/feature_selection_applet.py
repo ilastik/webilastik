@@ -28,9 +28,6 @@ class FeatureSelectionApplet(SequenceProviderApplet[IlpFilter]):
 
         return new_extractors
 
-    def clear(self, *, confirmer: CONFIRMER) -> None:
-        self.items.set_value(None, confirmer=confirmer)
-
     def add(self, items: List[IlpFilter], confirmer: CONFIRMER):
         current_datasources = [lane.get_raw_data() for lane in (self._in_lanes() or [])]
         for extractor in items:
