@@ -25,8 +25,7 @@ class FeatureSelectionApplet(SequenceProviderApplet[IlpFilter]):
                         raise CancelledException("User did not drop feature extractor")
             else:
                 new_extractors.append(ex)
-
-        return new_extractors
+        return tuple(new_extractors)
 
     def add(self, items: List[IlpFilter], confirmer: CONFIRMER):
         current_datasources = [lane.get_raw_data() for lane in (self._in_lanes() or [])]

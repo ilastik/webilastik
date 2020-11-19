@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Sequence, Optional, Callable, Generic, TypeVar, Set, Dict, Any
+from typing import List, Sequence, Optional, Callable, Generic, TypeVar, Set, Dict, Any, Tuple
 import typing_extensions
 
 
@@ -123,25 +123,25 @@ class Applet(ABC):
 Item_co = TypeVar("Item_co", covariant=True)
 class SequenceProviderApplet(Applet, Generic[Item_co]): #(DataSelectionApplet):
     def __init__(self, refresher: Optional[SLOT_REFRESHER]=None):
-        self.items = Slot[Sequence[Item_co]](owner=self, refresher=refresher)
+        self.items = Slot[Tuple[Item_co]](owner=self, refresher=refresher)
         super().__init__()
 
-    def add(self, items: List[Item_co], confirmer: CONFIRMER) -> None:
-        current_items: List[Item_co] = list(self.items() or [])
+    def add(self, items: Sequence[Item_co], confirmer: CONFIRMER) -> None:
+        current_items = self.items() or ()
         for item in items:
             if item in current_items:
                 raise ValueError(f"{item.__class__.__name__} {item} has already been added")
-        self.items.set_value(current_items + items, confirmer=confirmer)
+        self.items.set_value(current_items + tuple(items), confirmer=confirmer)
 
     def remove_at(self, idx: int, confirmer: CONFIRMER) -> None:
-        items: List[Item_co] = list(self.items() or [])
+        items = list(self.items() or ())
         if idx >= len(items):
             raise ValueError(f"There is no item at index {idx}")
         items.pop(idx)
-        self.items.set_value(items, confirmer=confirmer)
+        self.items.set_value(tuple(items), confirmer=confirmer)
 
     def remove(self, items: Sequence[Item_co], confirmer: CONFIRMER) -> None:
-        new_items = [item for item in (self.items() or []) if item not in items]
+        new_items = tuple(item for item in (self.items() or ()) if item not in items)
         self.items.set_value(new_items, confirmer=confirmer)
 
     def clear(self, confirmer: CONFIRMER) -> None:
