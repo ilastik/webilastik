@@ -1,4 +1,5 @@
 from abc import abstractmethod
+import functools
 from typing import List, Tuple, Iterable, Optional, Sequence, Dict
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
@@ -108,6 +109,7 @@ class PixelClassifier(Operator, JsonSerializable):
             self.feature_extractor.ensure_applicable(data_slice.datasource)
         return self._do_predict(data_slice=data_slice, out=out)
 
+    @functools.lru_cache()
     def compute(self, roi: DataSourceSlice) -> Array5D:
         return self.predict(roi)
 
@@ -132,8 +134,8 @@ class ScikitLearnPixelClassifier(PixelClassifier):
     @classmethod
     def train(
         cls,
-        feature_extractors: Sequence[FeatureExtractor],
-        annotations: Sequence[Annotation],
+        feature_extractors: Tuple[FeatureExtractor],
+        annotations: Tuple[Annotation],
         *,
         num_trees: int = 100,
         random_seed: int = 0,
@@ -174,7 +176,7 @@ class VigraPixelClassifier(PixelClassifier):
     def __init__(
         self,
         *,
-        feature_extractors: Sequence[FeatureExtractor],
+        feature_extractors: Tuple[FeatureExtractor],
         forests: List[VigraRandomForest],
         classes: List[np.uint8],
         strict: bool = False,
@@ -190,8 +192,8 @@ class VigraPixelClassifier(PixelClassifier):
     @classmethod
     def train(
         cls,
-        feature_extractors: Sequence[FeatureExtractor],
-        annotations: Sequence[Annotation],
+        feature_extractors: Tuple[FeatureExtractor],
+        annotations: Tuple[Annotation],
         *,
         num_trees: int = 100,
         num_forests: int = multiprocessing.cpu_count(),

@@ -1,4 +1,4 @@
-from typing import Sequence, List, Dict, Iterator
+from typing import Sequence, List, Dict, Iterator, Tuple
 import multiprocessing
 import pickle
 import tempfile
@@ -71,10 +71,11 @@ class IlpVigraPixelClassifier(VigraPixelClassifier):
         )
 
     @classmethod
+    @functools.lru_cache()
     def train(
         cls,
-        feature_extractors: Sequence[IlpFilter],
-        annotations: Sequence[Annotation],
+        feature_extractors: Tuple[IlpFilter],
+        annotations: Tuple[Annotation],
         *,
         num_trees: int = 100,
         num_forests: int = multiprocessing.cpu_count(),
