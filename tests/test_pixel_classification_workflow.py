@@ -23,7 +23,7 @@ def test_pixel_classification_workflow():
     wf = PixelClassificationWorkflow()
 
     # GUI creates a datasource somewhere...
-    ds = DataSource.create(Path("sample_data/2d_cells_apoptotic_1c.png"))
+    ds = DataSource.create(Path("sample_data/cropped1.png"))
 
     wf.data_selection_applet.add(
         [PixelClassificationLane(raw_data=ds)],
@@ -31,47 +31,35 @@ def test_pixel_classification_workflow():
     )
 
     # GUI creates some feature extractors
-    extractors = [
-        GaussianSmoothing.from_ilp_scale(scale=0.3, axis_2d="z"),
-        HessianOfGaussianEigenvalues.from_ilp_scale(scale=0.7, axis_2d="z"),
-    ]
-
-    wf.feature_selection_applet.add(extractors, confirmer=dummy_confirmer)
+    wf.feature_selection_applet.add(
+        [
+            GaussianSmoothing.from_ilp_scale(scale=0.3, axis_2d="z"),
+            HessianOfGaussianEigenvalues.from_ilp_scale(scale=0.7, axis_2d="z"),
+        ],
+        confirmer=dummy_confirmer
+    )
 
     # GUI creates some annotations
     wf.brushing_applet.add(
         [
             Annotation.interpolate_from_points(
-                color=Color(r=np.uint8(255)),
-                voxels=[
-                    Point5D.zero(x=760, y=266),
-                    Point5D.zero(x=761, y=267),
-                ],
+                voxels=[Point5D.zero(x=140, y=150), Point5D.zero(x=145, y=155)],
+                color=Color(r=np.uint8(0), g=np.uint8(255), b=np.uint8(0)),
                 raw_data=ds
             ),
             Annotation.interpolate_from_points(
-                color=Color(r=np.uint8(255)),
-                voxels=[
-                    Point5D.zero(x=432, y=633),
-                    Point5D.zero(x=433, y=634)
-                ],
-                raw_data=ds
-            ),
-
-            Annotation.interpolate_from_points(
-                color=Color(g=np.uint8(255)),
-                voxels=[
-                    Point5D.zero(x=1028, y=325),
-                    Point5D.zero(x=1029, y=326)
-                ],
+                voxels=[Point5D.zero(x=238, y=101), Point5D.zero(x=229, y=139)],
+                color=Color(r=np.uint8(0), g=np.uint8(255), b=np.uint8(0)),
                 raw_data=ds
             ),
             Annotation.interpolate_from_points(
-                color=Color(g=np.uint8(255)),
-                voxels=[
-                    Point5D.zero(x=234, y=238),
-                    Point5D.zero(x=235, y=239)
-                ],
+                voxels=[Point5D.zero(x=283, y=87), Point5D.zero(x=288, y=92)],
+                color=Color(r=np.uint8(255), g=np.uint8(0), b=np.uint8(0)),
+                raw_data=ds
+            ),
+            Annotation.interpolate_from_points(
+                voxels=[Point5D.zero(x=274, y=168), Point5D.zero(x=256, y=191)],
+                color=Color(r=np.uint8(255), g=np.uint8(0), b=np.uint8(0)),
                 raw_data=ds
             ),
         ],
