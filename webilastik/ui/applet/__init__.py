@@ -63,7 +63,7 @@ class Slot(Generic[SV]):
         try:
             for applet in [self.owner] + self.owner.get_downstream_applets():
                 applet_snapshots[applet] = applet.take_snapshot()
-                applet.refresh_derived_slots(confirmer)
+                applet.refresh_derived_slots(confirmer=confirmer, provoker=self)
         except Exception:
             for applet, snap in applet_snapshots.items():
                 applet.restore_snaphot(snap)
@@ -107,10 +107,18 @@ class Applet(ABC):
             slot.restore_snaphot(saved_value)
 
     @typing_extensions.final
-    def refresh_derived_slots(self, confirmer: CONFIRMER):
+    def refresh_derived_slots(self, confirmer: CONFIRMER, provoker: Slot):
+        self.pre_refresh(confirmer)
         for slot in self.owned_slots:
-            slot.refresh(confirmer)
+            if slot != provoker:
+                slot.refresh(confirmer)
+        self.post_refresh(confirmer)
 
+    def pre_refresh(self, confirmer: CONFIRMER):
+        pass
+
+    def post_refresh(self, confirmer: CONFIRMER):
+        pass
 
 Item_co = TypeVar("Item_co", covariant=True)
 class SequenceProviderApplet(Applet, Generic[Item_co]): #(DataSelectionApplet):
