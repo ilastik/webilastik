@@ -73,18 +73,18 @@ class Slot(Generic[SV]):
 
 class Applet(ABC):
     def __init__(self):
-        self.owned_slots = [
-            slot
-            for slot in self.__dict__.values()
+        self.owned_slots = {
+            slot_name: slot
+            for slot_name, slot in self.__dict__.items()
             if isinstance(slot, Slot) and slot.owner == self
-        ]
-        self.borrowed_slots = [
-            slot
-            for slot in self.__dict__.values()
+        }
+        self.borrowed_slots = {
+            slot_name: slot
+            for slot_name, slot in self.__dict__.items()
             if isinstance(slot, Slot) and slot.owner != self
-        ]
-        self.upstream_applets : Set[Applet] = {in_slot.owner for in_slot in self.borrowed_slots}
-        for borrowed_slot in self.borrowed_slots:
+        }
+        self.upstream_applets : Set[Applet] = {in_slot.owner for in_slot in self.borrowed_slots.values()}
+        for borrowed_slot in self.borrowed_slots.values():
             self.upstream_applets.update(borrowed_slot.owner.upstream_applets)
             borrowed_slot.subscribe(self)
         #self.refresh_derived_slots(confirmer=lambda msg: True)
@@ -92,24 +92,25 @@ class Applet(ABC):
     def get_downstream_applets(self) -> List["Applet"]:
         """Returns a list of the topologically sorted descendants of this applet"""
         out : Set[Applet] = set()
-        for output_slot in self.owned_slots:
+        for output_slot in self.owned_slots.values():
             out.update(output_slot.get_downstream_applets())
         return sorted(out)
 
     def __lt__(self, other: "Applet") -> bool:
         return self in other.upstream_applets
 
-    def take_snapshot(self) -> Dict[Slot, Any]:
-        return {slot: slot.take_snapshot() for slot in self.owned_slots}
+    def take_snapshot(self) -> Dict[str, Any]:
+        return {slot_name: slot.take_snapshot() for slot_name, slot in self.owned_slots.items()}
 
-    def restore_snaphot(self, snap: Dict[Slot, Any]):
-        for slot, saved_value in snap.items():
+    def restore_snaphot(self, snap: Dict[str, Any]):
+        for slot_name, saved_value in snap.items():
+            slot = self.owned_slots[slot_name]
             slot.restore_snaphot(saved_value)
 
     @typing_extensions.final
     def refresh_derived_slots(self, confirmer: CONFIRMER, provoker: Slot):
         self.pre_refresh(confirmer)
-        for slot in self.owned_slots:
+        for slot in self.owned_slots.values():
             if slot != provoker:
                 slot.refresh(confirmer)
         self.post_refresh(confirmer)
