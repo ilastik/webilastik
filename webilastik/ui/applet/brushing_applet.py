@@ -28,4 +28,4 @@ class BrushingApplet(SequenceProviderApplet[Annotation]):
         for annotation in items:
             if not any(annotation.raw_data == lane.get_raw_data() for lane in current_lanes):
                 raise ValueError(f"Annotation {annotation} references a DataSource not present in any lane")
-        super().add(current_annotations + tuple(items), confirmer=confirmer)
+        super().add(items, confirmer=confirmer)
