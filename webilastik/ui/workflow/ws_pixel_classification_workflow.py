@@ -1,6 +1,7 @@
 from abc import abstractmethod, ABC
 import asyncio
 from typing import Optional, Any, Sequence, Dict, List, cast
+import typing_extensions
 from dataclasses import dataclass
 from collections.abc import Mapping as BaseMapping
 
@@ -46,22 +47,36 @@ DataSource.from_json_data = datasource_from_json_data
 class WsAppletMixin(Applet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.websockets : List[web.WebSocketResponse]= []
+        self.websockets : List[web.WebSocketResponse] = []
 
-    @abstractmethod
-    def _updateRemote(self):
-        pass
+    def _get_message_for_remote(self) -> Any:
+        return None
+
+    def _update_remote(self):
+        async def do_update():
+            bad_sockets : List[web.WebSocketResponse] = []
+            for websocket in self.websockets:
+                try:
+                    message = self._get_message_for_remote()
+                    if message is not None:
+                        await websocket.send_str(json.dumps(message))
+                except ConnectionResetError as e:
+                    print(f"Got an exception while updating remote. Removing websocket...")
+                    bad_sockets.append(websocket)
+            for bad_socket in bad_sockets:
+                self.websockets.remove(bad_socket)
+        asyncio.get_event_loop().create_task(do_update())
 
     def _add_websocket(self, websocket: web.WebSocketResponse):
         self.websockets.append(websocket)
 
     def post_refresh(self, confirmer: CONFIRMER): #FIXME: this will fire even if something breaks downstream
         super().post_refresh(confirmer)
-        self._updateRemote()
+        self._update_remote()
 
     def restore_snaphot(self, snap: Dict[str, Any]):
         super().restore_snaphot(snap)
-        self._updateRemote()
+        self._update_remote()
 
 
 class WsSequenceProviderApplet(WsAppletMixin, SequenceProviderApplet[Item_co]):
@@ -81,39 +96,29 @@ class WsSequenceProviderApplet(WsAppletMixin, SequenceProviderApplet[Item_co]):
         pass
 
 class WsDataSelectionApplet(WsSequenceProviderApplet[PixelClassificationLane], DataSelectionApplet[PixelClassificationLane]):
-    def _updateRemote(self):
+    def _get_message_for_remote(self):
         print("oooooooooo>>> Updating remote data selection ")
-        for websocket in self.websockets:
-            print(f"Positn status back to data selection applet....")
-            asyncio.get_event_loop().create_task(
-                websocket.send_str(json.dumps({
-                    "applet_name": "data_selection_applet",#FIXME: maybe have python applets also have names?
-                    "items": to_json_data(self.items())
-                })
-            ))
+        return {
+            "applet_name": "data_selection_applet",#FIXME: maybe have python applets also have names?
+            "items": to_json_data(self.items())
+        }
 
     def item_from_json_data(self, data: Any) -> PixelClassificationLane:
         return from_json_data(PixelClassificationLane, data)
 
 
 class WsBrushingApplet(WsSequenceProviderApplet[Annotation], BrushingApplet):
-    def _updateRemote(self):
-        pass
-
     def item_from_json_data(self, data: Any) -> Annotation:
         return from_json_data(Annotation.interpolate_from_points, data)
 
 
 class WsFeatureSelectionApplet(WsSequenceProviderApplet[IlpFilter], FeatureSelectionApplet):
-    def _updateRemote(self):
-        pass
-
     def item_from_json_data(self, data: Any) -> IlpFilter:
         return IlpFilter.from_json_data(data)
 
 
 class WsPixelClassificationApplet(WsAppletMixin, PixelClassificationApplet):
-    def _updateRemote(self):
+    def _get_message_for_remote(self) -> Any:
         classifier = self.pixel_classifier()
         if classifier is None:
             return None
@@ -138,13 +143,10 @@ class WsPixelClassificationApplet(WsAppletMixin, PixelClassificationApplet):
         ]
         shader = "\n".join(shader_lines)
 
-        for websocket in self.websockets:
-            asyncio.get_event_loop().create_task(websocket.send_str(json.dumps(
-                {
-                    "applet_name": "pixel_classifier_applet",#FIXME: maybe have python applets also have names?
-                    "predictions_shader": shader
-                }
-            )))
+        return {
+            "applet_name": "pixel_classifier_applet",#FIXME: maybe have python applets also have names?
+            "predictions_shader": shader
+        }
 
 
 class WsPixelClassificationWorkflow:
