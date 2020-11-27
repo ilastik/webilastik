@@ -154,16 +154,16 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         self.app = web.Application()
 
         data_selection_applet = WsDataSelectionApplet()
-        feature_selection_applet = WsFeatureSelectionApplet(lanes=self.data_selection_applet.items)
-        brushing_applet = WsBrushingApplet(lanes=self.data_selection_applet.items)
+        feature_selection_applet = WsFeatureSelectionApplet(lanes=data_selection_applet.items)
+        brushing_applet = WsBrushingApplet(lanes=data_selection_applet.items)
         pixel_classifier_applet = WsPixelClassificationApplet(
-            lanes=self.data_selection_applet.items,
-            feature_extractors=self.feature_selection_applet.items,
-            annotations=self.brushing_applet.items,
+            lanes=data_selection_applet.items,
+            feature_extractors=feature_selection_applet.items,
+            annotations=brushing_applet.items,
         )
         predictions_export_applet = ExportApplet(
-            lanes=self.data_selection_applet.items,
-            producer=self.pixel_classifier_applet.pixel_classifier
+            lanes=data_selection_applet.items,
+            producer=pixel_classifier_applet.pixel_classifier
         )
         super().__init__(
             data_selection_applet=data_selection_applet,
