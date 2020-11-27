@@ -55,6 +55,15 @@ class ExportApplet(Applet):
         tiles : Sequence[Array5D] = [tile for future in result_batch_futures for tile in future.result()]
         return tiles[0].combine(tiles[1:])
 
+    @property
+    def ilp_data(self):
+        return {
+            "OutputFilenameFormat": "{dataset_dir}/{nickname}_{result_type}",
+            "OutputFormat": "hdf5",
+            "OutputInternalPath": "exported_data",
+            "StorageVersion": "0.1",
+        }
+
 
 def do_worker_compute(slice_batch: Tuple[Operator, Sequence[DataSourceSlice]]) -> List[Array5D]:
     op = slice_batch[0]

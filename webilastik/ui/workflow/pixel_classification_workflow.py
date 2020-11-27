@@ -29,6 +29,16 @@ class PixelClassificationLane(ILane, JsonSerializable):
             prediction_mask=None #FIXME
         )
 
+    @classmethod
+    def get_role_names(cls) -> Sequence[str]:
+        return ["Raw Data", "Prediction Mask"]
+
+    @property
+    def ilp_data(self) -> dict:
+        return {
+            "Raw Data": self.datasource_to_ilp_data(self.raw_data),
+            "Prediction Mask": {} if self.prediction_mask is None else self.datasource_to_ilp_data(self.prediction_mask),
+        }
 
 @dataclass
 class PixelClassificationWorkflow:
@@ -37,3 +47,27 @@ class PixelClassificationWorkflow:
     brushing_applet: BrushingApplet
     pixel_classifier_applet: PixelClassificationApplet
     predictions_export_applet : ExportApplet
+
+    @property
+    def ilp_data(self):
+        return {
+            "Input Data": self.data_selection_applet.get_ilp_data(PixelClassificationLane),
+            "FeatureSelections": self.feature_selection_applet.ilp_data,
+            "PixelClassification": self.pixel_classifier_applet.ilp_data,
+            "Prediction Export": self.predictions_export_applet.ilp_data,
+            "currentApplet": 0,
+            "ilastikVersion": b"1.3.2post1",  # FIXME
+            "time": b"Wed Mar 11 15:40:37 2020",  # FIXME
+            "workflowName": b"Pixel Classification",
+        }
+
+    @property
+    def ilp_file(self) -> io.BufferedIOBase:
+        project, backing_file = Project.from_ilp_data(self.ilp_data)
+        project.close()
+        backing_file.seek(0)
+        return backing_file
+
+    def save_as(self, path: Path):
+        with open(path, 'wb') as f:
+            f.write(self.ilp_file.read())
