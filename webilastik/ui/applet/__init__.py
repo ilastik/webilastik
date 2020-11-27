@@ -127,23 +127,26 @@ class SequenceProviderApplet(Applet, Generic[Item_co]): #(DataSelectionApplet):
         self.items = Slot[Tuple[Item_co]](owner=self, refresher=refresher)
         super().__init__()
 
+    def _set_items(self, items: Sequence[Item_co], confirmer: CONFIRMER):
+        self.items.set_value(tuple(items) if len(items) > 0 else None, confirmer=confirmer)
+
     def add(self, items: Sequence[Item_co], confirmer: CONFIRMER) -> None:
         current_items = self.items() or ()
         for item in items:
             if item in current_items:
                 raise ValueError(f"{item.__class__.__name__} {item} has already been added")
-        self.items.set_value(current_items + tuple(items), confirmer=confirmer)
+        self._set_items(current_items + tuple(items), confirmer=confirmer)
 
     def remove_at(self, idx: int, confirmer: CONFIRMER) -> None:
         items = list(self.items() or ())
         if idx >= len(items):
             raise ValueError(f"There is no item at index {idx}")
         items.pop(idx)
-        self.items.set_value(tuple(items), confirmer=confirmer)
+        self._set_items(items, confirmer=confirmer)
 
     def remove(self, items: Sequence[Item_co], confirmer: CONFIRMER) -> None:
         new_items = tuple(item for item in (self.items() or ()) if item not in items)
-        self.items.set_value(new_items, confirmer=confirmer)
+        self._set_items(new_items, confirmer=confirmer)
 
     def clear(self, confirmer: CONFIRMER) -> None:
-        self.items.set_value(None, confirmer=confirmer)
+        self._set_items((), confirmer=confirmer)

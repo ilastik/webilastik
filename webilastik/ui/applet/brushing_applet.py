@@ -15,12 +15,12 @@ class BrushingApplet(SequenceProviderApplet[Annotation]):
 
     def _refresh_annotations(self, confirmer: CONFIRMER) -> Optional[Tuple[Annotation]]:
         annotations = self.items() or ()
-        present_datasources = {lane.get_raw_data() for lane in self._in_lanes()}
+        present_datasources = {lane.get_raw_data() for lane in (self._in_lanes() or [])}
         dangling_annotations = [a for a in annotations if a.raw_data not in present_datasources]
         if dangling_annotations:
             if not confirmer(f"This action will drop these annotations:\n{dangling_annotations}\nContinue?"):
                 raise CancelledException("User did not want to drop annotations")
-        return tuple(a for a in annotations if a.raw_data in present_datasources)
+        return tuple(a for a in annotations if a.raw_data in present_datasources) or None
 
     def add(self, items: Sequence[Annotation], confirmer: CONFIRMER) -> None:
         current_annotations = self.items() or ()
