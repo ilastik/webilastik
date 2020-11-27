@@ -258,6 +258,15 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             headers={"Access-Control-Allow-Origin": "*"}
         )
 
+    def ilp_download(self, request: web.Request):
+        return web.Response(
+            body=self.ilp_file.read(),
+            content_type="application/octet-stream",
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Content-disposition": 'attachment; filename="MyProject.ilp"'
+            }
+        )
 
 workflow = WsPixelClassificationWorkflow(websockets=[])
 
@@ -271,6 +280,10 @@ app.add_routes([
     web.get(
         "/predictions_export_applet/{uuid}/{lane_index}/info", #uuid so not to cache
         workflow.ng_predict_info
+    ),
+    web.post(
+        "/ilp_project",
+        workflow.ilp_download
     )
 ])
 
