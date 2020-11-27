@@ -149,19 +149,28 @@ class WsPixelClassificationApplet(WsAppletMixin, PixelClassificationApplet):
         }
 
 
-class WsPixelClassificationWorkflow:
+class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
     def __init__(self, websockets: List[web.WebSocketResponse]):
         self.app = web.Application()
-        self.data_selection_applet = WsDataSelectionApplet()
-        self.feature_selection_applet = WsFeatureSelectionApplet(lanes=self.data_selection_applet.items)
-        self.brushing_applet = WsBrushingApplet(lanes=self.data_selection_applet.items)
-        self.pixel_classifier_applet = WsPixelClassificationApplet(
+
+        data_selection_applet = WsDataSelectionApplet()
+        feature_selection_applet = WsFeatureSelectionApplet(lanes=self.data_selection_applet.items)
+        brushing_applet = WsBrushingApplet(lanes=self.data_selection_applet.items)
+        pixel_classifier_applet = WsPixelClassificationApplet(
+            lanes=self.data_selection_applet.items,
             feature_extractors=self.feature_selection_applet.items,
             annotations=self.brushing_applet.items,
         )
-        self.predictions_export_applet = ExportApplet(
+        predictions_export_applet = ExportApplet(
             lanes=self.data_selection_applet.items,
             producer=self.pixel_classifier_applet.pixel_classifier
+        )
+        super().__init__(
+            data_selection_applet=data_selection_applet,
+            feature_selection_applet=feature_selection_applet,
+            brushing_applet=brushing_applet,
+            pixel_classifier_applet=pixel_classifier_applet,
+            predictions_export_applet=predictions_export_applet
         )
         self.websockets : List[web.WebSocketResponse] = []
         for ws in websockets:
@@ -169,9 +178,8 @@ class WsPixelClassificationWorkflow:
 
     def _add_websocket(self, websocket: web.WebSocketResponse):
         self.websockets.append(websocket)
-        self.data_selection_applet._add_websocket(websocket)
-        self.feature_selection_applet._add_websocket(websocket)
-        self.pixel_classifier_applet._add_websocket(websocket)
+        for applet in [app for app in self.__dict__.values() if isinstance(app, WsAppletMixin)]:
+            applet._add_websocket(websocket)
 
     async def open_websocket(self, request: web.Request):
         websocket = web.WebSocketResponse() #FIXME: what happens on 2 connections?

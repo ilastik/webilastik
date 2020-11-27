@@ -1,9 +1,13 @@
-from typing import Optional
+from typing import Optional, Sequence, Type
+from dataclasses import dataclass
+import io
+from pathlib import Path
 
 from ndstructs.datasource import DataSource
 from ndstructs.utils import JsonSerializable, Dereferencer
 
-from webilastik.ui.applet.data_selection_applet import DataSelectionApplet, ILane, url_to_datasource
+from webilastik import Project
+from webilastik.ui.applet.data_selection_applet import DataSelectionApplet, ILane, Lane, url_to_datasource
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
 from webilastik.ui.applet.brushing_applet import BrushingApplet
@@ -22,19 +26,14 @@ class PixelClassificationLane(ILane, JsonSerializable):
     def from_json_data(cls, data: dict, dereferencer: Optional[Dereferencer] = None) -> "PixelClassificationLane":
         return cls(
             raw_data=url_to_datasource(data['raw_data']),
-            prediction_mask=None
+            prediction_mask=None #FIXME
         )
 
+
+@dataclass
 class PixelClassificationWorkflow:
-    def __init__(self):
-        self.data_selection_applet = DataSelectionApplet[PixelClassificationLane]()
-        self.feature_selection_applet = FeatureSelectionApplet(lanes=self.data_selection_applet.items)
-        self.brushing_applet = BrushingApplet(lanes=self.data_selection_applet.items)
-        self.pixel_classifier_applet = PixelClassificationApplet(
-            feature_extractors=self.feature_selection_applet.items,
-            annotations=self.brushing_applet.items
-        )
-        self.predictions_export_applet = ExportApplet(
-            lanes=self.data_selection_applet.items,
-            producer=self.pixel_classifier_applet.pixel_classifier
-        )
+    data_selection_applet: DataSelectionApplet[PixelClassificationLane]
+    feature_selection_applet: FeatureSelectionApplet
+    brushing_applet: BrushingApplet
+    pixel_classifier_applet: PixelClassificationApplet
+    predictions_export_applet : ExportApplet
