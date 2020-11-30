@@ -6,6 +6,8 @@ import typing_extensions
 class CancelledException(Exception):
     pass
 
+class NotReadyException(Exception):
+    pass
 
 CONFIRMER = Callable[[str], bool]
 
@@ -51,9 +53,17 @@ class Slot(Generic[SV]):
 
     def refresh(self, confirmer: CONFIRMER):
         if self.refresher is not None:
-            self._value = self.refresher(confirmer)
+            try:
+                self._value = self.refresher(confirmer)
+            except NotReadyException:
+                self._value = None
 
-    def __call__(self) -> Optional[SV]:
+    def __call__(self) -> SV:
+        if self._value is None:
+            raise NotReadyException()
+        return self._value
+
+    def get(self, default: Optional[SV] = None) -> Optional[SV]:
         return self._value
 
     def set_value(self, new_value: Optional[SV], confirmer: CONFIRMER):
@@ -124,28 +134,26 @@ class Applet(ABC):
 Item_co = TypeVar("Item_co", covariant=True)
 class SequenceProviderApplet(Applet, Generic[Item_co]): #(DataSelectionApplet):
     def __init__(self, refresher: Optional[SLOT_REFRESHER]=None):
-        self.items = Slot[Tuple[Item_co]](owner=self, refresher=refresher)
+        self.items = Slot[Tuple[Item_co, ...]](owner=self, refresher=refresher)
         super().__init__()
 
     def _set_items(self, items: Sequence[Item_co], confirmer: CONFIRMER):
         self.items.set_value(tuple(items) if len(items) > 0 else None, confirmer=confirmer)
 
     def add(self, items: Sequence[Item_co], confirmer: CONFIRMER) -> None:
-        current_items = self.items() or ()
+        current_items = self.items.get() or ()
         for item in items:
             if item in current_items:
                 raise ValueError(f"{item.__class__.__name__} {item} has already been added")
         self._set_items(current_items + tuple(items), confirmer=confirmer)
 
     def remove_at(self, idx: int, confirmer: CONFIRMER) -> None:
-        items = list(self.items() or ())
-        if idx >= len(items):
-            raise ValueError(f"There is no item at index {idx}")
+        items = list(self.items())
         items.pop(idx)
         self._set_items(items, confirmer=confirmer)
 
     def remove(self, items: Sequence[Item_co], confirmer: CONFIRMER) -> None:
-        new_items = tuple(item for item in (self.items() or ()) if item not in items)
+        new_items = tuple(item for item in self.items() if item not in items)
         self._set_items(new_items, confirmer=confirmer)
 
     def clear(self, confirmer: CONFIRMER) -> None:

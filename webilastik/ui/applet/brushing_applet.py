@@ -14,8 +14,8 @@ class BrushingApplet(SequenceProviderApplet[Annotation]):
         super().__init__(refresher=self._refresh_annotations)
 
     def _refresh_annotations(self, confirmer: CONFIRMER) -> Optional[Tuple[Annotation]]:
-        annotations = self.items() or ()
-        present_datasources = {lane.get_raw_data() for lane in (self._in_lanes() or [])}
+        annotations = self.items.get() or ()
+        present_datasources = {lane.get_raw_data() for lane in self._in_lanes.get() or []}
         dangling_annotations = [a for a in annotations if a.raw_data not in present_datasources]
         if dangling_annotations:
             if not confirmer(f"This action will drop these annotations:\n{dangling_annotations}\nContinue?"):
@@ -23,8 +23,7 @@ class BrushingApplet(SequenceProviderApplet[Annotation]):
         return tuple(a for a in annotations if a.raw_data in present_datasources) or None
 
     def add(self, items: Sequence[Annotation], confirmer: CONFIRMER) -> None:
-        current_annotations = self.items() or ()
-        current_lanes = self._in_lanes() or ()
+        current_lanes = self._in_lanes.get() or ()
         for annotation in items:
             if not any(annotation.raw_data == lane.get_raw_data() for lane in current_lanes):
                 raise ValueError(f"Annotation {annotation} references a DataSource not present in any lane")

@@ -4,7 +4,7 @@ import itertools
 from ndstructs.datasource import DataSource, DataSourceSlice
 import numpy as np
 
-from webilastik.ui.applet  import Applet, SequenceProviderApplet, Slot, CancelledException, CONFIRMER
+from webilastik.ui.applet  import Applet, NotReadyException, SequenceProviderApplet, Slot, CancelledException, CONFIRMER
 from webilastik.ui.applet.data_selection_applet import ILane
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.annotations.annotation import Annotation, Color
@@ -36,27 +36,17 @@ class PixelClassificationApplet(Applet):
         super().__init__()
 
     def _create_pixel_classifier(self, confirmer: CONFIRMER) -> Optional[IlpVigraPixelClassifier]:
-        feature_extractors = self._in_feature_extractors()
-        annotations = self._in_annotations()
-        if not feature_extractors or not annotations:
-            return None
-        if len(annotations) > 10:
-            if not confirmer("Are you sure you want to retrain the classifier? This can take a few minutes or whatever"):
-                raise CancelledException("User cancelled random forest retraining")
-        print("Retraining pixel classifier..................")
         return  IlpVigraPixelClassifier.train(
-            annotations=annotations,
-            feature_extractors=feature_extractors
+            annotations=self._in_annotations(),
+            feature_extractors=self._in_feature_extractors()
         )
 
     def _create_color_map(self, confirmer: CONFIRMER) -> Optional[Dict[Color, np.uint8]]:
-        annotations = self._in_annotations() or []
+        annotations = self._in_annotations.get() or []
         return Color.create_color_map([a.color for a in annotations])
 
     def predict(self, roi: DataSourceSlice) -> Predictions:
         classifier = self.pixel_classifier()
-        if classifier is None:
-            raise ValueError("Applet has no classifier")
         return classifier.compute(roi)
 
     def get_ilp_classifier_feature_names(self) -> Iterator[bytes]:
@@ -70,10 +60,8 @@ class PixelClassificationApplet(Applet):
                 name_and_channel = fe.ilp_name + f" [{c}]"
                 yield name_and_channel.encode("utf8")
 
-    def get_classifier_ilp_data(self):
+    def get_classifier_ilp_data(self) -> dict:
         classifier = self.pixel_classifier()
-        if classifier is None:
-            return None
         out = classifier.get_forest_data()
         feature_names: Iterator[bytes] = self.get_ilp_classifier_feature_names()
         out["feature_names"] = np.asarray(list(feature_names))
@@ -90,10 +78,11 @@ class PixelClassificationApplet(Applet):
             "StorageVersion": "0.1",
             "ClassifierFactory": IlpVigraPixelClassifier.DEFAULT_ILP_CLASSIFIER_FACTORY,
         }
-        classifier = self.pixel_classifier()
-        if classifier is not None:
+        try:
             out["ClassifierForests"] = self.get_classifier_ilp_data()
-            out["ClassifierFactory"] = classifier.ilp_classifier_factory
+            out["ClassifierFactory"] = self.pixel_classifier().ilp_classifier_factory
+        except NotReadyException:
+            pass
 
         out["LabelSets"] = labelSets = {"labels000": {}}  # empty labels still produce this in classic ilastik
         color_map = self.color_map()

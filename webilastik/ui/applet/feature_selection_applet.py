@@ -25,9 +25,9 @@ class FeatureSelectionApplet(SequenceProviderApplet[IlpFilter]):
         super().__init__(refresher=self._refresh_extractors)
 
     def _refresh_extractors(self, confirmer: CONFIRMER) -> Optional[Sequence[IlpFilter]]:
-        current_extractors = list(self.items() or [])
+        current_extractors = list(self.items.get() or ())
         new_extractors : List[IlpFilter] = []
-        current_datasources = [lane.get_raw_data() for lane in self._in_lanes() or []]
+        current_datasources = [lane.get_raw_data() for lane in self._in_lanes.get() or ()]
         for ex in current_extractors:
             for ds in current_datasources:
                 if not ex.is_applicable_to(ds):
@@ -37,10 +37,10 @@ class FeatureSelectionApplet(SequenceProviderApplet[IlpFilter]):
                         raise CancelledException("User did not drop feature extractor")
             else:
                 new_extractors.append(ex)
-        return tuple(new_extractors)
+        return tuple(new_extractors) or None
 
     def add(self, items: List[IlpFilter], confirmer: CONFIRMER):
-        current_datasources = [lane.get_raw_data() for lane in (self._in_lanes() or [])]
+        current_datasources = [lane.get_raw_data() for lane in self._in_lanes.get() or ()]
         for extractor in items:
             for ds in current_datasources:
                 if not extractor.is_applicable_to(ds):
@@ -49,13 +49,13 @@ class FeatureSelectionApplet(SequenceProviderApplet[IlpFilter]):
 
     @property
     def ilp_data(self) -> Dict[str, Any]:
-        feature_extractors = self.items()
+        feature_extractors = self.items.get()
         if not feature_extractors:
             return {}
 
         out = {"FeatureIds": np.asarray([name.encode("utf8") for name in self.ilp_feature_names])}
 
-        default_scales = [0.3, 0.7, 1.0, 1.6, 3.5, 6.0, 10.0]
+        default_scales = [0.3, 0.7, 1.0, 1.6, 3.5, 6.0, 10.0] #FIXME allow arbitrary scales
         extra_scales = set(fe.ilp_scale for fe in feature_extractors if fe.ilp_scale not in default_scales)
         scales = default_scales + sorted(extra_scales)
         out["Scales"] = np.asarray(scales)

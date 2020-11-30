@@ -119,7 +119,7 @@ class WsFeatureSelectionApplet(WsSequenceProviderApplet[IlpFilter], FeatureSelec
 
 class WsPixelClassificationApplet(WsAppletMixin, PixelClassificationApplet):
     def _get_message_for_remote(self) -> Any:
-        classifier = self.pixel_classifier()
+        classifier = self.pixel_classifier.get()
         if classifier is None:
             return None
 
@@ -212,8 +212,6 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         lane_index = int(request.match_info.get("lane_index"))
         classifier = self.pixel_classifier_applet.pixel_classifier()
         color_map = self.pixel_classifier_applet.color_map()
-        if classifier is None or color_map is None:
-            raise ValueError("No classifier trained yet")
         expected_num_channels = len(color_map)
         datasource = self.data_selection_applet.items()[lane_index].get_raw_data()
 
