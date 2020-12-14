@@ -1,7 +1,7 @@
 from typing import List, Optional, Sequence, Dict, Any, Iterator
 import itertools
 
-from ndstructs.datasource import DataSource, DataSourceSlice
+from ndstructs.datasource import DataSource, DataRoi
 import numpy as np
 
 from webilastik.ui.applet  import Applet, NotReadyException, SequenceProviderApplet, Slot, CancelledException, CONFIRMER
@@ -45,7 +45,7 @@ class PixelClassificationApplet(Applet):
         annotations = self._in_annotations.get() or []
         return Color.create_color_map([a.color for a in annotations])
 
-    def predict(self, roi: DataSourceSlice) -> Predictions:
+    def predict(self, roi: DataRoi) -> Predictions:
         classifier = self.pixel_classifier()
         return classifier.compute(roi)
 

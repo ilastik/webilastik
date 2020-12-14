@@ -7,7 +7,7 @@ from ndstructs.utils import from_json_data, Dereferencer
 
 
 from .feature_extractor import ChannelwiseFilter
-from webilastik.operator import Operator
+from webilastik.operator import Operator, NoopOperator
 
 
 FE = TypeVar("FE", bound="IlpFilter")
@@ -27,7 +27,7 @@ class IlpFilter(ChannelwiseFilter):
     @classmethod
     @abstractmethod
     def from_ilp_scale(
-        cls: Type[FE], *, preprocessor: Optional[Operator] = None, scale: float, axis_2d: Optional[str] = None
+        cls: Type[FE], *, preprocessor: Operator = NoopOperator(), scale: float, axis_2d: Optional[str] = None
     ) -> FE:
         pass
 

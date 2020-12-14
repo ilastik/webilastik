@@ -81,7 +81,7 @@ class IlpVigraPixelClassifier(VigraPixelClassifier):
         num_forests: int = multiprocessing.cpu_count(),
         random_seed: int = 0,
         strict: bool = False,
-    ):
+    ) -> "IlpVigraPixelClassifier":
         return super().train(
             feature_extractors=feature_extractors,
             annotations=annotations,

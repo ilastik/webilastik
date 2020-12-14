@@ -7,10 +7,10 @@ from numbers import Number
 from pathlib import Path
 
 import numpy as np
-from ndstructs import Slice5D, Point5D, Shape5D
-from ndstructs import Array5D, Image, ScalarData, StaticLine, LinearData
+from ndstructs import Interval5D, Point5D, Shape5D
+from ndstructs import Array5D, All, ScalarData, StaticLine, LinearData
 from webilastik.features.feature_extractor import FeatureExtractor, FeatureData
-from ndstructs.datasource import DataSource, DataSourceSlice
+from ndstructs.datasource import DataSource, DataRoi
 from ndstructs.utils import JsonSerializable, from_json_data, to_json_data, Dereferencer, Referencer
 from PIL import Image as PilImage
 
@@ -83,7 +83,7 @@ class FeatureSamples(FeatureData, StaticLine):
 
 
 class AnnotationOutOfBounds(Exception):
-    def __init__(self, annotation_roi: Slice5D, raw_data: DataSource):
+    def __init__(self, annotation_roi: Interval5D, raw_data: DataSource):
         super().__init__(f"Annotation roi {annotation_roi} exceeds bounds of raw_data {raw_data}")
 
 
@@ -102,12 +102,12 @@ class Annotation(ScalarData):
         self, arr: np.ndarray, *, axiskeys: str, location: Point5D = Point5D.zero(), color: Color, raw_data: DataSource
     ):
         super().__init__(arr.astype(bool), axiskeys=axiskeys, location=location)
-        if not raw_data.roi.contains(self.roi):
-            raise AnnotationOutOfBounds(annotation_roi=self.roi, raw_data=raw_data)
+        if not raw_data.interval.contains(self.interval):
+            raise AnnotationOutOfBounds(annotation_roi=self.interval, raw_data=raw_data)
         self.color = color
         self.raw_data = raw_data
 
-    def rebuild(self, arr: np.ndarray, axiskeys: str, location: Point5D = None) -> "Annotation":
+    def rebuild(self, arr: np.ndarray, *, axiskeys: str, location: Point5D = None) -> "Annotation":
         location = self.location if location is None else location
         return self.__class__(arr, axiskeys=axiskeys, location=location, color=self.color, raw_data=self.raw_data)
 
@@ -115,7 +115,7 @@ class Annotation(ScalarData):
     def interpolate_from_points(cls, color: Color, voxels: List[Point5D], raw_data: DataSource):
         start = Point5D.min_coords(voxels)
         stop = Point5D.max_coords(voxels) + 1  # +1 because slice.stop is exclusive, but max_point isinclusive
-        scribbling_roi = Slice5D.create_from_start_stop(start=start, stop=stop)
+        scribbling_roi = Interval5D.create_from_start_stop(start=start, stop=stop)
         if scribbling_roi.shape.c != 1:
             raise ValueError(f"Annotations must not span multiple channels: {voxels}")
         scribblings = Array5D.allocate(scribbling_roi, dtype=np.dtype(bool), value=False)
@@ -143,14 +143,14 @@ class Annotation(ScalarData):
 
     def get_feature_samples(self, feature_extractor: FeatureExtractor) -> FeatureSamples:
         all_feature_samples = []
-        annotated_roi = self.roi.with_full_c()
+        interval_under_annotation = self.interval.updated(c=self.raw_data.interval.c)
 
         with ThreadPoolExecutor() as executor:
-            for data_tile in DataSourceSlice(self.raw_data).clamped(annotated_roi).get_tiles(clamp=False):
+            for data_tile in DataRoi(self.raw_data).clamped(interval_under_annotation).get_tiles(clamp=False):
 
                 def make_samples(data_tile):
                     annotation_tile = self.clamped(data_tile)
-                    feature_tile = feature_extractor.compute(data_tile).clamped(annotation_tile.roi.with_full_c())
+                    feature_tile = feature_extractor.compute(data_tile).cut(annotation_tile.interval, c=All())
 
                     feature_samples = FeatureSamples.create(annotation_tile, feature_tile)
                     assert feature_samples.shape.c == feature_extractor.get_expected_shape(data_tile.shape).c
@@ -168,8 +168,8 @@ class Annotation(ScalarData):
 
     @staticmethod
     def merge(annotations: Sequence["Annotation"], color_map: Optional[Dict[Color, np.uint8]] = None) -> Array5D:
-        out_roi = Slice5D.enclosing(annot.roi for annot in annotations)
-        out = Array5D.allocate(slc=out_roi, value=0, dtype=np.uint8)
+        out_roi = Interval5D.enclosing(annot.interval for annot in annotations)
+        out = Array5D.allocate(interval=out_roi, value=0, dtype=np.dtype('uint8'))
         color_map = color_map or Color.create_color_map(annot.color for annot in annotations)
         for annot in annotations:
             out.set(annot.colored(color_map[annot.color]), mask_value=0)
@@ -195,7 +195,7 @@ class Annotation(ScalarData):
                 "__data__": block.raw(axiskeys),
                 "__attrs__": {
                     "blockSlice": "["
-                    + ",".join(f"{slc.start}:{slc.stop}" for slc in block.roi.to_slices(axiskeys))
+                    + ",".join(f"{slc.start}:{slc.stop}" for slc in block.interval.to_slices(axiskeys))
                     + "]"
                 },
             }
@@ -207,7 +207,7 @@ class Annotation(ScalarData):
         return {
             "__data__": self.raw(axiskeys),
             "__attrs__": {
-                "blockSlice": "[" + ",".join(f"{slc.start}:{slc.stop}" for slc in self.roi.to_slices(axiskeys)) + "]"
+                "blockSlice": "[" + ",".join(f"{slc.start}:{slc.stop}" for slc in self.interval.to_slices(axiskeys)) + "]"
             },
         }
 

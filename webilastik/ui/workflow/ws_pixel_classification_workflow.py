@@ -245,7 +245,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         zEnd = int(request.match_info.get("zEnd"))
 
         requested_roi = Slice5D(x=slice(xBegin, xEnd), y=slice(yBegin, yEnd), z=slice(zBegin, zEnd))
-        predictions = self.predictions_export_applet.compute_lane(lane_index, slc=requested_roi)
+        predictions = self.predictions_export_applet.compute_lane(lane_index, interval=requested_roi)
 
         # https://github.com/google/neuroglancer/tree/master/src/neuroglancer/datasource/precomputed#raw-chunk-encoding
         # "(...) data for the chunk is stored directly in little-endian binary format in [x, y, z, channel] Fortran order"

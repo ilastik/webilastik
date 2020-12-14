@@ -2,7 +2,7 @@ from typing import Sequence, Optional
 from abc import ABC, abstractmethod
 
 from ndstructs import Array5D
-from ndstructs.datasource import DataSource, DataSourceSlice
+from ndstructs.datasource import DataSource, DataRoi
 
 from webilastik.ui.applet import Applet, Slot, CONFIRMER
 from webilastik.ui.applet.data_selection_applet import ILane
@@ -49,5 +49,5 @@ class Array5DViewer(Applet, ABC):
 
 class GimpArray5DViewer(Array5DViewer):
     def draw(self, operator: Operator, datasource: DataSource):
-        data = operator.compute(DataSourceSlice(datasource))
+        data = operator.compute(DataRoi(datasource))
         data.show_channels()

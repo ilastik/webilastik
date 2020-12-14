@@ -1,6 +1,6 @@
 from abc import abstractmethod
 import functools
-from typing import List, Tuple, Iterable, Optional, Sequence, Dict
+from typing import List, Tuple, Iterable, Optional, Sequence, Dict, TypeVar, Type
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
@@ -11,12 +11,12 @@ import vigra
 from vigra.learning import RandomForest as VigraRandomForest
 from sklearn.ensemble import RandomForestClassifier as ScikitRandomForestClassifier
 
-from ndstructs import Array5D, Slice5D, Point5D, Shape5D
+from ndstructs import Array5D, Interval5D, Point5D, Shape5D
 from webilastik.features.feature_extractor import FeatureExtractor, FeatureData, ChannelwiseFilter
 from webilastik.features.feature_extractor import FeatureExtractorCollection
 from webilastik.annotations import Annotation, FeatureSamples, Color
 from webilastik.operator import Operator
-from ndstructs.datasource import DataSourceSlice, DataSource
+from ndstructs.datasource import DataRoi, DataSource
 from ndstructs.utils import JsonSerializable, from_json_data, Dereferencer
 
 
@@ -24,24 +24,7 @@ class Predictions(Array5D):
     """An array of floats from 0.0 to 1.0. The value in each channel represents
     how likely that pixel is to belong to the classification class associated with
     that channel"""
-
-    def __init__(
-        self, arr: np.ndarray, *, axiskeys: str, location: Point5D = Point5D.zero(), color_map: Dict[Color, np.uint8]
-    ):
-        super().__init__(arr, axiskeys=axiskeys, location=location)
-        self.color_map = color_map
-
-    def rebuild(self, arr: np.ndarray, axiskeys: str, location: Optional[Point5D] = None) -> "Predictions":
-        location = self.location if location is None else location
-        return self.__class__(arr, axiskeys=axiskeys, location=location, color_map=self.color_map)
-
-    @classmethod
-    def allocate(
-        cls, *, slc: Slice5D, dtype=np.float32, axiskeys: str = Point5D.LABELS, color_map: Dict[Color, np.uint8]
-    ):
-        arr = Array5D.allocate(slc, dtype=dtype, axiskeys=axiskeys, value=0)
-        return cls(arr._data, axiskeys=arr.axiskeys, location=arr.location, color_map=color_map)
-
+    pass
 
 class TrainingData:
     feature_extractors: Sequence[FeatureExtractor]
@@ -96,25 +79,25 @@ class PixelClassifier(Operator, JsonSerializable):
     def get(cls, *classifier_args, **classifier_kwargs):
         return cls(*classifier_args, **classifier_kwargs)
 
-    def get_expected_roi(self, data_slice: Slice5D) -> Slice5D:
-        c_start = data_slice.c.start
+    def get_expected_roi(self, data_slice: Interval5D) -> Interval5D:
+        c_start = data_slice.c[0]
         c_stop = c_start + self.num_classes
-        return data_slice.with_coord(c=slice(c_start, c_stop))
+        return data_slice.updated(c=(c_start, c_stop))
 
-    def allocate_predictions(self, data_slice: Slice5D):
-        return Predictions.allocate(slc=self.get_expected_roi(data_slice), color_map=self.color_map)
+    def allocate_predictions(self, data_slice: Interval5D):
+        return Predictions.allocate(interval=self.get_expected_roi(data_slice), dtype=np.dtype('float32'))
 
-    def predict(self, data_slice: DataSourceSlice, out: Predictions = None) -> Predictions:
+    def predict(self, roi: DataRoi, out: Predictions = None) -> Predictions:
         if self.strict:
-            self.feature_extractor.ensure_applicable(data_slice.datasource)
-        return self._do_predict(data_slice=data_slice, out=out)
+            self.feature_extractor.ensure_applicable(roi.datasource)
+        return self._do_predict(roi=roi, out=out)
 
     @functools.lru_cache()
-    def compute(self, roi: DataSourceSlice) -> Array5D:
+    def compute(self, roi: DataRoi) -> Array5D:
         return self.predict(roi)
 
     @abstractmethod
-    def _do_predict(self, data_slice: DataSourceSlice, out: Predictions = None) -> Predictions:
+    def _do_predict(self, roi: DataRoi, out: Predictions = None) -> Predictions:
         pass
 
 
@@ -159,11 +142,11 @@ class ScikitLearnPixelClassifier(PixelClassifier):
     def from_json_data(cls, data: dict, dereferencer: Optional[Dereferencer] = None) -> "ScikitLearnPixelClassifier":
         return from_json_data(cls.train, data, dereferencer=dereferencer)
 
-    def _do_predict(self, data_slice: DataSourceSlice, out: Optional[Predictions] = None) -> Predictions:
-        feature_data = self.feature_extractor.compute(data_slice)
-        predictions_shape = data_slice.shape.with_coord(c=self.num_classes)
+    def _do_predict(self, roi: DataRoi, out: Optional[Predictions] = None) -> Predictions:
+        feature_data = self.feature_extractor.compute(roi)
+        predictions_shape = roi.shape.updated(c=self.num_classes)
         predictions_raw_line = self.forest.predict_proba(feature_data.linear_raw())
-        predictions = Predictions.from_line(predictions_raw_line, shape=predictions_shape, location=data_slice.start)
+        predictions = Predictions.from_line(predictions_raw_line, shape=predictions_shape, location=roi.start)
         if out is not None:
             assert out.shape == predictions.shape
             out.localSet(predictions)
@@ -172,6 +155,7 @@ class ScikitLearnPixelClassifier(PixelClassifier):
             return predictions
 
 
+VIGRA_CLASSIFIER = TypeVar("VIGRA_CLASSIFIER", bound="VigraPixelClassifier", covariant=True)
 class VigraPixelClassifier(PixelClassifier):
     def __init__(
         self,
@@ -191,7 +175,7 @@ class VigraPixelClassifier(PixelClassifier):
 
     @classmethod
     def train(
-        cls,
+        cls: Type[VIGRA_CLASSIFIER],
         feature_extractors: Tuple[FeatureExtractor],
         annotations: Tuple[Annotation],
         *,
@@ -199,7 +183,7 @@ class VigraPixelClassifier(PixelClassifier):
         num_forests: int = multiprocessing.cpu_count(),
         random_seed: int = 0,
         strict: bool = False,
-    ):
+    ) -> VIGRA_CLASSIFIER:
         training_data = TrainingData(feature_extractors=feature_extractors, annotations=annotations, strict=strict)
 
         tree_counts = np.array([num_trees // num_forests] * num_forests)
@@ -223,14 +207,15 @@ class VigraPixelClassifier(PixelClassifier):
         )
 
     @classmethod
-    def from_json_data(cls, data: dict) -> "VigraPixelClassifier":
+    def from_json_data(cls, data: dict, dereferencer: Optional[Dereferencer] = None) -> "VigraPixelClassifier":
         return from_json_data(cls.train, data)
 
-    def _do_predict(self, data_slice: DataSourceSlice, out: Predictions = None) -> Predictions:
-        feature_data = self.feature_extractor.compute(data_slice)
-        predictions = out or self.allocate_predictions(data_slice)
-        assert predictions.roi == self.get_expected_roi(data_slice)
+    def _do_predict(self, roi: DataRoi, out: Predictions = None) -> Predictions:
+        feature_data = self.feature_extractor.compute(roi)
+        predictions = out or self.allocate_predictions(roi)
+        assert predictions.interval == self.get_expected_roi(roi)
         raw_linear_predictions = predictions.linear_raw()
+        raw_linear_predictions[...] = 0
         lock = Lock()
 
         def do_predict(forest):

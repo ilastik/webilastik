@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Optional, TypeVar
+from typing import Optional, TypeVar, Type
 import math
 import fastfilters
 
@@ -10,8 +10,8 @@ from .feature_extractor import FeatureData
 from .ilp_filter import IlpFilter
 from webilastik.operator import NoopOperator, Operator
 from ndstructs import Array5D, Image, ScalarImage
-from ndstructs import Point5D, Slice5D, Shape5D
-from ndstructs.datasource import DataSource, DataSourceSlice
+from ndstructs import Point5D, Interval5D, Shape5D
+from ndstructs.datasource import DataSource, DataRoi
 from ndstructs.utils import from_json_data, Dereferencer
 
 
@@ -65,7 +65,7 @@ class ChannelwiseFastFilter(IlpFilter):
             args[self.axis_2d] = 1
         return Shape5D(**args)
 
-    def _compute_slice(self, source_roi: DataSourceSlice, out: FeatureData):
+    def _compute_slice(self, source_roi: DataRoi, out: FeatureData):
         assert source_roi.shape.c == 1 and source_roi.shape.t == 1
         haloed_roi = source_roi.enlarged(self.halo)
         if self.presmooth_sigma > 0:
@@ -84,7 +84,7 @@ class ChannelwiseFastFilter(IlpFilter):
         features = FeatureData(
             self.filter_fn(raw_data),
             axiskeys=source_axes + ("c" if self.channel_multiplier > 1 else ""),
-            location=haloed_roi.start.with_coord(c=out.roi.start.c),
+            location=haloed_roi.start.updated(c=out.interval.start.c),
         )
         out.set(features, autocrop=True)
 
@@ -156,7 +156,7 @@ class SigmaWindowFilter(ChannelwiseFastFilter):
 
     @classmethod
     def from_ilp_scale(
-        cls: SigmaFilter, *, preprocessor: Operator = NoopOperator(), scale: float, axis_2d: Optional[str] = None
+        cls: Type[SigmaFilter], *, preprocessor: Operator = NoopOperator(), scale: float, axis_2d: Optional[str] = None
     ) -> SigmaFilter:
         return cls(
             preprocessor=preprocessor,
@@ -254,7 +254,7 @@ class ScaleWindowFilter(ChannelwiseFastFilter):
 
     @classmethod
     def from_ilp_scale(
-        cls: ScaleFilter, *, preprocessor: Operator = NoopOperator(), scale: float, axis_2d: Optional[str] = None
+        cls: Type[ScaleFilter], *, preprocessor: Operator = NoopOperator(), scale: float, axis_2d: Optional[str] = None
     ) -> ScaleFilter:
         return cls(
             preprocessor=preprocessor,
