@@ -29,26 +29,31 @@ class Predictions(Array5D):
 class TrainingData:
     feature_extractors: Sequence[FeatureExtractor]
     combined_extractor: FeatureExtractor
-    strict: bool
     color_map: Dict[Color, np.uint8]
     classes: List[np.uint8]
+    num_input_channels: int
     X: np.ndarray  # shape is (num_samples, num_feature_channels)
     y: np.ndarray  # shape is (num_samples, 1)
 
     def __init__(
-        self, *, feature_extractors: Sequence[FeatureExtractor], annotations: Sequence[Annotation], strict: bool
+        self, *, feature_extractors: Sequence[FeatureExtractor], annotations: Sequence[Annotation]
     ):
         assert len(annotations) > 0
         assert len(feature_extractors) > 0
-        if strict:
-            (fx.ensure_applicable(annot.raw_data) for annot in annotations for fx in feature_extractors)
+        for fx in feature_extractors:
+            for annot in annotations:
+                fx.ensure_applicable(annot.raw_data)
+
+        channels = {a.raw_data.shape.c for a in annotations}
+        if len(channels) != 1:
+            raise ValueError(f"All annotations should be on images of same number of channels: {annotations}")
         annotations = Annotation.sort(annotations)  # sort so the meaning of the channels is always predictable
         combined_extractor = FeatureExtractorCollection(feature_extractors)
         feature_samples = [a.get_feature_samples(combined_extractor) for a in annotations]
 
+        self.num_input_channels = channels.pop()
         self.feature_extractors = feature_extractors
         self.combined_extractor = combined_extractor
-        self.strict = strict
         self.color_map = Color.create_color_map(annot.color for annot in annotations)
         self.classes = list(self.color_map.values())
         self.X = np.concatenate([fs.X for fs in feature_samples])
@@ -64,14 +69,14 @@ class PixelClassifier(Operator, JsonSerializable):
         *,
         feature_extractors: Sequence[FeatureExtractor],
         classes: List[np.uint8],
-        strict: bool,
+        num_input_channels: int,
         color_map: Dict[Color, np.uint8],
     ):
-        self.strict = strict
         self.feature_extractors = feature_extractors
         self.feature_extractor = FeatureExtractorCollection(feature_extractors)
         self.classes = classes
         self.num_classes = len(classes)
+        self.num_input_channels = num_input_channels
         self.color_map = color_map
 
     @classmethod
@@ -88,8 +93,9 @@ class PixelClassifier(Operator, JsonSerializable):
         return Predictions.allocate(interval=self.get_expected_roi(data_slice), dtype=np.dtype('float32'))
 
     def predict(self, roi: DataRoi, out: Predictions = None) -> Predictions:
-        if self.strict:
-            self.feature_extractor.ensure_applicable(roi.datasource)
+        self.feature_extractor.ensure_applicable(roi.datasource)
+        if roi.shape.c != self.num_input_channels:
+            raise ValueError(f"Bad roi: {roi}. Expected roi to have shape.c={self.num_input_channels}")
         return self._do_predict(roi=roi, out=out)
 
     @functools.lru_cache()
@@ -108,30 +114,30 @@ class ScikitLearnPixelClassifier(PixelClassifier):
         feature_extractors: Sequence[FeatureExtractor],
         forest: ScikitRandomForestClassifier,
         classes: List[np.uint8],
-        strict: bool = False,
+        num_input_channels: int,
         color_map: Dict[Color, np.uint8],
     ):
-        super().__init__(classes=classes, feature_extractors=feature_extractors, strict=strict, color_map=color_map)
+        super().__init__(classes=classes, feature_extractors=feature_extractors, num_input_channels=num_input_channels, color_map=color_map)
         self.forest = forest
 
     @classmethod
     def train(
         cls,
-        feature_extractors: Tuple[FeatureExtractor],
+        feature_extractors: Sequence[FeatureExtractor],
         annotations: Tuple[Annotation],
         *,
         num_trees: int = 100,
         random_seed: int = 0,
-        strict: bool = False,
     ) -> "ScikitLearnPixelClassifier":
-        training_data = TrainingData(feature_extractors=feature_extractors, annotations=annotations, strict=strict)
+        training_data = TrainingData(feature_extractors=feature_extractors, annotations=annotations)
         forest = ScikitRandomForestClassifier(n_estimators=num_trees, random_state=random_seed)
         forest.fit(training_data.X, training_data.y.squeeze())
+        num_channels = {a.raw_data for a in annotations}
         return cls(
             forest=forest,
             feature_extractors=feature_extractors,
             classes=training_data.classes,
-            strict=strict,
+            num_input_channels=training_data.num_input_channels,
             color_map=training_data.color_map,
         )
 
@@ -160,13 +166,15 @@ class VigraPixelClassifier(PixelClassifier):
     def __init__(
         self,
         *,
-        feature_extractors: Tuple[FeatureExtractor],
+        feature_extractors: Sequence[FeatureExtractor],
         forests: List[VigraRandomForest],
         classes: List[np.uint8],
-        strict: bool = False,
+        num_input_channels: int,
         color_map: Dict[Color, np.uint8],
     ):
-        super().__init__(classes=classes, feature_extractors=feature_extractors, strict=strict, color_map=color_map)
+        super().__init__(
+            classes=classes, feature_extractors=feature_extractors, num_input_channels=num_input_channels, color_map=color_map
+        )
         self.forests = forests
         self.num_trees = sum(f.treeCount() for f in forests)
 
@@ -176,15 +184,14 @@ class VigraPixelClassifier(PixelClassifier):
     @classmethod
     def train(
         cls: Type[VIGRA_CLASSIFIER],
-        feature_extractors: Tuple[FeatureExtractor],
+        feature_extractors: Sequence[FeatureExtractor],
         annotations: Tuple[Annotation],
         *,
         num_trees: int = 100,
         num_forests: int = multiprocessing.cpu_count(),
         random_seed: int = 0,
-        strict: bool = False,
     ) -> VIGRA_CLASSIFIER:
-        training_data = TrainingData(feature_extractors=feature_extractors, annotations=annotations, strict=strict)
+        training_data = TrainingData(feature_extractors=feature_extractors, annotations=annotations)
 
         tree_counts = np.array([num_trees // num_forests] * num_forests)
         tree_counts[: num_trees % num_forests] += 1
@@ -201,7 +208,7 @@ class VigraPixelClassifier(PixelClassifier):
         return cls(
             feature_extractors=feature_extractors,
             forests=forests,
-            strict=strict,
+            num_input_channels=training_data.num_input_channels,
             classes=training_data.classes,
             color_map=training_data.color_map,
         )

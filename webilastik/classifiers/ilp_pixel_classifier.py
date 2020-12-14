@@ -62,12 +62,12 @@ class IlpVigraPixelClassifier(VigraPixelClassifier):
         *,
         feature_extractors: Sequence[IlpFilter],
         forests: List[VigraRandomForest],
-        strict: bool = False,
+        num_input_channels:int,
         classes: List[np.uint8],
         color_map: Dict[Color, np.uint8],
     ):
         super().__init__(
-            feature_extractors=feature_extractors, forests=forests, strict=strict, classes=classes, color_map=color_map
+            feature_extractors=feature_extractors, forests=forests, num_input_channels=num_input_channels, classes=classes, color_map=color_map
         )
 
     @classmethod
@@ -88,7 +88,6 @@ class IlpVigraPixelClassifier(VigraPixelClassifier):
             num_trees=num_trees,
             num_forests=num_forests,
             random_seed=random_seed,
-            strict=strict,
         )
 
     # @classmethod
