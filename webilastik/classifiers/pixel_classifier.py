@@ -79,11 +79,6 @@ class PixelClassifier(Operator, JsonSerializable):
         self.num_input_channels = num_input_channels
         self.color_map = color_map
 
-    @classmethod
-    @lru_cache()
-    def get(cls, *classifier_args, **classifier_kwargs):
-        return cls(*classifier_args, **classifier_kwargs)
-
     def get_expected_roi(self, data_slice: Interval5D) -> Interval5D:
         c_start = data_slice.c[0]
         c_stop = c_start + self.num_classes
@@ -98,13 +93,13 @@ class PixelClassifier(Operator, JsonSerializable):
             raise ValueError(f"Bad roi: {roi}. Expected roi to have shape.c={self.num_input_channels}")
         return self._do_predict(roi=roi, out=out)
 
-    @functools.lru_cache()
-    def compute(self, roi: DataRoi) -> Array5D:
-        return self.predict(roi)
-
     @abstractmethod
     def _do_predict(self, roi: DataRoi, out: Predictions = None) -> Predictions:
         pass
+
+    @functools.lru_cache()
+    def compute(self, roi: DataRoi) -> Array5D:
+        return self.predict(roi)
 
 
 class ScikitLearnPixelClassifier(PixelClassifier):
