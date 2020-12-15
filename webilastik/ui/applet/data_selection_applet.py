@@ -7,9 +7,10 @@ import uuid
 import numpy as np
 from fs.osfs import OSFS
 import vigra
-from ndstructs.datasource import DataSource, SkimageDataSource, PrecomputedChunksDataSource
+from ndstructs.datasource import DataSource, PrecomputedChunksDataSource
 
-from webilastik.ui.applet import Applet, SequenceProviderApplet, Slot, CONFIRMER
+from webilastik.ui.applet import Applet, Slot, CONFIRMER
+from webilastik.ui.applet.sequence_provider_applet import SequenceProviderApplet
 from webilastik.filesystem import HttpPyFs
 
 

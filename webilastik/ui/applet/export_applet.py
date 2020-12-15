@@ -1,9 +1,10 @@
-from typing import Sequence, List, Dict, Tuple
+from typing import Sequence, List, Generic, Tuple, TypeVar, Dict
 from concurrent.futures import ProcessPoolExecutor
 from collections import defaultdict
 
-from ndstructs import Array5D, Slice5D
-from ndstructs.datasource import DataSource, DataSourceSlice
+from ndstructs import Array5D, Interval5D, Shape5D
+from ndstructs.datasource import DataSource, DataRoi
+from numpy.lib.shape_base import tile
 
 from webilastik.operator import Operator
 from webilastik.ui.applet  import Applet, Slot, CONFIRMER
@@ -12,13 +13,15 @@ from webilastik.features.ilp_filter import IlpFilter
 from webilastik.classifiers.pixel_classifier import PixelClassifier, VigraPixelClassifier
 from webilastik.ui.applet.data_selection_applet import ILane
 
-class ExportApplet(Applet):
+LANE = TypeVar("LANE", bound=ILane)
+PRODUCER = TypeVar("PRODUCER", bound=Operator, covariant=True)
+class ExportApplet(Applet, Generic[LANE, PRODUCER]):
     """Exports the outputs of an operator created by an upstream applet."""
-    def __init__(self, producer: Slot[Operator], lanes: Slot[Sequence[ILane]], num_workers: int = 4):
+    def __init__(self, name: str, producer: Slot[PRODUCER], lanes: Slot[Sequence[LANE]], num_workers: int = 4):
         self.producer = producer
         self.lanes = lanes
         self._executors = [ProcessPoolExecutor(max_workers=1) for i in range(num_workers)]
-        super().__init__()
+        super().__init__(name=name)
 
     def export_all(self) -> None:
         producer_op = self.producer()
@@ -26,24 +29,20 @@ class ExportApplet(Applet):
             raise ValueError("No producer from upstream")
         for lane in self.lanes() or []:
             #FIXME: get format/mapper/orchestrator/scheduler/whatever from slots or method args
-            data_slice = DataSourceSlice(lane.get_raw_data())
+            data_slice = DataRoi(lane.get_raw_data())
             for slc in data_slice.get_tiles():
                 #FIXME save this with a DataSink
                 print(f"Computing on {data_slice} with producer {producer_op}")
                 producer_op.compute(slc)
 
-    def compute_lane(self, lane_index: int, slc: Slice5D) -> Array5D:
-        datasource = self.lanes()[lane_index].get_raw_data()
-        roi = DataSourceSlice(datasource, **slc.to_dict()).defined()
-        return self.compute(roi)
-
-    def compute(self, roi: DataSourceSlice) -> Array5D:
+    def compute(self, roi: DataRoi) -> Array5D:
         producer_op = self.producer()
         if not producer_op:
             raise ValueError("No producer from upstream")
+        tile_shape = producer_op.get_tile_shape_hint(roi.datasource)
 
-        slc_batches : Dict[int, List[DataSourceSlice]] = defaultdict(list)
-        for slc in roi.get_tiles():
+        slc_batches : Dict[int, List[DataRoi]] = defaultdict(list)
+        for slc in roi.get_tiles(tile_shape=tile_shape):
             batch_idx = hash(slc) % len(self._executors)
             slc_batches[batch_idx].append(slc)
 
@@ -53,6 +52,13 @@ class ExportApplet(Applet):
             result_batch_futures.append(executor.submit(do_worker_compute, (producer_op, batch)))
 
         tiles : Sequence[Array5D] = [tile for future in result_batch_futures for tile in future.result()]
+
+
+        # tiles : List[Array5D] = []
+        # for tile in roi.get_tiles(tile_shape=tile_shape):
+        #     data = producer_op.compute(tile)
+        #     tiles.append(data)
+
         return tiles[0].combine(tiles[1:])
 
     @property
@@ -65,7 +71,7 @@ class ExportApplet(Applet):
         }
 
 
-def do_worker_compute(slice_batch: Tuple[Operator, Sequence[DataSourceSlice]]) -> List[Array5D]:
+def do_worker_compute(slice_batch: Tuple[Operator, Sequence[DataRoi]]) -> List[Array5D]:
     op = slice_batch[0]
     out = []
     for datasource_slc in slice_batch[1]:

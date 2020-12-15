@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Sequence, Optional, Callable, Generic, TypeVar, Set, Dict, Any, Tuple
+from typing import List, Sequence, Optional, Callable, Generic, TypeVar, Set, Dict, Any, Tuple, Union
 import typing_extensions
 
 
@@ -14,7 +14,7 @@ CONFIRMER = Callable[[str], bool]
 def noop_confirmer(msg: str) -> bool:
     return True
 
-SV = TypeVar('SV', covariant=True)
+SV = TypeVar('SV')
 SLOT_REFRESHER=Callable[[CONFIRMER], Optional[SV]]
 class Slot(Generic[SV]):
     def __init__(
@@ -22,7 +22,7 @@ class Slot(Generic[SV]):
         *,
         owner: "Applet",
         value: Optional[SV] = None,
-        refresher: Optional[SLOT_REFRESHER]=None,
+        refresher: Optional[SLOT_REFRESHER[SV]]=None,
     ):
         self.owner = owner
         self.refresher = refresher
@@ -82,7 +82,8 @@ class Slot(Generic[SV]):
 
 
 class Applet(ABC):
-    def __init__(self):
+    def __init__(self, name: str):
+        self.name = name
         self.owned_slots = {
             slot_name: slot
             for slot_name, slot in self.__dict__.items()
@@ -118,7 +119,7 @@ class Applet(ABC):
             slot.restore_snaphot(saved_value)
 
     @typing_extensions.final
-    def refresh_derived_slots(self, confirmer: CONFIRMER, provoker: Slot):
+    def refresh_derived_slots(self, confirmer: CONFIRMER, provoker: Slot[Any]):
         self.pre_refresh(confirmer)
         for slot in self.owned_slots.values():
             if slot != provoker:
@@ -130,31 +131,3 @@ class Applet(ABC):
 
     def post_refresh(self, confirmer: CONFIRMER):
         pass
-
-Item_co = TypeVar("Item_co", covariant=True)
-class SequenceProviderApplet(Applet, Generic[Item_co]): #(DataSelectionApplet):
-    def __init__(self, refresher: Optional[SLOT_REFRESHER]=None):
-        self.items = Slot[Tuple[Item_co, ...]](owner=self, refresher=refresher)
-        super().__init__()
-
-    def _set_items(self, items: Sequence[Item_co], confirmer: CONFIRMER):
-        self.items.set_value(tuple(items) if len(items) > 0 else None, confirmer=confirmer)
-
-    def add(self, items: Sequence[Item_co], confirmer: CONFIRMER) -> None:
-        current_items = self.items.get() or ()
-        for item in items:
-            if item in current_items:
-                raise ValueError(f"{item.__class__.__name__} {item} has already been added")
-        self._set_items(current_items + tuple(items), confirmer=confirmer)
-
-    def remove_at(self, idx: int, confirmer: CONFIRMER) -> None:
-        items = list(self.items())
-        items.pop(idx)
-        self._set_items(items, confirmer=confirmer)
-
-    def remove(self, items: Sequence[Item_co], confirmer: CONFIRMER) -> None:
-        new_items = tuple(item for item in self.items() if item not in items)
-        self._set_items(new_items, confirmer=confirmer)
-
-    def clear(self, confirmer: CONFIRMER) -> None:
-        self._set_items((), confirmer=confirmer)

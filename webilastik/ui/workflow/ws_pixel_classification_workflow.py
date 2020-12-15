@@ -1,6 +1,7 @@
 from abc import abstractmethod, ABC
 import asyncio
-from typing import Optional, Any, Sequence, Dict, List, cast
+from typing import Optional, Any, Sequence, Dict, List, cast, Mapping
+from ndstructs.datasource.DataRoi import DataRoi
 import typing_extensions
 from dataclasses import dataclass
 from collections.abc import Mapping as BaseMapping
@@ -12,14 +13,14 @@ import aiohttp
 from aiohttp import web
 from aiohttp.web import Request
 
-from ndstructs import Slice5D
+from ndstructs import Interval5D
 from ndstructs.utils import JsonSerializable, from_json_data, to_json_data, Dereferencer
 from ndstructs.datasource import DataSource
 
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.annotations import Annotation
-from webilastik.operator import Operator
-from webilastik.ui.applet import Applet, Item_co, SequenceProviderApplet, Slot, CONFIRMER
+from webilastik.ui.applet import Applet, CONFIRMER
+from webilastik.ui.applet.sequence_provider_applet import SequenceProviderApplet, Item_co
 from webilastik.ui.applet.export_applet import ExportApplet
 from webilastik.ui.applet.data_selection_applet import ILane, DataSelectionApplet
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
@@ -44,12 +45,13 @@ def datasource_from_json_data(cls, data, dereferencer: Dereferencer = None):
     return url_to_datasource(url)
 DataSource.from_json_data = datasource_from_json_data
 
+
 class WsAppletMixin(Applet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.websockets : List[web.WebSocketResponse] = []
 
-    def _get_message_for_remote(self) -> Any:
+    def _get_status_message(self) -> Any:
         return None
 
     def _update_remote(self):
@@ -57,7 +59,7 @@ class WsAppletMixin(Applet):
             bad_sockets : List[web.WebSocketResponse] = []
             for websocket in self.websockets:
                 try:
-                    message = self._get_message_for_remote()
+                    message = self._get_status_message()
                     if message is not None:
                         await websocket.send_str(json.dumps(message))
                 except ConnectionResetError as e:
@@ -78,6 +80,11 @@ class WsAppletMixin(Applet):
         super().restore_snaphot(snap)
         self._update_remote()
 
+    @abstractmethod
+    def do_rpc(self, method_name: str, payload: Any):
+        pass
+
+
 
 class WsSequenceProviderApplet(WsAppletMixin, SequenceProviderApplet[Item_co]):
     def __init__(self, *args, **kwargs):
@@ -96,20 +103,19 @@ class WsSequenceProviderApplet(WsAppletMixin, SequenceProviderApplet[Item_co]):
         pass
 
 class WsDataSelectionApplet(WsSequenceProviderApplet[PixelClassificationLane], DataSelectionApplet[PixelClassificationLane]):
-    def _get_message_for_remote(self):
-        print("oooooooooo>>> Updating remote data selection ")
+    def _get_status_message(self) -> Any:
         return {
             "applet_name": "data_selection_applet",#FIXME: maybe have python applets also have names?
             "items": to_json_data(self.items())
         }
 
     def item_from_json_data(self, data: Any) -> PixelClassificationLane:
-        return from_json_data(PixelClassificationLane, data)
+        return cast(PixelClassificationLane, from_json_data(PixelClassificationLane, data))
 
 
-class WsBrushingApplet(WsSequenceProviderApplet[Annotation], BrushingApplet):
+class WsBrushingApplet(WsSequenceProviderApplet[Annotation], BrushingApplet[PixelClassificationLane]):
     def item_from_json_data(self, data: Any) -> Annotation:
-        return from_json_data(Annotation.interpolate_from_points, data)
+        return cast(Annotation, from_json_data(Annotation.interpolate_from_points, data))
 
 
 class WsFeatureSelectionApplet(WsSequenceProviderApplet[IlpFilter], FeatureSelectionApplet):
@@ -117,8 +123,11 @@ class WsFeatureSelectionApplet(WsSequenceProviderApplet[IlpFilter], FeatureSelec
         return IlpFilter.from_json_data(data)
 
 
-class WsPixelClassificationApplet(WsAppletMixin, PixelClassificationApplet):
-    def _get_message_for_remote(self) -> Any:
+class WsPixelClassificationApplet(WsAppletMixin, PixelClassificationApplet[PixelClassificationLane]):
+    def do_rpc(self, method_name: str, payload: Any):
+        raise NotImplementedError
+
+    def _get_status_message(self) -> Any:
         classifier = self.pixel_classifier.get()
         if classifier is None:
             return None
@@ -153,18 +162,23 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
     def __init__(self, websockets: List[web.WebSocketResponse]):
         self.app = web.Application()
 
-        data_selection_applet = WsDataSelectionApplet()
-        feature_selection_applet = WsFeatureSelectionApplet(lanes=data_selection_applet.items)
-        brushing_applet = WsBrushingApplet(lanes=data_selection_applet.items)
+        data_selection_applet = WsDataSelectionApplet("data_selection_applet")
+        feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", lanes=data_selection_applet.items)
+        brushing_applet = WsBrushingApplet("brushing_applet", lanes=data_selection_applet.items)
         pixel_classifier_applet = WsPixelClassificationApplet(
+            "pixel_classifier_applet",
             lanes=data_selection_applet.items,
             feature_extractors=feature_selection_applet.items,
             annotations=brushing_applet.items,
         )
         predictions_export_applet = ExportApplet(
+            "predictions_export_applet",
             lanes=data_selection_applet.items,
             producer=pixel_classifier_applet.pixel_classifier
         )
+        self.applets : Mapping[str, WsAppletMixin] = {
+            aplt.name : aplt for aplt in (data_selection_applet, feature_selection_applet, brushing_applet, pixel_classifier_applet)
+        }
         super().__init__(
             data_selection_applet=data_selection_applet,
             feature_selection_applet=feature_selection_applet,
@@ -202,14 +216,14 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         applet_name = rpc_request["applet_name"]
         method_name = rpc_request["method_name"]
         args = rpc_request.get("args", {})
-        applet = getattr(self, applet_name)
-        if not isinstance(applet, Applet):
+        applet = self.applets.get(applet_name)
+        if applet == None:
             raise Exception(f"Bad applet name: {applet_name}")
         print(f"===>>> Running {applet_name}.{method_name}")
         applet.do_rpc(method_name, args)
 
     def ng_predict_info(self, request: web.Request):
-        lane_index = int(request.match_info.get("lane_index"))
+        lane_index = int(request.match_info.get("lane_index"))  # type: ignore
         classifier = self.pixel_classifier_applet.pixel_classifier()
         color_map = self.pixel_classifier_applet.color_map()
         expected_num_channels = len(color_map)
@@ -236,16 +250,18 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             headers={"Access-Control-Allow-Origin": "*"})
 
     def ng_predict(self, request: web.Request):
-        lane_index = int(request.match_info.get("lane_index"))
-        xBegin = int(request.match_info.get("xBegin"))
-        xEnd = int(request.match_info.get("xEnd"))
-        yBegin = int(request.match_info.get("yBegin"))
-        yEnd = int(request.match_info.get("yEnd"))
-        zBegin = int(request.match_info.get("zBegin"))
-        zEnd = int(request.match_info.get("zEnd"))
+        lane_index = int(request.match_info.get("lane_index")) # type: ignore
+        xBegin = int(request.match_info.get("xBegin")) # type: ignore
+        xEnd = int(request.match_info.get("xEnd")) # type: ignore
+        yBegin = int(request.match_info.get("yBegin")) # type: ignore
+        yEnd = int(request.match_info.get("yEnd")) # type: ignore
+        zBegin = int(request.match_info.get("zBegin")) # type: ignore
+        zEnd = int(request.match_info.get("zEnd")) # type: ignore
 
-        requested_roi = Slice5D(x=slice(xBegin, xEnd), y=slice(yBegin, yEnd), z=slice(zBegin, zEnd))
-        predictions = self.predictions_export_applet.compute_lane(lane_index, interval=requested_roi)
+        datasource = self.data_selection_applet.items()[lane_index]
+        predictions = self.predictions_export_applet.compute(
+            DataRoi(datasource.get_raw_data(), x=(xBegin, xEnd), y=(yBegin, yEnd), z=(zBegin, zEnd))
+        )
 
         # https://github.com/google/neuroglancer/tree/master/src/neuroglancer/datasource/precomputed#raw-chunk-encoding
         # "(...) data for the chunk is stored directly in little-endian binary format in [x, y, z, channel] Fortran order"
@@ -270,18 +286,18 @@ workflow = WsPixelClassificationWorkflow(websockets=[])
 
 app = web.Application()
 app.add_routes([
-    web.get('/wf', workflow.open_websocket),
+    web.get('/wf', workflow.open_websocket), # type: ignore
     web.get(
         "/predictions_export_applet/{uuid}/{lane_index}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}", #uuid so not to cache
-        workflow.ng_predict
+        workflow.ng_predict # type: ignore
     ),
     web.get(
         "/predictions_export_applet/{uuid}/{lane_index}/info", #uuid so not to cache
-        workflow.ng_predict_info
+        workflow.ng_predict_info # type: ignore
     ),
     web.post(
         "/ilp_project",
-        workflow.ilp_download
+        workflow.ilp_download # type: ignore
     )
 ])
 

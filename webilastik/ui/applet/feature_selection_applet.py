@@ -1,14 +1,13 @@
 from typing import List, TypeVar, Sequence, Optional, Dict, Any, Iterator
-from webilastik.classifiers.ilp_pixel_classifier import IlpVigraPixelClassifier
 
 import numpy as np
-from ndstructs.datasource import DataSource
 
-from webilastik.ui.applet import Applet, SequenceProviderApplet, CONFIRMER, Slot, CancelledException
+from webilastik.ui.applet import Applet, CONFIRMER, Slot, CancelledException
+from webilastik.ui.applet.sequence_provider_applet import SequenceProviderApplet
 from webilastik.ui.applet.data_selection_applet import ILane
 from webilastik.features.ilp_filter import IlpFilter
 
-Lane = TypeVar("Lane", bound=ILane)
+LANE = TypeVar("LANE", bound=ILane)
 class FeatureSelectionApplet(SequenceProviderApplet[IlpFilter]):
     ilp_feature_names = [
         "GaussianSmoothing",
@@ -20,9 +19,9 @@ class FeatureSelectionApplet(SequenceProviderApplet[IlpFilter]):
     ]
 
 
-    def __init__(self, lanes: Slot[Sequence[Lane]]):
+    def __init__(self, name: str, *, lanes: Slot[Sequence[LANE]]):
         self._in_lanes = lanes
-        super().__init__(refresher=self._refresh_extractors)
+        super().__init__(name=name, refresher=self._refresh_extractors)
 
     def _refresh_extractors(self, confirmer: CONFIRMER) -> Optional[Sequence[IlpFilter]]:
         current_extractors = list(self.items.get() or ())
@@ -39,7 +38,7 @@ class FeatureSelectionApplet(SequenceProviderApplet[IlpFilter]):
                 new_extractors.append(ex)
         return tuple(new_extractors) or None
 
-    def add(self, items: List[IlpFilter], confirmer: CONFIRMER):
+    def add(self, items: Sequence[IlpFilter], confirmer: CONFIRMER):
         current_datasources = [lane.get_raw_data() for lane in self._in_lanes.get() or ()]
         for extractor in items:
             for ds in current_datasources:

@@ -1,10 +1,9 @@
-from typing import List, Optional, Sequence, Dict, Any, Iterator
-import itertools
+from typing import Generic, Optional, Sequence, Dict, Any, Iterator, TypeVar
 
-from ndstructs.datasource import DataSource, DataRoi
+from ndstructs.datasource import DataRoi
 import numpy as np
 
-from webilastik.ui.applet  import Applet, NotReadyException, SequenceProviderApplet, Slot, CancelledException, CONFIRMER
+from webilastik.ui.applet  import Applet, NotReadyException, Slot, CONFIRMER
 from webilastik.ui.applet.data_selection_applet import ILane
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.annotations.annotation import Annotation, Color
@@ -12,13 +11,15 @@ from webilastik.features.ilp_filter import IlpFilter
 from webilastik.classifiers.pixel_classifier import Predictions
 from webilastik.classifiers.ilp_pixel_classifier import IlpVigraPixelClassifier
 
-class PixelClassificationApplet(Applet):
+LANE = TypeVar("LANE", bound=ILane)
+class PixelClassificationApplet(Applet, Generic[LANE]):
     pixel_classifier: Slot[IlpVigraPixelClassifier]
 
     def __init__(
         self,
+        name: str,
         *,
-        lanes: Slot[Sequence[ILane]], #this is only necessary to produce a .ilp file
+        lanes: Slot[Sequence[LANE]], #this is only necessary to produce a .ilp file
         feature_extractors: Slot[Sequence[IlpFilter]],
         annotations: Slot[Sequence[Annotation]],
     ):
@@ -33,7 +34,7 @@ class PixelClassificationApplet(Applet):
             owner=self,
             refresher=self._create_color_map
         )
-        super().__init__()
+        super().__init__(name=name)
 
     def _create_pixel_classifier(self, confirmer: CONFIRMER) -> Optional[IlpVigraPixelClassifier]:
         return  IlpVigraPixelClassifier.train(

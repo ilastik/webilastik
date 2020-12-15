@@ -180,7 +180,7 @@ class VigraPixelClassifier(PixelClassifier):
     def train(
         cls: Type[VIGRA_CLASSIFIER],
         feature_extractors: Sequence[FeatureExtractor],
-        annotations: Tuple[Annotation],
+        annotations: Sequence[Annotation],
         *,
         num_trees: int = 100,
         num_forests: int = multiprocessing.cpu_count(),

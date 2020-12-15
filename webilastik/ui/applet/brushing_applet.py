@@ -1,19 +1,21 @@
-from typing import Optional, Sequence, List, Tuple
+from typing import Generic, Optional, Sequence, TypeVar
 
 from ndstructs.datasource import DataSource
 
 from webilastik.annotations.annotation import Annotation
-from webilastik.ui.applet import Applet, Slot, SequenceProviderApplet, CONFIRMER, CancelledException
+from webilastik.ui.applet import Slot, CONFIRMER, CancelledException
+from webilastik.ui.applet.sequence_provider_applet import SequenceProviderApplet
 from webilastik.ui.applet.data_selection_applet import ILane
 
 
 
-class BrushingApplet(SequenceProviderApplet[Annotation]):
-    def __init__(self, lanes: Slot[Sequence[ILane]]):
+LANE = TypeVar("LANE", bound=ILane)
+class BrushingApplet(SequenceProviderApplet[Annotation], Generic[LANE]):
+    def __init__(self, name: str, *, lanes: Slot[Sequence[LANE]]):
         self._in_lanes = lanes
-        super().__init__(refresher=self._refresh_annotations)
+        super().__init__(name=name, refresher=self._refresh_annotations)
 
-    def _refresh_annotations(self, confirmer: CONFIRMER) -> Optional[Tuple[Annotation]]:
+    def _refresh_annotations(self, confirmer: CONFIRMER) -> Optional[Sequence[Annotation]]:
         annotations = self.items.get() or ()
         present_datasources = {lane.get_raw_data() for lane in self._in_lanes.get() or []}
         dangling_annotations = [a for a in annotations if a.raw_data not in present_datasources]

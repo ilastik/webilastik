@@ -12,6 +12,7 @@ from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
 from webilastik.ui.applet.brushing_applet import BrushingApplet
 from webilastik.ui.applet.export_applet import ExportApplet
+from webilastik.classifiers.pixel_classifier import PixelClassifier
 
 
 class PixelClassificationLane(ILane, JsonSerializable):
@@ -44,9 +45,9 @@ class PixelClassificationLane(ILane, JsonSerializable):
 class PixelClassificationWorkflow:
     data_selection_applet: DataSelectionApplet[PixelClassificationLane]
     feature_selection_applet: FeatureSelectionApplet
-    brushing_applet: BrushingApplet
-    pixel_classifier_applet: PixelClassificationApplet
-    predictions_export_applet : ExportApplet
+    brushing_applet: BrushingApplet[PixelClassificationLane]
+    pixel_classifier_applet: PixelClassificationApplet[PixelClassificationLane]
+    predictions_export_applet : ExportApplet[PixelClassificationLane, PixelClassifier]
 
     @property
     def ilp_data(self):

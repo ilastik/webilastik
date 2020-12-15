@@ -71,7 +71,7 @@ class IlpVigraPixelClassifier(VigraPixelClassifier):
         )
 
     @classmethod
-    @functools.lru_cache()
+    # @functools.lru_cache()
     def train(
         cls,
         feature_extractors: Tuple[IlpFilter],
@@ -80,7 +80,6 @@ class IlpVigraPixelClassifier(VigraPixelClassifier):
         num_trees: int = 100,
         num_forests: int = multiprocessing.cpu_count(),
         random_seed: int = 0,
-        strict: bool = False,
     ) -> "IlpVigraPixelClassifier":
         return super().train(
             feature_extractors=feature_extractors,
@@ -137,14 +136,22 @@ class IlpVigraPixelClassifier(VigraPixelClassifier):
                 forests.append(VigraRandomForest(tmp_file_path, forest_group.name))
         os.remove(tmp_file_path)
 
-        self.forests = forests
-        self.num_trees = data["num_trees"]
-        self.strict = data["strict"]
-        self.feature_extractors = data["feature_extractors"]
-        self.feature_extractor = data["feature_extractor"]
-        self.classes = data["classes"]
-        self.num_classes = data["num_classes"]
-        self.color_map = data["color_map"]
+        self.__init__(
+            feature_extractors=data["feature_extractors"],
+            forests=forests,
+            num_input_channels=data["num_input_channels"],
+            classes=data["classes"],
+            color_map=data["color_map"],
+        )
+
+        # self.forests = forests
+        # self.num_trees = data["num_trees"]
+        # self.num_input_channels = data["num_input_channels"]
+        # self.feature_extractors = data["feature_extractors"]
+        # self.feature_extractor = data["feature_extractor"]
+        # self.classes = data["classes"]
+        # self.num_classes = data["num_classes"]
+        # self.color_map = data["color_map"]
 
     @property
     def ilp_classifier_factory(self) -> bytes:
