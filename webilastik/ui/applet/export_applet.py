@@ -23,6 +23,11 @@ class ExportApplet(Applet, Generic[LANE, PRODUCER]):
         self._executors = [ProcessPoolExecutor(max_workers=1) for i in range(num_workers)]
         super().__init__(name=name)
 
+    def __del__(self):
+        for idx, executor in enumerate(self._executors):
+            print(f"===> Shutting down executor {idx} from {self}")
+            executor.shutdown()
+
     def export_all(self) -> None:
         producer_op = self.producer()
         if not producer_op:
@@ -46,18 +51,18 @@ class ExportApplet(Applet, Generic[LANE, PRODUCER]):
             batch_idx = hash(slc) % len(self._executors)
             slc_batches[batch_idx].append(slc)
 
-        result_batch_futures = []
-        for idx, batch in slc_batches.items():
-            executor = self._executors[idx]
-            result_batch_futures.append(executor.submit(do_worker_compute, (producer_op, batch)))
+        # result_batch_futures = []
+        # for idx, batch in slc_batches.items():
+        #     executor = self._executors[idx]
+        #     result_batch_futures.append(executor.submit(do_worker_compute, (producer_op, batch)))
 
-        tiles : Sequence[Array5D] = [tile for future in result_batch_futures for tile in future.result()]
+        # tiles : Sequence[Array5D] = [tile for future in result_batch_futures for tile in future.result()]
 
 
-        # tiles : List[Array5D] = []
-        # for tile in roi.get_tiles(tile_shape=tile_shape):
-        #     data = producer_op.compute(tile)
-        #     tiles.append(data)
+        tiles : List[Array5D] = []
+        for tile in roi.get_tiles(tile_shape=tile_shape):
+            data = producer_op.compute(tile)
+            tiles.append(data)
 
         return tiles[0].combine(tiles[1:])
 

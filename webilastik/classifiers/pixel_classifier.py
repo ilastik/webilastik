@@ -192,14 +192,15 @@ class VigraPixelClassifier(PixelClassifier):
         tree_counts[: num_trees % num_forests] += 1
         tree_counts = list(map(int, tree_counts))
 
-        forests = [VigraRandomForest(tree_counts[forest_index]) for forest_index in range(num_forests)]
+        def train_forest(forest_index: int) -> VigraRandomForest:
+            forest = VigraRandomForest(tree_counts[forest_index])
+            forest.learnRF(training_data.X, training_data.y, random_seed)
+            return forest
 
-        def train_forest(forest_index):
-            forests[forest_index].learnRF(training_data.X, training_data.y, random_seed)
-
-        with ThreadPoolExecutor(max_workers=num_forests) as executor:
-            for i in range(num_forests):
-                executor.submit(train_forest, i)
+        # executor = ThreadPoolExecutor(max_workers=num_forests)
+        # forests = list(executor.map(train_forest, range(num_forests)))
+        forests = list(map(train_forest, range(num_forests)))
+        # executor.shutdown()
         return cls(
             feature_extractors=feature_extractors,
             forests=forests,
@@ -227,9 +228,10 @@ class VigraPixelClassifier(PixelClassifier):
             with lock:
                 raw_linear_predictions += forest_predictions
 
-        with ThreadPoolExecutor(max_workers=len(self.forests), thread_name_prefix="predictor") as executor:
-            for forest in self.forests:
-                executor.submit(do_predict, forest)
+        # executor = ThreadPoolExecutor(max_workers=len(self.forests), thread_name_prefix="predictor")
+        list(map(do_predict, self.forests))
+        # list(executor.map(do_predict, self.forests))
+        # executor.shutdown()
 
         raw_linear_predictions /= self.num_trees
 

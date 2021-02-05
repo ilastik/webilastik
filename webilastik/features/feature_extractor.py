@@ -140,10 +140,11 @@ class FeatureExtractorCollection(FeatureExtractor):
 
     def compute_into(self, roi: DataRoi, out: FeatureData) -> FeatureData:
         assert out.shape == self.get_expected_shape(roi.shape)
-        offset = out.interval.start
+
+        channel_offset: int = out.interval.start.c
+
         for fx in self.extractors:
-            out_roi: Interval5D = fx.get_expected_shape(roi.shape).to_interval5d().translated(offset)
-            out_array: FeatureData = out.cut(out_roi)
-            fx.compute_into(roi, out=out_array)
-            offset += Point5D.zero(c=out_roi.shape.c)
+            results = fx.compute(roi).translated(Point5D.zero(c=channel_offset))
+            out.set(results)
+            channel_offset += results.shape.c
         return out
