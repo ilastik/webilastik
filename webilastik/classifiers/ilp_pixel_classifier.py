@@ -74,8 +74,8 @@ class IlpVigraPixelClassifier(VigraPixelClassifier):
     # @functools.lru_cache()
     def train(
         cls,
-        feature_extractors: Tuple[IlpFilter],
-        annotations: Tuple[Annotation],
+        feature_extractors: Sequence[IlpFilter],
+        annotations: Sequence[Annotation],
         *,
         num_trees: int = 100,
         num_forests: int = multiprocessing.cpu_count(),

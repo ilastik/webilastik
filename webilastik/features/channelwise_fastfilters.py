@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Optional, TypeVar, Type
+from typing import Optional, TypeVar, Type, cast
 import math
 import fastfilters
 
@@ -15,6 +15,8 @@ from ndstructs.datasource import DataSource, DataRoi
 from ndstructs.utils import from_json_data, Dereferencer
 
 
+CFF = TypeVar("CFF", bound="ChannelwiseFastFilter")
+
 class ChannelwiseFastFilter(IlpFilter):
     def __init__(
         self,
@@ -28,8 +30,8 @@ class ChannelwiseFastFilter(IlpFilter):
         super().__init__(axis_2d=axis_2d)
 
     @classmethod
-    def from_json_data(cls, data, dereferencer: Optional[Dereferencer] = None):
-        return from_json_data(cls, data, dereferencer=dereferencer, initOnly=True)
+    def from_json_data(cls: Type[CFF], data, dereferencer: Optional[Dereferencer] = None) -> CFF:
+        return cast(cls, from_json_data(cls, data, dereferencer=dereferencer, initOnly=True))
 
     @classmethod
     def calc_presmooth_sigma(cls, scale: float) -> float:
