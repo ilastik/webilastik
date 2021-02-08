@@ -1,4 +1,4 @@
-from typing import Generic, Optional, Sequence, Dict, Any, Iterator, TypeVar
+from typing import Generic, Mapping, Optional, Sequence, Dict, Any, Iterator, TypeVar
 
 from ndstructs.datasource import DataRoi
 import numpy as np
@@ -52,16 +52,13 @@ class PixelClassificationApplet(Applet, Generic[LANE]):
 
     def get_ilp_classifier_feature_names(self) -> Iterator[bytes]:
         lanes = self._in_lanes()
-        classifier = self.pixel_classifier()
-        if lanes is None or classifier is None:
-            return
         num_input_channels = lanes[0].get_raw_data().shape.c
-        for fe in sorted(classifier.feature_extractors, key=lambda ex: FeatureSelectionApplet.ilp_feature_names.index(ex.__class__.__name__)):
+        for fe in sorted(self._in_feature_extractors(), key=lambda ex: FeatureSelectionApplet.ilp_feature_names.index(ex.__class__.__name__)):
             for c in range(num_input_channels * fe.channel_multiplier):
                 name_and_channel = fe.ilp_name + f" [{c}]"
                 yield name_and_channel.encode("utf8")
 
-    def get_classifier_ilp_data(self) -> dict:
+    def get_classifier_ilp_data(self) -> Mapping[str, Any]:
         classifier = self.pixel_classifier()
         out = classifier.get_forest_data()
         feature_names: Iterator[bytes] = self.get_ilp_classifier_feature_names()

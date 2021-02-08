@@ -1,24 +1,26 @@
 from abc import abstractmethod
-import functools
-from typing import List, Tuple, Iterable, Optional, Sequence, Dict, TypeVar, Type
+from typing import cast, Any, List, Mapping, Tuple, Optional, Sequence, Dict, TypeVar, Type
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
-from functools import lru_cache
-from threading import Lock
 
 import numpy as np
-import vigra
 from vigra.learning import RandomForest as VigraRandomForest
 from sklearn.ensemble import RandomForestClassifier as ScikitRandomForestClassifier
 
 from ndstructs import Array5D, Interval5D, Point5D, Shape5D
-from webilastik.features.feature_extractor import FeatureExtractor, FeatureData, ChannelwiseFilter
+from webilastik.features.feature_extractor import FeatureExtractor, FeatureData
 from webilastik.features.feature_extractor import FeatureExtractorCollection
 from webilastik.annotations import Annotation, FeatureSamples, Color
 from webilastik.operator import Operator
 from ndstructs.datasource import DataRoi, DataSource
 from ndstructs.utils import JsonSerializable, from_json_data, Dereferencer
 
+try:
+    import ilastik_operator_cache
+    operator_cache = ilastik_operator_cache
+except ImportError:
+    from functools import lru_cache
+    operator_cache = lru_cache()
 
 class Predictions(Array5D):
     """An array of floats from 0.0 to 1.0. The value in each channel represents
@@ -79,27 +81,24 @@ class PixelClassifier(Operator, JsonSerializable):
         self.num_input_channels = num_input_channels
         self.color_map = color_map
 
+    @abstractmethod
+    def _do_predict(self, roi: DataRoi, out: Predictions = None) -> Predictions:
+        pass
+
     def get_expected_roi(self, data_slice: Interval5D) -> Interval5D:
         c_start = data_slice.c[0]
         c_stop = c_start + self.num_classes
         return data_slice.updated(c=(c_start, c_stop))
 
     def allocate_predictions(self, data_slice: Interval5D):
-        return Predictions.allocate(interval=self.get_expected_roi(data_slice), dtype=np.dtype('float32'))
+        return Predictions.allocate(interval=self.get_expected_roi(data_slice), dtype=np.dtype('float32'), value=0)
 
-    def predict(self, roi: DataRoi, out: Predictions = None) -> Predictions:
+    @operator_cache # type: ignore
+    def compute(self, roi: DataRoi) -> Array5D:
         self.feature_extractor.ensure_applicable(roi.datasource)
         if roi.shape.c != self.num_input_channels:
             raise ValueError(f"Bad roi: {roi}. Expected roi to have shape.c={self.num_input_channels}")
-        return self._do_predict(roi=roi, out=out)
-
-    @abstractmethod
-    def _do_predict(self, roi: DataRoi, out: Predictions = None) -> Predictions:
-        pass
-
-    @functools.lru_cache()
-    def compute(self, roi: DataRoi) -> Array5D:
-        return self.predict(roi)
+        return self._do_predict(roi=roi)
 
 
 class ScikitLearnPixelClassifier(PixelClassifier):
@@ -140,8 +139,8 @@ class ScikitLearnPixelClassifier(PixelClassifier):
         return np.dtype("float32")
 
     @classmethod
-    def from_json_data(cls, data: dict, dereferencer: Optional[Dereferencer] = None) -> "ScikitLearnPixelClassifier":
-        return from_json_data(cls.train, data, dereferencer=dereferencer)
+    def from_json_data(cls, data: Mapping[str, Any], dereferencer: Optional[Dereferencer] = None) -> "ScikitLearnPixelClassifier":
+        return cast(ScikitLearnPixelClassifier, from_json_data(cls.train, data, dereferencer=dereferencer))
 
     def _do_predict(self, roi: DataRoi, out: Optional[Predictions] = None) -> Predictions:
         feature_data = self.feature_extractor.compute(roi)
@@ -210,29 +209,23 @@ class VigraPixelClassifier(PixelClassifier):
         )
 
     @classmethod
-    def from_json_data(cls, data: dict, dereferencer: Optional[Dereferencer] = None) -> "VigraPixelClassifier":
-        return from_json_data(cls.train, data)
+    def from_json_data(cls, data: Mapping[str, Any], dereferencer: Optional[Dereferencer] = None) -> "VigraPixelClassifier":
+        return cast(VigraPixelClassifier, from_json_data(cls.train, data))
 
-    def _do_predict(self, roi: DataRoi, out: Predictions = None) -> Predictions:
+    def _do_predict(self, roi: DataRoi) -> Predictions:
         feature_data = self.feature_extractor.compute(roi)
-        predictions = out or self.allocate_predictions(roi)
+        predictions = self.allocate_predictions(roi)
         assert predictions.interval == self.get_expected_roi(roi)
-        raw_linear_predictions = predictions.linear_raw()
-        raw_linear_predictions[...] = 0
-        lock = Lock()
+        raw_linear_predictions: np.ndarray = predictions.linear_raw()
 
-        def do_predict(forest):
-            nonlocal raw_linear_predictions
-            forest_predictions = forest.predictProbabilities(feature_data.linear_raw())
-            forest_predictions *= forest.treeCount()
-            with lock:
+        def do_predict(forest: VigraRandomForest):
+            return forest.predictProbabilities(feature_data.linear_raw()) * forest.treeCount()
+
+        with ThreadPoolExecutor(max_workers=len(self.forests), thread_name_prefix="predictor") as executor:
+            for forest_predictions in executor.map(do_predict, self.forests):
                 raw_linear_predictions += forest_predictions
 
-        # executor = ThreadPoolExecutor(max_workers=len(self.forests), thread_name_prefix="predictor")
-        list(map(do_predict, self.forests))
-        # list(executor.map(do_predict, self.forests))
-        # executor.shutdown()
-
         raw_linear_predictions /= self.num_trees
+        predictions.setflags(write=False)
 
         return predictions

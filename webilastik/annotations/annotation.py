@@ -149,7 +149,6 @@ class Annotation(ScalarData):
             feature_tile = feature_extractor.compute(data_tile).cut(annotation_tile.interval, c=All())
 
             feature_samples = FeatureSamples.create(annotation_tile, feature_tile)
-            assert feature_samples.shape.c == feature_extractor.get_expected_shape(data_tile.shape).c
             return feature_samples
 
         tile_shape = self.raw_data.tile_shape.updated(c=self.raw_data.shape.c)

@@ -6,18 +6,23 @@ import numpy as np
 from ndstructs.utils import from_json_data, Dereferencer
 
 
-from .feature_extractor import ChannelwiseFilter
+from .feature_extractor import FeatureExtractor
 from webilastik.operator import Operator, NoopOperator
 
 
 FE = TypeVar("FE", bound="IlpFilter")
 
 
-class IlpFilter(ChannelwiseFilter):
-    REGISTRY: ClassVar[Dict[str, Type[FE]]] = {}
+class IlpFilter(FeatureExtractor):
+    REGISTRY: ClassVar[Dict[str, Type["IlpFilter"]]] = {}
 
-    def get_expected_dtype(self, input_dtype: np.dtype) -> np.dtype:
-        return np.dtype("float32")
+    def __init__(self, axis_2d: Optional[str]):
+        self.axis_2d = axis_2d
+        super().__init__()
+
+    @property
+    def channel_multiplier(self) -> int:
+        return 1
 
     @property
     @abstractmethod
@@ -48,8 +53,8 @@ class IlpFilter(ChannelwiseFilter):
     #     return klass.from_ilp_scale(scale=scale, axis_2d="z" if "in 2D" in description else None)
 
     @classmethod
-    def from_ilp_classifier_feature_names(cls, feature_names: List[bytes]) -> List["ChannelwiseFilter"]:
-        feature_extractors: List[ChannelwiseFilter] = []
+    def from_ilp_classifier_feature_names(cls, feature_names: List[bytes]) -> List["IlpFilter"]:
+        feature_extractors: List[IlpFilter] = []
         for feature_description in feature_names:
             extractor = cls.from_ilp_feature_name(feature_description)
             if len(feature_extractors) == 0 or feature_extractors[-1] != extractor:
@@ -57,7 +62,7 @@ class IlpFilter(ChannelwiseFilter):
         return feature_extractors
 
     @classmethod
-    def from_ilp_data(cls, data: Mapping) -> List["IlpFilter"]:
+    def from_ilp_data(cls, data: Mapping[str, Any]) -> List["IlpFilter"]:
         feature_names: List[str] = [feature_name.decode("utf-8") for feature_name in data["FeatureIds"][()]]
         compute_in_2d: List[bool] = list(data["ComputeIn2d"][()])
         scales: List[float] = list(data["Scales"][()])

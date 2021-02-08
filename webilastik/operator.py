@@ -1,21 +1,15 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Callable, Optional, TypeVar
 
 import numpy as np
 
 from ndstructs.datasource import DataRoi, DataSource
 from ndstructs import Array5D, Shape5D
 
-
-
 class Operator(ABC):
     @abstractmethod
     def compute(self, roi: DataRoi) -> Array5D:
         """Perform this operator's computaion and returns its result"""
-        pass
-
-    @abstractmethod
-    def get_expected_dtype(self, input_dtype: np.dtype) -> np.dtype:
         pass
 
     # for data-dependant Operators like ConnectedComponents this can't be done in any sensible way =/
@@ -37,6 +31,3 @@ class Operator(ABC):
 class NoopOperator(Operator):
     def compute(self, roi: DataRoi) -> Array5D:
         return roi.retrieve()
-
-    def get_expected_dtype(self, input_dtype: np.dtype) -> np.dtype:
-        return input_dtype
