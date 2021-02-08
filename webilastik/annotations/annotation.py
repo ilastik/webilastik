@@ -138,17 +138,14 @@ class Annotation(ScalarData):
         def make_samples(data_tile: DataRoi) -> FeatureSamples:
             annotation_tile = self.clamped(data_tile)
             feature_tile = feature_extractor.compute(data_tile).cut(annotation_tile.interval, c=All())
-
-            feature_samples = FeatureSamples.create(annotation_tile, feature_tile)
-            return feature_samples
+            return FeatureSamples.create(annotation_tile, feature_tile)
 
         tile_shape = self.raw_data.tile_shape.updated(c=self.raw_data.shape.c)
-        # executor = ThreadPoolExecutor()
-        all_feature_samples = list(map(
-            make_samples,
-            DataRoi(self.raw_data).clamped(interval_under_annotation).get_tiles(tile_shape=tile_shape, clamp=False)
-        ))
-        # executor.shutdown()
+        with ThreadPoolExecutor() as executor:
+            all_feature_samples = list(executor.map(
+                make_samples,
+                DataRoi(self.raw_data).clamped(interval_under_annotation).get_tiles(tile_shape=tile_shape, clamp=False)
+            ))
 
         return all_feature_samples[0].concatenate(*all_feature_samples[1:])
 
