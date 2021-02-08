@@ -9,8 +9,8 @@ from ndstructs.array5D import All
 import numpy
 
 from .feature_extractor import FeatureData
-from .ilp_filter import IlpFilter
-from webilastik.operator import NoopOperator, Operator
+from .ilp_filter import IlpFilter, OpRetriever
+from webilastik.operator import Operator
 from ndstructs import Array5D, Image, ScalarImage
 from ndstructs import Point5D, Interval5D, Shape5D
 from ndstructs.datasource import DataSource, DataRoi
@@ -30,7 +30,7 @@ class ChannelwiseFastFilter(IlpFilter):
     def __init__(
         self,
         *,
-        preprocessor: Operator = NoopOperator(),
+        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(),
         axis_2d: Optional[str] = None,
         presmooth_sigma: float = 0
     ):
@@ -121,7 +121,7 @@ class StructureTensorEigenvalues(ChannelwiseFastFilter):
     def __init__(
         self,
         *,
-        preprocessor: Operator = NoopOperator(),
+        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(),
         innerScale: float,
         outerScale: float,
         window_size: float = 0,
@@ -146,7 +146,7 @@ class StructureTensorEigenvalues(ChannelwiseFastFilter):
 
     @classmethod
     def from_ilp_scale(
-        cls, *, preprocessor: Operator = NoopOperator(), scale: float, axis_2d: Optional[str] = None
+        cls, *, preprocessor: Operator[DataRoi, Array5D] = OpRetriever(), scale: float, axis_2d: Optional[str] = None
     ) -> "StructureTensorEigenvalues":
         capped_scale = min(scale, 1.0)
         return cls(
@@ -172,7 +172,7 @@ class SigmaWindowFilter(ChannelwiseFastFilter):
     def __init__(
         self,
         *,
-        preprocessor: Operator = NoopOperator(),
+        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(),
         sigma: float,
         window_size: float = 0,
         axis_2d: Optional[str] = None,
@@ -184,7 +184,7 @@ class SigmaWindowFilter(ChannelwiseFastFilter):
 
     @classmethod
     def from_ilp_scale(
-        cls: Type[SigmaFilter], *, preprocessor: Operator = NoopOperator(), scale: float, axis_2d: Optional[str] = None
+        cls: Type[SigmaFilter], *, preprocessor: Operator[DataRoi, Array5D] = OpRetriever(), scale: float, axis_2d: Optional[str] = None
     ) -> SigmaFilter:
         return cls(
             preprocessor=preprocessor,
@@ -218,7 +218,7 @@ class DifferenceOfGaussians(ChannelwiseFastFilter):
     def __init__(
         self,
         *,
-        preprocessor: Operator = NoopOperator(),
+        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(),
         sigma0: float,
         sigma1: float,
         window_size: float = 0,
@@ -242,7 +242,7 @@ class DifferenceOfGaussians(ChannelwiseFastFilter):
 
     @classmethod
     def from_ilp_scale(
-        cls, *, preprocessor: Operator = NoopOperator(), scale: float, axis_2d: Optional[str] = None
+        cls, *, preprocessor: Operator[DataRoi, Array5D] = OpRetriever(), scale: float, axis_2d: Optional[str] = None
     ) -> "DifferenceOfGaussians":
         capped_scale = min(scale, 1.0)
         return cls(
@@ -268,7 +268,7 @@ class ScaleWindowFilter(ChannelwiseFastFilter):
     def __init__(
         self,
         *,
-        preprocessor: Operator = NoopOperator(),
+        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(),
         scale: float,
         window_size: float = 0,
         axis_2d: Optional[str] = None,
@@ -282,7 +282,7 @@ class ScaleWindowFilter(ChannelwiseFastFilter):
 
     @classmethod
     def from_ilp_scale(
-        cls: Type[ScaleFilter], *, preprocessor: Operator = NoopOperator(), scale: float, axis_2d: Optional[str] = None
+        cls: Type[ScaleFilter], *, preprocessor: Operator[DataRoi, Array5D] = OpRetriever(), scale: float, axis_2d: Optional[str] = None
     ) -> ScaleFilter:
         return cls(
             preprocessor=preprocessor,

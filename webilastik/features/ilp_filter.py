@@ -1,14 +1,20 @@
 from abc import abstractmethod, ABC
 from typing import Type, TypeVar, List, TypeVar, ClassVar, Mapping, Iterator, Sequence, Dict, Any, Optional
 import re
+from ndstructs.array5D import Array5D
+from ndstructs.datasource.DataRoi import DataRoi
 
 import numpy as np
 from ndstructs.utils import from_json_data, Dereferencer
 
 
 from .feature_extractor import FeatureExtractor
-from webilastik.operator import Operator, NoopOperator
+from webilastik.operator import Operator
 
+
+class OpRetriever(Operator[DataRoi, Array5D]):
+    def compute(self, roi: DataRoi) -> Array5D:
+        return roi.retrieve()
 
 FE = TypeVar("FE", bound="IlpFilter")
 
@@ -32,7 +38,7 @@ class IlpFilter(FeatureExtractor):
     @classmethod
     @abstractmethod
     def from_ilp_scale(
-        cls: Type[FE], *, preprocessor: Operator = NoopOperator(), scale: float, axis_2d: Optional[str] = None
+        cls: Type[FE], *, preprocessor: Operator[DataRoi, Array5D] = OpRetriever(), scale: float, axis_2d: Optional[str] = None
     ) -> FE:
         pass
 

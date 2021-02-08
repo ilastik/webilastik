@@ -1,4 +1,4 @@
-from typing import List, Sequence, TypeVar, Type
+from typing import Any, Mapping, Sequence, TypeVar, Type
 from abc import ABC, abstractmethod
 from urllib.parse import urlparse
 from pathlib import Path
@@ -78,7 +78,7 @@ class DataSelectionApplet(SequenceProviderApplet[Lane]):
     def lanes(self) -> Slot[Sequence[Lane]]:
         return self.items
 
-    def get_ilp_data(self, lane_type: Type[ILane]) -> dict:
+    def get_ilp_data(self, lane_type: Type[ILane]) -> Mapping[str, Any]:
         return {
             "Role Names": np.asarray([name.encode('utf8') for name in lane_type.get_role_names()]),
             "StorageVersion": "0.2",

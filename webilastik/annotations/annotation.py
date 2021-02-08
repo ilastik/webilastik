@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Iterator, Tuple, Dict, Iterable, Sequence, Any, Optional
+from typing import List, Iterator, Mapping, Tuple, Dict, Iterable, Sequence, Any, Optional
 from dataclasses import dataclass
 from collections.abc import Mapping as BaseMapping
 from numbers import Number
@@ -132,15 +132,6 @@ class Annotation(ScalarData):
     def from_json_data(cls, data, dereferencer: Optional[Dereferencer] = None):
         return from_json_data(cls.interpolate_from_points, data, dereferencer=dereferencer)
 
-    def to_json_data(self, referencer: Referencer):
-        return {
-            "arr": "FIXME",
-            "axiskeys": self.axiskeys,
-            "location": self.location.to_json_data(referencer),
-            "color": to_json_data(self.color, referencer=referencer),
-            "raw_data": self.raw_data.to_json_data(referencer)
-        }
-
     def get_feature_samples(self, feature_extractor: FeatureExtractor) -> FeatureSamples:
         interval_under_annotation = self.interval.updated(c=self.raw_data.interval.c)
 
@@ -204,7 +195,7 @@ class Annotation(ScalarData):
         return out
 
     @property
-    def ilp_data(self) -> dict:
+    def ilp_data(self) -> Mapping[str, Any]:
         axiskeys = self.raw_data.axiskeys
         return {
             "__data__": self.raw(axiskeys),

@@ -1,10 +1,12 @@
-from typing import Optional, Sequence, Type
+from typing import Any, Mapping, Optional, Sequence, Type
 from dataclasses import dataclass
 import io
 from pathlib import Path
+from webilastik.features.ilp_filter import IlpFilter
 
 from ndstructs.datasource import DataSource
 from ndstructs.utils import JsonSerializable, Dereferencer
+from ndstructs.utils.JsonSerializable import JSON_ARRAY, JSON_VALUE
 
 from webilastik import Project
 from webilastik.ui.applet.data_selection_applet import DataSelectionApplet, ILane, Lane, url_to_datasource
@@ -24,9 +26,9 @@ class PixelClassificationLane(ILane, JsonSerializable):
         return self.raw_data
 
     @classmethod
-    def from_json_data(cls, data: dict, dereferencer: Optional[Dereferencer] = None) -> "PixelClassificationLane":
+    def from_json_data(cls, data: JSON_VALUE, dereferencer: Optional[Dereferencer] = None) -> "PixelClassificationLane":
         return cls(
-            raw_data=url_to_datasource(data['raw_data']),
+            raw_data=url_to_datasource(data['raw_data']), # type: ignore
             prediction_mask=None #FIXME
         )
 
@@ -35,7 +37,7 @@ class PixelClassificationLane(ILane, JsonSerializable):
         return ["Raw Data", "Prediction Mask"]
 
     @property
-    def ilp_data(self) -> dict:
+    def ilp_data(self) -> Mapping[str, Any]:
         return {
             "Raw Data": self.datasource_to_ilp_data(self.raw_data),
             "Prediction Mask": {} if self.prediction_mask is None else self.datasource_to_ilp_data(self.prediction_mask),
@@ -47,10 +49,10 @@ class PixelClassificationWorkflow:
     feature_selection_applet: FeatureSelectionApplet
     brushing_applet: BrushingApplet[PixelClassificationLane]
     pixel_classifier_applet: PixelClassificationApplet[PixelClassificationLane]
-    predictions_export_applet : ExportApplet[PixelClassificationLane, PixelClassifier]
+    predictions_export_applet : ExportApplet[PixelClassificationLane, PixelClassifier[IlpFilter]]
 
     @property
-    def ilp_data(self):
+    def ilp_data(self) -> Mapping[str, Any]:
         return {
             "Input Data": self.data_selection_applet.get_ilp_data(PixelClassificationLane),
             "FeatureSelections": self.feature_selection_applet.ilp_data,

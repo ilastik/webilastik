@@ -1,4 +1,5 @@
 from typing import Generic, Mapping, Optional, Sequence, Dict, Any, Iterator, TypeVar
+import textwrap
 
 from ndstructs.datasource import DataRoi
 import numpy as np
@@ -8,12 +9,51 @@ from webilastik.ui.applet.data_selection_applet import ILane
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.annotations.annotation import Annotation, Color
 from webilastik.features.ilp_filter import IlpFilter
-from webilastik.classifiers.pixel_classifier import Predictions
-from webilastik.classifiers.ilp_pixel_classifier import IlpVigraPixelClassifier
+from webilastik.classifiers.pixel_classifier import Predictions, VigraPixelClassifier
+
+
+DEFAULT_ILP_CLASSIFIER_FACTORY = textwrap.dedent(
+        """
+        ccopy_reg
+        _reconstructor
+        p0
+        (clazyflow.classifiers.parallelVigraRfLazyflowClassifier
+        ParallelVigraRfLazyflowClassifierFactory
+        p1
+        c__builtin__
+        object
+        p2
+        Ntp3
+        Rp4
+        (dp5
+        VVERSION
+        p6
+        I2
+        sV_num_trees
+        p7
+        I100
+        sV_label_proportion
+        p8
+        NsV_variable_importance_path
+        p9
+        NsV_variable_importance_enabled
+        p10
+        I00
+        sV_kwargs
+        p11
+        (dp12
+        sV_num_forests
+        p13
+        I8
+        sb."""[
+            1:
+        ]
+    ).encode("utf8")
+
 
 LANE = TypeVar("LANE", bound=ILane)
 class PixelClassificationApplet(Applet, Generic[LANE]):
-    pixel_classifier: Slot[IlpVigraPixelClassifier]
+    pixel_classifier: Slot[VigraPixelClassifier[IlpFilter]]
 
     def __init__(
         self,
@@ -26,7 +66,7 @@ class PixelClassificationApplet(Applet, Generic[LANE]):
         self._in_lanes = lanes
         self._in_feature_extractors = feature_extractors
         self._in_annotations = annotations
-        self.pixel_classifier = Slot[IlpVigraPixelClassifier](
+        self.pixel_classifier = Slot[VigraPixelClassifier[IlpFilter]](
             owner=self,
             refresher=self._create_pixel_classifier
         )
@@ -36,8 +76,8 @@ class PixelClassificationApplet(Applet, Generic[LANE]):
         )
         super().__init__(name=name)
 
-    def _create_pixel_classifier(self, confirmer: CONFIRMER) -> Optional[IlpVigraPixelClassifier]:
-        return  IlpVigraPixelClassifier.train(
+    def _create_pixel_classifier(self, confirmer: CONFIRMER) -> Optional[VigraPixelClassifier[IlpFilter]]:
+        return  VigraPixelClassifier[IlpFilter].train(
             annotations=self._in_annotations(),
             feature_extractors=self._in_feature_extractors()
         )
@@ -74,11 +114,10 @@ class PixelClassificationApplet(Applet, Generic[LANE]):
         out = {
             "Bookmarks": {"0000": []},
             "StorageVersion": "0.1",
-            "ClassifierFactory": IlpVigraPixelClassifier.DEFAULT_ILP_CLASSIFIER_FACTORY,
+            "ClassifierFactory": DEFAULT_ILP_CLASSIFIER_FACTORY,
         }
         try:
             out["ClassifierForests"] = self.get_classifier_ilp_data()
-            out["ClassifierFactory"] = self.pixel_classifier().ilp_classifier_factory
         except NotReadyException:
             pass
 

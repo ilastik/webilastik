@@ -44,7 +44,7 @@ class ExportApplet(Applet, Generic[LANE, PRODUCER]):
         producer_op = self.producer()
         if not producer_op:
             raise ValueError("No producer from upstream")
-        tile_shape = producer_op.get_tile_shape_hint(roi.datasource)
+        tile_shape = roi.datasource.tile_shape.updated(c=roi.datasource.shape.c)
 
         slc_batches : Dict[int, List[DataRoi]] = defaultdict(list)
         for slc in roi.get_tiles(tile_shape=tile_shape):
@@ -76,7 +76,7 @@ class ExportApplet(Applet, Generic[LANE, PRODUCER]):
         }
 
 
-def do_worker_compute(slice_batch: Tuple[Operator, Sequence[DataRoi]]) -> List[Array5D]:
+def do_worker_compute(slice_batch: Tuple[Operator[DataRoi, Array5D], Sequence[DataRoi]]) -> List[Array5D]:
     op = slice_batch[0]
     out = []
     for datasource_slc in slice_batch[1]:

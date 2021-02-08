@@ -1,7 +1,12 @@
 from abc import abstractmethod
-from typing import cast, Any, List, Mapping, Tuple, Optional, Sequence, Dict, TypeVar, Type
+from typing import List, Generic, Sequence, Dict, TypeVar, Type
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
+import tempfile
+from functools import lru_cache
+import os
+import h5py
+
 
 import numpy as np
 from vigra.learning import RandomForest as VigraRandomForest
@@ -11,6 +16,7 @@ from ndstructs import Array5D, Interval5D, Point5D, Shape5D
 from webilastik.features.feature_extractor import FeatureExtractor, FeatureData
 from webilastik.features.feature_extractor import FeatureExtractorCollection
 from webilastik.annotations import Annotation, FeatureSamples, Color
+from webilastik import Project
 from webilastik.operator import Operator
 from ndstructs.datasource import DataRoi, DataSource
 from ndstructs.utils import JsonSerializable, from_json_data, Dereferencer
@@ -19,7 +25,6 @@ try:
     import ilastik_operator_cache
     operator_cache = ilastik_operator_cache
 except ImportError:
-    from functools import lru_cache
     operator_cache = lru_cache()
 
 class Predictions(Array5D):
@@ -28,8 +33,11 @@ class Predictions(Array5D):
     that channel"""
     pass
 
-class TrainingData:
-    feature_extractors: Sequence[FeatureExtractor]
+
+FE = TypeVar("FE", bound=FeatureExtractor, covariant=True)
+
+class TrainingData(Generic[FE]):
+    feature_extractors: Sequence[FE]
     combined_extractor: FeatureExtractor
     color_map: Dict[Color, np.uint8]
     classes: List[np.uint8]
@@ -38,7 +46,7 @@ class TrainingData:
     y: np.ndarray  # shape is (num_samples, 1)
 
     def __init__(
-        self, *, feature_extractors: Sequence[FeatureExtractor], annotations: Sequence[Annotation]
+        self, *, feature_extractors: Sequence[FE], annotations: Sequence[Annotation]
     ):
         assert len(annotations) > 0
         assert len(feature_extractors) > 0
@@ -64,12 +72,11 @@ class TrainingData:
         )
         assert self.X.shape[0] == self.y.shape[0]
 
-
-class PixelClassifier(Operator, JsonSerializable):
+class PixelClassifier(Operator[DataRoi, Predictions], Generic[FE]):
     def __init__(
         self,
         *,
-        feature_extractors: Sequence[FeatureExtractor],
+        feature_extractors: Sequence[FE],
         classes: List[np.uint8],
         num_input_channels: int,
         color_map: Dict[Color, np.uint8],
@@ -94,73 +101,19 @@ class PixelClassifier(Operator, JsonSerializable):
         return Predictions.allocate(interval=self.get_expected_roi(data_slice), dtype=np.dtype('float32'), value=0)
 
     @operator_cache # type: ignore
-    def compute(self, roi: DataRoi) -> Array5D:
+    def compute(self, roi: DataRoi) -> Predictions:
         self.feature_extractor.ensure_applicable(roi.datasource)
         if roi.shape.c != self.num_input_channels:
             raise ValueError(f"Bad roi: {roi}. Expected roi to have shape.c={self.num_input_channels}")
         return self._do_predict(roi=roi)
 
 
-class ScikitLearnPixelClassifier(PixelClassifier):
-    def __init__(
-        self,
-        *,
-        feature_extractors: Sequence[FeatureExtractor],
-        forest: ScikitRandomForestClassifier,
-        classes: List[np.uint8],
-        num_input_channels: int,
-        color_map: Dict[Color, np.uint8],
-    ):
-        super().__init__(classes=classes, feature_extractors=feature_extractors, num_input_channels=num_input_channels, color_map=color_map)
-        self.forest = forest
-
-    @classmethod
-    def train(
-        cls,
-        feature_extractors: Sequence[FeatureExtractor],
-        annotations: Tuple[Annotation],
-        *,
-        num_trees: int = 100,
-        random_seed: int = 0,
-    ) -> "ScikitLearnPixelClassifier":
-        training_data = TrainingData(feature_extractors=feature_extractors, annotations=annotations)
-        forest = ScikitRandomForestClassifier(n_estimators=num_trees, random_state=random_seed)
-        forest.fit(training_data.X, training_data.y.squeeze())
-        num_channels = {a.raw_data for a in annotations}
-        return cls(
-            forest=forest,
-            feature_extractors=feature_extractors,
-            classes=training_data.classes,
-            num_input_channels=training_data.num_input_channels,
-            color_map=training_data.color_map,
-        )
-
-    def get_expected_dtype(self, input_dtype: np.dtype) -> np.dtype:
-        return np.dtype("float32")
-
-    @classmethod
-    def from_json_data(cls, data: Mapping[str, Any], dereferencer: Optional[Dereferencer] = None) -> "ScikitLearnPixelClassifier":
-        return cast(ScikitLearnPixelClassifier, from_json_data(cls.train, data, dereferencer=dereferencer))
-
-    def _do_predict(self, roi: DataRoi, out: Optional[Predictions] = None) -> Predictions:
-        feature_data = self.feature_extractor.compute(roi)
-        predictions_shape = roi.shape.updated(c=self.num_classes)
-        predictions_raw_line = self.forest.predict_proba(feature_data.linear_raw())
-        predictions = Predictions.from_line(predictions_raw_line, shape=predictions_shape, location=roi.start)
-        if out is not None:
-            assert out.shape == predictions.shape
-            out.localSet(predictions)
-            return out
-        else:
-            return predictions
-
-
 VIGRA_CLASSIFIER = TypeVar("VIGRA_CLASSIFIER", bound="VigraPixelClassifier", covariant=True)
-class VigraPixelClassifier(PixelClassifier):
+class VigraPixelClassifier(PixelClassifier[FE]):
     def __init__(
         self,
         *,
-        feature_extractors: Sequence[FeatureExtractor],
+        feature_extractors: Sequence[FE],
         forests: List[VigraRandomForest],
         classes: List[np.uint8],
         num_input_channels: int,
@@ -178,14 +131,14 @@ class VigraPixelClassifier(PixelClassifier):
     @classmethod
     def train(
         cls: Type[VIGRA_CLASSIFIER],
-        feature_extractors: Sequence[FeatureExtractor],
+        feature_extractors: Sequence[FE],
         annotations: Sequence[Annotation],
         *,
         num_trees: int = 100,
         num_forests: int = multiprocessing.cpu_count(),
         random_seed: int = 0,
     ) -> VIGRA_CLASSIFIER:
-        training_data = TrainingData(feature_extractors=feature_extractors, annotations=annotations)
+        training_data = TrainingData[FE](feature_extractors=feature_extractors, annotations=annotations)
 
         tree_counts = np.array([num_trees // num_forests] * num_forests)
         tree_counts[: num_trees % num_forests] += 1
@@ -208,10 +161,6 @@ class VigraPixelClassifier(PixelClassifier):
             color_map=training_data.color_map,
         )
 
-    @classmethod
-    def from_json_data(cls, data: Mapping[str, Any], dereferencer: Optional[Dereferencer] = None) -> "VigraPixelClassifier":
-        return cast(VigraPixelClassifier, from_json_data(cls.train, data))
-
     def _do_predict(self, roi: DataRoi) -> Predictions:
         feature_data = self.feature_extractor.compute(roi)
         predictions = self.allocate_predictions(roi)
@@ -229,3 +178,39 @@ class VigraPixelClassifier(PixelClassifier):
         predictions.setflags(write=False)
 
         return predictions
+
+    def get_forest_data(self):
+        tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5")
+        os.close(tmp_file_handle)
+        for forest_index, forest in enumerate(self.forests):
+            forest.writeHDF5(tmp_file_path, f"/Forest{forest_index:04d}")
+        with h5py.File(tmp_file_path, "r") as f:
+            out = Project.h5_group_to_dict(f["/"])
+        os.remove(tmp_file_path)
+        return out
+
+    @lru_cache() #FIMXE: double check classifier __hash__/__eq__
+    def __getstate__(self):
+        out = self.__dict__.copy()
+        forest_data = self.get_forest_data()
+        out["forests"] = self.get_forest_data()
+        return out
+
+    def __setstate__(self, data):
+        forests: List[VigraRandomForest] = []
+        tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5")
+        os.close(tmp_file_handle)
+        with h5py.File(tmp_file_path, "r+") as f:
+            for forest_key, forest_data in data["forests"].items():
+                forest_group = f.create_group(forest_key)
+                Project.populate_h5_group(forest_group, forest_data)
+                forests.append(VigraRandomForest(tmp_file_path, forest_group.name))
+        os.remove(tmp_file_path)
+
+        self.__init__(
+            feature_extractors=data["feature_extractors"],
+            forests=forests,
+            num_input_channels=data["num_input_channels"],
+            classes=data["classes"],
+            color_map=data["color_map"],
+        )
