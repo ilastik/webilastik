@@ -14,9 +14,9 @@ from ndstructs.utils import JsonSerializable
 from webilastik.operator import Operator
 
 class FeatureData(Array5D):
-    pass
-    # FIXME:
-    # assert arr.dtype == np.float32
+    def __init__(self, arr: np.ndarray, axiskeys: str, location: Point5D = Point5D.zero()):
+        super().__init__(arr, axiskeys=axiskeys, location=location)
+        assert self.dtype == np.dtype('float32')
 
 
 class FeatureDataMismatchException(Exception):
