@@ -97,6 +97,11 @@ def test_pixel_classification_workflow():
     # import pydevd; pydevd.settrace()
     preds = wf.predictions_export_applet.compute(DataRoi(ds))
     preds.as_uint8().show_channels()
+
+
+    exported_tile = wf.predictions_export_applet.compute(DataRoi(datasource=ds, x=(100, 200), y=(100, 200)))
+    exported_tile.show_channels()
+
     return
 
     # GUI clicks "export button"
