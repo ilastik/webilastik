@@ -9,7 +9,6 @@ Webilastik heavily uses [ndstructs](https://github.com/ilastik/ndstructs) to hav
 
 A PixelClassification workflow can be exposed over http by running `webilastik/server/server.py`. You can make manual requests to the server such as the ones in `webilastik/server/servertest.py` or use [a modified version of Neuroglancer](https://github.com/ilastik/neuroglancer/tree/web_predictions) for that purpose.
 
-The PixelClassificationWorkflow used by the server still doesn't use the experimental `Applets` architecture.
 
 # Concepts
 
