@@ -1,9 +1,7 @@
 from abc import abstractmethod, ABC
 import asyncio
-from typing import Optional, Any, Sequence, Dict, List, cast, Mapping
+from typing import Any, Dict, List, cast, Mapping
 from ndstructs.datasource.DataRoi import DataRoi
-import typing_extensions
-from dataclasses import dataclass
 from collections.abc import Mapping as BaseMapping
 
 
@@ -11,10 +9,8 @@ import json
 from webilastik.annotations.annotation import Annotation
 import aiohttp
 from aiohttp import web
-from aiohttp.web import Request
 
-from ndstructs import Interval5D
-from ndstructs.utils import JsonSerializable, from_json_data, to_json_data, Dereferencer
+from ndstructs.utils import from_json_data, to_json_data, Dereferencer
 from ndstructs.datasource import DataSource
 
 from webilastik.features.ilp_filter import IlpFilter
@@ -22,11 +18,10 @@ from webilastik.annotations import Annotation
 from webilastik.ui.applet import Applet, CONFIRMER
 from webilastik.ui.applet.sequence_provider_applet import SequenceProviderApplet, Item_co
 from webilastik.ui.applet.export_applet import ExportApplet
-from webilastik.ui.applet.data_selection_applet import ILane, DataSelectionApplet
+from webilastik.ui.applet.data_selection_applet import DataSelectionApplet
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.ui.applet.brushing_applet import BrushingApplet
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
-from webilastik.ui.applet.array5d_viewer import Array5DViewer
 from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow, PixelClassificationLane
 from webilastik.ui.applet.data_selection_applet import url_to_datasource
 
