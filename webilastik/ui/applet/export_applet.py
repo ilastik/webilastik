@@ -42,8 +42,6 @@ class ExportApplet(Applet, Generic[LANE, PRODUCER]):
 
     def compute(self, roi: DataRoi) -> Array5D:
         producer_op = self.producer()
-        if not producer_op:
-            raise ValueError("No producer from upstream")
         tile_shape = roi.datasource.tile_shape.updated(c=roi.datasource.shape.c)
 
         slc_batches : Dict[int, List[DataRoi]] = defaultdict(list)
@@ -51,18 +49,12 @@ class ExportApplet(Applet, Generic[LANE, PRODUCER]):
             batch_idx = hash(slc) % len(self._executors)
             slc_batches[batch_idx].append(slc)
 
-        # result_batch_futures = []
-        # for idx, batch in slc_batches.items():
-        #     executor = self._executors[idx]
-        #     result_batch_futures.append(executor.submit(do_worker_compute, (producer_op, batch)))
+        result_batch_futures = []
+        for idx, batch in slc_batches.items():
+            executor = self._executors[idx]
+            result_batch_futures.append(executor.submit(do_worker_compute, (producer_op, batch)))
 
-        # tiles : Sequence[Array5D] = [tile for future in result_batch_futures for tile in future.result()]
-
-
-        tiles : List[Array5D] = []
-        for tile in roi.get_tiles(tile_shape=tile_shape):
-            data = producer_op.compute(tile)
-            tiles.append(data)
+        tiles : Sequence[Array5D] = [tile for future in result_batch_futures for tile in future.result()]
 
         return tiles[0].combine(tiles[1:])
 
