@@ -88,6 +88,7 @@ class ChannelwiseFastFilter(IlpFilter):
         per_channel_results : List[FeatureData] = []
         for roi_slice in roi.split(roi_step):
             haloed_roi = roi_slice.enlarged(self.halo)
+            channel_offset = roi_slice.start.c - roi.start.c
             if self.presmooth_sigma > 0:
                 gaussian_filter = GaussianSmoothing(
                     preprocessor=self.preprocessor, sigma=self.presmooth_sigma, axis_2d=self.axis_2d, window_size=3.5
@@ -95,6 +96,7 @@ class ChannelwiseFastFilter(IlpFilter):
                 source_data = gaussian_filter.compute(haloed_roi)
             else:
                 source_data = self.preprocessor.compute(haloed_roi)
+
             source_axes = "zyx"
             if self.axis_2d:
                 source_axes = source_axes.replace(self.axis_2d, "")
@@ -110,7 +112,7 @@ class ChannelwiseFastFilter(IlpFilter):
             feature_data = FeatureData(
                 raw_feature_data,
                 axiskeys=output_axes,
-                location=haloed_roi.start.updated(c=haloed_roi.start.c * channel_multiplier)
+                location=haloed_roi.start.updated(c=channel_offset * channel_multiplier)
             )
             per_channel_results.append(feature_data.cut(roi_slice, c=All()))
         combined_result = per_channel_results[0].combine(per_channel_results[1:])
