@@ -2,6 +2,7 @@ import aiohttp
 import asyncio
 import json
 import numpy
+import uuid
 
 from ndstructs import Array5D
 
@@ -77,7 +78,7 @@ async def main():
             print("done sending annotations<<<<<")
 
             print(f"Requesting predictions========================")
-            async with session.get("http://localhost:5000/predictions_export_applet/0/data/0-500_0-256_0-1") as response:
+            async with session.get(f"http://localhost:5000/predictions_export_applet/{uuid.uuid4()}/0/data/0-500_0-256_0-1") as response:
                 print("Status:", response.status)
                 print("Content-type:", response.headers['content-type'])
 

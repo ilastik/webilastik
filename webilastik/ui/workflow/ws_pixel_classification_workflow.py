@@ -281,11 +281,11 @@ app = web.Application()
 app.add_routes([
     web.get('/wf', workflow.open_websocket), # type: ignore
     web.get(
-        "/predictions_export_applet/{lane_index}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}",
+        "/predictions_export_applet/{uuid}/{lane_index}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}", #FIXME uuid is just there to prevent caching
         workflow.ng_predict # type: ignore
     ),
     web.get(
-        "/predictions_export_applet/{lane_index}/info",
+        "/predictions_export_applet/{uuid}/{lane_index}/info", #FIXME uuid is just there to prevent caching
         workflow.ng_predict_info # type: ignore
     ),
     web.post(
