@@ -2,7 +2,7 @@ import re
 from pathlib import Path
 from urllib.parse import urlparse, urljoin
 import io
-from typing import Dict, Iterable, List, Any, Callable, Optional, Tuple
+from typing import Collection, Dict, Iterable, List, Any, Callable, Optional, Tuple
 import requests
 from requests import HTTPError
 import sys
@@ -13,6 +13,7 @@ from fs.info import Info
 from fs.errors import DirectoryExpected, FileExpected, ResourceNotFound
 from fs.permissions import Permissions
 from fs.enums import ResourceType
+from requests.models import CaseInsensitiveDict
 
 from .RemoteFile import RemoteFile
 
@@ -48,13 +49,16 @@ class HttpPyFs(FS):
         )
         return new_url.geturl()
 
+    def geturl(self, path: str, purpose: str = 'download') -> str:
+        return self._make_full_path(path)
+
     def _delete_object(self, path: str) -> None:
         full_path = self._make_full_path(path)
         eprint(f"Removing object at {full_path}")
         resp = requests.delete(full_path)
         resp.raise_for_status()
 
-    def _put_object(self, path: str, contents: bytes) -> str:
+    def _put_object(self, path: str, contents: bytes):
         full_path = self._make_full_path(path)
         resource_type = self._get_type(full_path)
         if resource_type == ResourceType.file:
@@ -63,16 +67,16 @@ class HttpPyFs(FS):
         elif resource_type == ResourceType.directory:
             raise ValueError(f"{full_path} is a directory")
         assert full_path != "/"
-        response = requests.put(full_path, data=data, headers={"Content-Type": "application/octet-stream"})
+        response = requests.put(full_path, data=contents, headers={"Content-Type": "application/octet-stream"})
         response.raise_for_status()
 
-    def _get_object(self, path: str) -> Tuple[Dict[str, str], bytes]:
+    def _get_object(self, path: str) -> Tuple[CaseInsensitiveDict, bytes]:
         full_path = self._make_full_path(path)
         response = requests.get(full_path)
         response.raise_for_status()
         return response.headers, response.content
 
-    def _head_object(self, path: str) -> Dict:
+    def _head_object(self, path: str) -> CaseInsensitiveDict:
         full_path = self._make_full_path(path)
         resp = requests.head(full_path)
         resp.raise_for_status()
@@ -85,7 +89,7 @@ class HttpPyFs(FS):
             return ResourceType.file
         return ResourceType.directory
 
-    def getinfo(self, path: str, namespaces: Iterable[str] = ("basic",)) -> Info:
+    def getinfo(self, path: str, namespaces: Optional[Collection[str]] = ("basic",)) -> Info:
         full_path = self._make_full_path(path)
         resource_type = self._get_type(full_path)
         return Info(
@@ -117,7 +121,7 @@ class HttpPyFs(FS):
                 return RemoteFile(close_callback=close_callback, mode=mode, data=bytes())
             raise e
 
-    def opendir(self, path: str):
+    def opendir(self, path: str, factory=None) -> SubFS["HttpPyFs"]:
         return HttpPyFs(self._make_full_path(path))
 
     def listdir(self, path: str) -> List[str]:
@@ -125,7 +129,7 @@ class HttpPyFs(FS):
 
     def makedir(
         self, path: str, permissions: Optional[Permissions] = None, recreate: bool = False
-    ) -> SubFS["SwiftPyFs"]:
+    ) -> SubFS["HttpPyFs"]:
         raise NotImplementedError("Can't reliably create directories via http")
 
     def remove(self, path: str) -> None:
