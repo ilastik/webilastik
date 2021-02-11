@@ -1,18 +1,16 @@
-from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
-from typing import List, Iterator, Mapping, Tuple, Dict, Iterable, Sequence, Any, Optional
-from dataclasses import dataclass
-from collections.abc import Mapping as BaseMapping
-from numbers import Number
-from pathlib import Path
+from typing import List, Sequence, Mapping, Tuple, Dict, Iterable, Sequence, Any, Optional
 
 import numpy as np
 from ndstructs import Interval5D, Point5D, Shape5D
-from ndstructs import Array5D, All, ScalarData, StaticLine, LinearData
-from webilastik.features.feature_extractor import FeatureExtractor, FeatureData
+from ndstructs import Array5D, All, ScalarData, StaticLine
+from ndstructs.utils import Dereferencer, Referencer
 from ndstructs.datasource import DataSource, DataRoi
-from ndstructs.utils import JsonSerializable, from_json_data, to_json_data, Dereferencer, Referencer
-from PIL import Image as PilImage
+
+from webilastik.utility.serialization import ListGetter, ObjectGetter, ValueGetter, JSON_OBJECT, JSON_VALUE
+from webilastik.features.feature_extractor import FeatureExtractor, FeatureData
+from webilastik.datasource import datasource_from_url
+
 
 
 class Color:
@@ -29,6 +27,23 @@ class Color:
         self.b = b
         self.a = a
         self.name = name or f"Label {self.rgba}"
+
+    @classmethod
+    def from_json_data(cls, data: Mapping[str, Any]) -> "Color":
+        return Color(
+            r=np.uint8(data.get("r", 0)),
+            g=np.uint8(data.get("g", 0)),
+            b=np.uint8(data.get("b", 0)),
+            a=np.uint8(data.get("a", 255)),
+        )
+
+    def to_json_data(self) -> JSON_OBJECT:
+        return {
+            "r": int(self.r),
+            "g": int(self.g),
+            "b": int(self.b),
+            "a": int(self.a),
+        }
 
     @classmethod
     def from_channels(cls, channels: List[np.uint8], name: str = "") -> "Color":
@@ -112,7 +127,7 @@ class Annotation(ScalarData):
         return self.__class__(arr, axiskeys=axiskeys, location=location, color=self.color, raw_data=self.raw_data)
 
     @classmethod
-    def interpolate_from_points(cls, color: Color, voxels: List[Point5D], raw_data: DataSource):
+    def interpolate_from_points(cls, color: Color, voxels: Sequence[Point5D], raw_data: DataSource):
         start = Point5D.min_coords(voxels)
         stop = Point5D.max_coords(voxels) + 1  # +1 because slice.stop is exclusive, but max_point isinclusive
         scribbling_roi = Interval5D.create_from_start_stop(start=start, stop=stop)
@@ -129,8 +144,18 @@ class Annotation(ScalarData):
         return cls(scribblings._data, axiskeys=scribblings.axiskeys, color=color, raw_data=raw_data, location=start)
 
     @classmethod
-    def from_json_data(cls, data, dereferencer: Optional[Dereferencer] = None):
-        return from_json_data(cls.interpolate_from_points, data, dereferencer=dereferencer)
+    def from_json_data(cls, data: JSON_VALUE, dereferencer: Optional[Dereferencer] = None) -> "Annotation":
+        raw_voxels = ListGetter.get_list_of_objects(key="voxels", data=data)
+        voxels : Sequence[Point5D] = [Point5D.from_json_data(raw_voxel) for raw_voxel in raw_voxels]
+
+        raw_color = ObjectGetter.get(key="color", data=data)
+        color = Color.from_json_data(raw_color)
+
+        raw_data = datasource_from_url(ValueGetter(str).get(key="raw_data", data=data))
+        return Annotation.interpolate_from_points(color=color, voxels=voxels, raw_data=raw_data)
+
+    def to_json_data(self, referencer: Referencer = lambda x: None) -> JSON_OBJECT:
+        raise NotImplementedError
 
     def get_feature_samples(self, feature_extractor: FeatureExtractor) -> FeatureSamples:
         interval_under_annotation = self.interval.updated(c=self.raw_data.interval.c)

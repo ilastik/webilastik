@@ -2,22 +2,22 @@ from typing import Any, Mapping, Optional, Sequence, Type
 from dataclasses import dataclass
 import io
 from pathlib import Path
-from webilastik.features.ilp_filter import IlpFilter
 
 from ndstructs.datasource import DataSource
-from ndstructs.utils import JsonSerializable, Dereferencer
-from ndstructs.utils.JsonSerializable import JSON_ARRAY, JSON_VALUE
 
 from webilastik import Project
-from webilastik.ui.applet.data_selection_applet import DataSelectionApplet, ILane, Lane, url_to_datasource
+from webilastik.ui.applet.data_selection_applet import DataSelectionApplet, ILane
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
 from webilastik.ui.applet.brushing_applet import BrushingApplet
 from webilastik.ui.applet.export_applet import ExportApplet
 from webilastik.classifiers.pixel_classifier import PixelClassifier
+from webilastik.features.ilp_filter import IlpFilter
+from webilastik.utility.serialization import ValueGetter, JSON_VALUE, JSON_OBJECT
+from webilastik.datasource import datasource_from_url
 
 
-class PixelClassificationLane(ILane, JsonSerializable):
+class PixelClassificationLane(ILane):
     def __init__(self, raw_data: DataSource, prediction_mask: Optional[DataSource]=None):
         self.raw_data = raw_data
         self.prediction_mask = prediction_mask
@@ -26,11 +26,20 @@ class PixelClassificationLane(ILane, JsonSerializable):
         return self.raw_data
 
     @classmethod
-    def from_json_data(cls, data: JSON_VALUE, dereferencer: Optional[Dereferencer] = None) -> "PixelClassificationLane":
+    def from_json_data(cls, data: JSON_VALUE) -> "PixelClassificationLane":
+        raw_data_url : str = ValueGetter(str).get(key="raw_data", data=data)
+        mask_url : Optional[str] = ValueGetter(str).get_optional(key="prediction_mask", data=data)
+
         return cls(
-            raw_data=url_to_datasource(data['raw_data']), # type: ignore
-            prediction_mask=None #FIXME
+            raw_data=datasource_from_url(raw_data_url),
+            prediction_mask=None if mask_url is None else datasource_from_url(mask_url)
         )
+
+    def to_json_data(self) -> JSON_OBJECT:
+        return {
+            "raw_data": self.raw_data.to_json_data(),
+            "prediction_mask": None if self.prediction_mask == None else self.prediction_mask.to_json_data()
+        }
 
     @classmethod
     def get_role_names(cls) -> Sequence[str]:

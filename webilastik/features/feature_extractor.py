@@ -24,7 +24,7 @@ class FeatureDataMismatchException(Exception):
         super().__init__(f"Feature {feature_extractor} can't be cleanly applied to {data_source}")
 
 
-class FeatureExtractor(Operator[DataRoi, FeatureData], JsonSerializable):
+class FeatureExtractor(Operator[DataRoi, FeatureData]):
     """A specification of how feature data is to be (reproducibly) computed"""
 
     @abstractmethod

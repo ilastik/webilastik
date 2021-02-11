@@ -20,8 +20,6 @@ FE = TypeVar("FE", bound="IlpFilter")
 
 
 class IlpFilter(FeatureExtractor):
-    REGISTRY: ClassVar[Dict[str, Type["IlpFilter"]]] = {}
-
     def __init__(self, axis_2d: Optional[str]):
         self.axis_2d = axis_2d
         super().__init__()
@@ -85,10 +83,6 @@ class IlpFilter(FeatureExtractor):
                     )
                     feature_extractors.append(extractor)
         return feature_extractors
-
-    @classmethod
-    def from_json_data(cls, data, dereferencer: Optional[Dereferencer] = None) -> "IlpFilter":
-        return cls.REGISTRY[data["__class__"]].from_json_data(data, dereferencer=dereferencer)
 
     # def to_ilp_feature_names(self) -> Iterator[bytes]:
     #     for c in range(self.num_input_channels * self.channel_multiplier):

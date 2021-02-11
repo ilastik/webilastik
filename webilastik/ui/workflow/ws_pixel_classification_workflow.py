@@ -1,18 +1,23 @@
 from abc import abstractmethod, ABC
 import asyncio
 from typing import Any, Dict, List, cast, Mapping
-from ndstructs.datasource.DataRoi import DataRoi
 from collections.abc import Mapping as BaseMapping
-
-
 import json
-from webilastik.annotations.annotation import Annotation
+
 import aiohttp
 from aiohttp import web
+from ndstructs.datasource.DataRoi import DataRoi
 
-from ndstructs.utils import from_json_data, to_json_data, Dereferencer
-from ndstructs.datasource import DataSource
-
+from webilastik.features.channelwise_fastfilters import (
+    StructureTensorEigenvalues,
+    GaussianGradientMagnitude,
+    GaussianSmoothing,
+    DifferenceOfGaussians,
+    HessianOfGaussianEigenvalues,
+    LaplacianOfGaussian,
+)
+from webilastik.utility.serialization import ValueGetter, JSON_VALUE
+from webilastik.annotations.annotation import Annotation
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.annotations import Annotation
 from webilastik.ui.applet import Applet, CONFIRMER
@@ -23,22 +28,6 @@ from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.ui.applet.brushing_applet import BrushingApplet
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
 from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow, PixelClassificationLane
-from webilastik.ui.applet.data_selection_applet import url_to_datasource
-
-
-
-#FIXME: can we do this without the monkey patching?
-@classmethod
-#@functools.lru_cache(maxsize=128)
-def datasource_from_json_data(cls, data, dereferencer: Dereferencer = None):
-    if isinstance(data, str):
-        url = data
-    elif isinstance(data, BaseMapping):
-        url = data["url"]
-    else:
-        raise ValueError(f"Can't deserialize a datasource from {data}")
-    return url_to_datasource(url)
-DataSource.from_json_data = datasource_from_json_data
 
 
 class WsAppletMixin(Applet):
@@ -46,7 +35,7 @@ class WsAppletMixin(Applet):
         super().__init__(*args, **kwargs)
         self.websockets : List[web.WebSocketResponse] = []
 
-    def _get_status_message(self) -> Any:
+    def _get_status_message(self) -> JSON_VALUE:
         return None
 
     def _update_remote(self):
@@ -80,11 +69,7 @@ class WsAppletMixin(Applet):
         pass
 
 
-
 class WsSequenceProviderApplet(WsAppletMixin, SequenceProviderApplet[Item_co]):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     def do_rpc(self, method_name: str, payload: Any):
         if method_name in {'add', 'remove'}:
             items = [self.item_from_json_data(item) for item in payload["items"]]
@@ -94,28 +79,41 @@ class WsSequenceProviderApplet(WsAppletMixin, SequenceProviderApplet[Item_co]):
         raise Exception(f"Dont know how to run method '{method_name}'")
 
     @abstractmethod
-    def item_from_json_data(self, data: Any) -> Item_co:
+    def item_from_json_data(self, data: JSON_VALUE) -> Item_co:
         pass
 
 class WsDataSelectionApplet(WsSequenceProviderApplet[PixelClassificationLane], DataSelectionApplet[PixelClassificationLane]):
-    def _get_status_message(self) -> Any:
+    def _get_status_message(self) -> JSON_VALUE:
         return {
-            "applet_name": "data_selection_applet",#FIXME: maybe have python applets also have names?
-            "items": to_json_data(self.items())
+            "applet_name": self.name,#FIXME: maybe have python applets also have names?
+            "items": [item.to_json_data() for item in self.items()]
         }
 
-    def item_from_json_data(self, data: Any) -> PixelClassificationLane:
-        return cast(PixelClassificationLane, from_json_data(PixelClassificationLane, data))
+    def item_from_json_data(self, data: JSON_VALUE) -> PixelClassificationLane:
+        return PixelClassificationLane.from_json_data(data)
 
 
 class WsBrushingApplet(WsSequenceProviderApplet[Annotation], BrushingApplet[PixelClassificationLane]):
-    def item_from_json_data(self, data: Any) -> Annotation:
-        return cast(Annotation, from_json_data(Annotation.interpolate_from_points, data))
+    def item_from_json_data(self, data: JSON_VALUE) -> Annotation:
+        return Annotation.from_json_data(data)
 
 
 class WsFeatureSelectionApplet(WsSequenceProviderApplet[IlpFilter], FeatureSelectionApplet):
-    def item_from_json_data(self, data: Any) -> IlpFilter:
-        return IlpFilter.from_json_data(data)
+    def item_from_json_data(self, data: JSON_VALUE) -> IlpFilter:
+        class_name = ValueGetter.get_class_name(data=data)
+        if class_name == StructureTensorEigenvalues.__name__:
+            return StructureTensorEigenvalues.from_json_data(data)
+        if class_name == GaussianGradientMagnitude.__name__:
+            return GaussianGradientMagnitude.from_json_data(data)
+        if class_name == GaussianSmoothing.__name__:
+            return GaussianSmoothing.from_json_data(data)
+        if class_name == DifferenceOfGaussians.__name__:
+            return DifferenceOfGaussians.from_json_data(data)
+        if class_name == HessianOfGaussianEigenvalues.__name__:
+            return HessianOfGaussianEigenvalues.from_json_data(data)
+        if class_name == LaplacianOfGaussian.__name__:
+            return LaplacianOfGaussian.from_json_data(data)
+        raise ValueError(f"Could not convert {data} into a Feature Extractor")
 
 
 class WsPixelClassificationApplet(WsAppletMixin, PixelClassificationApplet[PixelClassificationLane]):
@@ -214,7 +212,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         applet = self.applets.get(applet_name)
         if applet == None:
             raise Exception(f"Bad applet name: {applet_name}")
-        print(f"===>>> Running {applet_name}.{method_name}")
+        print(f"===>>> Running {applet_name}.{method_name} with args {args}")
         applet.do_rpc(method_name, args)
 
     def ng_predict_info(self, request: web.Request):
@@ -283,11 +281,11 @@ app = web.Application()
 app.add_routes([
     web.get('/wf', workflow.open_websocket), # type: ignore
     web.get(
-        "/predictions_export_applet/{uuid}/{lane_index}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}", #uuid so not to cache
+        "/predictions_export_applet/{lane_index}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}",
         workflow.ng_predict # type: ignore
     ),
     web.get(
-        "/predictions_export_applet/{uuid}/{lane_index}/info", #uuid so not to cache
+        "/predictions_export_applet/{lane_index}/info",
         workflow.ng_predict_info # type: ignore
     ),
     web.post(

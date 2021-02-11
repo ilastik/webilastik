@@ -14,22 +14,6 @@ from webilastik.ui.applet.sequence_provider_applet import SequenceProviderApplet
 from webilastik.filesystem import HttpPyFs
 
 
-
-def url_to_datasource(url: str) -> DataSource:
-    parsed_url = urlparse(url.lstrip("precomputed://"))
-    if parsed_url.scheme in ("http", "https"):
-        fs = HttpPyFs(parsed_url._replace(path="/").geturl())
-    else:
-        fs = OSFS("/")
-
-    if url.startswith("precomputed://"):
-        return PrecomputedChunksDataSource(
-            path=Path(parsed_url.path),
-            filesystem=fs
-        )
-    return DataSource.create(path=Path(parsed_url.path), filesystem=fs)
-
-
 def create_precomputed_chunks_datasource(url: str) -> PrecomputedChunksDataSource:
     parsed_url = urlparse(url.lstrip("precomputed://"))
     return PrecomputedChunksDataSource(
