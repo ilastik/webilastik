@@ -42,6 +42,8 @@ Applets are organized in a Directed Acyclic Graph, where the vertices are the Ap
 
 The base `Applet` class contains some `__init__` logic that **must run after all local slots have been defined**. The easiest way to achieve that is to make sure custom applets call `super().__init__()` as the **last step** of their construction.
 
+Applets are constructed already connected to all of its upstream applets and cannot disconnect from them throughout their lifetimes.
+
 ### Slots  - applet "live properties" (experimental)
 
 Applets declare their observable properties using a subclass of `Slot`.
@@ -122,3 +124,7 @@ components_app = ConnectedCompsApplet(threshold=thresh_app.threshold)
 # on the threshold slot from thresh_app
 thresh_app.threshold.set_value(1, confirmer=some_gui_confirmation_popup)
 ```
+
+## Workflows
+
+Workflows are a predefined collection of `Applets`. Ideally, workflows implement no logic; As much as possible, the `Applets` should be independant of external logic, so that they can be reused in multiple workflows. Interaction with a workflow should also be throu the applets, so in a `PixelClassificationWorkflow`, for example, adding lanes is done via the `PixelClassificationWorkflow.data_selection_applet: DataSelectionApplet` property, and not through some custom workflow method that would have to be re-implemented for every workflow.
