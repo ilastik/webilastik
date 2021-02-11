@@ -94,15 +94,13 @@ def test_pixel_classification_workflow():
     wf.brushing_applet.add(brush_strokes, confirmer=dummy_confirmer)
 
 
-    # import pydevd; pydevd.settrace()
+    # calculate predictions on an arbitrary data
     preds = wf.predictions_export_applet.compute(DataRoi(ds))
-    preds.as_uint8().show_channels()
+#    preds.as_uint8().show_channels()
 
-
+    # calculate predictions on just a piece of arbitrary data
     exported_tile = wf.predictions_export_applet.compute(DataRoi(datasource=ds, x=(100, 200), y=(100, 200)))
-    exported_tile.show_channels()
-
-    return
+ #   exported_tile.show_channels()
 
     # GUI clicks "export button"
     wf.predictions_export_applet.export_all()
@@ -119,10 +117,3 @@ def test_pixel_classification_workflow():
 
     wf.data_selection_applet.remove_at(0, confirmer=lambda msg: True)
     assert wf.brushing_applet.items.get() == None
-
-# if __name__ == "__main__":
-#     wf = test_pixel_classification_workflow()
-#     # GUI creates a datasource somewhere...
-#     lane2 = PixelClassificationLane(raw_data=DataSource.create(Path("sample_data/cropped2.png")))
-#     wf.data_selection_applet.add([lane2], confirmer=lambda msg: True)
-#     wf.viewer.switch_to_lane(1)

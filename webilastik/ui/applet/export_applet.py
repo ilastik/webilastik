@@ -33,9 +33,12 @@ class ExportApplet(Applet, Generic[LANE, PRODUCER]):
         if not producer_op:
             raise ValueError("No producer from upstream")
         for lane in self.lanes() or []:
-            #FIXME: get format/mapper/orchestrator/scheduler/whatever from slots or method args
             data_slice = DataRoi(lane.get_raw_data())
-            for slc in data_slice.get_tiles():
+            # FIXME: Maybe the provider operator should suggest a sensible tile shape?
+            tile_shape = data_slice.datasource.tile_shape.updated(c=data_slice.datasource.shape.c)
+
+            #FIXME: get format/mapper/orchestrator/scheduler/whatever from slots or method args
+            for slc in data_slice.get_tiles(tile_shape=tile_shape):
                 #FIXME save this with a DataSink
                 print(f"Computing on {data_slice} with producer {producer_op}")
                 producer_op.compute(slc)
