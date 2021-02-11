@@ -96,11 +96,11 @@ def test_pixel_classification_workflow():
 
     # calculate predictions on an arbitrary data
     preds = wf.predictions_export_applet.compute(DataRoi(ds))
-#    preds.as_uint8().show_channels()
+    # preds.as_uint8().show_channels()
 
     # calculate predictions on just a piece of arbitrary data
     exported_tile = wf.predictions_export_applet.compute(DataRoi(datasource=ds, x=(100, 200), y=(100, 200)))
- #   exported_tile.show_channels()
+    # exported_tile.show_channels()
 
     # GUI clicks "export button"
     wf.predictions_export_applet.export_all()

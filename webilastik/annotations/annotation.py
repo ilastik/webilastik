@@ -151,7 +151,8 @@ class Annotation(ScalarData):
         raw_color = ObjectGetter.get(key="color", data=data)
         color = Color.from_json_data(raw_color)
 
-        raw_data = datasource_from_url(ValueGetter(str).get(key="raw_data", data=data))
+        raw_data_obj = ObjectGetter.get("raw_data", data=data)
+        raw_data = datasource_from_url(ValueGetter(str).get(key="url", data=raw_data_obj))
         return Annotation.interpolate_from_points(color=color, voxels=voxels, raw_data=raw_data)
 
     def to_json_data(self, referencer: Referencer = lambda x: None) -> JSON_OBJECT:

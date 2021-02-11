@@ -13,6 +13,8 @@ def _get_value(*, key: str, data: JSON_VALUE, value_class: type) -> Any:
     if not isinstance(data, MappingCollection):
             raise TypeError(f"Expected data to be a JSON object, found this: {data}")
     value = data[key]
+    if isinstance(value, int) and value_class == float:
+        value = float(value)
     if not isinstance(value, value_class):
         raise TypeError(f"Expected {key} to be a {value_class.__name__}, but found this: {value}")
     return value
@@ -67,3 +69,9 @@ class ObjectGetter:
     @classmethod
     def get(cls, key: str, data: JSON_VALUE) -> JSON_OBJECT:
         return _get_value(key=key, data=data, value_class=MappingCollection)
+    @classmethod
+    def get_optional(cls, key: str, data: JSON_VALUE) -> Optional[JSON_OBJECT]:
+        try:
+            return cls.get(key=key, data=data)
+        except KeyError:
+            return None

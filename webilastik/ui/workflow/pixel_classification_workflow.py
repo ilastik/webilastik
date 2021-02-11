@@ -13,7 +13,7 @@ from webilastik.ui.applet.brushing_applet import BrushingApplet
 from webilastik.ui.applet.export_applet import ExportApplet
 from webilastik.classifiers.pixel_classifier import PixelClassifier
 from webilastik.features.ilp_filter import IlpFilter
-from webilastik.utility.serialization import ValueGetter, JSON_VALUE, JSON_OBJECT
+from webilastik.utility.serialization import ObjectGetter, ValueGetter, JSON_VALUE, JSON_OBJECT
 from webilastik.datasource import datasource_from_url
 
 
@@ -27,8 +27,11 @@ class PixelClassificationLane(ILane):
 
     @classmethod
     def from_json_data(cls, data: JSON_VALUE) -> "PixelClassificationLane":
-        raw_data_url : str = ValueGetter(str).get(key="raw_data", data=data)
-        mask_url : Optional[str] = ValueGetter(str).get_optional(key="prediction_mask", data=data)
+        raw_data_obj = ObjectGetter.get(key="raw_data", data=data)
+        raw_data_url : str = ValueGetter(str).get(key="url", data=raw_data_obj)
+
+        mask_obj = ObjectGetter.get_optional(key="prediction_mask", data=data)
+        mask_url: Optional[str] = None if mask_obj is None else ValueGetter(str).get(key="url", data=mask_obj)
 
         return cls(
             raw_data=datasource_from_url(raw_data_url),

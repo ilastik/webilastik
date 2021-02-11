@@ -18,7 +18,9 @@ async def main():
                     "method_name": "add",
                     "args": {
                         "items": [
-                            {"raw_data": raw_data}
+                            {
+                                "raw_data": {"url": raw_data}
+                            }
                         ]
                     }
                 },
@@ -53,22 +55,22 @@ async def main():
                             {
                                 "voxels": [{"x": 140, "y": 150}, {"x": 145, "y": 155}],
                                 "color": {"r": 0, "g": 255, "b": 0},
-                                "raw_data": raw_data
+                                "raw_data": {"url": raw_data}
                             },
                             {
                                 "voxels": [{"x": 238, "y": 101}, {"x": 229, "y": 139}],
                                 "color": {"r": 0, "g": 255, "b": 0},
-                                "raw_data": raw_data
+                                "raw_data": {"url": raw_data}
                             },
                             {
                                 "voxels": [{"x": 283, "y": 87}, {"x": 288, "y": 92}],
                                 "color": {"r": 255, "g": 0, "b": 0},
-                                "raw_data": raw_data
+                                "raw_data": {"url": raw_data}
                             },
                             {
                                 "voxels": [{"x": 274, "y": 168}, {"x": 256, "y": 191}],
                                 "color": {"r": 255, "g": 0, "b": 0},
-                                "raw_data": raw_data
+                                "raw_data": {"url": raw_data}
                             },
                         ]
                     }

@@ -1,6 +1,9 @@
+from webilastik.utility.serialization import ValueGetter
 from ndstructs.datasource import DataSource, PrecomputedChunksDataSource
 from urllib.parse import urlparse
 from pathlib import Path
+
+from ndstructs.utils.JsonSerializable import JSON_VALUE
 
 from webilastik.filesystem import HttpPyFs
 
