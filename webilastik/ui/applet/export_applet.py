@@ -14,7 +14,7 @@ from webilastik.classifiers.pixel_classifier import PixelClassifier, VigraPixelC
 from webilastik.ui.applet.data_selection_applet import ILane
 
 LANE = TypeVar("LANE", bound=ILane)
-PRODUCER = TypeVar("PRODUCER", bound=Operator, covariant=True)
+PRODUCER = TypeVar("PRODUCER", bound=Operator[DataRoi, Array5D], covariant=True)
 class ExportApplet(Applet, Generic[LANE, PRODUCER]):
     """Exports the outputs of an operator created by an upstream applet."""
     def __init__(self, name: str, producer: Slot[PRODUCER], lanes: Slot[Sequence[LANE]], num_workers: int = 4):
