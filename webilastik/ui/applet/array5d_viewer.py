@@ -4,20 +4,20 @@ from abc import ABC, abstractmethod
 from ndstructs import Array5D
 from ndstructs.datasource import DataSource, DataRoi
 
-from webilastik.ui.applet import Applet, Slot, CONFIRMER
+from webilastik.ui.applet import Applet, Slot, CONFIRMER, ValueSlot
 from webilastik.ui.applet.data_selection_applet import ILane
 from webilastik.operator import Operator
 
 
 class Array5DViewer(Applet, ABC):
-    def __init__(self, source: Slot[Operator], lanes: Slot[Sequence[ILane]]):
+    def __init__(self, name: str, source: Slot[Operator[DataRoi, Array5D]], lanes: Slot[Sequence[ILane]]):
         self._in_source = source
         self._in_lanes = lanes
-        self.current_lane_index = Slot[int](
+        self.current_lane_index = ValueSlot[int](
             owner=self,
             refresher=self._refresh_current_lane_index
         )
-        super().__init__()
+        super().__init__(name=name)
 
     def switch_to_lane(self, lane_index: int):
         lanes = self._in_lanes() or []
@@ -44,10 +44,10 @@ class Array5DViewer(Applet, ABC):
         self.draw(op, lane.get_raw_data())
 
     @abstractmethod
-    def draw(self, operator: Operator, datasource: DataSource):
+    def draw(self, operator: Operator[DataRoi, Array5D], datasource: DataSource):
         pass
 
 class GimpArray5DViewer(Array5DViewer):
-    def draw(self, operator: Operator, datasource: DataSource):
+    def draw(self, operator: Operator[DataRoi, Array5D], datasource: DataSource):
         data = operator.compute(DataRoi(datasource))
         data.show_channels()

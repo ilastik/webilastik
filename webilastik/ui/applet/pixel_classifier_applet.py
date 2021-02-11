@@ -4,7 +4,7 @@ import textwrap
 from ndstructs.datasource import DataRoi
 import numpy as np
 
-from webilastik.ui.applet  import Applet, NotReadyException, Slot, CONFIRMER
+from webilastik.ui.applet  import Applet, DerivedSlot, NotReadyException, Slot, CONFIRMER
 from webilastik.ui.applet.data_selection_applet import ILane
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.annotations.annotation import Annotation, Color
@@ -66,11 +66,11 @@ class PixelClassificationApplet(Applet, Generic[LANE]):
         self._in_lanes = lanes
         self._in_feature_extractors = feature_extractors
         self._in_annotations = annotations
-        self.pixel_classifier = Slot[VigraPixelClassifier[IlpFilter]](
+        self.pixel_classifier = DerivedSlot[VigraPixelClassifier[IlpFilter]](
             owner=self,
             refresher=self._create_pixel_classifier
         )
-        self.color_map = Slot[Dict[Color, np.uint8]](
+        self.color_map = DerivedSlot[Dict[Color, np.uint8]](
             owner=self,
             refresher=self._create_color_map
         )

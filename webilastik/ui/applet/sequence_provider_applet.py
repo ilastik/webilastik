@@ -1,13 +1,13 @@
 from typing import TypeVar, Generic, Sequence, Optional
 
-from webilastik.ui.applet import CONFIRMER, SLOT_REFRESHER, Slot, Applet
+from webilastik.ui.applet import CONFIRMER, SLOT_REFRESHER, Applet, ValueSlot
 
 Item_co = TypeVar("Item_co", covariant=True)
-class SequenceProviderApplet(Applet, Generic[Item_co]): #(DataSelectionApplet):
+class SequenceProviderApplet(Applet, Generic[Item_co]):
     """A simple applet managing a Sequence of elements"""
 
     def __init__(self, name: str, refresher: Optional[ SLOT_REFRESHER[Sequence[Item_co]]  ]=None):
-        self.items = Slot[Sequence[Item_co]](owner=self, refresher=refresher)
+        self.items = ValueSlot[Sequence[Item_co]](owner=self, refresher=refresher)
         super().__init__(name=name)
 
     def _set_items(self, items: Sequence[Item_co], confirmer: CONFIRMER):
