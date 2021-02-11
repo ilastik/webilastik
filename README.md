@@ -7,7 +7,7 @@ Webilastik heavily uses [ndstructs](https://github.com/ilastik/ndstructs) to hav
 
 # Server
 
-A PixelClassification workflow can be exposed over http by running `webilastik/server/server.py`. You can make manual requests to the server such as the ones in `webilastik/server/servertest.py` or use [a modified version of Neuroglancer](https://github.com/ilastik/neuroglancer/tree/web_predictions) for that purpose.
+A PixelClassification workflow can be exposed over websockets by running `webilastik/ui/workflow/ws_pixel_classification_workflow.py`. You can make manual requests to the server such as the ones in `tests/test_ws_pixel_classification_workflow.py` or use [a modified version of Neuroglancer](https://github.com/ilastik/neuroglancer/tree/web_predictions) for that purpose. Eventually the modified neuroglancer will be replaced by the [webilastik-overlay](https://github.com/ilastik/webilastik-overlay)
 
 
 # Concepts
@@ -17,11 +17,11 @@ A PixelClassification workflow can be exposed over http by running `webilastik/s
 
 A refinement of the Operator concept in classic ilastik; they represent a lazy computation that can be applied to a `ndstructs.datasource.DataSource`.
 
-Operators inherit from the base `Operator` class and must implement `.compute(roi: DataSOurceSlice) -> Array5D`. This means that once you have an operator instantiated, you can apply it over any slice of any `DataSource`.
+Operators inherit from the base `Operator[IN, OUT]` class and must implement `.compute(roi: IN) -> OUT` . The most common implementation being `.compute(roi: DataRoi) -> Array5D` when dealing with operators that use halos. This means that once you have an operator instantiated, you can apply it over any slice of any `DataSource` and the operator will be able to retrieve any extra data if needs from the `DataRoi` object.
 
 Operators do *not* deal with Slots or dirty propagation; Those are a UI-only concept in webilastik. Operators are always ready to compute and do not need any other steps to be taken beyond successfully constructing one.
 
-Wherever it makes sense, operators will take a `preprocessor: Optional[Operator]` argument, which allows them to be composed with each other, e.g.:
+Wherever it makes sense, operators will take a `preprocessor: Optional[Operator]` constructor argument, which allows them to be composed with each other, e.g.:
 
 ```python3
 thresholder_op = Thresholder(threshold=30)
