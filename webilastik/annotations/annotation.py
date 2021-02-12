@@ -156,6 +156,17 @@ class Annotation(ScalarData):
         return Annotation.interpolate_from_points(color=color, voxels=voxels, raw_data=raw_data)
 
     def to_json_data(self, referencer: Referencer = lambda x: None) -> JSON_OBJECT:
+        voxels : List[Point5D] = []
+
+        # FIXME: annotation should probably not be an Array6D
+        for x, y, z in zip(*self.raw("xyz").nonzero()): # type: ignore
+            voxels.append(Point5D(x=x, y=y, z=z) + self.location)
+
+        return {
+            "color": self.color.to_json_data(),
+            "raw_data": self.raw_data.to_json_data(),
+            "voxels": [vx.to_json_data() for vx in voxels]
+        }
         raise NotImplementedError
 
     def get_feature_samples(self, feature_extractor: FeatureExtractor) -> FeatureSamples:
