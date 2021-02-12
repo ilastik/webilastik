@@ -1,6 +1,6 @@
 from abc import abstractmethod, ABC
 import asyncio
-from typing import Any, Dict, List, cast, Mapping
+from typing import Any, Dict, List, Sequence, Mapping
 from collections.abc import Mapping as BaseMapping
 import json
 
@@ -78,17 +78,17 @@ class WsSequenceProviderApplet(WsAppletMixin, SequenceProviderApplet[Item_co]):
             return self.clear(confirmer=lambda msg: True)
         raise Exception(f"Dont know how to run method '{method_name}'")
 
+    def _get_status_message(self) -> JSON_VALUE:
+        return {
+            "applet_name": self.name,
+            "items": [item.to_json_data() for item in (self.items.get() or [])]
+        }
+
     @abstractmethod
     def item_from_json_data(self, data: JSON_VALUE) -> Item_co:
         pass
 
 class WsDataSelectionApplet(WsSequenceProviderApplet[PixelClassificationLane], DataSelectionApplet[PixelClassificationLane]):
-    def _get_status_message(self) -> JSON_VALUE:
-        return {
-            "applet_name": self.name,#FIXME: maybe have python applets also have names?
-            "items": [item.to_json_data() for item in self.items()]
-        }
-
     def item_from_json_data(self, data: JSON_VALUE) -> PixelClassificationLane:
         return PixelClassificationLane.from_json_data(data)
 
@@ -152,9 +152,7 @@ class WsPixelClassificationApplet(WsAppletMixin, PixelClassificationApplet[Pixel
 
 
 class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
-    def __init__(self, websockets: List[web.WebSocketResponse]):
-        self.app = web.Application()
-
+    def __init__(self):
         data_selection_applet = WsDataSelectionApplet("data_selection_applet")
         feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", lanes=data_selection_applet.items)
         brushing_applet = WsBrushingApplet("brushing_applet", lanes=data_selection_applet.items)
@@ -180,8 +178,26 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             predictions_export_applet=predictions_export_applet
         )
         self.websockets : List[web.WebSocketResponse] = []
-        for ws in websockets:
-            self._add_websocket(ws)
+
+        self.app = web.Application()
+        self.app.add_routes([
+            web.get('/wf', self.open_websocket), # type: ignore
+            web.get(
+                "/predictions_export_applet/{uuid}/{lane_index}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}", #FIXME uuid is just there to prevent caching
+                self.ng_predict # type: ignore
+            ),
+            web.get(
+                "/predictions_export_applet/{uuid}/{lane_index}/info", #FIXME uuid is just there to prevent caching
+                self.ng_predict_info # type: ignore
+            ),
+            web.post(
+                "/ilp_project",
+                self.ilp_download # type: ignore
+            )
+        ])
+
+    def run(self, port: int):
+        web.run_app(self.app, port=port)
 
     def _add_websocket(self, websocket: web.WebSocketResponse):
         self.websockets.append(websocket)
@@ -198,7 +214,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
                 if msg.data == 'close':
                     await websocket.close()
                 else:
-                    workflow.run_rpc(msg.data)
+                    self.run_rpc(msg.data)
             elif msg.type == aiohttp.WSMsgType.ERROR:
                 print(f'ws connection closed with exception {websocket.exception()}')
         self.websockets.remove(websocket)
@@ -275,24 +291,5 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             }
         )
 
-workflow = WsPixelClassificationWorkflow(websockets=[])
-
-app = web.Application()
-app.add_routes([
-    web.get('/wf', workflow.open_websocket), # type: ignore
-    web.get(
-        "/predictions_export_applet/{uuid}/{lane_index}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}", #FIXME uuid is just there to prevent caching
-        workflow.ng_predict # type: ignore
-    ),
-    web.get(
-        "/predictions_export_applet/{uuid}/{lane_index}/info", #FIXME uuid is just there to prevent caching
-        workflow.ng_predict_info # type: ignore
-    ),
-    web.post(
-        "/ilp_project",
-        workflow.ilp_download # type: ignore
-    )
-])
-
-if __name__ == '__main__':
-    web.run_app(app, port=5000)
+# if __name__ == '__main__':
+#     WsPixelClassificationWorkflow().run(port=5000)
