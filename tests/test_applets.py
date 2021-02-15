@@ -10,16 +10,16 @@ def test_applet_dirty_propagation():
 
         def __init__(self, threshold: Optional[float] = None):
             self.threshold = ValueSlot[float](owner=self, value=threshold)
-            super().__init__()
+            super().__init__(name="thresholding applet")
 
     class ConnectedCompsApplet(Applet):
         def __init__(self, threshold: Slot[float]):
             self._threshold = threshold
             self.number_of_objects = DerivedSlot[int](
                 owner=self,
-                value_generator=self.count_number_objects
+                refresher=self.count_number_objects
             )
-            super().__init__()
+            super().__init__(name="Connected Components Applet")
 
         def count_number_objects(self, confirmer: CONFIRMER) -> Optional[int]:
             thresh = self._threshold()
@@ -51,20 +51,20 @@ def test_applet_dirty_propagation():
 
 def test_topologically_sorted_propagate_dirty():
     class IntProvider(Applet):
-        def __init__(self):
+        def __init__(self, name: str = "Int Provider Applet"):
             self.value_slot = ValueSlot[int](owner=self)
-            super().__init__()
+            super().__init__(name=name)
 
 
     class IntConsumer(Applet):
-        def __init__(self, int_input_slot: Slot[int]):
+        def __init__(self, int_input_slot: Slot[int], name: str = "Int Consumer Applet"):
             self.int_input_slot = int_input_slot
 
             self.str_output = DerivedSlot[str](
                 owner=self,
-                value_generator=self.generate_output
+                refresher=self.generate_output
             )
-            super().__init__()
+            super().__init__(name=name)
 
         def generate_output(self, confirmer: CONFIRMER) -> Optional[str]:
             confirmer(self.__class__.__name__)
@@ -73,7 +73,7 @@ def test_topologically_sorted_propagate_dirty():
     class StrAndIntConsumer(IntConsumer):
         def __init__(self, int_input_slot: Slot[int], str_input_slot: Slot[str]):
             self.str_input_slot = str_input_slot
-            super().__init__(int_input_slot=int_input_slot)
+            super().__init__(int_input_slot=int_input_slot, name="Str And Int Consumer")
 
 
     called_applet_class_names = []
