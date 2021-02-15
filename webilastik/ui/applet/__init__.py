@@ -138,9 +138,14 @@ class Applet(ABC):
     @typing_extensions.final
     def refresh_derived_slots(self, confirmer: CONFIRMER, provoker: Slot[Any]):
         self.pre_refresh(confirmer)
-        for slot in self.owned_slots.values():
-            if slot != provoker:
-                slot._refresh(confirmer)
+        value_slots = [slot for slot in self.owned_slots.values() if isinstance(slot, ValueSlot)]
+        derived_slots = [slot for slot in self.owned_slots.values() if isinstance(slot, DerivedSlot)]
+
+        # Refresh first Value slots so that the derived ones get the latest values upon refreshing
+        for slots in [value_slots, derived_slots]:
+            for slot in slots:
+                if slot != provoker:
+                    slot._refresh(confirmer)
         self.post_refresh(confirmer)
 
     def pre_refresh(self, confirmer: CONFIRMER):
