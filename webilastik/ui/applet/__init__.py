@@ -18,7 +18,7 @@ SV = TypeVar('SV')
 SLOT_REFRESHER=Callable[[CONFIRMER], Optional[SV]]
 class Slot(Generic[SV], ABC):
     """A watchable/dynamic property of an Applet. "Private" methods are meant to be used either by the
-    *Slot classes or by the base agApplet class, as they must work in tandem to propagate value changes"""
+    *Slot classes or by the base Applet class, as they must work in tandem to propagate value changes"""
     def __init__(
         self,
         *,
@@ -85,7 +85,7 @@ class ValueSlot(Slot[SV]):
     def set_value(self, new_value: Optional[SV], confirmer: CONFIRMER):
         old_value = self._value
         self._value = new_value
-        applet_snapshots = {}
+        applet_snapshots : Dict["Applet", Any] = {}
         try:
             for applet in [self._owner] + self._owner.get_downstream_applets():
                 applet_snapshots[applet] = applet.take_snapshot()
