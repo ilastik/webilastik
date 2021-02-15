@@ -40,7 +40,7 @@ Applets are a UI concept; they usually will represent the user's intent on creat
 
 Applets are organized in a Directed Acyclic Graph, where the vertices are the Applets and the edges are `Slots` (see section below).
 
-The base `Applet` class contains some `__init__` logic that **must run after all local slots have been defined**. The easiest way to achieve that is to make sure custom applets call `super().__init__()` as the **last step** of their construction.
+The base `Applet` class contains some `__init__` logic which registers dependencies between applets; This **must run after all local slots have been defined** in the child class constructor. The easiest way to achieve that is to make sure custom applets call `super().__init__()` as the **last step** of their construction. This restriction allows for easy inheritance between custom `Applets` with child classes creating more `Slots`.
 
 Applets are constructed already connected to all of its upstream applets and cannot disconnect from them throughout their lifetimes.
 
@@ -49,22 +49,22 @@ Applets are constructed already connected to all of its upstream applets and can
 Applets declare their observable properties using a subclass of `Slot`.
 
 Contrary to classic ilastik, there are no `InputSlots` in webilastik, but rather "owned slots" and "borrowed slots". From any applet's perspective:
-- "owned slots" are those instantiated inside that same `Applet` (see example below)
-- "borrowed slots" are the slots that show up in the constructor signature of an `Applet`, and that therefore belong to some other `Applet`. They are watched for value changes and their values can be used to update the values of the "owned slots" (see example below)
+- "owned slots" are those instantiated inside that same `Applet` (e.g.: `ValueSlot(owner=self, ...)`. See example below);
+- "borrowed slots" are the slots that show up in the constructor signature of an `Applet`, and that therefore belong to some other `Applet`. They are watched for value changes and their values can be used to update the values of the "owned slots" (see example below).
 
 Slots can be either `ValueSlots` or `DerivedSlots`:
-- A `ValueSlot` can have its value directly set by `set_value()`. This will cause the owner `Applet` as well as all downstream `Applets` to refresh their `DerivedSlots`
-- A `DerivedSlot` must be instantiated with a `value_generator` function, which is responsible for producing the actual value of the slot. This function will be called whenever a `ValueSlot` changes value in the owner `Applet` or in any upstream `Applet`.
+- A `ValueSlot` can have its value directly set by `set_value()`. This will cause the owner `Applet` as well as all downstream `Applets` to refresh their slots;
+- A `DerivedSlot` must be instantiated with a `refresher` function, which is responsible for producing the actual value of the slot. This function will be called whenever a `ValueSlot` changes value in the owner `Applet` or in any upstream `Applet`.
 
-| :warning: One should never set a `ValueSlot` inside the `value_generator` function of a `DerivedSlot`! |
+| :warning: One should never call `ValueSlot.set_value()` inside the `refresher` function of a `Slot`, as that will cause an infinite loop! |
 | --- |
 
 
-Whenever an applet (say B) is instantiated by borrowing a slot from another applet (say A), then B is said to be downstream from A, i.e., changes in applet A will trigger a value refresh in the owned `DerivedSlots` of B.
+Whenever an applet (say B) is instantiated by borrowing a slot from another applet (say A), then B is said to be downstream from A, i.e., changes in applet A will trigger a value refresh in the owned `*Slots` of B; B's `DerivedSlots` will regenerate their values and B's `ValueSlots` will have an opportunity to check if their values are still valid.
 
 If an exception is raised at any point in the cascading refresh of `DerivedSlots`, the entire `Applet` graph is safely reverted to the previous state.
 
-The `value_generator` argument of `DerivedSlot` is a function that must accept a `confirmer` argument of type `Callable[[str], bool]`. This `confirmer` function should be called by the `value_generator` whenever the applet is about to do something the user might regret (like destroying data or making costly computations). Typical usage would be a GUI passing in a `confirmer` function that shows a "Ok/Cancel" popup. `value_generator` functions should raise a `CancelledException` if the user did not confirm their intent when asked. See the code below for an example of using the `confirmer` function.
+The `refresher` argument of a `Slot` is a function that must accept a `confirmer` argument of type `Callable[[str], bool]`. This `confirmer` function should be called by the `refresher` whenever the applet is about to do something the user might regret (like destroying data or making costly computations). Typical usage would be a GUI passing in a `confirmer` function that shows an "Ok/Cancel" popup. `refresher` functions should raise a `CancelledException` if the user did not confirm their intent when asked. See the code below for an example of using the `confirmer` function.
 
 Example:
 
@@ -95,11 +95,11 @@ class ConnectedCompsApplet(Applet):
         # value whenever the threshold slot changes its value
         self.number_of_objects = DerivedSlot[int](
             owner=self,
-            value_generator=self.compute_number_of_objects
+            refresher=self.compute_number_of_objects
         )
         super().__init__() #call Applet.__init__ AFTER all slots have been defined
 
-    # this method is used as the value_generator function of the number_of_objects slot
+    # this method is used as the refresher function of the number_of_objects slot
     # notice that it takes a CONFIRMER function, which is a Callable[[str], bool]. This function is
     # used to ask the user for confirmation before performing slow, costly or destructive operations
     def compute_number_of_objects(self, confirmer: CONFIRMER) -> Optional[int]:
