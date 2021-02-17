@@ -7,8 +7,8 @@ from ndstructs.array5D import All
 import numpy
 
 from .feature_extractor import FeatureData
-from .ilp_filter import IlpFilter, OpRetriever
-from webilastik.operator import Operator
+from .ilp_filter import IlpFilter
+from webilastik.operator import Operator, OpRetriever
 from webilastik.utility.serialization import JSON_VALUE, JSON_OBJECT, ValueGetter
 from ndstructs import Array5D, Image, ScalarImage
 from ndstructs import Point5D, Interval5D, Shape5D

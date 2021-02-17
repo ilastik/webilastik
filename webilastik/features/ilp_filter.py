@@ -9,12 +9,8 @@ from ndstructs.utils import from_json_data, Dereferencer
 
 
 from .feature_extractor import FeatureExtractor
-from webilastik.operator import Operator
+from webilastik.operator import Operator, OpRetriever
 
-
-class OpRetriever(Operator[DataRoi, Array5D]):
-    def compute(self, roi: DataRoi) -> Array5D:
-        return roi.retrieve()
 
 FE = TypeVar("FE", bound="IlpFilter")
 
