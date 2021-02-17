@@ -10,6 +10,7 @@ from webilastik.operator import Operator, OpRetriever
 
 
 class ConnectedComponents(ScalarData):
+    """A "labeled" Array5D, where voxels of connected components have the same integer label, with 0 as background"""
     def __init__(
         self, arr: np.ndarray, *, axiskeys: str, location: Point5D = Point5D.zero(), labels: Optional[Set[int]] = None
     ):
@@ -25,7 +26,7 @@ class ConnectedComponents(ScalarData):
 
     def rebuild(self: ARR, arr: np.ndarray, *, axiskeys: str, location: Point5D = None) -> ARR:
         location = self.location if location is None else location
-        return ConnectedComponents(arr, axiskeys=axiskeys, location=location, labels=None)  # FIXME
+        return self.__class__(arr, axiskeys=axiskeys, location=location)  # FIXME
 
     def enlarged(self, radius: Point5D, limits: Interval5D) -> "ConnectedComponents":
         """Enlarges the array by 'radius', and fills this halo with zero"""
