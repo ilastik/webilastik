@@ -1,24 +1,29 @@
+from ndstructs.point5D import Point5D
 import numpy as np
 from typing import Optional, Set
 
-from ndstructs import Array5D, Slice5D, ScalarData
-from ndstructs.datasource import DataSourceSlice
+from ndstructs import Array5D, Interval5D, ScalarData
+from ndstructs.datasource import DataRoi
 
-from webilastik.operator import NoopOperator, Operator
+from webilastik.operator import Operator, OpRetriever
 
 
 
-class Thresholder(Operator):
-    def __init__(self, *, preprocessor: Operator = NoopOperator(), threshold: float):
+class Thresholder(Operator[DataRoi, Array5D]):
+    def __init__(self, *, threshold: float, preprocessor: Operator[DataRoi, Array5D] = OpRetriever()):
         self.preprocessor = preprocessor
         self.threshold = threshold
 
-    def compute(self, roi: DataSourceSlice) -> ScalarData:
-        data : Array5D = self.preprocessor.compute(roi)
-        return data.threshold(self.threshold)
+    def __hash__(self) -> int:
+        return hash((self.preprocessor, self.threshold))
 
-    def get_expected_dtype(self, input_dtype: np.dtype) -> np.dtype:
-        return np.dtype("bool")
+    def __eq__(self, other: "Thresholder"):
+        return (self.preprocessor, self.threshold) == (other.preprocessor, other.threshold)
 
-    def get_expected_roi(self, data_slice: Slice5D) -> Slice5D:
-        return data_slice
+    def compute(self, roi: DataRoi) -> ScalarData:
+        raw_data = roi.retrieve().raw(Point5D.LABELS)
+        out = ScalarData.allocate(interval=roi, dtype=np.dtype("bool"))
+
+        out.raw(Point5D.LABELS)[raw_data >= self.threshold] = True
+        out.raw(Point5D.LABELS)[raw_data < self.threshold] = False
+        return out
