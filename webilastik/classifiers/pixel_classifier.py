@@ -22,7 +22,7 @@ from ndstructs.datasource import DataRoi, DataSource
 from ndstructs.utils import JsonSerializable, from_json_data, Dereferencer
 
 try:
-    import ilastik_operator_cache
+    import ilastik_operator_cache # type: ignore
     operator_cache = ilastik_operator_cache
 except ImportError:
     operator_cache = lru_cache()

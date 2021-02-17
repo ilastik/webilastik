@@ -2,7 +2,7 @@ from typing import List, Sequence
 
 import numpy as np
 from vigra.learning import RandomForest as VigraRandomForest
-from ndstructs.datasource import DataSourceSlice, DataSource
+from ndstructs.datasource import DataRoi, DataSource
 import multiprocessing
 
 from webilastik.features.object_feature_extractor import ObjectFeatureExtractor
@@ -41,5 +41,5 @@ class ObjectClassifier:
 
         return cls(feature_extractor=feature_extractor, forests=forests)
 
-    def predict(self, roi: DataSourceSlice):
+    def predict(self, roi: DataRoi):
         pass

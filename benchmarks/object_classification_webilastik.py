@@ -55,7 +55,11 @@ annotations = [
 #     a.show()
 
 
+obj_feature_extractor = VigraObjectFeatureExtractor(feature_names=["Kurtosis", "Skewness"])
+obj_features = obj_feature_extractor.compute(
+    (DataRoi(ds, x=(100, 200), y=(200, 300)), comps_op)
+)
 
 classifier = ObjectClassifier.train(
-    annotations=annotations, feature_extractor=VigraObjectFeatureExtractor(feature_names=["Kurtosis", "Skewness"])
+    annotations=annotations, feature_extractor=obj_feature_extractor
 )
