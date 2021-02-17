@@ -140,12 +140,9 @@ class VigraPixelClassifier(PixelClassifier[FE]):
     ) -> VIGRA_CLASSIFIER:
         training_data = TrainingData[FE](feature_extractors=feature_extractors, annotations=annotations)
 
-        tree_counts = np.array([num_trees // num_forests] * num_forests)
-        tree_counts[: num_trees % num_forests] += 1
-        tree_counts = list(map(int, tree_counts))
-
         def train_forest(forest_index: int) -> VigraRandomForest:
-            forest = VigraRandomForest(tree_counts[forest_index])
+            ntrees = (num_trees // num_forests) + (forest_index < num_trees % num_forests)
+            forest = VigraRandomForest(ntrees)
             forest.learnRF(training_data.X, training_data.y, random_seed)
             return forest
 
