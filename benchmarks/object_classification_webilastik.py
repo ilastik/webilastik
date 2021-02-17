@@ -14,7 +14,7 @@ print(sys.path)
 from webilastik.classifiers.object_classifier import ObjectClassifier
 from webilastik.connected_components import ConnectedComponentsExtractor
 from webilastik.thresholder import Thresholder
-from webilastik.features.object_feature_extractor import array5d_to_vigra, VigraObjectFeatureExtractor
+from webilastik.features.object_feature_extractor import VigraObjectFeatureExtractor, VigraFeatureName
 from webilastik.annotations.object_annotation import ObjectAnnotation
 
 
@@ -55,11 +55,20 @@ annotations = [
 #     a.show()
 
 
-obj_feature_extractor = VigraObjectFeatureExtractor(feature_names=["Kurtosis", "Skewness"])
-obj_features = obj_feature_extractor.compute(
+obj_feature_extractor = VigraObjectFeatureExtractor(feature_names=[VigraFeatureName.Kurtosis, VigraFeatureName.Skewness, VigraFeatureName.RegionCenter])
+feature_map = obj_feature_extractor.get_timewise_feature_map(
     (DataRoi(ds, x=(100, 200), y=(200, 300)), comps_op)
 )
 
-classifier = ObjectClassifier.train(
-    annotations=annotations, feature_extractor=obj_feature_extractor
+print(f"Key: ", list(feature_map.keys())[0])
+print(list(feature_map.values())[0]["RegionCenter"].raw("xc"))
+
+
+features = obj_feature_extractor.compute(
+    (DataRoi(ds, x=(100, 200), y=(200, 300)), comps_op)
 )
+
+
+# classifier = ObjectClassifier.train(
+#     annotations=annotations, feature_extractor=obj_feature_extractor
+# )
