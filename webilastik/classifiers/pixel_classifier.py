@@ -149,10 +149,9 @@ class VigraPixelClassifier(PixelClassifier[FE]):
             forest.learnRF(training_data.X, training_data.y, random_seed)
             return forest
 
-        # executor = ThreadPoolExecutor(max_workers=num_forests)
-        # forests = list(executor.map(train_forest, range(num_forests)))
-        forests = list(map(train_forest, range(num_forests)))
-        # executor.shutdown()
+        with ThreadPoolExecutor(max_workers=num_forests) as executor:
+            forests = list(executor.map(train_forest, range(num_forests)))
+
         return cls(
             feature_extractors=feature_extractors,
             forests=forests,
