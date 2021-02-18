@@ -69,6 +69,6 @@ features = obj_feature_extractor.compute(
 )
 
 
-# classifier = ObjectClassifier.train(
-#     annotations=annotations, feature_extractor=obj_feature_extractor
-# )
+classifier = ObjectClassifier.train(
+    annotations=annotations, feature_extractor=obj_feature_extractor
+)

@@ -1,4 +1,5 @@
 from typing import List, Sequence
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 from vigra.learning import RandomForest as VigraRandomForest
@@ -12,6 +13,7 @@ from webilastik.annotations.object_annotation import ObjectAnnotation
 class ObjectClassifier:
     def __init__(self, *, feature_extractor: ObjectFeatureExtractor, forests: List[VigraRandomForest]):
         self.feature_extractor = feature_extractor
+        self.forests = forests
 
     @classmethod
     def train(
@@ -26,18 +28,14 @@ class ObjectClassifier:
     ) -> "ObjectClassifier":
         X, y = ObjectAnnotation.gather_samples(annotations=annotations, feature_extractor=feature_extractor)
 
-        tree_counts = np.array([num_trees // num_forests] * num_forests)
-        tree_counts[: num_trees % num_forests] += 1
-        tree_counts = list(map(int, tree_counts))
+        def train_forest(forest_index: int) -> VigraRandomForest:
+            ntrees = (num_trees // num_forests) + (forest_index < num_trees % num_forests)
+            forest = VigraRandomForest(ntrees)
+            forest.learnRF(X, y, random_seed)
+            return forest
 
-        forests = [VigraRandomForest(tree_counts[forest_index]) for forest_index in range(num_forests)]
-
-        def train_forest(forest_index):
-            forests[forest_index].learnRF(X, y, random_seed)
-
-        # FIXME: do it in thread pool
-        for i in range(num_forests):
-            train_forest(i)
+        with ThreadPoolExecutor() as executor:
+            forests = list(executor.map(train_forest, range(num_forests)))
 
         return cls(feature_extractor=feature_extractor, forests=forests)
 
