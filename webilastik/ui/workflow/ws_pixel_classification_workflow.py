@@ -1,6 +1,6 @@
 from abc import abstractmethod, ABC
 import asyncio
-from typing import Any, Dict, List, Sequence, Mapping, TypeVar
+from typing import Any, Dict, List, Optional, Mapping, TypeVar
 from collections.abc import Mapping as BaseMapping
 import json
 
@@ -197,8 +197,8 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             )
         ])
 
-    def run(self, port: int):
-        web.run_app(self.app, port=port)
+    def run(self, host: Optional[str] = None, port: Optional[int] = None, unix_socket_path: Optional[str] = None):
+        web.run_app(self.app, port=port, path=unix_socket_path)
 
     def _add_websocket(self, websocket: web.WebSocketResponse):
         self.websockets.append(websocket)
@@ -292,5 +292,11 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             }
         )
 
-# if __name__ == '__main__':
-#     WsPixelClassificationWorkflow().run(port=5000)
+if __name__ == '__main__':
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument("--host", default=None)
+    parser.add_argument("--port", default=None)
+    parser.add_argument("--unix-socket-path", default=None)
+    args = parser.parse_args()
+    WsPixelClassificationWorkflow().run(host=args.host, port=args.port, unix_socket_path=args.unix_socket_path) #type: ignore
