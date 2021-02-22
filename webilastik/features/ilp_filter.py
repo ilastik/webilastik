@@ -1,11 +1,11 @@
 from abc import abstractmethod, ABC
 from typing import Type, TypeVar, List, TypeVar, ClassVar, Mapping, Iterator, Sequence, Dict, Any, Optional
 import re
+from webilastik.utility.serialization import JsonSerializable
 from ndstructs.array5D import Array5D
 from ndstructs.datasource.DataRoi import DataRoi
 
 import numpy as np
-from ndstructs.utils import from_json_data, Dereferencer
 
 
 from .feature_extractor import FeatureExtractor
@@ -15,7 +15,7 @@ from webilastik.operator import Operator, OpRetriever
 FE = TypeVar("FE", bound="IlpFilter")
 
 
-class IlpFilter(FeatureExtractor):
+class IlpFilter(FeatureExtractor, JsonSerializable):
     def __init__(self, axis_2d: Optional[str]):
         self.axis_2d = axis_2d
         super().__init__()

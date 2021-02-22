@@ -9,6 +9,11 @@ JSON_ARRAY = Sequence["JSON_VALUE"]
 JSON_OBJECT = Mapping[str, "JSON_VALUE"]
 JSON_VALUE = Union[JSON_LEAF_VALUE, JSON_ARRAY, JSON_OBJECT]
 
+
+class JsonSerializable(Protocol):
+    def to_json_data(self) -> JSON_VALUE: ...
+
+
 def _get_value(*, key: str, data: JSON_VALUE, value_class: type) -> Any:
     if not isinstance(data, MappingCollection):
             raise TypeError(f"Expected data to be a JSON object, found this: {data}")

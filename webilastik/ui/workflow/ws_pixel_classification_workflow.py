@@ -1,6 +1,6 @@
 from abc import abstractmethod, ABC
 import asyncio
-from typing import Any, Dict, List, Sequence, Mapping
+from typing import Any, Dict, List, Sequence, Mapping, TypeVar
 from collections.abc import Mapping as BaseMapping
 import json
 
@@ -16,7 +16,7 @@ from webilastik.features.channelwise_fastfilters import (
     HessianOfGaussianEigenvalues,
     LaplacianOfGaussian,
 )
-from webilastik.utility.serialization import ValueGetter, JSON_VALUE
+from webilastik.utility.serialization import JsonSerializable, ValueGetter, JSON_VALUE
 from webilastik.annotations.annotation import Annotation
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.annotations import Annotation
@@ -69,7 +69,8 @@ class WsAppletMixin(Applet):
         pass
 
 
-class WsSequenceProviderApplet(WsAppletMixin, SequenceProviderApplet[Item_co]):
+ITEM = TypeVar("ITEM", bound=JsonSerializable)
+class WsSequenceProviderApplet(WsAppletMixin, SequenceProviderApplet[ITEM]):
     def do_rpc(self, method_name: str, payload: Any):
         if method_name in {'add', 'remove'}:
             items = [self.item_from_json_data(item) for item in payload["items"]]
@@ -85,7 +86,7 @@ class WsSequenceProviderApplet(WsAppletMixin, SequenceProviderApplet[Item_co]):
         }
 
     @abstractmethod
-    def item_from_json_data(self, data: JSON_VALUE) -> Item_co:
+    def item_from_json_data(self, data: JSON_VALUE) -> ITEM:
         pass
 
 class WsDataSelectionApplet(WsSequenceProviderApplet[PixelClassificationLane], DataSelectionApplet[PixelClassificationLane]):
