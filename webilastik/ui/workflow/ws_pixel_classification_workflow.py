@@ -185,16 +185,13 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             web.get('/wf', self.open_websocket), # type: ignore
             web.get(
                 "/predictions_export_applet/{uuid}/{lane_index}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}", #FIXME uuid is just there to prevent caching
-                self.ng_predict # type: ignore
+                self.ng_predict
             ),
             web.get(
                 "/predictions_export_applet/{uuid}/{lane_index}/info", #FIXME uuid is just there to prevent caching
-                self.ng_predict_info # type: ignore
+                self.ng_predict_info
             ),
-            web.post(
-                "/ilp_project",
-                self.ilp_download # type: ignore
-            )
+            web.post("/ilp_project", self.ilp_download),
         ])
 
     def run(self, host: Optional[str] = None, port: Optional[int] = None, unix_socket_path: Optional[str] = None):
@@ -232,7 +229,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         print(f"===>>> Running {applet_name}.{method_name} with args {args}")
         applet.do_rpc(method_name, args)
 
-    def ng_predict_info(self, request: web.Request):
+    async def ng_predict_info(self, request: web.Request):
         lane_index = int(request.match_info.get("lane_index"))  # type: ignore
         classifier = self.pixel_classifier_applet.pixel_classifier()
         color_map = self.pixel_classifier_applet.color_map()
@@ -259,7 +256,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             content_type="application/json",
             headers={"Access-Control-Allow-Origin": "*"})
 
-    def ng_predict(self, request: web.Request):
+    async def ng_predict(self, request: web.Request):
         lane_index = int(request.match_info.get("lane_index")) # type: ignore
         xBegin = int(request.match_info.get("xBegin")) # type: ignore
         xEnd = int(request.match_info.get("xEnd")) # type: ignore
@@ -282,7 +279,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             headers={"Access-Control-Allow-Origin": "*"}
         )
 
-    def ilp_download(self, request: web.Request):
+    async def ilp_download(self, request: web.Request):
         return web.Response(
             body=self.ilp_file.read(),
             content_type="application/octet-stream",
