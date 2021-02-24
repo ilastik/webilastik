@@ -2,28 +2,35 @@
 set -u
 set -e
 set -x
+set -o pipefail
 
 MASTER_USER="${MASTER_USER}"
-MASTER_IP="${MASTER_IP}"
+MASTER_HOST="${MASTER_HOST}"
 SOCKET_PATH_AT_MASTER="${SOCKET_PATH_AT_MASTER}"
-SOCKET_PATH_AT_WORKER="${SOCKET_PATH_AT_WORKER}"
-SOCKET_PATH_AT_WORKER="${SOCKET_PATH_AT_WORKER}"
+SOCKET_PATH_AT_SESSION="${SOCKET_PATH_AT_SESSION}"
 
-
-rm -fv "${SOCKET_PATH_AT_WORKER}"
-nc -lkU "${SOCKET_PATH_AT_WORKER}" &
-
-ssh "${MASTER_USER}@${MASTER_IP}" -- rm -fv "$SOCKET_PATH_AT_MASTER"
-ssh -R "${SOCKET_PATH_AT_MASTER}:${SOCKET_PATH_AT_WORKER}" "${MASTER_USER}@${MASTER_IP}" -N &
-TUNNEL_PID=$!
-
-function cleanup(){
-    echo "Killing tunnel process (${TUNNEL_PID})"
-    kill -2 $TUNNEL_PID
-    #sleep 2
-    #kill -9 $TUNNEL_PID
+function errcho(){
+    echo "$@" 1>&2
 }
 
-trap cleanup SIGINT
+TUNNEL_CONTROL_SOCKET="${SOCKET_PATH_AT_SESSION}.tunnel_control"
 
-PYTHONPATH=. python webilastik/ui/workflow/ws_pixel_classification_workflow.py --unix-socket-path "${SOCKET_PATH_AT_WORKER}"
+function close_tunnel(){
+    if [ -e "${TUNNEL_CONTROL_SOCKET}" ]; then
+        errcho "--> Closing tunnel"
+        ssh -S "${TUNNEL_CONTROL_SOCKET}" -O exit "${MASTER_USER}@${MASTER_HOST}"
+    fi
+}
+
+trap close_tunnel SIGINT
+
+errcho "--> Removing leftover sockets, if any..."
+rm -fv "${SOCKET_PATH_AT_SESSION}"
+ssh "${MASTER_USER}@${MASTER_HOST}" -- rm -fv "$SOCKET_PATH_AT_MASTER"
+
+errcho "--> Stabilishing reverse-tunnel from master to session"
+ssh -M -S "${TUNNEL_CONTROL_SOCKET}" -fnNT -R "${SOCKET_PATH_AT_MASTER}:${SOCKET_PATH_AT_SESSION}" "${MASTER_USER}@${MASTER_HOST}"
+
+PYTHONPATH=. python webilastik/ui/workflow/ws_pixel_classification_workflow.py --unix-socket-path "${SOCKET_PATH_AT_SESSION}"
+
+close_tunnel
