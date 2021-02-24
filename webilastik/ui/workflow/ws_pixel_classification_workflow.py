@@ -1,4 +1,6 @@
 from abc import abstractmethod, ABC
+import os
+import signal
 import asyncio
 from typing import Any, Dict, List, Optional, Mapping, TypeVar
 from collections.abc import Mapping as BaseMapping
@@ -192,7 +194,18 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
                 self.ng_predict_info
             ),
             web.post("/ilp_project", self.ilp_download),
+            web.delete("/session", self.close_session),
         ])
+
+    async def close_session(self, request: web.Request) -> web.Response:
+        asyncio.create_task(self._self_destruct(delay=5))
+        return web.Response()
+
+    async def _self_destruct(self, delay: int):
+        #FIXME: is there a clean way to close the server? self.app.(shutdown|cleanup) are not it
+        await asyncio.sleep(delay)
+        os.kill(os.getpid(), signal.SIGINT)
+
 
     def run(self, host: Optional[str] = None, port: Optional[int] = None, unix_socket_path: Optional[str] = None):
         web.run_app(self.app, port=port, path=unix_socket_path)
