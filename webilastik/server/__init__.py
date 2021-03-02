@@ -1,70 +1,14 @@
 import json
-import os
 from typing import Any, Dict
-from subprocess import Popen
 from pathlib import Path
 import tempfile
 import uuid
 from urllib.parse import urljoin
 import asyncio
-from asyncio.subprocess import Process
-import signal
-
-
-import aiohttp
-
 
 from aiohttp import web
-from aiohttp.web_routedef import delete
 
-from webilastik.ui.workflow.ws_pixel_classification_workflow import WsPixelClassificationWorkflow
-import webilastik.ui.workflow.ws_pixel_classification_workflow as ws_workflow
-
-
-SESSION_SCRIPT_PATH = str(Path(__file__).parent.joinpath("reverse_tunnel_to_master.sh"))
-
-def start_pixel_classification_session(port: int):
-    workflow = WsPixelClassificationWorkflow()
-    workflow.run(port=port)
-
-class LocalSession:
-    @classmethod
-    async def create(
-        cls,
-        *,
-        master_username: str,
-        master_host: str,
-        socket_at_session: Path,
-        socket_at_master: Path
-    ):
-        process = await asyncio.create_subprocess_exec(
-            SESSION_SCRIPT_PATH,
-            env={
-                **os.environ,
-                "MASTER_USER": master_username,
-                "MASTER_HOST": master_host,
-                "SOCKET_PATH_AT_MASTER": str(socket_at_master),
-                "SOCKET_PATH_AT_SESSION": str(socket_at_session),
-            },
-            preexec_fn=os.setsid
-        )
-        print(f"----->>>>>>>>>>>>>>> Started local session with pid={process.pid} and group {os.getpgid(process.pid)}")
-        return LocalSession(process=process, socket_at_master=socket_at_master)
-
-    # private. Use LocalSession.create instead
-    def __init__(self, process: Process, socket_at_master: Path):
-        self.process = process
-        self.socket_at_master = socket_at_master
-
-    async def kill(self):
-        print(f"===>>>> gently killing local session (pid={self.process.pid})with SIGINT on group....")
-        pgid = os.getpgid(self.process.pid)
-        os.killpg(pgid, signal.SIGINT)
-        # await asyncio.sleep(10)
-        # print(f"===>>>> forcefully killing local session (pid={self.process.pid}) with SIGKILL on group....")
-        # os.killpg(pgid, signal.SIGKILL)
-        await self.process.wait()
-        os.remove(self.socket_at_master)
+from webilastik.server.session import LocalSession
 
 class LocalSessionAllocator:
     def __init__(
@@ -74,11 +18,11 @@ class LocalSessionAllocator:
         external_url: str,
         sockets_dir_at_master: Path,
         sockets_dir_at_session: Path,
-        master_usermame: str,
+        master_user: str,
     ):
         self.sockets_dir_at_master = sockets_dir_at_master
         self.sockets_dir_at_session = sockets_dir_at_session
-        self.master_usermame = master_usermame
+        self.master_user = master_user
         self.master_host = master_host
         self.external_url = external_url
 
@@ -102,7 +46,7 @@ class LocalSessionAllocator:
         #FIXME: add to self.sessions?
         self.sessions[session_id] = await LocalSession.create(
             master_host=self.master_host,
-            master_username=self.master_usermame,
+            master_user=self.master_user,
             socket_at_session=self.sockets_dir_at_session.joinpath(f"{session_id}-to-master.sock"),
             socket_at_master=self.sockets_dir_at_master.joinpath(f"to-session-{session_id}.sock"),
         )
@@ -127,7 +71,7 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument("--master-host")
     parser.add_argument("--external-url")
-    parser.add_argument("--master-username", default="wwww-data")
+    parser.add_argument("--master-user", default="wwww-data")
     parser.add_argument("--sockets-dir-at-master", type=Path, default=Path(tempfile.gettempdir()))
     parser.add_argument("--sockets-dir-at-session", type=Path, default=Path(tempfile.gettempdir()))
 
@@ -137,7 +81,7 @@ if __name__ == '__main__':
     LocalSessionAllocator(
         master_host=args.master_host,
         external_url=args.external_url,
-        master_usermame=args.master_username,
+        master_user=args.master_user,
         sockets_dir_at_master=args.sockets_dir_at_master,
         sockets_dir_at_session=args.sockets_dir_at_session,
     ).run(port=5000)
