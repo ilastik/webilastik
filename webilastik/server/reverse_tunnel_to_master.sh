@@ -16,10 +16,10 @@ function errcho(){
 TUNNEL_CONTROL_SOCKET="${SOCKET_PATH_AT_SESSION}.tunnel_control"
 
 function close_tunnel(){
-    echo "TRAPPED SIGINT!!!!!!!"
     if [ -e "${TUNNEL_CONTROL_SOCKET}" ]; then
         errcho "--> Closing tunnel"
         ssh -S "${TUNNEL_CONTROL_SOCKET}" -O exit "${MASTER_USER}@${MASTER_HOST}"
+        rm -f "${TUNNEL_CONTROL_SOCKET}" "${SOCKET_PATH_AT_SESSION}"
     fi
 }
 
