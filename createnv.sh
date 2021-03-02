@@ -4,7 +4,7 @@ set -e
 set -x
 set -u
 
-ENVIRONMENT_NAME="webilastik"
+ENVIRONMENT_NAME="${ENVIRONMENT_NAME:-webilastik}"
 
 conda create -n ${ENVIRONMENT_NAME} -c ilastik-forge -c conda-forge python=3.7 \
     numpy \
@@ -19,13 +19,12 @@ conda create -n ${ENVIRONMENT_NAME} -c ilastik-forge -c conda-forge python=3.7 \
     requests \
     pytest \
     python-jose \
-    ipython \
 
 BASE_ENVIRONMENT="$(conda info | grep "base environment" | awk '{print $4}')"
 ENV_PATH="${BASE_ENVIRONMENT}/envs/${ENVIRONMENT_NAME}"
 PYTHON="${ENV_PATH}/bin/python"
 
-$PYTHON -m pip install pydevd uwsgi
+$PYTHON -m pip install pyunicore
 
-git clone https://github.com/ilastik/ndstructs -b dev
+git clone "$NDSTRUCTS_URL" -b dev ndstructs/
 $PYTHON -m pip install -e ndstructs/
