@@ -6,21 +6,21 @@ import os
 import signal
 
 
-from webilastik.hpc.job import HpcEnvironment, JobDescription, JobImport
+from webilastik.hpc.job import HbpClient, JobDescription, JobImport
 
 class HpcSession:
     @classmethod
     async def create(
         cls: Type["HpcSession"],
         *,
-        master_username: str,
+        master_user: str,
         master_host: str,
         socket_at_session: Path,
         socket_at_master: Path
     ) -> "HpcSession":
         process = await asyncio.create_subprocess_exec(
             __file__,
-            "--master-user=" + master_username,
+            "--master-user=" + master_user,
             "--master-host=" + master_host,
             "--socket-at-session=" + str(socket_at_master),
             "--socket-at-master=" + str(socket_at_session),
@@ -54,20 +54,24 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument("--master-host")
     parser.add_argument("--external-url")
-    parser.add_argument("--master-username", default="wwww-data")
+    parser.add_argument("--master-user", default="wwww-data")
     parser.add_argument("--socket-at-session", type=Path)
-    parser.add_argument("--sockets-at-master", type=Path)
+    parser.add_argument("--socket-at-master", type=Path)
 
     parser.add_argument("--hpc-project-name")
     parser.add_argument("--hpc-python-executable", type=Path)
     parser.add_argument("--hpc-webilastik-dir", type=Path)
+
+    parser.add_argument("--hbp-refresh-token")
+    parser.add_argument("--hbp-app-id")
+    parser.add_argument("--hbp-app-secret")
 
     args = parser.parse_args()
 
     job_desc = JobDescription(
         Executable=f"{args.hpc_webilastik_dir}/webilastik/server/reverse_tunnel_to_master.sh",
         Environment={
-            "MASTER_USER": args.master_username,
+            "MASTER_USER": args.master_user,
             "MASTER_HOST": args.master_host,
             "SOCKET_PATH_AT_MASTER": str(args.socket_at_session),
             "SOCKET_PATH_AT_SESSION": str(args.socket_at_master),
@@ -76,5 +80,9 @@ if __name__ == '__main__':
         Project=args.hpc_project_name,
     )
 
-    hpc_env = HpcEnvironment.from_environ()
-    hpc_env.run_job(job_desc)
+    hbp_env = HbpClient(
+        hbp_refresh_token=args.hbp_refresh_token,
+        hbp_app_id=args.hbp_app_id,
+        hbp_app_secret=args.hbp_app_secret,
+    )
+    job = hbp_env.run_job(job_desc)

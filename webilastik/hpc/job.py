@@ -8,6 +8,7 @@ import jwt
 import requests
 from urllib.parse import urljoin
 from collections.abc import Mapping, Iterable
+from pathlib import Path
 
 
 def dict_to_json_data(dic: Dict[str, Any], strip_nones=True):
@@ -16,6 +17,8 @@ def dict_to_json_data(dic: Dict[str, Any], strip_nones=True):
 def to_json_data(value, strip_nones=True):
     if isinstance(value, (str, int, float, type(None))):
         return value
+    if isinstance(value, Path):
+        return str(value)
     if hasattr(value, "to_json_data"):
         return value.to_json_data()
     if hasattr(value, "__dict__"):
@@ -24,7 +27,7 @@ def to_json_data(value, strip_nones=True):
         return dict_to_json_data(value, strip_nones=strip_nones)
     if isinstance(value, Iterable):
         return [to_json_data(v, strip_nones=strip_nones) for v in value]
-    raise ValueError("Don't know how to convert {value} to json data")
+    raise ValueError(f"Don't know how to convert {value} to json data")
 
 
 _FIVE_MINUTES = 5 * 60
@@ -78,35 +81,29 @@ class JobDescription:
         self.Project = Project
 
 
-class HpcEnvironment:
+class HbpClient:
     _site = None
 
     def __init__(
         self,
         *,
-        HBP_REFRESH_TOKEN: str,
-        HBP_APP_ID: str,
-        HBP_APP_SECRET: str,
-        HPC_PATH_PREFIX: str,
-        HPC_PROJECT_NAME: Optional[str] = None,
+        hbp_refresh_token: str,
+        hbp_app_id: str,
+        hbp_app_secret: str,
         access_token: Optional[str] = None,
     ):
-        self.HBP_REFRESH_TOKEN = HBP_REFRESH_TOKEN
-        self.HBP_APP_ID = HBP_APP_ID
-        self.HBP_APP_SECRET = HBP_APP_SECRET
-        self.HPC_PATH_PREFIX = HPC_PATH_PREFIX
-        self.HPC_PROJECT_NAME = HPC_PROJECT_NAME or os.environ.get("HPC_PROJECT_NAME", None)
+        self.hbp_refresh_token = hbp_refresh_token
+        self.hbp_app_id = hbp_app_id
+        self.hbp_app_secret = hbp_app_secret
         self.access_token = access_token
 
     @staticmethod
-    def from_environ(access_token: Optional[str] = None) -> "HpcEnvironment":
-        return HpcEnvironment(
+    def from_environ(access_token: Optional[str] = None) -> "HbpClient":
+        return HbpClient(
             access_token=access_token,
-            HBP_REFRESH_TOKEN=os.environ["HBP_REFRESH_TOKEN"],
-            HBP_APP_ID=os.environ["HBP_APP_ID"],
-            HBP_APP_SECRET=os.environ["HBP_APP_SECRET"],
-            HPC_PATH_PREFIX= os.environ.get("HPC_PATH_PREFIX", ""),
-            HPC_PROJECT_NAME=os.environ.get("HPC_PROJECT_NAME", None),
+            hbp_refresh_token=os.environ["HBP_REFRESH_TOKEN"],
+            hbp_app_id=os.environ["HBP_APP_ID"],
+            hbp_app_secret=os.environ["HBP_APP_SECRET"],
         )
 
     def token_is_valid(self):
@@ -122,9 +119,9 @@ class HpcEnvironment:
             resp = requests.post(
                 "https://services.humanbrainproject.eu/oidc/token",
                 data={
-                    "refresh_token": self.HBP_REFRESH_TOKEN,
-                    "client_id": self.HBP_APP_ID,
-                    "client_secret": self.HBP_APP_SECRET,
+                    "refresh_token": self.hbp_refresh_token,
+                    "client_id": self.hbp_app_id,
+                    "client_secret": self.hbp_app_secret,
                     "grant_type": "refresh_token",
                 },
             )
