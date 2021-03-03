@@ -1,32 +1,36 @@
 import json
-from typing import Any, Dict
+from typing import Any, Dict, TypeVar,  Type, Generic
 from pathlib import Path
 import tempfile
 import uuid
 from urllib.parse import urljoin
 import asyncio
-
 from aiohttp import web
 
-from webilastik.server.session import LocalSession
+from webilastik.server.hpc_session import HpcSession
+from webilastik.server.session import Session, LocalSession
 
-class LocalSessionAllocator:
+SESSION_TYPE = TypeVar("SESSION_TYPE", bound=Session)
+
+class SessionAllocator(Generic[SESSION_TYPE]):
     def __init__(
         self,
         *,
+        session_type: Type[SESSION_TYPE],
         master_host: str,
         external_url: str,
         sockets_dir_at_master: Path,
         sockets_dir_at_session: Path,
         master_user: str,
     ):
+        self.session_type = session_type
         self.sockets_dir_at_master = sockets_dir_at_master
         self.sockets_dir_at_session = sockets_dir_at_session
         self.master_user = master_user
         self.master_host = master_host
         self.external_url = external_url
 
-        self.sessions : Dict[uuid.UUID, LocalSession] = {}
+        self.sessions : Dict[uuid.UUID, Session] = {}
 
         self.app = web.Application()
         self.app.add_routes([
@@ -45,7 +49,7 @@ class LocalSessionAllocator:
             return web.Response(status=400)
         session_id = uuid.uuid4()
 
-        self.sessions[session_id] = await LocalSession.create(
+        self.sessions[session_id] = await self.session_type.create(
             master_host=self.master_host,
             master_user=self.master_user,
             socket_at_session=self.sockets_dir_at_session.joinpath(f"{session_id}-to-master.sock"),
@@ -71,6 +75,7 @@ class LocalSessionAllocator:
 if __name__ == '__main__':
     from argparse import ArgumentParser
     parser = ArgumentParser()
+    parser.add_argument("--session-type", choices=["Local", "Hpc"])
     parser.add_argument("--master-host")
     parser.add_argument("--external-url")
     parser.add_argument("--master-user", default="wwww-data")
@@ -80,7 +85,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # multiprocessing.set_start_method('spawn') #start a fresh interpreter so it doesn't 'inherit' the event loop
-    LocalSessionAllocator(
+    SessionAllocator(
+        session_type=LocalSession if args.session_type == "Local" else HpcSession,
         master_host=args.master_host,
         external_url=args.external_url,
         master_user=args.master_user,

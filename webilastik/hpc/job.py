@@ -81,29 +81,29 @@ class JobDescription:
         self.Project = Project
 
 
-class HbpClient:
+class EBrainsClient:
     _site = None
 
     def __init__(
         self,
         *,
-        hbp_refresh_token: str,
-        hbp_app_id: str,
-        hbp_app_secret: str,
+        ebrains_refresh_token: str,
+        ebrains_app_id: str,
+        ebrains_app_secret: str,
         access_token: Optional[str] = None,
     ):
-        self.hbp_refresh_token = hbp_refresh_token
-        self.hbp_app_id = hbp_app_id
-        self.hbp_app_secret = hbp_app_secret
+        self.ebrains_refresh_token = ebrains_refresh_token
+        self.ebrains_app_id = ebrains_app_id
+        self.ebrains_app_secret = ebrains_app_secret
         self.access_token = access_token
 
     @staticmethod
-    def from_environ(access_token: Optional[str] = None) -> "HbpClient":
-        return HbpClient(
+    def from_environ(access_token: Optional[str] = None) -> "EBrainsClient":
+        return EBrainsClient(
             access_token=access_token,
-            hbp_refresh_token=os.environ["HBP_REFRESH_TOKEN"],
-            hbp_app_id=os.environ["HBP_APP_ID"],
-            hbp_app_secret=os.environ["HBP_APP_SECRET"],
+            ebrains_refresh_token=os.environ["HBP_REFRESH_TOKEN"],
+            ebrains_app_id=os.environ["HBP_APP_ID"],
+            ebrains_app_secret=os.environ["HBP_APP_SECRET"],
         )
 
     def token_is_valid(self):
@@ -119,9 +119,9 @@ class HbpClient:
             resp = requests.post(
                 "https://services.humanbrainproject.eu/oidc/token",
                 data={
-                    "refresh_token": self.hbp_refresh_token,
-                    "client_id": self.hbp_app_id,
-                    "client_secret": self.hbp_app_secret,
+                    "refresh_token": self.ebrains_refresh_token,
+                    "client_id": self.ebrains_app_id,
+                    "client_secret": self.ebrains_app_secret,
                     "grant_type": "refresh_token",
                 },
             )

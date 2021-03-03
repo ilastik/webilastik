@@ -4,11 +4,23 @@ import asyncio
 from asyncio.subprocess import Process
 import os
 import signal
+import tempfile
+from argparse import ArgumentParser
+from uuid import UUID
+
+from webilastik.server.session import Session, SESSION_SCRIPT_PATH
+from webilastik.hpc.job import EBrainsClient, JobDescription, JobImport, JobResources
 
 
-from webilastik.hpc.job import HbpClient, JobDescription, JobImport
+HPC_PROJECT_NAME = os.environ["HPC_PROJECT_NAME"]
+HPC_PYTHON_EXECUTABLE = os.environ["HPC_PYTHON_EXECUTABLE"]
+HPC_WEBILASTIK_DIR = os.environ["HPC_WEBILASTIK_DIR"]
+EBRAINS_REFRESH_TOKEN = os.environ["EBRAINS_REFRESH_TOKEN"]
+EBRAINS_APP_ID = os.environ["EBRAINS_APP_ID"]
+EBRAINS_APP_SECRET = os.environ["EBRAINS_APP_SECRET"]
 
-class HpcSession:
+
+class HpcSession(Session):
     @classmethod
     async def create(
         cls: Type["HpcSession"],
@@ -16,7 +28,8 @@ class HpcSession:
         master_user: str,
         master_host: str,
         socket_at_session: Path,
-        socket_at_master: Path
+        socket_at_master: Path,
+        time_limit_seconds: int,
     ) -> "HpcSession":
         process = await asyncio.create_subprocess_exec(
             __file__,
@@ -24,33 +37,28 @@ class HpcSession:
             "--master-host=" + master_host,
             "--socket-at-session=" + str(socket_at_master),
             "--socket-at-master=" + str(socket_at_session),
-            preexec_fn=os.setsid
+
+
+            "--resources-time-limit-seconds=" + str(time_limit_seconds),
+            preexec_fn=os.setsid,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
-        print(f"----->>>>>>>>>>>>>>> Started local session with pid={process.pid} and group {os.getpgid(process.pid)}")
-        return HpcSession(process=process, socket_at_master=socket_at_master)
+        stdout, stderr = await process.communicate()
+        return_code = process.returncode
+        if return_code != 0:
+            raise RuntimeError(f"Scheduling HpcSession failed with code {return_code}\nstdout:\n{stdout}\n\n\nstderr:\n{stderr}")
+        job_id = UUID(stdout.decode('utf8'))
+        return HpcSession(job_id=job_id)
 
     # private. Use LocalSession.create instead
-    def __init__(self, process: Process, socket_at_master: Path):
-        self.process = process
-        self.socket_at_master = socket_at_master
+    def __init__(self, job_id: UUID):
+        self.job_id = job_id
 
-    async def kill(self):
-        print(f"===>>>> gently killing local session (pid={self.process.pid})with SIGINT on group....")
-        pgid = os.getpgid(self.process.pid)
-        os.killpg(pgid, signal.SIGINT)
-        # await asyncio.sleep(10)
-        # print(f"===>>>> forcefully killing local session (pid={self.process.pid}) with SIGKILL on group....")
-        # os.killpg(pgid, signal.SIGKILL)
-        await self.process.wait()
-        os.remove(self.socket_at_master)
-
+    async def kill(self, after_seconds: int):
+        ... #FIXME: implement early killing
 
 if __name__ == '__main__':
-    import tempfile
-    from argparse import ArgumentParser
-
-    from webilastik.server.session import SESSION_SCRIPT_PATH
-
     parser = ArgumentParser()
     parser.add_argument("--master-host")
     parser.add_argument("--external-url")
@@ -58,31 +66,28 @@ if __name__ == '__main__':
     parser.add_argument("--socket-at-session", type=Path)
     parser.add_argument("--socket-at-master", type=Path)
 
-    parser.add_argument("--hpc-project-name")
-    parser.add_argument("--hpc-python-executable", type=Path)
-    parser.add_argument("--hpc-webilastik-dir", type=Path)
-
-    parser.add_argument("--hbp-refresh-token")
-    parser.add_argument("--hbp-app-id")
-    parser.add_argument("--hbp-app-secret")
+    parser.add_argument("--resources-time-limit-seconds", type=int, default=10 * 60)
 
     args = parser.parse_args()
 
     job_desc = JobDescription(
-        Executable=f"{args.hpc_webilastik_dir}/webilastik/server/reverse_tunnel_to_master.sh",
+        Executable=f"{HPC_WEBILASTIK_DIR}/webilastik/server/reverse_tunnel_to_master.sh",
         Environment={
             "MASTER_USER": args.master_user,
             "MASTER_HOST": args.master_host,
             "SOCKET_PATH_AT_MASTER": str(args.socket_at_master),
             "SOCKET_PATH_AT_SESSION": str(args.socket_at_session),
-            "PYTHON_EXECUTABLE": args.hpc_python_executable
+            "PYTHON_EXECUTABLE": HPC_PYTHON_EXECUTABLE
         },
-        Project=args.hpc_project_name,
+        Project=HPC_PROJECT_NAME,
+        Resources=JobResources(
+            Runtime=args.resources_time_limit_seconds
+        )
     )
-
-    hbp_env = HbpClient(
-        hbp_refresh_token=args.hbp_refresh_token,
-        hbp_app_id=args.hbp_app_id,
-        hbp_app_secret=args.hbp_app_secret,
+    ebrains_env = EBrainsClient(
+        ebrains_refresh_token=EBRAINS_REFRESH_TOKEN,
+        ebrains_app_id=EBRAINS_APP_ID,
+        ebrains_app_secret=EBRAINS_APP_SECRET,
     )
-    job = hbp_env.run_job(job_desc)
+    job = ebrains_env.run_job(job_desc)
+    print(job.job_id)

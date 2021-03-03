@@ -25,6 +25,8 @@ class Session(ABC):
     ) -> "Session": # SELF:
         pass
 
+    async def kill(self, after_seconds: int):
+        pass
 
 class LocalSession(Session):
     @classmethod
