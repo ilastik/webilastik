@@ -38,17 +38,19 @@ class LocalSessionAllocator:
 
     async def spawn_session(self, request: web.Request):
         raw_payload = await request.content.read()
-        payload_dict = json.loads(raw_payload.decode('utf8'))
+        try:
+            payload_dict = json.loads(raw_payload.decode('utf8'))
+            session_duration = int(payload_dict["session_duration"])
+        except Exception:
+            return web.Response(status=400)
         session_id = uuid.uuid4()
 
-        asyncio.create_task(self.kill_session(session_id=session_id, after_seconds=payload_dict["session_duration"]))
-
-        #FIXME: add to self.sessions?
         self.sessions[session_id] = await LocalSession.create(
             master_host=self.master_host,
             master_user=self.master_user,
             socket_at_session=self.sockets_dir_at_session.joinpath(f"{session_id}-to-master.sock"),
             socket_at_master=self.sockets_dir_at_master.joinpath(f"to-session-{session_id}.sock"),
+            time_limit_seconds=session_duration
         )
 
         return web.json_response(
@@ -59,9 +61,9 @@ class LocalSessionAllocator:
             headers={"Access-Control-Allow-Origin": "*"}
         )
 
-    async def kill_session(self, session_id: uuid.UUID, after_seconds: int):
+    async def kill_session(self, session_id: uuid.UUID, after_seconds: int = 0):
         await asyncio.sleep(after_seconds)
-        await self.sessions.pop(session_id).kill()
+        await self.sessions.pop(session_id).kill(after_seconds=after_seconds)
 
     def run(self, port: int):
         web.run_app(self.app, port=port)
