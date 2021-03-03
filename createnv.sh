@@ -5,6 +5,7 @@ set -x
 set -u
 
 ENVIRONMENT_NAME="${ENVIRONMENT_NAME:-webilastik}"
+NDSTRUCTS_URL="${NDSTRUCTS_URL:-https://github.com/ilastik/ndstructs.git}"
 
 conda create -n ${ENVIRONMENT_NAME} -c ilastik-forge -c conda-forge python=3.7 \
     numpy \
