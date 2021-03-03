@@ -73,8 +73,8 @@ if __name__ == '__main__':
         Environment={
             "MASTER_USER": args.master_user,
             "MASTER_HOST": args.master_host,
-            "SOCKET_PATH_AT_MASTER": str(args.socket_at_session),
-            "SOCKET_PATH_AT_SESSION": str(args.socket_at_master),
+            "SOCKET_PATH_AT_MASTER": str(args.socket_at_master),
+            "SOCKET_PATH_AT_SESSION": str(args.socket_at_session),
             "PYTHON_EXECUTABLE": args.hpc_python_executable
         },
         Project=args.hpc_project_name,

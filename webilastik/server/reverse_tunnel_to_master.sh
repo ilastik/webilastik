@@ -5,11 +5,20 @@ set -x
 set -o pipefail
 
 
+# non-dot-slash relative paths can mess up ssh tunneling
+ensure_dot_slash_in_relative_path(){
+    if echo "$1" | grep -Evq "^(/|./)" ; then
+        echo "./$1"
+    else
+        echo "$1"
+    fi
+}
+
 #Params:
 MASTER_USER="${MASTER_USER}"
 MASTER_HOST="${MASTER_HOST}"
 SOCKET_PATH_AT_MASTER="${SOCKET_PATH_AT_MASTER}"
-SOCKET_PATH_AT_SESSION="${SOCKET_PATH_AT_SESSION}"
+SOCKET_PATH_AT_SESSION=$(ensure_dot_slash_in_relative_path "${SOCKET_PATH_AT_SESSION}")
 PYTHON_EXECUTABLE="${PYTHON_EXECUTABLE:-python}"
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
@@ -38,6 +47,7 @@ ssh "${MASTER_USER}@${MASTER_HOST}" -- rm -fv "$SOCKET_PATH_AT_MASTER"
 errcho "--> Stabilishing reverse-tunnel from master to session"
 ssh -M -S "${TUNNEL_CONTROL_SOCKET}" -fnNT -R "${SOCKET_PATH_AT_MASTER}:${SOCKET_PATH_AT_SESSION}" "${MASTER_USER}@${MASTER_HOST}"
 
+export PYTHONPATH="$WEBILASTIK_ROOT"
 "${PYTHON_EXECUTABLE}"  "${WEBILASTIK_ROOT}/webilastik/ui/workflow/ws_pixel_classification_workflow.py" --unix-socket-path "${SOCKET_PATH_AT_SESSION}"
 
 close_tunnel
