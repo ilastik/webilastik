@@ -44,10 +44,18 @@ errcho "--> Removing leftover sockets, if any..."
 rm -fv "${SOCKET_PATH_AT_SESSION}"
 ssh "${MASTER_USER}@${MASTER_HOST}" -- rm -fv "$SOCKET_PATH_AT_MASTER"
 
+
+export PYTHONPATH="$WEBILASTIK_ROOT"
+"${PYTHON_EXECUTABLE}"  "${WEBILASTIK_ROOT}/webilastik/ui/workflow/ws_pixel_classification_workflow.py" --unix-socket-path "${SOCKET_PATH_AT_SESSION}" &
+
+while [ ! -e "${SOCKET_PATH_AT_SESSION}" ]; do
+    errcho "----> Waiting for server socket to show up..."
+    sleep 2
+done
 errcho "--> Stabilishing reverse-tunnel from master to session"
 ssh -M -S "${TUNNEL_CONTROL_SOCKET}" -fnNT -R "${SOCKET_PATH_AT_MASTER}:${SOCKET_PATH_AT_SESSION}" "${MASTER_USER}@${MASTER_HOST}"
 
-export PYTHONPATH="$WEBILASTIK_ROOT"
-"${PYTHON_EXECUTABLE}"  "${WEBILASTIK_ROOT}/webilastik/ui/workflow/ws_pixel_classification_workflow.py" --unix-socket-path "${SOCKET_PATH_AT_SESSION}"
+errcho "--> Waiting for server to finish..."
+wait
 
 close_tunnel
