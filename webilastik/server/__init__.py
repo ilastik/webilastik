@@ -7,7 +7,6 @@ from urllib.parse import urljoin
 import asyncio
 from aiohttp import web
 
-from webilastik.server.hpc_session import HpcSession
 from webilastik.server.session import Session, LocalSession
 
 SESSION_TYPE = TypeVar("SESSION_TYPE", bound=Session)
@@ -85,8 +84,13 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # multiprocessing.set_start_method('spawn') #start a fresh interpreter so it doesn't 'inherit' the event loop
+    if args.session_type == "Local":
+        session_type = LocalSession
+    else:
+        from webilastik.server.hpc_session import HpcSession
+        session_type = HpcSession
     SessionAllocator(
-        session_type=LocalSession if args.session_type == "Local" else HpcSession,
+        session_type=session_type,
         master_host=args.master_host,
         external_url=args.external_url,
         master_user=args.master_user,
