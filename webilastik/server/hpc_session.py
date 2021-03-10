@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from pathlib import Path
 from typing import Type
 import asyncio
@@ -74,7 +76,7 @@ if __name__ == '__main__':
         Arguments=[
             HPC_PYTHON_EXECUTABLE,
             f"{HPC_WEBILASTIK_DIR}/webilastik/ui/workflow/ws_pixel_classification_workflow.py",
-            f"--listen-url={str(args.socket_at_session)}",
+            f"--listen-url=unix://{str(args.socket_at_session)}",
             "tunnel",
             f"--remote-username={args.master_username}",
             f"--remote-host={args.master_host}",
