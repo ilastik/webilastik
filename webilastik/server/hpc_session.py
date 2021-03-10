@@ -25,7 +25,7 @@ class HpcSession(Session):
     async def create(
         cls: Type["HpcSession"],
         *,
-        master_user: str,
+        master_username: str,
         master_host: str,
         socket_at_session: Path,
         socket_at_master: Path,
@@ -33,11 +33,10 @@ class HpcSession(Session):
     ) -> "HpcSession":
         process = await asyncio.create_subprocess_exec(
             __file__,
-            "--master-user=" + master_user,
+            "--master-username=" + master_username,
             "--master-host=" + master_host,
             "--socket-at-session=" + str(socket_at_master),
             "--socket-at-master=" + str(socket_at_session),
-
 
             "--resources-time-limit-seconds=" + str(time_limit_seconds),
             preexec_fn=os.setsid,
@@ -62,7 +61,7 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument("--master-host")
     parser.add_argument("--external-url")
-    parser.add_argument("--master-user", default="wwww-data")
+    parser.add_argument("--master-username", default="wwww-data")
     parser.add_argument("--socket-at-session", type=Path)
     parser.add_argument("--socket-at-master", type=Path)
 
@@ -71,16 +70,20 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     job_desc = JobDescription(
-        Executable=f"{HPC_WEBILASTIK_DIR}/webilastik/server/reverse_tunnel_to_master.sh",
-        Environment={
-            "MASTER_USER": args.master_user,
-            "MASTER_HOST": args.master_host,
-            "SOCKET_PATH_AT_MASTER": str(args.socket_at_master),
-            "SOCKET_PATH_AT_SESSION": str(args.socket_at_session),
-            "PYTHON_EXECUTABLE": HPC_PYTHON_EXECUTABLE
-        },
+        Executable="srun",
+        Arguments=[
+            HPC_PYTHON_EXECUTABLE,
+            f"{HPC_WEBILASTIK_DIR}/webilastik/ui/workflow/ws_pixel_classification_workflow.py",
+            f"--listen-url={str(args.socket_at_session)}",
+            "tunnel",
+            f"--remote-username={args.master_username}",
+            f"--remote-host={args.master_host}",
+            f"--remote-unix-socket={str(args.socket_at_master)}",
+        ],
         Project=HPC_PROJECT_NAME,
         Resources=JobResources(
+            Nodes=1,
+            # CPUs=2,
             Runtime=args.resources_time_limit_seconds
         )
     )

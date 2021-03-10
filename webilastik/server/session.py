@@ -5,7 +5,7 @@ from asyncio.subprocess import Process
 import asyncio
 import os
 from typing import Type, TypeVar, Generic
-
+import webilastik.ui.workflow.ws_pixel_classification_workflow
 
 SESSION_SCRIPT_PATH = Path(__file__).parent.joinpath("reverse_tunnel_to_master.sh")
 
@@ -17,7 +17,7 @@ class Session(ABC):
     async def create(
         cls, #: Type[SELF],
         *,
-        master_user: str,
+        master_username: str,
         master_host: str,
         socket_at_session: Path,
         socket_at_master: Path,
@@ -33,21 +33,20 @@ class LocalSession(Session):
     async def create(
         cls,
         *,
-        master_user: str,
+        master_username: str,
         master_host: str,
         socket_at_session: Path,
         socket_at_master: Path,
         time_limit_seconds: int,
     ) -> "LocalSession":
         process = await asyncio.create_subprocess_exec(
-            str(SESSION_SCRIPT_PATH),
-            env={
-                **os.environ,
-                "MASTER_USER": master_user,
-                "MASTER_HOST": master_host,
-                "SOCKET_PATH_AT_MASTER": str(socket_at_master),
-                "SOCKET_PATH_AT_SESSION": str(socket_at_session),
-            },
+            "python",
+            webilastik.ui.workflow.ws_pixel_classification_workflow.__file__,
+            f"--listen-url=unix://{socket_at_session}",
+            "tunnel",
+            f"--remote-username={master_username}",
+            f"--remote-host={master_host}",
+            f"--remote-unix-socket={str(socket_at_master)}",
             preexec_fn=os.setsid
         )
         print(f"----->>>>>>>>>>>>>>> Started local session with pid={process.pid} and group {os.getpgid(process.pid)}")
