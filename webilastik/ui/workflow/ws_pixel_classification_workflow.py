@@ -304,9 +304,28 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
+    from urllib.parse import urlparse
+
     parser = ArgumentParser()
-    parser.add_argument("--host", default=None)
-    parser.add_argument("--port", default=None)
-    parser.add_argument("--unix-socket-path", default=None)
+    parser.add_argument("--listen-on")
     args = parser.parse_args()
-    WsPixelClassificationWorkflow().run(host=args.host, port=args.port, unix_socket_path=args.unix_socket_path) #type: ignore
+
+    parsed = urlparse(args.listen_on)
+    if parsed.scheme == "tcp":
+        host_port = parsed.netloc.split(":")
+        host = host_port[0]
+        port = int(host_port[1]) if len(host_port) > 1 else None
+        WsPixelClassificationWorkflow().run(
+            host=host,
+            port=port,
+        )
+    elif parsed.scheme == "unix":
+        WsPixelClassificationWorkflow().run(
+            unix_socket_path=parsed.path
+        )
+    elif parsed.scheme == "abstractunix":
+        WsPixelClassificationWorkflow().run(
+            unix_socket_path="\0" + parsed.path
+        )
+    else:
+        raise ValueError(f"Bad value for --listen-on: {args.listen_on}")

@@ -46,9 +46,9 @@ ssh "${MASTER_USER}@${MASTER_HOST}" -- rm -fv "$SOCKET_PATH_AT_MASTER"
 
 
 export PYTHONPATH="$WEBILASTIK_ROOT"
-"${PYTHON_EXECUTABLE}"  "${WEBILASTIK_ROOT}/webilastik/ui/workflow/ws_pixel_classification_workflow.py" --unix-socket-path "${SOCKET_PATH_AT_SESSION}" &
+"${PYTHON_EXECUTABLE}"  "${WEBILASTIK_ROOT}/webilastik/ui/workflow/ws_pixel_classification_workflow.py" --listen-on "unix://${SOCKET_PATH_AT_SESSION}" &
 
-while [ ! -e "${SOCKET_PATH_AT_SESSION}" ]; do
+while  ! lsof -U | grep -qEw "${SOCKET_PATH_AT_SESSION}s" ; do
     errcho "----> Waiting for server socket to show up..."
     sleep 2
 done
