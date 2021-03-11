@@ -27,9 +27,9 @@ class HpcSession(Session):
     async def create(
         cls: Type["HpcSession"],
         *,
+        session_id: UUID,
         master_username: str,
         master_host: str,
-        socket_at_session: Path,
         socket_at_master: Path,
         time_limit_seconds: int,
     ) -> "HpcSession":
@@ -37,7 +37,6 @@ class HpcSession(Session):
             __file__,
             "--master-username=" + master_username,
             "--master-host=" + master_host,
-            "--socket-at-session=" + str(socket_at_session),
             "--socket-at-master=" + str(socket_at_master),
 
             "--resources-time-limit-seconds=" + str(time_limit_seconds),
@@ -55,12 +54,16 @@ class HpcSession(Session):
         except Exception:
             raise RuntimeError(f"Could not grab uuid: Scheduling HpcSession failed with code {return_code}\nstdout:\n{stdout}\n\n\nstderr:\n{stderr}")
 
-
-        return HpcSession(job_id=job_id)
+        print(f"Created job {job_id} for session {session_id}")
+        return HpcSession(session_id=session_id, job_id=job_id)
 
     # private. Use LocalSession.create instead
-    def __init__(self, job_id: UUID):
+    def __init__(self, session_id: UUID, job_id: UUID):
+        self.session_id = session_id
         self.job_id = job_id
+
+    def get_id(self) -> UUID:
+        return self.session_id
 
     async def kill(self, after_seconds: int):
         ... #FIXME: implement early killing
@@ -83,7 +86,7 @@ if __name__ == '__main__':
             HPC_PYTHON_EXECUTABLE,
             "-u",
             f"{HPC_WEBILASTIK_DIR}/webilastik/ui/workflow/ws_pixel_classification_workflow.py",
-            f"--listen-url=unix://{str(args.socket_at_session)}",
+            f"--listen-socket=to-master",
             "tunnel",
             f"--remote-username={args.master_username}",
             f"--remote-host={args.master_host}",

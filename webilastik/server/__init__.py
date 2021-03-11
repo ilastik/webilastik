@@ -19,12 +19,10 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         master_host: str,
         external_url: str,
         sockets_dir_at_master: Path,
-        sockets_dir_at_session: Path,
         master_username: str,
     ):
         self.session_type = session_type
         self.sockets_dir_at_master = sockets_dir_at_master
-        self.sockets_dir_at_session = sockets_dir_at_session
         self.master_username = master_username
         self.master_host = master_host
         self.external_url = external_url
@@ -48,10 +46,11 @@ class SessionAllocator(Generic[SESSION_TYPE]):
             return web.Response(status=400)
         session_id = uuid.uuid4()
 
+        #FIXME: remove stuff from self.sessions
         self.sessions[session_id] = await self.session_type.create(
+            session_id=session_id,
             master_host=self.master_host,
             master_username=self.master_username,
-            socket_at_session=self.sockets_dir_at_session.joinpath(f"{session_id}-to-master"),
             socket_at_master=self.sockets_dir_at_master.joinpath(f"to-session-{session_id}"),
             time_limit_seconds=session_duration
         )
@@ -79,7 +78,6 @@ if __name__ == '__main__':
     parser.add_argument("--external-url")
     parser.add_argument("--master-username", default="wwww-data")
     parser.add_argument("--sockets-dir-at-master", type=Path, default=Path(tempfile.gettempdir()))
-    parser.add_argument("--sockets-dir-at-session", type=Path, default=Path(tempfile.gettempdir()))
 
     args = parser.parse_args()
 
@@ -95,5 +93,4 @@ if __name__ == '__main__':
         external_url=args.external_url,
         master_username=args.master_username,
         sockets_dir_at_master=args.sockets_dir_at_master,
-        sockets_dir_at_session=args.sockets_dir_at_session,
     ).run(port=5000)

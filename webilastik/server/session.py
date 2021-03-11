@@ -5,6 +5,8 @@ from asyncio.subprocess import Process
 import asyncio
 import os
 from typing import Type, TypeVar, Generic
+import uuid
+from uuid import UUID
 import webilastik.ui.workflow.ws_pixel_classification_workflow
 
 SESSION_SCRIPT_PATH = Path(__file__).parent.joinpath("reverse_tunnel_to_master.sh")
@@ -17,9 +19,9 @@ class Session(ABC):
     async def create(
         cls, #: Type[SELF],
         *,
+        session_id: UUID,
         master_username: str,
         master_host: str,
-        socket_at_session: Path,
         socket_at_master: Path,
         time_limit_seconds: int,
     ) -> "Session": # SELF:
@@ -28,21 +30,26 @@ class Session(ABC):
     async def kill(self, after_seconds: int):
         pass
 
+    @abstractmethod
+    def get_id(self) -> UUID:
+        ...
+
 class LocalSession(Session):
     @classmethod
     async def create(
         cls,
         *,
+        session_id: UUID,
         master_username: str,
         master_host: str,
-        socket_at_session: Path,
         socket_at_master: Path,
         time_limit_seconds: int,
     ) -> "LocalSession":
+        local_socket = Path(f"/tmp/{session_id}-to-master")
         process = await asyncio.create_subprocess_exec(
             "python",
             webilastik.ui.workflow.ws_pixel_classification_workflow.__file__,
-            f"--listen-url=unix://{socket_at_session}",
+            f"--listen-url={local_socket}",
             "tunnel",
             f"--remote-username={master_username}",
             f"--remote-host={master_host}",
@@ -50,14 +57,19 @@ class LocalSession(Session):
             preexec_fn=os.setsid
         )
         print(f"----->>>>>>>>>>>>>>> Started local session with pid={process.pid} and group {os.getpgid(process.pid)}")
-        session = LocalSession(process=process, socket_at_master=socket_at_master)
+        session = LocalSession(session_id=session_id, process=process, local_socket=local_socket, socket_at_master=socket_at_master)
         asyncio.create_task(session.kill(after_seconds=time_limit_seconds))
         return session
 
     # private. Use LocalSession.create instead
-    def __init__(self, process: Process, socket_at_master: Path):
+    def __init__(self, session_id: UUID, process: Process, local_socket: Path, socket_at_master: Path):
+        self.session_id = session_id
         self.process = process
+        self.local_socket = local_socket
         self.socket_at_master = socket_at_master
+
+    def get_id(self) -> UUID:
+        return self.session_id
 
     async def kill(self, after_seconds: int):
         await asyncio.sleep(after_seconds)
