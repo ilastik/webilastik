@@ -5,7 +5,6 @@ import asyncio
 from typing import Any, Dict, List, Optional, Mapping, TypeVar
 from collections.abc import Mapping as BaseMapping
 import json
-from urllib.parse import ParseResult
 from webilastik.server.tunnel import ReverseSshTunnel
 from pathlib import Path
 import contextlib
@@ -308,10 +307,9 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
-    from urllib.parse import urlparse
 
     parser = ArgumentParser()
-    parser.add_argument("--listen-url", required=True)
+    parser.add_argument("--listen-socket", type=Path, required=True)
 
     subparsers = parser.add_subparsers(required=False, help="tunnel stuff")
     tunnel_parser = subparsers.add_parser("tunnel", help="Creates a reverse tunnel to an orchestrator")
@@ -320,7 +318,6 @@ if __name__ == '__main__':
     tunnel_parser.add_argument("--remote-unix-socket", type=Path, required=True)
 
     args = parser.parse_args()
-    parsed_listen_url = urlparse(args.listen_url)
 
     mpi_rank = 0
     try:
@@ -330,33 +327,16 @@ if __name__ == '__main__':
         pass
 
     if "remote_username" in vars(args) and mpi_rank == 0:
-        if parsed_listen_url.scheme != "unix":
-            parser.error("Can only tunnel if --listen-url uses unix:// scheme")
         server_context = ReverseSshTunnel(
             remote_username=args.remote_username,
             remote_host=args.remote_host,
             remote_unix_socket=args.remote_unix_socket,
-            local_unix_socket=Path(parsed_listen_url.path),
+            local_unix_socket=args.listen_socket,
         )
     else:
         server_context = contextlib.nullcontext()
 
     with server_context:
-        if parsed_listen_url.scheme == "tcp":
-            host_port = parsed_listen_url.netloc.split(":")
-            host = host_port[0]
-            port = int(host_port[1]) if len(host_port) > 1 else None
-            WsPixelClassificationWorkflow().run(
-                host=host,
-                port=port,
-            )
-        elif parsed_listen_url.scheme == "unix":
-            WsPixelClassificationWorkflow().run(
-                unix_socket_path=parsed_listen_url.path
-            )
-        elif parsed_listen_url.scheme == "abstractunix":
-            WsPixelClassificationWorkflow().run(
-                unix_socket_path="\0" + parsed_listen_url.path
-            )
-        else:
-            parser.error(f"Bad value for --listen-url: {args.listen_url}")
+        WsPixelClassificationWorkflow().run(
+            unix_socket_path=str(args.listen_socket)
+        )
