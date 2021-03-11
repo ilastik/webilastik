@@ -16,9 +16,9 @@ class ReverseSshTunnel:
     ):
         self.remote_username = remote_username
         self.remote_host = remote_host
-        self.remote_unix_socket = remote_unix_socket
-        self.local_unix_socket = local_unix_socket
-        self.tunnel_control_socket = Path(str(local_unix_socket) + ".control")
+        self.remote_unix_socket = ("" if remote_unix_socket.anchor else "./") + str(remote_unix_socket)
+        self.local_unix_socket = ("" if local_unix_socket.anchor else "./") + str(local_unix_socket)
+        self.tunnel_control_socket = self.local_unix_socket + ".control"
 
     def __enter__(self):
         subprocess.run(
