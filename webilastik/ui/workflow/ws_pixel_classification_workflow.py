@@ -197,7 +197,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
                 self.ng_predict_info
             ),
             web.post("/ilp_project", self.ilp_download),
-            web.delete("/session", self.close_session),
+            web.delete("/", self.close_session),
         ])
 
     async def close_session(self, request: web.Request) -> web.Response:
