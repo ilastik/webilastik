@@ -49,7 +49,13 @@ class HpcSession(Session):
         return_code = process.returncode
         if return_code != 0:
             raise RuntimeError(f"Scheduling HpcSession failed with code {return_code}\nstdout:\n{stdout}\n\n\nstderr:\n{stderr}")
-        job_id = UUID(stdout.decode('utf8'))
+        try:
+            job_id = UUID(stdout.decode('utf8').strip())
+            print(f"New session created: {job_id}")
+        except Exception:
+            raise RuntimeError(f"Could not grab uuid: Scheduling HpcSession failed with code {return_code}\nstdout:\n{stdout}\n\n\nstderr:\n{stderr}")
+
+
         return HpcSession(job_id=job_id)
 
     # private. Use LocalSession.create instead
@@ -75,6 +81,7 @@ if __name__ == '__main__':
         Executable="srun",
         Arguments=[
             HPC_PYTHON_EXECUTABLE,
+            "-u",
             f"{HPC_WEBILASTIK_DIR}/webilastik/ui/workflow/ws_pixel_classification_workflow.py",
             f"--listen-url=unix://{str(args.socket_at_session)}",
             "tunnel",
