@@ -51,8 +51,8 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         self.sessions[session_id] = await self.session_type.create(
             master_host=self.master_host,
             master_username=self.master_username,
-            socket_at_session=self.sockets_dir_at_session.joinpath(f"{session_id}-to-master.sock"),
-            socket_at_master=self.sockets_dir_at_master.joinpath(f"to-session-{session_id}.sock"),
+            socket_at_session=self.sockets_dir_at_session.joinpath(f"{session_id}-to-master"),
+            socket_at_master=self.sockets_dir_at_master.joinpath(f"to-session-{session_id}"),
             time_limit_seconds=session_duration
         )
 
