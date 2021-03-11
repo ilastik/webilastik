@@ -37,8 +37,8 @@ class HpcSession(Session):
             __file__,
             "--master-username=" + master_username,
             "--master-host=" + master_host,
-            "--socket-at-session=" + str(socket_at_master),
-            "--socket-at-master=" + str(socket_at_session),
+            "--socket-at-session=" + str(socket_at_session),
+            "--socket-at-master=" + str(socket_at_master),
 
             "--resources-time-limit-seconds=" + str(time_limit_seconds),
             preexec_fn=os.setsid,
