@@ -187,7 +187,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
 
         self.app = web.Application()
         self.app.add_routes([
-            web.get('/wf', self.open_websocket), # type: ignore
+            web.get('/ws', self.open_websocket), # type: ignore
             web.get(
                 "/predictions_export_applet/{uuid}/{lane_index}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}", #FIXME uuid is just there to prevent caching
                 self.ng_predict
@@ -197,7 +197,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
                 self.ng_predict_info
             ),
             web.post("/ilp_project", self.ilp_download),
-            web.delete("/", self.close_session),
+            web.delete("/close", self.close_session),
         ])
 
     async def close_session(self, request: web.Request) -> web.Response:
