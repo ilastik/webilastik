@@ -6,10 +6,15 @@ import uuid
 from urllib.parse import urljoin
 import asyncio
 from aiohttp import web
+import os
 
 from webilastik.server.session import Session, LocalSession
 
+import jwt
+
 SESSION_TYPE = TypeVar("SESSION_TYPE", bound=Session)
+
+SESSION_SECRET = os.environ["SESSION_SECRET"]
 
 class SessionAllocator(Generic[SESSION_TYPE]):
     def __init__(
@@ -32,10 +37,14 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         self.app = web.Application()
         self.app.add_routes([
             web.post('/session', self.spawn_session),
+            web.get('/session/{session_id}', self.session_status),
         ])
 
     def _make_session_url(self, session_id: uuid.UUID) -> str:
         return urljoin(self.external_url, f"session-{session_id}")
+
+    def _make_socket_path_at_master(self, session_id: uuid.UUID) -> Path:
+        return self.sockets_dir_at_master.joinpath(f"to-session-{session_id}")
 
     async def spawn_session(self, request: web.Request):
         raw_payload = await request.content.read()
@@ -43,7 +52,7 @@ class SessionAllocator(Generic[SESSION_TYPE]):
             payload_dict = json.loads(raw_payload.decode('utf8'))
             session_duration = int(payload_dict["session_duration"])
         except Exception:
-            return web.Response(status=400)
+            return web.json_response({"error": "Bad payload"}, status=400)
         session_id = uuid.uuid4()
 
         #FIXME: remove stuff from self.sessions
@@ -51,17 +60,37 @@ class SessionAllocator(Generic[SESSION_TYPE]):
             session_id=session_id,
             master_host=self.master_host,
             master_username=self.master_username,
-            socket_at_master=self.sockets_dir_at_master.joinpath(f"to-session-{session_id}"),
+            socket_at_master=self._make_socket_path_at_master(session_id),
             time_limit_seconds=session_duration
         )
 
         return web.json_response(
-            data={
+            {
+                "session_id": str(session_id),
                 "session_url": self._make_session_url(session_id),
-                "session_token": "FIXME", #use this to authenticate with the session server
+                "session_token": jwt.encode(
+                    {
+                        "sid": str(session_id)
+                    },
+                    SESSION_SECRET,
+                    algorithm="HS256"
+                )
             },
             headers={"Access-Control-Allow-Origin": "*"}
         )
+
+    async def session_status(self, request: web.Request):
+        # FIXME: do security checks here?
+        try:
+            session_id =  uuid.UUID(request.match_info.get("session_id"))
+        except Exception:
+            return web.json_response({"error": "Bad session id"}, status=400)
+        if session_id not in self.sessions:
+            return web.json_response({"error": "Session not found"}, status=404)
+        return web.json_response({
+            "status": "ready" if self._make_socket_path_at_master(session_id).exists() else "not ready",
+            "url": self._make_session_url(session_id)
+        })
 
     async def kill_session(self, session_id: uuid.UUID, after_seconds: int = 0):
         await asyncio.sleep(after_seconds)

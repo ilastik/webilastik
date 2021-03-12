@@ -1,10 +1,10 @@
-from os import wait
 import aiohttp
 import asyncio
 import json
 from aiohttp.client_ws import ClientWebSocketResponse
 import numpy
 import uuid
+from typing import Dict, Any
 
 from ndstructs import Array5D
 
@@ -21,16 +21,26 @@ async def main():
     async with aiohttp.ClientSession() as session:
 
         print(f"Creating new session--------------")
-        async with session.post(f"http://localhost:5000/session") as response:
-            print("Status:", response.status)
-            print("Content-type:", response.headers['content-type'])
+        async with session.post(f"http://localhost:5000/session", json={"session_duration": 60}) as response:
+            response.raise_for_status()
+            session_data : Dict[str, Any] = await response.json()
+            session_id = session_data["session_id"]
+        print(f"Done creating session: {json.dumps(session_data)} <<<<<<<<<<<<<<<<<<")
 
-            session_url = await response.text()
-        print(f"Done creating session: {session_url} <<<<<<<<<<<<<<<<<<")
+        session_is_ready = False
+        for _ in range(10):
+            response = await session.get(f"http://localhost:5000/session/{session_id}")
+            response.raise_for_status()
+            session_status = await response.json()
+            if session_status["status"] == "ready":
+                session_url = session_status["url"]
+                break
+            print(f"Session {session_id} is notready yet")
+            await asyncio.sleep(2)
+        else:
+            raise RuntimeError("Given up waiting on session")
 
-        import time; time.sleep(2)
-
-        async with session.ws_connect(f"{session_url}/wf") as ws:
+        async with session.ws_connect(f"{session_url}/ws") as ws:
             asyncio.get_event_loop().create_task(read_server_status(ws))
 
             print("sending a data source=======")
@@ -111,6 +121,4 @@ async def main():
 
 
 
-loop = asyncio.get_event_loop()
-loop.create_task(main())
-loop.run_forever()
+asyncio.run(main())
