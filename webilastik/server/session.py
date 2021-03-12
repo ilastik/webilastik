@@ -49,7 +49,7 @@ class LocalSession(Session):
         process = await asyncio.create_subprocess_exec(
             "python",
             webilastik.ui.workflow.ws_pixel_classification_workflow.__file__,
-            f"--listen-url={local_socket}",
+            f"--listen-socket={local_socket}",
             "tunnel",
             f"--remote-username={master_username}",
             f"--remote-host={master_host}",
