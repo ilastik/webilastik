@@ -1,6 +1,7 @@
 from typing import Sequence, List, Generic, Tuple, TypeVar, Dict
 from concurrent.futures import ProcessPoolExecutor
 from collections import defaultdict
+import asyncio
 
 from ndstructs import Array5D, Interval5D, Shape5D
 from ndstructs.datasource import DataSource, DataRoi
@@ -42,6 +43,11 @@ class ExportApplet(Applet, Generic[LANE, PRODUCER]):
                 #FIXME save this with a DataSink
                 print(f"Computing on {data_slice} with producer {producer_op}")
                 producer_op.compute(slc)
+
+    async def async_compute(self, roi: DataRoi) -> Array5D:
+        executor = self._executors[hash(roi) % len(self._executors)]
+        result_future = executor.submit(self.producer().compute, roi)
+        return await asyncio.wrap_future(result_future)
 
     def compute(self, roi: DataRoi) -> Array5D:
         producer_op = self.producer()

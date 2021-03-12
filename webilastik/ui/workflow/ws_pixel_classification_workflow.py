@@ -282,7 +282,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         zEnd = int(request.match_info.get("zEnd")) # type: ignore
 
         datasource = self.data_selection_applet.items()[lane_index]
-        predictions = self.predictions_export_applet.compute(
+        predictions = await self.predictions_export_applet.async_compute(
             DataRoi(datasource.get_raw_data(), x=(xBegin, xEnd), y=(yBegin, yEnd), z=(zBegin, zEnd))
         )
 
