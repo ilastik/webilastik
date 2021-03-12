@@ -73,11 +73,19 @@ class LocalSession(Session):
 
     async def kill(self, after_seconds: int):
         await asyncio.sleep(after_seconds)
-        print(f"===>>>> gently killing local session (pid={self.process.pid})with SIGINT on group....")
-        pgid = os.getpgid(self.process.pid)
-        os.killpg(pgid, signal.SIGINT)
-        # await asyncio.sleep(10)
-        # print(f"===>>>> forcefully killing local session (pid={self.process.pid}) with SIGKILL on group....")
-        # os.killpg(pgid, signal.SIGKILL)
+        try:
+            pgid = os.getpgid(self.process.pid)
+            print(f"===>>>> gently killing local session (pid={self.process.pid}) with SIGINT on group....")
+            os.killpg(pgid, signal.SIGINT)
+            await asyncio.sleep(10)
+            print(f"===>>>> Killing local session (pid={self.process.pid}) with SIGKILL on group....")
+            os.killpg(pgid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
         await self.process.wait()
-        os.remove(self.socket_at_master)
+
+        try:
+            os.remove(self.socket_at_master)
+        except FileNotFoundError:
+            pass
