@@ -270,7 +270,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
                 ],
             }),
             content_type="application/json",
-            headers={"Access-Control-Allow-Origin": "*"})
+        )
 
     async def ng_predict(self, request: web.Request):
         lane_index = int(request.match_info.get("lane_index")) # type: ignore
@@ -292,7 +292,6 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         return web.Response(
             body=resp,
             content_type="application/octet-stream",
-            headers={"Access-Control-Allow-Origin": "*"}
         )
 
     async def ilp_download(self, request: web.Request):
@@ -300,7 +299,6 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             body=self.ilp_file.read(),
             content_type="application/octet-stream",
             headers={
-                "Access-Control-Allow-Origin": "*",
                 "Content-disposition": 'attachment; filename="MyProject.ilp"'
             }
         )
