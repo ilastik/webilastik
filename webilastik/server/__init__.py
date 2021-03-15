@@ -8,6 +8,8 @@ import asyncio
 from aiohttp import web
 import os
 
+from aiohttp.web_routedef import head
+
 from webilastik.server.session import Session, LocalSession
 
 import jwt
@@ -36,9 +38,20 @@ class SessionAllocator(Generic[SESSION_TYPE]):
 
         self.app = web.Application()
         self.app.add_routes([
+            web.options("/session", self.do_cors_preflight),
             web.post('/session', self.spawn_session),
             web.get('/session/{session_id}', self.session_status),
         ])
+
+    async def do_cors_preflight(self, request: web.Request):
+        return web.Response(
+            headers={
+                'Access-Control-Allow-Origin': "*",
+                'Access-Control-Allow-Credentials': 'true',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Accept,Authorization,Cache-Control,Content-Type,DNT,If-Modified-Since,Keep-Alive,Origin,User-Agent,X-Requested-With',
+            }
+        )
 
     def _make_session_url(self, session_id: uuid.UUID) -> str:
         return urljoin(self.external_url, f"session-{session_id}")
@@ -52,7 +65,7 @@ class SessionAllocator(Generic[SESSION_TYPE]):
             payload_dict = json.loads(raw_payload.decode('utf8'))
             session_duration = int(payload_dict["session_duration"])
         except Exception:
-            return web.json_response({"error": "Bad payload"}, status=400)
+            return web.json_response({"error": "Bad payload"}, status=400, headers={"Access-Control-Allow-Origin": "*"})
         session_id = uuid.uuid4()
 
         #FIXME: remove stuff from self.sessions
@@ -66,12 +79,10 @@ class SessionAllocator(Generic[SESSION_TYPE]):
 
         return web.json_response(
             {
-                "session_id": str(session_id),
-                "session_url": self._make_session_url(session_id),
-                "session_token": jwt.encode(
-                    {
-                        "sid": str(session_id)
-                    },
+                "id": str(session_id),
+                "url": self._make_session_url(session_id),
+                "token": jwt.encode(
+                    {"sid": str(session_id)},
                     SESSION_SECRET,
                     algorithm="HS256"
                 )
@@ -87,10 +98,13 @@ class SessionAllocator(Generic[SESSION_TYPE]):
             return web.json_response({"error": "Bad session id"}, status=400)
         if session_id not in self.sessions:
             return web.json_response({"error": "Session not found"}, status=404)
-        return web.json_response({
-            "status": "ready" if self._make_socket_path_at_master(session_id).exists() else "not ready",
-            "url": self._make_session_url(session_id)
-        })
+        return web.json_response(
+            {
+                "status": "ready" if self._make_socket_path_at_master(session_id).exists() else "not ready",
+                "url": self._make_session_url(session_id)
+            },
+            headers={"Access-Control-Allow-Origin": "*"}
+        )
 
     async def kill_session(self, session_id: uuid.UUID, after_seconds: int = 0):
         await asyncio.sleep(after_seconds)

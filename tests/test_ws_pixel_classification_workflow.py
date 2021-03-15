@@ -24,7 +24,7 @@ async def main():
         async with session.post(f"http://localhost:5000/session", json={"session_duration": 60}) as response:
             response.raise_for_status()
             session_data : Dict[str, Any] = await response.json()
-            session_id = session_data["session_id"]
+            session_id = session_data["id"]
         print(f"Done creating session: {json.dumps(session_data)} <<<<<<<<<<<<<<<<<<")
 
         session_is_ready = False
