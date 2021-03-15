@@ -57,16 +57,34 @@ class LocalSession(Session):
             preexec_fn=os.setsid
         )
         print(f"----->>>>>>>>>>>>>>> Started local session with pid={process.pid} and group {os.getpgid(process.pid)}")
-        session = LocalSession(session_id=session_id, process=process, local_socket=local_socket, socket_at_master=socket_at_master)
+        session = LocalSession(
+            session_id=session_id,
+            process=process,
+            local_socket=local_socket,
+            socket_at_master=socket_at_master,
+            master_username=master_username,
+            master_host=master_host
+        )
         asyncio.create_task(session.kill(after_seconds=time_limit_seconds))
         return session
 
     # private. Use LocalSession.create instead
-    def __init__(self, session_id: UUID, process: Process, local_socket: Path, socket_at_master: Path):
+    def __init__(
+        self,
+        *,
+        session_id: UUID,
+        process: Process,
+        local_socket: Path,
+        socket_at_master: Path,
+        master_username: str,
+        master_host: str
+    ):
         self.session_id = session_id
         self.process = process
         self.local_socket = local_socket
         self.socket_at_master = socket_at_master
+        self.master_username = master_username
+        self.master_host = master_host
 
     def get_id(self) -> UUID:
         return self.session_id
@@ -85,7 +103,6 @@ class LocalSession(Session):
 
         await self.process.wait()
 
-        try:
-            os.remove(self.socket_at_master)
-        except FileNotFoundError:
-            pass
+        await asyncio.create_subprocess_exec(
+            "ssh", f"{self.master_username}@{self.master_host}",  "--",  "rm", "-fv", str(self.socket_at_master)
+        )
