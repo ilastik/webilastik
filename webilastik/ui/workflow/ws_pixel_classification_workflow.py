@@ -43,31 +43,29 @@ class WsAppletMixin(Applet):
     def _get_status_message(self) -> JSON_VALUE:
         return None
 
-    def _update_remote(self):
-        async def do_update():
-            bad_sockets : List[web.WebSocketResponse] = []
-            for websocket in self.websockets:
-                try:
-                    message = self._get_status_message()
-                    if message is not None:
-                        await websocket.send_str(json.dumps(message))
-                except ConnectionResetError as e:
-                    print(f"Got an exception while updating remote. Removing websocket...")
-                    bad_sockets.append(websocket)
-            for bad_socket in bad_sockets:
-                self.websockets.remove(bad_socket)
-        asyncio.get_event_loop().create_task(do_update())
+    async def _update_remote(self):
+        bad_sockets : List[web.WebSocketResponse] = []
+        for websocket in self.websockets:
+            try:
+                message = self._get_status_message()
+                if message is not None:
+                    await websocket.send_str(json.dumps(message))
+            except ConnectionResetError as e:
+                print(f"Got an exception while updating remote:\n{e}\n\nRemoving websocket...")
+                bad_sockets.append(websocket)
+        for bad_socket in bad_sockets:
+            self.websockets.remove(bad_socket)
 
     def _add_websocket(self, websocket: web.WebSocketResponse):
         self.websockets.append(websocket)
 
     def post_refresh(self, confirmer: CONFIRMER): #FIXME: this will fire even if something breaks downstream
         super().post_refresh(confirmer)
-        self._update_remote()
+        asyncio.get_event_loop().create_task(self._update_remote())
 
     def restore_snaphot(self, snap: Dict[str, Any]):
         super().restore_snaphot(snap)
-        self._update_remote()
+        asyncio.get_event_loop().create_task(self._update_remote())
 
     @abstractmethod
     def do_rpc(self, method_name: str, payload: Any):
