@@ -44,10 +44,12 @@ class ExportApplet(Applet, Generic[LANE, PRODUCER]):
                 print(f"Computing on {data_slice} with producer {producer_op}")
                 producer_op.compute(slc)
 
-    async def async_compute(self, roi: DataRoi) -> Array5D:
-        executor = self._executors[hash(roi) % len(self._executors)]
-        result_future = executor.submit(self.producer().compute, roi)
-        return await asyncio.wrap_future(result_future)
+    async def async_compute(self, roi: DataRoi):# -> Array5D:
+        loop = asyncio.get_event_loop()
+        exec_idx = hash(roi) % len(self._executors)
+        producer_op = self.producer()
+        executor = self._executors[exec_idx]
+        return await loop.run_in_executor(executor, do_async_compute, producer_op, roi)
 
     def compute(self, roi: DataRoi) -> Array5D:
         producer_op = self.producer()
@@ -75,6 +77,11 @@ class ExportApplet(Applet, Generic[LANE, PRODUCER]):
             "OutputInternalPath": "exported_data",
             "StorageVersion": "0.1",
         }
+
+#these functions must be top level because ProcessPool doesn't like object methods
+def do_async_compute(op: Operator[DataRoi, Array5D], roi: DataRoi) -> Array5D:
+    pred_tile = op.compute(roi)
+    return pred_tile
 
 
 def do_worker_compute(slice_batch: Tuple[Operator[DataRoi, Array5D], Sequence[DataRoi]]) -> List[Array5D]:
