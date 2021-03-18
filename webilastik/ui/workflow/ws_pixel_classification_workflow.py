@@ -231,6 +231,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
                 print(f'ws connection closed with exception {websocket.exception()}')
         self.websockets.remove(websocket)
         print('websocket connection closed')
+        return websocket
 
     def run_rpc(self, payload: str):
         rpc_request = json.loads(payload)
