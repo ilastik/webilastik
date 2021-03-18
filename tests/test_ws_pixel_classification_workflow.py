@@ -2,9 +2,11 @@ import aiohttp
 import asyncio
 import json
 from aiohttp.client_ws import ClientWebSocketResponse
+from ndstructs.point5D import Interval5D, Shape5D
 import numpy
 import uuid
 from typing import Dict, Any
+from concurrent.futures import ThreadPoolExecutor
 
 from ndstructs import Array5D
 
@@ -102,20 +104,40 @@ async def main():
             print("done sending annotations<<<<<")
 
 
+            import pprint
+            import requests
+            from concurrent.futures import ProcessPoolExecutor
             print(f"Requesting predictions========================")
-            async with session.get(f"{session_url}/predictions_export_applet/{uuid.uuid4()}/0/data/0-500_0-256_0-1") as response:
-                print("Status:", response.status)
-                print("Content-type:", response.headers['content-type'])
+            with ProcessPoolExecutor(max_workers=8) as executor:
+                future_generator = executor.map(
+                    requests.get,
+                    [
+                        f"{session_url}/predictions_export_applet/{uuid.uuid4()}/0/data/{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_0-1"
+                        for tile in
+                        Interval5D.zero(x=(0, 697), y=(0, 450), c=(0, 3)).get_tiles(tile_shape=Shape5D(x=256, y=256, c=2))
+                    ]
+                )
+                for f in list(future_generator):
+                    print(f"Response : {f.status_code}")
 
-                tile_bytes = await response.content.read()
-                print(f"Got predictions<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+            response_tasks = {}
+            for tile in Interval5D.zero(x=(0, 697), y=(0, 450), c=(0, 3)).get_tiles(tile_shape=Shape5D(x=256, y=256, c=2)):
+                response_tasks[tile] = session.get(
+                    f"{session_url}/predictions_export_applet/{uuid.uuid4()}/0/data/{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_0-1"
+                )
 
-                raw_data = numpy.frombuffer(tile_bytes, dtype=numpy.uint8).reshape(2, 256, 500)
-                a = Array5D(raw_data, axiskeys="cyx")
-                a.show_channels()
-            print(f"    shown predictions<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+            for tile, resp in response_tasks.items():
+                async with resp as response:
+                    print("Status:", response.status)
+                    print("Content-type:", response.headers['content-type'])
 
-            await asyncio.sleep(3)
+                    tile_bytes = await response.content.read()
+                    print(f"Got predictions<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+
+                    raw_data = numpy.frombuffer(tile_bytes, dtype=numpy.uint8).reshape(2, tile.shape.y, tile.shape.x)
+                    a = Array5D(raw_data, axiskeys="cyx")
+                    a.show_channels()
+
             global finished;
             finished = True
 
