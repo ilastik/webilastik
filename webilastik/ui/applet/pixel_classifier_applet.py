@@ -77,10 +77,12 @@ class PixelClassificationApplet(Applet, Generic[LANE]):
         super().__init__(name=name)
 
     def _create_pixel_classifier(self, confirmer: CONFIRMER) -> Optional[VigraPixelClassifier[IlpFilter]]:
-        return  VigraPixelClassifier[IlpFilter].train(
+        classifier = VigraPixelClassifier[IlpFilter].train(
             annotations=self._in_annotations(),
             feature_extractors=self._in_feature_extractors()
         )
+        classifier.__getstate__() #warm up pickle cache?
+        return classifier
 
     def _create_color_map(self, confirmer: CONFIRMER) -> Optional[Dict[Color, np.uint8]]:
         annotations = self._in_annotations.get() or []
