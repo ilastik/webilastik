@@ -1,5 +1,6 @@
 from typing import Sequence, List, Generic, Tuple, TypeVar, Dict
 from concurrent.futures import ProcessPoolExecutor
+import multiprocessing
 from collections import defaultdict
 import asyncio
 
@@ -18,10 +19,12 @@ LANE = TypeVar("LANE", bound=ILane)
 PRODUCER = TypeVar("PRODUCER", bound=Operator[DataRoi, Array5D], covariant=True)
 class ExportApplet(Applet, Generic[LANE, PRODUCER]):
     """Exports the outputs of an operator created by an upstream applet."""
-    def __init__(self, name: str, producer: Slot[PRODUCER], lanes: Slot[Sequence[LANE]], num_workers: int = 4):
+    def __init__(
+        self, name: str, producer: Slot[PRODUCER], lanes: Slot[Sequence[LANE]], num_workers: int = max(1, multiprocessing.cpu_count() - 1)
+    ):
         self.producer = producer
         self.lanes = lanes
-        self._executors = [ProcessPoolExecutor(max_workers=1) for i in range(num_workers)]
+        self._executors = [ProcessPoolExecutor(max_workers=1) for _ in range(num_workers)]
         super().__init__(name=name)
 
     def __del__(self):
