@@ -15,13 +15,10 @@ class H5pyDeprecationWarning(H5pyWarning):
 
 
 class ModuleWrapper(object):
-    def __init__(self, mod):
+    def __init__(self, mod) -> None:
         ...
     
     def __getattr__(self, attr):
-        ...
-    
-    def _import(self):
         ...
     
 

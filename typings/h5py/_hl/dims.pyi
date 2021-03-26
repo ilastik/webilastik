@@ -24,15 +24,15 @@ class DimensionProxy(base.CommonStateObject):
         ...
     
     @with_phil
-    def __init__(self, id_, dimension):
+    def __init__(self, id_, dimension) -> None:
         ...
     
     @with_phil
-    def __hash__(self):
+    def __hash__(self) -> int:
         ...
     
     @with_phil
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         ...
     
     @with_phil
@@ -89,7 +89,7 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
         accessing the ".dims" property on a Dataset.
     """
     @with_phil
-    def __init__(self, parent):
+    def __init__(self, parent) -> None:
         """ Private constructor.
         """
         ...

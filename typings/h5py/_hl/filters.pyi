@@ -37,19 +37,6 @@ from .. import h5z
 _COMP_FILTERS = { 'gzip': h5z.FILTER_DEFLATE,'szip': h5z.FILTER_SZIP,'lzf': h5z.FILTER_LZF,'shuffle': h5z.FILTER_SHUFFLE,'fletcher32': h5z.FILTER_FLETCHER32,'scaleoffset': h5z.FILTER_SCALEOFFSET }
 DEFAULT_GZIP = 4
 DEFAULT_SZIP = ('nn', 8)
-def _gen_filter_tuples():
-    """ Bootstrap function to figure out what filters are available. """
-    ...
-
-def _external_entry(name, offset=..., size=...):
-    """ Check for and return a well-formed entry tuple for
-    a call to h5p.set_external. """
-    ...
-
-def _normalize_external(external):
-    """ Normalize external into a well-formed list of tuples and return. """
-    ...
-
 def fill_dcpl(plist, shape, dtype, chunks, compression, compression_opts, shuffle, fletcher32, maxshape, scaleoffset, external):
     """ Generate a dataset creation property list.
 

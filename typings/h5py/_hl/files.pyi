@@ -6,7 +6,6 @@ import six
 from .base import with_phil
 from .group import Group
 from .. import h5, h5f, version
-from typing import Any, Optional
 
 """
     Implements high-level support for HDF5 file objects.
@@ -20,12 +19,6 @@ libver_dict = { 'earliest': h5f.LIBVER_EARLIEST,'latest': h5f.LIBVER_LATEST }
 libver_dict_r = dict((y, x) for (x, y) in six.iteritems(libver_dict))
 if hdf5_version >= (1, 10, 2):
     ...
-def _set_fapl_mpio(plist, **kwargs):
-    ...
-
-def _set_fapl_fileobj(plist, **kwargs):
-    ...
-
 _drivers = { 'sec2': lambda plist, **kwargs: plist.set_fapl_sec2(**kwargs),'stdio': lambda plist, **kwargs: plist.set_fapl_stdio(**kwargs),'core': lambda plist, **kwargs: plist.set_fapl_core(**kwargs),'family': lambda plist, **kwargs: plist.set_fapl_family(memb_fapl=plist.copy(), **kwargs),'mpio': _set_fapl_mpio,'fileobj': _set_fapl_fileobj }
 def register_driver(name, set_fapl):
     """Register a custom driver.
@@ -58,11 +51,11 @@ def make_fapl(driver, libver, rdcc_nslots, rdcc_nbytes, rdcc_w0, **kwds):
     """ Set up a file access property list """
     ...
 
-def make_fcpl(track_order: bool = ...):
+def make_fcpl(track_order=...):
     """ Set up a file creation property list """
     ...
 
-def make_fid(name, mode, userblock_size, fapl, fcpl: Optional[Any] = ..., swmr: bool = ...):
+def make_fid(name, mode, userblock_size, fapl, fcpl=..., swmr=...):
     """ Get a new FileID by opening or creating a file.
     Also validates mode argument."""
     ...
@@ -136,7 +129,7 @@ class File(Group):
         def swmr_mode(self, value):
             ...
 
-    def __init__(self, name, mode: Optional[Any] = ..., driver: Optional[Any] = ..., libver: Optional[Any] = ..., userblock_size: Optional[Any] = ..., swmr: bool = ..., rdcc_nslots: Optional[Any] = ..., rdcc_nbytes: Optional[Any] = ..., rdcc_w0: Optional[Any] = ..., track_order: Optional[Any] = ..., **kwds):
+    def __init__(self, name, mode=..., driver=..., libver=..., userblock_size=..., swmr=..., rdcc_nslots=..., rdcc_nbytes=..., rdcc_w0=..., track_order=..., **kwds) -> None:
         """Create a new file object.
 
         See the h5py user guide for a detailed explanation of the options.
@@ -196,17 +189,17 @@ class File(Group):
         """
         ...
 
-    def close(self) -> None:
+    def close(self):
         """ Close the file.  All open objects become invalid """
         ...
 
-    def flush(self) -> None:
+    def flush(self):
         """ Tell the HDF5 library to flush its buffers.
         """
         ...
 
     @with_phil
-    def __enter__(self):
+    def __enter__(self) -> "File":
         ...
 
     @with_phil

@@ -24,7 +24,7 @@ class Datatype(HLObject):
         ...
     
     @with_phil
-    def __init__(self, bind):
+    def __init__(self, bind) -> None:
         """ Create a new Datatype object by binding to a low-level TypeID.
         """
         ...
