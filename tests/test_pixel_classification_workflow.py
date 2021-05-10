@@ -30,17 +30,17 @@ def crashing_confirmer(msg: str) -> bool:
 
 def test_pixel_classification_workflow():
     data_selection_applet = DataSelectionApplet[PixelClassificationLane]("data_selection_applet")
-    feature_selection_applet = FeatureSelectionApplet("feature_selection_applet", lanes=data_selection_applet.items)
-    brushing_applet = BrushingApplet("brushing_applet", lanes=data_selection_applet.items)
+    feature_selection_applet = FeatureSelectionApplet("feature_selection_applet", lanes=data_selection_applet.lanes)
+    brushing_applet = BrushingApplet("brushing_applet", lanes=data_selection_applet.lanes)
     pixel_classifier_applet = PixelClassificationApplet(
         "pixel_classifier_applet",
-        lanes=data_selection_applet.items,
-        feature_extractors=feature_selection_applet.items,
-        annotations=brushing_applet.items
+        lanes=data_selection_applet.lanes,
+        feature_extractors=feature_selection_applet.feature_extractors,
+        annotations=brushing_applet.annotations
     )
     predictions_export_applet = ExportApplet(
         "predictions_export_applet",
-        lanes=data_selection_applet.items,
+        lanes=data_selection_applet.lanes,
         producer=pixel_classifier_applet.pixel_classifier
     )
     wf = PixelClassificationWorkflow(
@@ -54,13 +54,13 @@ def test_pixel_classification_workflow():
     # GUI creates a datasource somewhere...
     ds = SkimageDataSource(Path("sample_data/cropped1.png"), filesystem=OSFS("."), tile_shape=Shape5D(x=400, y=400))
 
-    wf.data_selection_applet.add(
+    wf.data_selection_applet.lanes.set_value(
         [PixelClassificationLane(raw_data=ds)],
         confirmer=dummy_confirmer
     )
 
     # GUI creates some feature extractors
-    wf.feature_selection_applet.add(
+    wf.feature_selection_applet.feature_extractors.set_value(
         [
             GaussianSmoothing.from_ilp_scale(scale=0.3, axis_2d="z"),
             HessianOfGaussianEigenvalues.from_ilp_scale(scale=0.7, axis_2d="z"),
@@ -91,7 +91,7 @@ def test_pixel_classification_workflow():
                 raw_data=ds
             ),
     ]
-    wf.brushing_applet.add(brush_strokes, confirmer=dummy_confirmer)
+    wf.brushing_applet.annotations.set_value(brush_strokes, confirmer=dummy_confirmer)
 
 
     # calculate predictions on an arbitrary data
@@ -108,12 +108,12 @@ def test_pixel_classification_workflow():
     wf.save_as(Path("/tmp/blas.ilp"))
 
     #try removing a brush stroke
-    wf.brushing_applet.remove(brush_strokes[0:1], confirmer=dummy_confirmer)
-    assert wf.brushing_applet.items() == tuple(brush_strokes[1:])
+    wf.brushing_applet.annotations.set_value(brush_strokes[1:], confirmer=dummy_confirmer)
+    assert tuple(wf.brushing_applet.annotations()) == tuple(brush_strokes[1:])
 
     #check that removing a lane would drop the annotations:
     with pytest.raises(CancelledException):
-        wf.data_selection_applet.remove_at(0, confirmer=lambda msg: False)
+        wf.data_selection_applet.lanes.set_value(None, confirmer=lambda msg: False)
 
-    wf.data_selection_applet.remove_at(0, confirmer=lambda msg: True)
-    assert wf.brushing_applet.items.get() == None
+    wf.data_selection_applet.lanes.set_value(None, confirmer=lambda msg: True)
+    assert wf.brushing_applet.annotations.get() == None

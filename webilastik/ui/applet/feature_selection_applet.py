@@ -1,14 +1,13 @@
-from typing import List, TypeVar, Sequence, Optional, Dict, Any, Iterator
+from typing import List, TypeVar, Sequence, Optional, Dict, Any
 
 import numpy as np
 
-from webilastik.ui.applet import Applet, CONFIRMER, Slot, CancelledException
-from webilastik.ui.applet.sequence_provider_applet import SequenceProviderApplet
+from webilastik.ui.applet import Applet, CONFIRMER, Slot, ValueSlot, CancelledException
 from webilastik.ui.applet.data_selection_applet import ILane
 from webilastik.features.ilp_filter import IlpFilter
 
 LANE = TypeVar("LANE", bound=ILane)
-class FeatureSelectionApplet(SequenceProviderApplet[IlpFilter]):
+class FeatureSelectionApplet(Applet):
     ilp_feature_names = [
         "GaussianSmoothing",
         "LaplacianOfGaussian",
@@ -18,13 +17,13 @@ class FeatureSelectionApplet(SequenceProviderApplet[IlpFilter]):
         "HessianOfGaussianEigenvalues",
     ]
 
-
     def __init__(self, name: str, *, lanes: Slot[Sequence[LANE]]):
         self._in_lanes = lanes
-        super().__init__(name=name, refresher=self._refresh_extractors)
+        self.feature_extractors = ValueSlot[Sequence[IlpFilter]](owner=self, refresher=self._refresh_extractors)
+        super().__init__(name=name)
 
     def _refresh_extractors(self, confirmer: CONFIRMER) -> Optional[Sequence[IlpFilter]]:
-        current_extractors = list(self.items.get() or ())
+        current_extractors = list(self.feature_extractors.get() or ())
         new_extractors : List[IlpFilter] = []
         current_datasources = [lane.get_raw_data() for lane in self._in_lanes.get() or ()]
         for ex in current_extractors:
@@ -38,17 +37,9 @@ class FeatureSelectionApplet(SequenceProviderApplet[IlpFilter]):
                 new_extractors.append(ex)
         return tuple(new_extractors) or None
 
-    def add(self, items: Sequence[IlpFilter], confirmer: CONFIRMER):
-        current_datasources = [lane.get_raw_data() for lane in self._in_lanes.get() or ()]
-        for extractor in items:
-            for ds in current_datasources:
-                if not extractor.is_applicable_to(ds):
-                    raise ValueError(f"Feature Extractor {extractor} is not applicable to datasource {ds}")
-        super().add(items, confirmer=confirmer)
-
     @property
     def ilp_data(self) -> Dict[str, Any]:
-        feature_extractors = self.items.get()
+        feature_extractors = self.feature_extractors.get()
         if not feature_extractors:
             return {}
 

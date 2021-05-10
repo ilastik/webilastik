@@ -1,4 +1,4 @@
-from typing import Any, Mapping, Sequence, TypeVar, Type
+from typing import Any, Mapping, Sequence, TypeVar, Type, Generic, Optional, Sequence
 from abc import ABC, abstractmethod
 from urllib.parse import urlparse
 from pathlib import Path
@@ -9,8 +9,7 @@ from fs.osfs import OSFS
 import vigra
 from ndstructs.datasource import DataSource, PrecomputedChunksDataSource
 
-from webilastik.ui.applet import Applet, Slot, CONFIRMER
-from webilastik.ui.applet.sequence_provider_applet import SequenceProviderApplet
+from webilastik.ui.applet import Applet, Slot, ValueSlot, CONFIRMER
 from webilastik.filesystem import HttpPyFs
 
 
@@ -57,15 +56,18 @@ class ILane(ABC):
         }
 
 Lane = TypeVar("Lane", bound=ILane)
-class DataSelectionApplet(SequenceProviderApplet[Lane]):
-    @property
-    def lanes(self) -> Slot[Sequence[Lane]]:
-        return self.items
+class DataSelectionApplet(Applet, Generic[Lane]):
+    def __init__(self, name: str):
+        self.lanes = ValueSlot[Sequence[Lane]](owner=self, refresher=self._refresh_lanes)
+        super().__init__(name=name)
+
+    def _refresh_lanes(self, confirmer: CONFIRMER) -> Optional[Sequence[Lane]]:
+        return self.lanes.get() or None # foce empty lanes to be None instead of []
 
     def get_ilp_data(self, lane_type: Type[ILane]) -> Mapping[str, Any]:
         return {
             "Role Names": np.asarray([name.encode('utf8') for name in lane_type.get_role_names()]),
             "StorageVersion": "0.2",
-            "infos": {f"lane{lane_idx:04d}": lane.ilp_data for lane_idx, lane in enumerate(self.items() or [])},
+            "infos": {f"lane{lane_idx:04d}": lane.ilp_data for lane_idx, lane in enumerate(self.lanes() or [])},
             "local_data": {},
         }

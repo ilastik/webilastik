@@ -89,7 +89,7 @@ class ValueSlot(Slot[SV]):
         try:
             for applet in [self._owner] + self._owner.get_downstream_applets():
                 applet_snapshots[applet] = applet.take_snapshot()
-                applet.refresh_derived_slots(confirmer=confirmer, provoker=self)
+                applet.refresh_slots(confirmer=confirmer, provoker=self)
         except Exception:
             for applet, snap in applet_snapshots.items():
                 applet.restore_snaphot(snap)
@@ -136,7 +136,7 @@ class Applet(ABC):
             slot._restore_snaphot(saved_value)
 
     @typing_extensions.final
-    def refresh_derived_slots(self, confirmer: CONFIRMER, provoker: Slot[Any]):
+    def refresh_slots(self, confirmer: CONFIRMER, provoker: Slot[Any]):
         self.pre_refresh(confirmer)
         value_slots = [slot for slot in self.owned_slots.values() if isinstance(slot, ValueSlot)]
         derived_slots = [slot for slot in self.owned_slots.values() if isinstance(slot, DerivedSlot)]
