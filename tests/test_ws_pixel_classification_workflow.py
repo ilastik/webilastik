@@ -42,64 +42,56 @@ async def main():
         else:
             raise RuntimeError("Given up waiting on session")
 
-        async with session.ws_connect(f"{session_url}/ws") as ws:
+        async with session.ws_connect(f"{session_url}/ws/data_selection_applet") as ws:
             asyncio.get_event_loop().create_task(read_server_status(ws))
-
             print("sending a data source=======")
             await ws.send_json({
-                "applet_name": "data_selection_applet",
-                "method_name": "add",
-                "args": {
-                    "items": [
-                        {
-                            "raw_data": {"url": raw_data}
-                        }
-                    ]
-                }
+                "method_name": "set_state",
+                "state": [
+                    {"raw_data": {"url": raw_data}}
+                ]
             })
             print("done sending datasource<<<<<")
 
+        async with session.ws_connect(f"{session_url}/ws/feature_selection_applet") as ws:
+            asyncio.get_event_loop().create_task(read_server_status(ws))
             print("sending some feature extractors=======")
             await ws.send_json({
-                "applet_name": "feature_selection_applet",
-                "method_name": "add",
-                "args": {
-                    "items": [
-                        {"__class__": "GaussianSmoothing", "sigma": 0.3, "axis_2d": "z"},
-                        {"__class__": "HessianOfGaussianEigenvalues", "scale": 0.7, "axis_2d": "z"},
-                    ]
-                }
+                "method_name": "set_state",
+                "state": [
+                    {"__class__": "GaussianSmoothing", "sigma": 0.3, "axis_2d": "z"},
+                    {"__class__": "HessianOfGaussianEigenvalues", "scale": 0.7, "axis_2d": "z"},
+                ]
             })
             print("done sending feature extractors<<<<<")
 
+        async with session.ws_connect(f"{session_url}/ws/brushing_applet") as ws:
+            asyncio.get_event_loop().create_task(read_server_status(ws))
             print("sending some annotations=======")
             await ws.send_json({
-                "applet_name": "brushing_applet",
-                "method_name": "add",
-                "args": {
-                    "items": [
-                        {
-                            "voxels": [{"x": 140, "y": 150}, {"x": 145, "y": 155}],
-                            "color": {"r": 0, "g": 255, "b": 0},
-                            "raw_data": {"url": raw_data}
-                        },
-                        {
-                            "voxels": [{"x": 238, "y": 101}, {"x": 229, "y": 139}],
-                            "color": {"r": 0, "g": 255, "b": 0},
-                            "raw_data": {"url": raw_data}
-                        },
-                        {
-                            "voxels": [{"x": 283, "y": 87}, {"x": 288, "y": 92}],
-                            "color": {"r": 255, "g": 0, "b": 0},
-                            "raw_data": {"url": raw_data}
-                        },
-                        {
-                            "voxels": [{"x": 274, "y": 168}, {"x": 256, "y": 191}],
-                            "color": {"r": 255, "g": 0, "b": 0},
-                            "raw_data": {"url": raw_data}
-                        },
-                    ]
-                }
+                "method_name": "set_state",
+                "state": [
+                    {
+                        "voxels": [{"x": 140, "y": 150}, {"x": 145, "y": 155}],
+                        "color": {"r": 0, "g": 255, "b": 0},
+                        "raw_data": {"url": raw_data}
+                    },
+                    {
+                        "voxels": [{"x": 238, "y": 101}, {"x": 229, "y": 139}],
+                        "color": {"r": 0, "g": 255, "b": 0},
+                        "raw_data": {"url": raw_data}
+                    },
+                    {
+                        "voxels": [{"x": 283, "y": 87}, {"x": 288, "y": 92}],
+                        "color": {"r": 255, "g": 0, "b": 0},
+                        "raw_data": {"url": raw_data}
+                    },
+                    {
+                        "voxels": [{"x": 274, "y": 168}, {"x": 256, "y": 191}],
+                        "color": {"r": 255, "g": 0, "b": 0},
+                        "raw_data": {"url": raw_data}
+                    },
+                ]
             })
             print("done sending annotations<<<<<")
 

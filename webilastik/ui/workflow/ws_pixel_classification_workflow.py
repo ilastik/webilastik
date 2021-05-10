@@ -2,8 +2,7 @@ from abc import abstractmethod, ABC
 import os
 import signal
 import asyncio
-from typing import Any, Dict, List, Optional, Mapping, TypeVar
-from collections.abc import Mapping as BaseMapping
+from typing import Any, Dict, List, Optional, Mapping, cast
 import json
 from webilastik.server.tunnel import ReverseSshTunnel
 from pathlib import Path
@@ -21,12 +20,11 @@ from webilastik.features.channelwise_fastfilters import (
     HessianOfGaussianEigenvalues,
     LaplacianOfGaussian,
 )
-from webilastik.utility.serialization import JsonSerializable, ValueGetter, JSON_VALUE
+from webilastik.utility.serialization import ValueGetter, JSON_VALUE
 from webilastik.annotations.annotation import Annotation
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.annotations import Annotation
 from webilastik.ui.applet import Applet, CONFIRMER
-from webilastik.ui.applet.sequence_provider_applet import SequenceProviderApplet, Item_co
 from webilastik.ui.applet.export_applet import ExportApplet
 from webilastik.ui.applet.data_selection_applet import DataSelectionApplet
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
@@ -34,30 +32,56 @@ from webilastik.ui.applet.brushing_applet import BrushingApplet
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
 from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow, PixelClassificationLane
 
-
 class WsAppletMixin(Applet):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.websockets : List[web.WebSocketResponse] = []
+    @property
+    def websockets(self) -> List[web.WebSocketResponse]:
+        if not hasattr(self,"_websockets"):
+            self._websockets = cast(List[web.WebSocketResponse], [])
+        return self._websockets
 
-    def _get_status_message(self) -> JSON_VALUE:
-        return None
+    @abstractmethod
+    def _get_json_state(self) -> JSON_VALUE:
+        pass
+
+    @abstractmethod
+    def _set_json_state(self, state: JSON_VALUE):
+        pass
 
     async def _update_remote(self):
         bad_sockets : List[web.WebSocketResponse] = []
         for websocket in self.websockets:
             try:
-                message = self._get_status_message()
-                if message is not None:
-                    await websocket.send_str(json.dumps(message))
+                state = self._get_json_state()
+                if state is not None:
+                    await websocket.send_str(json.dumps(state))
             except ConnectionResetError as e:
                 print(f"Got an exception while updating remote:\n{e}\n\nRemoving websocket...")
                 bad_sockets.append(websocket)
         for bad_socket in bad_sockets:
             self.websockets.remove(bad_socket)
 
-    def _add_websocket(self, websocket: web.WebSocketResponse):
+    async def _add_websocket(self, websocket: web.WebSocketResponse):
         self.websockets.append(websocket)
+        async for msg in websocket:
+            if msg.type == aiohttp.WSMsgType.TEXT:
+                if msg.data == 'close':
+                    await websocket.close()
+                else:
+                    payload = json.loads(msg.data)
+                    method_name = ValueGetter(str).get(key="method_name", data=payload)
+                    if method_name == "set_state":
+                        self._set_json_state(payload["state"])
+                    elif method_name == "get_state":
+                        await self._update_remote()
+                    else:
+                        raise ValueError(f"Bad method_name in socket communication: {method_name}")
+            elif msg.type == aiohttp.WSMsgType.BINARY:
+                print(f'Unexpected binary message')
+            elif msg.type == aiohttp.WSMsgType.ERROR:
+                print(f'ws connection closed with exception {websocket.exception()}')
+        self.websockets.remove(websocket)
+        print('websocket connection closed')
+        return websocket
 
     def post_refresh(self, confirmer: CONFIRMER): #FIXME: this will fire even if something breaks downstream
         super().post_refresh(confirmer)
@@ -67,43 +91,35 @@ class WsAppletMixin(Applet):
         super().restore_snaphot(snap)
         asyncio.get_event_loop().create_task(self._update_remote())
 
-    @abstractmethod
-    def do_rpc(self, method_name: str, payload: Any):
-        pass
+
+class WsDataSelectionApplet(WsAppletMixin, DataSelectionApplet[PixelClassificationLane]):
+    def _get_json_state(self) -> JSON_VALUE:
+        return [lane.to_json_data() for lane in self.lanes.get(default=[])]
+
+    def _set_json_state(self, state: JSON_VALUE):
+        if not isinstance(state, list):
+            raise TypeError(f"Bad state value in {self.__class__.__name__}:\n", json.dumps(state))
+        return self.lanes.set_value(
+            [PixelClassificationLane.from_json_data(raw_lane) for raw_lane in state],
+            confirmer=lambda msg: True
+        )
 
 
-ITEM = TypeVar("ITEM", bound=JsonSerializable)
-class WsSequenceProviderApplet(WsAppletMixin, SequenceProviderApplet[ITEM]):
-    def do_rpc(self, method_name: str, payload: Any):
-        if method_name in {'add', 'remove'}:
-            items = [self.item_from_json_data(item) for item in payload["items"]]
-            return getattr(self, method_name)(items, confirmer=lambda msg: True)
-        if method_name in {'clear'}:
-            return self.clear(confirmer=lambda msg: True)
-        raise Exception(f"Dont know how to run method '{method_name}'")
+class WsBrushingApplet(WsAppletMixin, BrushingApplet[PixelClassificationLane]):
+    def _get_json_state(self) -> JSON_VALUE:
+        return [annotation.to_json_data() for annotation in self.annotations.get(default=[])]
 
-    def _get_status_message(self) -> JSON_VALUE:
-        return {
-            "applet_name": self.name,
-            "items": [item.to_json_data() for item in (self.items.get() or [])]
-        }
-
-    @abstractmethod
-    def item_from_json_data(self, data: JSON_VALUE) -> ITEM:
-        pass
-
-class WsDataSelectionApplet(WsSequenceProviderApplet[PixelClassificationLane], DataSelectionApplet[PixelClassificationLane]):
-    def item_from_json_data(self, data: JSON_VALUE) -> PixelClassificationLane:
-        return PixelClassificationLane.from_json_data(data)
+    def _set_json_state(self, state: JSON_VALUE):
+        if not isinstance(state, list):
+            raise TypeError(f"Bad state value in {self.__class__.__name__}:\n", json.dumps(state))
+        return self.annotations.set_value(
+            [Annotation.from_json_data(raw_lane) for raw_lane in state],
+            confirmer=lambda msg: True
+        )
 
 
-class WsBrushingApplet(WsSequenceProviderApplet[Annotation], BrushingApplet[PixelClassificationLane]):
-    def item_from_json_data(self, data: JSON_VALUE) -> Annotation:
-        return Annotation.from_json_data(data)
-
-
-class WsFeatureSelectionApplet(WsSequenceProviderApplet[IlpFilter], FeatureSelectionApplet):
-    def item_from_json_data(self, data: JSON_VALUE) -> IlpFilter:
+class WsFeatureSelectionApplet(WsAppletMixin, FeatureSelectionApplet):
+    def _item_from_json_data(self, data: JSON_VALUE) -> IlpFilter:
         class_name = ValueGetter.get_class_name(data=data)
         if class_name == StructureTensorEigenvalues.__name__:
             return StructureTensorEigenvalues.from_json_data(data)
@@ -119,60 +135,38 @@ class WsFeatureSelectionApplet(WsSequenceProviderApplet[IlpFilter], FeatureSelec
             return LaplacianOfGaussian.from_json_data(data)
         raise ValueError(f"Could not convert {data} into a Feature Extractor")
 
+    def _get_json_state(self) -> JSON_VALUE:
+        return [extractor.to_json_data() for extractor in self.feature_extractors.get(default=[])]
 
-class WsPixelClassificationApplet(WsAppletMixin, PixelClassificationApplet[PixelClassificationLane]):
-    def do_rpc(self, method_name: str, payload: Any):
-        raise NotImplementedError
-
-    def _get_status_message(self) -> Any:
-        classifier = self.pixel_classifier.get()
-        if classifier is None:
-            return None
-
-        color_lines: List[str] = []
-        colors_to_mix: List[str] = []
-
-        for idx, color in enumerate(classifier.color_map.keys()):
-            color_line = (
-                f"vec3 color{idx} = (vec3({color.r}, {color.g}, {color.b}) / 255.0) * toNormalized(getDataValue({idx}));"
-            )
-            color_lines.append(color_line)
-            colors_to_mix.append(f"color{idx}")
-
-        shader_lines = [
-            "void main() {",
-            "    " + "\n    ".join(color_lines),
-            "    emitRGBA(",
-           f"        vec4({' + '.join(colors_to_mix)}, 1.0)",
-            "    );",
-            "}",
-        ]
-        shader = "\n".join(shader_lines)
-
-        return {
-            "applet_name": "pixel_classifier_applet",#FIXME: maybe have python applets also have names?
-            "predictions_shader": shader
-        }
+    def _set_json_state(self, state: JSON_VALUE):
+        if not isinstance(state, list):
+            raise TypeError(f"Bad state value in {self.__class__.__name__}:\n", json.dumps(state))
+        return self.feature_extractors.set_value(
+            [self._item_from_json_data(raw_lane) for raw_lane in state],
+            confirmer=lambda msg: True
+        )
 
 
 class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
     def __init__(self):
         data_selection_applet = WsDataSelectionApplet("data_selection_applet")
-        feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", lanes=data_selection_applet.items)
-        brushing_applet = WsBrushingApplet("brushing_applet", lanes=data_selection_applet.items)
-        pixel_classifier_applet = WsPixelClassificationApplet(
+        feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", lanes=data_selection_applet.lanes)
+        brushing_applet = WsBrushingApplet("brushing_applet", lanes=data_selection_applet.lanes)
+        pixel_classifier_applet = PixelClassificationApplet(
             "pixel_classifier_applet",
-            lanes=data_selection_applet.items,
-            feature_extractors=feature_selection_applet.items,
-            annotations=brushing_applet.items,
+            lanes=data_selection_applet.lanes,
+            feature_extractors=feature_selection_applet.feature_extractors,
+            annotations=brushing_applet.annotations,
         )
         predictions_export_applet = ExportApplet(
             "predictions_export_applet",
-            lanes=data_selection_applet.items,
+            lanes=data_selection_applet.lanes,
             producer=pixel_classifier_applet.pixel_classifier
         )
-        self.applets : Mapping[str, WsAppletMixin] = {
-            aplt.name : aplt for aplt in (data_selection_applet, feature_selection_applet, brushing_applet, pixel_classifier_applet)
+        self.ws_applets : Mapping[str, WsAppletMixin] = {
+            data_selection_applet.name: data_selection_applet,
+            feature_selection_applet.name: feature_selection_applet,
+            brushing_applet.name: brushing_applet
         }
         super().__init__(
             data_selection_applet=data_selection_applet,
@@ -181,11 +175,10 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             pixel_classifier_applet=pixel_classifier_applet,
             predictions_export_applet=predictions_export_applet
         )
-        self.websockets : List[web.WebSocketResponse] = []
 
         self.app = web.Application()
         self.app.add_routes([
-            web.get('/ws', self.open_websocket), # type: ignore
+            web.get('/ws/{applet_name}', self.open_websocket), # type: ignore
             web.get(
                 "/predictions_export_applet/{uuid}/{lane_index}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}", #FIXME uuid is just there to prevent caching
                 self.ng_predict
@@ -207,49 +200,24 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         await asyncio.sleep(delay)
         os.kill(os.getpid(), signal.SIGINT)
 
-
     def run(self, host: Optional[str] = None, port: Optional[int] = None, unix_socket_path: Optional[str] = None):
         web.run_app(self.app, port=port, path=unix_socket_path)
 
-    def _add_websocket(self, websocket: web.WebSocketResponse):
-        self.websockets.append(websocket)
-        for applet in [app for app in self.__dict__.values() if isinstance(app, WsAppletMixin)]:
-            applet._add_websocket(websocket)
-
     async def open_websocket(self, request: web.Request):
-        websocket = web.WebSocketResponse() #FIXME: what happens on 2 connections?
+        applet_name = str(request.match_info.get("applet_name"))  # type: ignore
+        if applet_name not in self.ws_applets:
+            raise ValueError(f"Bad applet name: {applet_name}")
+        applet = self.ws_applets[applet_name]
+        websocket = web.WebSocketResponse()
         await websocket.prepare(request)
-        self._add_websocket(websocket)
-
-        async for msg in websocket:
-            if msg.type == aiohttp.WSMsgType.TEXT:
-                if msg.data == 'close':
-                    await websocket.close()
-                else:
-                    self.run_rpc(msg.data)
-            elif msg.type == aiohttp.WSMsgType.ERROR:
-                print(f'ws connection closed with exception {websocket.exception()}')
-        self.websockets.remove(websocket)
-        print('websocket connection closed')
-        return websocket
-
-    def run_rpc(self, payload: str):
-        rpc_request = json.loads(payload)
-        applet_name = rpc_request["applet_name"]
-        method_name = rpc_request["method_name"]
-        args = rpc_request.get("args", {})
-        applet = self.applets.get(applet_name)
-        if applet == None:
-            raise Exception(f"Bad applet name: {applet_name}")
-        print(f"===>>> Running {applet_name}.{method_name} with args {args}")
-        applet.do_rpc(method_name, args)
+        return await applet._add_websocket(websocket)
 
     async def ng_predict_info(self, request: web.Request):
         lane_index = int(request.match_info.get("lane_index"))  # type: ignore
         classifier = self.pixel_classifier_applet.pixel_classifier()
         color_map = self.pixel_classifier_applet.color_map()
         expected_num_channels = len(color_map)
-        datasource = self.data_selection_applet.items()[lane_index].get_raw_data()
+        datasource = self.data_selection_applet.lanes()[lane_index].get_raw_data()
 
         return web.Response(
             text=json.dumps({
@@ -280,7 +248,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         zBegin = int(request.match_info.get("zBegin")) # type: ignore
         zEnd = int(request.match_info.get("zEnd")) # type: ignore
 
-        datasource = self.data_selection_applet.items()[lane_index]
+        datasource = self.data_selection_applet.lanes()[lane_index]
         predictions = await self.predictions_export_applet.async_compute(
             DataRoi(datasource.get_raw_data(), x=(xBegin, xEnd), y=(yBegin, yEnd), z=(zBegin, zEnd))
         )
