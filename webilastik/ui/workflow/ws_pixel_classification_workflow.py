@@ -62,19 +62,14 @@ class WsAppletMixin(Applet):
 
     async def _add_websocket(self, websocket: web.WebSocketResponse):
         self.websockets.append(websocket)
+        await self._update_remote()
         async for msg in websocket:
             if msg.type == aiohttp.WSMsgType.TEXT:
                 if msg.data == 'close':
                     await websocket.close()
                 else:
                     payload = json.loads(msg.data)
-                    method_name = ValueGetter(str).get(key="method_name", data=payload)
-                    if method_name == "set_state":
-                        self._set_json_state(payload["state"])
-                    elif method_name == "get_state":
-                        await self._update_remote()
-                    else:
-                        raise ValueError(f"Bad method_name in socket communication: {method_name}")
+                    self._set_json_state(payload)
             elif msg.type == aiohttp.WSMsgType.BINARY:
                 print(f'Unexpected binary message')
             elif msg.type == aiohttp.WSMsgType.ERROR:
