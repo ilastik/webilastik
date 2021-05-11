@@ -38,20 +38,9 @@ class SessionAllocator(Generic[SESSION_TYPE]):
 
         self.app = web.Application()
         self.app.add_routes([
-            web.options("/session", self.do_cors_preflight),
             web.post('/session', self.spawn_session),
             web.get('/session/{session_id}', self.session_status),
         ])
-
-    async def do_cors_preflight(self, request: web.Request):
-        return web.Response(
-            headers={
-                'Access-Control-Allow-Origin': "*",
-                'Access-Control-Allow-Credentials': 'true',
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-                'Access-Control-Allow-Headers': 'Accept,Authorization,Cache-Control,Content-Type,DNT,If-Modified-Since,Keep-Alive,Origin,User-Agent,X-Requested-With',
-            }
-        )
 
     def _make_session_url(self, session_id: uuid.UUID) -> str:
         return urljoin(self.external_url, f"session-{session_id}")
