@@ -187,13 +187,22 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         ])
 
     async def close_session(self, request: web.Request) -> web.Response:
-        asyncio.create_task(self._self_destruct(delay=5))
+        #FIXME: this is not properly killing the server
+        asyncio.get_event_loop().create_task(self._self_destruct())
         return web.Response()
 
-    async def _self_destruct(self, delay: int):
-        #FIXME: is there a clean way to close the server? self.app.(shutdown|cleanup) are not it
-        await asyncio.sleep(delay)
-        os.kill(os.getpid(), signal.SIGINT)
+    async def _self_destruct(self, after_seconds: int = 5):
+        await asyncio.sleep(5)
+        try:
+            pid = os.getpid()
+            pgid = os.getpgid(pid)
+            print(f"===>>>> gently killing local session (pid={pid}) with SIGINT on group....")
+            os.killpg(pgid, signal.SIGINT)
+            await asyncio.sleep(10)
+            print(f"===>>>> Killing local session (pid={pid}) with SIGKILL on group....")
+            os.killpg(pgid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
 
     def run(self, host: Optional[str] = None, port: Optional[int] = None, unix_socket_path: Optional[str] = None):
         web.run_app(self.app, port=port, path=unix_socket_path)
