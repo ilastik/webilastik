@@ -93,13 +93,13 @@ class LocalSession(Session):
         await asyncio.sleep(after_seconds)
         try:
             pgid = os.getpgid(self.process.pid)
-            print(f"===>>>> gently killing local session (pid={self.process.pid}) with SIGINT on group....")
+            print(f"===>>>> AUTOKILL: gently killing local session (pid={self.process.pid}) with SIGINT on group....")
             os.killpg(pgid, signal.SIGINT)
             await asyncio.sleep(10)
-            print(f"===>>>> Killing local session (pid={self.process.pid}) with SIGKILL on group....")
+            print(f"===>>>> AUTOKILL: Killing local session (pid={self.process.pid}) with SIGKILL on group....")
             os.killpg(pgid, signal.SIGKILL)
         except ProcessLookupError:
-            pass
+            print(f"AUTOKILL: Could not find process {self.process.pid}")
 
         await self.process.wait()
 
