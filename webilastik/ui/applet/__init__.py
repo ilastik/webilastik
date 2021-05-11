@@ -66,7 +66,7 @@ class Slot(Generic[SV], ABC):
         return self._value
 
     def get(self, default: Optional[SV] = None) -> Optional[SV]:
-        return self._value
+        return self._value if self._value is not None else default
 
 
 class DerivedSlot(Slot[SV]):
