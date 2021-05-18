@@ -148,7 +148,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", lanes=data_selection_applet.lanes)
         brushing_applet = WsBrushingApplet("brushing_applet", lanes=data_selection_applet.lanes)
         pixel_classifier_applet = PixelClassificationApplet(
-            "pixel_classifier_applet",
+            "pixel_classification_applet",
             lanes=data_selection_applet.lanes,
             feature_extractors=feature_selection_applet.feature_extractors,
             annotations=brushing_applet.annotations,
