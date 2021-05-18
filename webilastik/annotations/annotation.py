@@ -153,7 +153,18 @@ class Annotation(ScalarData):
 
         raw_data_obj = ObjectGetter.get("raw_data", data=data)
         raw_data = datasource_from_url(ValueGetter(str).get(key="url", data=raw_data_obj))
-        return Annotation.interpolate_from_points(color=color, voxels=voxels, raw_data=raw_data)
+
+        start = Point5D.min_coords(voxels)
+        stop = Point5D.max_coords(voxels) + 1  # +1 because slice.stop is exclusive, but max_point isinclusive
+        scribbling_roi = Interval5D.create_from_start_stop(start=start, stop=stop)
+        if scribbling_roi.shape.c != 1:
+            raise ValueError(f"Annotations must not span multiple channels: {voxels}")
+        scribblings = Array5D.allocate(scribbling_roi, dtype=np.dtype(bool), value=False)
+
+        for voxel in voxels:
+            scribblings.paint_point(point=voxel, value=True)
+
+        return cls(scribblings._data, axiskeys=scribblings.axiskeys, color=color, raw_data=raw_data, location=start)
 
     def to_json_data(self, referencer: Referencer = lambda x: None) -> JSON_OBJECT:
         voxels : List[Point5D] = []
