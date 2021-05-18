@@ -89,7 +89,7 @@ class PixelClassifier(Operator[DataRoi, Predictions], Generic[FE]):
         self.color_map = color_map
 
     @abstractmethod
-    def _do_predict(self, roi: DataRoi, out: Predictions = None) -> Predictions:
+    def _do_predict(self, roi: DataRoi) -> Predictions:
         pass
 
     def get_expected_roi(self, data_slice: Interval5D) -> Interval5D:
@@ -108,7 +108,6 @@ class PixelClassifier(Operator[DataRoi, Predictions], Generic[FE]):
         return self._do_predict(roi=roi)
 
 
-VIGRA_CLASSIFIER = TypeVar("VIGRA_CLASSIFIER", bound="VigraPixelClassifier", covariant=True)
 class VigraPixelClassifier(PixelClassifier[FE]):
     def __init__(
         self,
@@ -130,14 +129,14 @@ class VigraPixelClassifier(PixelClassifier[FE]):
 
     @classmethod
     def train(
-        cls: Type[VIGRA_CLASSIFIER],
+        cls,
         feature_extractors: Sequence[FE],
         annotations: Sequence[Annotation],
         *,
         num_trees: int = 100,
         num_forests: int = multiprocessing.cpu_count(),
         random_seed: int = 0,
-    ) -> VIGRA_CLASSIFIER:
+    ) -> "VigraPixelClassifier[FE]":
         training_data = TrainingData[FE](feature_extractors=feature_extractors, annotations=annotations)
 
         def train_forest(forest_index: int) -> VigraRandomForest:
