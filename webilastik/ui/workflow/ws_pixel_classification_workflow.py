@@ -173,6 +173,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
 
         self.app = web.Application()
         self.app.add_routes([
+            web.get('/status', self.get_status),
             web.get('/ws/{applet_name}', self.open_websocket), # type: ignore
             web.get(
                 "/predictions_export_applet/{uuid}/{lane_index}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}", #FIXME uuid is just there to prevent caching
@@ -185,6 +186,15 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             web.post("/ilp_project", self.ilp_download),
             web.delete("/close", self.close_session),
         ])
+
+    async def get_status(self, request: web.Request) -> web.Response:
+        return web.Response(
+            text=json.dumps({
+                "status": "running"
+            }),
+            content_type="application/json",
+        )
+
 
     async def close_session(self, request: web.Request) -> web.Response:
         #FIXME: this is not properly killing the server
