@@ -68,8 +68,14 @@ class WsAppletMixin(Applet):
                 if msg.data == 'close':
                     await websocket.close()
                 else:
-                    payload = json.loads(msg.data)
-                    self._set_json_state(payload)
+                    try:
+                        payload = json.loads(msg.data)
+                        self._set_json_state(payload)
+                    except Exception as e:
+                        print(f"Exception happend on set state:\n\033[31m{e}\033[0m")
+                        # FIXME: show some error message
+                    finally:
+                        await self._update_remote()
             elif msg.type == aiohttp.WSMsgType.BINARY:
                 print(f'Unexpected binary message')
             elif msg.type == aiohttp.WSMsgType.ERROR:
