@@ -1,14 +1,18 @@
+from ndstructs.datasource.DataSource import DataSource
+from webilastik.annotations import annotation
 import aiohttp
 import asyncio
 import json
 from aiohttp.client_ws import ClientWebSocketResponse
 from ndstructs.point5D import Interval5D, Shape5D
-import numpy
+import numpy as np
 import uuid
 from typing import Dict, Any
 from concurrent.futures import ThreadPoolExecutor
 
-from ndstructs import Array5D
+from ndstructs import Array5D, Point5D
+from webilastik.annotations import Annotation, Color
+from webilastik.datasource import datasource_from_url
 
 finished = False
 
@@ -19,7 +23,8 @@ async def read_server_status(websocket: ClientWebSocketResponse):
             break
 
 async def main():
-    raw_data = "http://localhost:8000/cropped1.png"
+    ds = datasource_from_url("http://localhost:8000/cropped1.png")
+
     async with aiohttp.ClientSession() as session:
 
         print(f"Creating new session--------------")
@@ -42,14 +47,6 @@ async def main():
         else:
             raise RuntimeError("Given up waiting on session")
 
-        async with session.ws_connect(f"{session_url}/ws/data_selection_applet") as ws:
-            asyncio.get_event_loop().create_task(read_server_status(ws))
-            print("sending a data source=======")
-            await ws.send_json([
-                {"raw_data": {"url": raw_data}}
-            ])
-            print("done sending datasource<<<<<")
-
         async with session.ws_connect(f"{session_url}/ws/feature_selection_applet") as ws:
             asyncio.get_event_loop().create_task(read_server_status(ws))
             print("sending some feature extractors=======")
@@ -62,27 +59,30 @@ async def main():
         async with session.ws_connect(f"{session_url}/ws/brushing_applet") as ws:
             asyncio.get_event_loop().create_task(read_server_status(ws))
             print("sending some annotations=======")
+            brush_strokes = [
+                Annotation.interpolate_from_points(
+                    voxels=[Point5D.zero(x=140, y=150), Point5D.zero(x=145, y=155)],
+                    color=Color(r=np.uint8(0), g=np.uint8(255), b=np.uint8(0)),
+                    raw_data=ds
+                ),
+                Annotation.interpolate_from_points(
+                    voxels=[Point5D.zero(x=238, y=101), Point5D.zero(x=229, y=139)],
+                    color=Color(r=np.uint8(0), g=np.uint8(255), b=np.uint8(0)),
+                    raw_data=ds
+                ),
+                Annotation.interpolate_from_points(
+                    voxels=[Point5D.zero(x=283, y=87), Point5D.zero(x=288, y=92)],
+                    color=Color(r=np.uint8(255), g=np.uint8(0), b=np.uint8(0)),
+                    raw_data=ds
+                ),
+                Annotation.interpolate_from_points(
+                    voxels=[Point5D.zero(x=274, y=168), Point5D.zero(x=256, y=191)],
+                    color=Color(r=np.uint8(255), g=np.uint8(0), b=np.uint8(0)),
+                    raw_data=ds
+                ),
+            ]
             await ws.send_json([
-                {
-                    "voxels": [{"x": 140, "y": 150}, {"x": 145, "y": 155}],
-                    "color": {"r": 0, "g": 255, "b": 0},
-                    "raw_data": {"url": raw_data}
-                },
-                {
-                    "voxels": [{"x": 238, "y": 101}, {"x": 229, "y": 139}],
-                    "color": {"r": 0, "g": 255, "b": 0},
-                    "raw_data": {"url": raw_data}
-                },
-                {
-                    "voxels": [{"x": 283, "y": 87}, {"x": 288, "y": 92}],
-                    "color": {"r": 255, "g": 0, "b": 0},
-                    "raw_data": {"url": raw_data}
-                },
-                {
-                    "voxels": [{"x": 274, "y": 168}, {"x": 256, "y": 191}],
-                    "color": {"r": 255, "g": 0, "b": 0},
-                    "raw_data": {"url": raw_data}
-                },
+                a.to_json_data() for a in brush_strokes
             ])
             print("done sending annotations<<<<<")
 
@@ -117,7 +117,7 @@ async def main():
                     tile_bytes = await response.content.read()
                     print(f"Got predictions<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 
-                    raw_data = numpy.frombuffer(tile_bytes, dtype=numpy.uint8).reshape(2, tile.shape.y, tile.shape.x)
+                    raw_data = np.frombuffer(tile_bytes, dtype=np.uint8).reshape(2, tile.shape.y, tile.shape.x)
                     a = Array5D(raw_data, axiskeys="cyx")
                     a.show_channels()
 
