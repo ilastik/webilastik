@@ -57,16 +57,16 @@ class PixelClassificationLane(ILane):
 
 @dataclass
 class PixelClassificationWorkflow:
-    data_selection_applet: DataSelectionApplet[PixelClassificationLane]
+    # data_selection_applet: DataSelectionApplet[PixelClassificationLane]
     feature_selection_applet: FeatureSelectionApplet
-    brushing_applet: BrushingApplet[PixelClassificationLane]
-    pixel_classifier_applet: PixelClassificationApplet[PixelClassificationLane]
+    brushing_applet: BrushingApplet
+    pixel_classifier_applet: PixelClassificationApplet
     predictions_export_applet : ExportApplet[PixelClassificationLane, PixelClassifier[IlpFilter]]
 
     @property
     def ilp_data(self) -> Mapping[str, Any]:
         return {
-            "Input Data": self.data_selection_applet.get_ilp_data(PixelClassificationLane),
+            "Input Data": b"FIXME!!!!", #self.data_selection_applet.get_ilp_data(PixelClassificationLane),
             "FeatureSelections": self.feature_selection_applet.ilp_data,
             "PixelClassification": self.pixel_classifier_applet.ilp_data,
             "Prediction Export": self.predictions_export_applet.ilp_data,

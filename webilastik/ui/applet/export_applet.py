@@ -20,10 +20,9 @@ PRODUCER = TypeVar("PRODUCER", bound=Operator[DataRoi, Array5D], covariant=True)
 class ExportApplet(Applet, Generic[LANE, PRODUCER]):
     """Exports the outputs of an operator created by an upstream applet."""
     def __init__(
-        self, name: str, producer: Slot[PRODUCER], lanes: Slot[Sequence[LANE]], num_workers: int = max(1, multiprocessing.cpu_count() - 1)
+        self, name: str, producer: Slot[PRODUCER], num_workers: int = max(1, multiprocessing.cpu_count() - 1)
     ):
         self.producer = producer
-        self.lanes = lanes
         self._executors = [ProcessPoolExecutor(max_workers=1) for _ in range(num_workers)]
         super().__init__(name=name)
 
@@ -31,21 +30,6 @@ class ExportApplet(Applet, Generic[LANE, PRODUCER]):
         for idx, executor in enumerate(self._executors):
             print(f"===> Shutting down executor {idx} from {self}")
             executor.shutdown()
-
-    def export_all(self) -> None:
-        producer_op = self.producer()
-        if not producer_op:
-            raise ValueError("No producer from upstream")
-        for lane in self.lanes() or []:
-            data_slice = DataRoi(lane.get_raw_data())
-            # FIXME: Maybe the provider operator should suggest a sensible tile shape?
-            tile_shape = data_slice.datasource.tile_shape.updated(c=data_slice.datasource.shape.c)
-
-            #FIXME: get format/mapper/orchestrator/scheduler/whatever from slots or method args
-            for slc in data_slice.get_tiles(tile_shape=tile_shape):
-                #FIXME save this with a DataSink
-                print(f"Computing on {data_slice} with producer {producer_op}")
-                producer_op.compute(slc)
 
     async def async_compute(self, roi: DataRoi):# -> Array5D:
         loop = asyncio.get_event_loop()

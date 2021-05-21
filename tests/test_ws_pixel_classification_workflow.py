@@ -90,15 +90,23 @@ async def main():
             import pprint
             import requests
             from concurrent.futures import ProcessPoolExecutor
+            from base64 import b64encode
+
+            encoded_ds_url = b64encode(ds.url.encode('utf8'), altchars=b'-_').decode('utf8')
+
             print(f"Requesting predictions========================")
+            urls = [
+                f"{session_url}/predictions_export_applet/{encoded_ds_url}/data/{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_0-1"
+                for tile in
+                Interval5D.zero(x=(0, 697), y=(0, 450), c=(0, 3)).get_tiles(tile_shape=Shape5D(x=256, y=256, c=2))
+            ]
+            print(f"Will requests these urls: ")
+            print("\n".join(urls))
+
             with ProcessPoolExecutor(max_workers=8) as executor:
                 future_generator = executor.map(
                     requests.get,
-                    [
-                        f"{session_url}/predictions_export_applet/{uuid.uuid4()}/0/data/{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_0-1"
-                        for tile in
-                        Interval5D.zero(x=(0, 697), y=(0, 450), c=(0, 3)).get_tiles(tile_shape=Shape5D(x=256, y=256, c=2))
-                    ]
+                    urls
                 )
                 for f in list(future_generator):
                     print(f"Response : {f.status_code}")
@@ -106,7 +114,7 @@ async def main():
             response_tasks = {}
             for tile in Interval5D.zero(x=(0, 697), y=(0, 450), c=(0, 3)).get_tiles(tile_shape=Shape5D(x=256, y=256, c=2)):
                 response_tasks[tile] = session.get(
-                    f"{session_url}/predictions_export_applet/{uuid.uuid4()}/0/data/{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_0-1"
+                    f"{session_url}/predictions_export_applet/{encoded_ds_url}/data/{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_0-1"
                 )
 
             for tile, resp in response_tasks.items():

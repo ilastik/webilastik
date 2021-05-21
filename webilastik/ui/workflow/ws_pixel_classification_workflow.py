@@ -29,7 +29,7 @@ from webilastik.annotations.annotation import Annotation
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.annotations import Annotation
 from webilastik.ui.applet import Applet, CONFIRMER
-from webilastik.ui.applet.export_applet import ExportApplet
+from webilastik.ui.applet.export_applet import ExportApplet, LANE, PRODUCER
 from webilastik.ui.applet.data_selection_applet import DataSelectionApplet
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.ui.applet.brushing_applet import BrushingApplet
@@ -59,7 +59,7 @@ class WsAppletMixin(Applet):
                 if state is not None:
                     await websocket.send_str(json.dumps(state))
             except ConnectionResetError as e:
-                print(f"Got an exception while updating remote:\n{e}\n\nRemoving websocket...")
+                print(f"!!!!!+++!!!! Got an exception while updating remote:\n{e}\n\nRemoving websocket...")
                 bad_sockets.append(websocket)
         for bad_socket in bad_sockets:
             self.websockets.remove(bad_socket)
@@ -110,7 +110,7 @@ class WsDataSelectionApplet(WsAppletMixin, DataSelectionApplet[PixelClassificati
         )
 
 
-class WsBrushingApplet(WsAppletMixin, BrushingApplet[PixelClassificationLane]):
+class WsBrushingApplet(WsAppletMixin, BrushingApplet):
     def _get_json_state(self) -> JSON_VALUE:
         return [annotation.to_json_data() for annotation in self.annotations.get(default=[])]
 
@@ -152,29 +152,33 @@ class WsFeatureSelectionApplet(WsAppletMixin, FeatureSelectionApplet):
         )
 
 
+class WsExportApplet(WsAppletMixin, ExportApplet[LANE, PRODUCER]):
+    def _get_json_state(self) -> JSON_VALUE:
+        return None
+
+    def _set_json_state(self, state: JSON_VALUE):
+        pass
+
+
 class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
     def __init__(self):
-        data_selection_applet = WsDataSelectionApplet("data_selection_applet")
-        feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", lanes=data_selection_applet.lanes)
-        brushing_applet = WsBrushingApplet("brushing_applet", lanes=data_selection_applet.lanes)
+        brushing_applet = WsBrushingApplet("brushing_applet")
+        feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", datasources=brushing_applet.datasources)
         pixel_classifier_applet = PixelClassificationApplet(
             "pixel_classification_applet",
-            lanes=data_selection_applet.lanes,
             feature_extractors=feature_selection_applet.feature_extractors,
             annotations=brushing_applet.annotations,
         )
-        predictions_export_applet = ExportApplet(
+        predictions_export_applet = WsExportApplet(
             "predictions_export_applet",
-            lanes=data_selection_applet.lanes,
             producer=pixel_classifier_applet.pixel_classifier
         )
         self.ws_applets : Mapping[str, WsAppletMixin] = {
-            data_selection_applet.name: data_selection_applet,
             feature_selection_applet.name: feature_selection_applet,
-            brushing_applet.name: brushing_applet
+            brushing_applet.name: brushing_applet,
+            predictions_export_applet.name: predictions_export_applet,
         }
         super().__init__(
-            data_selection_applet=data_selection_applet,
             feature_selection_applet=feature_selection_applet,
             brushing_applet=brushing_applet,
             pixel_classifier_applet=pixel_classifier_applet,

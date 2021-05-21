@@ -1,4 +1,5 @@
 from typing import List, TypeVar, Sequence, Optional, Dict, Any
+from ndstructs.datasource.DataSource import DataSource
 
 import numpy as np
 
@@ -17,15 +18,15 @@ class FeatureSelectionApplet(Applet):
         "HessianOfGaussianEigenvalues",
     ]
 
-    def __init__(self, name: str, *, lanes: Slot[Sequence[LANE]]):
-        self._in_lanes = lanes
+    def __init__(self, name: str, *, datasources: Slot[Sequence[DataSource]]):
+        self._in_datasources = datasources
         self.feature_extractors = ValueSlot[Sequence[IlpFilter]](owner=self, refresher=self._refresh_extractors)
         super().__init__(name=name)
 
     def _refresh_extractors(self, confirmer: CONFIRMER) -> Optional[Sequence[IlpFilter]]:
         current_extractors = list(self.feature_extractors.get() or ())
         new_extractors : List[IlpFilter] = []
-        current_datasources = [lane.get_raw_data() for lane in self._in_lanes.get() or ()]
+        current_datasources = self._in_datasources.get() or []
         for ex in current_extractors:
             for ds in current_datasources:
                 if not ex.is_applicable_to(ds):

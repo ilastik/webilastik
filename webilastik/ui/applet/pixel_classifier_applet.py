@@ -5,7 +5,6 @@ from ndstructs.datasource import DataRoi
 import numpy as np
 
 from webilastik.ui.applet  import Applet, DerivedSlot, NotReadyException, Slot, CONFIRMER
-from webilastik.ui.applet.data_selection_applet import ILane
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.annotations.annotation import Annotation, Color
 from webilastik.features.ilp_filter import IlpFilter
@@ -51,19 +50,16 @@ DEFAULT_ILP_CLASSIFIER_FACTORY = textwrap.dedent(
     ).encode("utf8")
 
 
-LANE = TypeVar("LANE", bound=ILane)
-class PixelClassificationApplet(Applet, Generic[LANE]):
+class PixelClassificationApplet(Applet):
     pixel_classifier: Slot[VigraPixelClassifier[IlpFilter]]
 
     def __init__(
         self,
         name: str,
         *,
-        lanes: Slot[Sequence[LANE]], #this is only necessary to produce a .ilp file
         feature_extractors: Slot[Sequence[IlpFilter]],
         annotations: Slot[Sequence[Annotation]],
     ):
-        self._in_lanes = lanes
         self._in_feature_extractors = feature_extractors
         self._in_annotations = annotations
         self.pixel_classifier = DerivedSlot[VigraPixelClassifier[IlpFilter]](
@@ -93,8 +89,7 @@ class PixelClassificationApplet(Applet, Generic[LANE]):
         return classifier.compute(roi)
 
     def get_ilp_classifier_feature_names(self) -> Iterator[bytes]:
-        lanes = self._in_lanes()
-        num_input_channels = lanes[0].get_raw_data().shape.c
+        num_input_channels = self._in_annotations()[0].raw_data.shape.c #FIXME: all lanes always have same c?
         for fe in sorted(self._in_feature_extractors(), key=lambda ex: FeatureSelectionApplet.ilp_feature_names.index(ex.__class__.__name__)):
             for c in range(num_input_channels * fe.channel_multiplier):
                 name_and_channel = fe.ilp_name + f" [{c}]"
@@ -125,8 +120,9 @@ class PixelClassificationApplet(Applet, Generic[LANE]):
 
         out["LabelSets"] = labelSets = {"labels000": {}}  # empty labels still produce this in classic ilastik
         color_map = self.color_map()
-        for lane_idx, lane in enumerate(self._in_lanes() or []):
-            lane_annotations = [annot for annot in self._in_annotations() or [] if annot.raw_data == lane.get_raw_data()]
+        datasources = {a.raw_data for a in self._in_annotations.get() or []} # FIXME: is order important?
+        for lane_idx, datasource in enumerate(datasources):
+            lane_annotations = [annot for annot in self._in_annotations() or [] if annot.raw_data == datasource]
             label_data = Annotation.dump_as_ilp_data(lane_annotations, color_map=color_map)
             labelSets[f"labels{lane_idx:03d}"] = label_data
         out["LabelColors"] = np.asarray([color.rgba[:-1] for color in color_map.keys()], dtype=np.int64)
