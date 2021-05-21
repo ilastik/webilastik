@@ -33,7 +33,7 @@ class ILane(ABC):
 
     @property
     @abstractmethod
-    def ilp_data(self):
+    def ilp_data(self) -> Any:
         pass
 
     @classmethod
