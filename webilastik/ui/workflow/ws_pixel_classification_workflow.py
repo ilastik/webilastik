@@ -4,6 +4,10 @@ import signal
 import asyncio
 from typing import Any, Dict, List, Optional, Mapping, cast
 import json
+from base64 import b64decode
+from webilastik.datasource import datasource_from_url
+
+from ndstructs.datasource.DataSource import DataSource
 from webilastik.server.tunnel import ReverseSshTunnel
 from pathlib import Path
 import contextlib
@@ -177,21 +181,30 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             predictions_export_applet=predictions_export_applet
         )
 
+        self.datasource_cache: Dict[str, DataSource] = {}
         self.app = web.Application()
         self.app.add_routes([
             web.get('/status', self.get_status),
             web.get('/ws/{applet_name}', self.open_websocket), # type: ignore
             web.get(
-                "/predictions_export_applet/{uuid}/{lane_index}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}", #FIXME uuid is just there to prevent caching
+                "/predictions_export_applet/{datasource_url_b64_altchars_dash_underline}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}",
                 self.ng_predict
             ),
             web.get(
-                "/predictions_export_applet/{uuid}/{lane_index}/info", #FIXME uuid is just there to prevent caching
+                "/predictions_export_applet/{datasource_url_b64_altchars_dash_underline}/info",
                 self.ng_predict_info
             ),
             web.post("/ilp_project", self.ilp_download),
             web.delete("/close", self.close_session),
         ])
+
+    def get_datasource(self, datasource_url_b64_altchars_dash_underline: str) -> DataSource:
+        if datasource_url_b64_altchars_dash_underline not in self.datasource_cache:
+            url = b64decode(datasource_url_b64_altchars_dash_underline.encode('utf8'), altchars=b'-_').decode('utf8')
+            datasource = datasource_from_url(url)
+            self.datasource_cache[datasource_url_b64_altchars_dash_underline] = datasource
+        return self.datasource_cache[datasource_url_b64_altchars_dash_underline]
+
 
     async def get_status(self, request: web.Request) -> web.Response:
         return web.Response(
@@ -233,11 +246,11 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         return await applet._add_websocket(websocket)
 
     async def ng_predict_info(self, request: web.Request):
-        lane_index = int(request.match_info.get("lane_index"))  # type: ignore
         classifier = self.pixel_classifier_applet.pixel_classifier()
         color_map = self.pixel_classifier_applet.color_map()
         expected_num_channels = len(color_map)
-        datasource = self.data_selection_applet.lanes()[lane_index].get_raw_data()
+        datasource_url_b64_altchars_dash_underline = str(request.match_info.get("datasource_url_b64_altchars_dash_underline")) # type: ignore
+        datasource = self.get_datasource(datasource_url_b64_altchars_dash_underline)
 
         return web.Response(
             text=json.dumps({
@@ -259,8 +272,8 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             content_type="application/json",
         )
 
-    async def ng_predict(self, request: web.Request):
-        lane_index = int(request.match_info.get("lane_index")) # type: ignore
+    async def ng_predict(self, request: web.Request) -> web.Response:
+        datasource_url_b64_altchars_dash_underline = str(request.match_info.get("datasource_url_b64_altchars_dash_underline")) # type: ignore
         xBegin = int(request.match_info.get("xBegin")) # type: ignore
         xEnd = int(request.match_info.get("xEnd")) # type: ignore
         yBegin = int(request.match_info.get("yBegin")) # type: ignore
@@ -268,9 +281,9 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         zBegin = int(request.match_info.get("zBegin")) # type: ignore
         zEnd = int(request.match_info.get("zEnd")) # type: ignore
 
-        datasource = self.data_selection_applet.lanes()[lane_index]
+        datasource = self.get_datasource(datasource_url_b64_altchars_dash_underline)
         predictions = await self.predictions_export_applet.async_compute(
-            DataRoi(datasource.get_raw_data(), x=(xBegin, xEnd), y=(yBegin, yEnd), z=(zBegin, zEnd))
+            DataRoi(datasource, x=(xBegin, xEnd), y=(yBegin, yEnd), z=(zBegin, zEnd))
         )
 
         # https://github.com/google/neuroglancer/tree/master/src/neuroglancer/datasource/precomputed#raw-chunk-encoding
