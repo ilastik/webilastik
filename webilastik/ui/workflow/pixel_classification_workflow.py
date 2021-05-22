@@ -61,7 +61,7 @@ class PixelClassificationWorkflow:
     feature_selection_applet: FeatureSelectionApplet
     brushing_applet: BrushingApplet
     pixel_classifier_applet: PixelClassificationApplet
-    predictions_export_applet : ExportApplet[PixelClassificationLane, PixelClassifier[IlpFilter]]
+    predictions_export_applet : ExportApplet[PixelClassifier[IlpFilter]]
 
     @property
     def ilp_data(self) -> Mapping[str, Any]:

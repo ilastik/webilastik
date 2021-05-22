@@ -17,7 +17,7 @@ from webilastik.ui.applet.data_selection_applet import ILane
 
 LANE = TypeVar("LANE", bound=ILane)
 PRODUCER = TypeVar("PRODUCER", bound=Operator[DataRoi, Array5D], covariant=True)
-class ExportApplet(Applet, Generic[LANE, PRODUCER]):
+class ExportApplet(Applet, Generic[PRODUCER]):
     """Exports the outputs of an operator created by an upstream applet."""
     def __init__(
         self, name: str, producer: Slot[PRODUCER], num_workers: int = max(1, multiprocessing.cpu_count() - 1)
