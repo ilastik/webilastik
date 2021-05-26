@@ -28,7 +28,7 @@ async def main():
     async with aiohttp.ClientSession() as session:
 
         print(f"Creating new session--------------")
-        async with session.post(f"http://localhost:5000/session", json={"session_duration": 60}) as response:
+        async with session.post(f"http://localhost:5000/session", json={"session_duration": 30}) as response:
             response.raise_for_status()
             session_data : Dict[str, Any] = await response.json()
             session_id = session_data["id"]
@@ -94,28 +94,11 @@ async def main():
 
             encoded_ds_url = b64encode(ds.url.encode('utf8'), altchars=b'-_').decode('utf8')
 
-            print(f"Requesting predictions========================")
-            urls = [
-                f"{session_url}/predictions_export_applet/{encoded_ds_url}/data/{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_0-1"
-                for tile in
-                Interval5D.zero(x=(0, 697), y=(0, 450), c=(0, 3)).get_tiles(tile_shape=Shape5D(x=256, y=256, c=2))
-            ]
-            print(f"Will requests these urls: ")
-            print("\n".join(urls))
-
-            with ProcessPoolExecutor(max_workers=8) as executor:
-                future_generator = executor.map(
-                    requests.get,
-                    urls
-                )
-                for f in list(future_generator):
-                    print(f"Response : {f.status_code}")
-
             response_tasks = {}
             for tile in Interval5D.zero(x=(0, 697), y=(0, 450), c=(0, 3)).get_tiles(tile_shape=Shape5D(x=256, y=256, c=2)):
-                response_tasks[tile] = session.get(
-                    f"{session_url}/predictions_export_applet/{encoded_ds_url}/data/{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_0-1"
-                )
+                url = f"{session_url}/predicting_applet/{encoded_ds_url}/data/{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_0-1"
+                print(f"---> Requesting {url}")
+                response_tasks[tile] = session.get(url)
 
             for tile, resp in response_tasks.items():
                 async with resp as response:

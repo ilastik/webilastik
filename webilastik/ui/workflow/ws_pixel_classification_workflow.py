@@ -2,9 +2,15 @@ from abc import abstractmethod, ABC
 import os
 import signal
 import asyncio
-from typing import Any, Dict, List, Optional, Mapping, cast
+from typing import Any, Dict, List, Optional, Mapping, cast, Sequence
 import json
 from base64 import b64decode
+from webilastik.scheduling.multiprocess_runner import MultiprocessRunner
+
+from aiohttp.web_response import BaseClass
+from ndstructs.array5D import Array5D
+from webilastik.classifiers.pixel_classifier import PixelClassifier, VigraPixelClassifier
+from webilastik import datasource
 from webilastik.datasource import datasource_from_url
 
 from ndstructs.datasource.DataSource import DataSource
@@ -28,8 +34,7 @@ from webilastik.utility.serialization import ValueGetter, JSON_VALUE
 from webilastik.annotations.annotation import Annotation
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.annotations import Annotation
-from webilastik.ui.applet import Applet, CONFIRMER
-from webilastik.ui.applet.export_applet import ExportApplet, LANE, PRODUCER
+from webilastik.ui.applet import Applet, CONFIRMER, Slot
 from webilastik.ui.applet.data_selection_applet import DataSelectionApplet
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.ui.applet.brushing_applet import BrushingApplet
@@ -57,6 +62,7 @@ class WsAppletMixin(Applet):
             try:
                 state = self._get_json_state()
                 if state is not None:
+                    print(f"\033[32m  Updating remote {self.name} to following state:\n{json.dumps(state, indent=4)}  \033[0m")
                     await websocket.send_str(json.dumps(state))
             except ConnectionResetError as e:
                 print(f"!!!!!+++!!!! Got an exception while updating remote:\n{e}\n\nRemoving websocket...")
@@ -74,6 +80,7 @@ class WsAppletMixin(Applet):
                 else:
                     try:
                         payload = json.loads(msg.data)
+                        print(f"\033[34m Got new state:\n{json.dumps(payload, indent=4)}\n \033[0m")
                         self._set_json_state(payload)
                     except Exception as e:
                         print(f"Exception happend on set state:\n\033[31m{e}\033[0m")
@@ -152,12 +159,108 @@ class WsFeatureSelectionApplet(WsAppletMixin, FeatureSelectionApplet):
         )
 
 
-class WsExportApplet(WsAppletMixin, ExportApplet[LANE, PRODUCER]):
+class WsPredictingApplet(WsAppletMixin):
+    def __init__(
+        self,
+        name: str,
+        *,
+        pixel_classifier: Slot[VigraPixelClassifier[IlpFilter]],
+        datasources: Slot[Sequence[DataSource]],
+        runner: MultiprocessRunner,
+    ):
+        self._in_pixel_classifier = pixel_classifier
+        self._in_datasources = datasources
+        self.runner = runner
+        self.datasource_cache: Dict[str, DataSource] = {}
+        super().__init__(name=name)
+
     def _get_json_state(self) -> JSON_VALUE:
-        return None
+        classifier = self._in_pixel_classifier.get()
+        if classifier:
+            producer_is_ready = True
+            channel_colors = [color.to_json_data() for color in classifier.color_map.keys()]
+        else:
+            producer_is_ready = False
+            channel_colors = []
+
+        return {
+            "producer_is_ready": producer_is_ready,
+            "channel_colors": channel_colors,
+            "datasources": [ds.to_json_data() for ds in self._in_datasources.get() or []],
+        }
 
     def _set_json_state(self, state: JSON_VALUE):
         pass
+
+    def _decode_datasource(self, datasource_url_b64_altchars_dash_underline: str) -> DataSource:
+        if datasource_url_b64_altchars_dash_underline not in self.datasource_cache:
+            url = b64decode(datasource_url_b64_altchars_dash_underline.encode('utf8'), altchars=b'-_').decode('utf8')
+            datasource = datasource_from_url(url)
+            self.datasource_cache[datasource_url_b64_altchars_dash_underline] = datasource
+        return self.datasource_cache[datasource_url_b64_altchars_dash_underline]
+
+    async def precomputed_chunks_info(self, request: web.Request):
+        classifier = self._in_pixel_classifier()
+        expected_num_channels = len(classifier.color_map)
+        datasource_url_b64_altchars_dash_underline = str(request.match_info.get("datasource_url_b64_altchars_dash_underline")) # type: ignore
+        datasource = self._decode_datasource(datasource_url_b64_altchars_dash_underline)
+
+        return web.Response(
+            text=json.dumps({
+                "@type": "neuroglancer_multiscale_volume",
+                "type": "image",
+                "data_type": "uint8",  # DONT FORGET TO CONVERT PREDICTIONS TO UINT8!
+                "num_channels": expected_num_channels,
+                "scales": [
+                    {
+                        "key": "data",
+                        "size": [int(v) for v in datasource.shape.to_tuple("xyz")],
+                        "resolution": [1, 1, 1],
+                        "voxel_offset": [0, 0, 0],
+                        "chunk_sizes": [datasource.tile_shape.to_tuple("xyz")],
+                        "encoding": "raw",
+                    }
+                ],
+            }),
+            content_type="application/json",
+        )
+
+    async def precomputed_chunks_compute(self, request: web.Request) -> web.Response:
+        datasource_url_b64_altchars_dash_underline = str(request.match_info.get("datasource_url_b64_altchars_dash_underline")) # type: ignore
+        xBegin = int(request.match_info.get("xBegin")) # type: ignore
+        xEnd = int(request.match_info.get("xEnd")) # type: ignore
+        yBegin = int(request.match_info.get("yBegin")) # type: ignore
+        yEnd = int(request.match_info.get("yEnd")) # type: ignore
+        zBegin = int(request.match_info.get("zBegin")) # type: ignore
+        zEnd = int(request.match_info.get("zEnd")) # type: ignore
+
+        datasource = self._decode_datasource(datasource_url_b64_altchars_dash_underline)
+        predictions = await self.runner.async_compute(
+            self._in_pixel_classifier().compute,
+            DataRoi(datasource, x=(xBegin, xEnd), y=(yBegin, yEnd), z=(zBegin, zEnd))
+        )
+
+        if "format" in request.query:
+            requested_format = request.query["format"]
+            if requested_format != "png":
+                return web.Response(status=400, text="Server-side rendering only available in png, not in {requested_format}")
+            if predictions.shape.z > 1:
+                return web.Response(status=400, text="Server-side rendering only available for 2d images")
+
+            prediction_png_bytes = list(predictions.to_z_slice_pngs())[0]
+            return web.Response(
+                body=prediction_png_bytes.getbuffer(),
+                content_type="image/png",
+            )
+
+        # https://github.com/google/neuroglancer/tree/master/src/neuroglancer/datasource/precomputed#raw-chunk-encoding
+        # "(...) data for the chunk is stored directly in little-endian binary format in [x, y, z, channel] Fortran order"
+        resp = predictions.as_uint8().raw("xyzc").tobytes("F")
+        return web.Response(
+            body=resp,
+            content_type="application/octet-stream",
+        )
+
 
 
 class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
@@ -169,46 +272,38 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             feature_extractors=feature_selection_applet.feature_extractors,
             annotations=brushing_applet.annotations,
         )
-        predictions_export_applet = WsExportApplet(
-            "predictions_export_applet",
-            producer=pixel_classifier_applet.pixel_classifier
+        predicting_applet = WsPredictingApplet(
+            "predicting_applet",
+            pixel_classifier=pixel_classifier_applet.pixel_classifier,
+            datasources=brushing_applet.datasources,
+            runner=MultiprocessRunner(num_workers=8),
         )
         self.ws_applets : Mapping[str, WsAppletMixin] = {
             feature_selection_applet.name: feature_selection_applet,
             brushing_applet.name: brushing_applet,
-            predictions_export_applet.name: predictions_export_applet,
+            predicting_applet.name: predicting_applet,
         }
         super().__init__(
             feature_selection_applet=feature_selection_applet,
             brushing_applet=brushing_applet,
             pixel_classifier_applet=pixel_classifier_applet,
-            predictions_export_applet=predictions_export_applet
         )
 
-        self.datasource_cache: Dict[str, DataSource] = {}
         self.app = web.Application()
         self.app.add_routes([
             web.get('/status', self.get_status),
             web.get('/ws/{applet_name}', self.open_websocket), # type: ignore
             web.get(
-                "/predictions_export_applet/{datasource_url_b64_altchars_dash_underline}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}",
-                self.ng_predict
+                f"/{predicting_applet.name}" + "/{datasource_url_b64_altchars_dash_underline}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}",
+                predicting_applet.precomputed_chunks_compute
             ),
             web.get(
-                "/predictions_export_applet/{datasource_url_b64_altchars_dash_underline}/info",
-                self.ng_predict_info
+                f"/{predicting_applet.name}" + "/{datasource_url_b64_altchars_dash_underline}/info",
+                predicting_applet.precomputed_chunks_info
             ),
             web.post("/ilp_project", self.ilp_download),
             web.delete("/close", self.close_session),
         ])
-
-    def get_datasource(self, datasource_url_b64_altchars_dash_underline: str) -> DataSource:
-        if datasource_url_b64_altchars_dash_underline not in self.datasource_cache:
-            url = b64decode(datasource_url_b64_altchars_dash_underline.encode('utf8'), altchars=b'-_').decode('utf8')
-            datasource = datasource_from_url(url)
-            self.datasource_cache[datasource_url_b64_altchars_dash_underline] = datasource
-        return self.datasource_cache[datasource_url_b64_altchars_dash_underline]
-
 
     async def get_status(self, request: web.Request) -> web.Response:
         return web.Response(
@@ -248,55 +343,6 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         websocket = web.WebSocketResponse()
         await websocket.prepare(request)
         return await applet._add_websocket(websocket)
-
-    async def ng_predict_info(self, request: web.Request):
-        classifier = self.pixel_classifier_applet.pixel_classifier()
-        color_map = self.pixel_classifier_applet.color_map()
-        expected_num_channels = len(color_map)
-        datasource_url_b64_altchars_dash_underline = str(request.match_info.get("datasource_url_b64_altchars_dash_underline")) # type: ignore
-        datasource = self.get_datasource(datasource_url_b64_altchars_dash_underline)
-
-        return web.Response(
-            text=json.dumps({
-                "@type": "neuroglancer_multiscale_volume",
-                "type": "image",
-                "data_type": "uint8",  # DONT FORGET TO CONVERT PREDICTIONS TO UINT8!
-                "num_channels": expected_num_channels,
-                "scales": [
-                    {
-                        "key": "data",
-                        "size": [int(v) for v in datasource.shape.to_tuple("xyz")],
-                        "resolution": [1, 1, 1],
-                        "voxel_offset": [0, 0, 0],
-                        "chunk_sizes": [datasource.tile_shape.to_tuple("xyz")],
-                        "encoding": "raw",
-                    }
-                ],
-            }),
-            content_type="application/json",
-        )
-
-    async def ng_predict(self, request: web.Request) -> web.Response:
-        datasource_url_b64_altchars_dash_underline = str(request.match_info.get("datasource_url_b64_altchars_dash_underline")) # type: ignore
-        xBegin = int(request.match_info.get("xBegin")) # type: ignore
-        xEnd = int(request.match_info.get("xEnd")) # type: ignore
-        yBegin = int(request.match_info.get("yBegin")) # type: ignore
-        yEnd = int(request.match_info.get("yEnd")) # type: ignore
-        zBegin = int(request.match_info.get("zBegin")) # type: ignore
-        zEnd = int(request.match_info.get("zEnd")) # type: ignore
-
-        datasource = self.get_datasource(datasource_url_b64_altchars_dash_underline)
-        predictions = await self.predictions_export_applet.async_compute(
-            DataRoi(datasource, x=(xBegin, xEnd), y=(yBegin, yEnd), z=(zBegin, zEnd))
-        )
-
-        # https://github.com/google/neuroglancer/tree/master/src/neuroglancer/datasource/precomputed#raw-chunk-encoding
-        # "(...) data for the chunk is stored directly in little-endian binary format in [x, y, z, channel] Fortran order"
-        resp = predictions.as_uint8().raw("xyzc").tobytes("F")
-        return web.Response(
-            body=resp,
-            content_type="application/octet-stream",
-        )
 
     async def ilp_download(self, request: web.Request):
         return web.Response(

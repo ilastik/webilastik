@@ -1,5 +1,10 @@
 from pathlib import Path
+from webilastik.scheduling.multiprocess_runner import MultiprocessRunner
+from webilastik.classifiers.pixel_classifier import Predictions
 from ndstructs.point5D import Shape5D
+from typing import cast
+import uuid
+import os
 
 import pytest
 import numpy as np
@@ -18,7 +23,6 @@ from webilastik.ui.applet.data_selection_applet import DataSelectionApplet
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.ui.applet.brushing_applet import BrushingApplet
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
-from webilastik.ui.applet.export_applet import ExportApplet
 
 
 #dummy_confirmer = lambda msg: True
@@ -36,22 +40,18 @@ def test_pixel_classification_workflow():
         feature_extractors=feature_selection_applet.feature_extractors,
         annotations=brushing_applet.annotations
     )
-    predictions_export_applet = ExportApplet(
-        "predictions_export_applet",
-        producer=pixel_classifier_applet.pixel_classifier
-    )
-    wf = PixelClassificationWorkflow(
-        feature_selection_applet=feature_selection_applet,
-        brushing_applet=brushing_applet,
-        pixel_classifier_applet=pixel_classifier_applet,
-        predictions_export_applet=predictions_export_applet
-    )
+    # wf = PixelClassificationWorkflow(
+    #     feature_selection_applet=feature_selection_applet,
+    #     brushing_applet=brushing_applet,
+    #     pixel_classifier_applet=pixel_classifier_applet,
+    #     predictions_export_applet=predictions_export_applet
+    # )
 
     # GUI creates a datasource somewhere...
     ds = SkimageDataSource(Path("sample_data/cropped1.png"), filesystem=OSFS("."), tile_shape=Shape5D(x=400, y=400))
 
     # GUI creates some feature extractors
-    wf.feature_selection_applet.feature_extractors.set_value(
+    feature_selection_applet.feature_extractors.set_value(
         [
             GaussianSmoothing.from_ilp_scale(scale=0.3, axis_2d="z"),
             HessianOfGaussianEigenvalues.from_ilp_scale(scale=0.7, axis_2d="z"),
@@ -63,12 +63,12 @@ def test_pixel_classification_workflow():
     brush_strokes = [
             Annotation.interpolate_from_points(
                 voxels=[Point5D.zero(x=140, y=150), Point5D.zero(x=145, y=155)],
-                color=Color(r=np.uint8(0), g=np.uint8(255), b=np.uint8(0)),
+                color=Color(r=np.uint8(0), g=np.uint8(0), b=np.uint8(255)),
                 raw_data=ds
             ),
             Annotation.interpolate_from_points(
                 voxels=[Point5D.zero(x=238, y=101), Point5D.zero(x=229, y=139)],
-                color=Color(r=np.uint8(0), g=np.uint8(255), b=np.uint8(0)),
+                color=Color(r=np.uint8(0), g=np.uint8(0), b=np.uint8(255)),
                 raw_data=ds
             ),
             Annotation.interpolate_from_points(
@@ -82,22 +82,31 @@ def test_pixel_classification_workflow():
                 raw_data=ds
             ),
     ]
-    wf.brushing_applet.annotations.set_value(brush_strokes, confirmer=dummy_confirmer)
+    brushing_applet.annotations.set_value(brush_strokes, confirmer=dummy_confirmer)
 
+
+    # preds = predictions_export_applet.compute(DataRoi(ds))
+
+    classifier = pixel_classifier_applet.pixel_classifier()
+    runner = MultiprocessRunner(num_workers=4)
 
     # calculate predictions on an arbitrary data
-    preds = wf.predictions_export_applet.compute(DataRoi(ds))
+    preds = runner.compute(classifier.compute, DataRoi(ds))
     preds.as_uint8().show_channels()
 
+    for png_bytes in preds.to_z_slice_pngs():
+        path = f"/tmp/junk_test_image_{uuid.uuid4()}.png"
+        with open(path, "wb") as outfile:
+            outfile.write(png_bytes.getbuffer())
+        os.system(f"gimp {path}")
+
+
     # calculate predictions on just a piece of arbitrary data
-    exported_tile = wf.predictions_export_applet.compute(DataRoi(datasource=ds, x=(100, 200), y=(100, 200)))
+    exported_tile = runner.compute(classifier.compute, DataRoi(datasource=ds, x=(100, 200), y=(100, 200)))
     exported_tile.show_channels()
 
-    # GUI clicks "export button"
-    #wf.predictions_export_applet.export_all()
-
-    wf.save_as(Path("/tmp/blas.ilp"))
+    # wf.save_as(Path("/tmp/blas.ilp"))
 
     #try removing a brush stroke
-    wf.brushing_applet.annotations.set_value(brush_strokes[1:], confirmer=dummy_confirmer)
-    assert tuple(wf.brushing_applet.annotations()) == tuple(brush_strokes[1:])
+    brushing_applet.annotations.set_value(brush_strokes[1:], confirmer=dummy_confirmer)
+    assert tuple(brushing_applet.annotations()) == tuple(brush_strokes[1:])

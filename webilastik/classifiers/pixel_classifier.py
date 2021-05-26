@@ -6,6 +6,8 @@ import tempfile
 from functools import lru_cache
 import os
 import h5py
+import PIL
+import io
 
 
 import numpy as np
@@ -48,6 +50,26 @@ class Predictions(Array5D):
             )
         return Predictions(arr=arr, axiskeys=axiskeys, location=location or self.location, channel_colors=channel_colors)
 
+    def to_z_slice_pngs(self) -> Iterator[io.BytesIO]:
+        for z_slice in self.split(self.shape.updated(z=1)):
+            print(f"\nz_slice: {z_slice}")
+            rendered_rgb = Array5D.allocate(z_slice.shape.updated(c=3), dtype=np.dtype("float32"), value=0)
+            rendered_rgb_yxc = rendered_rgb.raw("yxc")
+
+            for prediction_channel, color in zip(z_slice.split(z_slice.shape.updated(c=1)), self.channel_colors):
+                print(f"\nprediction_channel: {prediction_channel}")
+
+                class_rgb = Array5D(np.ones(prediction_channel.shape.updated(c=3).to_tuple("yxc")), axiskeys="yxc")
+                class_rgb.raw("yxc")[...] *= np.asarray([color.r, color.g, color.b]) * (color.a / 255)
+                class_rgb.raw("cyx")[...] *= prediction_channel.raw("yx")
+
+                rendered_rgb_yxc += class_rgb.raw("yxc")
+
+            out_image = PIL.Image.fromarray(rendered_rgb.raw("yxc").astype(np.uint8)) # type: ignore
+            out_file = io.BytesIO()
+            out_image.save(out_file, "png")
+            out_file.seek(0)
+            yield out_file
 
 
 FE = TypeVar("FE", bound=FeatureExtractor, covariant=True)

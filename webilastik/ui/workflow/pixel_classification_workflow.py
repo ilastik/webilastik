@@ -10,7 +10,6 @@ from webilastik.ui.applet.data_selection_applet import DataSelectionApplet, ILan
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
 from webilastik.ui.applet.brushing_applet import BrushingApplet
-from webilastik.ui.applet.export_applet import ExportApplet
 from webilastik.classifiers.pixel_classifier import PixelClassifier
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.utility.serialization import ObjectGetter, ValueGetter, JSON_VALUE, JSON_OBJECT
@@ -61,7 +60,6 @@ class PixelClassificationWorkflow:
     feature_selection_applet: FeatureSelectionApplet
     brushing_applet: BrushingApplet
     pixel_classifier_applet: PixelClassificationApplet
-    predictions_export_applet : ExportApplet[PixelClassifier[IlpFilter]]
 
     @property
     def ilp_data(self) -> Mapping[str, Any]:
@@ -69,7 +67,12 @@ class PixelClassificationWorkflow:
             "Input Data": b"FIXME!!!!", #self.data_selection_applet.get_ilp_data(PixelClassificationLane),
             "FeatureSelections": self.feature_selection_applet.ilp_data,
             "PixelClassification": self.pixel_classifier_applet.ilp_data,
-            "Prediction Export": self.predictions_export_applet.ilp_data,
+            "Prediction Export": {
+                "OutputFilenameFormat": "{dataset_dir}/{nickname}_{result_type}",
+                "OutputFormat": "hdf5",
+                "OutputInternalPath": "exported_data",
+                "StorageVersion": "0.1",
+            },
             "currentApplet": 0,
             "ilastikVersion": b"1.3.2post1",  # FIXME
             "time": b"Wed Mar 11 15:40:37 2020",  # FIXME
