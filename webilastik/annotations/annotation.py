@@ -86,7 +86,7 @@ class FeatureSamples(FeatureData, StaticLine):
 
     @classmethod
     def create(cls, annotation: "Annotation", data: FeatureData):
-        samples = data.sample_channels(annotation.as_mask())
+        samples = data.sample_channels(annotation.as_mask()) #type: ignore
         return cls.fromArray5D(samples)
 
     @property
@@ -198,7 +198,7 @@ class Annotation(ScalarData):
         return all_feature_samples[0].concatenate(*all_feature_samples[1:])
 
     @classmethod
-    def sort(self, annotations: Sequence["Annotation"]) -> List["Annotation"]:
+    def sort(cls, annotations: Sequence["Annotation"]) -> List["Annotation"]:
         return sorted(annotations, key=lambda a: a.color.q_rgba)
 
     def colored(self, value: np.uint8) -> Array5D:
