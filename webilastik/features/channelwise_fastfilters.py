@@ -125,7 +125,9 @@ class ChannelwiseFastFilter(IlpFilter):
             )
             per_channel_results.append(feature_data.cut(roi_slice, c=All()))
         combined_result = Array5D.combine(per_channel_results)
-        out = FeatureData(combined_result.raw(combined_result.axiskeys), axiskeys=combined_result.axiskeys)
+        out = FeatureData(
+            combined_result.raw(combined_result.axiskeys), axiskeys=combined_result.axiskeys, location=combined_result.location
+        )
         out.setflags(write=False)
         return out
 
