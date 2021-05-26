@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import List, Generic, Sequence, Dict, TypeVar, Type
+from typing import Iterator, List, Generic, Optional, Sequence, Dict, TypeVar, Type
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 import tempfile
@@ -31,7 +31,23 @@ class Predictions(Array5D):
     """An array of floats from 0.0 to 1.0. The value in each channel represents
     how likely that pixel is to belong to the classification class associated with
     that channel"""
-    pass
+    def __init__(self, arr: np.ndarray, axiskeys: str, channel_colors: Sequence[Color], location: Point5D = Point5D.zero()):
+        super().__init__(arr, axiskeys, location=location)
+        self.channel_colors = tuple(channel_colors)
+
+    def rebuild(self: "Predictions", arr: np.ndarray, *, axiskeys: str, location: Optional[Point5D] = None) -> "Predictions":
+        a5d = Array5D(arr=arr, axiskeys=axiskeys, location=location or self.location)
+        channel_colors: Sequence[Color];
+        if a5d.shape.c == self.shape.c:
+            channel_colors = self.channel_colors
+        elif self.interval.contains(a5d.interval):
+            channel_colors = [self.channel_colors[c] for c in range(*a5d.interval.c)]
+        else:
+            raise RuntimeError(
+                f"Don't know how to propagate prediction channel colors {self.channel_colors} when rebuilding as {a5d}"
+            )
+        return Predictions(arr=arr, axiskeys=axiskeys, location=location or self.location, channel_colors=channel_colors)
+
 
 
 FE = TypeVar("FE", bound=FeatureExtractor, covariant=True)
@@ -97,9 +113,6 @@ class PixelClassifier(Operator[DataRoi, Predictions], Generic[FE]):
         c_stop = c_start + self.num_classes
         return data_slice.updated(c=(c_start, c_stop))
 
-    def allocate_predictions(self, data_slice: Interval5D):
-        return Predictions.allocate(interval=self.get_expected_roi(data_slice), dtype=np.dtype('float32'), value=0)
-
     @operator_cache # type: ignore
     def compute(self, roi: DataRoi) -> Predictions:
         self.feature_extractor.ensure_applicable(roi.datasource)
@@ -158,7 +171,12 @@ class VigraPixelClassifier(PixelClassifier[FE]):
 
     def _do_predict(self, roi: DataRoi) -> Predictions:
         feature_data = self.feature_extractor.compute(roi)
-        predictions = self.allocate_predictions(roi)
+
+        predictions = Array5D.allocate(
+            interval=self.get_expected_roi(roi),
+            dtype=np.dtype('float32'),
+            value=0,
+        )
         assert predictions.interval == self.get_expected_roi(roi)
         raw_linear_predictions: np.ndarray = predictions.linear_raw()
 
@@ -172,7 +190,12 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         raw_linear_predictions /= self.num_trees
         predictions.setflags(write=False)
 
-        return predictions
+        return Predictions(
+            arr=predictions.raw(predictions.axiskeys),
+            axiskeys=predictions.axiskeys,
+            location=predictions.location,
+            channel_colors=Color.sort(self.color_map.keys()),
+        )
 
     def get_forest_data(self):
         tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5")

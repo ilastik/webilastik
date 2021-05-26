@@ -54,7 +54,7 @@ class ExportApplet(Applet, Generic[PRODUCER]):
 
         tiles : Sequence[Array5D] = [tile for future in result_batch_futures for tile in future.result()]
 
-        return tiles[0].combine(tiles[1:])
+        return Array5D.combine(tiles)
 
     @property
     def ilp_data(self):

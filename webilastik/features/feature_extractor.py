@@ -57,4 +57,9 @@ class FeatureExtractorCollection(FeatureExtractor):
             result = fx.compute(roi).translated(Point5D.zero(c=channel_offset))
             features.append(result)
             channel_offset += result.shape.c
-        return features[0].combine(features[1:])
+        out = Array5D.combine(features)
+        return FeatureData(
+            arr=out.raw(out.axiskeys),
+            axiskeys=out.axiskeys,
+            location=out.location
+        )

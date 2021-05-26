@@ -124,9 +124,10 @@ class ChannelwiseFastFilter(IlpFilter):
                 location=haloed_roi.start.updated(c=channel_offset * channel_multiplier)
             )
             per_channel_results.append(feature_data.cut(roi_slice, c=All()))
-        combined_result = per_channel_results[0].combine(per_channel_results[1:])
-        combined_result.setflags(write=False)
-        return combined_result
+        combined_result = Array5D.combine(per_channel_results)
+        out = FeatureData(combined_result.raw(combined_result.axiskeys), axiskeys=combined_result.axiskeys)
+        out.setflags(write=False)
+        return out
 
 class StructureTensorEigenvalues(ChannelwiseFastFilter):
     def __init__(
