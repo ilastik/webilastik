@@ -7,7 +7,8 @@ class CancelledException(Exception):
     pass
 
 class NotReadyException(Exception):
-    pass
+    def __init__(self, slot: "Slot[Any]"):
+        super().__init__(f"Slot {slot} is not ready")
 
 CONFIRMER = Callable[[str], bool]
 
@@ -62,7 +63,7 @@ class Slot(Generic[SV], ABC):
 
     def __call__(self) -> SV: #raises NotReadyException
         if self._value is None:
-            raise NotReadyException()
+            raise NotReadyException(self)
         return self._value
 
     def get(self, default: Optional[SV] = None) -> Optional[SV]:
@@ -116,6 +117,9 @@ class Applet(ABC):
         for borrowed_slot in self.borrowed_slots.values():
             self.upstream_applets.update(borrowed_slot._owner.upstream_applets)
             borrowed_slot._subscribe(self)
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} name={self.name}>"
 
     def get_downstream_applets(self) -> List["Applet"]:
         """Returns a list of the topologically sorted descendants of this applet"""
