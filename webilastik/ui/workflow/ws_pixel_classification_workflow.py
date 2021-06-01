@@ -222,6 +222,9 @@ class WsPredictingApplet(WsAppletMixin):
                     }
                 ],
             }),
+            headers={
+                "Cache-Control": "no-store"
+            },
             content_type="application/json",
         )
 
@@ -250,6 +253,9 @@ class WsPredictingApplet(WsAppletMixin):
             prediction_png_bytes = list(predictions.to_z_slice_pngs())[0]
             return web.Response(
                 body=prediction_png_bytes.getbuffer(),
+                headers={
+                    "Cache-Control": "no-store"
+                },
                 content_type="image/png",
             )
 
