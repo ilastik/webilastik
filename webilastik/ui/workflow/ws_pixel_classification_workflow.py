@@ -300,11 +300,11 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             web.get('/status', self.get_status),
             web.get('/ws/{applet_name}', self.open_websocket), # type: ignore
             web.get(
-                f"/{predicting_applet.name}" + "/{datasource_url_b64_altchars_dash_underline}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}",
+                f"/{predicting_applet.name}" + "/datasource={datasource_url_b64_altchars_dash_underline}/run_id={run_id}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}",
                 predicting_applet.precomputed_chunks_compute
             ),
             web.get(
-                f"/{predicting_applet.name}" + "/{datasource_url_b64_altchars_dash_underline}/info",
+                f"/{predicting_applet.name}" + "/datasource={datasource_url_b64_altchars_dash_underline}/run_id={run_id}/info",
                 predicting_applet.precomputed_chunks_info
             ),
             web.post("/ilp_project", self.ilp_download),
