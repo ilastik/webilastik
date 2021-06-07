@@ -54,7 +54,7 @@ class SessionAllocator(Generic[SESSION_TYPE]):
             payload_dict = json.loads(raw_payload.decode('utf8'))
             session_duration = int(payload_dict["session_duration"])
         except Exception:
-            return web.json_response({"error": "Bad payload"}, status=400, headers={"Access-Control-Allow-Origin": "*"})
+            return web.json_response({"error": "Bad payload"}, status=400)
         session_id = uuid.uuid4()
 
         #FIXME: remove stuff from self.sessions
@@ -76,7 +76,6 @@ class SessionAllocator(Generic[SESSION_TYPE]):
                     algorithm="HS256"
                 )
             },
-            headers={"Access-Control-Allow-Origin": "*"}
         )
 
     async def session_status(self, request: web.Request):
@@ -92,7 +91,6 @@ class SessionAllocator(Generic[SESSION_TYPE]):
                 "status": "ready" if self._make_socket_path_at_master(session_id).exists() else "not ready",
                 "url": self._make_session_url(session_id)
             },
-            headers={"Access-Control-Allow-Origin": "*"}
         )
 
     async def kill_session(self, session_id: uuid.UUID, after_seconds: int = 0):
