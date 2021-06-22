@@ -5,6 +5,8 @@ import asyncio
 from typing import Any, Dict, List, Optional, Mapping, cast, Sequence
 import json
 from base64 import b64decode
+
+from ndstructs.datasource.PrecomputedChunksDataSource import PrecomputedChunksInfo
 from webilastik.scheduling.multiprocess_runner import MultiprocessRunner
 
 from aiohttp.web_response import BaseClass
@@ -309,6 +311,14 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             ),
             web.post("/ilp_project", self.ilp_download),
             web.delete("/close", self.close_session),
+            web.get(
+                "/stripped_precomputed_info/url={info_url_b64_altchars_dash_underline}/resolution={resolution_x}_{resolution_y}_{resolution_z}/info",
+                self.stripped_precomputed_info
+            ),
+            web.get(
+                "/stripped_precomputed_info/url={info_url_b64_altchars_dash_underline}/resolution={resolution_x}_{resolution_y}_{resolution_z}/{rest:.*}",
+                self.forward_chunk_request
+            ),
         ])
 
     async def get_status(self, request: web.Request) -> web.Response:
@@ -358,6 +368,51 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
                 "Content-disposition": 'attachment; filename="MyProject.ilp"'
             }
         )
+
+    async def stripped_precomputed_info(self, request: web.Request) -> web.Response:
+        """Serves a precomp info stripped of all but one scales"""
+        resolution_x = request.match_info.get("resolution_x")
+        resolution_y = request.match_info.get("resolution_y")
+        resolution_z = request.match_info.get("resolution_z")
+        if resolution_x is None or resolution_y is None or resolution_z is None:
+            return web.Response(status=400, text=f"Bad resolution: {resolution_x}_{resolution_y}_{resolution_z}")
+        try:
+            resolution = (int(resolution_x), int(resolution_x), int(resolution_x))
+        except Exception:
+            return web.Response(status=400, text=f"Bad resolution: {resolution_x}_{resolution_y}_{resolution_z}")
+
+        info_url_b64_dash_under = request.match_info.get("info_url_b64_altchars_dash_underline")
+        if not info_url_b64_dash_under:
+            return web.Response(status=400, text="Missing parameter: url")
+
+        info_url = b64decode(info_url_b64_dash_under, altchars=b'-_').decode('utf8')
+        async with aiohttp.ClientSession() as session:
+            async with session.get(info_url) as response:
+                response_text = await response.text()
+                if response.status // 100 != 2:
+                    return web.Response(status=response.status, text=response_text)
+                info = PrecomputedChunksInfo.from_json(response_text)
+
+        stripped_info = PrecomputedChunksInfo(
+            at_type=info.at_type,
+            type_=info.type_,
+            data_type=info.data_type,
+            num_channels=info.num_channels,
+            scales=[scale for scale in info.scales if tuple(scale.resolution) == resolution],
+        )
+        return web.json_response(stripped_info.to_json_data())
+
+    async def forward_chunk_request(self, request: web.Request) -> web.Response:
+        """Redirects a precomp chunk request to the original URL"""
+        info_url_b64_dash_under = request.match_info.get("info_url_b64_altchars_dash_underline")
+        if not info_url_b64_dash_under:
+            return web.Response(status=400, text="Missing parameter: url")
+        info_url = b64decode(info_url_b64_dash_under, altchars=b'-_').decode('utf8')
+        info_url = info_url.rstrip("/").rstrip("/info")
+        rest = request.match_info.get("rest", "")
+        raise web.HTTPFound(location=f"{info_url}/{rest}")
+
+
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
