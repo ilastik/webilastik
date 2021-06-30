@@ -385,7 +385,8 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         if not info_url_b64_dash_under:
             return web.Response(status=400, text="Missing parameter: url")
 
-        info_url = b64decode(info_url_b64_dash_under, altchars=b'-_').decode('utf8')
+        info_url = b64decode(info_url_b64_dash_under, altchars=b'-_').decode('utf8').lstrip("precomputed://").rstrip("/") + "/info"
+        print(f"+++++ Will request this info: {info_url}")
         async with aiohttp.ClientSession() as session:
             async with session.get(info_url) as response:
                 response_text = await response.text()
@@ -407,10 +408,9 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         info_url_b64_dash_under = request.match_info.get("info_url_b64_altchars_dash_underline")
         if not info_url_b64_dash_under:
             return web.Response(status=400, text="Missing parameter: url")
-        info_url = b64decode(info_url_b64_dash_under, altchars=b'-_').decode('utf8')
-        info_url = info_url.rstrip("/").rstrip("/info")
+        info_url = b64decode(info_url_b64_dash_under, altchars=b'-_').decode('utf8').lstrip("precomputed://").rstrip("/")
         rest = request.match_info.get("rest", "")
-        raise web.HTTPFound(location=f"{info_url}/{rest}")
+        raise web.HTTPFound(location=f"{info_url}/{rest.lstrip('/')}")
 
 
 
