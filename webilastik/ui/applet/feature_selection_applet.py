@@ -3,7 +3,7 @@ from ndstructs.datasource.DataSource import DataSource
 
 import numpy as np
 
-from webilastik.ui.applet import Applet, CONFIRMER, Slot, ValueSlot, CancelledException
+from webilastik.ui.applet import Applet, CONFIRMER, Slot, SequenceValueSlot, CancelledException
 from webilastik.ui.applet.data_selection_applet import ILane
 from webilastik.features.ilp_filter import IlpFilter
 
@@ -20,7 +20,7 @@ class FeatureSelectionApplet(Applet):
 
     def __init__(self, name: str, *, datasources: Slot[Sequence[DataSource]]):
         self._in_datasources = datasources
-        self.feature_extractors = ValueSlot[Sequence[IlpFilter]](owner=self, refresher=self._refresh_extractors)
+        self.feature_extractors = SequenceValueSlot[IlpFilter](owner=self, refresher=self._refresh_extractors)
         super().__init__(name=name)
 
     def _refresh_extractors(self, confirmer: CONFIRMER) -> Optional[Sequence[IlpFilter]]:

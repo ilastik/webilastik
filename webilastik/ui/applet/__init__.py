@@ -77,6 +77,16 @@ class DerivedSlot(Slot[SV]):
     def __init__(self, owner: "Applet", refresher: SLOT_REFRESHER[SV]):
         super().__init__(owner=owner, refresher=refresher)
 
+class DerivedSequenceSlot(DerivedSlot[Sequence[SV]]):
+    "A derived slot that either contains a sequence of at least one SV element, or None (no empty sequences)"
+
+    def __init__(self, owner: "Applet", refresher: SLOT_REFRESHER[Sequence[SV]]):
+        def non_empty_sequence_refresher(confirmer: CONFIRMER) -> Optional[Sequence[SV]]:
+            return refresher(confirmer) or None
+        super().__init__(owner=owner, refresher=non_empty_sequence_refresher)
+
+
+
 class ValueSlot(Slot[SV]):
     """ValueSlots can be set by human users by calling set_value (or having the GUI do it for them).
     This slot can still use a refresher function like in DeriveSlot which can be used to validate if
@@ -96,6 +106,20 @@ class ValueSlot(Slot[SV]):
                 applet.restore_snaphot(snap)
             self._value = old_value
             raise
+
+class SequenceValueSlot(ValueSlot[Sequence[SV]]):
+    "A value slot that either contains a sequence of at least one SV element, or None (no empty sequences)"
+
+    def __init__(self, owner: "Applet", refresher: Optional[SLOT_REFRESHER[Sequence[SV]]] = None):
+        def non_empty_sequence_refresher(confirmer: CONFIRMER) -> Optional[Sequence[SV]]:
+            if refresher is None:
+                return None
+            return refresher(confirmer) or None
+        super().__init__(owner=owner, refresher=None if refresher is None else non_empty_sequence_refresher)
+
+    def set_value(self, new_value: Optional[Sequence[SV]], confirmer: CONFIRMER):
+        super().set_value(new_value=new_value or None, confirmer=confirmer)
+
 
 
 class Applet(ABC):
