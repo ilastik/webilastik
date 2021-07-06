@@ -86,7 +86,7 @@ class TrainingData(Generic[FE]):
     def __init__(
         self, *, feature_extractors: Sequence[FE], annotations: Sequence[Annotation]
     ):
-        assert len(annotations) > 0
+        assert len(annotations) > 0, "Cannot train classifier with 0 annotations"
         assert len(feature_extractors) > 0
         for fx in feature_extractors:
             for annot in annotations:
