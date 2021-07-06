@@ -90,9 +90,9 @@ async def main():
             import pprint
             import requests
             from concurrent.futures import ProcessPoolExecutor
-            from base64 import b64encode
+            import urllib.parse
 
-            encoded_ds_url = b64encode(ds.url.encode('utf8'), altchars=b'-_').decode('utf8')
+            encoded_ds_url = urllib.parse.quote(ds.url)
 
             response_tasks = {}
             for tile in Interval5D.zero(x=(0, 697), y=(0, 450), c=(0, 3)).get_tiles(tile_shape=Shape5D(x=256, y=256, c=2)):

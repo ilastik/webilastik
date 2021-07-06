@@ -201,11 +201,11 @@ class WsPredictingApplet(WsAppletMixin):
             self.datasource_cache[datasource_url_b64_altchars_dash_underline] = datasource
         return self.datasource_cache[datasource_url_b64_altchars_dash_underline]
 
-    async def precomputed_chunks_info(self, request: web.Request):
+    async def predictions_precomputed_chunks_info(self, request: web.Request):
         classifier = self._in_pixel_classifier()
         expected_num_channels = len(classifier.color_map)
-        datasource_url_b64_altchars_dash_underline = str(request.match_info.get("datasource_url_b64_altchars_dash_underline")) # type: ignore
-        datasource = self._decode_datasource(datasource_url_b64_altchars_dash_underline)
+        encoded_raw_data_url = str(request.match_info.get("encoded_raw_data")) # type: ignore
+        datasource = self._decode_datasource(encoded_raw_data_url)
 
         return web.Response(
             text=json.dumps({
@@ -231,7 +231,7 @@ class WsPredictingApplet(WsAppletMixin):
         )
 
     async def precomputed_chunks_compute(self, request: web.Request) -> web.Response:
-        datasource_url_b64_altchars_dash_underline = str(request.match_info.get("datasource_url_b64_altchars_dash_underline")) # type: ignore
+        encoded_raw_data_url = str(request.match_info.get("encoded_raw_data")) # type: ignore
         xBegin = int(request.match_info.get("xBegin")) # type: ignore
         xEnd = int(request.match_info.get("xEnd")) # type: ignore
         yBegin = int(request.match_info.get("yBegin")) # type: ignore
@@ -239,7 +239,7 @@ class WsPredictingApplet(WsAppletMixin):
         zBegin = int(request.match_info.get("zBegin")) # type: ignore
         zEnd = int(request.match_info.get("zEnd")) # type: ignore
 
-        datasource = self._decode_datasource(datasource_url_b64_altchars_dash_underline)
+        datasource = self._decode_datasource(encoded_raw_data_url)
         predictions = await self.runner.async_compute(
             self._in_pixel_classifier().compute,
             DataRoi(datasource, x=(xBegin, xEnd), y=(yBegin, yEnd), z=(zBegin, zEnd))
@@ -302,21 +302,21 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             web.get('/status', self.get_status),
             web.get('/ws/{applet_name}', self.open_websocket), # type: ignore
             web.get(
-                f"/{predicting_applet.name}" + "/datasource={datasource_url_b64_altchars_dash_underline}/run_id={run_id}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}",
+                "/predictions/raw_data={encoded_raw_data}/run_id={run_id}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}",
                 predicting_applet.precomputed_chunks_compute
             ),
             web.get(
-                f"/{predicting_applet.name}" + "/datasource={datasource_url_b64_altchars_dash_underline}/run_id={run_id}/info",
-                predicting_applet.precomputed_chunks_info
+                "/predictions/raw_data={encoded_raw_data}/run_id={run_id}/info",
+                predicting_applet.predictions_precomputed_chunks_info
             ),
             web.post("/ilp_project", self.ilp_download),
             web.delete("/close", self.close_session),
             web.get(
-                "/stripped_precomputed_info/url={info_url_b64_altchars_dash_underline}/resolution={resolution_x}_{resolution_y}_{resolution_z}/info",
+                "/stripped_precomputed/url={encoded_original_url}/resolution={resolution_x}_{resolution_y}_{resolution_z}/info",
                 self.stripped_precomputed_info
             ),
             web.get(
-                "/stripped_precomputed_info/url={info_url_b64_altchars_dash_underline}/resolution={resolution_x}_{resolution_y}_{resolution_z}/{rest:.*}",
+                "/stripped_precomputed/url={encoded_original_url}/resolution={resolution_x}_{resolution_y}_{resolution_z}/{rest:.*}",
                 self.forward_chunk_request
             ),
         ])
@@ -381,11 +381,11 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         except Exception:
             return web.Response(status=400, text=f"Bad resolution: {resolution_x}_{resolution_y}_{resolution_z}")
 
-        info_url_b64_dash_under = request.match_info.get("info_url_b64_altchars_dash_underline")
-        if not info_url_b64_dash_under:
+        encoded_original_url = request.match_info.get("encoded_original_url")
+        if not encoded_original_url:
             return web.Response(status=400, text="Missing parameter: url")
 
-        info_url = b64decode(info_url_b64_dash_under, altchars=b'-_').decode('utf8').lstrip("precomputed://").rstrip("/") + "/info"
+        info_url = b64decode(encoded_original_url, altchars=b'-_').decode('utf8').lstrip("precomputed://").rstrip("/") + "/info"
         print(f"+++++ Will request this info: {info_url}")
         async with aiohttp.ClientSession() as session:
             async with session.get(info_url) as response:
@@ -405,10 +405,10 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
 
     async def forward_chunk_request(self, request: web.Request) -> web.Response:
         """Redirects a precomp chunk request to the original URL"""
-        info_url_b64_dash_under = request.match_info.get("info_url_b64_altchars_dash_underline")
-        if not info_url_b64_dash_under:
+        encoded_original_url = request.match_info.get("encoded_original_url")
+        if not encoded_original_url:
             return web.Response(status=400, text="Missing parameter: url")
-        info_url = b64decode(info_url_b64_dash_under, altchars=b'-_').decode('utf8').lstrip("precomputed://").rstrip("/")
+        info_url = b64decode(encoded_original_url, altchars=b'-_').decode('utf8').lstrip("precomputed://").rstrip("/")
         rest = request.match_info.get("rest", "")
         raise web.HTTPFound(location=f"{info_url}/{rest.lstrip('/')}")
 
