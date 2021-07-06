@@ -108,7 +108,7 @@ class WsAppletMixin(Applet):
 
 class WsDataSelectionApplet(WsAppletMixin, DataSelectionApplet[PixelClassificationLane]):
     def _get_json_state(self) -> JSON_VALUE:
-        return [lane.to_json_data() for lane in self.lanes.get(default=[])]
+        return [lane.to_json_data() for lane in self.lanes.get() or []]
 
     def _set_json_state(self, state: JSON_VALUE):
         if not isinstance(state, list):
@@ -121,7 +121,7 @@ class WsDataSelectionApplet(WsAppletMixin, DataSelectionApplet[PixelClassificati
 
 class WsBrushingApplet(WsAppletMixin, BrushingApplet):
     def _get_json_state(self) -> JSON_VALUE:
-        return [annotation.to_json_data() for annotation in self.annotations.get(default=[])]
+        return [annotation.to_json_data() for annotation in self.annotations.get() or []]
 
     def _set_json_state(self, state: JSON_VALUE):
         if not isinstance(state, list):
@@ -150,7 +150,7 @@ class WsFeatureSelectionApplet(WsAppletMixin, FeatureSelectionApplet):
         raise ValueError(f"Could not convert {data} into a Feature Extractor")
 
     def _get_json_state(self) -> JSON_VALUE:
-        return [extractor.to_json_data() for extractor in self.feature_extractors.get(default=[])]
+        return [extractor.to_json_data() for extractor in self.feature_extractors.get() or []]
 
     def _set_json_state(self, state: JSON_VALUE):
         if not isinstance(state, list):
