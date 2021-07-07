@@ -1,0 +1,1 @@
+javascript:(function(){window.ilastik_debug=false;var s=document.createElement("script");s.src="http://localhost/app/js/inject_into_neuroglancer.js";s.onload = () => window.inject_ilastik(new URL("http://localhost/app"), new URL("http://localhost/app/css/main.css")); document.head.appendChild(s)})();
