@@ -7,6 +7,8 @@ from urllib.parse import urljoin
 import asyncio
 from aiohttp import web
 import os
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 from aiohttp.web_routedef import head
 
@@ -40,6 +42,7 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         self.app.add_routes([
             web.post('/session', self.spawn_session),
             web.get('/session/{session_id}', self.session_status),
+            web.static('/', Path(__file__) / "../../../overlay/public", follow_symlinks=True, show_index=True),
         ])
 
     def _make_session_url(self, session_id: uuid.UUID) -> str:

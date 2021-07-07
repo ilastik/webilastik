@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "strictFunctionTypes": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "outDir": "build/cjs",
+    "declaration": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noUnusedParameters": true,
+    "noUnusedLocals": true,
+    "preserveConstEnums": true,
+    "experimentalDecorators": true,
+    "strictNullChecks": true,
+    "strictPropertyInitialization": true,
+    "allowSyntheticDefaultImports": true,
+    "sourceMap": true,
+    "moduleResolution": "node",
+    "target": "ES2018",
+    "newLine": "LF",
+    "typeRoots": [],
+    "module": "CommonJS"
+  }
+}

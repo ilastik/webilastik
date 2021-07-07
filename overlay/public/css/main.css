@@ -1,0 +1,77 @@
+.ItkOverlayControls, .ItkCollapsableApplet, .ItkPopupWidget{
+    padding: 10px;
+    border-radius: 3px;
+    font-family: helvetica;
+    border: solid 2px black;
+    background-color: rgb(239 239 239);
+    margin-bottom: 5px;
+    color: black
+}
+
+.ItkCollapsableApplet_header{
+    margin: 0.1em;
+    padding: 0.2em;
+    background-color: rgba(0,0,0, 5%);
+}
+
+.ItkOverlayControls{
+    position: fixed;
+    resize: both;
+    overflow: scroll;
+    filter: drop-shadow(10px 10px 4px rgba(0,0,0, 0.3));
+}
+
+.ItkOverlayControls_header{
+    margin-top: 0;
+    padding: 0.3em;
+}
+
+.ItkOverlayControls_drag_handle{
+    color: rgba(0,0,0, 0.2);
+    font-size: 1.0em;
+}
+
+.ItkSessionCreatorWidget form, .ItkSessionLoaderWidget form{
+    padding-left: 2em;
+}
+
+.ItkSessionCreatorWidget_status-messages{
+    height: 6em;
+    resize: both;
+    overflow-y: scroll;
+    background-color: rgba(0, 0, 0, 10%);
+    padding: 5px;
+}
+
+.ItkSessionCreatorWidget_status-messages p{
+    margin-top: 2px;
+    margin-bottom: 2px;
+}
+
+.ItkFeatureSelectionWidget td, .ItkFeatureSelectionWidget th{
+    border: solid 1px grey;
+    padding: 0.3em;
+}
+
+.ItkBrushingWidget_status_display{
+    border: dashed 1px grey;
+    background-color: rgba(0,0,0, 0.1);
+    padding: 0.2em;
+}
+
+.ItkBrushStrokesContainer{
+    background-color: rgba(0,0,0, 0.1);
+}
+
+.ItkBrushStrokesContainer td{
+    padding: 0.4em;
+    background-color: rgba(0,0,0, 0.1);
+}
+
+.itk_hidden_element{
+    display: none;
+}
+
+.ItkSelector{
+    background-color: rgba(0,0,0, 0.1);
+}
