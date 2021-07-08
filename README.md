@@ -7,19 +7,26 @@ Webilastik heavily uses [ndstructs](https://github.com/ilastik/ndstructs) to hav
 
 # Server
 
-A PixelClassification workflow can be exposed over websockets by running `webilastik/ui/workflow/ws_pixel_classification_workflow.py`. You can make manual requests to the server such as the ones in `tests/test_ws_pixel_classification_workflow.py` or use [a modified version of Neuroglancer](https://github.com/ilastik/neuroglancer/tree/web_predictions) for that purpose. Eventually the modified neuroglancer will be replaced by the [webilastik-overlay](https://github.com/ilastik/webilastik-overlay)
+In order to use ilastik over the web, a user must first allocate a session (which for now can run either locally as a separate process or remotely on CSCS). This session allocation is done by `webilastik/server/__init__.py` (see `examples/start_manager_for_local_sessions.sh` for an example on how to launch it). This executable is an HTTP handler that will itself spawn other HTTP servers, which are the user sessions, and those sessions will actually run computations for the user.
 
+An HTTP server to expose webilastik should be configured with options analogous to those in `examples/nginx_session_proxy.conf`. The important thing to note is the redirection from requests of the form `session-<session-id>` to `http://unix:/tmp/to-session-$session_id`, since those unix sockets will tunnel back to the user sessions, which might be running in different machines than that which is hosting `webilastik/server/__init__.py`. Also, CORS must be enabled since ilastik will probably not be running on the same server as the viewer.
+
+# Client (Overlay)
+
+This project contains an npm project in `./overlay`, which can be used to build the ilastik client. It is an overlay that can be applied on top of neuroglancer or vanilla HTML `<img/>` tags (for now, via bookmarklet injection), and contains all controls required to request a session, add brush strokes, select image features and visualize predictions.
+
+There is a compiled neuroglancer at `overlay/public/nehuba/index.html` which can be accessed once the session allocation server is running (`webilastik/server/__init__.py`). You can access that and inject ilastik on top of it by first compiling the appropriate target in the overlay project (e.g.: `npm run bundle-ng-inject` or `npm run bundle-img-inject`), then adding the bookmarlets at `overlay/bookmarklets` to your bookmarks toolbar in your browser, and then just executing the bookmark once the page with neuroglancer is loaded.
 
 # Concepts
 
 
 ## Operators
 
-A refinement of the Operator concept in classic ilastik; they represent a lazy computation that can be applied to a `ndstructs.datasource.DataSource`.
+A refinement of the Operator concept in classic ilastik; they represent a lazy computation that usually can be applied to a `ndstructs.datasource.DataRoi`.
 
 Operators inherit from the base `Operator[IN, OUT]` class and must implement `.compute(roi: IN) -> OUT` . The most common implementation being `.compute(roi: DataRoi) -> Array5D` when dealing with operators that use halos. This means that once you have an operator instantiated, you can apply it over any slice of any `DataSource` and the operator will be able to retrieve any extra data if needs from the `DataRoi` object.
 
-Operators do *not* deal with Slots or dirty propagation; Those are a UI-only concept in webilastik. Operators are always ready to compute and do not need any other steps to be taken beyond successfully constructing one.
+Operators do *not* deal with `Slots` or dirty propagation; Those are a UI-only concept in webilastik. Operators are always ready to compute and do not need any other steps to be taken beyond successfully constructing one.
 
 Wherever it makes sense, operators will take a `preprocessor: Optional[Operator]` constructor argument, which allows them to be composed with each other, e.g.:
 
@@ -36,7 +43,7 @@ connected_components_op.compute(...)
 
 ## Applets (experimental)
 
-Applets are a UI concept; they usually will represent the user's intent on creating an Operator.
+Applets are a UI concept; they usually will represent the user's intent on creating an `Operator`.
 
 Applets are organized in a Directed Acyclic Graph, where the vertices are the Applets and the edges are `Slots` (see section below).
 
@@ -127,4 +134,4 @@ thresh_app.threshold.set_value(1, confirmer=some_gui_confirmation_popup)
 
 ## Workflows
 
-Workflows are a predefined collection of `Applets`. Ideally, workflows implement no logic; As much as possible, the `Applets` should be independant of external logic, so that they can be reused in multiple workflows. Interaction with a workflow should also be throu the applets, so in a `PixelClassificationWorkflow`, for example, adding lanes is done via the `PixelClassificationWorkflow.data_selection_applet: DataSelectionApplet` property, and not through some custom workflow method that would have to be re-implemented for every workflow.
+Workflows are a predefined collection of `Applets`. Ideally, workflows implement no logic; As much as possible, the `Applets` should be independant of external logic, so that they can be reused in multiple workflows. Interaction with a workflow should also be through the applets, so in a `PixelClassificationWorkflow`, for example, adding brush strokes is done via the `PixelClassificationWorkflow.brushing_applet : BrushingApplet` property, and not through some custom workflow method that would have to be re-implemented for every workflow.
