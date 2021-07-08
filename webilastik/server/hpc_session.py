@@ -71,7 +71,6 @@ class HpcSession(Session):
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument("--master-host")
-    parser.add_argument("--external-url")
     parser.add_argument("--master-username", default="wwww-data")
     parser.add_argument("--socket-at-session", type=Path)
     parser.add_argument("--socket-at-master", type=Path)
