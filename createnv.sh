@@ -11,6 +11,7 @@ conda create -n ${ENVIRONMENT_NAME} -c ilastik-forge -c conda-forge python=3.7 \
     numpy \
     fastfilters \
     fs \
+    lemon=1.3.1=he9d42e9_3 \
     vigra \
     scikit-image \
     scikit-learn \
