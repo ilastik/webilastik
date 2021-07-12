@@ -5,14 +5,12 @@ import asyncio
 from typing import Any, Dict, List, Optional, Mapping, cast, Sequence
 import json
 from base64 import b64decode
+from http import HTTPStatus
 
 from ndstructs.datasource.PrecomputedChunksDataSource import PrecomputedChunksInfo
-from webilastik.scheduling.multiprocess_runner import MultiprocessRunner
+from webilastik.scheduling.hashing_executor import HashingExecutor
 
-from aiohttp.web_response import BaseClass
-from ndstructs.array5D import Array5D
-from webilastik.classifiers.pixel_classifier import PixelClassifier, VigraPixelClassifier
-from webilastik import datasource
+from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.datasource import datasource_from_url
 
 from ndstructs.datasource.DataSource import DataSource
@@ -168,7 +166,7 @@ class WsPredictingApplet(WsAppletMixin):
         *,
         pixel_classifier: Slot[VigraPixelClassifier[IlpFilter]],
         datasources: Slot[Sequence[DataSource]],
-        runner: MultiprocessRunner,
+        runner: HashingExecutor,
     ):
         self._in_pixel_classifier = pixel_classifier
         self._in_datasources = datasources
@@ -240,7 +238,7 @@ class WsPredictingApplet(WsAppletMixin):
         zEnd = int(request.match_info.get("zEnd")) # type: ignore
 
         datasource = self._decode_datasource(encoded_raw_data_url)
-        predictions = await self.runner.async_compute(
+        predictions = await self.runner.async_submit(
             self._in_pixel_classifier().compute,
             DataRoi(datasource, x=(xBegin, xEnd), y=(yBegin, yEnd), z=(zBegin, zEnd))
         )
@@ -284,7 +282,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             "predicting_applet",
             pixel_classifier=pixel_classifier_applet.pixel_classifier,
             datasources=brushing_applet.datasources,
-            runner=MultiprocessRunner(num_workers=8),
+            runner=HashingExecutor(num_workers=8),
         )
         self.ws_applets : Mapping[str, WsAppletMixin] = {
             feature_selection_applet.name: feature_selection_applet,
