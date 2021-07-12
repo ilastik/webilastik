@@ -39,8 +39,3 @@ class MultiprocessRunner:
         exec_idx = hash(arg) % len(self._executors)
         executor = self._executors[exec_idx]
         return executor.submit(target, arg).result()
-
-class PixelPredictionsRunner:
-    def __init__(self, *, classifier: PixelClassifier[IlpFilter], runner: MultiprocessRunner):
-        self.runner = runner
-        self.classifier = classifier
