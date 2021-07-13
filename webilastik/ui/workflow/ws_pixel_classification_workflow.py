@@ -1,4 +1,5 @@
 from abc import abstractmethod, ABC
+import functools
 import os
 import signal
 import asyncio
@@ -40,6 +41,13 @@ from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.ui.applet.brushing_applet import BrushingApplet
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
 from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow, PixelClassificationLane
+
+
+@functools.lru_cache()
+def _decode_datasource(datasource_url_b64_altchars_dash_underline: str) -> DataSource:
+    url = b64decode(datasource_url_b64_altchars_dash_underline.encode('utf8'), altchars=b'-_').decode('utf8')
+    return datasource_from_url(url)
+
 
 class WsAppletMixin(Applet):
     @property
@@ -171,7 +179,6 @@ class WsPredictingApplet(WsAppletMixin):
         self._in_pixel_classifier = pixel_classifier
         self._in_datasources = datasources
         self.runner = runner
-        self.datasource_cache: Dict[str, DataSource] = {}
         super().__init__(name=name)
 
     def _get_json_state(self) -> JSON_VALUE:
@@ -192,18 +199,11 @@ class WsPredictingApplet(WsAppletMixin):
     def _set_json_state(self, state: JSON_VALUE):
         pass
 
-    def _decode_datasource(self, datasource_url_b64_altchars_dash_underline: str) -> DataSource:
-        if datasource_url_b64_altchars_dash_underline not in self.datasource_cache:
-            url = b64decode(datasource_url_b64_altchars_dash_underline.encode('utf8'), altchars=b'-_').decode('utf8')
-            datasource = datasource_from_url(url)
-            self.datasource_cache[datasource_url_b64_altchars_dash_underline] = datasource
-        return self.datasource_cache[datasource_url_b64_altchars_dash_underline]
-
     async def predictions_precomputed_chunks_info(self, request: web.Request):
         classifier = self._in_pixel_classifier()
         expected_num_channels = len(classifier.color_map)
         encoded_raw_data_url = str(request.match_info.get("encoded_raw_data")) # type: ignore
-        datasource = self._decode_datasource(encoded_raw_data_url)
+        datasource = _decode_datasource(encoded_raw_data_url)
 
         return web.Response(
             text=json.dumps({
@@ -237,7 +237,7 @@ class WsPredictingApplet(WsAppletMixin):
         zBegin = int(request.match_info.get("zBegin")) # type: ignore
         zEnd = int(request.match_info.get("zEnd")) # type: ignore
 
-        datasource = self._decode_datasource(encoded_raw_data_url)
+        datasource = _decode_datasource(encoded_raw_data_url)
         predictions = await self.runner.async_submit(
             self._in_pixel_classifier().compute,
             DataRoi(datasource, x=(xBegin, xEnd), y=(yBegin, yEnd), z=(zBegin, zEnd))
