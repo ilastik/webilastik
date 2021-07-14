@@ -4,6 +4,7 @@ import io
 from pathlib import Path
 
 from ndstructs.datasource import DataSource
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 
 from webilastik import Project
 from webilastik.ui.applet.data_selection_applet import DataSelectionApplet, ILane
@@ -12,7 +13,6 @@ from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationAppl
 from webilastik.ui.applet.brushing_applet import BrushingApplet
 from webilastik.classifiers.pixel_classifier import PixelClassifier
 from webilastik.features.ilp_filter import IlpFilter
-from webilastik.utility.serialization import ObjectGetter, ValueGetter, JSON_VALUE, JSON_OBJECT
 from webilastik.datasource import datasource_from_url
 
 
@@ -25,19 +25,20 @@ class PixelClassificationLane(ILane):
         return self.raw_data
 
     @classmethod
-    def from_json_data(cls, data: JSON_VALUE) -> "PixelClassificationLane":
-        raw_data_obj = ObjectGetter.get(key="raw_data", data=data)
-        raw_data_url : str = ValueGetter(str).get(key="url", data=raw_data_obj)
+    def from_json_data(cls, data: JsonValue) -> "PixelClassificationLane":
+        data_dict = ensureJsonObject(data)
+        raw_data_obj = ensureJsonObject(data_dict.get("raw_data"))
+        raw_data_url : str = ensureJsonString(raw_data_obj.get("url"))
 
-        mask_obj = ObjectGetter.get_optional(key="prediction_mask", data=data)
-        mask_url: Optional[str] = None if mask_obj is None else ValueGetter(str).get(key="url", data=mask_obj)
+        mask_obj = data_dict.get("prediction_mask")
+        mask_url: Optional[str] = None if mask_obj is None else ensureJsonString(ensureJsonObject(mask_obj).get("url"))
 
         return cls(
             raw_data=datasource_from_url(raw_data_url),
             prediction_mask=None if mask_url is None else datasource_from_url(mask_url)
         )
 
-    def to_json_data(self) -> JSON_OBJECT:
+    def to_json_data(self) -> JsonObject:
         return {
             "raw_data": self.raw_data.to_json_data(),
             "prediction_mask": None if self.prediction_mask == None else self.prediction_mask.to_json_data()

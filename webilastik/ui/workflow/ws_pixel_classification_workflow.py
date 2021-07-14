@@ -9,6 +9,7 @@ from base64 import b64decode
 from http import HTTPStatus
 
 from ndstructs.datasource.PrecomputedChunksDataSource import PrecomputedChunksInfo
+from ndstructs.utils.json_serializable import JsonValue, ensureJsonArray, ensureJsonObject, ensureJsonString
 from webilastik.scheduling.hashing_executor import HashingExecutor
 
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
@@ -31,7 +32,6 @@ from webilastik.features.channelwise_fastfilters import (
     HessianOfGaussianEigenvalues,
     LaplacianOfGaussian,
 )
-from webilastik.utility.serialization import ValueGetter, JSON_VALUE
 from webilastik.annotations.annotation import Annotation
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.annotations import Annotation
@@ -57,11 +57,11 @@ class WsAppletMixin(Applet):
         return self._websockets
 
     @abstractmethod
-    def _get_json_state(self) -> JSON_VALUE:
+    def _get_json_state(self) -> JsonValue:
         pass
 
     @abstractmethod
-    def _set_json_state(self, state: JSON_VALUE):
+    def _set_json_state(self, state: JsonValue):
         pass
 
     async def _update_remote(self):
@@ -112,35 +112,22 @@ class WsAppletMixin(Applet):
         asyncio.get_event_loop().create_task(self._update_remote())
 
 
-class WsDataSelectionApplet(WsAppletMixin, DataSelectionApplet[PixelClassificationLane]):
-    def _get_json_state(self) -> JSON_VALUE:
-        return [lane.to_json_data() for lane in self.lanes.get() or []]
-
-    def _set_json_state(self, state: JSON_VALUE):
-        if not isinstance(state, list):
-            raise TypeError(f"Bad state value in {self.__class__.__name__}:\n", json.dumps(state))
-        return self.lanes.set_value(
-            [PixelClassificationLane.from_json_data(raw_lane) for raw_lane in state],
-            confirmer=lambda msg: True
-        )
-
-
 class WsBrushingApplet(WsAppletMixin, BrushingApplet):
-    def _get_json_state(self) -> JSON_VALUE:
-        return [annotation.to_json_data() for annotation in self.annotations.get() or []]
+    def _get_json_state(self) -> JsonValue:
+        return tuple(annotation.to_json_data() for annotation in self.annotations.get() or [])
 
-    def _set_json_state(self, state: JSON_VALUE):
-        if not isinstance(state, list):
-            raise TypeError(f"Bad state value in {self.__class__.__name__}:\n", json.dumps(state))
+    def _set_json_state(self, state: JsonValue):
+        raw_brush_array = ensureJsonArray(state)
         return self.annotations.set_value(
-            [Annotation.from_json_data(raw_lane) for raw_lane in state],
+            [Annotation.from_json_data(raw_brush) for raw_brush in raw_brush_array],
             confirmer=lambda msg: True
         )
 
 
 class WsFeatureSelectionApplet(WsAppletMixin, FeatureSelectionApplet):
-    def _item_from_json_data(self, data: JSON_VALUE) -> IlpFilter:
-        class_name = ValueGetter.get_class_name(data=data)
+    def _item_from_json_data(self, data: JsonValue) -> IlpFilter:
+        data_dict = ensureJsonObject(data)
+        class_name = ensureJsonString(data_dict.get("__class__"))
         if class_name == StructureTensorEigenvalues.__name__:
             return StructureTensorEigenvalues.from_json_data(data)
         if class_name == GaussianGradientMagnitude.__name__:
@@ -155,14 +142,13 @@ class WsFeatureSelectionApplet(WsAppletMixin, FeatureSelectionApplet):
             return LaplacianOfGaussian.from_json_data(data)
         raise ValueError(f"Could not convert {data} into a Feature Extractor")
 
-    def _get_json_state(self) -> JSON_VALUE:
-        return [extractor.to_json_data() for extractor in self.feature_extractors.get() or []]
+    def _get_json_state(self) -> JsonValue:
+        return tuple(extractor.to_json_data() for extractor in self.feature_extractors.get() or [])
 
-    def _set_json_state(self, state: JSON_VALUE):
-        if not isinstance(state, list):
-            raise TypeError(f"Bad state value in {self.__class__.__name__}:\n", json.dumps(state))
+    def _set_json_state(self, state: JsonValue):
+        raw_feature_array = ensureJsonArray(state)
         return self.feature_extractors.set_value(
-            [self._item_from_json_data(raw_lane) for raw_lane in state],
+            [self._item_from_json_data(raw_feature) for raw_feature in raw_feature_array],
             confirmer=lambda msg: True
         )
 
@@ -181,22 +167,22 @@ class WsPredictingApplet(WsAppletMixin):
         self.runner = runner
         super().__init__(name=name)
 
-    def _get_json_state(self) -> JSON_VALUE:
+    def _get_json_state(self) -> JsonValue:
         classifier = self._in_pixel_classifier.get()
         if classifier:
             producer_is_ready = True
-            channel_colors = [color.to_json_data() for color in classifier.color_map.keys()]
+            channel_colors = tuple(color.to_json_data() for color in classifier.color_map.keys())
         else:
             producer_is_ready = False
-            channel_colors = []
+            channel_colors = tuple()
 
         return {
             "producer_is_ready": producer_is_ready,
             "channel_colors": channel_colors,
-            "datasources": [ds.to_json_data() for ds in self._in_datasources.get() or []],
+            "datasources": tuple(ds.to_json_data() for ds in self._in_datasources.get() or []),
         }
 
-    def _set_json_state(self, state: JSON_VALUE):
+    def _set_json_state(self, state: JsonValue):
         pass
 
     async def predictions_precomputed_chunks_info(self, request: web.Request):
@@ -266,7 +252,6 @@ class WsPredictingApplet(WsAppletMixin):
             body=resp,
             content_type="application/octet-stream",
         )
-
 
 
 class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
@@ -390,14 +375,14 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
                 response_text = await response.text()
                 if response.status // 100 != 2:
                     return web.Response(status=response.status, text=response_text)
-                info = PrecomputedChunksInfo.from_json(response_text)
+                info = PrecomputedChunksInfo.from_json_data(json.loads(response_text))
 
         stripped_info = PrecomputedChunksInfo(
             at_type=info.at_type,
             type_=info.type_,
             data_type=info.data_type,
             num_channels=info.num_channels,
-            scales=[scale for scale in info.scales if tuple(scale.resolution) == resolution],
+            scales=tuple(scale for scale in info.scales if tuple(scale.resolution) == resolution),
         )
         return web.json_response(stripped_info.to_json_data())
 

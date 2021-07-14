@@ -4,10 +4,9 @@ from typing import List, Sequence, Mapping, Tuple, Dict, Iterable, Sequence, Any
 import numpy as np
 from ndstructs import Interval5D, Point5D, Shape5D
 from ndstructs import Array5D, All, ScalarData, StaticLine
-from ndstructs.utils import Dereferencer, Referencer
 from ndstructs.datasource import DataSource, DataRoi
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonArray, ensureJsonInt, ensureJsonObject, ensureJsonString
 
-from webilastik.utility.serialization import ListGetter, ObjectGetter, ValueGetter, JSON_OBJECT, JSON_VALUE
 from webilastik.features.feature_extractor import FeatureExtractor, FeatureData
 from webilastik.datasource import datasource_from_url
 
@@ -29,15 +28,16 @@ class Color:
         self.name = name or f"Label {self.rgba}"
 
     @classmethod
-    def from_json_data(cls, data: Mapping[str, Any]) -> "Color":
+    def from_json_data(cls, data: JsonValue) -> "Color":
+        data_dict = ensureJsonObject(data)
         return Color(
-            r=np.uint8(data.get("r", 0)),
-            g=np.uint8(data.get("g", 0)),
-            b=np.uint8(data.get("b", 0)),
-            a=np.uint8(data.get("a", 255)),
+            r=np.uint8(ensureJsonInt(data_dict.get("r", 0))),
+            g=np.uint8(ensureJsonInt(data_dict.get("g", 0))),
+            b=np.uint8(ensureJsonInt(data_dict.get("b", 0))),
+            a=np.uint8(ensureJsonInt(data_dict.get("a", 255))),
         )
 
-    def to_json_data(self) -> JSON_OBJECT:
+    def to_json_data(self) -> JsonObject:
         return {
             "r": int(self.r),
             "g": int(self.g),
@@ -144,15 +144,16 @@ class Annotation(ScalarData):
         return cls(scribblings._data, axiskeys=scribblings.axiskeys, color=color, raw_data=raw_data, location=start)
 
     @classmethod
-    def from_json_data(cls, data: JSON_VALUE, dereferencer: Optional[Dereferencer] = None) -> "Annotation":
-        raw_voxels = ListGetter.get_list_of_objects(key="voxels", data=data)
+    def from_json_data(cls, data: JsonValue) -> "Annotation":
+        data_dict = ensureJsonObject(data)
+        raw_voxels = ensureJsonArray(data_dict.get("voxels"))
         voxels : Sequence[Point5D] = [Point5D.from_json_data(raw_voxel) for raw_voxel in raw_voxels]
 
-        raw_color = ObjectGetter.get(key="color", data=data)
-        color = Color.from_json_data(raw_color)
+        color = Color.from_json_data(data_dict.get("color"))
 
-        raw_data_obj = ObjectGetter.get("raw_data", data=data)
-        raw_data = datasource_from_url(ValueGetter(str).get(key="url", data=raw_data_obj))
+        raw_data_obj = ensureJsonObject(data_dict.get("raw_data"))
+        raw_data_url = ensureJsonString(raw_data_obj.get("url"))
+        raw_data = datasource_from_url(raw_data_url)
 
         start = Point5D.min_coords(voxels)
         stop = Point5D.max_coords(voxels) + 1  # +1 because slice.stop is exclusive, but max_point isinclusive
@@ -166,7 +167,7 @@ class Annotation(ScalarData):
 
         return cls(scribblings._data, axiskeys=scribblings.axiskeys, color=color, raw_data=raw_data, location=start)
 
-    def to_json_data(self, referencer: Referencer = lambda x: None) -> JSON_OBJECT:
+    def to_json_data(self) -> JsonObject:
         voxels : List[Point5D] = []
 
         # FIXME: annotation should probably not be an Array6D
@@ -176,9 +177,8 @@ class Annotation(ScalarData):
         return {
             "color": self.color.to_json_data(),
             "raw_data": self.raw_data.to_json_data(),
-            "voxels": [vx.to_json_data() for vx in voxels]
+            "voxels": tuple(vx.to_json_data() for vx in voxels),
         }
-        raise NotImplementedError
 
     def get_feature_samples(self, feature_extractor: FeatureExtractor) -> FeatureSamples:
         interval_under_annotation = self.interval.updated(c=self.raw_data.interval.c)

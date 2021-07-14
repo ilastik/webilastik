@@ -21,7 +21,6 @@ from webilastik.annotations import Annotation, FeatureSamples, Color
 from webilastik import Project
 from webilastik.operator import Operator
 from ndstructs.datasource import DataRoi, DataSource
-from ndstructs.utils import JsonSerializable, from_json_data, Dereferencer
 
 try:
     import ilastik_operator_cache # type: ignore
