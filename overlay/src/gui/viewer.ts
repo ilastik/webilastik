@@ -5,7 +5,7 @@ import { IMultiscaleDataSource } from "../datasource/datasource";
 import { HtmlImgSource } from "../datasource/html_img";
 import { PrecomputedChunks, PredictionsPrecomputedChunks, StrippedPrecomputedChunks } from "../datasource/precomputed_chunks";
 import { IViewerDriver, IViewportDriver } from "../drivers/viewer_driver";
-import { ParsedUrl } from "../util/parsed_url";
+import { Url } from "../util/parsed_url";
 
 export abstract class View{
     public readonly name: string;
@@ -59,7 +59,7 @@ export class Viewer{
         if(native_view === undefined){
             return undefined
         }
-        let current_url = ParsedUrl.parse(native_view.url)
+        let current_url = Url.parse(native_view.url)
         let multiscale_datasource : IMultiscaleDataSource;
         if(HtmlImgSource.accepts(current_url)){
             multiscale_datasource = new HtmlImgSource(current_url)

@@ -98,11 +98,11 @@ export class BrushingWidget{
         if(data_view.datasource instanceof StrippedPrecomputedChunks){
             let originalDataProvider = data_view.datasource.original
             let scale = originalDataProvider.findScale(data_view.datasource.scales[0].resolution)!
-            return this.startTraining(scale.toDataSource())
+            return this.startTraining(scale.toIlastikDataSource())
         }
         if(data_view.datasource instanceof PredictionsPrecomputedChunks){
             //FIXME: allow more annotations?
-            return this.showStatus(`Showing predictions for ${data_view.datasource.raw_data_url.getSchemedHref("://")}`)
+            return this.showStatus(`Showing predictions for ${data_view.datasource.raw_data_url.double_protocol_raw}`)
         }
         if(data_view.datasource.scales.length == 1){
             return this.startTraining(data_view.datasource.scales[0].toIlastikDataSource())
@@ -117,8 +117,8 @@ export class BrushingWidget{
                 const stripped_precomp_chunks = await scale.toStrippedMultiscaleDataSource(this.session) //FIXME: race condition?
                 this.viewer.refreshView({
                     name: BrushingWidget.training_view_name_prefix + `${data_view.name} (${scale.toDisplayString()})`,
-                    url: stripped_precomp_chunks.url.getSchemedHref("://"),
-                    similar_url_hint: data_view.datasource.url.getSchemedHref("://"),
+                    url: stripped_precomp_chunks.url.double_protocol_raw,
+                    similar_url_hint: data_view.datasource.url.double_protocol_raw,
                 })
             },
         })

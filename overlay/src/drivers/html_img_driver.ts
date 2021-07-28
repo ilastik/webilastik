@@ -1,7 +1,7 @@
 import { vec3, quat, mat4 } from "gl-matrix";
 import { IViewerDriver } from "..";
 import { createElement } from "../util/misc";
-import { ParsedUrl } from "../util/parsed_url";
+import { Url } from "../util/parsed_url";
 import { PrecomputedChunks } from "../datasource/precomputed_chunks";
 import { IDataView, IViewportDriver, IViewportGeometry } from "./viewer_driver";
 import { HtmlImgSource } from "../datasource/html_img";
@@ -9,14 +9,14 @@ import { HtmlImgSource } from "../datasource/html_img";
 export class HtmlImgDriver implements IViewerDriver{
     public readonly img: HTMLImageElement;
     public readonly container: HTMLElement;
-    public readonly data_url: ParsedUrl;
+    public readonly data_url: Url;
     constructor({img}:{img: HTMLImageElement}){
         this.img = img
         this.container = img.parentElement || document.body
         try{
-            this.data_url = ParsedUrl.parse(this.img.src)
+            this.data_url = Url.parse(this.img.src)
         }catch{
-            this.data_url = ParsedUrl.parse(window.location.href).concat(this.img.src)
+            this.data_url = Url.parse(window.location.href).joinPath(this.img.src)
         }
     }
     public getViewportDrivers() : Array<HtmlImgViewportDriver>{
@@ -32,13 +32,13 @@ export class HtmlImgDriver implements IViewerDriver{
             htmlElement.parentElement?.removeChild(htmlElement)
         })
         const container = createElement({tagName: "div", parentElement: this.img.parentElement!, cssClasses: [output_css_class]})
-        const url = ParsedUrl.parse(view.url)
+        const url = Url.parse(view.url)
 
         if(HtmlImgSource.accepts(url)){
             return //FIXME
         }
 
-        PrecomputedChunks.fromUrl(ParsedUrl.parse(view.url)).then(precomp_chunks => {
+        PrecomputedChunks.fromUrl(Url.parse(view.url)).then(precomp_chunks => {
             const scale = precomp_chunks.scales[0]
             const increment = 128
             for(let y=0; y<this.img.height; y += increment){
@@ -54,14 +54,14 @@ export class HtmlImgDriver implements IViewerDriver{
                         y: [y, y_end],
                         z: [0, 1]
                     })
-                    .withAddedSearchParams(new Map([["format", "png"]]))
-                    .href
+                    .updatedWith({extra_search: new Map([["format", "png"]])})
+                    .schemeless_raw
                 }
             }
         })
     }
     public getDataViewOnDisplay(): IDataView | undefined{
-        return {name: this.data_url.name, url: this.data_url.href}
+        return {name: this.data_url.name, url: this.data_url.schemeless_raw}
     }
 }
 

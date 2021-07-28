@@ -1,9 +1,9 @@
 import { vec3 } from "gl-matrix";
 import { DataSource, Session } from "../client/ilastik";
-import { ParsedUrl } from "../util/parsed_url";
+import { Url } from "../util/parsed_url";
 
 export interface IMultiscaleDataSource{
-    readonly url: ParsedUrl;
+    readonly url: Url;
     readonly scales: Array<IDataScale>;
     findScale(resolution: vec3): IDataScale | undefined;
 }
