@@ -2,7 +2,7 @@ from abc import abstractmethod, ABC
 from typing import Type, TypeVar, List, TypeVar, ClassVar, Mapping, Iterator, Sequence, Dict, Any, Optional
 import re
 from ndstructs.array5D import Array5D
-from ndstructs.datasource.DataRoi import DataRoi
+from ndstructs.datasource.DataSource import DataRoi
 from ndstructs.utils.json_serializable import JsonValue
 
 import numpy as np
