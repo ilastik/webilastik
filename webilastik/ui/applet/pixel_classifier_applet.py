@@ -1,7 +1,7 @@
 from typing import Generic, Mapping, Optional, Sequence, Dict, Any, Iterator, TypeVar
 import textwrap
 
-from ndstructs.datasource import DataRoi
+from webilastik.datasource import DataRoi
 import numpy as np
 
 from webilastik.ui.applet  import Applet, DerivedSlot, NotReadyException, Slot, CONFIRMER

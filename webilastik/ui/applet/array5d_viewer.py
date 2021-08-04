@@ -2,7 +2,7 @@ from typing import Sequence, Optional
 from abc import ABC, abstractmethod
 
 from ndstructs import Array5D
-from ndstructs.datasource import DataSource, DataRoi
+from webilastik.datasource import DataSource, DataRoi
 
 from webilastik.ui.applet import Applet, Slot, CONFIRMER, ValueSlot
 from webilastik.ui.applet.data_selection_applet import ILane

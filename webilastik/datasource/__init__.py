@@ -3,8 +3,9 @@ import enum
 from abc import abstractmethod, ABC
 from enum import IntEnum
 from pathlib import Path, PurePosixPath
-from typing import Optional, Tuple, Union, cast, Iterator
+from typing import Callable, ClassVar, Optional, Tuple, Union, cast, Iterator, Dict
 from typing_extensions import Final
+from webilastik.utility.url import Url
 
 import h5py
 import numpy as np
@@ -14,10 +15,10 @@ from fs.base import FS
 from ndstructs import Array5D, Shape5D, Interval5D, Point5D
 from ndstructs.array5D import SPAN_OVERRIDE, All
 from ndstructs.point5D import SPAN
-from ndstructs.utils.json_serializable import JsonObject
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 
 try:
-    import ndstructs_datasource_cache # type: ignore
+    import datasource_cache # type: ignore
 except ImportError:
     from functools import lru_cache
 
@@ -33,6 +34,8 @@ def guess_axiskeys(raw_shape: Tuple[int, ...]) -> str:
     return guesses[len(raw_shape)]
 
 
+DATASOURCE_FROM_JSON_CONSTRUCTOR = Callable[[JsonValue], "DataSource"]
+
 class DataSource(ABC):
     tile_shape: Final[Shape5D]
     dtype: Final[np.dtype]
@@ -42,6 +45,8 @@ class DataSource(ABC):
     axiskeys: Final[str]
     spatial_resolution: Final[Tuple[int, int, int]]
     roi: Final["DataRoi"]
+
+    datasource_from_json_constructors: ClassVar[Dict[str, DATASOURCE_FROM_JSON_CONSTRUCTOR]] = {}
 
     def __init__(
         self,
@@ -73,6 +78,16 @@ class DataSource(ABC):
             "axiskeys": self.axiskeys,
             "spatial_resolution": self.spatial_resolution,
         }
+
+    @classmethod
+    @abstractmethod
+    def from_json_value(cls, value: JsonValue) -> "DataSource":
+        json_obj = ensureJsonObject(value)
+        datasource_name = ensureJsonString(json_obj.get("__class__"))
+        for name, constructor in cls.datasource_from_json_constructors.items():
+            if name == datasource_name:
+                return constructor(value)
+        raise ValueError(f"Can't deserialize {json.dumps(value)}")
 
     @abstractmethod
     def __hash__(self) -> int:
@@ -265,6 +280,25 @@ class H5DataSource(DataSource):
             f.close()
             raise e
 
+    def to_json_value(self) -> JsonObject:
+        out = {**super().to_json_value()}
+        out["outer_path"] = self.outer_path.as_posix()
+        out["inner_path"] = self.inner_path.as_posix()
+        out["filesystem"] = self.filesystem.geturl("")
+        return out
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "H5DataSource":
+        value_obj = ensureJsonObject(value)
+        filesystem_raw_url = ensureJsonString(value_obj.get("filesystem"))
+        raw_location = value_obj.get("location")
+        return H5DataSource(
+            outer_path=Path(ensureJsonString(value_obj.get("outer_path"))),
+            inner_path=PurePosixPath(ensureJsonString(value_obj.get("inner_path"))),
+            filesystem=Url.parse(filesystem_raw_url).as_filesystem(),
+            location=Point5D.zero() if raw_location is None else Point5D.from_json_value(raw_location),
+        )
+
     def __hash__(self) -> int:
         return hash((
             super().__hash__(),
@@ -302,6 +336,7 @@ class H5DataSource(DataSource):
 
         return guess_axiskeys(dataset.shape)
 
+DataSource.datasource_from_json_constructors[H5DataSource.__name__] = H5DataSource.from_json_value
 
 class ArrayDataSource(DataSource):
     """A DataSource backed by an Array5D"""
@@ -323,6 +358,13 @@ class ArrayDataSource(DataSource):
             interval=self._data.interval,
             axiskeys=axiskeys,
         )
+
+    def to_json_value(self) -> JsonObject:
+        raise NotImplementedError
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "SkimageDataSource":
+        raise NotImplementedError
 
     def __hash__(self) -> int:
         return hash((self._data, self.tile_shape))
@@ -351,6 +393,8 @@ class SkimageDataSource(ArrayDataSource):
     def __init__(
         self, path: Path, *, location: Point5D = Point5D.zero(), filesystem: FS, tile_shape: Optional[Shape5D] = None
     ):
+        self.path = path
+        self.filesystem = filesystem
         raw_data: np.ndarray = skimage.io.imread(filesystem.openbin(path.as_posix())) # type: ignore
         axiskeys = "yxc"[: len(raw_data.shape)]
         super().__init__(
@@ -359,3 +403,32 @@ class SkimageDataSource(ArrayDataSource):
             location=location,
             tile_shape=tile_shape,
         )
+
+    def to_json_value(self) -> JsonObject:
+        out = {**DataSource.to_json_value(self)}
+        out["path"] = self.path.as_posix()
+        out["filesystem"] = self.filesystem.geturl("")
+        return out
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "SkimageDataSource":
+        value_obj = ensureJsonObject(value)
+        filesystem_raw_url = ensureJsonString(value_obj.get("filesystem"))
+        raw_location = value_obj.get("location")
+        raw_tile_shape = value_obj.get("tile_shape")
+        return SkimageDataSource(
+            path=Path(ensureJsonString(value_obj.get("path"))),
+            location=Point5D.zero() if raw_location is None else Point5D.from_json_value(raw_location),
+            filesystem=Url.parse(filesystem_raw_url).as_filesystem(),
+            tile_shape=None if raw_tile_shape is None else Shape5D.from_json_value(raw_tile_shape)
+        )
+
+    def __getstate__(self) -> JsonObject:
+        print(json.dumps(self.to_json_value(), indent=4))
+        return self.to_json_value()
+
+    def __setstate__(self, data: JsonObject):
+        ds = SkimageDataSource.from_json_value(data)
+        self.__init__(path=ds.path, filesystem=ds.filesystem, tile_shape=ds.tile_shape, location=ds.location)
+
+DataSource.datasource_from_json_constructors[SkimageDataSource.__name__] = SkimageDataSource.from_json_value

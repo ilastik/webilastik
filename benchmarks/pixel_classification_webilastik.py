@@ -6,7 +6,7 @@ import math
 
 
 from ndstructs import Array5D, Slice5D, Shape5D, Point5D
-from ndstructs.datasource import DataSource, N5DataSource, DataSourceSlice
+from webilastik.datasource import DataSource, N5DataSource, DataSourceSlice
 from webilastik.features.feature_extractor import FeatureExtractor
 from webilastik.features import (
     GaussianSmoothing,

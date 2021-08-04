@@ -146,15 +146,19 @@ class Url:
         if hostname == "" and protocol not in (Protocol.FILE, Protocol.MEMORY):
             raise ValueError(f"Missing hostname in {self.raw}")
 
-    def get_filesystem(self) -> FileSystem:
+    def __hash__(self) -> int:
+        return hash(self.raw)
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, Url) and self.raw == other.raw
+
+    def as_filesystem(self) -> FileSystem:
         if self.protocol in (Protocol.HTTP, Protocol.HTTPS):
-            return HttpPyFs(
-                self.updated_with(path=PurePosixPath("/")).schemeless_raw
-            )
+            return HttpPyFs(self.schemeless_raw)
         elif self.protocol == Protocol.MEMORY:
             raise ValueError(f"Can't get filesystem for {self.raw}")
         else: # self.protocol == Protocol.FILE
-            return OSFS("/")
+            return OSFS(self.path.as_posix())
 
     def updated_with(
         self,

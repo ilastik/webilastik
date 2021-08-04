@@ -20,7 +20,7 @@ from webilastik.features.feature_extractor import FeatureExtractorCollection
 from webilastik.annotations import Annotation, FeatureSamples, Color
 from webilastik import Project
 from webilastik.operator import Operator
-from ndstructs.datasource import DataRoi, DataSource
+from webilastik.datasource import DataRoi
 
 try:
     import ilastik_operator_cache # type: ignore
@@ -224,7 +224,7 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         for forest_index, forest in enumerate(self.forests):
             forest.writeHDF5(tmp_file_path, f"/Forest{forest_index:04d}")
         with h5py.File(tmp_file_path, "r") as f:
-            out = Project.h5_group_to_dict(f["/"])
+            out = Project.h5_group_to_dict(f["/"]) #type: ignore
         os.remove(tmp_file_path)
         return out
 

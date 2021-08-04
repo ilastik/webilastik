@@ -3,11 +3,12 @@ from pathlib import Path
 import pickle
 from typing_extensions import TypedDict
 import json
+from webilastik.utility.url import Url
 
 from fs import open_fs
 from fs.base import FS as FileSystem
 from ndstructs import Point5D, Shape5D, Interval5D, Array5D
-from ndstructs.utils.json_serializable import JsonObject
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonIntTripplet, ensureJsonObject, ensureJsonString
 
 from webilastik.datasource import DataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo
@@ -59,6 +60,20 @@ class PrecomputedChunksDataSource(DataSource):
         out["filesystem"] = self.filesystem.geturl("")
         return out
 
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "PrecomputedChunksDataSource":
+        value_obj = ensureJsonObject(value)
+        filesystem_raw_url = ensureJsonString(value_obj.get("filesystem"))
+        raw_location = value_obj.get("location")
+        raw_chunk_size = value_obj.get("chunk_size")
+        return PrecomputedChunksDataSource(
+            path=Path(ensureJsonString(value_obj.get("path"))),
+            resolution=ensureJsonIntTripplet(value_obj.get("spatial_resolution")), # FIXME? change to just resolution?
+            location=raw_location if raw_location is None else Point5D.from_json_value(raw_location),
+            chunk_size=None if raw_chunk_size is None else Shape5D.from_json_value(raw_chunk_size),
+            filesystem=Url.parse(filesystem_raw_url).as_filesystem(),
+        )
+
     def __hash__(self) -> int:
         return hash((super().__hash__(), self.filesystem.desc(self.path.as_posix()), self.scale.key))
 
@@ -107,3 +122,5 @@ class PrecomputedChunksDataSource(DataSource):
             chunk_size=data["chunk_size"],
             filesystem=filesystem
         )
+
+DataSource.datasource_from_json_constructors[PrecomputedChunksDataSource.__name__] = PrecomputedChunksDataSource.from_json_value

@@ -4,6 +4,7 @@ import enum
 import json
 import pickle
 from typing_extensions import TypedDict
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 
 import numpy as np
 from fs import open_fs
@@ -14,6 +15,7 @@ from ndstructs import Point5D, Interval5D, Array5D
 
 from webilastik.datasource.n5_attributes import N5Compressor, N5DatasetAttributes
 from webilastik.datasource import DataSource
+from webilastik.utility.url import Url
 
 class N5Block(Array5D):
     class Modes(enum.IntEnum):
@@ -90,6 +92,23 @@ class N5DataSource(DataSource):
             axiskeys=self.attributes.axiskeys,
         )
 
+    def to_json_value(self) -> JsonObject:
+        out = {**super().to_json_value()}
+        out["path"] = self.path.as_posix()
+        out["filesystem"] = self.filesystem.geturl("")
+        return out
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "N5DataSource":
+        value_obj = ensureJsonObject(value)
+        filesystem_raw_url = ensureJsonString(value_obj.get("filesystem"))
+        raw_location = value_obj.get("location")
+        return N5DataSource(
+            path=Path(ensureJsonString(value_obj.get("path"))),
+            filesystem=Url.parse(filesystem_raw_url).as_filesystem(),
+            location=raw_location if raw_location is None else Point5D.from_json_value(raw_location),
+        )
+
     def __hash__(self) -> int:
         return hash((self.filesystem.desc(self.path.as_posix()), self.interval))
 
@@ -131,3 +150,5 @@ class N5DataSource(DataSource):
         else:
             filesystem: FS = serialized_filesystem
         self.__init__(path=data["path"], location=data["location"], filesystem=filesystem)
+
+DataSource.datasource_from_json_constructors[N5DataSource.__name__] = N5DataSource.from_json_value

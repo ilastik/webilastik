@@ -3,7 +3,7 @@ from typing import Callable, Generic, Optional, Type, TypeVar
 
 import numpy as np
 
-from ndstructs.datasource import DataRoi, DataSource
+from webilastik.datasource import DataRoi, DataSource
 from ndstructs import Array5D, Shape5D
 
 IN = TypeVar("IN", contravariant=True)

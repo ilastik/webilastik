@@ -1,18 +1,18 @@
 from abc import abstractmethod
-from typing import Any, Mapping, Optional, TypeVar, Type, cast, List
+from typing import Optional, TypeVar, Type, List
 import math
-import fastfilters
-from ndstructs.array5D import All
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString, ensureJsonFloat
+import fastfilters #type: ignore
 
 import numpy
+from ndstructs import Array5D
+from ndstructs.array5D import All
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString, ensureJsonFloat
+from ndstructs import Point5D, Interval5D, Shape5D
 
 from .feature_extractor import FeatureData
 from .ilp_filter import IlpFilter
+from webilastik.datasource import DataSource, DataRoi
 from webilastik.operator import Operator, OpRetriever
-from ndstructs import Array5D, Image, ScalarImage
-from ndstructs import Point5D, Interval5D, Shape5D
-from ndstructs.datasource import DataSource, DataRoi
 
 try:
     import ilastik_operator_cache # type: ignore

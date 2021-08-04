@@ -1,7 +1,8 @@
-from typing import Iterable
+from typing import Dict, Iterable
 import bisect
 
 from ndstructs import Interval5D, Point5D, Array5D
+from ndstructs.utils.json_serializable import JsonObject, JsonValue
 
 from webilastik.datasource import DataSource
 
@@ -28,6 +29,15 @@ class SequenceDataSource(DataSource):
             axiskeys=stack_axis + Point5D.LABELS.replace(stack_axis, ""),
             tile_shape=tile_shape
         )
+
+    def to_json_value(self) -> JsonObject:
+        out : Dict[str, JsonValue] = {**super().to_json_value()}
+        out["datasources"] = tuple([ds.to_json_value() for ds in self.datasources])
+        return out
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "SequenceDataSource":
+        raise NotImplementedError
 
     def __hash__(self) -> int:
         return hash(tuple(self.datasources))

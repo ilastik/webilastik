@@ -1,13 +1,13 @@
 from abc import abstractmethod, ABC
 from typing import Type, TypeVar, List, TypeVar, ClassVar, Mapping, Iterator, Sequence, Dict, Any, Optional
 import re
-from ndstructs.array5D import Array5D
-from ndstructs.datasource.DataSource import DataRoi
-from ndstructs.utils.json_serializable import JsonValue
 
+
+from ndstructs.array5D import Array5D
+from ndstructs.utils.json_serializable import JsonValue
 import numpy as np
 
-
+from webilastik.datasource import DataRoi
 from .feature_extractor import FeatureExtractor
 from webilastik.operator import Operator, OpRetriever
 

@@ -2,7 +2,7 @@ from typing import Tuple, Iterable
 
 from abc import abstractmethod, ABC
 from ndstructs import Point5D, Shape5D, Interval5D, Point5D, Array5D, ScalarData
-from ndstructs.datasource import DataSource, DataRoi
+from webilastik.datasource import DataSource, DataRoi
 import numpy as np
 import vigra
 

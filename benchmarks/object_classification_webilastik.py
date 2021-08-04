@@ -1,11 +1,11 @@
 from pathlib import Path
 import time
-from ndstructs.datasource.DataRoi import DataRoi
+from webilastik.datasource import DataRoi
 
 import vigra
 import numpy as np
 from fs.osfs import OSFS
-from ndstructs.datasource import SkimageDataSource
+from webilastik.datasource import SkimageDataSource
 from ndstructs import Shape5D, Point5D
 
 import sys

@@ -4,12 +4,10 @@ from typing import List, Sequence, Mapping, Tuple, Dict, Iterable, Sequence, Any
 import numpy as np
 from ndstructs import Interval5D, Point5D, Shape5D
 from ndstructs import Array5D, All, ScalarData, StaticLine
-from ndstructs.datasource import DataSource, DataRoi
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonArray, ensureJsonInt, ensureJsonObject, ensureJsonString
 
+from webilastik.datasource import DataSource, DataRoi
 from webilastik.features.feature_extractor import FeatureExtractor, FeatureData
-from webilastik.datasource import datasource_from_url
-
 
 
 class Color:
@@ -144,16 +142,13 @@ class Annotation(ScalarData):
         return cls(scribblings._data, axiskeys=scribblings.axiskeys, color=color, raw_data=raw_data, location=start)
 
     @classmethod
-    def from_json_data(cls, data: JsonValue) -> "Annotation":
+    def from_json_value(cls, data: JsonValue) -> "Annotation":
         data_dict = ensureJsonObject(data)
         raw_voxels = ensureJsonArray(data_dict.get("voxels"))
-        voxels : Sequence[Point5D] = [Point5D.from_json_data(raw_voxel) for raw_voxel in raw_voxels]
+        voxels : Sequence[Point5D] = [Point5D.from_json_value(raw_voxel) for raw_voxel in raw_voxels]
 
         color = Color.from_json_data(data_dict.get("color"))
-
-        raw_data_obj = ensureJsonObject(data_dict.get("raw_data"))
-        raw_data_url = ensureJsonString(raw_data_obj.get("url"))
-        raw_data = datasource_from_url(raw_data_url)
+        raw_data = DataSource.from_json_value(data_dict.get("raw_data"))
 
         start = Point5D.min_coords(voxels)
         stop = Point5D.max_coords(voxels) + 1  # +1 because slice.stop is exclusive, but max_point isinclusive
@@ -176,8 +171,8 @@ class Annotation(ScalarData):
 
         return {
             "color": self.color.to_json_data(),
-            "raw_data": self.raw_data.to_json_data(),
-            "voxels": tuple(vx.to_json_data() for vx in voxels),
+            "raw_data": self.raw_data.to_json_value(),
+            "voxels": tuple(vx.to_json_value() for vx in voxels),
         }
 
     def get_feature_samples(self, feature_extractor: FeatureExtractor) -> FeatureSamples:
@@ -225,10 +220,9 @@ class Annotation(ScalarData):
             raise ValueError(f"All Annotations must come from the same datasource!")
         axiskeys = annotations[0].raw_data.axiskeys
         merged_annotations = Annotation.merge(annotations, color_map=color_map)
-        block_size = block_size or merged_annotations.shape
 
         out = {}
-        for block_index, block in enumerate(merged_annotations.split(block_size)):
+        for block_index, block in enumerate(merged_annotations.split(block_size or merged_annotations.shape)):
             out[f"block{block_index:04d}"] = {
                 "__data__": block.raw(axiskeys),
                 "__attrs__": {

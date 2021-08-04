@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 from vigra.learning import RandomForest as VigraRandomForest
-from ndstructs.datasource import DataRoi, DataSource
+from webilastik.datasource import DataRoi, DataSource
 import multiprocessing
 
 from webilastik.features.object_feature_extractor import ObjectFeatureExtractor

@@ -1,28 +1,25 @@
 from abc import abstractmethod, ABC
-import functools
 import os
 import signal
 import asyncio
-from typing import Any, Dict, List, Optional, Mapping, cast, Sequence
+from typing import Any, Dict, List, Optional, Mapping, cast
 import json
 from base64 import b64decode
-from http import HTTPStatus
 
-from ndstructs.datasource.PrecomputedChunksDataSource import PrecomputedChunksInfo
+from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
 from ndstructs.utils.json_serializable import JsonValue, ensureJsonArray, ensureJsonObject, ensureJsonString
 from webilastik.scheduling.hashing_executor import HashingExecutor
 
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
-from webilastik.datasource import datasource_from_url
 
-from ndstructs.datasource.DataSource import DataSource
+from webilastik.datasource import DataSource
 from webilastik.server.tunnel import ReverseSshTunnel
 from pathlib import Path
 import contextlib
 
 import aiohttp
 from aiohttp import web
-from ndstructs.datasource.DataRoi import DataRoi
+from webilastik.datasource import DataRoi
 
 from webilastik.features.channelwise_fastfilters import (
     StructureTensorEigenvalues,
@@ -36,18 +33,15 @@ from webilastik.annotations.annotation import Annotation
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.annotations import Annotation
 from webilastik.ui.applet import Applet, CONFIRMER, Slot
-from webilastik.ui.applet.data_selection_applet import DataSelectionApplet
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.ui.applet.brushing_applet import BrushingApplet
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
-from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow, PixelClassificationLane
+from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
 
 
-@functools.lru_cache()
-def _decode_datasource(datasource_url_b64_altchars_dash_underline: str) -> DataSource:
-    url = b64decode(datasource_url_b64_altchars_dash_underline.encode('utf8'), altchars=b'-_').decode('utf8')
-    return datasource_from_url(url)
-
+def _decode_datasource(datasource_json_b64_altchars_dash_underline: str) -> DataSource:
+    json_str = b64decode(datasource_json_b64_altchars_dash_underline.encode('utf8'), altchars=b'-_').decode('utf8')
+    return DataSource.from_json_value(json.loads(json_str))
 
 class WsAppletMixin(Applet):
     @property
@@ -117,9 +111,8 @@ class WsBrushingApplet(WsAppletMixin, BrushingApplet):
         return tuple(annotation.to_json_data() for annotation in self.annotations.get() or [])
 
     def _set_json_state(self, state: JsonValue):
-        raw_brush_array = ensureJsonArray(state)
-        return self.annotations.set_value(
-            [Annotation.from_json_data(raw_brush) for raw_brush in raw_brush_array],
+        self.annotations.set_value(
+            [Annotation.from_json_value(raw_annotation) for raw_annotation in ensureJsonArray(state)],
             confirmer=lambda msg: True
         )
 
@@ -159,11 +152,9 @@ class WsPredictingApplet(WsAppletMixin):
         name: str,
         *,
         pixel_classifier: Slot[VigraPixelClassifier[IlpFilter]],
-        datasources: Slot[Sequence[DataSource]],
         runner: HashingExecutor,
     ):
         self._in_pixel_classifier = pixel_classifier
-        self._in_datasources = datasources
         self.runner = runner
         super().__init__(name=name)
 
@@ -179,7 +170,6 @@ class WsPredictingApplet(WsAppletMixin):
         return {
             "producer_is_ready": producer_is_ready,
             "channel_colors": channel_colors,
-            "datasources": tuple(ds.to_json_data() for ds in self._in_datasources.get() or []),
         }
 
     def _set_json_state(self, state: JsonValue):
@@ -201,7 +191,7 @@ class WsPredictingApplet(WsAppletMixin):
                     {
                         "key": "data",
                         "size": [int(v) for v in datasource.shape.to_tuple("xyz")],
-                        "resolution": [1, 1, 1],
+                        "resolution": datasource.spatial_resolution,
                         "voxel_offset": [0, 0, 0],
                         "chunk_sizes": [datasource.tile_shape.to_tuple("xyz")],
                         "encoding": "raw",
@@ -215,7 +205,7 @@ class WsPredictingApplet(WsAppletMixin):
         )
 
     async def precomputed_chunks_compute(self, request: web.Request) -> web.Response:
-        encoded_raw_data_url = str(request.match_info.get("encoded_raw_data")) # type: ignore
+        encoded_raw_data = str(request.match_info.get("encoded_raw_data")) # type: ignore
         xBegin = int(request.match_info.get("xBegin")) # type: ignore
         xEnd = int(request.match_info.get("xEnd")) # type: ignore
         yBegin = int(request.match_info.get("yBegin")) # type: ignore
@@ -223,7 +213,7 @@ class WsPredictingApplet(WsAppletMixin):
         zBegin = int(request.match_info.get("zBegin")) # type: ignore
         zEnd = int(request.match_info.get("zEnd")) # type: ignore
 
-        datasource = _decode_datasource(encoded_raw_data_url)
+        datasource = _decode_datasource(json.loads(encoded_raw_data))
         predictions = await self.runner.async_submit(
             self._in_pixel_classifier().compute,
             DataRoi(datasource, x=(xBegin, xEnd), y=(yBegin, yEnd), z=(zBegin, zEnd))
@@ -253,6 +243,22 @@ class WsPredictingApplet(WsAppletMixin):
             content_type="application/octet-stream",
         )
 
+    # async def run_batch_prediction(self, request: web.Request) -> web.Response:
+    #     try:
+    #         raw_data_url = request.rel_url.query["raw_data"]
+    #     except KeyError:
+    #         return web.Response(status=400, text="Missing query parameter 'raw_data'")
+
+    #     try:
+    #         raw_data = DataSource.from_url(url=raw_data_url)
+    #     except Exception as e:
+    #         print("!!! ERROR !! Could not open datasource: ${e}")
+    #         return web.Response(status=404, text="Could not open datasource {raw_data_url}")
+
+    #     #FIXME!!!
+
+    #     return web.Response(status=HTTPStatus.ACCEPTED, text="Started predictions on '{raw_data_url}'")
+
 
 class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
     def __init__(self):
@@ -266,7 +272,6 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         predicting_applet = WsPredictingApplet(
             "predicting_applet",
             pixel_classifier=pixel_classifier_applet.pixel_classifier,
-            datasources=brushing_applet.datasources,
             runner=HashingExecutor(num_workers=8),
         )
         self.ws_applets : Mapping[str, WsAppletMixin] = {
@@ -377,13 +382,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
                     return web.Response(status=response.status, text=response_text)
                 info = PrecomputedChunksInfo.from_json_data(json.loads(response_text))
 
-        stripped_info = PrecomputedChunksInfo(
-            at_type=info.at_type,
-            type_=info.type_,
-            data_type=info.data_type,
-            num_channels=info.num_channels,
-            scales=tuple(scale for scale in info.scales if tuple(scale.resolution) == resolution),
-        )
+        stripped_info = info.stripped(resolution=resolution)
         return web.json_response(stripped_info.to_json_data())
 
     async def forward_chunk_request(self, request: web.Request) -> web.Response:

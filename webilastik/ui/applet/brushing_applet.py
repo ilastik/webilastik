@@ -1,6 +1,6 @@
 from typing import Generic, Optional, Sequence, TypeVar, Set
 
-from ndstructs.datasource import DataSource
+from webilastik.datasource import DataSource
 
 from webilastik.annotations.annotation import Annotation
 from webilastik.ui.applet import Applet, DerivedSequenceSlot, SequenceValueSlot, CONFIRMER

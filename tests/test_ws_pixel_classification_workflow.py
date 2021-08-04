@@ -1,18 +1,20 @@
-from ndstructs.datasource.DataSource import DataSource
-from webilastik.annotations import annotation
+from pathlib import Path
 import aiohttp
 import asyncio
 import json
+import uuid
+from concurrent.futures import ThreadPoolExecutor
+from typing import Dict, Any
+
+import numpy as np
 from aiohttp.client_ws import ClientWebSocketResponse
 from ndstructs.point5D import Interval5D, Shape5D
-import numpy as np
-import uuid
-from typing import Dict, Any
-from concurrent.futures import ThreadPoolExecutor
-
 from ndstructs import Array5D, Point5D
+
 from webilastik.annotations import Annotation, Color
-from webilastik.datasource import datasource_from_url
+from webilastik.filesystem.HttpPyFs import HttpPyFs
+from webilastik.datasource import SkimageDataSource
+
 
 finished = False
 
@@ -23,7 +25,7 @@ async def read_server_status(websocket: ClientWebSocketResponse):
             break
 
 async def main():
-    ds = datasource_from_url("http://localhost:8000/cropped1.png")
+    ds = SkimageDataSource(filesystem=HttpPyFs("http://localhost:8000/"), path=Path("cropped1.png"))
 
     async with aiohttp.ClientSession() as session:
 
@@ -87,16 +89,12 @@ async def main():
             print("done sending annotations<<<<<")
 
 
-            import pprint
-            import requests
-            from concurrent.futures import ProcessPoolExecutor
-            import urllib.parse
-
-            encoded_ds_url = urllib.parse.quote(ds.url)
+            from base64 import b64encode
+            encoded_ds = b64encode(json.dumps(ds.to_json_value()).encode("utf8"), altchars=b'-_')
 
             response_tasks = {}
-            for tile in Interval5D.zero(x=(0, 697), y=(0, 450), c=(0, 3)).get_tiles(tile_shape=Shape5D(x=256, y=256, c=2)):
-                url = f"{session_url}/predicting_applet/{encoded_ds_url}/data/{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_0-1"
+            for tile in Interval5D.zero(x=(0, 697), y=(0, 450), c=(0, 3)).get_tiles(tile_shape=Shape5D(x=256, y=256, c=2), tiles_origin=Point5D.zero()):
+                url = f"{session_url}/predicting_applet/{encoded_ds}/data/{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_0-1"
                 print(f"---> Requesting {url}")
                 response_tasks[tile] = session.get(url)
 
