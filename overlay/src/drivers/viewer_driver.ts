@@ -9,8 +9,9 @@ export interface IViewerDriver{
     getViewportDrivers: () => Array<IViewportDriver>;
     getTrackedElement: () => HTMLElement;
     refreshView: (params: {name: string, url: string, similar_url_hint?: string, channel_colors?: vec3[]}) => void;
-    onViewportsChanged?: (handler: () => void) => void;
+    onViewportsChanged: (handler: () => void) => void;
     getDataViewOnDisplay(): IDataView | undefined;
+    getOpenDataViews(): Array<IDataView>;
 }
 
 export interface IDataSourceScale{

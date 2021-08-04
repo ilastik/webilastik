@@ -180,4 +180,8 @@ export class Url{
     public get name(): string{
         return this.path.split("/").slice(-1)[0]
     }
+
+    public equals(other: Url): boolean{
+        return this.double_protocol_raw == other.double_protocol_raw
+    }
 }

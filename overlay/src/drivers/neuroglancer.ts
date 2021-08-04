@@ -1,6 +1,7 @@
 import { vec3, mat4, quat } from "gl-matrix"
 import { IViewportDriver, IViewerDriver } from "..";
-import { getElementContentRect } from "../util/misc";
+import { getElementContentRect} from "../util/misc";
+import { Url } from "../util/parsed_url";
 import { IDataView } from "./viewer_driver";
 
 type NeuroglancerLayout = "4panel" | "xy" | "xy-3d" | "xz" | "xz-3d" | "yz" | "yz-3d";
@@ -55,6 +56,7 @@ interface INeuroglancerLayer{
     source: string,
     visible: boolean,
     shader: string | undefined
+    type?: string
 }
 
 export class NeuroglancerDriver implements IViewerDriver{
@@ -84,8 +86,14 @@ export class NeuroglancerDriver implements IViewerDriver{
         return [new NeuroglancerViewportDriver(this, panels[0], orientation_offsets.get(layout.replace("-3d", ""))!)]
     }
     onViewportsChanged(handler: () => void){
-        this.viewer.layerManager.layersChanged.add(() => handler())
-        this.viewer.layout.changed.add(() => handler())
+        this.viewer.display.changed.add(() => {
+            if(this.viewer.state.toJSON().layers.find((layer: INeuroglancerLayer) => layer.type === undefined)){
+                return // if any layer has no type, then the viwer hasn't settled yet
+            }
+            handler()
+        })
+        // this.viewer.layerManager.layersChanged.add(() => handler())
+        // this.viewer.layout.changed.add(() => handler())
     }
     refreshView(params: {name: string, url: string, similar_url_hint?: string, channel_colors?: vec3[]}){
         let shader: string | undefined = undefined;
@@ -101,9 +109,14 @@ export class NeuroglancerDriver implements IViewerDriver{
     }
 
     private refreshLayer({name, url, shader}: {name: string, url: string, shader?: string}){
-        console.log(`Refreshing layer ${name} with url ${url}`)
         this.dropLayer(name)
-        this.openNewDataSource({name, url, shader})
+        const cache_busting_url = Url.parse(url)
+            // .updatedWith({ //FIXME: this needs patching NG to handle query params
+            //     extra_search: new Map<string, string>([["cache_busting_random", uuidv4()]])
+            // })
+            .double_protocol_raw
+        console.log(`Refreshing layer ${name} with url ${cache_busting_url}`)
+        this.openNewDataSource({name, url: cache_busting_url, shader})
     }
 
     private getLayerManager(): any {
@@ -154,6 +167,10 @@ export class NeuroglancerDriver implements IViewerDriver{
                 visible: l.visible  === undefined ? true : l.visible,
                 shader: l.shader
         }));
+    }
+
+    public getOpenDataViews(): Array<IDataView>{
+        return this.getImageLayers().map(layer => ({name: layer.name, url: layer.source}))
     }
 
     public getDataViewOnDisplay(): IDataView | undefined{

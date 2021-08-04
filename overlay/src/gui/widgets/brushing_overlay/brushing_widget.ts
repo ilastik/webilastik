@@ -1,8 +1,7 @@
 import { quat, vec3 } from "gl-matrix"
 import { BrushStroke } from "../../.."
 import { DataSource, Session } from "../../../client/ilastik"
-import { createElement, createInput, removeElement } from "../../../util/misc"
-import { PredictionsPrecomputedChunks, StrippedPrecomputedChunks } from "../../../datasource/precomputed_chunks"
+import { awaitStalable, createElement, createInput, removeElement, StaleResult } from "../../../util/misc"
 import { CollapsableWidget } from "../collapsable_applet_gui"
 import { OneShotSelectorWidget, SelectorWidget } from "../selector_widget"
 import { Vec3ColorPicker } from "../vec3_color_picker"
@@ -12,7 +11,7 @@ import { BrushelLinesRenderer } from "./brush_lines_renderer"
 import { BrushRenderer } from "./brush_renderer"
 import { BrushStrokesContainer } from "./brush_strokes_container"
 import { IDataScale } from "../../../datasource/datasource"
-import { Viewer } from "../../viewer"
+import { PixelPredictionsView, PixelTrainingView, Viewer } from "../../viewer"
 
 export class BrushingWidget{
     public static training_view_name_prefix = "ilastik training: "
@@ -59,9 +58,7 @@ export class BrushingWidget{
         })
 
         this.showCanvas(false)
-        if(viewer.onViewportsChanged){
-            viewer.onViewportsChanged(() => this.handleViewerDataDisplayChange())
-        }
+        viewer.onViewportsChanged(() => this.handleViewerDataDisplayChange())
         this.handleViewerDataDisplayChange()
     }
 
@@ -84,42 +81,57 @@ export class BrushingWidget{
         this.clearStatus()
     }
 
+    private async openTrainingView(training_view: PixelTrainingView){
+        if(!this.viewer.findView(training_view)){
+            this.viewer.refreshView({view: training_view})
+        }
+    }
+
     private async handleViewerDataDisplayChange(){
         this.resetWidgets()
 
-        //FIXME: can racing mess this up?
-        const data_view = await this.viewer.getActiveView()
-        if(data_view === undefined){
+        const view = this.viewer.getActiveView()
+        if(view === undefined){
             return
         }
-        if(data_view instanceof Error){
-            return this.showStatus(`${data_view}`)
+        if(view instanceof Error){
+            return this.showStatus(`${view}`)
         }
-        if(data_view.datasource instanceof StrippedPrecomputedChunks){
-            let originalDataProvider = data_view.datasource.original
-            let scale = originalDataProvider.findScale(data_view.datasource.scales[0].resolution)!
-            return this.startTraining(scale.toIlastikDataSource())
+        if(view instanceof PixelTrainingView){
+            return this.startTraining(view.raw_data)
         }
-        if(data_view.datasource instanceof PredictionsPrecomputedChunks){
+        if(view instanceof PixelPredictionsView){
             //FIXME: allow more annotations?
-            return this.showStatus(`Showing predictions for ${data_view.datasource.raw_data_url.double_protocol_raw}`)
+            return this.showStatus(`Showing predictions for ${view.raw_data.getDisplayString()}`)
         }
-        if(data_view.datasource.scales.length == 1){
-            return this.startTraining(data_view.datasource.scales[0].toIlastikDataSource())
+
+        if(view.multiscale_datasource.scales.length == 1){
+            const scale = view.multiscale_datasource.scales[0]
+            const multiscale_datasource = await awaitStalable({referenceKey: "brushingGetMultiscaleDataSource", callable: () => scale.toStrippedMultiscaleDataSource(this.session)})
+            if(multiscale_datasource instanceof StaleResult){
+                return
+            }
+            const training_view = new PixelTrainingView({
+                multiscale_datasource: multiscale_datasource,
+                name: `pixel classification: ${scale.toDisplayString()}`,
+                raw_data: scale.toIlastikDataSource()
+            })
+            this.openTrainingView(training_view)
+            return this.startTraining(training_view.raw_data)
         }
 
         createElement({tagName: "label", innerHTML: "Select a voxel size to annotate on:", parentElement: this.controlsContainer});
         new OneShotSelectorWidget<IDataScale>({
             parentElement: this.controlsContainer,
-            options: data_view.datasource.scales,
+            options: view.multiscale_datasource.scales,
             optionRenderer: (scale) => scale.toDisplayString(),
             onOk: async (scale) => {
-                const stripped_precomp_chunks = await scale.toStrippedMultiscaleDataSource(this.session) //FIXME: race condition?
-                this.viewer.refreshView({
-                    name: BrushingWidget.training_view_name_prefix + `${data_view.name} (${scale.toDisplayString()})`,
-                    url: stripped_precomp_chunks.url.double_protocol_raw,
-                    similar_url_hint: data_view.datasource.url.double_protocol_raw,
+                const training_view = new PixelTrainingView({
+                    multiscale_datasource: await scale.toStrippedMultiscaleDataSource(this.session),
+                    name: `pixel classification: ${scale.toDisplayString()}`,
+                    raw_data: scale.toIlastikDataSource()
                 })
+                this.openTrainingView(training_view)
             },
         })
     }
@@ -128,7 +140,6 @@ export class BrushingWidget{
         this.resetWidgets()
         this.showCanvas(true)
 
-        const resolution = datasource.spatial_resolution
         this.trainingWidget = new TrainingWidget({
             gl: this.gl,
             parentElement: this.controlsContainer,
@@ -136,7 +147,7 @@ export class BrushingWidget{
             datasource,
             viewer: this.viewer
         })
-        this.showStatus(`Now training on ${datasource.url}(${resolution[0]} x ${resolution[1]} x ${resolution[2]} nm)`)
+        this.showStatus(`Now training on ${datasource.getDisplayString()}`)
         window.cancelAnimationFrame(this.animationRequestId)
         const render = () => {
             this.trainingWidget?.render(this.brushStrokeContainer.getBrushStrokes())

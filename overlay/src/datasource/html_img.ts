@@ -1,5 +1,5 @@
 import { vec3 } from "gl-matrix";
-import { DataSource } from "../client/ilastik";
+import { SkimageDataSource } from "../client/ilastik";
 import { Url } from "../util/parsed_url";
 import { IDataScale, IMultiscaleDataSource } from "./datasource";
 
@@ -15,12 +15,13 @@ export class HtmlImgSource implements IMultiscaleDataSource{
     }
 
     public get scales(): Array<IDataScale>{
+        const ilastik_datasource = new SkimageDataSource({filesystem: this.url, path: this.url.name})
         return [
             {
-                resolution: vec3.fromValues(1,1,1),
-                toDisplayString: () => "No resolution information",
+                resolution: ilastik_datasource.spatial_resolution,
+                toDisplayString: () => ilastik_datasource.getDisplayString(),
                 toStrippedMultiscaleDataSource: async () => {return this},
-                toIlastikDataSource: () => new DataSource(this.url.schemeless_raw, vec3.fromValues(1,1,1)),
+                toIlastikDataSource: () => ilastik_datasource,
             }
         ]
     }

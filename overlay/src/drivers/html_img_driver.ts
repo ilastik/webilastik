@@ -10,6 +10,9 @@ export class HtmlImgDriver implements IViewerDriver{
     public readonly img: HTMLImageElement;
     public readonly container: HTMLElement;
     public readonly data_url: Url;
+
+    private onViewportChangedHandlers = new Array<() => void>()
+
     constructor({img}:{img: HTMLImageElement}){
         this.img = img
         this.container = img.parentElement || document.body
@@ -62,6 +65,14 @@ export class HtmlImgDriver implements IViewerDriver{
     }
     public getDataViewOnDisplay(): IDataView | undefined{
         return {name: this.data_url.name, url: this.data_url.schemeless_raw}
+    }
+    public onViewportsChanged(handler: () => void){
+        this.onViewportChangedHandlers.push(handler)
+    }
+    public getOpenDataViews(): Array<IDataView>{
+        return [
+            {name: "FIXME", url: this.data_url.raw}
+        ]
     }
 }
 

@@ -1,6 +1,7 @@
 import { vec3 } from "gl-matrix"
 import { sleep } from "../util/misc"
-import { ensureJsonArray, ensureJsonNumber, ensureJsonObject, ensureJsonString, IJsonable, JsonObject, JsonValue } from "../util/serialization"
+import { Url } from "../util/parsed_url"
+import { ensureJsonArray, ensureJsonNumberTripplet, ensureJsonObject, ensureJsonString, IJsonable, JsonObject, JsonValue } from "../util/serialization"
 
 export class Session{
     public readonly ilastik_url: string
@@ -275,24 +276,85 @@ export class Shape5D{
     }
 }
 
-export class DataSource implements IJsonable{
-    public constructor(public readonly url: string, public readonly spatial_resolution: vec3){
+export abstract class DataSource implements IJsonable{
+    public readonly filesystem: Url
+    public readonly path: string
+    public readonly spatial_resolution: vec3
+
+    constructor({filesystem, path, spatial_resolution=vec3.fromValues(1,1,1)}: {filesystem: Url, path: string, spatial_resolution?: vec3}){
+        this.filesystem = filesystem
+        this.path = path
+        this.spatial_resolution = spatial_resolution
     }
+
     public static fromJsonValue(data: JsonValue) : DataSource{
-        let obj = ensureJsonObject(data)
-        const raw_resolution = ensureJsonArray(obj["spatial_resolution"])
-        const resolution = vec3.fromValues(
-            ensureJsonNumber(raw_resolution[0]),
-            ensureJsonNumber(raw_resolution[1]),
-            ensureJsonNumber(raw_resolution[2]),
-        )
-        return new this(ensureJsonString(obj["url"]), resolution)
+        const data_obj = ensureJsonObject(data)
+        const class_name = ensureJsonString(data_obj["__class__"])
+        switch(class_name){
+            case "PrecomputedChunksDataSource":
+                return PrecomputedChunksDataSource.fromJsonValue(data)
+            case "SkimageDataSource":
+                return SkimageDataSource.fromJsonValue(data)
+            default:
+                throw Error(`Could not create datasource of type ${class_name}`)
+        }
     }
+
+    public static extractBasicData(json_object: JsonObject): ConstructorParameters<typeof DataSource>[0]{
+        const spatial_resolution = json_object["spatial_resolution"]
+        return {
+            filesystem: Url.parse(ensureJsonString(json_object["filesystem"])),
+            path: ensureJsonString(json_object["path"]),
+            spatial_resolution: spatial_resolution === undefined ? vec3.fromValues(1,1,1) : ensureJsonNumberTripplet(spatial_resolution)
+        }
+    }
+
     public toJsonValue(): JsonObject{
-        return {url: this.url}
+        return {
+            filesystem: this.filesystem.double_protocol_raw,
+            path: this.path,
+            spatial_resolution: [this.spatial_resolution[0], this.spatial_resolution[1], this.spatial_resolution[2]],
+            ...this.doToJsonValue()
+        }
     }
+
+    public getDisplayString() : string{
+        const resolution_str = `${this.spatial_resolution[0]} x ${this.spatial_resolution[1]} x ${this.spatial_resolution[2]}`
+        return `${this.filesystem.joinPath(this.path).raw} (${resolution_str})`
+    }
+
+    protected abstract doToJsonValue() : JsonObject & {__class__: string}
+
     public equals(other: DataSource): boolean{
-        return this.url == other.url
+        //FIXME
+        return JSON.stringify(this.toJsonValue()) == JSON.stringify(other.toJsonValue())
+    }
+
+}
+
+export class PrecomputedChunksDataSource extends DataSource{
+    public static fromJsonValue(data: JsonValue) : PrecomputedChunksDataSource{
+        const data_obj = ensureJsonObject(data)
+        return new PrecomputedChunksDataSource({
+            ...DataSource.extractBasicData(data_obj),
+        })
+    }
+
+    protected doToJsonValue() : JsonObject & {__class__: string}{
+        return { __class__: "PrecomputedChunksDataSource"}
+    }
+}
+
+export class SkimageDataSource extends DataSource{
+    public static fromJsonValue(data: JsonValue) : SkimageDataSource{
+        const data_obj = ensureJsonObject(data)
+        return new SkimageDataSource({
+            ...DataSource.extractBasicData(data_obj),
+        })
+    }
+
+    protected doToJsonValue() : JsonObject & {__class__: string}{
+        return { __class__: "SkimageDataSource"}
     }
 }
 

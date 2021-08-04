@@ -29,4 +29,12 @@ export class HashMap<K, V>{
     public delete(key: K): boolean{
         return this.registry.delete(this.hash_function(key))
     }
+
+    public keys(): Array<K>{
+        return Array.from(this.registry.values()).map(([key, _]) => key)
+    }
+
+    public values(): Array<V>{
+        return Array.from(this.registry.values()).map(([_, value]) => value)
+    }
 }

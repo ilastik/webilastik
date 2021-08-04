@@ -35,7 +35,7 @@ export class ReferencePixelClassificationWorkflowGui{
         })
         this.live_updater = new PredictingWidget({
             session,
-            viewer_driver
+            viewer: this.viewer
         })
     }
 

@@ -1,5 +1,5 @@
 import { vec3 } from "gl-matrix"
-import { DataSource, Session } from "../client/ilastik"
+import { DataSource, PrecomputedChunksDataSource, Session } from "../client/ilastik"
 import { uuidv4 } from "../util/misc";
 import { Url } from "../util/parsed_url";
 import { ensureJsonArray, ensureJsonNumber, ensureJsonNumberTripplet, ensureJsonObject, ensureJsonString, JsonValue } from "../util/serialization"
@@ -68,8 +68,12 @@ export class PrecomputedChunksScale implements IDataScale{
         return await StrippedPrecomputedChunks.strip(original, this.resolution, session)
     }
 
-    public toIlastikDataSource() : DataSource{
-        return new DataSource(this.getUrl().double_protocol_raw, this.resolution)
+    public toIlastikDataSource() : PrecomputedChunksDataSource{
+        return new PrecomputedChunksDataSource({
+            filesystem: this.base_url.updatedWith({path: "/"}),
+            path: this.base_url.path,
+            spatial_resolution: vec3.clone(this.resolution)
+        })
     }
 
     public static fromJsonValue(base_url: Url, value: JsonValue){
@@ -157,6 +161,7 @@ export class PrecomputedChunks implements IMultiscaleDataSource{
 export class StrippedPrecomputedChunks extends PrecomputedChunks{
     public readonly original: PrecomputedChunks;
     public readonly scale: PrecomputedChunksScale;
+    public readonly ilastikDatasource: PrecomputedChunksDataSource;
     private constructor(params: {
         url: Url,
         type: Type,
@@ -175,6 +180,7 @@ export class StrippedPrecomputedChunks extends PrecomputedChunks{
         }
         this.original = params.original
         this.scale = this.scales[0]
+        this.ilastikDatasource = this.scale.toIlastikDataSource()
     }
 
     public static match(url: Url): RegExpMatchArray | null{
@@ -229,7 +235,7 @@ export class StrippedPrecomputedChunks extends PrecomputedChunks{
 }
 
 export class PredictionsPrecomputedChunks extends PrecomputedChunks{
-    public readonly raw_data_url: Url;
+    public readonly raw_data: DataSource;
     private constructor(params: {
         url: Url,
         type: Type,
@@ -239,7 +245,7 @@ export class PredictionsPrecomputedChunks extends PrecomputedChunks{
     }){
         super(params)
         const parsed_args = PredictionsPrecomputedChunks.parse(params.url)
-        this.raw_data_url = parsed_args.raw_data_url
+        this.raw_data = parsed_args.raw_data
     }
 
     public static match(url: Url): RegExpMatchArray | null{
@@ -247,15 +253,15 @@ export class PredictionsPrecomputedChunks extends PrecomputedChunks{
         return url.double_protocol_raw.match(url_regex)
     }
 
-    public static parse(url: Url): {url: Url, raw_data_url: Url}{
+    public static parse(url: Url): {raw_data: DataSource}{
         const match = this.match(url)
         if(!match){
             throw Error(`Url ${url.double_protocol_raw} is not a predictions precomputed chunks URL`)
         }
-        const raw_data_url = Url.parse(Session.atob(match.groups!["raw_data"]))
+        const raw_data_json: JsonValue = JSON.parse(Session.atob(match.groups!["raw_data"]))
+        const raw_data = DataSource.fromJsonValue(raw_data_json)
         return {
-            url,
-            raw_data_url,
+            raw_data,
         }
     }
 
@@ -266,11 +272,11 @@ export class PredictionsPrecomputedChunks extends PrecomputedChunks{
         })
     }
 
-    public static async createFor({raw_data, ilastik_session}: {raw_data: Url, ilastik_session: Session}): Promise<PredictionsPrecomputedChunks>{
-        let raw_data_url = raw_data.double_protocol_raw
+    public static async createFor({raw_data, ilastik_session}: {raw_data: DataSource, ilastik_session: Session}): Promise<PredictionsPrecomputedChunks>{
+        let raw_data_json = JSON.stringify(raw_data.toJsonValue())
         let predictions_url = Url.parse(ilastik_session.session_url)
             .updatedWith({datascheme: "precomputed"})
-            .joinPath(`predictions/raw_data=${Session.btoa(raw_data_url)}/run_id=${uuidv4()}`);
+            .joinPath(`predictions/raw_data=${Session.btoa(raw_data_json)}/run_id=${uuidv4()}`);
         let precomp_chunks = await PrecomputedChunks.fromUrl(predictions_url)
         return new PredictionsPrecomputedChunks({
             url: predictions_url,
