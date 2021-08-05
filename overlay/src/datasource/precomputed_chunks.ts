@@ -51,7 +51,7 @@ export class PrecomputedChunksScale implements IDataScale{
 
     public getChunkUrl(interval: {x: [number, number], y: [number, number], z: [number, number]}): Url{
         return this.getUrl().joinPath(
-            `${interval.x[0]}-${interval.x[1]}_${interval.y[0]}-${interval.y[1]}_${interval.z[0]}-${interval.z[1]}`
+            `${this.key}/${interval.x[0]}-${interval.x[1]}_${interval.y[0]}-${interval.y[1]}_${interval.z[0]}-${interval.z[1]}`
         )
     }
 

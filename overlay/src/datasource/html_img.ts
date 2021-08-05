@@ -15,7 +15,10 @@ export class HtmlImgSource implements IMultiscaleDataSource{
     }
 
     public get scales(): Array<IDataScale>{
-        const ilastik_datasource = new SkimageDataSource({filesystem: this.url, path: this.url.name})
+        const ilastik_datasource = new SkimageDataSource({
+            filesystem: this.url.updatedWith({path: "/"}),
+            path: this.url.path,
+        })
         return [
             {
                 resolution: ilastik_datasource.spatial_resolution,
