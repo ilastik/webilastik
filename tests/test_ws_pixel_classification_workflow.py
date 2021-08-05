@@ -94,7 +94,7 @@ async def main():
 
             response_tasks = {}
             for tile in Interval5D.zero(x=(0, 697), y=(0, 450), c=(0, 3)).get_tiles(tile_shape=Shape5D(x=256, y=256, c=2), tiles_origin=Point5D.zero()):
-                url = f"{session_url}/predicting_applet/{encoded_ds}/data/{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_0-1"
+                url = f"{session_url}/predictions/raw_data={encoded_ds}/run_id=123456/data/{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_0-1"
                 print(f"---> Requesting {url}")
                 response_tasks[tile] = session.get(url)
 
