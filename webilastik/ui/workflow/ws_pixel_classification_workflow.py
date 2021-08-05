@@ -2,15 +2,13 @@ from abc import abstractmethod, ABC
 import os
 import signal
 import asyncio
-from typing import Any, Dict, List, Optional, Mapping, cast
+from typing import Iterable, List, Optional, Mapping, Sequence, Set, cast
 import json
 from base64 import b64decode
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
-from ndstructs.utils.json_serializable import JsonValue, ensureJsonArray, ensureJsonObject, ensureJsonString
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonArray, ensureJsonObject, ensureJsonString
 from webilastik.scheduling.hashing_executor import HashingExecutor
-
-from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 
 from webilastik.datasource import DataSource
 from webilastik.server.tunnel import ReverseSshTunnel
@@ -43,13 +41,8 @@ def _decode_datasource(datasource_json_b64_altchars_dash_underline: str) -> Data
     json_str = b64decode(datasource_json_b64_altchars_dash_underline.encode('utf8'), altchars=b'-_').decode('utf8')
     return DataSource.from_json_value(json.loads(json_str))
 
-class WsAppletMixin(Applet):
-    @property
-    def websockets(self) -> List[web.WebSocketResponse]:
-        if not hasattr(self,"_websockets"):
-            self._websockets = cast(List[web.WebSocketResponse], [])
-        return self._websockets
 
+class WsApplet(Applet):
     @abstractmethod
     def _get_json_state(self) -> JsonValue:
         pass
@@ -58,55 +51,7 @@ class WsAppletMixin(Applet):
     def _set_json_state(self, state: JsonValue):
         pass
 
-    async def _update_remote(self):
-        bad_sockets : List[web.WebSocketResponse] = []
-        for websocket in self.websockets:
-            try:
-                state = self._get_json_state()
-                if state is not None:
-                    print(f"\033[32m  Updating remote {self.name} to following state:\n{json.dumps(state, indent=4)}  \033[0m")
-                    await websocket.send_str(json.dumps(state))
-            except ConnectionResetError as e:
-                print(f"!!!!!+++!!!! Got an exception while updating remote:\n{e}\n\nRemoving websocket...")
-                bad_sockets.append(websocket)
-        for bad_socket in bad_sockets:
-            self.websockets.remove(bad_socket)
-
-    async def _add_websocket(self, websocket: web.WebSocketResponse):
-        self.websockets.append(websocket)
-        await self._update_remote()
-        async for msg in websocket:
-            if msg.type == aiohttp.WSMsgType.TEXT:
-                if msg.data == 'close':
-                    await websocket.close()
-                else:
-                    try:
-                        payload = json.loads(msg.data)
-                        print(f"\033[34m Got new state:\n{json.dumps(payload, indent=4)}\n \033[0m")
-                        self._set_json_state(payload)
-                    except Exception as e:
-                        print(f"Exception happend on set state:\n\033[31m{e}\033[0m")
-                        # FIXME: show some error message
-                    finally:
-                        await self._update_remote()
-            elif msg.type == aiohttp.WSMsgType.BINARY:
-                print(f'Unexpected binary message')
-            elif msg.type == aiohttp.WSMsgType.ERROR:
-                print(f'ws connection closed with exception {websocket.exception()}')
-        self.websockets.remove(websocket)
-        print('websocket connection closed')
-        return websocket
-
-    def post_refresh(self, confirmer: CONFIRMER): #FIXME: this will fire even if something breaks downstream
-        super().post_refresh(confirmer)
-        asyncio.get_event_loop().create_task(self._update_remote())
-
-    def restore_snaphot(self, snap: Dict[str, Any]):
-        super().restore_snaphot(snap)
-        asyncio.get_event_loop().create_task(self._update_remote())
-
-
-class WsBrushingApplet(WsAppletMixin, BrushingApplet):
+class WsBrushingApplet(WsApplet, BrushingApplet):
     def _get_json_state(self) -> JsonValue:
         return tuple(annotation.to_json_data() for annotation in self.annotations.get() or [])
 
@@ -117,7 +62,7 @@ class WsBrushingApplet(WsAppletMixin, BrushingApplet):
         )
 
 
-class WsFeatureSelectionApplet(WsAppletMixin, FeatureSelectionApplet):
+class WsFeatureSelectionApplet(WsApplet, FeatureSelectionApplet):
     def _item_from_json_data(self, data: JsonValue) -> IlpFilter:
         data_dict = ensureJsonObject(data)
         class_name = ensureJsonString(data_dict.get("__class__"))
@@ -146,20 +91,20 @@ class WsFeatureSelectionApplet(WsAppletMixin, FeatureSelectionApplet):
         )
 
 
-class WsPredictingApplet(WsAppletMixin):
+class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
     def __init__(
         self,
         name: str,
         *,
-        pixel_classifier: Slot[VigraPixelClassifier[IlpFilter]],
+        feature_extractors: Slot[Sequence[IlpFilter]],
+        annotations: Slot[Sequence[Annotation]],
         runner: HashingExecutor,
     ):
-        self._in_pixel_classifier = pixel_classifier
         self.runner = runner
-        super().__init__(name=name)
+        super().__init__(name=name, feature_extractors=feature_extractors, annotations=annotations)
 
     def _get_json_state(self) -> JsonValue:
-        classifier = self._in_pixel_classifier.get()
+        classifier = self.pixel_classifier.get()
         if classifier:
             producer_is_ready = True
             channel_colors = tuple(color.to_json_data() for color in classifier.color_map.keys())
@@ -176,7 +121,7 @@ class WsPredictingApplet(WsAppletMixin):
         pass
 
     async def predictions_precomputed_chunks_info(self, request: web.Request):
-        classifier = self._in_pixel_classifier()
+        classifier = self.pixel_classifier()
         expected_num_channels = len(classifier.color_map)
         encoded_raw_data_url = str(request.match_info.get("encoded_raw_data")) # type: ignore
         datasource = _decode_datasource(encoded_raw_data_url)
@@ -199,7 +144,8 @@ class WsPredictingApplet(WsAppletMixin):
                 ],
             }),
             headers={
-                "Cache-Control": "no-store"
+                "Cache-Control": "no-store, must-revalidate",
+                "Expires": "0",
             },
             content_type="application/json",
         )
@@ -213,9 +159,9 @@ class WsPredictingApplet(WsAppletMixin):
         zBegin = int(request.match_info.get("zBegin")) # type: ignore
         zEnd = int(request.match_info.get("zEnd")) # type: ignore
 
-        datasource = _decode_datasource(json.loads(encoded_raw_data))
+        datasource = _decode_datasource(encoded_raw_data)
         predictions = await self.runner.async_submit(
-            self._in_pixel_classifier().compute,
+            self.pixel_classifier().compute,
             DataRoi(datasource, x=(xBegin, xEnd), y=(yBegin, yEnd), z=(zBegin, zEnd))
         )
 
@@ -230,7 +176,8 @@ class WsPredictingApplet(WsAppletMixin):
             return web.Response(
                 body=prediction_png_bytes.getbuffer(),
                 headers={
-                    "Cache-Control": "no-store"
+                    "Cache-Control": "no-store, must-revalidate",
+                    "Expires": "0",
                 },
                 content_type="image/png",
             )
@@ -243,41 +190,22 @@ class WsPredictingApplet(WsAppletMixin):
             content_type="application/octet-stream",
         )
 
-    # async def run_batch_prediction(self, request: web.Request) -> web.Response:
-    #     try:
-    #         raw_data_url = request.rel_url.query["raw_data"]
-    #     except KeyError:
-    #         return web.Response(status=400, text="Missing query parameter 'raw_data'")
-
-    #     try:
-    #         raw_data = DataSource.from_url(url=raw_data_url)
-    #     except Exception as e:
-    #         print("!!! ERROR !! Could not open datasource: ${e}")
-    #         return web.Response(status=404, text="Could not open datasource {raw_data_url}")
-
-    #     #FIXME!!!
-
-    #     return web.Response(status=HTTPStatus.ACCEPTED, text="Started predictions on '{raw_data_url}'")
-
 
 class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
     def __init__(self):
+        self.websockets: List[web.WebSocketResponse] = []
         brushing_applet = WsBrushingApplet("brushing_applet")
         feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", datasources=brushing_applet.datasources)
-        pixel_classifier_applet = PixelClassificationApplet(
+        pixel_classifier_applet = WsPixelClassificationApplet(
             "pixel_classification_applet",
             feature_extractors=feature_selection_applet.feature_extractors,
             annotations=brushing_applet.annotations,
-        )
-        predicting_applet = WsPredictingApplet(
-            "predicting_applet",
-            pixel_classifier=pixel_classifier_applet.pixel_classifier,
             runner=HashingExecutor(num_workers=8),
         )
-        self.ws_applets : Mapping[str, WsAppletMixin] = {
+        self.wsapplets : Mapping[str, WsApplet] = {
             feature_selection_applet.name: feature_selection_applet,
             brushing_applet.name: brushing_applet,
-            predicting_applet.name: predicting_applet,
+            pixel_classifier_applet.name: pixel_classifier_applet,
         }
         super().__init__(
             feature_selection_applet=feature_selection_applet,
@@ -288,14 +216,14 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         self.app = web.Application()
         self.app.add_routes([
             web.get('/status', self.get_status),
-            web.get('/ws/{applet_name}', self.open_websocket), # type: ignore
+            web.get('/ws', self.open_websocket), # type: ignore
             web.get(
                 "/predictions/raw_data={encoded_raw_data}/run_id={run_id}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}",
-                predicting_applet.precomputed_chunks_compute
+                pixel_classifier_applet.precomputed_chunks_compute
             ),
             web.get(
                 "/predictions/raw_data={encoded_raw_data}/run_id={run_id}/info",
-                predicting_applet.predictions_precomputed_chunks_info
+                pixel_classifier_applet.predictions_precomputed_chunks_info
             ),
             web.post("/ilp_project", self.ilp_download),
             web.delete("/close", self.close_session),
@@ -340,13 +268,65 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         web.run_app(self.app, port=port, path=unix_socket_path)
 
     async def open_websocket(self, request: web.Request):
-        applet_name = str(request.match_info.get("applet_name"))  # type: ignore
-        if applet_name not in self.ws_applets:
-            raise ValueError(f"Bad applet name: {applet_name}")
-        applet = self.ws_applets[applet_name]
         websocket = web.WebSocketResponse()
         await websocket.prepare(request)
-        return await applet._add_websocket(websocket)
+        self.websockets.append(websocket)
+        await self._update_clients_state([websocket]) # when a new client connects, send it the current state
+        async for msg in websocket:
+            if msg.type == aiohttp.WSMsgType.TEXT:
+                if msg.data == 'close':
+                    await websocket.close()
+                    continue
+                try:
+                    payload = json.loads(msg.data)
+                    await self._update_local_state(new_state=payload, originator=websocket)
+                except Exception as e:
+                    print(f"Exception happened on set state:\n\033[31m{e}\033[0m")
+                    import traceback
+                    traceback.print_exc()
+                    await self._update_clients_state([websocket]) # restore last known good state of offending client
+            elif msg.type == aiohttp.WSMsgType.BINARY:
+                print(f'Unexpected binary message')
+            elif msg.type == aiohttp.WSMsgType.ERROR:
+                print(f'ws connection closed with exception {websocket.exception()}')
+        if websocket in self.websockets:
+            self.websockets.remove(websocket)
+        print('websocket connection closed')
+        return websocket
+
+    async def _update_local_state(self, new_state: JsonValue, originator: web.WebSocketResponse):
+        print(f"\033[34m Got new state:\n{json.dumps(new_state, indent=4)}\n \033[0m")
+        state_obj = ensureJsonObject(new_state)
+        # FIXME: sort applets maybe? only allow for a single applet update?
+        updated_wsapplets: Set[WsApplet] = set()
+        for applet_name, raw_applet_state in state_obj.items():
+            wsapplet = self.wsapplets[applet_name]
+            wsapplet._set_json_state(raw_applet_state)
+            updated_wsapplets.update([wsapplet])
+            updated_wsapplets.update([ap for ap in wsapplet.get_downstream_applets() if isinstance(ap, WsApplet)])
+
+        updated_state = {applet.name: applet._get_json_state() for applet in updated_wsapplets}
+        originator_updated_state = {key: value for key, value in updated_state.items() if key not in state_obj} # FIXME
+
+        for websocket in self.websockets:
+            try:
+                if websocket == originator:
+                    await websocket.send_str(json.dumps(originator_updated_state))
+                else:
+                    await websocket.send_str(json.dumps(updated_state))
+            except ConnectionResetError as e:
+                print(f"!!!!!+++!!!! Got an exception while updating remote:\n{e}\n\nRemoving websocket...")
+                self.websockets.remove(websocket)
+
+    async def _update_clients_state(self, websockets: Iterable[web.WebSocketResponse] = ()):
+        state : JsonObject = {applet.name: applet._get_json_state() for applet in self.wsapplets.values()}
+        print(f"\033[32m  Updating remote to following state:\n{json.dumps(state, indent=4)}  \033[0m")
+        for websocket in list(websockets):
+            try:
+                await websocket.send_str(json.dumps(state))
+            except ConnectionResetError as e:
+                print(f"!!!!!+++!!!! Got an exception while updating remote:\n{e}\n\nRemoving websocket...")
+                self.websockets.remove(websocket)
 
     async def ilp_download(self, request: web.Request):
         return web.Response(
@@ -412,7 +392,7 @@ if __name__ == '__main__':
 
     mpi_rank = 0
     try:
-        from mpi4py import MPI
+        from mpi4py import MPI #type: ignore
         mpi_rank = MPI.COMM_WORLD.Get_rank()
     except ModuleNotFoundError:
         pass
