@@ -22,7 +22,7 @@ There is a compiled neuroglancer at `overlay/public/nehuba/index.html` which can
 
 ## Operators
 
-A refinement of the Operator concept in classic ilastik; they represent a lazy computation that usually can be applied to a `ndstructs.datasource.DataRoi`.
+A refinement of the Operator concept in classic ilastik; they represent a lazy computation that usually can be applied to a `webilastik.datasource.DataRoi`.
 
 Operators inherit from the base `Operator[IN, OUT]` class and must implement `.compute(roi: IN) -> OUT` . The most common implementation being `.compute(roi: DataRoi) -> Array5D` when dealing with operators that use halos. This means that once you have an operator instantiated, you can apply it over any slice of any `DataSource` and the operator will be able to retrieve any extra data if needs from the `DataRoi` object.
 
