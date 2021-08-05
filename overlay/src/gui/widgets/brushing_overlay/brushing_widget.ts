@@ -22,7 +22,7 @@ export class BrushingWidget{
     public readonly canvas: HTMLCanvasElement
     public readonly status_display: HTMLElement
 
-    private brushStrokeContainer: BrushStrokesContainer
+    public readonly brushStrokeContainer: BrushStrokesContainer
     private readonly controlsContainer: HTMLElement
     private animationRequestId: number = 0
     private trainingWidget: TrainingWidget | undefined = undefined
@@ -30,10 +30,12 @@ export class BrushingWidget{
 
     constructor({
         session,
+        socket,
         parentElement,
         viewer,
     }: {
         session: Session,
+        socket: WebSocket,
         parentElement: HTMLElement,
         viewer: Viewer,
     }){
@@ -50,7 +52,7 @@ export class BrushingWidget{
         let p = createElement({tagName: "p", parentElement: this.element})
         createElement({tagName: "label", innerHTML: "Brush Strokes:", parentElement: p})
         this.brushStrokeContainer = new BrushStrokesContainer({
-            session,
+            socket,
             parentElement: this.element,
             applet_name: "brushing_applet",
             gl: this.gl,

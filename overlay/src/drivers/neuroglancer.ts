@@ -1,6 +1,6 @@
 import { vec3, mat4, quat } from "gl-matrix"
 import { IViewportDriver, IViewerDriver } from "..";
-import { getElementContentRect} from "../util/misc";
+import { getElementContentRect, uuidv4} from "../util/misc";
 import { Url } from "../util/parsed_url";
 import { IDataView } from "./viewer_driver";
 
@@ -115,7 +115,8 @@ export class NeuroglancerDriver implements IViewerDriver{
             //     extra_search: new Map<string, string>([["cache_busting_random", uuidv4()]])
             // })
             .double_protocol_raw
-        console.log(`Refreshing layer ${name} with url ${cache_busting_url}`)
+            .replace(/run_id=[^/?]+/, `run_id=${uuidv4()}`) // FIXME
+        console.log(`Refreshing layer '${name}' with url ${cache_busting_url}`)
         this.openNewDataSource({name, url: cache_busting_url, shader})
     }
 

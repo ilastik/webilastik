@@ -12,12 +12,12 @@ export class FeatureSelectionWidget extends Applet<itk.FeatureExtractor[]>{
     private selected_features: Array<itk.FeatureExtractor> = [];
     private feature_to_checkbox: Map<itk.FeatureExtractor, HTMLInputElement>
 
-    public constructor({name, session, parentElement}: {
-        name: string, session: itk.Session, parentElement: HTMLElement
+    public constructor({name, socket, parentElement}: {
+        name: string, socket: WebSocket, parentElement: HTMLElement
     }){
         super({
             name,
-            session,
+            socket,
             deserializer: itk.FeatureExtractor.fromJsonArray,
             onNewState: (new_state) => this.onNewState(new_state)
         })

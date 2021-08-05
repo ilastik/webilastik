@@ -39,12 +39,13 @@ class PredictingAppletState{
 
 export class PredictingWidget extends Applet<PredictingAppletState>{
     public readonly viewer: Viewer;
+    public readonly session: Session
 
-    constructor({session, viewer}: {session: Session, viewer: Viewer}){
+    constructor({socket, session, viewer}: {socket: WebSocket, session: Session, viewer: Viewer}){
         super({
             deserializer: PredictingAppletState.fromJsonValue,
-            name: "predicting_applet",
-            session,
+            name: "pixel_classification_applet",
+            socket,
             onNewState: async (new_state: PredictingAppletState) => {
                 if(!new_state.producer_is_ready){
                     return
@@ -56,6 +57,7 @@ export class PredictingWidget extends Applet<PredictingAppletState>{
             },
         })
         this.viewer = viewer
+        this.session = session
     }
 
     private getPredictionsViews = async (): Promise<Array<PixelPredictionsView>> => {
