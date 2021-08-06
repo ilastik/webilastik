@@ -87,10 +87,10 @@ export class Url{
 
     public static readonly url_pattern = new RegExp(
         "(" +
-            String.raw`(?<datascheme>[a-z0-9\-\.]+)` + String.raw`(\+|://)` +
+            `(?<datascheme>${data_schemes.join("|").replace("+", "\\+")})` + String.raw`(\+|://)` +
         ")?" +
 
-        String.raw`(?<protocol>[a-z0-9\-\.]+)` + "://" +
+        `(?<protocol>${protocols.join("|").replace("+", "\\+")})` + "://" +
 
         String.raw`(?<hostname>[a-z\-\.]+)` +
 
