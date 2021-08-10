@@ -4,7 +4,7 @@ This project implements a web version of [ilastik](https://www.ilastik.org/), in
 
 ## Coordinate Space conventions  and Terminology
 
-### Voxel Space
+### Voxel Space / Data Space
 
 The Voxel Space are the coordinates of a voxel as defined in the image format where it is stored. For example, the voxel space coordinates of the top-left corner of a `.png` image is `{x: 0, y: 0}`, with `y` pointing down and `x` pointing to the right. In voxel space, the difference between the coordinates of adjacent voxels on the same line is something like `{x: 1, y: 0}`
 
