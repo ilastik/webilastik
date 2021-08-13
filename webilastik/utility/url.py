@@ -152,6 +152,9 @@ class Url:
     def __eq__(self, other: object) -> bool:
         return isinstance(other, Url) and self.raw == other.raw
 
+    def __str__(self) -> str:
+        return self.raw
+
     def as_filesystem(self) -> FileSystem:
         if self.protocol in (Protocol.HTTP, Protocol.HTTPS):
             return HttpPyFs(self.schemeless_raw)
