@@ -12,9 +12,11 @@ logging.basicConfig(level=logging.DEBUG)
 
 from aiohttp.web_routedef import head
 
+import jwt
+from webilastik.utility.url import Url, Protocol
 from webilastik.server.session import Session, LocalSession
 
-import jwt
+logging.basicConfig(level=logging.DEBUG)
 
 SESSION_TYPE = TypeVar("SESSION_TYPE", bound=Session)
 
@@ -26,7 +28,7 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         *,
         session_type: Type[SESSION_TYPE],
         master_host: str,
-        external_url: str,
+        external_url: Url,
         sockets_dir_at_master: Path,
         master_username: str,
     ):
@@ -45,8 +47,8 @@ class SessionAllocator(Generic[SESSION_TYPE]):
             web.static('/', Path(__file__) / "../../../overlay/public", follow_symlinks=True, show_index=True),
         ])
 
-    def _make_session_url(self, session_id: uuid.UUID) -> str:
-        return urljoin(self.external_url, f"session-{session_id}")
+    def _make_session_url(self, session_id: uuid.UUID) -> Url:
+        return self.external_url.joinpath(f"session-{session_id}")
 
     def _make_socket_path_at_master(self, session_id: uuid.UUID) -> Path:
         return self.sockets_dir_at_master.joinpath(f"to-session-{session_id}")
@@ -72,7 +74,7 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         return web.json_response(
             {
                 "id": str(session_id),
-                "url": self._make_session_url(session_id),
+                "url": self._make_session_url(session_id).raw,
                 "token": jwt.encode(
                     {"sid": str(session_id)},
                     SESSION_SECRET,
@@ -92,7 +94,7 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         return web.json_response(
             {
                 "status": "ready" if self._make_socket_path_at_master(session_id).exists() else "not ready",
-                "url": self._make_session_url(session_id)
+                "url": self._make_session_url(session_id).raw
             },
         )
 
