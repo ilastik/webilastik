@@ -1,16 +1,16 @@
+from functools import wraps
 import json
-from typing import Any, Dict, TypeVar,  Type, Generic
-from pathlib import Path
+from typing import Any, Callable, Coroutine, Dict, TypeVar,  Type, Generic, Optional
+from pathlib import Path, PurePosixPath
 import tempfile
 import uuid
-from urllib.parse import urljoin
 import asyncio
+
+from webilastik.libebrains.user_token import UserToken
+from webilastik.libebrains.oidc_client import OidcClient
 from aiohttp import web
 import os
 import logging
-logging.basicConfig(level=logging.DEBUG)
-
-from aiohttp.web_routedef import head
 
 import jwt
 from webilastik.utility.url import Url, Protocol
@@ -22,6 +22,71 @@ SESSION_TYPE = TypeVar("SESSION_TYPE", bound=Session)
 
 SESSION_SECRET = os.environ["SESSION_SECRET"]
 
+
+def get_requested_url(request: web.Request) -> Url:
+    protocol = Protocol.from_str(request.headers['X-Forwarded-Proto'])
+    host = request.headers['X-Forwarded-Host']
+    if ":" in host:
+        hostname, port_str = host.split(":")
+        port = int(port_str)
+    else:
+        hostname = host
+        port = None
+    path = PurePosixPath(request.headers['X-Forwarded-Prefix']) / request.url.path.lstrip("/")
+    url = Url(protocol=protocol, hostname=hostname, port=port, path=path)
+    return  url
+
+def redirect_to_ebrains_login(request: web.Request, oidc_client: OidcClient):
+    raise web.HTTPFound(location=oidc_client.create_user_login_url(
+        redirect_uri=get_requested_url(request),
+    ).raw)
+
+class EbrainsSession:
+    AUTH_COOKIE_KEY = "ebrains_access_token"
+
+    def __init__(self, user_token: UserToken):
+        self.user_token = user_token
+
+    @classmethod
+    def from_cookie(cls, request: web.Request) -> Optional["EbrainsSession"]:
+        access_token = request.cookies.get(cls.AUTH_COOKIE_KEY)
+        if access_token is None:
+            return None
+        user_token = UserToken(access_token=access_token)
+        if not user_token.is_valid():
+            return None
+        return EbrainsSession(user_token=user_token)
+
+    @classmethod
+    def from_code(cls, request: web.Request, oidc_client: OidcClient) -> Optional["EbrainsSession"]:
+        auth_code = request.query.get("code")
+        if auth_code is None:
+            return None
+        user_token = oidc_client.get_user_token(code=auth_code, redirect_uri=get_requested_url(request))
+        return EbrainsSession(user_token=user_token)
+
+    def set_cookie(self, response: web.Response) -> web.Response:
+        response.set_cookie(
+            name=self.AUTH_COOKIE_KEY, value=self.user_token.access_token, secure=True
+        )
+        return response
+
+
+def require_ebrains_login(
+    endpoint: Callable[["SessionAllocator[SESSION_TYPE]", web.Request], Coroutine[Any, Any, web.Response]]
+) -> Callable[["SessionAllocator[SESSION_TYPE]", web.Request], Coroutine[Any, Any, web.Response]]:
+
+    @wraps(endpoint)
+    async def wrapper(self: "SessionAllocator[SESSION_TYPE]", request: web.Request) -> web.Response:
+        ebrains_session = EbrainsSession.from_cookie(request) or EbrainsSession.from_code(request, oidc_client=self.ilastik_client)
+        if ebrains_session is None:
+            redirect_to_ebrains_login(request, oidc_client=self.ilastik_client)
+        response = await endpoint(self, request)
+        return ebrains_session.set_cookie(response)
+
+    return wrapper
+
+
 class SessionAllocator(Generic[SESSION_TYPE]):
     def __init__(
         self,
@@ -31,19 +96,24 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         external_url: Url,
         sockets_dir_at_master: Path,
         master_username: str,
+        oidc_client_json: Path,
     ):
         self.session_type = session_type
         self.sockets_dir_at_master = sockets_dir_at_master
         self.master_username = master_username
         self.master_host = master_host
         self.external_url = external_url
+        with open(oidc_client_json) as f:
+            self.ilastik_client = OidcClient.from_json_value(json.load(f))
 
         self.sessions : Dict[uuid.UUID, Session] = {}
 
         self.app = web.Application()
         self.app.add_routes([
-            web.post('/session', self.spawn_session),
-            web.get('/session/{session_id}', self.session_status),
+            web.get('/check_login', self.check_login),
+            web.get('/hello', self.hello), #type: ignore
+            web.post('/session', self.spawn_session), #type: ignore
+            web.get('/session/{session_id}', self.session_status), #type: ignore
             web.static('/', Path(__file__) / "../../../overlay/public", follow_symlinks=True, show_index=True),
         ])
 
@@ -53,7 +123,17 @@ class SessionAllocator(Generic[SESSION_TYPE]):
     def _make_socket_path_at_master(self, session_id: uuid.UUID) -> Path:
         return self.sockets_dir_at_master.joinpath(f"to-session-{session_id}")
 
-    async def spawn_session(self, request: web.Request):
+    @require_ebrains_login
+    async def hello(self, request: web.Request) -> web.Response:
+        return web.json_response("hello!", status=200)
+
+    async def check_login(self, request: web.Request) -> web.Response:
+        if EbrainsSession.from_cookie(request) is None:
+            return web.json_response({"logged_in": False}, status=401)
+        return web.json_response({"logged_in": True}, status=200)
+
+    @require_ebrains_login
+    async def spawn_session(self, request: web.Request) -> web.Response:
         raw_payload = await request.content.read()
         try:
             payload_dict = json.loads(raw_payload.decode('utf8'))
@@ -83,6 +163,7 @@ class SessionAllocator(Generic[SESSION_TYPE]):
             },
         )
 
+    @require_ebrains_login
     async def session_status(self, request: web.Request):
         # FIXME: do security checks here?
         try:
@@ -113,6 +194,13 @@ if __name__ == '__main__':
     parser.add_argument("--external-url")
     parser.add_argument("--master-username", default="wwww-data")
     parser.add_argument("--sockets-dir-at-master", type=Path, default=Path(tempfile.gettempdir()))
+    parser.add_argument(
+        "--oidc-client-json",
+        type=Path,
+        required=True,
+        help="Path to a json file representing the keycloak client. You can get this data via OidcClient.get"
+    )
+
 
     args = parser.parse_args()
 
@@ -128,4 +216,5 @@ if __name__ == '__main__':
         external_url=args.external_url,
         master_username=args.master_username,
         sockets_dir_at_master=args.sockets_dir_at_master,
+        oidc_client_json=args.oidc_client_json,
     ).run(port=5000)
