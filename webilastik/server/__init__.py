@@ -111,9 +111,9 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         self.app = web.Application()
         self.app.add_routes([
             web.get('/check_login', self.check_login),
-            web.get('/hello', self.hello), #type: ignore
-            web.post('/session', self.spawn_session), #type: ignore
-            web.get('/session/{session_id}', self.session_status), #type: ignore
+            web.get('/hello', self.hello),
+            web.post('/session', self.spawn_session),
+            web.get('/session/{session_id}', self.session_status),
             web.static('/', Path(__file__) / "../../../overlay/public", follow_symlinks=True, show_index=True),
         ])
 
