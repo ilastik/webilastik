@@ -5,12 +5,10 @@ export class SessionLoaderWidget{
     element: HTMLElement;
     public readonly url_input: HTMLInputElement;
     public readonly session_url_field: HTMLInputElement;
-    public readonly session_token_field: HTMLInputElement;
     constructor({
-        ilastik_url, session_url, token="", parentElement, onNewSession}: {
+        ilastik_url, session_url, parentElement, onNewSession}: {
         ilastik_url: URL,
         session_url?: URL,
-        token?: string,
         parentElement: HTMLElement,
         onNewSession: (session: Session) => void,
     }){
@@ -31,10 +29,6 @@ export class SessionLoaderWidget{
         })
 
         p = createElement({tagName: "p", parentElement: form})
-        createElement({tagName: "label", parentElement: p, innerHTML: "Session token: "})
-        this.session_token_field = createInput({inputType: "text", parentElement: p, required: true, value: token})
-
-        p = createElement({tagName: "p", parentElement: form})
         const load_session_button = createInput({inputType: "submit", value: "Rejoin Session", parentElement: p})
 
         const message_p = createElement({tagName: "p", parentElement: form})
@@ -46,7 +40,6 @@ export class SessionLoaderWidget{
             Session.load({
                 ilastik_url: new URL(this.url_input.value),
                 session_url: new URL(this.session_url_field.value.trim()),
-                token: this.session_token_field.value.trim(),
             }).then(
                 session => onNewSession(session),
                 failure => {message_p.innerHTML = failure.message},
@@ -65,9 +58,8 @@ export class SessionLoaderWidget{
         })
     }
 
-    public setFields(params: {ilastik_url: URL, session_url: URL, token: string}){
+    public setFields(params: {ilastik_url: URL, session_url: URL}){
         this.url_input.value = params.session_url.toString()
         this.session_url_field.value = params.session_url.toString()
-        this.session_token_field.value = params.token
     }
 }

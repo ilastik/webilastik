@@ -6,16 +6,13 @@ import { ensureJsonArray, ensureJsonNumberTripplet, ensureJsonObject, ensureJson
 export class Session{
     public readonly ilastik_url: string
     public readonly session_url: string
-    public readonly token: string
 
-    protected constructor({ilastik_url, session_url, token}: {
+    protected constructor({ilastik_url, session_url}: {
         ilastik_url: URL,
         session_url: URL,
-        token: string
     }){
         this.ilastik_url = ilastik_url.toString().replace(/\/$/, "")
         this.session_url = session_url.toString().replace(/\/$/, "")
-        this.token = token
     }
 
     public static btoa(url: String): string{
@@ -62,28 +59,22 @@ export class Session{
             return new Session({
                 ilastik_url: new URL(clean_ilastik_url),
                 session_url: new URL(raw_session_data.url),
-                token: raw_session_data["token"],
             })
         }
         throw `Could not create a session`
     }
 
-    public static async load({ilastik_url, session_url, token}: {
-        ilastik_url: URL, session_url:URL, token: string
+    public static async load({ilastik_url, session_url}: {
+        ilastik_url: URL, session_url:URL
     }): Promise<Session>{
         const status_endpoint = session_url.toString().replace(/\/?$/, "/status")
-        let session_status_resp = await fetch(status_endpoint, {
-            headers: {
-                'Authorization': 'Bearer ' + token
-            }
-        })
+        let session_status_resp = await fetch(status_endpoint)
         if(!session_status_resp.ok){
             throw Error(`Bad response from session: ${session_status_resp.status}`)
         }
         return new Session({
             ilastik_url: ilastik_url,
             session_url: session_url,
-            token: token,
         })
     }
 

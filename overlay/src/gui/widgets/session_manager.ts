@@ -31,7 +31,6 @@ export class SessionManagerWidget{
             this.session_loader.setFields({
                 ilastik_url: new URL(new_session.ilastik_url),
                 session_url: new URL(new_session.session_url),
-                token: new_session.token
             })
         }
         this.session_creator = new SessionCreatorWidget({parentElement: this.element, ilastik_url, onNewSession})

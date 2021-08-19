@@ -12,7 +12,6 @@ from aiohttp import web
 import os
 import logging
 
-import jwt
 from webilastik.utility.url import Url, Protocol
 from webilastik.server.session import Session, LocalSession
 
@@ -155,11 +154,6 @@ class SessionAllocator(Generic[SESSION_TYPE]):
             {
                 "id": str(session_id),
                 "url": self._make_session_url(session_id).raw,
-                "token": jwt.encode(
-                    {"sid": str(session_id)},
-                    SESSION_SECRET,
-                    algorithm="HS256"
-                )
             },
         )
 
