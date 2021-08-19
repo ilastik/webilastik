@@ -207,7 +207,7 @@ if __name__ == '__main__':
     SessionAllocator(
         session_type=session_type,
         master_host=args.master_host,
-        external_url=args.external_url,
+        external_url=Url.parse(args.external_url),
         master_username=args.master_username,
         sockets_dir_at_master=args.sockets_dir_at_master,
         oidc_client_json=args.oidc_client_json,
