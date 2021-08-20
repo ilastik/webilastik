@@ -70,13 +70,13 @@ class HttpPyFs(FS):
         response = requests.put(full_path, data=contents, headers={"Content-Type": "application/octet-stream"})
         response.raise_for_status()
 
-    def _get_object(self, path: str) -> Tuple[CaseInsensitiveDict, bytes]:
+    def _get_object(self, path: str) -> Tuple["CaseInsensitiveDict[str]", bytes]:
         full_path = self._make_full_path(path)
         response = requests.get(full_path)
         response.raise_for_status()
         return response.headers, response.content
 
-    def _head_object(self, path: str) -> CaseInsensitiveDict:
+    def _head_object(self, path: str) -> "CaseInsensitiveDict[str]":
         full_path = self._make_full_path(path)
         resp = requests.head(full_path)
         resp.raise_for_status()
@@ -122,7 +122,8 @@ class HttpPyFs(FS):
             raise e
 
     def opendir(self, path: str, factory=None) -> SubFS["HttpPyFs"]:
-        return HttpPyFs(self._make_full_path(path))
+        #FIXME: is the typing correct?
+        return HttpPyFs(self._make_full_path(path)) #type: ignore
 
     def listdir(self, path: str) -> List[str]:
         raise NotImplementedError("Can't reliably list directories via http")
