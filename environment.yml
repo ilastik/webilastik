@@ -1,0 +1,21 @@
+name: webilastik-test
+channels:
+  - defaults
+  - conda-forge
+  - ilastik-forge
+dependencies:
+  - python>=3.7
+  - numpy
+  - fastfilters
+  - fs
+  - lemon=1.3.1=he9d42e9_3
+  - vigra
+  - scikit-image
+  - scikit-learn
+  - h5py
+  - typing_extensions
+  - aiohttp
+  - requests
+  - pip
+  - pip:
+    - git+https://git@github.com/ilastik/ndstructs@dev

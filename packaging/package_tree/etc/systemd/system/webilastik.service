@@ -1,0 +1,37 @@
+# based off of nginx.service
+#
+# Stop dance
+# ==========
+#
+# ExecStop sends SIGSTOP (graceful stop) to the process.
+# If, after 5s (--retry QUIT/5) nginx is still running, systemd takes control
+# and sends SIGTERM (fast shutdown) to the main process.
+# After another 5s (TimeoutStopSec=5), and if nginx is alive, systemd sends
+# SIGKILL to all the remaining processes in the process group (KillMode=mixed).
+#
+# nginx signals reference doc:
+# http://nginx.org/en/docs/control.html
+#
+[Unit]
+Description=Webilastik session allocator server
+Documentation=https://github.com/ilastik/webilastik
+Wants=nginx.service
+
+[Service]
+Type=simple
+ExecStart=/opt/webilastik_conda_env/bin/python3 /opt/webilastik/server/__init__.py \
+    --session-type=Local \
+    --master-host=localhost \
+    --master-username=www-data \
+    --external-url=https://web.ilastik.org/ \
+
+TimeoutStopSec=30
+KillMode=mixed
+Restart=on-failure
+User=www-data
+Group=www-data
+KillSignal=SIGQUIT
+NotifyAccess=all
+
+[Install]
+WantedBy=multi-user.target

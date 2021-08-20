@@ -1,0 +1,9 @@
+Package: webilastik
+Version: 0.1.1
+Section: base
+Priority: optional
+Architecture: amd64
+Depends:
+Maintainer: ilastik Team <team@ilastik.org>
+Description: Webilastik
+ Server and frontend for the web version of ilastik
