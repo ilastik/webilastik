@@ -1,12 +1,15 @@
-from abc import abstractmethod, ABC
+from abc import abstractmethod
+import sys
 import os
 import signal
 import asyncio
-from typing import Iterable, List, Optional, Mapping, Sequence, Set, cast
+from typing import Iterable, List, Optional, Mapping, Sequence, Set
 import json
 from base64 import b64decode
+import ssl
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
+from webilastik.utility.url import Url
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonArray, ensureJsonObject, ensureJsonString
 from webilastik.scheduling.hashing_executor import HashingExecutor
 
@@ -30,7 +33,7 @@ from webilastik.features.channelwise_fastfilters import (
 from webilastik.annotations.annotation import Annotation
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.annotations import Annotation
-from webilastik.ui.applet import Applet, CONFIRMER, Slot
+from webilastik.ui.applet import Applet, Slot
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.ui.applet.brushing_applet import BrushingApplet
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
@@ -192,7 +195,8 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
 
 
 class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
-    def __init__(self):
+    def __init__(self, ssl_context: Optional[ssl.SSLContext] = None):
+        self.ssl_context = ssl_context
         self.websockets: List[web.WebSocketResponse] = []
         brushing_applet = WsBrushingApplet("brushing_applet")
         feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", datasources=brushing_applet.datasources)
@@ -353,10 +357,10 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         if not encoded_original_url:
             return web.Response(status=400, text="Missing parameter: url")
 
-        info_url = b64decode(encoded_original_url, altchars=b'-_').decode('utf8').lstrip("precomputed://").rstrip("/") + "/info"
-        print(f"+++++ Will request this info: {info_url}")
+        info_url = Url.parse(b64decode(encoded_original_url, altchars=b'-_').decode('utf8')).joinpath("info")
+        print(f"+++++ Will request this info: {info_url.schemeless_raw}", file=sys.stderr)
         async with aiohttp.ClientSession() as session:
-            async with session.get(info_url) as response:
+            async with session.get(info_url.schemeless_raw, ssl=self.ssl_context) as response:
                 response_text = await response.text()
                 if response.status // 100 != 2:
                     return web.Response(status=response.status, text=response_text)
@@ -370,10 +374,9 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         encoded_original_url = request.match_info.get("encoded_original_url")
         if not encoded_original_url:
             return web.Response(status=400, text="Missing parameter: url")
-        info_url = b64decode(encoded_original_url, altchars=b'-_').decode('utf8').lstrip("precomputed://").rstrip("/")
-        rest = request.match_info.get("rest", "")
-        raise web.HTTPFound(location=f"{info_url}/{rest.lstrip('/')}")
-
+        info_url = Url.parse(b64decode(encoded_original_url, altchars=b'-_').decode('utf8'))
+        rest = request.match_info.get("rest", "").lstrip("/")
+        raise web.HTTPFound(location=info_url.joinpath(rest).schemeless_raw)
 
 
 if __name__ == '__main__':
@@ -381,6 +384,7 @@ if __name__ == '__main__':
 
     parser = ArgumentParser()
     parser.add_argument("--listen-socket", type=Path, required=True)
+    parser.add_argument("--ca-cert-path", "--ca_cert_path", help="Path to CA crt file. Useful e.g. for testing with mkcert")
 
     subparsers = parser.add_subparsers(required=False, help="tunnel stuff")
     tunnel_parser = subparsers.add_parser("tunnel", help="Creates a reverse tunnel to an orchestrator")
@@ -397,6 +401,15 @@ if __name__ == '__main__':
     except ModuleNotFoundError:
         pass
 
+    ca_crt: Optional[str] = args.ca_cert_path or os.environ.get("CA_CERT_PATH")
+    ssl_context: Optional[ssl.SSLContext] = None
+
+    if ca_crt is not None:
+        if not Path(ca_crt).exists():
+            print(f"File not found: {ca_crt}", file=sys.stderr)
+            exit(1)
+        ssl_context = ssl.create_default_context(cafile=ca_crt)
+
     if "remote_username" in vars(args) and mpi_rank == 0:
         server_context = ReverseSshTunnel(
             remote_username=args.remote_username,
@@ -408,6 +421,6 @@ if __name__ == '__main__':
         server_context = contextlib.nullcontext()
 
     with server_context:
-        WsPixelClassificationWorkflow().run(
+        WsPixelClassificationWorkflow(ssl_context=ssl_context).run(
             unix_socket_path=str(args.listen_socket)
         )

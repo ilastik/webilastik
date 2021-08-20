@@ -1,8 +1,9 @@
+import os
 import re
 from pathlib import Path
 from urllib.parse import urlparse, urljoin
 import io
-from typing import Collection, Dict, Iterable, List, Any, Callable, Optional, Tuple
+from typing import Collection, Dict, Iterable, List, Any, Callable, Optional, Tuple, Union
 import requests
 from requests import HTTPError
 import sys
@@ -32,6 +33,9 @@ class HttpPyFs(FS):
         clean_path = Path(parsed.path or "/").resolve().as_posix()
         self.parsed_url = parsed._replace(path=clean_path)
         self.root_path = Path(self.parsed_url.path)
+        self.requests_verify: Union[str, bool] = os.environ.get("CA_CERT_PATH", True)
+        if isinstance(self.requests_verify, str) and not Path(self.requests_verify).exists():
+            raise ValueError(f"CA_CERT_PATH '{self.requests_verify}' not found")
 
     def __getstate__(self) -> Dict[str, Any]:
         return {"url": self.url}
@@ -55,7 +59,7 @@ class HttpPyFs(FS):
     def _delete_object(self, path: str) -> None:
         full_path = self._make_full_path(path)
         eprint(f"Removing object at {full_path}")
-        resp = requests.delete(full_path)
+        resp = requests.delete(full_path, verify=self.requests_verify)
         resp.raise_for_status()
 
     def _put_object(self, path: str, contents: bytes):
@@ -67,18 +71,20 @@ class HttpPyFs(FS):
         elif resource_type == ResourceType.directory:
             raise ValueError(f"{full_path} is a directory")
         assert full_path != "/"
-        response = requests.put(full_path, data=contents, headers={"Content-Type": "application/octet-stream"})
+        response = requests.put(
+            full_path, data=contents, headers={"Content-Type": "application/octet-stream"}, verify=self.requests_verify
+        )
         response.raise_for_status()
 
     def _get_object(self, path: str) -> Tuple["CaseInsensitiveDict[str]", bytes]:
         full_path = self._make_full_path(path)
-        response = requests.get(full_path)
+        response = requests.get(full_path, verify=self.requests_verify)
         response.raise_for_status()
         return response.headers, response.content
 
     def _head_object(self, path: str) -> "CaseInsensitiveDict[str]":
         full_path = self._make_full_path(path)
-        resp = requests.head(full_path)
+        resp = requests.head(full_path, verify=self.requests_verify)
         resp.raise_for_status()
         return resp.headers
 
