@@ -19,9 +19,6 @@ logging.basicConfig(level=logging.DEBUG)
 
 SESSION_TYPE = TypeVar("SESSION_TYPE", bound=Session)
 
-SESSION_SECRET = os.environ["SESSION_SECRET"]
-
-
 def get_requested_url(request: web.Request) -> Url:
     protocol = Protocol.from_str(request.headers['X-Forwarded-Proto'])
     host = request.headers['X-Forwarded-Host']
