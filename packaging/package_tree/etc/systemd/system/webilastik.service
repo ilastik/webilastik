@@ -19,11 +19,13 @@ Wants=nginx.service
 
 [Service]
 Type=simple
-ExecStart=/opt/webilastik_conda_env/bin/python3 /opt/webilastik/server/__init__.py \
+Environment=PYTHONPATH=/opt/webilastik/
+ExecStart=/opt/webilastik_conda_env/bin/python3 -B /opt/webilastik/webilastik/server/__init__.py \
     --session-type=Local \
     --master-host=localhost \
     --master-username=www-data \
     --external-url=https://web.ilastik.org/ \
+    --oidc-client-json=/etc/webilastik/oidc_client.json \
 
 TimeoutStopSec=30
 KillMode=mixed

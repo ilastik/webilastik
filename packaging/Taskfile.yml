@@ -48,10 +48,12 @@ tasks:
            Server and frontend for the web version of ilastik
     cmds:
       - cp -rT ./package_tree {{.PKG_TREE_PATH}}
+      - mkdir -p {{.PKG_TREE_PATH}}/etc/webilastik
       - echo '{{.CONTROL_FILE_CONTENTS}}' > {{.PKG_TREE_PATH}}/DEBIAN/control
       - mkdir -p {{.PKG_TREE_PATH}}/opt/webilastik_conda_env
       - tar -xzf {{.PACKED_ENV_PATH}} -C {{.PKG_TREE_PATH}}/opt/webilastik_conda_env
-      - cp -rT ../webilastik {{.PKG_TREE_PATH}}/opt/webilastik
+      - mkdir {{.PKG_TREE_PATH}}/opt/webilastik
+      - cp -r ../webilastik ../overlay {{.PKG_TREE_PATH}}/opt/webilastik
       - find {{.PKG_TREE_PATH}}/opt/webilastik -name __pycache__ -delete
       - dpkg-deb --build {{.PKG_TREE_PATH}} {{.DEB_PKG_PATH}}
 
