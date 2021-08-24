@@ -1,0 +1,60 @@
+version: '3'
+
+vars:
+  CWD:
+    sh: pwd
+  BUILD_DIR: "{{.CWD}}/build"
+  PKG_VERSION: "0.1.1"
+  PKG_NAME: webilastik_{{.PKG_VERSION}}
+  ENV_PATH: "{{.BUILD_DIR}}/{{.PKG_NAME}}_conda_env"
+  PACKED_ENV_PATH: "{{.ENV_PATH}}.tar.gz"
+  PKG_TREE_PATH: "{{.BUILD_DIR}}/{{.PKG_NAME}}"
+  DEB_PKG_PATH: "{{.BUILD_DIR}}/{{.PKG_NAME}}.deb"
+
+tasks:
+  create-build-dir:
+    cmds:
+      - mkdir -p {{.BUILD_DIR}}
+    status:
+      - test -d {{.BUILD_DIR}}
+
+  clean: rm -rf {{.BUILD_DIR}}
+
+  create-conda-environment:
+    deps: [create-build-dir]
+    sources: ["../environment.yml"]
+    generates:
+      - "{{.PACKED_ENV_PATH}}"
+    cmds:
+      - conda env create --prefix {{.ENV_PATH}} -f ../environment.yml
+      - conda pack -p {{.ENV_PATH}} -o {{.PACKED_ENV_PATH}}
+
+  create-package-tree:
+    deps: [create-conda-environment]
+    sources:
+      - "{{.PACKED_ENV_PATH}}"
+    generates:
+      - "{{.DEB_PKG_PATH}}"
+    vars:
+      CONTROL_FILE_CONTENTS: |-
+          Package: webilastik
+          Version: {{.PKG_VERSION}}
+          Section: base
+          Priority: optional
+          Architecture: amd64
+          Depends:
+          Maintainer: ilastik Team <team@ilastik.org>
+          Description: Webilastik
+           Server and frontend for the web version of ilastik
+    cmds:
+      - cp -rT ./package_tree {{.PKG_TREE_PATH}}
+      - echo '{{.CONTROL_FILE_CONTENTS}}' > {{.PKG_TREE_PATH}}/DEBIAN/control
+      - mkdir -p {{.PKG_TREE_PATH}}/opt/webilastik_conda_env
+      - tar -xzf {{.PACKED_ENV_PATH}} -C {{.PKG_TREE_PATH}}/opt/webilastik_conda_env
+      - cp -rT ../webilastik {{.PKG_TREE_PATH}}/opt/webilastik
+      - find {{.PKG_TREE_PATH}}/opt/webilastik -name __pycache__ -delete
+      - dpkg-deb --build {{.PKG_TREE_PATH}} {{.DEB_PKG_PATH}}
+
+  default:
+    deps: [create-package-tree]
+

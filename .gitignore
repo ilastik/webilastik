@@ -1,3 +1,5 @@
 __pycache__/
 ndstructs/
 ndstructs
+packaging/build/
+.task
