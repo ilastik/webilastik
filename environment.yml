@@ -1,4 +1,4 @@
-name: webilastik-test
+name: webilastik
 channels:
   - defaults
   - conda-forge
