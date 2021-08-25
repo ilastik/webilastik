@@ -12,21 +12,25 @@ vars:
   DEB_PKG_PATH: "{{.BUILD_DIR}}/{{.PKG_NAME}}.deb"
 
 tasks:
-  create-build-dir:
-    cmds:
-      - mkdir -p {{.BUILD_DIR}}
-    status:
-      - test -d {{.BUILD_DIR}}
-
-  clean: rm -rf {{.BUILD_DIR}}/*
+  create-build-dir: mkdir -p {{.BUILD_DIR}}
 
   create-conda-environment:
     deps: [create-build-dir]
     sources: ["../environment.yml"]
-    generates:
-      - "{{.PACKED_ENV_PATH}}"
+    vars:
+      ENV_CHECKSUM_PATH: "{{.BUILD_DIR}}/environment.yml.sha256"
     cmds:
       - conda env create --prefix {{.ENV_PATH}} -f ../environment.yml
+      - sha256sum ../environment.yml > {{.ENV_CHECKSUM_PATH}}
+    status:
+      - sha256sum ../environment.yml > {{.ENV_CHECKSUM_PATH}}.check
+      - diff {{.ENV_CHECKSUM_PATH}}.check {{.ENV_CHECKSUM_PATH}}
+
+  create-packed-conda-environment:
+    deps: [create-conda-environment]
+    sources: ["{{.PACKED_ENV_PATH}}"]
+    generates: ["{{.PACKED_ENV_PATH}}"]
+    cmds:
       - conda pack -p {{.ENV_PATH}} -o {{.PACKED_ENV_PATH}}
 
   create-package-tree:
@@ -54,8 +58,10 @@ tasks:
       - tar -xzf {{.PACKED_ENV_PATH}} -C {{.PKG_TREE_PATH}}/opt/webilastik_conda_env
       - mkdir {{.PKG_TREE_PATH}}/opt/webilastik
       - cp -r ../webilastik ../overlay {{.PKG_TREE_PATH}}/opt/webilastik
-      - find {{.PKG_TREE_PATH}}/opt/webilastik -name __pycache__ -delete
+      - find {{.PKG_TREE_PATH}}/opt/webilastik -name __pycache__ | xargs --no-run-if-empty rm -rf
       - dpkg-deb --build {{.PKG_TREE_PATH}} {{.DEB_PKG_PATH}}
+
+  clean: rm -rf {{.BUILD_DIR}}/*
 
   default:
     deps: [create-package-tree]
