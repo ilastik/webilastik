@@ -33,7 +33,7 @@ tasks:
     cmds:
       - conda pack -p {{.ENV_PATH}} -o {{.PACKED_ENV_PATH}}
 
-  create-package-tree:
+  create-deb-package:
     deps: [create-conda-environment]
     sources:
       - "{{.PACKED_ENV_PATH}}"
@@ -51,12 +51,13 @@ tasks:
           Description: Webilastik
            Server and frontend for the web version of ilastik
     cmds:
-      - cp -rT ./package_tree {{.PKG_TREE_PATH}}
+      - rm -rf {{.PKG_TREE_PATH}}
+      - cp -r ./package_tree {{.PKG_TREE_PATH}}
       - mkdir -p {{.PKG_TREE_PATH}}/etc/webilastik
       - echo '{{.CONTROL_FILE_CONTENTS}}' > {{.PKG_TREE_PATH}}/DEBIAN/control
       - mkdir -p {{.PKG_TREE_PATH}}/opt/webilastik_conda_env
       - tar -xzf {{.PACKED_ENV_PATH}} -C {{.PKG_TREE_PATH}}/opt/webilastik_conda_env
-      - mkdir {{.PKG_TREE_PATH}}/opt/webilastik
+      - mkdir -p {{.PKG_TREE_PATH}}/opt/webilastik
       - cp -r ../webilastik ../overlay {{.PKG_TREE_PATH}}/opt/webilastik
       - find {{.PKG_TREE_PATH}}/opt/webilastik -name __pycache__ | xargs --no-run-if-empty rm -rf
       - dpkg-deb --build {{.PKG_TREE_PATH}} {{.DEB_PKG_PATH}}
@@ -64,5 +65,5 @@ tasks:
   clean: rm -rf {{.BUILD_DIR}}/*
 
   default:
-    deps: [create-package-tree]
+    deps: [create-deb-package]
 
