@@ -1,0 +1,62 @@
+#!/bin/bash
+
+set -u
+set -e
+
+OIDC_JSON_FILE_INSTALL_PATH=/etc/webilastik/oidc_client.json
+NGINX_EXTRA_CONF_PATH=/etc/webilastik/nginx_extra_conf
+
+errcho(){
+    echo "$@" 1>&2
+}
+
+confirm(){
+    local MESSAGE="$1"
+    local REPLY=""
+    while true; do
+        read -p "$MESSAGE  (yes/no) " REPLY
+        case $REPLY in
+            [Yy]* ) return 0;;
+            [Nn]* ) return 1;;
+            * ) echo "Please answer yes or no.";;
+        esac
+    done
+}
+
+ask_for_file(){
+    local MESSAGE="$1"
+    local FILE_PATH=""
+    while true; do
+        read -p  "$MESSAGE " FILE_PATH
+        if [ -f "$FILE_PATH" ]; then
+            echo "$FILE_PATH"
+            return 0
+        fi
+        errcho "File '$FILE_PATH' does not exist or is inacessible"
+    done
+}
+
+if [ $1 = "configure" ]; then
+    if [ ! -f $OIDC_JSON_FILE_INSTALL_PATH ] || ! confirm "File $OIDC_JSON_FILE_INSTALL_PATH already exists. Use it?"; then
+        OIDC_JSON_FILE="$(ask_for_file 'Enter path to your oidc client json file')"
+        cp -v "$OIDC_JSON_FILE" $OIDC_JSON_FILE_INSTALL_PATH
+    fi
+
+    #FIXME: Use certbot instead
+    if ! confirm "Would you like to configure static SSL certificate/key paths?" ; then
+        exit 0
+    fi
+
+    if [ -f $NGINX_EXTRA_CONF_PATH ] && confirm "File $NGINX_EXTRA_CONF_PATH already exists. Use it?"; then
+        exit 0
+    fi
+
+    CERTIFICATE_PATH="$(ask_for_file 'Enter the path to your SSL certificate file')"
+    CERTIFICATE_KEY_PATH="$(ask_for_file 'Enter the path to your SSL certificate KEY file')"
+
+    cp "$CERTIFICATE_PATH" /etc/webilastik/cert.pem
+    cp "$CERTIFICATE_KEY_PATH" /etc/webilastik/cert-key.pem
+
+    echo "ssl_certificate /etc/webilastik/cert.pem;" > $NGINX_EXTRA_CONF_PATH
+    echo "ssl_certificate_key /etc/webilastik/cert-key.pem;" >> $NGINX_EXTRA_CONF_PATH
+fi
