@@ -39,6 +39,9 @@ tasks:
       - "{{.PACKED_ENV_PATH}}"
     generates:
       - "{{.DEB_PKG_PATH}}"
+    status:
+      - "false" #FIXME
+
     vars:
       CONTROL_FILE_CONTENTS: |-
           Package: webilastik
