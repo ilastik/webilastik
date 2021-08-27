@@ -7,6 +7,7 @@ vars:
   PKG_VERSION: "0.1.1"
   PKG_NAME: webilastik_{{.PKG_VERSION}}
   ENV_PATH: "{{.BUILD_DIR}}/{{.PKG_NAME}}_conda_env"
+  ENV_CHECKSUM_PATH: "{{.BUILD_DIR}}/environment.yml.sha256"
   PACKED_ENV_PATH: "{{.ENV_PATH}}.tar.gz"
   PKG_TREE_PATH: "{{.BUILD_DIR}}/{{.PKG_NAME}}"
   DEB_PKG_PATH: "{{.BUILD_DIR}}/{{.PKG_NAME}}.deb"
@@ -24,8 +25,6 @@ tasks:
       - test -d {{.BUILD_DIR}}
 
   create-conda-environment:
-    vars:
-      ENV_CHECKSUM_PATH: "{{.BUILD_DIR}}/environment.yml.sha256"
     deps: [create-build-dir]
     sources: ["{{.PROJECT_ROOT}}/environment.yml"]
     generates: ["{{.ENV_CHECKSUM_PATH}}"]
@@ -35,9 +34,10 @@ tasks:
 
   create-packed-conda-environment:
     deps: [create-conda-environment]
-    sources: ["{{.PACKED_ENV_PATH}}"]
+    sources: ["{{.ENV_CHECKSUM_PATH}}"]
     generates: ["{{.PACKED_ENV_PATH}}"]
     cmds:
+      - rm -f {{.PACKED_ENV_PATH}}
       - conda pack -p {{.ENV_PATH}} -o {{.PACKED_ENV_PATH}}
 
   create-neuroglancer-git-dir:
@@ -80,22 +80,24 @@ tasks:
 
   compile-overlay:
     dir: "{{.OVERLAY_DIR}}"
+    generates: ["{{.OVERLAY_BUNDLE_PATH}}"]
+    status:
+      - test "$(git status --porcelain .)" = ""
     cmds:
       - rm -rf node_modules
       - npm ci
       - npm run bundle-ng-inject
 
-  create-deb-package-tree:
+  create-deb-package:
     deps: [create-packed-conda-environment, compile-neuroglancer, compile-overlay]
     sources:
+      - "{{.PROJECT_ROOT}}/package_tree/**/*"
       - "{{.PACKED_ENV_PATH}}"
-      - "{{.NEUROGLANCER_BUNDLE_PATH}}"
+      - "{{.PROJECT_ROOT}}/webilastik/**/*.py"
       - "{{.OVERLAY_BUNDLE_PATH}}"
+      - "{{.NEUROGLANCER_BUNDLE_PATH}}"
     generates:
       - "{{.DEB_PKG_PATH}}"
-    status:
-      - "false" #FIXME
-
     vars:
       CONTROL_FILE_CONTENTS: |-
           Package: webilastik
@@ -127,17 +129,17 @@ tasks:
       - find {{.PKG_TREE_PATH}}/opt/webilastik -name __pycache__ | xargs --no-run-if-empty rm -rf
 
       - echo 2>&1 '[INFO] Copying overlay bundle to public dir'
+      - mkdir -p {{.PKG_TREE_PATH}}/opt/webilastik/public/js/
       - cp {{.OVERLAY_BUNDLE_PATH}} {{.PKG_TREE_PATH}}/opt/webilastik/public/js/
 
       - echo 2>&1 '[INFO] Copying nehuba to public dir'
       - cp -r {{.NEUROGLANCER_BUILD_PATH}} {{.PKG_TREE_PATH}}/opt/webilastik/public/nehuba
 
-  create-deb-package:
-    deps: [create-deb-package-tree]
-    cmds:
+      - echo 2>&1 '[INFO] Generating .deb package at {{.DEB_PKG_PATH}}'
       - dpkg-deb --build -z2 {{.PKG_TREE_PATH}} {{.DEB_PKG_PATH}}
 
-  clean: rm -rf {{.BUILD_DIR}}/*
+  clean:
+    - rm -rf {{.BUILD_DIR}}/*
 
   default:
     deps: [create-deb-package]
