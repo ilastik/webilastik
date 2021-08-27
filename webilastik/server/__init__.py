@@ -110,7 +110,7 @@ class SessionAllocator(Generic[SESSION_TYPE]):
             web.get('/hello', self.hello),
             web.post('/session', self.spawn_session),
             web.get('/session/{session_id}', self.session_status),
-            web.static('/', Path(__file__) / "../../../overlay/public", follow_symlinks=True, show_index=True),
+            web.static('/', Path(__file__) / "../../../public", follow_symlinks=True, show_index=True),
         ])
 
     def _make_session_url(self, session_id: uuid.UUID) -> Url:

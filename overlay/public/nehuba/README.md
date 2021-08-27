@@ -1,1 +1,0 @@
-Built from git@github.com:HumanBrainProject/neuroglancer.git bb6b678bdd884c94d484c906dff0e723a8466297
