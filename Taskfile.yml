@@ -29,6 +29,7 @@ tasks:
     sources: ["{{.PROJECT_ROOT}}/environment.yml"]
     generates: ["{{.ENV_CHECKSUM_PATH}}"]
     cmds:
+      - rm -rf {{.ENV_PATH}}
       - conda env create --prefix {{.ENV_PATH}} -f {{.PROJECT_ROOT}}/environment.yml
       - sha256sum {{.PROJECT_ROOT}}/environment.yml > {{.ENV_CHECKSUM_PATH}}
 
