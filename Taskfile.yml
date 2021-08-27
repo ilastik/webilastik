@@ -86,7 +86,7 @@ tasks:
       - npm run bundle-ng-inject
 
   create-deb-package-tree:
-    deps: [create-conda-environment, compile-neuroglancer, compile-overlay]
+    deps: [create-packed-conda-environment, compile-neuroglancer, compile-overlay]
     sources:
       - "{{.PACKED_ENV_PATH}}"
       - "{{.NEUROGLANCER_BUNDLE_PATH}}"
