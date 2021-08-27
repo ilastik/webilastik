@@ -1,9 +1,9 @@
 version: '3'
 
 vars:
-  CWD:
+  PROJECT_ROOT:
     sh: pwd
-  BUILD_DIR: "{{.CWD}}/build"
+  BUILD_DIR: "{{.PROJECT_ROOT}}/build"
   PKG_VERSION: "0.1.1"
   PKG_NAME: webilastik_{{.PKG_VERSION}}
   ENV_PATH: "{{.BUILD_DIR}}/{{.PKG_NAME}}_conda_env"
@@ -13,21 +13,25 @@ vars:
   NEUROGLANCER_GIT_DIR: "{{.BUILD_DIR}}/neuroglancer"
   NEUROGLANCER_BUILD_PATH: "{{.NEUROGLANCER_GIT_DIR}}/dist/dev"
   NEUROGLANCER_BUNDLE_PATH: "{{.NEUROGLANCER_BUILD_PATH}}/main.bundle.js"
-  OVERLAY_DIR: "{{.CWD}}/../overlay"
+  OVERLAY_DIR: "{{.PROJECT_ROOT}}/overlay"
   OVERLAY_BUNDLE_PATH: "{{.OVERLAY_DIR}}/build/inject_into_neuroglancer.js"
 
 tasks:
-  create-build-dir: mkdir -p {{.BUILD_DIR}}
+  create-build-dir:
+    cmds:
+      - mkdir -p {{.BUILD_DIR}}
+    status:
+      - test -d {{.BUILD_DIR}}
 
   create-conda-environment:
     vars:
       ENV_CHECKSUM_PATH: "{{.BUILD_DIR}}/environment.yml.sha256"
     deps: [create-build-dir]
-    sources: ["../environment.yml"]
+    sources: ["{{.PROJECT_ROOT}}/environment.yml"]
     generates: ["{{.ENV_CHECKSUM_PATH}}"]
     cmds:
-      - conda env create --prefix {{.ENV_PATH}} -f ../environment.yml
-      - sha256sum ../environment.yml > {{.ENV_CHECKSUM_PATH}}
+      - conda env create --prefix {{.ENV_PATH}} -f {{.PROJECT_ROOT}}/environment.yml
+      - sha256sum {{.PROJECT_ROOT}}/environment.yml > {{.ENV_CHECKSUM_PATH}}
 
   create-packed-conda-environment:
     deps: [create-conda-environment]
@@ -106,7 +110,7 @@ tasks:
     cmds:
       - echo 2>&1 '[INFO] Generating basic package tree'
       - rm -rf {{.PKG_TREE_PATH}}
-      - cp -r ./package_tree {{.PKG_TREE_PATH}}
+      - cp -r {{.PROJECT_ROOT}}/package_tree {{.PKG_TREE_PATH}}
 
       - echo 2>&1 '[INFO] Generating DEBIAN/control file'
       - echo '{{.CONTROL_FILE_CONTENTS}}' > {{.PKG_TREE_PATH}}/DEBIAN/control
@@ -119,7 +123,7 @@ tasks:
 
       - echo 2>&1 '[INFO] Copying webilastik files'
       - mkdir -p {{.PKG_TREE_PATH}}/opt/webilastik
-      - cp -r ../webilastik ../public {{.PKG_TREE_PATH}}/opt/webilastik
+      - cp -r {{.PROJECT_ROOT}}/webilastik {{.PROJECT_ROOT}}/public {{.PKG_TREE_PATH}}/opt/webilastik
       - find {{.PKG_TREE_PATH}}/opt/webilastik -name __pycache__ | xargs --no-run-if-empty rm -rf
 
       - echo 2>&1 '[INFO] Copying overlay bundle to public dir'

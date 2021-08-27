@@ -1,5 +1,5 @@
 {
-  "exclude": ["packaging/"],
+  "exclude": ["build/"],
   "strict": ["webilastik/datasource", "webilastik/datasink"],
   "typeCheckingMode": "basic",
   "reportUnknownMemberType": false,
