@@ -40,7 +40,7 @@ def test_pixel_classification_workflow():
     # )
 
     # GUI creates a datasource somewhere...
-    ds = SkimageDataSource(Path("sample_data/cropped1.png"), filesystem=OSFS("."), tile_shape=Shape5D(x=400, y=400))
+    ds = SkimageDataSource(Path("public/images/c_cells_1.png"), filesystem=OSFS("."), tile_shape=Shape5D(x=400, y=400))
 
     # GUI creates some feature extractors
     feature_selection_applet.feature_extractors.set_value(

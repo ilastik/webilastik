@@ -25,7 +25,7 @@ async def read_server_status(websocket: ClientWebSocketResponse):
             break
 
 async def main():
-    ds = SkimageDataSource(filesystem=HttpPyFs("http://localhost:8000/"), path=Path("cropped1.png"))
+    ds = SkimageDataSource(filesystem=HttpPyFs("http://localhost:5000/"), path=Path("images/c_cells_1.png"))
 
     async with aiohttp.ClientSession() as session:
 
