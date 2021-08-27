@@ -10,21 +10,24 @@ vars:
   PACKED_ENV_PATH: "{{.ENV_PATH}}.tar.gz"
   PKG_TREE_PATH: "{{.BUILD_DIR}}/{{.PKG_NAME}}"
   DEB_PKG_PATH: "{{.BUILD_DIR}}/{{.PKG_NAME}}.deb"
+  NEUROGLANCER_GIT_DIR: "{{.BUILD_DIR}}/neuroglancer"
+  NEUROGLANCER_BUILD_PATH: "{{.NEUROGLANCER_GIT_DIR}}/dist/dev"
+  NEUROGLANCER_BUNDLE_PATH: "{{.NEUROGLANCER_BUILD_PATH}}/main.bundle.js"
+  OVERLAY_DIR: "{{.CWD}}/../overlay"
+  OVERLAY_BUNDLE_PATH: "{{.OVERLAY_DIR}}/build/inject_into_neuroglancer.js"
 
 tasks:
   create-build-dir: mkdir -p {{.BUILD_DIR}}
 
   create-conda-environment:
-    deps: [create-build-dir]
-    sources: ["../environment.yml"]
     vars:
       ENV_CHECKSUM_PATH: "{{.BUILD_DIR}}/environment.yml.sha256"
+    deps: [create-build-dir]
+    sources: ["../environment.yml"]
+    generates: ["{{.ENV_CHECKSUM_PATH}}"]
     cmds:
       - conda env create --prefix {{.ENV_PATH}} -f ../environment.yml
       - sha256sum ../environment.yml > {{.ENV_CHECKSUM_PATH}}
-    status:
-      - sha256sum ../environment.yml > {{.ENV_CHECKSUM_PATH}}.check
-      - diff {{.ENV_CHECKSUM_PATH}}.check {{.ENV_CHECKSUM_PATH}}
 
   create-packed-conda-environment:
     deps: [create-conda-environment]
@@ -33,10 +36,57 @@ tasks:
     cmds:
       - conda pack -p {{.ENV_PATH}} -o {{.PACKED_ENV_PATH}}
 
-  create-deb-package:
-    deps: [create-conda-environment]
+  create-neuroglancer-git-dir:
+    cmds:
+      - mkdir -p {{.NEUROGLANCER_GIT_DIR}}
+    status:
+      - test -d {{.NEUROGLANCER_GIT_DIR}}
+
+  checkout-neuroglancer:
+    deps: [create-neuroglancer-git-dir]
+    dir: "{{.NEUROGLANCER_GIT_DIR}}"
+    vars:
+      COMMIT_HASH: "bb6b678bdd884c94d484c906dff0e723a8466297"
+    cmds:
+      - git clone https://github.com/ilastik/neuroglancer . || git fetch
+      - git checkout {{.COMMIT_HASH}}
+    status:
+      - test $(git rev-parse HEAD) = {{.COMMIT_HASH}}
+
+  install-neuroglancer-dependencies:
+    deps: [checkout-neuroglancer]
+    vars:
+      PACKAGE_LOCK_CHECKSUM_PATH: "{{.BUILD_DIR}}/package-lock.json.check"
+    sources: ["{{.NEUROGLANCER_GIT_DIR}}/package-lock.json"]
+    generates: ["{{.PACKAGE_LOCK_CHECKSUM_PATH}}"]
+    dir: "{{.NEUROGLANCER_GIT_DIR}}"
+    cmds:
+      - rm -rf node_modules
+      - npm ci
+      - sha256sum package-lock.json > {{.PACKAGE_LOCK_CHECKSUM_PATH}}
+
+  compile-neuroglancer:
+    deps: [install-neuroglancer-dependencies]
+    dir: "{{.NEUROGLANCER_GIT_DIR}}"
+    sources: ["{{.NEUROGLANCER_GIT_DIR}}/package-lock.json"]
+    generates: ["{{.NEUROGLANCER_BUNDLE_PATH}}"]
+    cmds:
+      - rm -rf dist/
+      - npm run build
+
+  compile-overlay:
+    dir: "{{.OVERLAY_DIR}}"
+    cmds:
+      - rm -rf node_modules
+      - npm ci
+      - npm run bundle-ng-inject
+
+  create-deb-package-tree:
+    deps: [create-conda-environment, compile-neuroglancer, compile-overlay]
     sources:
       - "{{.PACKED_ENV_PATH}}"
+      - "{{.NEUROGLANCER_BUNDLE_PATH}}"
+      - "{{.OVERLAY_BUNDLE_PATH}}"
     generates:
       - "{{.DEB_PKG_PATH}}"
     status:
@@ -54,16 +104,34 @@ tasks:
           Description: Webilastik
            Server and frontend for the web version of ilastik
     cmds:
+      - echo 2>&1 '[INFO] Generating basic package tree'
       - rm -rf {{.PKG_TREE_PATH}}
       - cp -r ./package_tree {{.PKG_TREE_PATH}}
-      - mkdir -p {{.PKG_TREE_PATH}}/etc/webilastik
+
+      - echo 2>&1 '[INFO] Generating DEBIAN/control file'
       - echo '{{.CONTROL_FILE_CONTENTS}}' > {{.PKG_TREE_PATH}}/DEBIAN/control
+
+      - mkdir -p {{.PKG_TREE_PATH}}/etc/webilastik
+
+      - echo 2>&1 '[INFO] Unpacking conda environment'
       - mkdir -p {{.PKG_TREE_PATH}}/opt/webilastik_conda_env
       - tar -xzf {{.PACKED_ENV_PATH}} -C {{.PKG_TREE_PATH}}/opt/webilastik_conda_env
+
+      - echo 2>&1 '[INFO] Copying webilastik files'
       - mkdir -p {{.PKG_TREE_PATH}}/opt/webilastik
-      - cp -r ../webilastik ../overlay {{.PKG_TREE_PATH}}/opt/webilastik
+      - cp -r ../webilastik ../public {{.PKG_TREE_PATH}}/opt/webilastik
       - find {{.PKG_TREE_PATH}}/opt/webilastik -name __pycache__ | xargs --no-run-if-empty rm -rf
-      - dpkg-deb --build {{.PKG_TREE_PATH}} {{.DEB_PKG_PATH}}
+
+      - echo 2>&1 '[INFO] Copying overlay bundle to public dir'
+      - cp {{.OVERLAY_BUNDLE_PATH}} {{.PKG_TREE_PATH}}/opt/webilastik/public/js/
+
+      - echo 2>&1 '[INFO] Copying nehuba to public dir'
+      - cp -r {{.NEUROGLANCER_BUILD_PATH}} {{.PKG_TREE_PATH}}/opt/webilastik/public/nehuba
+
+  create-deb-package:
+    deps: [create-deb-package-tree]
+    cmds:
+      - dpkg-deb --build -z2 {{.PKG_TREE_PATH}} {{.DEB_PKG_PATH}}
 
   clean: rm -rf {{.BUILD_DIR}}/*
 
