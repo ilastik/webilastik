@@ -109,6 +109,7 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         self.app = web.Application()
         self.app.add_routes([
             web.get('/check_login', self.check_login),
+            web.get('/login_then_close', self.login_then_close),
             web.get('/hello', self.hello),
             web.post('/session', self.spawn_session),
             web.get('/session/{session_id}', self.session_status),
@@ -129,6 +130,23 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         if self.oidc_client and EbrainsSession.from_cookie(request) is None:
             return web.json_response({"logged_in": False}, status=401)
         return web.json_response({"logged_in": True}, status=200)
+
+    @require_ebrains_login
+    async def login_then_close(self, request: web.Request) -> web.Response:
+        return  web.Response(
+            text="""
+                <html>
+                    <head>
+                        <meta charset="UTF-8">
+                        <script>window.close()</script>
+                    </head>>
+                    <body>
+                        <p>You've logged into ebrains. You can close this tab now</p>
+                    </body>
+                </html>
+            """,
+            content_type='text/html'
+        )
 
     @require_ebrains_login
     async def spawn_session(self, request: web.Request) -> web.Response:

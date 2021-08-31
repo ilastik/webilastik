@@ -23,6 +23,20 @@ export class Session{
         return atob(encoded.replace("-", "+").replace("_", "/"))
     }
 
+    public static async check_login({ilastik_api_url}: {ilastik_api_url: Url}): Promise<boolean>{
+        let response = await fetch(ilastik_api_url.joinPath("check_login").raw, {
+            credentials: "include"
+        });
+        if(response.ok){
+            return true
+        }
+        if(response.status == 401){
+            return false
+        }
+        let contents = await response.text()
+        throw new Error(`Checking loging faield with ${response.status}:\n${contents}`)
+    }
+
     public static async create({ilastik_url, session_duration_seconds, timeout_s, onProgress=(_) => {}}: {
         ilastik_url: URL,
         session_duration_seconds: number,
