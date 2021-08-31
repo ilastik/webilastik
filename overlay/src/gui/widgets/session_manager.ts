@@ -29,7 +29,7 @@ export class SessionManagerWidget{
             this.session_creator.set_disabled(true)
             this.session_loader.set_disabled(true)
             this.session_loader.setFields({
-                ilastik_url: new URL(new_session.ilastik_url),
+                ilastik_url,
                 session_url: new URL(new_session.session_url),
             })
         }
