@@ -1,1 +1,1 @@
-javascript:(function(){var s=document.createElement("script");s.src="http://dev.web.ilastik.org/js/inject_into_img.js"; s.onload=() => window.inject_ilastik_into_images(new URL("http://dev.web.ilastik.org/"), new URL("http://dev.web.ilastik.org/css/main.css"));document.head.appendChild(s)})();
+javascript:(function(){var s=document.createElement("script");s.src="https://app.ilastik.org/js/inject_into_img.js"; s.onload=() => window.inject_ilastik_into_images(new URL("https://app.ilastik.org/"), new URL("https://app.ilastik.org/css/main.css"));document.head.appendChild(s)})();

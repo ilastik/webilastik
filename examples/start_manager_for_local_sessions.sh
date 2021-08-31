@@ -22,5 +22,5 @@ python $SCRIPT_DIR/../webilastik/server/__init__.py \
     --session-type=Local \
     --master-host=localhost \
     --master-username=www-data \
-    --external-url=http://dev.web.ilastik.org/ \
+    --external-url=https://app.ilastik.org/ \
     "$@"

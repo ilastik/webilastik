@@ -52,7 +52,7 @@ tasks:
     deps: [create-neuroglancer-git-dir]
     dir: "{{.NEUROGLANCER_GIT_DIR}}"
     vars:
-      COMMIT_HASH: "bb6b678bdd884c94d484c906dff0e723a8466297"
+      COMMIT_HASH: "origin/with-ilastik-overlay"
     cmds:
       - git clone https://github.com/ilastik/neuroglancer . || git fetch
       - git checkout {{.COMMIT_HASH}}
@@ -75,11 +75,17 @@ tasks:
   compile-neuroglancer:
     deps: [install-neuroglancer-dependencies]
     dir: "{{.NEUROGLANCER_GIT_DIR}}"
-    sources: ["{{.NEUROGLANCER_GIT_DIR}}/package-lock.json"]
     generates: ["{{.NEUROGLANCER_BUNDLE_PATH}}"]
+    vars:
+      NEUROGLANCER_BUNDLE_CHECKSUM_PATH: "{{.BUILD_DIR}}/neuroglancer-bunble.sha256"
+    env:
+      ILASTIK_API_URL: https://app.ilastik.org/app #needed for 'npm run build-with-ilastik-overlay'
     cmds:
-      - rm -rf dist/
-      - npm run build
+      - rm -rf dist/ {{.NEUROGLANCER_BUNDLE_CHECKSUM_PATH}}
+      - npm run build-with-ilastik-overlay
+      - sha256sum {{.NEUROGLANCER_BUNDLE_PATH}} > {{.NEUROGLANCER_BUNDLE_CHECKSUM_PATH}}
+    status:
+      - sha256sum {{.NEUROGLANCER_BUNDLE_PATH}} | diff {{.NEUROGLANCER_BUNDLE_CHECKSUM_PATH}} -
 
   compile-overlay:
     dir: "{{.OVERLAY_DIR}}"
