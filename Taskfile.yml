@@ -79,7 +79,7 @@ tasks:
     vars:
       NEUROGLANCER_BUNDLE_CHECKSUM_PATH: "{{.BUILD_DIR}}/neuroglancer-bunble.sha256"
     env:
-      ILASTIK_API_URL: https://app.ilastik.org/app #needed for 'npm run build-with-ilastik-overlay'
+      ILASTIK_API_URL: https://app.ilastik.org/api #needed for 'npm run build-with-ilastik-overlay'
     cmds:
       - rm -rf dist/ {{.NEUROGLANCER_BUNDLE_CHECKSUM_PATH}}
       - npm run build-with-ilastik-overlay
