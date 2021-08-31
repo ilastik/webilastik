@@ -5,6 +5,7 @@ from pathlib import Path, PurePosixPath
 import tempfile
 import uuid
 import asyncio
+import sys
 
 from webilastik.libebrains.user_token import UserToken
 from webilastik.libebrains.oidc_client import OidcClient
@@ -74,9 +75,11 @@ def require_ebrains_login(
 
     @wraps(endpoint)
     async def wrapper(self: "SessionAllocator[SESSION_TYPE]", request: web.Request) -> web.Response:
-        ebrains_session = EbrainsSession.from_cookie(request) or EbrainsSession.from_code(request, oidc_client=self.ilastik_client)
+        if self.oidc_client is None:
+            return await endpoint(self, request)
+        ebrains_session = EbrainsSession.from_cookie(request) or EbrainsSession.from_code(request, oidc_client=self.oidc_client)
         if ebrains_session is None:
-            redirect_to_ebrains_login(request, oidc_client=self.ilastik_client)
+            redirect_to_ebrains_login(request, oidc_client=self.oidc_client)
         response = await endpoint(self, request)
         return ebrains_session.set_cookie(response)
 
@@ -92,15 +95,14 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         external_url: Url,
         sockets_dir_at_master: Path,
         master_username: str,
-        oidc_client_json: Path,
+        oidc_client: Optional[OidcClient],
     ):
         self.session_type = session_type
         self.sockets_dir_at_master = sockets_dir_at_master
         self.master_username = master_username
         self.master_host = master_host
         self.external_url = external_url
-        with open(oidc_client_json) as f:
-            self.ilastik_client = OidcClient.from_json_value(json.load(f))
+        self.oidc_client = oidc_client
 
         self.sessions : Dict[uuid.UUID, Session] = {}
 
@@ -124,7 +126,7 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         return web.json_response("hello!", status=200)
 
     async def check_login(self, request: web.Request) -> web.Response:
-        if EbrainsSession.from_cookie(request) is None:
+        if self.oidc_client and EbrainsSession.from_cookie(request) is None:
             return web.json_response({"logged_in": False}, status=401)
         return web.json_response({"logged_in": True}, status=200)
 
@@ -180,15 +182,15 @@ class SessionAllocator(Generic[SESSION_TYPE]):
 if __name__ == '__main__':
     from argparse import ArgumentParser
     parser = ArgumentParser()
-    parser.add_argument("--session-type", choices=["Local", "Hpc"])
-    parser.add_argument("--master-host")
-    parser.add_argument("--external-url")
-    parser.add_argument("--master-username", default="wwww-data")
+    parser.add_argument("--session-type", choices=["Local", "Hpc"], required=True)
+    parser.add_argument("--master-host", required=True, help="Host name or IP where workers should ssh back to")
+    parser.add_argument("--master-username", default="wwww-data", help="username with which workers should ssh back to master")
+    parser.add_argument("--external-url", type=Url.parse, required=True, help="Url from which sessions can be accessed (where the session sockets live)")
     parser.add_argument("--sockets-dir-at-master", type=Path, default=Path(tempfile.gettempdir()))
+    parser.add_argument("--skip-login", default=False, action='store_true')
     parser.add_argument(
         "--oidc-client-json",
         type=Path,
-        required=True,
         help="Path to a json file representing the keycloak client. You can get this data via OidcClient.get"
     )
 
@@ -201,11 +203,21 @@ if __name__ == '__main__':
     else:
         from webilastik.server.hpc_session import HpcSession
         session_type = HpcSession
+
+    if args.oidc_client_json is None:
+        if not args.skip_login:
+            print(f"You must specify a path in --oidc-client-json or set --skip-login", file=sys.stderr)
+            exit(1)
+        oidc_client = None
+    else:
+        with open(args.oidc_client_json) as f:
+            oidc_client = OidcClient.from_json_value(json.load(f))
+
     SessionAllocator(
         session_type=session_type,
         master_host=args.master_host,
-        external_url=Url.parse(args.external_url),
+        external_url=args.external_url,
         master_username=args.master_username,
         sockets_dir_at_master=args.sockets_dir_at_master,
-        oidc_client_json=args.oidc_client_json,
+        oidc_client=oidc_client,
     ).run(port=5000)
