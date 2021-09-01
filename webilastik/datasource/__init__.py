@@ -212,7 +212,7 @@ class DataRoi(Interval5D):
         return self.datasource.tile_shape
 
     @property
-    def dtype(self):
+    def dtype(self) -> np.dtype:
         return self.datasource.dtype
 
     def is_datasource_tile(self) -> bool:
