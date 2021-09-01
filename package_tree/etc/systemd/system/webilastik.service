@@ -19,6 +19,7 @@ Wants=nginx.service
 
 [Service]
 Type=simple
+Environment=SSL_CERT_DIR=/etc/ssl/certs/
 Environment=PYTHONPATH=/opt/webilastik/
 ExecStart=/opt/webilastik_conda_env/bin/python3 -B /opt/webilastik/webilastik/server/__init__.py \
     --session-type=Local \
