@@ -1,21 +1,16 @@
-from typing import Optional, Union
+from typing import Optional
 from pathlib import Path
 import enum
 import json
-import pickle
-from typing_extensions import TypedDict
+from webilastik.filesystem import JsonableFilesystem
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 
 import numpy as np
-from fs import open_fs
-from fs.base import FS
 from fs.errors import ResourceNotFound
-from fs import open_fs
 from ndstructs import Point5D, Interval5D, Array5D
 
 from webilastik.datasource.n5_attributes import N5Compressor, N5DatasetAttributes
 from webilastik.datasource import DataSource
-from webilastik.utility.url import Url
 
 class N5Block(Array5D):
     class Modes(enum.IntEnum):
@@ -68,16 +63,10 @@ class N5Block(Array5D):
         return tile.tobytes()
 
 
-class SerializedN5Datasource(TypedDict):
-    path: Path
-    location: Point5D
-    filesystem: Union[str, FS]
-
-
 class N5DataSource(DataSource):
     """A DataSource representing an N5 dataset. "axiskeys" are, like everywhere else in ndstructs, C-ordered."""
 
-    def __init__(self, path: Path, *, location: Optional[Point5D] = None, filesystem: FS):
+    def __init__(self, path: Path, *, location: Optional[Point5D] = None, filesystem: JsonableFilesystem):
         self.path = path
         self.filesystem = filesystem
 
@@ -95,17 +84,16 @@ class N5DataSource(DataSource):
     def to_json_value(self) -> JsonObject:
         out = {**super().to_json_value()}
         out["path"] = self.path.as_posix()
-        out["filesystem"] = self.filesystem.geturl("")
+        out["filesystem"] = self.filesystem.to_json_value()
         return out
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "N5DataSource":
         value_obj = ensureJsonObject(value)
-        filesystem_raw_url = ensureJsonString(value_obj.get("filesystem"))
         raw_location = value_obj.get("location")
         return N5DataSource(
             path=Path(ensureJsonString(value_obj.get("path"))),
-            filesystem=Url.parse(filesystem_raw_url).as_filesystem(),
+            filesystem=JsonableFilesystem.from_json_value(value_obj.get("filesystem")),
             location=raw_location if raw_location is None else Point5D.from_json_value(raw_location),
         )
 
@@ -131,24 +119,15 @@ class N5DataSource(DataSource):
             tile_5d = self._allocate(interval=tile, fill_value=0)
         return tile_5d
 
-    def __getstate__(self) -> SerializedN5Datasource:
-        try:
-            pickle.dumps(self.filesystem)
-            filesystem = self.filesystem
-        except Exception:
-            filesystem = self.filesystem.desc("")
-        return SerializedN5Datasource(
-            path=self.path,
-            location=self.location,
-            filesystem=filesystem
-        )
+    def __getstate__(self) -> JsonObject:
+        return self.to_json_value()
 
-    def __setstate__(self, data: SerializedN5Datasource):
-        serialized_filesystem = data["filesystem"]
-        if isinstance(serialized_filesystem, str):
-            filesystem: FS = open_fs(serialized_filesystem)
-        else:
-            filesystem: FS = serialized_filesystem
-        self.__init__(path=data["path"], location=data["location"], filesystem=filesystem)
+    def __setstate__(self, data: JsonValue):
+        data_obj = ensureJsonObject(data)
+        self.__init__(
+            path=Path(ensureJsonString(data_obj.get("path"))),
+            location=Interval5D.from_json_value(data_obj.get("interval")).start,
+            filesystem=JsonableFilesystem.from_json_value(data_obj.get("filesystem"))
+        )
 
 DataSource.datasource_from_json_constructors[N5DataSource.__name__] = N5DataSource.from_json_value

@@ -10,8 +10,6 @@ import vigra
 from webilastik.datasource import DataSource
 
 from webilastik.ui.applet import Applet, Slot, ValueSlot, CONFIRMER
-from webilastik.filesystem import HttpPyFs
-
 
 class ILane(ABC):
     @abstractmethod

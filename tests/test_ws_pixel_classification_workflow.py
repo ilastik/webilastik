@@ -12,8 +12,9 @@ from ndstructs.point5D import Interval5D, Shape5D
 from ndstructs import Array5D, Point5D
 
 from webilastik.annotations import Annotation, Color
-from webilastik.filesystem.HttpPyFs import HttpPyFs
+from webilastik.filesystem.http_fs import HttpFs
 from webilastik.datasource import SkimageDataSource
+from webilastik.utility.url import Url
 
 
 finished = False
@@ -25,7 +26,7 @@ async def read_server_status(websocket: ClientWebSocketResponse):
             break
 
 async def main():
-    ds = SkimageDataSource(filesystem=HttpPyFs("http://localhost:5000/"), path=Path("images/c_cells_1.png"))
+    ds = SkimageDataSource(filesystem=HttpFs(read_url=Url.parse("http://localhost:5000/")), path=Path("images/c_cells_1.png"))
 
     async with aiohttp.ClientSession() as session:
 
@@ -108,7 +109,7 @@ async def main():
 
                     raw_data = np.frombuffer(tile_bytes, dtype=np.uint8).reshape(2, tile.shape.y, tile.shape.x)
                     a = Array5D(raw_data, axiskeys="cyx")
-                    a.show_channels()
+                    # a.show_channels()
 
             global finished;
             finished = True

@@ -8,8 +8,8 @@ from urllib.parse import parse_qs, urlencode
 
 from fs.base import FS as FileSystem
 from fs.osfs import OSFS
+from ndstructs.utils.json_serializable import JsonValue, ensureJsonString
 
-from webilastik.filesystem.HttpPyFs import HttpPyFs
 
 class DataScheme(enum.Enum):
     PRECOMPUTED = "precomputed"
@@ -74,6 +74,13 @@ class Url:
         r")?",
         re.IGNORECASE
     )
+
+    def to_json_value(self) -> JsonValue:
+        return self.raw
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "Url":
+        return Url.parse(ensureJsonString(value))
 
     @classmethod
     def parse(cls, url: str) -> "Url":
@@ -155,14 +162,6 @@ class Url:
     def __str__(self) -> str:
         return self.raw
 
-    def as_filesystem(self) -> FileSystem:
-        if self.protocol in (Protocol.HTTP, Protocol.HTTPS):
-            return HttpPyFs(self.schemeless_raw)
-        elif self.protocol == Protocol.MEMORY:
-            raise ValueError(f"Can't get filesystem for {self.raw}")
-        else: # self.protocol == Protocol.FILE
-            return OSFS(self.path.as_posix())
-
     def updated_with(
         self,
         *,
@@ -192,7 +191,12 @@ class Url:
         return self.updated_with(path=self.path.parent)
 
     def joinpath(self, subpath: Union[str, PurePosixPath]) -> "Url":
+        """joins paths the same way Path does (e.g.: absolute paths are not appended)"""
         return self.updated_with(path=self.path / subpath)
+
+    def concatpath(self, subpath: Union[str, PurePosixPath]) -> "Url":
+        """Always concatenates path, even if subpath starts with a /"""
+        return self.joinpath(str(subpath).lstrip("/"))
 
     def ensure_datascheme(self, datascheme: DataScheme) -> "Url":
         if self.datascheme != datascheme:

@@ -6,7 +6,6 @@ from pathlib import Path, PurePosixPath
 import pickle
 
 import numpy as np
-from fs.osfs import OSFS
 import h5py
 import json
 import skimage.io # type: ignore
@@ -23,6 +22,7 @@ from webilastik.datasource import (
     ArrayDataSource,
 )
 from webilastik.datasource.sequence_datasource import SequenceDataSource
+from webilastik.filesystem.osfs import OsFs
 
 # fmt: off
 raw = np.asarray([
@@ -74,7 +74,7 @@ def create_n5(
     array: Array5D, *, axiskeys: Optional[str] = None, chunk_size: Shape5D, compression: N5Compressor = RawCompressor()
 ):
     path = Path(tempfile.mkstemp()[1] + ".n5")
-    sink = N5DatasetSink.create(outer_path=path, inner_path=PurePosixPath("/data"), filesystem=OSFS("/"), attributes=N5DatasetAttributes(
+    sink = N5DatasetSink.create(outer_path=path, inner_path=PurePosixPath("/data"), filesystem=OsFs("/"), attributes=N5DatasetAttributes(
         dimensions=array.shape,
         blockSize=chunk_size,
         axiskeys=axiskeys or array.axiskeys,
@@ -132,7 +132,7 @@ def test_retrieve_roi_smaller_than_tile():
     ]).astype(np.uint32), axiskeys="cyx")
     # fmt: on
     path = Path(create_n5(data, chunk_size=Shape5D(c=2, y=4, x=4)))
-    ds = N5DataSource(path=path / "data", filesystem=OSFS("/"))
+    ds = N5DataSource(path=path / "data", filesystem=OsFs("/"))
     print(f"\n\n====>> tile shape: {ds.shape}")
 
     smaller_than_tile = ds.retrieve(c=1, y=(0, 4), x=(0, 4))
@@ -150,7 +150,7 @@ def test_n5_datasource():
     # fmt: on
 
     path = Path(create_n5(data, chunk_size=Shape5D(x=2, y=2)))
-    ds = N5DataSource(path=path / "data", filesystem=OSFS("/"))
+    ds = N5DataSource(path=path / "data", filesystem=OsFs("/"))
     assert ds.shape == data.shape
 
     # fmt: off
@@ -179,7 +179,7 @@ def test_n5_datasource_over_swift():
 def test_h5_datasource():
     data_2d = Array5D(np.arange(100).reshape(10, 10), axiskeys="yx")
     h5_path = create_h5(data_2d, axiskeys_style="vigra", chunk_shape=Shape5D(x=3, y=3))
-    ds = H5DataSource(outer_path=h5_path, inner_path=PurePosixPath("/data"), filesystem=OSFS("/"))
+    ds = H5DataSource(outer_path=h5_path, inner_path=PurePosixPath("/data"), filesystem=OsFs("/"))
     assert ds.shape == data_2d.shape
     assert ds.tile_shape == Shape5D(x=3, y=3)
 
@@ -188,7 +188,7 @@ def test_h5_datasource():
 
     data_3d = Array5D(np.arange(10 * 10 * 10).reshape(10, 10, 10), axiskeys="zyx")
     h5_path = create_h5(data_3d, axiskeys_style="vigra", chunk_shape=Shape5D(x=3, y=3))
-    ds = H5DataSource(outer_path=h5_path, inner_path=PurePosixPath("/data"), filesystem=OSFS("/"))
+    ds = H5DataSource(outer_path=h5_path, inner_path=PurePosixPath("/data"), filesystem=OsFs("/"))
     assert ds.shape == data_3d.shape
     assert ds.tile_shape == Shape5D(x=3, y=3)
 
@@ -196,8 +196,9 @@ def test_h5_datasource():
     assert (ds.retrieve(slc).raw("yxz") == data_3d.cut(slc).raw("yxz")).all() #type: ignore
 
 
+
 def test_skimage_datasource_tiles(png_image: Path):
-    bs = DataRoi(SkimageDataSource(png_image, filesystem=OSFS("/")))
+    bs = DataRoi(SkimageDataSource(png_image, filesystem=OsFs("/")))
     num_checked_tiles = 0
     for tile in bs.split(Shape5D(x=2, y=2)):
         if tile == Interval5D.zero(x=(0, 2), y=(0, 2)):
@@ -236,7 +237,7 @@ def test_neighboring_tiles():
 
         [0,   1,  2,    3,  4,  5,    6]], dtype=np.uint8), axiskeys="yx")
 
-    ds = SkimageDataSource(path=create_png(arr), filesystem=OSFS("/"))
+    ds = SkimageDataSource(path=create_png(arr), filesystem=OsFs("/"))
 
     fifties_slice = DataRoi(ds, x=(3, 6), y=(3, 6))
     expected_fifties_slice = Array5D(np.asarray([
@@ -393,7 +394,7 @@ def test_sequence_datasource():
         offset = Point5D.zero()
         stack: List[H5DataSource] = []
         for outer_path in h5_outer_paths:
-            stack.append(H5DataSource(outer_path=outer_path, inner_path=PurePosixPath("/data"), filesystem=OSFS("/"), location=offset))
+            stack.append(H5DataSource(outer_path=outer_path, inner_path=PurePosixPath("/data"), filesystem=OsFs("/"), location=offset))
             offset += Point5D.zero(**{stack_axis: stack[-1].shape[stack_axis]})
         return stack
 

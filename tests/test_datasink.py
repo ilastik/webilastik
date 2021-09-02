@@ -1,3 +1,4 @@
+from webilastik.filesystem.osfs import OsFs
 from fs.osfs import OSFS
 from pathlib import Path, PurePosixPath
 
@@ -40,7 +41,7 @@ def test_n5_attributes():
 
 def test_n5_datasink(tmp_path: Path, data: Array5D, datasource: DataSource):
     sink = N5DatasetSink.create(
-        filesystem=OSFS(tmp_path.as_posix()),
+        filesystem=OsFs(tmp_path.as_posix()),
         outer_path=Path("test_n5_datasink.n5"),
         inner_path=PurePosixPath("/data"),
         attributes=N5DatasetAttributes(
@@ -61,7 +62,7 @@ def test_n5_datasink(tmp_path: Path, data: Array5D, datasource: DataSource):
     assert saved_data == data
 
 def test_distributed_n5_datasink(tmp_path: Path, data: Array5D, datasource: DataSource):
-    filesystem = OSFS(tmp_path.as_posix())
+    filesystem = OsFs(tmp_path.as_posix())
     outer_path = Path("test_distributed_n5_datasink.n5")
     inner_path = PurePosixPath("/data")
     full_path = Path("test_distributed_n5_datasink.n5/data")
@@ -96,7 +97,7 @@ def test_writing_to_precomputed_chunks(tmp_path: Path, data: Array5D):
         scales=tuple([scale]),
     )
     sink_path = Path("mytest.precomputed")
-    filesystem = OSFS(tmp_path.as_posix())
+    filesystem = OsFs(tmp_path.as_posix())
     datasink = PrecomputedChunksScaleSink.create(
         path=sink_path,
         filesystem=filesystem,
@@ -116,7 +117,7 @@ def test_writing_to_offset_precomputed_chunks(tmp_path: Path, data: Array5D):
     datasource = ArrayDataSource.from_array5d(data, tile_shape=Shape5D(x=10, y=10), location=Point5D(x=1000, y=1000))
     scale = PrecomputedChunksScale.from_datasource(datasource=datasource, key=Path("my_test_data"), encoding=RawEncoder())
     sink_path = Path("mytest.precomputed")
-    filesystem = OSFS(tmp_path.as_posix())
+    filesystem = OsFs(tmp_path.as_posix())
     datasink = PrecomputedChunksScaleSink.create(
         path=sink_path,
         filesystem=filesystem,

@@ -24,7 +24,7 @@ class PrecomputedChunksEncoder(ABC):
         pass
 
     @abstractmethod
-    def to_json_data(self) -> JsonValue:
+    def to_json_value(self) -> JsonValue:
         pass
 
     @classmethod
@@ -37,7 +37,7 @@ class PrecomputedChunksEncoder(ABC):
         raise ValueError(f"Bad encoding value: {label}")
 
 class RawEncoder(PrecomputedChunksEncoder):
-    def to_json_data(self) -> JsonValue:
+    def to_json_value(self) -> JsonValue:
         return "raw"
 
     def decode(self, *, roi: Interval5D, dtype: np.dtype, raw_chunk: bytes) -> Array5D:
@@ -53,7 +53,7 @@ class RawEncoder(PrecomputedChunksEncoder):
         return data.raw("xyzc").tobytes("F")
 
 class JpegEncoder(PrecomputedChunksEncoder):
-    def to_json_data(self) -> JsonValue:
+    def to_json_value(self) -> JsonValue:
         return "jpeg"
 
     def decode(self, *, roi: Interval5D, dtype: np.dtype, raw_chunk: bytes) -> Array5D:
@@ -108,14 +108,14 @@ class PrecomputedChunksScale:
             encoding=encoding
         )
 
-    def to_json_data(self) -> JsonObject:
+    def to_json_value(self) -> JsonObject:
         return {
             "key": self.key.as_posix(),
             "size": self.size.to_tuple("xyz"),
             "resolution": self.resolution,
             "voxel_offset": self.voxel_offset.to_tuple("xyz"),
             "chunk_sizes": tuple(cs.to_tuple("xyz") for cs in self.chunk_sizes),
-            "encoding": self.encoding.to_json_data(),
+            "encoding": self.encoding.to_json_value(),
         }
 
     def __eq__(self, other: object) -> bool:
@@ -227,11 +227,11 @@ class PrecomputedChunksInfo:
             scales=tuple(scales)
         )
 
-    def to_json_data(self) -> JsonObject:
+    def to_json_value(self) -> JsonObject:
         return {
             "@type": "neuroglancer_multiscale_volume",
             "type": self.type_,
             "data_type": str(self.data_type.name),
             "num_channels": self.num_channels,
-            "scales": tuple(scale.to_json_data() for scale in self.scales),
+            "scales": tuple(scale.to_json_value() for scale in self.scales),
         }

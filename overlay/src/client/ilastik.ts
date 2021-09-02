@@ -281,12 +281,51 @@ export class Shape5D{
     }
 }
 
+export abstract class FileSystem implements IJsonable{
+    public abstract getDisplayString(): string;
+    public abstract toJsonValue(): JsonObject
+    public static fromJsonValue(value: JsonValue): FileSystem{
+        const value_obj = ensureJsonObject(value)
+        const class_name = ensureJsonString(value_obj["__class__"])
+        if(class_name == "HttpFs"){
+            return HttpFs.fromJsonValue(value)
+        }
+        throw Error(`Could not deserialize FileSystem from ${JSON.stringify(value)}`)
+    }
+}
+
+export class HttpFs extends FileSystem{
+    public readonly read_url: Url
+    public constructor({read_url}: {read_url: Url}){
+        super()
+        this.read_url = read_url
+    }
+
+    public getDisplayString(): string{
+        return this.read_url.raw
+    }
+
+    public toJsonValue(): JsonObject{
+        return {
+            __class__: "HttpFs",
+            read_url: this.read_url.schemeless_raw,
+        }
+    }
+
+    public static fromJsonValue(data: JsonValue) : HttpFs{
+        const data_obj = ensureJsonObject(data)
+        return new HttpFs({
+            read_url: Url.parse(ensureJsonString(data_obj["read_url"]))
+        })
+    }
+}
+
 export abstract class DataSource implements IJsonable{
-    public readonly filesystem: Url
+    public readonly filesystem: FileSystem
     public readonly path: string
     public readonly spatial_resolution: vec3
 
-    constructor({filesystem, path, spatial_resolution=vec3.fromValues(1,1,1)}: {filesystem: Url, path: string, spatial_resolution?: vec3}){
+    constructor({filesystem, path, spatial_resolution=vec3.fromValues(1,1,1)}: {filesystem: FileSystem, path: string, spatial_resolution?: vec3}){
         this.filesystem = filesystem
         this.path = path
         this.spatial_resolution = spatial_resolution
@@ -308,7 +347,7 @@ export abstract class DataSource implements IJsonable{
     public static extractBasicData(json_object: JsonObject): ConstructorParameters<typeof DataSource>[0]{
         const spatial_resolution = json_object["spatial_resolution"]
         return {
-            filesystem: Url.parse(ensureJsonString(json_object["filesystem"])),
+            filesystem: FileSystem.fromJsonValue(json_object["filesystem"]),
             path: ensureJsonString(json_object["path"]),
             spatial_resolution: spatial_resolution === undefined ? vec3.fromValues(1,1,1) : ensureJsonNumberTripplet(spatial_resolution)
         }
@@ -316,7 +355,7 @@ export abstract class DataSource implements IJsonable{
 
     public toJsonValue(): JsonObject{
         return {
-            filesystem: this.filesystem.double_protocol_raw,
+            filesystem: this.filesystem.toJsonValue(),
             path: this.path,
             spatial_resolution: [this.spatial_resolution[0], this.spatial_resolution[1], this.spatial_resolution[2]],
             ...this.doToJsonValue()
@@ -325,7 +364,7 @@ export abstract class DataSource implements IJsonable{
 
     public getDisplayString() : string{
         const resolution_str = `${this.spatial_resolution[0]} x ${this.spatial_resolution[1]} x ${this.spatial_resolution[2]}`
-        return `${this.filesystem.joinPath(this.path).raw} (${resolution_str})`
+        return `${this.filesystem.getDisplayString()} ${this.path} (${resolution_str})`
     }
 
     protected abstract doToJsonValue() : JsonObject & {__class__: string}

@@ -1,5 +1,5 @@
 import { vec3 } from "gl-matrix"
-import { DataSource, PrecomputedChunksDataSource, Session } from "../client/ilastik"
+import { DataSource, HttpFs, PrecomputedChunksDataSource, Session } from "../client/ilastik"
 import { uuidv4 } from "../util/misc";
 import { Url } from "../util/parsed_url";
 import { ensureJsonArray, ensureJsonNumber, ensureJsonNumberTripplet, ensureJsonObject, ensureJsonString, JsonValue } from "../util/serialization"
@@ -70,7 +70,7 @@ export class PrecomputedChunksScale implements IDataScale{
 
     public toIlastikDataSource() : PrecomputedChunksDataSource{
         return new PrecomputedChunksDataSource({
-            filesystem: this.base_url.updatedWith({path: "/"}),
+            filesystem: new HttpFs({read_url: this.base_url.updatedWith({path: "/"})}),
             path: this.base_url.path,
             spatial_resolution: vec3.clone(this.resolution)
         })

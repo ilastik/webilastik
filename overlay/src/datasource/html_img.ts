@@ -1,5 +1,5 @@
 import { vec3 } from "gl-matrix";
-import { SkimageDataSource } from "../client/ilastik";
+import { HttpFs, SkimageDataSource } from "../client/ilastik";
 import { Url } from "../util/parsed_url";
 import { IDataScale, IMultiscaleDataSource } from "./datasource";
 
@@ -16,7 +16,7 @@ export class HtmlImgSource implements IMultiscaleDataSource{
 
     public get scales(): Array<IDataScale>{
         const ilastik_datasource = new SkimageDataSource({
-            filesystem: this.url.updatedWith({path: "/"}),
+            filesystem: new HttpFs({read_url: this.url.updatedWith({path: "/"})}),
             path: this.url.path,
         })
         return [

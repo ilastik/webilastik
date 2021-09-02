@@ -1,4 +1,5 @@
 from pathlib import Path
+from webilastik.filesystem.osfs import OsFs
 from webilastik.scheduling.hashing_executor import HashingExecutor
 # from webilastik.scheduling.multiprocess_runner import MultiprocessRunner
 from ndstructs.point5D import Shape5D
@@ -40,7 +41,7 @@ def test_pixel_classification_workflow():
     # )
 
     # GUI creates a datasource somewhere...
-    ds = SkimageDataSource(Path("public/images/c_cells_1.png"), filesystem=OSFS("."), tile_shape=Shape5D(x=400, y=400))
+    ds = SkimageDataSource(Path("public/images/c_cells_1.png"), filesystem=OsFs("."), tile_shape=Shape5D(x=400, y=400))
 
     # GUI creates some feature extractors
     feature_selection_applet.feature_extractors.set_value(

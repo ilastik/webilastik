@@ -1,7 +1,7 @@
 from typing import Set
 from pathlib import Path, PurePosixPath
 import json
-from fs.base import FS as FileSystem
+from webilastik.filesystem import JsonableFilesystem
 
 from ndstructs.array5D import Array5D
 
@@ -15,18 +15,18 @@ class N5DatasetSink(DataSink):
         self,
         *,
         path: Path,  # dataset path, e.g. "mydata.n5/mydataset"
-        filesystem: FileSystem,
+        filesystem: JsonableFilesystem,
         attributes: N5DatasetAttributes
     ):
         super().__init__(
             path=path,
-            filesystem=filesystem,
-            dtype=attributes.dataType,
+            dtype=attributes.dataType, #type: ignore
             tile_shape=attributes.blockSize,
             interval=attributes.dimensions.to_interval5d(),
             location=attributes.location,
         )
         self.attributes = attributes
+        self.filesystem = filesystem
 
     @classmethod
     def create(
@@ -34,7 +34,7 @@ class N5DatasetSink(DataSink):
         *,
         outer_path: Path,
         inner_path: PurePosixPath,
-        filesystem: FileSystem,
+        filesystem: JsonableFilesystem,
         attributes: N5DatasetAttributes,
     ) -> "N5DatasetSink":
         full_path = outer_path.joinpath(inner_path.as_posix().lstrip("/"))
@@ -63,7 +63,7 @@ class N5DatasetSink(DataSink):
         )
 
     @classmethod
-    def open(cls, *, path: Path, filesystem: FileSystem) -> "N5DatasetSink":
+    def open(cls, *, path: Path, filesystem: JsonableFilesystem) -> "N5DatasetSink":
         with filesystem.openbin(path.joinpath("attributes.json").as_posix(), "r") as f:
             attributes_json = f.read().decode("utf8")
         attributes = N5DatasetAttributes.from_json_data(json.loads(attributes_json))

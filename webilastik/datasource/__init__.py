@@ -5,12 +5,11 @@ from enum import IntEnum
 from pathlib import Path, PurePosixPath
 from typing import Callable, ClassVar, Optional, Tuple, Union, cast, Iterator, Dict
 from typing_extensions import Final
-from webilastik.utility.url import Url
+from webilastik.filesystem import JsonableFilesystem
 
 import h5py
 import numpy as np
 import skimage.io #type: ignore
-from fs.base import FS
 
 from ndstructs import Array5D, Shape5D, Interval5D, Point5D
 from ndstructs.array5D import SPAN_OVERRIDE, All
@@ -23,7 +22,6 @@ except ImportError:
     from functools import lru_cache
 
     ndstructs_datasource_cache = lru_cache(maxsize=4096)
-
 
 @enum.unique
 class AddressMode(IntEnum):
@@ -93,7 +91,7 @@ class DataSource(ABC):
     def __hash__(self) -> int:
         return hash((
             self.tile_shape,
-            self.dtype,
+            self.dtype, #type: ignore
             self.interval,
             self.axiskeys,
             self.spatial_resolution,
@@ -257,7 +255,7 @@ class DataRoi(Interval5D):
 
 class H5DataSource(DataSource):
     _dataset: h5py.Dataset
-    def __init__(self, *, outer_path: Path, inner_path: PurePosixPath, location: Point5D = Point5D.zero(), filesystem: FS):
+    def __init__(self, *, outer_path: Path, inner_path: PurePosixPath, location: Point5D = Point5D.zero(), filesystem: JsonableFilesystem):
         self.outer_path = outer_path
         self.inner_path = inner_path
         self.filesystem = filesystem
@@ -284,18 +282,17 @@ class H5DataSource(DataSource):
         out = {**super().to_json_value()}
         out["outer_path"] = self.outer_path.as_posix()
         out["inner_path"] = self.inner_path.as_posix()
-        out["filesystem"] = self.filesystem.geturl("")
+        out["filesystem"] = self.filesystem.to_json_value()
         return out
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "H5DataSource":
         value_obj = ensureJsonObject(value)
-        filesystem_raw_url = ensureJsonString(value_obj.get("filesystem"))
         raw_location = value_obj.get("location")
         return H5DataSource(
             outer_path=Path(ensureJsonString(value_obj.get("outer_path"))),
             inner_path=PurePosixPath(ensureJsonString(value_obj.get("inner_path"))),
-            filesystem=Url.parse(filesystem_raw_url).as_filesystem(),
+            filesystem=JsonableFilesystem.from_json_value(value_obj.get("filesystem")),
             location=Point5D.zero() if raw_location is None else Point5D.from_json_value(raw_location),
         )
 
@@ -391,7 +388,7 @@ class SkimageDataSource(ArrayDataSource):
     """A naive implementation of DataSource that can read images using skimage"""
 
     def __init__(
-        self, path: Path, *, location: Point5D = Point5D.zero(), filesystem: FS, tile_shape: Optional[Shape5D] = None
+        self, path: Path, *, location: Point5D = Point5D.zero(), filesystem: JsonableFilesystem, tile_shape: Optional[Shape5D] = None
     ):
         self.path = path
         self.filesystem = filesystem
@@ -413,13 +410,12 @@ class SkimageDataSource(ArrayDataSource):
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "SkimageDataSource":
         value_obj = ensureJsonObject(value)
-        filesystem_raw_url = ensureJsonString(value_obj.get("filesystem"))
         raw_location = value_obj.get("location")
         raw_tile_shape = value_obj.get("tile_shape")
         return SkimageDataSource(
             path=Path(ensureJsonString(value_obj.get("path"))),
             location=Point5D.zero() if raw_location is None else Point5D.from_json_value(raw_location),
-            filesystem=Url.parse(filesystem_raw_url).as_filesystem(),
+            filesystem=JsonableFilesystem.from_json_value(value_obj.get("filesystem")),
             tile_shape=None if raw_tile_shape is None else Shape5D.from_json_value(raw_tile_shape)
         )
 

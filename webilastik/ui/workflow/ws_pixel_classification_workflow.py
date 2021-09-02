@@ -367,7 +367,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
                 info = PrecomputedChunksInfo.from_json_data(json.loads(response_text))
 
         stripped_info = info.stripped(resolution=resolution)
-        return web.json_response(stripped_info.to_json_data())
+        return web.json_response(stripped_info.to_json_value())
 
     async def forward_chunk_request(self, request: web.Request) -> web.Response:
         """Redirects a precomp chunk request to the original URL"""

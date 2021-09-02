@@ -1,25 +1,13 @@
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple
 from pathlib import Path
-import pickle
-from typing_extensions import TypedDict
 import json
-from webilastik.utility.url import Url
 
-from fs import open_fs
-from fs.base import FS as FileSystem
 from ndstructs import Point5D, Shape5D, Interval5D, Array5D
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonIntTripplet, ensureJsonObject, ensureJsonString
 
 from webilastik.datasource import DataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo
-
-
-class SerializedPrecomputedChunksDatasource(TypedDict):
-    path: Path
-    resolution: Tuple[int, int, int]
-    location: Point5D
-    chunk_size: Shape5D
-    filesystem: Union[str, FileSystem]
+from webilastik.filesystem import JsonableFilesystem
 
 
 class PrecomputedChunksDataSource(DataSource):
@@ -30,7 +18,7 @@ class PrecomputedChunksDataSource(DataSource):
         resolution: Tuple[int, int, int],
         location: Optional[Point5D] = None,
         chunk_size: Optional[Shape5D] = None,
-        filesystem: FileSystem,
+        filesystem: JsonableFilesystem,
     ):
         self.path = path
         self.filesystem = filesystem
@@ -48,7 +36,7 @@ class PrecomputedChunksDataSource(DataSource):
 
         super().__init__(
             tile_shape=tile_shape,
-            dtype=self.info.data_type,
+            dtype=self.info.data_type, #type: ignore
             interval=self.scale.size.to_interval5d(location or self.scale.voxel_offset),
             axiskeys="zyxc",  # externally reported axiskeys are always c-ordered
             spatial_resolution=self.scale.resolution #FIXME: maybe delete this altogether?
@@ -57,21 +45,20 @@ class PrecomputedChunksDataSource(DataSource):
     def to_json_value(self) -> JsonObject:
         out = {**super().to_json_value()}
         out["path"] = self.path.as_posix()
-        out["filesystem"] = self.filesystem.geturl("")
+        out["filesystem"] = self.filesystem.to_json_value()
         return out
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "PrecomputedChunksDataSource":
         value_obj = ensureJsonObject(value)
-        filesystem_raw_url = ensureJsonString(value_obj.get("filesystem"))
         raw_location = value_obj.get("location")
         raw_chunk_size = value_obj.get("chunk_size")
         return PrecomputedChunksDataSource(
             path=Path(ensureJsonString(value_obj.get("path"))),
             resolution=ensureJsonIntTripplet(value_obj.get("spatial_resolution")), # FIXME? change to just resolution?
-            location=raw_location if raw_location is None else Point5D.from_json_value(raw_location),
+            location=None if raw_location is None else Point5D.from_json_value(raw_location),
             chunk_size=None if raw_chunk_size is None else Shape5D.from_json_value(raw_chunk_size),
-            filesystem=Url.parse(filesystem_raw_url).as_filesystem(),
+            filesystem=JsonableFilesystem.from_json_value(value_obj.get("filesystem")),
         )
 
     def __hash__(self) -> int:
@@ -91,36 +78,23 @@ class PrecomputedChunksDataSource(DataSource):
         tile_path = self.path / self.scale.get_tile_path(tile)
         with self.filesystem.openbin(tile_path.as_posix()) as f:
             raw_tile_bytes = f.read()
-        tile_5d = self.scale.encoding.decode(roi=tile, dtype=self.dtype, raw_chunk=raw_tile_bytes)
+        tile_5d = self.scale.encoding.decode(roi=tile, dtype=self.dtype, raw_chunk=raw_tile_bytes) #type: ignore
         return tile_5d
 
-    def __getstate__(self) -> SerializedPrecomputedChunksDatasource:
-        try:
-            pickle.dumps(self.filesystem)
-            filesystem = self.filesystem
-        except Exception:
-            filesystem = self.filesystem.desc("")
-        return SerializedPrecomputedChunksDatasource(
-            chunk_size=self.tile_shape,
-            filesystem=filesystem,
-            location=self.location,
-            path=self.path,
-            resolution=self.scale.resolution,
-        )
+    def __getstate__(self) -> JsonObject:
+        return self.to_json_value()
 
-    def __setstate__(self, data: SerializedPrecomputedChunksDatasource):
-        serialized_filesystem = data["filesystem"]
-        if isinstance(serialized_filesystem, str):
-            filesystem: FileSystem = open_fs(serialized_filesystem)
-        else:
-            filesystem: FileSystem = serialized_filesystem
-
-        self.__init__(
-            path=data["path"],
-            resolution=data["resolution"],
-            location=data["location"],
-            chunk_size=data["chunk_size"],
-            filesystem=filesystem
+    def __setstate__(self, data: JsonValue):
+        # FIXME: can this eb usnified with from_json_value somehow?
+        value_obj = ensureJsonObject(data)
+        raw_location = value_obj.get("location")
+        raw_chunk_size = value_obj.get("chunk_size")
+        return self.__init__(
+            path=Path(ensureJsonString(value_obj.get("path"))),
+            resolution=ensureJsonIntTripplet(value_obj.get("spatial_resolution")), # FIXME? change to just resolution?
+            location=None if raw_location is None else Point5D.from_json_value(raw_location),
+            chunk_size=None if raw_chunk_size is None else Shape5D.from_json_value(raw_chunk_size),
+            filesystem=JsonableFilesystem.from_json_value(value_obj.get("filesystem")),
         )
 
 DataSource.datasource_from_json_constructors[PrecomputedChunksDataSource.__name__] = PrecomputedChunksDataSource.from_json_value
