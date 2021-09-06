@@ -66,7 +66,7 @@ class Color:
     def __hash__(self):
         return hash(self.rgba)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         return not isinstance(other, Color) or self.rgba == other.rgba
 
     @classmethod
@@ -106,10 +106,10 @@ class Annotation(ScalarData):
     def __hash__(self):
         return hash((self._data.tobytes(), self.color))
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Annotation):
             return False
-        return self.color == other.color and np.all(self._data == other._data)
+        return self.color == other.color and bool(np.all(self._data == other._data))
 
     def __init__(
         self, arr: np.ndarray, *, axiskeys: str, location: Point5D = Point5D.zero(), color: Color, raw_data: DataSource
