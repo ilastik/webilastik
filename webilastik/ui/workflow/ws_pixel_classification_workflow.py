@@ -364,7 +364,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
                 response_text = await response.text()
                 if response.status // 100 != 2:
                     return web.Response(status=response.status, text=response_text)
-                info = PrecomputedChunksInfo.from_json_data(json.loads(response_text))
+                info = PrecomputedChunksInfo.from_json_value(json.loads(response_text))
 
         stripped_info = info.stripped(resolution=resolution)
         return web.json_response(stripped_info.to_json_value())
