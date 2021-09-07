@@ -23,7 +23,6 @@ class N5DatasetSink(DataSink):
             dtype=attributes.dataType, #type: ignore
             tile_shape=attributes.blockSize,
             interval=attributes.dimensions.to_interval5d(),
-            location=attributes.location,
         )
         self.attributes = attributes
         self.filesystem = filesystem

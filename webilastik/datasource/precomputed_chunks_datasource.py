@@ -24,7 +24,7 @@ class PrecomputedChunksDataSource(DataSource):
         self.filesystem = filesystem
         with self.filesystem.openbin(path.joinpath("info").as_posix(), "r") as f:
             info_json = f.read().decode("utf8")
-        self.info = PrecomputedChunksInfo.from_json_data(json.loads(info_json))
+        self.info = PrecomputedChunksInfo.from_json_value(json.loads(info_json))
         self.scale = self.info.get_scale(resolution=resolution)
 
         if chunk_size:
@@ -85,16 +85,13 @@ class PrecomputedChunksDataSource(DataSource):
         return self.to_json_value()
 
     def __setstate__(self, data: JsonValue):
-        # FIXME: can this eb usnified with from_json_value somehow?
-        value_obj = ensureJsonObject(data)
-        raw_location = value_obj.get("location")
-        raw_chunk_size = value_obj.get("chunk_size")
+        ds = PrecomputedChunksDataSource.from_json_value(data)
         return self.__init__(
-            path=Path(ensureJsonString(value_obj.get("path"))),
-            resolution=ensureJsonIntTripplet(value_obj.get("spatial_resolution")), # FIXME? change to just resolution?
-            location=None if raw_location is None else Point5D.from_json_value(raw_location),
-            chunk_size=None if raw_chunk_size is None else Shape5D.from_json_value(raw_chunk_size),
-            filesystem=JsonableFilesystem.from_json_value(value_obj.get("filesystem")),
+            path=ds.path,
+            resolution=ds.spatial_resolution,
+            location=ds.location,
+            chunk_size=ds.tile_shape,
+            filesystem=ds.filesystem,
         )
 
 DataSource.datasource_from_json_constructors[PrecomputedChunksDataSource.__name__] = PrecomputedChunksDataSource.from_json_value

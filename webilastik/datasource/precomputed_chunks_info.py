@@ -28,7 +28,7 @@ class PrecomputedChunksEncoder(ABC):
         pass
 
     @classmethod
-    def from_json_data(cls, data: JsonValue) -> "PrecomputedChunksEncoder":
+    def from_json_value(cls, data: JsonValue) -> "PrecomputedChunksEncoder":
         label = ensureJsonString(data)
         if label == "raw":
             return RawEncoder()
@@ -118,6 +118,22 @@ class PrecomputedChunksScale:
             "encoding": self.encoding.to_json_value(),
         }
 
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "PrecomputedChunksScale":
+        value_obj = ensureJsonObject(value)
+        return PrecomputedChunksScale(
+            key=Path(ensureJsonString(value_obj.get("key"))),
+            size=Shape5D.from_json_value(value_obj.get("size")),
+            resolution_5d=Shape5D.from_json_value(value_obj.get("resolution_5d")),
+            voxel_offset=Point5D.from_json_value(value_obj.get("voxel_offset")),
+            chunk_sizes=tuple([
+                Shape5D.from_json_value(v)
+                for v in ensureJsonArray(value_obj.get("chunk_sizes"))
+            ]),
+            encoding=PrecomputedChunksEncoder.from_json_value(value_obj.get("encoding")),
+        )
+
+
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, PrecomputedChunksScale):
             return False
@@ -198,7 +214,7 @@ class PrecomputedChunksInfo:
         )
 
     @classmethod
-    def from_json_data(cls, data: JsonValue):
+    def from_json_value(cls, data: JsonValue):
         data_dict = ensureJsonObject(data)
         num_channels = ensureJsonInt(data_dict.get("num_channels"))
         raw_scales = ensureJsonArray(data_dict.get("scales"))
@@ -217,7 +233,7 @@ class PrecomputedChunksInfo:
                 resolution_5d=Shape5D(x=resolution[0], y=resolution[1], z=resolution[2], c=num_channels),
                 voxel_offset=Point5D.zero(x=voxel_offset[0], y=voxel_offset[1], z=voxel_offset[2]),
                 chunk_sizes=tuple(Shape5D(x=cs[0], y=cs[1], z=cs[2], c=num_channels) for cs in chunk_sizes),
-                encoding=PrecomputedChunksEncoder.from_json_data(scale_dict.get("encoding")),
+                encoding=PrecomputedChunksEncoder.from_json_value(scale_dict.get("encoding")),
             ))
 
         return PrecomputedChunksInfo(
