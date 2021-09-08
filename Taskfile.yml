@@ -97,13 +97,12 @@ tasks:
     generates: ["{{.OVERLAY_BUNDLE_PATH}}"]
     status:
       - test "$(git status --porcelain .)" = ""
-
     cmds:
       - rm -rf node_modules
       - npm ci
       - npm run bundle-ng-inject
 
-  create-deb-package:
+  create-deb-tree:
     deps: [create-packed-conda-environment, compile-neuroglancer, compile-overlay]
     sources:
       - "{{.PROJECT_ROOT}}/package_tree/**/*"
@@ -112,7 +111,7 @@ tasks:
       - "{{.OVERLAY_BUNDLE_PATH}}"
       - "{{.NEUROGLANCER_BUNDLE_PATH}}"
     generates:
-      - "{{.DEB_PKG_PATH}}"
+      - "{{.PKG_TREE_PATH}}/**/*"
     vars:
       CONTROL_FILE_CONTENTS: |-
           Package: webilastik
@@ -150,7 +149,13 @@ tasks:
       - echo 2>&1 '[INFO] Copying nehuba to public dir'
       - cp -r {{.NEUROGLANCER_BUILD_PATH}} {{.PKG_TREE_PATH}}/opt/webilastik/public/nehuba
 
-      - echo 2>&1 '[INFO] Generating .deb package at {{.DEB_PKG_PATH}}'
+  create-deb-package:
+    deps: [create-deb-tree]
+    sources:
+      - "{{.PKG_TREE_PATH}}/**/*"
+    generates:
+      - "{{.DEB_PKG_PATH}}"
+    cmds:
       - dpkg-deb --build -z2 {{.PKG_TREE_PATH}} {{.DEB_PKG_PATH}}
 
   clean:
