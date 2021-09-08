@@ -404,7 +404,7 @@ class SkimageDataSource(ArrayDataSource):
     def to_json_value(self) -> JsonObject:
         out = {**DataSource.to_json_value(self)}
         out["path"] = self.path.as_posix()
-        out["filesystem"] = self.filesystem.geturl("")
+        out["filesystem"] = self.filesystem.to_json_value()
         return out
 
     @classmethod
