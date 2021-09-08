@@ -205,11 +205,9 @@ if __name__ == '__main__':
     parser.add_argument("--master-username", default="wwww-data", help="username with which workers should ssh back to master")
     parser.add_argument("--external-url", type=Url.parse, required=True, help="Url from which sessions can be accessed (where the session sockets live)")
     parser.add_argument("--sockets-dir-at-master", type=Path, default=Path(tempfile.gettempdir()))
-    parser.add_argument("--skip-login", default=False, action='store_true')
     parser.add_argument(
         "--oidc-client-json",
-        type=Path,
-        help="Path to a json file representing the keycloak client. You can get this data via OidcClient.get"
+        help="Path to a json file representing the keycloak client or the special value 'skip'. You can get this data via OidcClient.get"
     )
 
 
@@ -222,10 +220,7 @@ if __name__ == '__main__':
         from webilastik.server.hpc_session import HpcSession
         session_type = HpcSession
 
-    if args.oidc_client_json is None:
-        if not args.skip_login:
-            print(f"You must specify a path in --oidc-client-json or set --skip-login", file=sys.stderr)
-            exit(1)
+    if args.oidc_client_json == "skip":
         oidc_client = None
     else:
         with open(args.oidc_client_json) as f:
