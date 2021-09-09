@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 import json
-from pathlib import Path
 from typing import Callable, Dict
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 
@@ -16,13 +15,13 @@ class DataSink(ABC):
         *,
         tile_shape: Shape5D,
         interval: Interval5D,
-        path: Path,
         dtype: np.dtype, #type: ignore
     ):
         self.tile_shape = tile_shape
         self.interval = interval
-        self.path = path
         self.dtype = dtype # type: ignore
+
+        self.shape = self.interval.shape
         self.location = interval.start
 
     @abstractmethod
@@ -34,9 +33,7 @@ class DataSink(ABC):
             "__class__": self.__class__.__name__,
             "tile_shape": self.tile_shape.to_json_value(),
             "interval": self.interval.to_json_value(),
-            "path": str(self.path),
-            "dtype": str(self.dtype.name),
-            "location": self.location.to_json_value(),
+            "dtype": str(self.dtype.name), #type: ignore
         }
 
     @classmethod

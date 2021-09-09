@@ -1,45 +1,91 @@
 from pathlib import Path
 import json
-from typing import Tuple
-from webilastik.datasink import DataSink, DATASINK_FROM_JSON_CONSTRUCTORS
 
 import numpy as np
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
-from webilastik.filesystem import JsonableFilesystem
-
 from ndstructs.array5D import Array5D
 
-from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale
+from webilastik.datasink import DataSink, DATASINK_FROM_JSON_CONSTRUCTORS
+from webilastik.filesystem import JsonableFilesystem
+from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale5D
+
+class PrecomputedChunksSink:
+    def __init__(
+        self,
+        *,
+        filesystem: JsonableFilesystem,
+        base_path: Path,
+        info: PrecomputedChunksInfo,
+    ):
+        self.filesystem = filesystem
+        self.base_path = base_path
+        self.info = info
+        self.scale_sinks = tuple(
+            PrecomputedChunksScaleSink(
+                filesystem=filesystem,
+                base_path=base_path,
+                scale=scale,
+                dtype=info.data_type, #type: ignore
+            )
+            for scale in info.scales_5d
+        )
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        filesystem: JsonableFilesystem,
+        base_path: Path, # path to the "directory" that should contain the info file
+        info: PrecomputedChunksInfo,
+    ) -> "PrecomputedChunksSink":
+        if filesystem.exists(base_path.as_posix()):
+            filesystem.removedir(base_path.as_posix())
+        filesystem.makedirs(base_path.as_posix())
+
+        with filesystem.openbin(base_path.joinpath("info").as_posix(), "w") as info_file:
+            info_file.write(json.dumps(info.to_json_value()).encode("utf8"))
+
+        for scale in info.scales_5d:
+            scale_path = base_path.joinpath(scale.key.as_posix().lstrip("/"))
+            filesystem.makedirs(scale_path.as_posix())
+
+        return  PrecomputedChunksSink(filesystem=filesystem, base_path=base_path, info=info)
 
 
 class PrecomputedChunksScaleSink(DataSink):
-    # @privatemethod
     def __init__(
-        self, *, path: Path, filesystem: JsonableFilesystem, scale: PrecomputedChunksScale, dtype: np.dtype
+        self,
+        *,
+        filesystem: JsonableFilesystem,
+        base_path: Path,
+        scale: PrecomputedChunksScale5D,
+        dtype: np.dtype, #type: ignore
     ):
-        super().__init__(
-            tile_shape=scale.chunk_sizes[0], #FIXME: what if scale had multiple chunk sizes?
-            interval=scale.size.to_interval5d(scale.voxel_offset),
-            dtype=dtype,
-            path=path,
-        )
         self.filesystem = filesystem
+        self.base_path = base_path
         self.scale = scale
+
+        super().__init__( #type: ignore
+            tile_shape=self.scale.chunk_sizes_5d[0], #FIXME
+            interval=self.scale.interval,
+            dtype=dtype, #type: ignore
+        )
 
     def to_json_value(self) -> JsonObject:
         return {
             **super().to_json_value(),
             "filesystem": self.filesystem.to_json_value(),
-            "scale": self.scale.to_json_value()
+            "base_path": self.base_path.as_posix(),
+            "scale": self.scale.to_json_value(),
         }
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "PrecomputedChunksScaleSink":
         value_obj = ensureJsonObject(value)
         return PrecomputedChunksScaleSink(
-            path=Path(ensureJsonString(value_obj.get("path"))),
             filesystem=JsonableFilesystem.from_json_value(value_obj.get("filesystem")),
-            scale=PrecomputedChunksScale.from_json_value(value_obj.get("scale")),
+            base_path=Path(ensureJsonString(value_obj.get("base_path"))),
+            scale=PrecomputedChunksScale5D.from_json_value(value_obj.get("scale")),
             dtype=np.dtype(ensureJsonString(value_obj.get("dtype"))), #type: ignore
         )
 
@@ -48,42 +94,16 @@ class PrecomputedChunksScaleSink(DataSink):
 
     def __setstate__(self, value: JsonValue):
         sink = PrecomputedChunksScaleSink.from_json_value(value)
-        self.__init__(
-            path=sink.path,
+        self.__init__( #type: ignore
             filesystem=sink.filesystem,
+            base_path=sink.base_path,
             scale=sink.scale,
             dtype=sink.dtype, #type: ignore
         )
 
-    @classmethod
-    def create(
-        cls,
-        *,
-        path: Path,
-        resolution: Tuple[int, int, int],
-        filesystem: JsonableFilesystem,
-        info: PrecomputedChunksInfo,
-    ) -> "PrecomputedChunksScaleSink":
-        selected_scale=info.get_scale(resolution=resolution)
-        if filesystem.exists(path.as_posix()):
-            filesystem.removedir(path.as_posix())
-        filesystem.makedirs(path.as_posix())
-        with filesystem.openbin(path.joinpath("info").as_posix(), "w") as info_file:
-            info_file.write(json.dumps(info.to_json_value()).encode("utf8"))
-        for scale in info.scales:
-            filesystem.makedirs(path.joinpath(scale.key).as_posix())
-        return PrecomputedChunksScaleSink(path=path, filesystem=filesystem, scale=selected_scale, dtype=info.data_type)
-
-    @classmethod
-    def open(cls, *, path: Path, resolution: Tuple[int, int, int], filesystem: JsonableFilesystem) -> "PrecomputedChunksScaleSink":
-        with filesystem.openbin(path.joinpath("info").as_posix(), "r") as f:
-            info_json = f.read().decode("utf8")
-        info = PrecomputedChunksInfo.from_json_value(json.loads(info_json))
-        selected_scale = info.get_scale(resolution=resolution)
-        return PrecomputedChunksScaleSink(path=path, filesystem=filesystem, scale=selected_scale, dtype=info.data_type)
-
     def write(self, data: Array5D):
-        chunk_path = self.path / self.scale.get_tile_path(data.interval)
+        chunk_path = self.base_path / self.scale.get_tile_path(data.interval)
+        print(f"Writing {data} to chunk at {chunk_path}")
         # https://github.com/google/neuroglancer/tree/master/src/neuroglancer/datasource/precomputed#raw-chunk-encoding
         # "(...) data for the chunk is stored directly in little-endian binary format in [x, y, z, channel] Fortran order"
         with self.filesystem.openbin(chunk_path.as_posix(), "w") as f:

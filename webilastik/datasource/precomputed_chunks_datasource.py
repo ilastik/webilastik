@@ -25,19 +25,19 @@ class PrecomputedChunksDataSource(DataSource):
         with self.filesystem.openbin(path.joinpath("info").as_posix(), "r") as f:
             info_json = f.read().decode("utf8")
         self.info = PrecomputedChunksInfo.from_json_value(json.loads(info_json))
-        self.scale = self.info.get_scale(resolution=resolution)
+        self.scale = self.info.get_scale_5d(resolution=resolution)
 
         if chunk_size:
-            if chunk_size not in self.scale.chunk_sizes:
+            if chunk_size not in self.scale.chunk_sizes_5d:
                 raise ValueError(f"Bad chunk size: {chunk_size}. Available are: {self.scale.chunk_sizes}")
             tile_shape = chunk_size
         else:
-            tile_shape = self.scale.chunk_sizes[0]
+            tile_shape = self.scale.chunk_sizes_5d[0]
 
-        super().__init__(
+        super().__init__( #type: ignore
             tile_shape=tile_shape,
             dtype=self.info.data_type, #type: ignore
-            interval=self.scale.size.to_interval5d(location or self.scale.voxel_offset),
+            interval=self.scale.shape.to_interval5d(location or self.scale.location),
             axiskeys="zyxc",  # externally reported axiskeys are always c-ordered
             spatial_resolution=self.scale.resolution #FIXME: maybe delete this altogether?
         )
@@ -74,7 +74,7 @@ class PrecomputedChunksDataSource(DataSource):
 
     def _get_tile(self, tile: Interval5D) -> Array5D:
         if self.location != self.scale.voxel_offset:
-            tile = tile.translated(-self.location).translated(self.scale.voxel_offset)
+            tile = tile.translated(-self.location).translated(self.scale.location)
         tile_path = self.path / self.scale.get_tile_path(tile)
         with self.filesystem.openbin(tile_path.as_posix()) as f:
             raw_tile_bytes = f.read()

@@ -1,5 +1,4 @@
 from webilastik.filesystem.osfs import OsFs
-from fs.osfs import OSFS
 from pathlib import Path, PurePosixPath
 
 import pytest
@@ -7,7 +6,7 @@ import numpy as np
 from ndstructs import Point5D, Array5D, Shape5D
 
 from webilastik.datasink.n5_dataset_sink import N5DatasetSink
-from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksScaleSink
+from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
 from webilastik.datasource import DataRoi, ArrayDataSource, DataSource
 from webilastik.datasource.n5_datasource import N5DataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale, RawEncoder
@@ -98,12 +97,12 @@ def test_writing_to_precomputed_chunks(tmp_path: Path, data: Array5D):
     )
     sink_path = Path("mytest.precomputed")
     filesystem = OsFs(tmp_path.as_posix())
-    datasink = PrecomputedChunksScaleSink.create(
-        path=sink_path,
+
+    datasink = PrecomputedChunksSink.create(
         filesystem=filesystem,
+        base_path=sink_path,
         info=info,
-        resolution=scale.resolution,
-    )
+    ).scale_sinks[0]
 
     for tile in datasource.roi.get_datasource_tiles():
         datasink.write(tile.retrieve())
@@ -118,17 +117,17 @@ def test_writing_to_offset_precomputed_chunks(tmp_path: Path, data: Array5D):
     scale = PrecomputedChunksScale.from_datasource(datasource=datasource, key=Path("my_test_data"), encoding=RawEncoder())
     sink_path = Path("mytest.precomputed")
     filesystem = OsFs(tmp_path.as_posix())
-    datasink = PrecomputedChunksScaleSink.create(
-        path=sink_path,
-        filesystem=filesystem,
-        resolution=scale.resolution,
-        info=PrecomputedChunksInfo(
-            data_type=datasource.dtype,
-            type_="image",
-            num_channels=datasource.shape.c,
-            scales=tuple([scale]),
-        ),
+    info = PrecomputedChunksInfo(
+        data_type=datasource.dtype,
+        type_="image",
+        num_channels=datasource.shape.c,
+        scales=tuple([scale]),
     )
+    datasink = PrecomputedChunksSink.create(
+        filesystem=filesystem,
+        base_path=sink_path,
+        info=info,
+    ).scale_sinks[0]
 
     for tile in datasource.roi.get_datasource_tiles():
         datasink.write(tile.retrieve())

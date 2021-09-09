@@ -18,12 +18,12 @@ class N5DatasetSink(DataSink):
         filesystem: JsonableFilesystem,
         attributes: N5DatasetAttributes
     ):
-        super().__init__(
-            path=path,
+        super().__init__( #type: ignore
             dtype=attributes.dataType, #type: ignore
             tile_shape=attributes.blockSize,
             interval=attributes.dimensions.to_interval5d(),
         )
+        self.path = path
         self.attributes = attributes
         self.filesystem = filesystem
 
