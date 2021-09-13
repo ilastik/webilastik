@@ -95,8 +95,6 @@ tasks:
       - "{{.OVERLAY_DIR}}/src/**/*"
       - "{{.OVERLAY_DIR}}/tsconfig.json"
     generates: ["{{.OVERLAY_BUNDLE_PATH}}"]
-    status:
-      - test "$(git status --porcelain .)" = ""
     cmds:
       - rm -rf node_modules
       - npm ci
