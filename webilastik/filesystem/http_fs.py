@@ -46,7 +46,7 @@ class HttpFs(JsonableFilesystem):
     def from_json_value(cls, value: JsonValue) -> "JsonableFilesystem":
         value_obj = ensureJsonObject(value)
         raw_write_url = value_obj.get("write_url")
-        return HttpFs(
+        return cls(
             read_url=Url.parse(ensureJsonString(value_obj.get("read_url"))),
             write_url=None if raw_write_url is None else Url.parse(ensureJsonString(raw_write_url))
         )
