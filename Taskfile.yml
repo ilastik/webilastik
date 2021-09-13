@@ -4,9 +4,10 @@ vars:
   PROJECT_ROOT:
     sh: pwd
   BUILD_DIR: "{{.PROJECT_ROOT}}/build"
-  PKG_VERSION: "0.1.1"
+  PKG_VERSION:
+    sh: git describe --tags HEAD | sed 's@^[a-zA-Z]\+@@' | sed 's@-[^-]*$@@'
   PKG_NAME: webilastik_{{.PKG_VERSION}}
-  ENV_PATH: "{{.BUILD_DIR}}/{{.PKG_NAME}}_conda_env"
+  ENV_PATH: "{{.BUILD_DIR}}/webilastik_conda_env"
   ENV_CHECKSUM_PATH: "{{.BUILD_DIR}}/environment.yml.sha256"
   PACKED_ENV_PATH: "{{.ENV_PATH}}.tar.gz"
   PKG_TREE_PATH: "{{.BUILD_DIR}}/{{.PKG_NAME}}"
