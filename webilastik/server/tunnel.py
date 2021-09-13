@@ -27,6 +27,7 @@ class ReverseSshTunnel:
         self.tunnel_process = Popen(
             [
                 "ssh", "-fnNT",
+                "-oBatchMode=yes",
                 "-o", "StreamLocalBindMask=0111",
                 "-M", "-S", self.tunnel_control_socket,
                 "-R", f"{self.remote_unix_socket}:{self.local_unix_socket}",
