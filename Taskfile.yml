@@ -171,7 +171,7 @@ tasks:
       # the ssh happen for the user www-data is one way to do that
       # FIXME: investigate "-oStreamLocalBindMask=0111" in tunnel.py
       - echo "Checking that www-data can ssh into itself to create local sessions"
-      - ssh -oBatchMode=yes www-data@localhost echo success
+      - sudo -u www-data -g www-data ssh -oBatchMode=yes www-data@localhost echo success
 
       - echo "Running local server as www-data (because that's nginx's user)"
       - >
