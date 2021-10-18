@@ -48,7 +48,7 @@ class Protocol(enum.Enum):
 
 
 class Url:
-    hostname_pattern = r"[a-z\-\.]*"
+    hostname_pattern = r"[0-9a-z\-\.]*"
 
     url_pattern = re.compile(
         "("
