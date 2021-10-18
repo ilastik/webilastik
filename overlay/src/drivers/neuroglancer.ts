@@ -86,7 +86,7 @@ export class NeuroglancerDriver implements IViewerDriver{
         return [new NeuroglancerViewportDriver(this, panels[0], orientation_offsets.get(layout.replace("-3d", ""))!)]
     }
     onViewportsChanged(handler: () => void){
-        this.viewer.display.changed.add(() => {
+        this.viewer.layerManager.layersChanged.add(() => {
             if(this.viewer.state.toJSON().layers.find((layer: INeuroglancerLayer) => layer.type === undefined)){
                 return // if any layer has no type, then the viwer hasn't settled yet
             }
