@@ -63,30 +63,23 @@ tasks:
 
   install-neuroglancer-dependencies:
     deps: [checkout-neuroglancer]
-    vars:
-      PACKAGE_LOCK_CHECKSUM_PATH: "{{.BUILD_DIR}}/package-lock.json.check"
     sources: ["{{.NEUROGLANCER_GIT_DIR}}/package-lock.json"]
-    generates: ["{{.PACKAGE_LOCK_CHECKSUM_PATH}}"]
+    generates: ["{{.NEUROGLANCER_GIT_DIR}}/node_modules/**/*"]
     dir: "{{.NEUROGLANCER_GIT_DIR}}"
     cmds:
       - rm -rf node_modules
       - npm ci
-      - sha256sum package-lock.json > {{.PACKAGE_LOCK_CHECKSUM_PATH}}
 
   compile-neuroglancer:
     deps: [install-neuroglancer-dependencies]
     dir: "{{.NEUROGLANCER_GIT_DIR}}"
+    sources: ["{{.NEUROGLANCER_GIT_DIR}}/**/*"]
     generates: ["{{.NEUROGLANCER_BUNDLE_PATH}}"]
-    vars:
-      NEUROGLANCER_BUNDLE_CHECKSUM_PATH: "{{.BUILD_DIR}}/neuroglancer-bunble.sha256"
     env:
       ILASTIK_API_URL: https://app.ilastik.org/api #needed for 'npm run build-with-ilastik-overlay'
     cmds:
-      - rm -rf dist/ {{.NEUROGLANCER_BUNDLE_CHECKSUM_PATH}}
+      - rm -rf dist/
       - npm run build-with-ilastik-overlay
-      - sha256sum {{.NEUROGLANCER_BUNDLE_PATH}} > {{.NEUROGLANCER_BUNDLE_CHECKSUM_PATH}}
-    status:
-      - sha256sum {{.NEUROGLANCER_BUNDLE_PATH}} | diff {{.NEUROGLANCER_BUNDLE_CHECKSUM_PATH}} -
 
   compile-overlay:
     dir: "{{.OVERLAY_DIR}}"
