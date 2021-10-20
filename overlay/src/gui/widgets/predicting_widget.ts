@@ -1,11 +1,11 @@
 import { vec3 } from "gl-matrix";
 import { Applet } from "../../client/applets/applet";
 import { DataSource, Session } from "../../client/ilastik";
-import { PredictionsPrecomputedChunks } from "../../datasource/precomputed_chunks";
 import { HashMap } from "../../util/hashmap";
 import { awaitStalable } from "../../util/misc";
 import { ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonObject, JsonObject, JsonValue } from "../../util/serialization";
-import { PixelPredictionsView, PixelTrainingView, Viewer } from "../viewer";
+import { PredictionsView, TrainingView } from "../../viewer/view";
+import { Viewer } from "../../viewer/viewer";
 
 class PredictingAppletState{
     constructor(
@@ -60,20 +60,15 @@ export class PredictingWidget extends Applet<PredictingAppletState>{
         this.session = session
     }
 
-    private getPredictionsViews = async (): Promise<Array<PixelPredictionsView>> => {
-        let views_to_refresh = new HashMap<DataSource, PixelPredictionsView>({hash_function: ds => JSON.stringify(ds.toJsonValue())})
+    private getPredictionsViews = async (): Promise<Array<PredictionsView>> => {
+        let views_to_refresh = new HashMap<DataSource, PredictionsView>({hash_function: ds => JSON.stringify(ds.toJsonValue())})
         for(let view of this.viewer.getViews()){
-            if(view instanceof PixelPredictionsView){
+            if(view instanceof PredictionsView){
                 views_to_refresh.set(view.raw_data, view)
-            }else if(view instanceof PixelTrainingView){
-                let prediction_chunks = await PredictionsPrecomputedChunks.createFor({
+            }else if(view instanceof TrainingView){
+                let predictions_view = PredictionsView.createFor({
+                    raw_data: view.raw_data,
                     ilastik_session: this.session,
-                    raw_data: view.raw_data
-                })
-                let predictions_view = new PixelPredictionsView({
-                    name: `predictions: ${view.raw_data.getDisplayString()}`,
-                    multiscale_datasource: prediction_chunks,
-                    raw_data: view.raw_data
                 })
                 views_to_refresh.set(predictions_view.raw_data, predictions_view)
             }

@@ -5,7 +5,7 @@ import { createElement, removeElement } from "../util/misc";
 import { PredictingWidget } from "./widgets/predicting_widget";
 import { BrushingWidget } from "./widgets/brushing_overlay/brushing_widget";
 import { FeatureSelectionWidget } from "./widgets/feature_selection";
-import { Viewer } from "./viewer";
+import { Viewer } from "../viewer/viewer";
 
 export class ReferencePixelClassificationWorkflowGui{
     public readonly element: HTMLElement

@@ -184,4 +184,8 @@ export class Url{
     public equals(other: Url): boolean{
         return this.double_protocol_raw == other.double_protocol_raw
     }
+
+    public get root(): Url{
+        return this.updatedWith({path: "/"})
+    }
 }

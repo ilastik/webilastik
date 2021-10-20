@@ -1,6 +1,7 @@
 import { vec3 } from "gl-matrix"
 import { sleep } from "../util/misc"
 import { Url } from "../util/parsed_url"
+import { PrecomputedChunks } from "../util/precomputed_chunks"
 import { ensureJsonArray, ensureJsonNumberTripplet, ensureJsonObject, ensureJsonString, IJsonable, JsonObject, JsonValue } from "../util/serialization"
 
 export class Session{
@@ -292,6 +293,8 @@ export abstract class FileSystem implements IJsonable{
         }
         throw Error(`Could not deserialize FileSystem from ${JSON.stringify(value)}`)
     }
+    public abstract equals(other: FileSystem): boolean;
+    public abstract getUrl(): Url;
 }
 
 export class HttpFs extends FileSystem{
@@ -317,6 +320,14 @@ export class HttpFs extends FileSystem{
         return new HttpFs({
             read_url: Url.parse(ensureJsonString(data_obj["read_url"]))
         })
+    }
+
+    public equals(other: FileSystem): boolean{
+        return other instanceof HttpFs && this.read_url.equals(other.read_url)
+    }
+
+    public getUrl(): Url{
+        return this.read_url
     }
 }
 
@@ -370,12 +381,18 @@ export abstract class DataSource implements IJsonable{
     protected abstract doToJsonValue() : JsonObject & {__class__: string}
 
     public equals(other: DataSource): boolean{
-        //FIXME
-        return JSON.stringify(this.toJsonValue()) == JSON.stringify(other.toJsonValue())
+        return (
+            this.constructor.name == other.constructor.name &&
+            this.filesystem.equals(other.filesystem) &&
+            this.path == other.path &&
+            vec3.equals(this.spatial_resolution, other.spatial_resolution)
+        )
     }
 
+    public abstract toTrainingUrl(_session: Session): Url;
 }
 
+// Represents a single scale from precomputed chunks
 export class PrecomputedChunksDataSource extends DataSource{
     public static fromJsonValue(data: JsonValue) : PrecomputedChunksDataSource{
         const data_obj = ensureJsonObject(data)
@@ -386,6 +403,44 @@ export class PrecomputedChunksDataSource extends DataSource{
 
     protected doToJsonValue() : JsonObject & {__class__: string}{
         return { __class__: "PrecomputedChunksDataSource"}
+    }
+
+    public static async tryGetTrainingRawData(url: Url): Promise<PrecomputedChunksDataSource | undefined>{
+        let training_regex = /stripped_precomputed\/url=(?<url>[^/]+)\/resolution=(?<resolution>\d+_\d+_\d+)/
+        let match = url.path.match(training_regex)
+        if(!match){
+            return undefined
+        }
+        const original_url = Url.parse(Session.atob(match.groups!["url"]));
+        const raw_resolution = match.groups!["resolution"].split("_").map(axis => parseInt(axis));
+        const resolution = vec3.fromValues(raw_resolution[0], raw_resolution[1], raw_resolution[2]);
+        return new PrecomputedChunksDataSource({
+            filesystem: new HttpFs({read_url: original_url.updatedWith({path: "/"})}),
+            path: url.path,
+            spatial_resolution: resolution
+        })
+    }
+
+    public toTrainingUrl(session: Session): Url{
+        const original_url = this.filesystem.getUrl().joinPath(this.path)
+        const resolution_str = `${this.spatial_resolution[0]}_${this.spatial_resolution[1]}_${this.spatial_resolution[2]}`
+        return Url.parse(session.session_url)
+            .ensureDataScheme("precomputed")
+            .joinPath(`stripped_precomputed/url=${Session.btoa(original_url.raw)}/resolution=${resolution_str}`)
+    }
+
+    public static async tryArrayFromUrl(url: Url): Promise<Array<PrecomputedChunksDataSource> | undefined>{
+        let chunks = await PrecomputedChunks.tryFromUrl(url);
+        if(chunks === undefined){
+            return undefined
+        }
+        return chunks.scales.map(scale => {
+            return new PrecomputedChunksDataSource({
+                filesystem: new HttpFs({read_url: url.root}),
+                path: url.path,
+                spatial_resolution: vec3.clone(scale.resolution)
+            })
+        })
     }
 }
 
@@ -399,6 +454,33 @@ export class SkimageDataSource extends DataSource{
 
     protected doToJsonValue() : JsonObject & {__class__: string}{
         return { __class__: "SkimageDataSource"}
+    }
+
+    public static async tryFromUrl(url: Url): Promise<SkimageDataSource | undefined>{
+        if(url.datascheme !== undefined){
+            return undefined
+        }
+        if(url.protocol !== "http" && url.protocol !== "https"){
+            return undefined
+        }
+        //FIXME: maybe do a HEAD and check mime type?
+        return new SkimageDataSource({
+            filesystem: new HttpFs({read_url: url.updatedWith({path: "/"})}),
+            path: url.path,
+        })
+    }
+
+    public static async tryGetTrainingRawData(url: Url): Promise<SkimageDataSource | undefined>{
+        return await this.tryFromUrl(url)
+    }
+
+    public static async tryArrayFromUrl(url: Url): Promise<Array<SkimageDataSource> | undefined>{
+        let datasource = await this.tryFromUrl(url)
+        return datasource === undefined ? undefined : [datasource]
+    }
+
+    public toTrainingUrl(_session: Session): Url{
+        return this.filesystem.getUrl().joinPath(this.path)
     }
 }
 

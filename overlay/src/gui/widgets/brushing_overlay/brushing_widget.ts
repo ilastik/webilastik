@@ -1,7 +1,7 @@
 import { quat, vec3 } from "gl-matrix"
 import { BrushStroke } from "../../.."
 import { DataSource, Session } from "../../../client/ilastik"
-import { awaitStalable, createElement, createInput, removeElement, StaleResult } from "../../../util/misc"
+import { createElement, createInput, removeElement } from "../../../util/misc"
 import { CollapsableWidget } from "../collapsable_applet_gui"
 import { OneShotSelectorWidget, SelectorWidget } from "../selector_widget"
 import { Vec3ColorPicker } from "../vec3_color_picker"
@@ -10,8 +10,8 @@ import { BrushelBoxRenderer } from "./brush_boxes_renderer"
 import { BrushelLinesRenderer } from "./brush_lines_renderer"
 import { BrushRenderer } from "./brush_renderer"
 import { BrushStrokesContainer } from "./brush_strokes_container"
-import { IDataScale } from "../../../datasource/datasource"
-import { PixelPredictionsView, PixelTrainingView, Viewer } from "../../viewer"
+import { Viewer } from "../../../viewer/viewer"
+import { PredictionsView, RawDataView, TrainingView } from "../../../viewer/view"
 
 export class BrushingWidget{
     public static training_view_name_prefix = "ilastik training: "
@@ -83,7 +83,7 @@ export class BrushingWidget{
         this.clearStatus()
     }
 
-    private async openTrainingView(training_view: PixelTrainingView){
+    private async openTrainingView(training_view: TrainingView){
         if(!this.viewer.findView(training_view)){
             this.viewer.refreshView({view: training_view})
         }
@@ -96,43 +96,33 @@ export class BrushingWidget{
         if(view === undefined){
             return
         }
-        if(view instanceof Error){
+        if(view instanceof Error){ //FIXME: remove this? or return error from viewer?
             return this.showStatus(`${view}`)
         }
-        if(view instanceof PixelTrainingView){
+        if(view instanceof TrainingView){
             return this.startTraining(view.raw_data)
         }
-        if(view instanceof PixelPredictionsView){
+        if(view instanceof PredictionsView){
             //FIXME: allow more annotations?
             return this.showStatus(`Showing predictions for ${view.raw_data.getDisplayString()}`)
         }
-
-        if(view.multiscale_datasource.scales.length == 1){
-            const scale = view.multiscale_datasource.scales[0]
-            const multiscale_datasource = await awaitStalable({referenceKey: "brushingGetMultiscaleDataSource", callable: () => scale.toStrippedMultiscaleDataSource(this.session)})
-            if(multiscale_datasource instanceof StaleResult){
-                return
-            }
-            const training_view = new PixelTrainingView({
-                multiscale_datasource: multiscale_datasource,
-                name: `pixel classification: ${scale.toDisplayString()}`,
-                raw_data: scale.toIlastikDataSource()
-            })
+        if(!(view instanceof RawDataView)){
+            throw `Unexpected view type (${view.constructor.name}): ${JSON.stringify(view)}`
+        }
+        if(view.datasources.length == 1){
+            const datasource = view.datasources[0]
+            const training_view = view.toTrainingView({resolution: datasource.spatial_resolution, session: this.session})
             this.openTrainingView(training_view)
             return this.startTraining(training_view.raw_data)
         }
 
         createElement({tagName: "label", innerHTML: "Select a voxel size to annotate on:", parentElement: this.controlsContainer});
-        new OneShotSelectorWidget<IDataScale>({
+        new OneShotSelectorWidget<DataSource>({
             parentElement: this.controlsContainer,
-            options: view.multiscale_datasource.scales,
-            optionRenderer: (scale) => scale.toDisplayString(),
-            onOk: async (scale) => {
-                const training_view = new PixelTrainingView({
-                    multiscale_datasource: await scale.toStrippedMultiscaleDataSource(this.session),
-                    name: `pixel classification: ${scale.toDisplayString()}`,
-                    raw_data: scale.toIlastikDataSource()
-                })
+            options: view.datasources,
+            optionRenderer: (datasource) => `${datasource.spatial_resolution[0]} x ${datasource.spatial_resolution[1]} x ${datasource.spatial_resolution[2]} nm`,
+            onOk: async (datasource) => {
+                const training_view = view.toTrainingView({resolution: datasource.spatial_resolution, session: this.session})
                 this.openTrainingView(training_view)
             },
         })

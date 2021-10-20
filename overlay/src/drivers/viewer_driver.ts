@@ -4,7 +4,7 @@ import { mat4, quat, vec3 } from "gl-matrix";
 /**
  * A data source from a viewer. Usually
  */
-export interface IDataView{
+export interface INativeView{
     name: string,
     url: string,
 }
@@ -27,14 +27,14 @@ export interface IViewerDriver{
     getTrackedElement: () => HTMLElement;
 
     /**
-     * Opens data at params.url (preferably in a 'tab' named params.name) or refreshes that tab
+     * Opens data at params.native_view.url (preferably in a 'tab' named params.native_view.name) or refreshes that tab
      * if the url is already open.
      * @param params.url - the url to open or refresh
      * @param params.name - a hint of the name to be used for this data
      * @param params.channel_colors - a hint on how to interpret the channels of the data incoming from params.url
      * This is particulary useful for pixel prediction urls, since each channel has the color of a brush stroke
      */
-    refreshView: (params: {name: string, url: string, similar_url_hint?: string, channel_colors?: vec3[]}) => void;
+    refreshView: (params: {native_view: INativeView, similar_url_hint?: string, channel_colors?: vec3[]}) => void;
 
     /**
      * Registers a calback that should be called every time the viewer:
@@ -58,12 +58,12 @@ export interface IViewerDriver{
      *
      * @returns The IDataView representing the data source currently being actively viewed, if any
      */
-    getDataViewOnDisplay(): IDataView | undefined;
+    getDataViewOnDisplay(): INativeView | undefined;
 
     /**
      * @returns an array of `IDataView`s representing all data sources currently opened by the viewer
      */
-    getOpenDataViews(): Array<IDataView>;
+    getOpenDataViews(): Array<INativeView>;
 }
 
 /**
