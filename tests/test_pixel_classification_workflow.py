@@ -1,25 +1,18 @@
 from pathlib import Path
-from webilastik.scheduling.multiprocess_runner import MultiprocessRunner
-from webilastik.classifiers.pixel_classifier import Predictions
+from webilastik.filesystem.osfs import OsFs
+from webilastik.scheduling.hashing_executor import HashingExecutor
+# from webilastik.scheduling.multiprocess_runner import MultiprocessRunner
 from ndstructs.point5D import Shape5D
-from typing import cast
-import uuid
-import os
 
-import pytest
 import numpy as np
 from fs.osfs import OSFS
 
 from ndstructs import Point5D
-from ndstructs.datasource import DataSource, DataRoi
-from ndstructs.datasource.DataSource import SkimageDataSource
+from webilastik.datasource import DataRoi
+from webilastik.datasource import SkimageDataSource
 
-from webilastik.ui.applet import CancelledException
 from webilastik.annotations import Annotation, Color
 from webilastik.features.channelwise_fastfilters import GaussianSmoothing, HessianOfGaussianEigenvalues
-from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationLane, PixelClassificationWorkflow
-from webilastik.ui.workflow.pixel_classification_workflow_gui import PixelClassificationWorkflowGui
-from webilastik.ui.applet.data_selection_applet import DataSelectionApplet
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.ui.applet.brushing_applet import BrushingApplet
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
@@ -48,7 +41,7 @@ def test_pixel_classification_workflow():
     # )
 
     # GUI creates a datasource somewhere...
-    ds = SkimageDataSource(Path("sample_data/cropped1.png"), filesystem=OSFS("."), tile_shape=Shape5D(x=400, y=400))
+    ds = SkimageDataSource(Path("public/images/c_cells_1.png"), filesystem=OsFs("."), tile_shape=Shape5D(x=400, y=400))
 
     # GUI creates some feature extractors
     feature_selection_applet.feature_extractors.set_value(
@@ -88,22 +81,22 @@ def test_pixel_classification_workflow():
     # preds = predictions_export_applet.compute(DataRoi(ds))
 
     classifier = pixel_classifier_applet.pixel_classifier()
-    runner = MultiprocessRunner(num_workers=4)
+    executor = HashingExecutor(num_workers=8)
 
     # calculate predictions on an arbitrary data
-    preds = runner.compute(classifier.compute, DataRoi(ds))
-    preds.as_uint8().show_channels()
+    preds = executor.submit(classifier.compute, ds.roi)
+    preds.result().as_uint8().show_channels()
 
-    for png_bytes in preds.to_z_slice_pngs():
-        path = f"/tmp/junk_test_image_{uuid.uuid4()}.png"
-        with open(path, "wb") as outfile:
-            outfile.write(png_bytes.getbuffer())
-        os.system(f"gimp {path}")
+    # for png_bytes in preds.to_z_slice_pngs():
+    #     path = f"/tmp/junk_test_image_{uuid.uuid4()}.png"
+    #     with open(path, "wb") as outfile:
+    #         outfile.write(png_bytes.getbuffer())
+    #     os.system(f"gimp {path}")
 
 
     # calculate predictions on just a piece of arbitrary data
-    exported_tile = runner.compute(classifier.compute, DataRoi(datasource=ds, x=(100, 200), y=(100, 200)))
-    exported_tile.show_channels()
+    exported_tile = executor.submit(classifier.compute, DataRoi(datasource=ds, x=(100, 200), y=(100, 200)))
+    exported_tile.result().show_channels()
 
     # wf.save_as(Path("/tmp/blas.ilp"))
 

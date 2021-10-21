@@ -8,8 +8,7 @@ import numpy as np
 
 from ndstructs import Interval5D, Point5D, Shape5D, SPAN
 from ndstructs import Array5D
-from ndstructs.datasource import DataSource, DataRoi
-from ndstructs.utils import JsonSerializable
+from webilastik.datasource import DataSource, DataRoi
 
 from webilastik.operator import Operator
 

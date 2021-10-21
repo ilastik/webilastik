@@ -4,13 +4,10 @@ from typing import List, Sequence, Mapping, Tuple, Dict, Iterable, Sequence, Any
 import numpy as np
 from ndstructs import Interval5D, Point5D, Shape5D
 from ndstructs import Array5D, All, ScalarData, StaticLine
-from ndstructs.utils import Dereferencer, Referencer
-from ndstructs.datasource import DataSource, DataRoi
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonArray, ensureJsonInt, ensureJsonObject, ensureJsonString
 
-from webilastik.utility.serialization import ListGetter, ObjectGetter, ValueGetter, JSON_OBJECT, JSON_VALUE
+from webilastik.datasource import DataSource, DataRoi
 from webilastik.features.feature_extractor import FeatureExtractor, FeatureData
-from webilastik.datasource import datasource_from_url
-
 
 
 class Color:
@@ -29,15 +26,16 @@ class Color:
         self.name = name or f"Label {self.rgba}"
 
     @classmethod
-    def from_json_data(cls, data: Mapping[str, Any]) -> "Color":
+    def from_json_data(cls, data: JsonValue) -> "Color":
+        data_dict = ensureJsonObject(data)
         return Color(
-            r=np.uint8(data.get("r", 0)),
-            g=np.uint8(data.get("g", 0)),
-            b=np.uint8(data.get("b", 0)),
-            a=np.uint8(data.get("a", 255)),
+            r=np.uint8(ensureJsonInt(data_dict.get("r", 0))),
+            g=np.uint8(ensureJsonInt(data_dict.get("g", 0))),
+            b=np.uint8(ensureJsonInt(data_dict.get("b", 0))),
+            a=np.uint8(ensureJsonInt(data_dict.get("a", 255))),
         )
 
-    def to_json_data(self) -> JSON_OBJECT:
+    def to_json_data(self) -> JsonObject:
         return {
             "r": int(self.r),
             "g": int(self.g),
@@ -68,7 +66,7 @@ class Color:
     def __hash__(self):
         return hash(self.rgba)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         return not isinstance(other, Color) or self.rgba == other.rgba
 
     @classmethod
@@ -108,10 +106,10 @@ class Annotation(ScalarData):
     def __hash__(self):
         return hash((self._data.tobytes(), self.color))
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Annotation):
             return False
-        return self.color == other.color and np.all(self._data == other._data)
+        return self.color == other.color and bool(np.all(self._data == other._data))
 
     def __init__(
         self, arr: np.ndarray, *, axiskeys: str, location: Point5D = Point5D.zero(), color: Color, raw_data: DataSource
@@ -144,15 +142,13 @@ class Annotation(ScalarData):
         return cls(scribblings._data, axiskeys=scribblings.axiskeys, color=color, raw_data=raw_data, location=start)
 
     @classmethod
-    def from_json_data(cls, data: JSON_VALUE, dereferencer: Optional[Dereferencer] = None) -> "Annotation":
-        raw_voxels = ListGetter.get_list_of_objects(key="voxels", data=data)
-        voxels : Sequence[Point5D] = [Point5D.from_json_data(raw_voxel) for raw_voxel in raw_voxels]
+    def from_json_value(cls, data: JsonValue) -> "Annotation":
+        data_dict = ensureJsonObject(data)
+        raw_voxels = ensureJsonArray(data_dict.get("voxels"))
+        voxels : Sequence[Point5D] = [Point5D.from_json_value(raw_voxel) for raw_voxel in raw_voxels]
 
-        raw_color = ObjectGetter.get(key="color", data=data)
-        color = Color.from_json_data(raw_color)
-
-        raw_data_obj = ObjectGetter.get("raw_data", data=data)
-        raw_data = datasource_from_url(ValueGetter(str).get(key="url", data=raw_data_obj))
+        color = Color.from_json_data(data_dict.get("color"))
+        raw_data = DataSource.from_json_value(data_dict.get("raw_data"))
 
         start = Point5D.min_coords(voxels)
         stop = Point5D.max_coords(voxels) + 1  # +1 because slice.stop is exclusive, but max_point isinclusive
@@ -166,7 +162,7 @@ class Annotation(ScalarData):
 
         return cls(scribblings._data, axiskeys=scribblings.axiskeys, color=color, raw_data=raw_data, location=start)
 
-    def to_json_data(self, referencer: Referencer = lambda x: None) -> JSON_OBJECT:
+    def to_json_data(self) -> JsonObject:
         voxels : List[Point5D] = []
 
         # FIXME: annotation should probably not be an Array6D
@@ -175,10 +171,9 @@ class Annotation(ScalarData):
 
         return {
             "color": self.color.to_json_data(),
-            "raw_data": self.raw_data.to_json_data(),
-            "voxels": [vx.to_json_data() for vx in voxels]
+            "raw_data": self.raw_data.to_json_value(),
+            "voxels": tuple(vx.to_json_value() for vx in voxels),
         }
-        raise NotImplementedError
 
     def get_feature_samples(self, feature_extractor: FeatureExtractor) -> FeatureSamples:
         interval_under_annotation = self.interval.updated(c=self.raw_data.interval.c)
@@ -192,7 +187,7 @@ class Annotation(ScalarData):
         with ThreadPoolExecutor() as executor:
             all_feature_samples = list(executor.map(
                 make_samples,
-                DataRoi(self.raw_data).clamped(interval_under_annotation).get_tiles(tile_shape=tile_shape, clamp=False)
+                self.raw_data.roi.clamped(interval_under_annotation).get_tiles(tile_shape=tile_shape, tiles_origin=self.raw_data.location)
             ))
 
         return all_feature_samples[0].concatenate(*all_feature_samples[1:])
@@ -225,10 +220,9 @@ class Annotation(ScalarData):
             raise ValueError(f"All Annotations must come from the same datasource!")
         axiskeys = annotations[0].raw_data.axiskeys
         merged_annotations = Annotation.merge(annotations, color_map=color_map)
-        block_size = block_size or merged_annotations.shape
 
         out = {}
-        for block_index, block in enumerate(merged_annotations.split(block_size)):
+        for block_index, block in enumerate(merged_annotations.split(block_size or merged_annotations.shape)):
             out[f"block{block_index:04d}"] = {
                 "__data__": block.raw(axiskeys),
                 "__attrs__": {

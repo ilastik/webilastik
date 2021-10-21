@@ -1,19 +1,18 @@
 from abc import abstractmethod
-from typing import Any, Mapping, Optional, TypeVar, Type, cast, List
+from typing import Optional, TypeVar, Type, List
 import math
-import fastfilters
-from ndstructs.array5D import All
+import fastfilters #type: ignore
 
 import numpy
+from ndstructs import Array5D
+from ndstructs.array5D import All
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString, ensureJsonFloat
+from ndstructs import Point5D, Interval5D, Shape5D
 
 from .feature_extractor import FeatureData
 from .ilp_filter import IlpFilter
+from webilastik.datasource import DataSource, DataRoi
 from webilastik.operator import Operator, OpRetriever
-from webilastik.utility.serialization import JSON_VALUE, JSON_OBJECT, ValueGetter
-from ndstructs import Array5D, Image, ScalarImage
-from ndstructs import Point5D, Interval5D, Shape5D
-from ndstructs.datasource import DataSource, DataRoi
-from ndstructs.utils import from_json_data, Dereferencer, Referencer
 
 try:
     import ilastik_operator_cache # type: ignore
@@ -23,10 +22,12 @@ except ImportError:
     operator_cache = lru_cache()
 
 
-def get_axis_2d(data: JSON_VALUE) -> Optional[str]:
-    axis_2d = ValueGetter(str).get_optional(key="axis_2d", data=data)
+def get_axis_2d(data: JsonValue) -> Optional[str]:
+    data_dict = ensureJsonObject(data)
+    axis_2d = data_dict.get("axis_2d")
     if axis_2d is None:
         return None
+    axis_2d = ensureJsonString(axis_2d)
     if len(axis_2d) != 1 or axis_2d not in Point5D.LABELS:
         raise ValueError(f"Bad value for axis_2d in {data}")
     return axis_2d
@@ -44,7 +45,7 @@ class ChannelwiseFastFilter(IlpFilter):
         self.presmooth_sigma = presmooth_sigma
         super().__init__(axis_2d=axis_2d)
 
-    def to_json_data(self) -> JSON_OBJECT:
+    def to_json_data(self) -> JsonObject:
         return {
             "__class__": self.__class__.__name__,
             "axis_2d": self.axis_2d,
@@ -150,16 +151,17 @@ class StructureTensorEigenvalues(ChannelwiseFastFilter):
         self.window_size = window_size
 
     @classmethod
-    def from_json_data(cls, data: JSON_VALUE) -> "StructureTensorEigenvalues":
+    def from_json_data(cls, data: JsonValue) -> "StructureTensorEigenvalues":
+        data_dict = ensureJsonObject(data)
         return cls(
-            innerScale=ValueGetter(float).get(data=data, key="innerScale"),
-            outerScale=ValueGetter(float).get(data=data, key="outerScale"),
-            window_size=ValueGetter(float).get_default(data=data, key="window_size", default=0),
+            innerScale=ensureJsonFloat(data_dict.get("innerScale")),
+            outerScale=ensureJsonFloat(data_dict.get("outerScale")),
+            window_size=ensureJsonFloat(data_dict.get("window_size", 0)),
             axis_2d=get_axis_2d(data),
-            presmooth_sigma=ValueGetter(float).get_default(data=data, key="presmooth_sigma", default=0),
+            presmooth_sigma=ensureJsonFloat(data_dict.get("presmooth_sigma", 0)),
         )
 
-    def to_json_data(self, referencer: Referencer = lambda x: None) -> JSON_OBJECT:
+    def to_json_data(self) -> JsonObject:
         return {
             **super().to_json_data(),
             "innerScale": self.innerScale,
@@ -212,15 +214,16 @@ class SigmaWindowFilter(ChannelwiseFastFilter):
         self.window_size = window_size
 
     @classmethod
-    def from_json_data(cls: Type[SIGMA_FILTER], data: JSON_VALUE, dereferencer: Optional[Dereferencer] = None) -> SIGMA_FILTER:
+    def from_json_data(cls: Type[SIGMA_FILTER], data: JsonValue) -> SIGMA_FILTER:
+        data_dict = ensureJsonObject(data)
         return cls(
-            sigma=ValueGetter(float).get(data=data, key="sigma"),
-            window_size=ValueGetter(float).get_default(data=data, key="window_size", default=0),
+            sigma=ensureJsonFloat(data_dict.get("sigma")),
+            window_size=ensureJsonFloat(data_dict.get("window_size", 0)),
             axis_2d=get_axis_2d(data),
-            presmooth_sigma=ValueGetter(float).get_default(data=data, key="presmooth_sigma", default=0),
+            presmooth_sigma=ensureJsonFloat(data_dict.get("presmooth_sigma", 0)),
         )
 
-    def to_json_data(self, referencer: Referencer = lambda x: None) -> JSON_OBJECT:
+    def to_json_data(self) -> JsonObject:
         return {
             **super().to_json_data(),
             "sigma": self.sigma,
@@ -272,16 +275,17 @@ class DifferenceOfGaussians(ChannelwiseFastFilter):
         self.window_size = window_size
 
     @classmethod
-    def from_json_data(cls, data: JSON_VALUE, dereferencer: Optional[Dereferencer] = None) -> "DifferenceOfGaussians":
+    def from_json_data(cls, data: JsonValue) -> "DifferenceOfGaussians":
+        data_dict = ensureJsonObject(data)
         return cls(
-            sigma0=ValueGetter(float).get(data=data, key="sigma0"),
-            sigma1=ValueGetter(float).get(data=data, key="sigma1"),
-            window_size=ValueGetter(float).get_default(data=data, key="window_size", default=0),
+            sigma0=ensureJsonFloat(data_dict.get("sigma0")),
+            sigma1=ensureJsonFloat(data_dict.get("sigma1")),
+            window_size=ensureJsonFloat(data_dict.get("window_size", 0)),
             axis_2d=get_axis_2d(data),
-            presmooth_sigma=ValueGetter(float).get_default(data=data, key="presmooth_sigma", default=0),
+            presmooth_sigma=ensureJsonFloat(data_dict.get("presmooth_sigma", 0)),
         )
 
-    def to_json_data(self, referencer: Referencer = lambda x: None) -> JSON_OBJECT:
+    def to_json_data(self) -> JsonObject:
         return {
             **super().to_json_data(),
             "sigma0": self.sigma0,
@@ -335,15 +339,16 @@ class ScaleWindowFilter(ChannelwiseFastFilter):
         self.window_size = window_size
 
     @classmethod
-    def from_json_data(cls: Type[ScaleFilter], data: JSON_VALUE, dereferencer: Optional[Dereferencer] = None) -> ScaleFilter:
+    def from_json_data(cls: Type[ScaleFilter], data: JsonValue) -> ScaleFilter:
+        data_dict = ensureJsonObject(data)
         return cls(
-            scale=ValueGetter(float).get(data=data, key="scale"),
-            window_size=ValueGetter(float).get_default(data=data, key="window_size", default=0),
+            scale=ensureJsonFloat(data_dict.get("scale")),
+            window_size=ensureJsonFloat(data_dict.get("window_size", 0)),
             axis_2d=get_axis_2d(data),
-            presmooth_sigma=ValueGetter(float).get_default(data=data, key="presmooth_sigma", default=0),
+            presmooth_sigma=ensureJsonFloat(data_dict.get("presmooth_sigma", 0)),
         )
 
-    def to_json_data(self, referencer: Referencer = lambda x: None) -> JSON_OBJECT:
+    def to_json_data(self) -> JsonObject:
         return {
             **super().to_json_data(),
             "scale": self.scale,

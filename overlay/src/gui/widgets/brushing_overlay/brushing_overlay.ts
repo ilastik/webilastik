@@ -51,7 +51,7 @@ export class OverlayViewport{
         this.element.addEventListener("mousedown", (mouseDownEvent: MouseEvent) => {
             let currentBrushStroke = brush_stroke_handler.handleNewBrushStroke({
                 start_position_uvw: this.getMouseUvwPosition(mouseDownEvent),
-                camera_orientation_uvw: viewport_driver.getCameraPoseInUvwSpace().orientation_uvw, //FIXME: realy data space? rename param in BrushStroke?
+                camera_orientation_uvw: viewport_driver.getCameraPoseInUvwSpace().orientation_uvw,
             })
 
             let scribbleHandler = (mouseMoveEvent: MouseEvent) => {

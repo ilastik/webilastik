@@ -4,7 +4,7 @@ from typing import Optional, Set
 from skimage import measure as skmeasure
 from ndstructs import Array5D, Interval5D, Shape5D, ScalarData, Point5D
 from ndstructs.array5D import ARR
-from ndstructs.datasource import DataRoi
+from webilastik.datasource import DataRoi
 
 from webilastik.operator import Operator, OpRetriever
 

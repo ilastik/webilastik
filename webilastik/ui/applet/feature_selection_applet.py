@@ -1,13 +1,11 @@
 from typing import List, TypeVar, Sequence, Optional, Dict, Any
-from ndstructs.datasource.DataSource import DataSource
+from webilastik.datasource import DataSource
 
 import numpy as np
 
 from webilastik.ui.applet import Applet, CONFIRMER, Slot, SequenceValueSlot, CancelledException
-from webilastik.ui.applet.data_selection_applet import ILane
 from webilastik.features.ilp_filter import IlpFilter
 
-LANE = TypeVar("LANE", bound=ILane)
 class FeatureSelectionApplet(Applet):
     ilp_feature_names = [
         "GaussianSmoothing",

@@ -6,7 +6,7 @@ import numpy as np
 import vigra
 from ndstructs import Array5D, Point5D, ScalarData
 from ndstructs.point5D import Interval5D, SPAN, Shape5D
-from ndstructs.datasource import DataSource, DataRoi
+from webilastik.datasource import DataSource, DataRoi
 
 from webilastik.operator import Operator
 from webilastik.connected_components import ConnectedComponentsExtractor

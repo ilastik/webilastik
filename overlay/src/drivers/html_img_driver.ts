@@ -1,22 +1,24 @@
 import { vec3, quat, mat4 } from "gl-matrix";
 import { IViewerDriver } from "..";
 import { createElement } from "../util/misc";
-import { ParsedUrl } from "../util/parsed_url";
-import { PrecomputedChunks } from "../datasource/precomputed_chunks";
-import { IDataView, IViewportDriver, IViewportGeometry } from "./viewer_driver";
-import { HtmlImgSource } from "../datasource/html_img";
+import { Url } from "../util/parsed_url";
+import { INativeView, IViewportDriver, IViewportGeometry } from "./viewer_driver";
+import { PredictionsView, View } from "../viewer/view";
 
 export class HtmlImgDriver implements IViewerDriver{
     public readonly img: HTMLImageElement;
     public readonly container: HTMLElement;
-    public readonly data_url: ParsedUrl;
+    public readonly data_url: Url;
+
+    private onViewportChangedHandlers = new Array<() => void>()
+
     constructor({img}:{img: HTMLImageElement}){
         this.img = img
         this.container = img.parentElement || document.body
         try{
-            this.data_url = ParsedUrl.parse(this.img.src)
+            this.data_url = Url.parse(this.img.src)
         }catch{
-            this.data_url = ParsedUrl.parse(window.location.href).concat(this.img.src)
+            this.data_url = Url.parse(window.location.href).joinPath(this.img.src)
         }
     }
     public getViewportDrivers() : Array<HtmlImgViewportDriver>{
@@ -25,43 +27,53 @@ export class HtmlImgDriver implements IViewerDriver{
     public getTrackedElement(): HTMLImageElement{
         return this.img
     }
-    public refreshView(view: {name: string, url: string, similar_url_hint?: string, channel_colors?: vec3[]}){
+    public refreshView(params: {native_view: INativeView, similar_url_hint?: string, channel_colors?: vec3[]}){
         const output_css_class = "ilastik_img_output_image"
         document.querySelectorAll("." + output_css_class).forEach(element => {
             const htmlElement = (element as HTMLElement)
             htmlElement.parentElement?.removeChild(htmlElement)
         })
-        const container = createElement({tagName: "div", parentElement: this.img.parentElement!, cssClasses: [output_css_class]})
-        const url = ParsedUrl.parse(view.url)
+        const container = createElement({tagName: "div", parentElement: this.img.parentElement!, cssClasses: [output_css_class]});
 
-        if(HtmlImgSource.accepts(url)){
-            return //FIXME
-        }
-
-        PrecomputedChunks.fromUrl(ParsedUrl.parse(view.url)).then(precomp_chunks => {
-            const scale = precomp_chunks.scales[0]
-            const increment = 128
-            for(let y=0; y<this.img.height; y += increment){
+        (async () => {
+            let view = View.tryFromNative(params.native_view)
+            if(view === undefined){
+                throw `Could not convert to view: ${JSON.stringify(params.native_view)}`
+            }
+            if(!(view instanceof PredictionsView)){
+                return
+            }
+            const increment_x = 128 //FIXME
+            const increment_y = 128 //FIXME
+            for(let y=0; y<this.img.height; y += increment_y){
                 let row = createElement({tagName: "div", parentElement: container})
-                for(let x=0; x<this.img.width; x += increment){
+                for(let x=0; x<this.img.width; x += increment_x){
                     let tile = createElement({tagName: "img", parentElement: row, inlineCss: {float: "left"}}) as HTMLImageElement
-                    let x_end = Math.min(x + increment, this.img.width);
-                    let y_end = Math.min(y + increment, this.img.height);
+                    let x_end = Math.min(x + increment_x, this.img.width);
+                    let y_end = Math.min(y + increment_y, this.img.height);
                     tile.width = x_end - x;
                     tile.height = y_end - y;
-                    tile.src = scale.getChunkUrl({
+                    tile.src = view.getChunkUrl({
                         x: [x, x_end],
                         y: [y, y_end],
                         z: [0, 1]
                     })
-                    .withAddedSearchParams(new Map([["format", "png"]]))
-                    .href
+                    .updatedWith({extra_search: new Map([["format", "png"]])})
+                    .schemeless_raw
                 }
             }
-        })
+        })()
     }
-    public getDataViewOnDisplay(): IDataView | undefined{
-        return {name: this.data_url.name, url: this.data_url.href}
+    public getDataViewOnDisplay(): INativeView | undefined{
+        return {name: this.data_url.name, url: this.data_url.schemeless_raw}
+    }
+    public onViewportsChanged(handler: () => void){
+        this.onViewportChangedHandlers.push(handler)
+    }
+    public getOpenDataViews(): Array<INativeView>{
+        return [
+            {name: "FIXME", url: this.data_url.raw}
+        ]
     }
 }
 

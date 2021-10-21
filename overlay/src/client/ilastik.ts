@@ -1,20 +1,19 @@
 import { vec3 } from "gl-matrix"
 import { sleep } from "../util/misc"
-import { ensureJsonArray, ensureJsonNumber, ensureJsonObject, ensureJsonString, IJsonable, JsonObject, JsonValue } from "../util/serialization"
+import { Url } from "../util/parsed_url"
+import { PrecomputedChunks } from "../util/precomputed_chunks"
+import { ensureJsonArray, ensureJsonNumberTripplet, ensureJsonObject, ensureJsonString, IJsonable, JsonObject, JsonValue } from "../util/serialization"
 
 export class Session{
     public readonly ilastik_url: string
     public readonly session_url: string
-    public readonly token: string
 
-    protected constructor({ilastik_url, session_url, token}: {
+    protected constructor({ilastik_url, session_url}: {
         ilastik_url: URL,
         session_url: URL,
-        token: string
     }){
         this.ilastik_url = ilastik_url.toString().replace(/\/$/, "")
         this.session_url = session_url.toString().replace(/\/$/, "")
-        this.token = token
     }
 
     public static btoa(url: String): string{
@@ -23,6 +22,20 @@ export class Session{
 
     public static atob(encoded: String): string{
         return atob(encoded.replace("-", "+").replace("_", "/"))
+    }
+
+    public static async check_login({ilastik_api_url}: {ilastik_api_url: Url}): Promise<boolean>{
+        let response = await fetch(ilastik_api_url.joinPath("check_login").raw, {
+            credentials: "include"
+        });
+        if(response.ok){
+            return true
+        }
+        if(response.status == 401){
+            return false
+        }
+        let contents = await response.text()
+        throw new Error(`Checking loging faield with ${response.status}:\n${contents}`)
     }
 
     public static async create({ilastik_url, session_duration_seconds, timeout_s, onProgress=(_) => {}}: {
@@ -61,36 +74,30 @@ export class Session{
             return new Session({
                 ilastik_url: new URL(clean_ilastik_url),
                 session_url: new URL(raw_session_data.url),
-                token: raw_session_data["token"],
             })
         }
         throw `Could not create a session`
     }
 
-    public static async load({ilastik_url, session_url, token}: {
-        ilastik_url: URL, session_url:URL, token: string
+    public static async load({ilastik_url, session_url}: {
+        ilastik_url: URL, session_url:URL
     }): Promise<Session>{
         const status_endpoint = session_url.toString().replace(/\/?$/, "/status")
-        let session_status_resp = await fetch(status_endpoint, {
-            headers: {
-                'Authorization': 'Bearer ' + token
-            }
-        })
+        let session_status_resp = await fetch(status_endpoint)
         if(!session_status_resp.ok){
             throw Error(`Bad response from session: ${session_status_resp.status}`)
         }
         return new Session({
             ilastik_url: ilastik_url,
             session_url: session_url,
-            token: token,
         })
     }
 
-    public createAppletSocket(applet_name: string): WebSocket{
+    public createSocket(): WebSocket{
         //FIXME  is there a point to handling socket errors?:
         let ws_url = new URL(this.session_url)
         ws_url.protocol = ws_url.protocol == "http:" ? "ws:" : "wss:";
-        ws_url.pathname = ws_url.pathname + `/ws/${applet_name}`
+        ws_url.pathname = ws_url.pathname + '/ws'
         return new WebSocket(ws_url.toString())
     }
 
@@ -275,24 +282,205 @@ export class Shape5D{
     }
 }
 
-export class DataSource implements IJsonable{
-    public constructor(public readonly url: string, public readonly spatial_resolution: vec3){
+export abstract class FileSystem implements IJsonable{
+    public abstract getDisplayString(): string;
+    public abstract toJsonValue(): JsonObject
+    public static fromJsonValue(value: JsonValue): FileSystem{
+        const value_obj = ensureJsonObject(value)
+        const class_name = ensureJsonString(value_obj["__class__"])
+        if(class_name == "HttpFs"){
+            return HttpFs.fromJsonValue(value)
+        }
+        throw Error(`Could not deserialize FileSystem from ${JSON.stringify(value)}`)
     }
-    public static fromJsonValue(data: JsonValue) : DataSource{
-        let obj = ensureJsonObject(data)
-        const raw_resolution = ensureJsonArray(obj["spatial_resolution"])
-        const resolution = vec3.fromValues(
-            ensureJsonNumber(raw_resolution[0]),
-            ensureJsonNumber(raw_resolution[1]),
-            ensureJsonNumber(raw_resolution[2]),
-        )
-        return new this(ensureJsonString(obj["url"]), resolution)
+    public abstract equals(other: FileSystem): boolean;
+    public abstract getUrl(): Url;
+}
+
+export class HttpFs extends FileSystem{
+    public readonly read_url: Url
+    public constructor({read_url}: {read_url: Url}){
+        super()
+        this.read_url = read_url
     }
+
+    public getDisplayString(): string{
+        return this.read_url.raw
+    }
+
     public toJsonValue(): JsonObject{
-        return {url: this.url}
+        return {
+            __class__: "HttpFs",
+            read_url: this.read_url.schemeless_raw,
+        }
     }
+
+    public static fromJsonValue(data: JsonValue) : HttpFs{
+        const data_obj = ensureJsonObject(data)
+        return new HttpFs({
+            read_url: Url.parse(ensureJsonString(data_obj["read_url"]))
+        })
+    }
+
+    public equals(other: FileSystem): boolean{
+        return other instanceof HttpFs && this.read_url.equals(other.read_url)
+    }
+
+    public getUrl(): Url{
+        return this.read_url
+    }
+}
+
+export abstract class DataSource implements IJsonable{
+    public readonly filesystem: FileSystem
+    public readonly path: string
+    public readonly spatial_resolution: vec3
+
+    constructor({filesystem, path, spatial_resolution=vec3.fromValues(1,1,1)}: {filesystem: FileSystem, path: string, spatial_resolution?: vec3}){
+        this.filesystem = filesystem
+        this.path = path
+        this.spatial_resolution = spatial_resolution
+    }
+
+    public static fromJsonValue(data: JsonValue) : DataSource{
+        const data_obj = ensureJsonObject(data)
+        const class_name = ensureJsonString(data_obj["__class__"])
+        switch(class_name){
+            case "PrecomputedChunksDataSource":
+                return PrecomputedChunksDataSource.fromJsonValue(data)
+            case "SkimageDataSource":
+                return SkimageDataSource.fromJsonValue(data)
+            default:
+                throw Error(`Could not create datasource of type ${class_name}`)
+        }
+    }
+
+    public static extractBasicData(json_object: JsonObject): ConstructorParameters<typeof DataSource>[0]{
+        const spatial_resolution = json_object["spatial_resolution"]
+        return {
+            filesystem: FileSystem.fromJsonValue(json_object["filesystem"]),
+            path: ensureJsonString(json_object["path"]),
+            spatial_resolution: spatial_resolution === undefined ? vec3.fromValues(1,1,1) : ensureJsonNumberTripplet(spatial_resolution)
+        }
+    }
+
+    public toJsonValue(): JsonObject{
+        return {
+            filesystem: this.filesystem.toJsonValue(),
+            path: this.path,
+            spatial_resolution: [this.spatial_resolution[0], this.spatial_resolution[1], this.spatial_resolution[2]],
+            ...this.doToJsonValue()
+        }
+    }
+
+    public getDisplayString() : string{
+        const resolution_str = `${this.spatial_resolution[0]} x ${this.spatial_resolution[1]} x ${this.spatial_resolution[2]}`
+        return `${this.filesystem.getDisplayString()} ${this.path} (${resolution_str})`
+    }
+
+    protected abstract doToJsonValue() : JsonObject & {__class__: string}
+
     public equals(other: DataSource): boolean{
-        return this.url == other.url
+        return (
+            this.constructor.name == other.constructor.name &&
+            this.filesystem.equals(other.filesystem) &&
+            this.path == other.path &&
+            vec3.equals(this.spatial_resolution, other.spatial_resolution)
+        )
+    }
+
+    public abstract toTrainingUrl(_session: Session): Url;
+}
+
+// Represents a single scale from precomputed chunks
+export class PrecomputedChunksDataSource extends DataSource{
+    public static fromJsonValue(data: JsonValue) : PrecomputedChunksDataSource{
+        const data_obj = ensureJsonObject(data)
+        return new PrecomputedChunksDataSource({
+            ...DataSource.extractBasicData(data_obj),
+        })
+    }
+
+    protected doToJsonValue() : JsonObject & {__class__: string}{
+        return { __class__: "PrecomputedChunksDataSource"}
+    }
+
+    public static async tryGetTrainingRawData(url: Url): Promise<PrecomputedChunksDataSource | undefined>{
+        let training_regex = /stripped_precomputed\/url=(?<url>[^/]+)\/resolution=(?<resolution>\d+_\d+_\d+)/
+        let match = url.path.match(training_regex)
+        if(!match){
+            return undefined
+        }
+        const original_url = Url.parse(Session.atob(match.groups!["url"]));
+        const raw_resolution = match.groups!["resolution"].split("_").map(axis => parseInt(axis));
+        const resolution = vec3.fromValues(raw_resolution[0], raw_resolution[1], raw_resolution[2]);
+        return new PrecomputedChunksDataSource({
+            filesystem: new HttpFs({read_url: original_url.updatedWith({path: "/"})}),
+            path: url.path,
+            spatial_resolution: resolution
+        })
+    }
+
+    public toTrainingUrl(session: Session): Url{
+        const original_url = this.filesystem.getUrl().joinPath(this.path)
+        const resolution_str = `${this.spatial_resolution[0]}_${this.spatial_resolution[1]}_${this.spatial_resolution[2]}`
+        return Url.parse(session.session_url)
+            .ensureDataScheme("precomputed")
+            .joinPath(`stripped_precomputed/url=${Session.btoa(original_url.raw)}/resolution=${resolution_str}`)
+    }
+
+    public static async tryArrayFromUrl(url: Url): Promise<Array<PrecomputedChunksDataSource> | undefined>{
+        let chunks = await PrecomputedChunks.tryFromUrl(url);
+        if(chunks === undefined){
+            return undefined
+        }
+        return chunks.scales.map(scale => {
+            return new PrecomputedChunksDataSource({
+                filesystem: new HttpFs({read_url: url.root}),
+                path: url.path,
+                spatial_resolution: vec3.clone(scale.resolution)
+            })
+        })
+    }
+}
+
+export class SkimageDataSource extends DataSource{
+    public static fromJsonValue(data: JsonValue) : SkimageDataSource{
+        const data_obj = ensureJsonObject(data)
+        return new SkimageDataSource({
+            ...DataSource.extractBasicData(data_obj),
+        })
+    }
+
+    protected doToJsonValue() : JsonObject & {__class__: string}{
+        return { __class__: "SkimageDataSource"}
+    }
+
+    public static async tryFromUrl(url: Url): Promise<SkimageDataSource | undefined>{
+        if(url.datascheme !== undefined){
+            return undefined
+        }
+        if(url.protocol !== "http" && url.protocol !== "https"){
+            return undefined
+        }
+        //FIXME: maybe do a HEAD and check mime type?
+        return new SkimageDataSource({
+            filesystem: new HttpFs({read_url: url.updatedWith({path: "/"})}),
+            path: url.path,
+        })
+    }
+
+    public static async tryGetTrainingRawData(url: Url): Promise<SkimageDataSource | undefined>{
+        return await this.tryFromUrl(url)
+    }
+
+    public static async tryArrayFromUrl(url: Url): Promise<Array<SkimageDataSource> | undefined>{
+        let datasource = await this.tryFromUrl(url)
+        return datasource === undefined ? undefined : [datasource]
+    }
+
+    public toTrainingUrl(_session: Session): Url{
+        return this.filesystem.getUrl().joinPath(this.path)
     }
 }
 

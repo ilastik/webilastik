@@ -17,9 +17,10 @@ set -e
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 export SESSION_SECRET=123
-export PYTHONPATH="$SCRIPT_DIR/.."
+export PYTHONPATH="$SCRIPT_DIR/..:$SCRIPT_DIR/../ndstructs"
 python $SCRIPT_DIR/../webilastik/server/__init__.py \
     --session-type=Local \
     --master-host=localhost \
     --master-username=www-data \
-    --external-url=http://dev.web.ilastik.org \
+    --external-url=https://app.ilastik.org/ \
+    "$@"

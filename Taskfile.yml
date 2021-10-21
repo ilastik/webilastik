@@ -1,0 +1,191 @@
+version: '3'
+
+vars:
+  PROJECT_ROOT:
+    sh: pwd
+  BUILD_DIR: "{{.PROJECT_ROOT}}/build"
+  PKG_VERSION:
+    sh: git describe --tags HEAD | sed 's@^[a-zA-Z]\+@@' | sed 's@-[^-]*$@@'
+  PKG_NAME: webilastik_{{.PKG_VERSION}}
+  ENV_PATH: "{{.BUILD_DIR}}/webilastik_conda_env"
+  ENV_CHECKSUM_PATH: "{{.BUILD_DIR}}/environment.yml.sha256"
+  PACKED_ENV_PATH: "{{.ENV_PATH}}.tar.gz"
+  PKG_TREE_PATH: "{{.BUILD_DIR}}/{{.PKG_NAME}}"
+  DEB_PKG_PATH: "{{.BUILD_DIR}}/{{.PKG_NAME}}.deb"
+  NEUROGLANCER_GIT_DIR: "{{.BUILD_DIR}}/neuroglancer"
+  NEUROGLANCER_BUILD_PATH: "{{.NEUROGLANCER_GIT_DIR}}/dist/dev"
+  NEUROGLANCER_BUNDLE_PATH: "{{.NEUROGLANCER_BUILD_PATH}}/main.bundle.js"
+  OVERLAY_DIR: "{{.PROJECT_ROOT}}/overlay"
+  OVERLAY_BUNDLE_PATH: "{{.OVERLAY_DIR}}/build/inject_into_neuroglancer.js"
+
+tasks:
+  create-build-dir:
+    cmds:
+      - mkdir -p {{.BUILD_DIR}}
+    status:
+      - test -d {{.BUILD_DIR}}
+
+  create-conda-environment:
+    deps: [create-build-dir]
+    sources: ["{{.PROJECT_ROOT}}/environment.yml"]
+    generates: ["{{.ENV_CHECKSUM_PATH}}"]
+    cmds:
+      - rm -rf {{.ENV_PATH}}
+      - conda env create --prefix {{.ENV_PATH}} -f {{.PROJECT_ROOT}}/environment.yml
+      - sha256sum {{.PROJECT_ROOT}}/environment.yml > {{.ENV_CHECKSUM_PATH}}
+
+  create-packed-conda-environment:
+    deps: [create-conda-environment]
+    sources: ["{{.ENV_CHECKSUM_PATH}}"]
+    generates: ["{{.PACKED_ENV_PATH}}"]
+    cmds:
+      - rm -f {{.PACKED_ENV_PATH}}
+      - conda pack -p {{.ENV_PATH}} -o {{.PACKED_ENV_PATH}}
+
+  create-neuroglancer-git-dir:
+    run: once
+    cmds:
+      - mkdir -p {{.NEUROGLANCER_GIT_DIR}}
+    status:
+      - test -d {{.NEUROGLANCER_GIT_DIR}}
+
+  checkout-neuroglancer:
+    deps: [create-neuroglancer-git-dir]
+    dir: "{{.NEUROGLANCER_GIT_DIR}}"
+    vars:
+      COMMIT_HASH: "origin/with-ilastik-overlay"
+    cmds:
+      - git clone https://github.com/ilastik/neuroglancer . || git fetch
+      - git checkout {{.COMMIT_HASH}}
+    status:
+      - git status > /dev/null 2>&1
+      - test "$(git rev-parse HEAD)" = "$(git rev-parse {{.COMMIT_HASH}})"
+
+  install-neuroglancer-dependencies:
+    deps: [checkout-neuroglancer]
+    sources: ["{{.NEUROGLANCER_GIT_DIR}}/package-lock.json"]
+    generates: ["{{.NEUROGLANCER_GIT_DIR}}/node_modules/**/*"]
+    dir: "{{.NEUROGLANCER_GIT_DIR}}"
+    cmds:
+      - rm -rf node_modules
+      - npm ci
+
+  compile-neuroglancer:
+    deps: [install-neuroglancer-dependencies]
+    dir: "{{.NEUROGLANCER_GIT_DIR}}"
+    sources: ["{{.NEUROGLANCER_GIT_DIR}}/**/*"]
+    generates: ["{{.NEUROGLANCER_BUNDLE_PATH}}"]
+    env:
+      ILASTIK_API_URL: https://app.ilastik.org/api #needed for 'npm run build-with-ilastik-overlay'
+    cmds:
+      - rm -rf dist/
+      - npm run build-with-ilastik-overlay
+
+  compile-overlay:
+    dir: "{{.OVERLAY_DIR}}"
+    sources:
+      - "{{.OVERLAY_DIR}}/package-lock.json"
+      - "{{.OVERLAY_DIR}}/package.json"
+      - "{{.OVERLAY_DIR}}/src/**/*"
+      - "{{.OVERLAY_DIR}}/tsconfig.json"
+    generates: ["{{.OVERLAY_BUNDLE_PATH}}"]
+    cmds:
+      - rm -rf node_modules
+      - npm ci
+      - npm run bundle-ng-inject
+
+  create-deb-tree:
+    deps: [create-packed-conda-environment, compile-neuroglancer, compile-overlay]
+    sources:
+      - "{{.PROJECT_ROOT}}/package_tree/**/*"
+      - "{{.PACKED_ENV_PATH}}"
+      - "{{.PROJECT_ROOT}}/webilastik/**/*.py"
+      - "{{.OVERLAY_BUNDLE_PATH}}"
+      - "{{.NEUROGLANCER_BUNDLE_PATH}}"
+    generates:
+      - "{{.PKG_TREE_PATH}}/**/*"
+    vars:
+      CONTROL_FILE_CONTENTS: |-
+          Package: webilastik
+          Version: {{.PKG_VERSION}}
+          Section: base
+          Priority: optional
+          Architecture: amd64
+          Depends:
+          Maintainer: ilastik Team <team@ilastik.org>
+          Description: Webilastik
+           Server and frontend for the web version of ilastik
+    cmds:
+      - echo 2>&1 '[INFO] Generating basic package tree'
+      - rm -rf {{.PKG_TREE_PATH}}
+      - cp -r {{.PROJECT_ROOT}}/package_tree {{.PKG_TREE_PATH}}
+
+      - echo 2>&1 '[INFO] Generating DEBIAN/control file'
+      - echo '{{.CONTROL_FILE_CONTENTS}}' > {{.PKG_TREE_PATH}}/DEBIAN/control
+
+      - mkdir -p {{.PKG_TREE_PATH}}/etc/webilastik
+
+      - echo 2>&1 '[INFO] Unpacking conda environment'
+      - mkdir -p {{.PKG_TREE_PATH}}/opt/webilastik_conda_env
+      - tar -xzf {{.PACKED_ENV_PATH}} -C {{.PKG_TREE_PATH}}/opt/webilastik_conda_env
+
+      - echo 2>&1 '[INFO] Copying webilastik files'
+      - mkdir -p {{.PKG_TREE_PATH}}/opt/webilastik
+      - cp -r {{.PROJECT_ROOT}}/webilastik {{.PROJECT_ROOT}}/public {{.PKG_TREE_PATH}}/opt/webilastik
+      - find {{.PKG_TREE_PATH}}/opt/webilastik -name __pycache__ | xargs --no-run-if-empty rm -rf
+
+      - echo 2>&1 '[INFO] Copying overlay bundle to public dir'
+      - mkdir -p {{.PKG_TREE_PATH}}/opt/webilastik/public/js/
+      - cp {{.OVERLAY_BUNDLE_PATH}} {{.PKG_TREE_PATH}}/opt/webilastik/public/js/
+
+      - echo 2>&1 '[INFO] Copying nehuba to public dir'
+      - cp -r {{.NEUROGLANCER_BUILD_PATH}} {{.PKG_TREE_PATH}}/opt/webilastik/public/nehuba
+
+  create-deb-package:
+    deps: [create-deb-tree]
+    sources:
+      - "{{.PKG_TREE_PATH}}/**/*"
+    generates:
+      - "{{.DEB_PKG_PATH}}"
+    cmds:
+      - dpkg-deb --build -z2 {{.PKG_TREE_PATH}} {{.DEB_PKG_PATH}}
+
+  start-local-server:
+    deps: [create-deb-tree]
+    env:
+      PYTHONPATH: "{{.PKG_TREE_PATH}}/opt/webilastik/"
+      REQUESTS_CA_BUNDLE: "/etc/ssl/certs/ca-certificates.crt" # so python requests uses local certificate
+      SSL_CERT_DIR: "/etc/ssl/certs/" # aiohttp needs help finding certs when running from packed conda env
+    cmds: #this assumes an nginx like the one in webilastik.conf running already
+      - echo "Ensuring that app.ilastik.org points to localhost"
+      - getent hosts app.ilastik.org | awk '{ print $1 }' | grep -qE '^(127\.0\.0\.1|::1)$'
+
+      - echo "Checking that nginx is running"
+      - ps -ef | grep -q nginx
+
+      - echo "Checking that webilastik.conf is installed in nginx's config files"
+      - sudo nginx -T | grep -q app.ilastik.org
+
+      # for now this must be via www-data because that's nginx's user, and nginx must
+      # be able to open the socket files that go back to the sessions, and having
+      # the ssh happen for the user www-data is one way to do that
+      # FIXME: investigate "-oStreamLocalBindMask=0111" in tunnel.py
+      - echo "Checking that www-data can ssh into itself to create local sessions"
+      - sudo -u www-data -g www-data ssh -oBatchMode=yes www-data@localhost echo success
+
+      - echo "Running local server as www-data (because that's nginx's user)"
+      - >
+        sudo -u www-data -g www-data --preserve-env=PYTHONPATH,REQUESTS_CA_BUNDLE,SSL_CERT_DIR
+        {{.PKG_TREE_PATH}}/opt/webilastik_conda_env/bin/python3 -B {{.PKG_TREE_PATH}}/opt/webilastik/webilastik/server/__init__.py
+        --session-type=Local
+        --master-host=localhost
+        --master-username=www-data
+        --external-url=https://app.ilastik.org/
+        --oidc-client-json=skip
+
+  clean:
+    - rm -rf {{.BUILD_DIR}}/*
+
+  default:
+    deps: [create-deb-package]
+

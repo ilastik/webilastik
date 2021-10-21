@@ -2,7 +2,6 @@ import { quat, vec3 } from "gl-matrix"
 import { BrushStroke } from "../../.."
 import { DataSource, Session } from "../../../client/ilastik"
 import { createElement, createInput, removeElement } from "../../../util/misc"
-import { PredictionsPrecomputedChunks, StrippedPrecomputedChunks } from "../../../datasource/precomputed_chunks"
 import { CollapsableWidget } from "../collapsable_applet_gui"
 import { OneShotSelectorWidget, SelectorWidget } from "../selector_widget"
 import { Vec3ColorPicker } from "../vec3_color_picker"
@@ -11,8 +10,8 @@ import { BrushelBoxRenderer } from "./brush_boxes_renderer"
 import { BrushelLinesRenderer } from "./brush_lines_renderer"
 import { BrushRenderer } from "./brush_renderer"
 import { BrushStrokesContainer } from "./brush_strokes_container"
-import { IDataScale } from "../../../datasource/datasource"
-import { Viewer } from "../../viewer"
+import { Viewer } from "../../../viewer/viewer"
+import { PredictionsView, RawDataView, TrainingView } from "../../../viewer/view"
 
 export class BrushingWidget{
     public static training_view_name_prefix = "ilastik training: "
@@ -23,7 +22,7 @@ export class BrushingWidget{
     public readonly canvas: HTMLCanvasElement
     public readonly status_display: HTMLElement
 
-    private brushStrokeContainer: BrushStrokesContainer
+    public readonly brushStrokeContainer: BrushStrokesContainer
     private readonly controlsContainer: HTMLElement
     private animationRequestId: number = 0
     private trainingWidget: TrainingWidget | undefined = undefined
@@ -31,10 +30,12 @@ export class BrushingWidget{
 
     constructor({
         session,
+        socket,
         parentElement,
         viewer,
     }: {
         session: Session,
+        socket: WebSocket,
         parentElement: HTMLElement,
         viewer: Viewer,
     }){
@@ -51,7 +52,7 @@ export class BrushingWidget{
         let p = createElement({tagName: "p", parentElement: this.element})
         createElement({tagName: "label", innerHTML: "Brush Strokes:", parentElement: p})
         this.brushStrokeContainer = new BrushStrokesContainer({
-            session,
+            socket,
             parentElement: this.element,
             applet_name: "brushing_applet",
             gl: this.gl,
@@ -59,9 +60,7 @@ export class BrushingWidget{
         })
 
         this.showCanvas(false)
-        if(viewer.onViewportsChanged){
-            viewer.onViewportsChanged(() => this.handleViewerDataDisplayChange())
-        }
+        viewer.onViewportsChanged(() => this.handleViewerDataDisplayChange())
         this.handleViewerDataDisplayChange()
     }
 
@@ -84,42 +83,47 @@ export class BrushingWidget{
         this.clearStatus()
     }
 
+    private async openTrainingView(training_view: TrainingView){
+        if(!this.viewer.findView(training_view)){
+            this.viewer.refreshView({view: training_view})
+        }
+    }
+
     private async handleViewerDataDisplayChange(){
         this.resetWidgets()
 
-        //FIXME: can racing mess this up?
-        const data_view = await this.viewer.getActiveView()
-        if(data_view === undefined){
+        const view = this.viewer.getActiveView()
+        if(view === undefined){
             return
         }
-        if(data_view instanceof Error){
-            return this.showStatus(`${data_view}`)
+        if(view instanceof Error){ //FIXME: remove this? or return error from viewer?
+            return this.showStatus(`${view}`)
         }
-        if(data_view.datasource instanceof StrippedPrecomputedChunks){
-            let originalDataProvider = data_view.datasource.original
-            let scale = originalDataProvider.findScale(data_view.datasource.scales[0].resolution)!
-            return this.startTraining(scale.toDataSource())
+        if(view instanceof TrainingView){
+            return this.startTraining(view.raw_data)
         }
-        if(data_view.datasource instanceof PredictionsPrecomputedChunks){
+        if(view instanceof PredictionsView){
             //FIXME: allow more annotations?
-            return this.showStatus(`Showing predictions for ${data_view.datasource.raw_data_url.getSchemedHref("://")}`)
+            return this.showStatus(`Showing predictions for ${view.raw_data.getDisplayString()}`)
         }
-        if(data_view.datasource.scales.length == 1){
-            return this.startTraining(data_view.datasource.scales[0].toIlastikDataSource())
+        if(!(view instanceof RawDataView)){
+            throw `Unexpected view type (${view.constructor.name}): ${JSON.stringify(view)}`
+        }
+        if(view.datasources.length == 1){
+            const datasource = view.datasources[0]
+            const training_view = view.toTrainingView({resolution: datasource.spatial_resolution, session: this.session})
+            this.openTrainingView(training_view)
+            return this.startTraining(training_view.raw_data)
         }
 
         createElement({tagName: "label", innerHTML: "Select a voxel size to annotate on:", parentElement: this.controlsContainer});
-        new OneShotSelectorWidget<IDataScale>({
+        new OneShotSelectorWidget<DataSource>({
             parentElement: this.controlsContainer,
-            options: data_view.datasource.scales,
-            optionRenderer: (scale) => scale.toDisplayString(),
-            onOk: async (scale) => {
-                const stripped_precomp_chunks = await scale.toStrippedMultiscaleDataSource(this.session) //FIXME: race condition?
-                this.viewer.refreshView({
-                    name: BrushingWidget.training_view_name_prefix + `${data_view.name} (${scale.toDisplayString()})`,
-                    url: stripped_precomp_chunks.url.getSchemedHref("://"),
-                    similar_url_hint: data_view.datasource.url.getSchemedHref("://"),
-                })
+            options: view.datasources,
+            optionRenderer: (datasource) => `${datasource.spatial_resolution[0]} x ${datasource.spatial_resolution[1]} x ${datasource.spatial_resolution[2]} nm`,
+            onOk: async (datasource) => {
+                const training_view = view.toTrainingView({resolution: datasource.spatial_resolution, session: this.session})
+                this.openTrainingView(training_view)
             },
         })
     }
@@ -128,7 +132,6 @@ export class BrushingWidget{
         this.resetWidgets()
         this.showCanvas(true)
 
-        const resolution = datasource.spatial_resolution
         this.trainingWidget = new TrainingWidget({
             gl: this.gl,
             parentElement: this.controlsContainer,
@@ -136,7 +139,7 @@ export class BrushingWidget{
             datasource,
             viewer: this.viewer
         })
-        this.showStatus(`Now training on ${datasource.url}(${resolution[0]} x ${resolution[1]} x ${resolution[2]} nm)`)
+        this.showStatus(`Now training on ${datasource.getDisplayString()}`)
         window.cancelAnimationFrame(this.animationRequestId)
         const render = () => {
             this.trainingWidget?.render(this.brushStrokeContainer.getBrushStrokes())

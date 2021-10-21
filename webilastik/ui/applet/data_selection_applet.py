@@ -7,19 +7,9 @@ import uuid
 import numpy as np
 from fs.osfs import OSFS
 import vigra
-from ndstructs.datasource import DataSource, PrecomputedChunksDataSource
+from webilastik.datasource import DataSource
 
 from webilastik.ui.applet import Applet, Slot, ValueSlot, CONFIRMER
-from webilastik.filesystem import HttpPyFs
-
-
-def create_precomputed_chunks_datasource(url: str) -> PrecomputedChunksDataSource:
-    parsed_url = urlparse(url.lstrip("precomputed://"))
-    return PrecomputedChunksDataSource(
-        path=Path(parsed_url.path),
-        filesystem=HttpPyFs(parsed_url._replace(path="/").geturl())
-    )
-
 
 class ILane(ABC):
     @abstractmethod
@@ -36,24 +26,24 @@ class ILane(ABC):
     def ilp_data(self) -> Any:
         pass
 
-    @classmethod
-    def datasource_to_ilp_data(cls, datasource: DataSource):
-        url = datasource.url
-        return {
-            "allowLabels": True,
-            "axisorder": datasource.axiskeys.encode("utf8"),
-            "axistags": vigra.defaultAxistags(datasource.axiskeys).toJSON().encode("utf8"),
-            "datasetId": str(uuid.uuid1()).encode("utf8"),
-            "dtype": str(datasource.dtype).encode("utf8"),
-            "filePath": url.encode("utf8"),
-            "fromstack": False,  # FIXME
-            "location": "FileSystem".encode("utf8"), #FIXME
-            "nickname": datasource.name.encode("utf8"), #FIXME
-            "shape": datasource.shape.to_tuple(datasource.axiskeys),
-            "display_mode": "default".encode('utf8'), #FIXME
-            "normalizeDisplay": True, #FIXME
-            "drange": None, #FIXME
-        }
+    # @classmethod
+    # def datasource_to_ilp_data(cls, datasource: DataSource):
+    #     url = datasource.url
+    #     return {
+    #         "allowLabels": True,
+    #         "axisorder": datasource.axiskeys.encode("utf8"),
+    #         "axistags": vigra.defaultAxistags(datasource.axiskeys).toJSON().encode("utf8"),
+    #         "datasetId": str(uuid.uuid1()).encode("utf8"),
+    #         "dtype": str(datasource.dtype).encode("utf8"),
+    #         "filePath": url.encode("utf8"),
+    #         "fromstack": False,  # FIXME
+    #         "location": "FileSystem".encode("utf8"), #FIXME
+    #         "nickname": datasource.name.encode("utf8"), #FIXME
+    #         "shape": datasource.shape.to_tuple(datasource.axiskeys),
+    #         "display_mode": "default".encode('utf8'), #FIXME
+    #         "normalizeDisplay": True, #FIXME
+    #         "drange": None, #FIXME
+    #     }
 
 Lane = TypeVar("Lane", bound=ILane)
 class DataSelectionApplet(Applet, Generic[Lane]):

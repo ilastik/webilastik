@@ -1,22 +1,26 @@
 import { vec3 } from "gl-matrix";
 import { Applet } from "../../client/applets/applet";
 import { DataSource, Session } from "../../client/ilastik";
-import { PredictionsPrecomputedChunks } from "../../datasource/precomputed_chunks";
-import { IViewerDriver } from "../../drivers/viewer_driver";
-import { ParsedUrl } from "../../util/parsed_url";
+import { HashMap } from "../../util/hashmap";
+import { awaitStalable } from "../../util/misc";
 import { ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonObject, JsonObject, JsonValue } from "../../util/serialization";
+import { PredictionsView, TrainingView } from "../../viewer/view";
+import { Viewer } from "../../viewer/viewer";
 
 class PredictingAppletState{
     constructor(
         public readonly producer_is_ready: boolean,
         public readonly channel_colors: Array<vec3>,
-        public readonly datasources: Array<DataSource>,
     ){}
 
     public toJsonValue(): JsonObject{
         return {
             producer_is_ready: this.producer_is_ready,
-            datasources: this.datasources.map(ds => ds.toJsonValue()),
+            channel_colors: this.channel_colors.map(cc => ({
+                r: cc[0],
+                g: cc[1],
+                b: cc[2],
+            }))
         }
     }
 
@@ -29,31 +33,46 @@ class PredictingAppletState{
                 ensureJsonNumber(color_obj["r"]), ensureJsonNumber(color_obj["g"]), ensureJsonNumber(color_obj["b"])
             )
         })
-        let datasources = ensureJsonArray(obj["datasources"]).map(rds => DataSource.fromJsonValue(rds))
-        return new PredictingAppletState(producer_is_ready, channel_colors, datasources)
+        return new PredictingAppletState(producer_is_ready, channel_colors)
     }
 }
 
 export class PredictingWidget extends Applet<PredictingAppletState>{
-    constructor({session, viewer_driver}: {session: Session, viewer_driver: IViewerDriver}){
+    public readonly viewer: Viewer;
+    public readonly session: Session
+
+    constructor({socket, session, viewer}: {socket: WebSocket, session: Session, viewer: Viewer}){
         super({
             deserializer: PredictingAppletState.fromJsonValue,
-            name: "predicting_applet",
-            session,
-            onNewState: async (new_state) => {
+            name: "pixel_classification_applet",
+            socket,
+            onNewState: async (new_state: PredictingAppletState) => {
                 if(!new_state.producer_is_ready){
                     return
                 }
-                new_state.datasources.forEach(async (ds, ds_index) => {
-                    let precomp_predictions = await PredictionsPrecomputedChunks.createFor({ilastik_session: session, raw_data: ParsedUrl.parse(ds.url)})
-                    viewer_driver.refreshView({
-                        name: `lane${ds_index}`,
-                        url: precomp_predictions.url.getSchemedHref("://"),
-                        similar_url_hint: ds.url.toString(),
-                        channel_colors: new_state.channel_colors
-                    })
-                })
-            }
+                let predictionViews = await awaitStalable({referenceKey: "getPredictionsViews", callable: this.getPredictionsViews})
+                if(predictionViews instanceof Array){
+                    predictionViews.forEach(view => this.viewer.refreshView({view, channel_colors: new_state.channel_colors}))
+                }
+            },
         })
+        this.viewer = viewer
+        this.session = session
+    }
+
+    private getPredictionsViews = async (): Promise<Array<PredictionsView>> => {
+        let views_to_refresh = new HashMap<DataSource, PredictionsView>({hash_function: ds => JSON.stringify(ds.toJsonValue())})
+        for(let view of this.viewer.getViews()){
+            if(view instanceof PredictionsView){
+                views_to_refresh.set(view.raw_data, view)
+            }else if(view instanceof TrainingView){
+                let predictions_view = PredictionsView.createFor({
+                    raw_data: view.raw_data,
+                    ilastik_session: this.session,
+                })
+                views_to_refresh.set(predictions_view.raw_data, predictions_view)
+            }
+        }
+        return views_to_refresh.values()
     }
 }

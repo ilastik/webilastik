@@ -71,7 +71,7 @@ class File(Group):
 
     @property
     @with_phil
-    def filename(self):
+    def filename(self) -> str:
         """File name on disk"""
         ...
 
@@ -189,7 +189,7 @@ class File(Group):
         """
         ...
 
-    def close(self):
+    def close(self) -> None:
         """ Close the file.  All open objects become invalid """
         ...
 

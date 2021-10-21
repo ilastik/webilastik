@@ -7,6 +7,8 @@ import os
 from typing import Type, TypeVar, Generic
 import uuid
 from uuid import UUID
+import sys
+
 import webilastik.ui.workflow.ws_pixel_classification_workflow
 
 SESSION_SCRIPT_PATH = Path(__file__).parent.joinpath("reverse_tunnel_to_master.sh")
@@ -47,7 +49,7 @@ class LocalSession(Session):
     ) -> "LocalSession":
         local_socket = Path(f"/tmp/{session_id}-to-master")
         process = await asyncio.create_subprocess_exec(
-            "python",
+            sys.executable,
             webilastik.ui.workflow.ws_pixel_classification_workflow.__file__,
             f"--listen-socket={local_socket}",
             "tunnel",

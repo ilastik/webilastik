@@ -1,9 +1,13 @@
 {
-
+  "exclude": ["build/"],
+  "strict": ["webilastik/datasource", "webilastik/datasink"],
   "typeCheckingMode": "basic",
   "reportUnknownMemberType": false,
   "reportIncompatibleMethodOverride": true,
   "reportMissingTypeArgument": true,
+  "reportMissingTypeStubs": "warning",
+  "useLibraryCodeForTypes": true,
+
 
   "pythonVersion": "3.7",
   "pythonPlatform": "Linux"

@@ -1,28 +1,26 @@
-from abc import abstractmethod, ABC
+from abc import abstractmethod
+import sys
 import os
 import signal
 import asyncio
-from typing import Any, Dict, List, Optional, Mapping, cast, Sequence
+from typing import Iterable, List, Optional, Mapping, Sequence, Set
 import json
 from base64 import b64decode
+import ssl
 
-from ndstructs.datasource.PrecomputedChunksDataSource import PrecomputedChunksInfo
-from webilastik.scheduling.multiprocess_runner import MultiprocessRunner
+from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
+from webilastik.utility.url import Url
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonArray, ensureJsonObject, ensureJsonString
+from webilastik.scheduling.hashing_executor import HashingExecutor
 
-from aiohttp.web_response import BaseClass
-from ndstructs.array5D import Array5D
-from webilastik.classifiers.pixel_classifier import PixelClassifier, VigraPixelClassifier
-from webilastik import datasource
-from webilastik.datasource import datasource_from_url
-
-from ndstructs.datasource.DataSource import DataSource
+from webilastik.datasource import DataSource
 from webilastik.server.tunnel import ReverseSshTunnel
 from pathlib import Path
 import contextlib
 
 import aiohttp
 from aiohttp import web
-from ndstructs.datasource.DataRoi import DataRoi
+from webilastik.datasource import DataRoi
 
 from webilastik.features.channelwise_fastfilters import (
     StructureTensorEigenvalues,
@@ -32,109 +30,45 @@ from webilastik.features.channelwise_fastfilters import (
     HessianOfGaussianEigenvalues,
     LaplacianOfGaussian,
 )
-from webilastik.utility.serialization import ValueGetter, JSON_VALUE
 from webilastik.annotations.annotation import Annotation
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.annotations import Annotation
-from webilastik.ui.applet import Applet, CONFIRMER, Slot
-from webilastik.ui.applet.data_selection_applet import DataSelectionApplet
+from webilastik.ui.applet import Applet, Slot
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.ui.applet.brushing_applet import BrushingApplet
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
-from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow, PixelClassificationLane
+from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
 
-class WsAppletMixin(Applet):
-    @property
-    def websockets(self) -> List[web.WebSocketResponse]:
-        if not hasattr(self,"_websockets"):
-            self._websockets = cast(List[web.WebSocketResponse], [])
-        return self._websockets
 
+def _decode_datasource(datasource_json_b64_altchars_dash_underline: str) -> DataSource:
+    json_str = b64decode(datasource_json_b64_altchars_dash_underline.encode('utf8'), altchars=b'-_').decode('utf8')
+    return DataSource.from_json_value(json.loads(json_str))
+
+
+class WsApplet(Applet):
     @abstractmethod
-    def _get_json_state(self) -> JSON_VALUE:
+    def _get_json_state(self) -> JsonValue:
         pass
 
     @abstractmethod
-    def _set_json_state(self, state: JSON_VALUE):
+    def _set_json_state(self, state: JsonValue):
         pass
 
-    async def _update_remote(self):
-        bad_sockets : List[web.WebSocketResponse] = []
-        for websocket in self.websockets:
-            try:
-                state = self._get_json_state()
-                if state is not None:
-                    print(f"\033[32m  Updating remote {self.name} to following state:\n{json.dumps(state, indent=4)}  \033[0m")
-                    await websocket.send_str(json.dumps(state))
-            except ConnectionResetError as e:
-                print(f"!!!!!+++!!!! Got an exception while updating remote:\n{e}\n\nRemoving websocket...")
-                bad_sockets.append(websocket)
-        for bad_socket in bad_sockets:
-            self.websockets.remove(bad_socket)
+class WsBrushingApplet(WsApplet, BrushingApplet):
+    def _get_json_state(self) -> JsonValue:
+        return tuple(annotation.to_json_data() for annotation in self.annotations.get() or [])
 
-    async def _add_websocket(self, websocket: web.WebSocketResponse):
-        self.websockets.append(websocket)
-        await self._update_remote()
-        async for msg in websocket:
-            if msg.type == aiohttp.WSMsgType.TEXT:
-                if msg.data == 'close':
-                    await websocket.close()
-                else:
-                    try:
-                        payload = json.loads(msg.data)
-                        print(f"\033[34m Got new state:\n{json.dumps(payload, indent=4)}\n \033[0m")
-                        self._set_json_state(payload)
-                    except Exception as e:
-                        print(f"Exception happend on set state:\n\033[31m{e}\033[0m")
-                        # FIXME: show some error message
-                    finally:
-                        await self._update_remote()
-            elif msg.type == aiohttp.WSMsgType.BINARY:
-                print(f'Unexpected binary message')
-            elif msg.type == aiohttp.WSMsgType.ERROR:
-                print(f'ws connection closed with exception {websocket.exception()}')
-        self.websockets.remove(websocket)
-        print('websocket connection closed')
-        return websocket
-
-    def post_refresh(self, confirmer: CONFIRMER): #FIXME: this will fire even if something breaks downstream
-        super().post_refresh(confirmer)
-        asyncio.get_event_loop().create_task(self._update_remote())
-
-    def restore_snaphot(self, snap: Dict[str, Any]):
-        super().restore_snaphot(snap)
-        asyncio.get_event_loop().create_task(self._update_remote())
-
-
-class WsDataSelectionApplet(WsAppletMixin, DataSelectionApplet[PixelClassificationLane]):
-    def _get_json_state(self) -> JSON_VALUE:
-        return [lane.to_json_data() for lane in self.lanes.get() or []]
-
-    def _set_json_state(self, state: JSON_VALUE):
-        if not isinstance(state, list):
-            raise TypeError(f"Bad state value in {self.__class__.__name__}:\n", json.dumps(state))
-        return self.lanes.set_value(
-            [PixelClassificationLane.from_json_data(raw_lane) for raw_lane in state],
+    def _set_json_state(self, state: JsonValue):
+        self.annotations.set_value(
+            [Annotation.from_json_value(raw_annotation) for raw_annotation in ensureJsonArray(state)],
             confirmer=lambda msg: True
         )
 
 
-class WsBrushingApplet(WsAppletMixin, BrushingApplet):
-    def _get_json_state(self) -> JSON_VALUE:
-        return [annotation.to_json_data() for annotation in self.annotations.get() or []]
-
-    def _set_json_state(self, state: JSON_VALUE):
-        if not isinstance(state, list):
-            raise TypeError(f"Bad state value in {self.__class__.__name__}:\n", json.dumps(state))
-        return self.annotations.set_value(
-            [Annotation.from_json_data(raw_lane) for raw_lane in state],
-            confirmer=lambda msg: True
-        )
-
-
-class WsFeatureSelectionApplet(WsAppletMixin, FeatureSelectionApplet):
-    def _item_from_json_data(self, data: JSON_VALUE) -> IlpFilter:
-        class_name = ValueGetter.get_class_name(data=data)
+class WsFeatureSelectionApplet(WsApplet, FeatureSelectionApplet):
+    def _item_from_json_data(self, data: JsonValue) -> IlpFilter:
+        data_dict = ensureJsonObject(data)
+        class_name = ensureJsonString(data_dict.get("__class__"))
         if class_name == StructureTensorEigenvalues.__name__:
             return StructureTensorEigenvalues.from_json_data(data)
         if class_name == GaussianGradientMagnitude.__name__:
@@ -149,63 +83,51 @@ class WsFeatureSelectionApplet(WsAppletMixin, FeatureSelectionApplet):
             return LaplacianOfGaussian.from_json_data(data)
         raise ValueError(f"Could not convert {data} into a Feature Extractor")
 
-    def _get_json_state(self) -> JSON_VALUE:
-        return [extractor.to_json_data() for extractor in self.feature_extractors.get() or []]
+    def _get_json_state(self) -> JsonValue:
+        return tuple(extractor.to_json_data() for extractor in self.feature_extractors.get() or [])
 
-    def _set_json_state(self, state: JSON_VALUE):
-        if not isinstance(state, list):
-            raise TypeError(f"Bad state value in {self.__class__.__name__}:\n", json.dumps(state))
+    def _set_json_state(self, state: JsonValue):
+        raw_feature_array = ensureJsonArray(state)
         return self.feature_extractors.set_value(
-            [self._item_from_json_data(raw_lane) for raw_lane in state],
+            [self._item_from_json_data(raw_feature) for raw_feature in raw_feature_array],
             confirmer=lambda msg: True
         )
 
 
-class WsPredictingApplet(WsAppletMixin):
+class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
     def __init__(
         self,
         name: str,
         *,
-        pixel_classifier: Slot[VigraPixelClassifier[IlpFilter]],
-        datasources: Slot[Sequence[DataSource]],
-        runner: MultiprocessRunner,
+        feature_extractors: Slot[Sequence[IlpFilter]],
+        annotations: Slot[Sequence[Annotation]],
+        runner: HashingExecutor,
     ):
-        self._in_pixel_classifier = pixel_classifier
-        self._in_datasources = datasources
         self.runner = runner
-        self.datasource_cache: Dict[str, DataSource] = {}
-        super().__init__(name=name)
+        super().__init__(name=name, feature_extractors=feature_extractors, annotations=annotations)
 
-    def _get_json_state(self) -> JSON_VALUE:
-        classifier = self._in_pixel_classifier.get()
+    def _get_json_state(self) -> JsonValue:
+        classifier = self.pixel_classifier.get()
         if classifier:
             producer_is_ready = True
-            channel_colors = [color.to_json_data() for color in classifier.color_map.keys()]
+            channel_colors = tuple(color.to_json_data() for color in classifier.color_map.keys())
         else:
             producer_is_ready = False
-            channel_colors = []
+            channel_colors = tuple()
 
         return {
             "producer_is_ready": producer_is_ready,
             "channel_colors": channel_colors,
-            "datasources": [ds.to_json_data() for ds in self._in_datasources.get() or []],
         }
 
-    def _set_json_state(self, state: JSON_VALUE):
+    def _set_json_state(self, state: JsonValue):
         pass
 
-    def _decode_datasource(self, datasource_url_b64_altchars_dash_underline: str) -> DataSource:
-        if datasource_url_b64_altchars_dash_underline not in self.datasource_cache:
-            url = b64decode(datasource_url_b64_altchars_dash_underline.encode('utf8'), altchars=b'-_').decode('utf8')
-            datasource = datasource_from_url(url)
-            self.datasource_cache[datasource_url_b64_altchars_dash_underline] = datasource
-        return self.datasource_cache[datasource_url_b64_altchars_dash_underline]
-
     async def predictions_precomputed_chunks_info(self, request: web.Request):
-        classifier = self._in_pixel_classifier()
+        classifier = self.pixel_classifier()
         expected_num_channels = len(classifier.color_map)
         encoded_raw_data_url = str(request.match_info.get("encoded_raw_data")) # type: ignore
-        datasource = self._decode_datasource(encoded_raw_data_url)
+        datasource = _decode_datasource(encoded_raw_data_url)
 
         return web.Response(
             text=json.dumps({
@@ -217,7 +139,7 @@ class WsPredictingApplet(WsAppletMixin):
                     {
                         "key": "data",
                         "size": [int(v) for v in datasource.shape.to_tuple("xyz")],
-                        "resolution": [1, 1, 1],
+                        "resolution": datasource.spatial_resolution,
                         "voxel_offset": [0, 0, 0],
                         "chunk_sizes": [datasource.tile_shape.to_tuple("xyz")],
                         "encoding": "raw",
@@ -225,13 +147,14 @@ class WsPredictingApplet(WsAppletMixin):
                 ],
             }),
             headers={
-                "Cache-Control": "no-store"
+                "Cache-Control": "no-store, must-revalidate",
+                "Expires": "0",
             },
             content_type="application/json",
         )
 
     async def precomputed_chunks_compute(self, request: web.Request) -> web.Response:
-        encoded_raw_data_url = str(request.match_info.get("encoded_raw_data")) # type: ignore
+        encoded_raw_data = str(request.match_info.get("encoded_raw_data")) # type: ignore
         xBegin = int(request.match_info.get("xBegin")) # type: ignore
         xEnd = int(request.match_info.get("xEnd")) # type: ignore
         yBegin = int(request.match_info.get("yBegin")) # type: ignore
@@ -239,9 +162,9 @@ class WsPredictingApplet(WsAppletMixin):
         zBegin = int(request.match_info.get("zBegin")) # type: ignore
         zEnd = int(request.match_info.get("zEnd")) # type: ignore
 
-        datasource = self._decode_datasource(encoded_raw_data_url)
-        predictions = await self.runner.async_compute(
-            self._in_pixel_classifier().compute,
+        datasource = _decode_datasource(encoded_raw_data)
+        predictions = await self.runner.async_submit(
+            self.pixel_classifier().compute,
             DataRoi(datasource, x=(xBegin, xEnd), y=(yBegin, yEnd), z=(zBegin, zEnd))
         )
 
@@ -256,7 +179,8 @@ class WsPredictingApplet(WsAppletMixin):
             return web.Response(
                 body=prediction_png_bytes.getbuffer(),
                 headers={
-                    "Cache-Control": "no-store"
+                    "Cache-Control": "no-store, must-revalidate",
+                    "Expires": "0",
                 },
                 content_type="image/png",
             )
@@ -270,26 +194,22 @@ class WsPredictingApplet(WsAppletMixin):
         )
 
 
-
 class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
-    def __init__(self):
+    def __init__(self, ssl_context: Optional[ssl.SSLContext] = None):
+        self.ssl_context = ssl_context
+        self.websockets: List[web.WebSocketResponse] = []
         brushing_applet = WsBrushingApplet("brushing_applet")
         feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", datasources=brushing_applet.datasources)
-        pixel_classifier_applet = PixelClassificationApplet(
+        pixel_classifier_applet = WsPixelClassificationApplet(
             "pixel_classification_applet",
             feature_extractors=feature_selection_applet.feature_extractors,
             annotations=brushing_applet.annotations,
+            runner=HashingExecutor(num_workers=8),
         )
-        predicting_applet = WsPredictingApplet(
-            "predicting_applet",
-            pixel_classifier=pixel_classifier_applet.pixel_classifier,
-            datasources=brushing_applet.datasources,
-            runner=MultiprocessRunner(num_workers=8),
-        )
-        self.ws_applets : Mapping[str, WsAppletMixin] = {
+        self.wsapplets : Mapping[str, WsApplet] = {
             feature_selection_applet.name: feature_selection_applet,
             brushing_applet.name: brushing_applet,
-            predicting_applet.name: predicting_applet,
+            pixel_classifier_applet.name: pixel_classifier_applet,
         }
         super().__init__(
             feature_selection_applet=feature_selection_applet,
@@ -300,14 +220,14 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         self.app = web.Application()
         self.app.add_routes([
             web.get('/status', self.get_status),
-            web.get('/ws/{applet_name}', self.open_websocket), # type: ignore
+            web.get('/ws', self.open_websocket), # type: ignore
             web.get(
                 "/predictions/raw_data={encoded_raw_data}/run_id={run_id}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}",
-                predicting_applet.precomputed_chunks_compute
+                pixel_classifier_applet.precomputed_chunks_compute
             ),
             web.get(
                 "/predictions/raw_data={encoded_raw_data}/run_id={run_id}/info",
-                predicting_applet.predictions_precomputed_chunks_info
+                pixel_classifier_applet.predictions_precomputed_chunks_info
             ),
             web.post("/ilp_project", self.ilp_download),
             web.delete("/close", self.close_session),
@@ -352,13 +272,65 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         web.run_app(self.app, port=port, path=unix_socket_path)
 
     async def open_websocket(self, request: web.Request):
-        applet_name = str(request.match_info.get("applet_name"))  # type: ignore
-        if applet_name not in self.ws_applets:
-            raise ValueError(f"Bad applet name: {applet_name}")
-        applet = self.ws_applets[applet_name]
         websocket = web.WebSocketResponse()
         await websocket.prepare(request)
-        return await applet._add_websocket(websocket)
+        self.websockets.append(websocket)
+        await self._update_clients_state([websocket]) # when a new client connects, send it the current state
+        async for msg in websocket:
+            if msg.type == aiohttp.WSMsgType.TEXT:
+                if msg.data == 'close':
+                    await websocket.close()
+                    continue
+                try:
+                    payload = json.loads(msg.data)
+                    await self._update_local_state(new_state=payload, originator=websocket)
+                except Exception as e:
+                    print(f"Exception happened on set state:\n\033[31m{e}\033[0m")
+                    import traceback
+                    traceback.print_exc()
+                    await self._update_clients_state([websocket]) # restore last known good state of offending client
+            elif msg.type == aiohttp.WSMsgType.BINARY:
+                print(f'Unexpected binary message')
+            elif msg.type == aiohttp.WSMsgType.ERROR:
+                print(f'ws connection closed with exception {websocket.exception()}')
+        if websocket in self.websockets:
+            self.websockets.remove(websocket)
+        print('websocket connection closed')
+        return websocket
+
+    async def _update_local_state(self, new_state: JsonValue, originator: web.WebSocketResponse):
+        print(f"\033[34m Got new state:\n{json.dumps(new_state, indent=4)}\n \033[0m")
+        state_obj = ensureJsonObject(new_state)
+        # FIXME: sort applets maybe? only allow for a single applet update?
+        updated_wsapplets: Set[WsApplet] = set()
+        for applet_name, raw_applet_state in state_obj.items():
+            wsapplet = self.wsapplets[applet_name]
+            wsapplet._set_json_state(raw_applet_state)
+            updated_wsapplets.update([wsapplet])
+            updated_wsapplets.update([ap for ap in wsapplet.get_downstream_applets() if isinstance(ap, WsApplet)])
+
+        updated_state = {applet.name: applet._get_json_state() for applet in updated_wsapplets}
+        originator_updated_state = {key: value for key, value in updated_state.items() if key not in state_obj} # FIXME
+
+        for websocket in self.websockets:
+            try:
+                if websocket == originator:
+                    await websocket.send_str(json.dumps(originator_updated_state))
+                else:
+                    await websocket.send_str(json.dumps(updated_state))
+            except ConnectionResetError as e:
+                print(f"!!!!!+++!!!! Got an exception while updating remote:\n{e}\n\nRemoving websocket...")
+                self.websockets.remove(websocket)
+
+    async def _update_clients_state(self, websockets: Iterable[web.WebSocketResponse] = ()):
+        state : JsonObject = {applet.name: applet._get_json_state() for applet in self.wsapplets.values()}
+        print(f"\033[32m  Updating remote to following state:\n{json.dumps(state, indent=4)}  \033[0m")
+        for websocket in list(websockets):
+            try:
+                await websocket.send_str(json.dumps(state))
+            except ConnectionResetError as e:
+                print(f"!!!!!+++!!!! Got an exception while updating remote:\n{e}\n\nRemoving websocket...")
+                self.websockets.remove(websocket)
 
     async def ilp_download(self, request: web.Request):
         return web.Response(
@@ -385,33 +357,26 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         if not encoded_original_url:
             return web.Response(status=400, text="Missing parameter: url")
 
-        info_url = b64decode(encoded_original_url, altchars=b'-_').decode('utf8').lstrip("precomputed://").rstrip("/") + "/info"
-        print(f"+++++ Will request this info: {info_url}")
+        info_url = Url.parse(b64decode(encoded_original_url, altchars=b'-_').decode('utf8')).joinpath("info")
+        print(f"+++++ Will request this info: {info_url.schemeless_raw}", file=sys.stderr)
         async with aiohttp.ClientSession() as session:
-            async with session.get(info_url) as response:
+            async with session.get(info_url.schemeless_raw, ssl=self.ssl_context) as response:
                 response_text = await response.text()
                 if response.status // 100 != 2:
                     return web.Response(status=response.status, text=response_text)
-                info = PrecomputedChunksInfo.from_json(response_text)
+                info = PrecomputedChunksInfo.from_json_value(json.loads(response_text))
 
-        stripped_info = PrecomputedChunksInfo(
-            at_type=info.at_type,
-            type_=info.type_,
-            data_type=info.data_type,
-            num_channels=info.num_channels,
-            scales=[scale for scale in info.scales if tuple(scale.resolution) == resolution],
-        )
-        return web.json_response(stripped_info.to_json_data())
+        stripped_info = info.stripped(resolution=resolution)
+        return web.json_response(stripped_info.to_json_value())
 
     async def forward_chunk_request(self, request: web.Request) -> web.Response:
         """Redirects a precomp chunk request to the original URL"""
         encoded_original_url = request.match_info.get("encoded_original_url")
         if not encoded_original_url:
             return web.Response(status=400, text="Missing parameter: url")
-        info_url = b64decode(encoded_original_url, altchars=b'-_').decode('utf8').lstrip("precomputed://").rstrip("/")
-        rest = request.match_info.get("rest", "")
-        raise web.HTTPFound(location=f"{info_url}/{rest.lstrip('/')}")
-
+        info_url = Url.parse(b64decode(encoded_original_url, altchars=b'-_').decode('utf8'))
+        rest = request.match_info.get("rest", "").lstrip("/")
+        raise web.HTTPFound(location=info_url.joinpath(rest).schemeless_raw)
 
 
 if __name__ == '__main__':
@@ -419,6 +384,7 @@ if __name__ == '__main__':
 
     parser = ArgumentParser()
     parser.add_argument("--listen-socket", type=Path, required=True)
+    parser.add_argument("--ca-cert-path", "--ca_cert_path", help="Path to CA crt file. Useful e.g. for testing with mkcert")
 
     subparsers = parser.add_subparsers(required=False, help="tunnel stuff")
     tunnel_parser = subparsers.add_parser("tunnel", help="Creates a reverse tunnel to an orchestrator")
@@ -430,10 +396,19 @@ if __name__ == '__main__':
 
     mpi_rank = 0
     try:
-        from mpi4py import MPI
+        from mpi4py import MPI #type: ignore
         mpi_rank = MPI.COMM_WORLD.Get_rank()
     except ModuleNotFoundError:
         pass
+
+    ca_crt: Optional[str] = args.ca_cert_path or os.environ.get("CA_CERT_PATH")
+    ssl_context: Optional[ssl.SSLContext] = None
+
+    if ca_crt is not None:
+        if not Path(ca_crt).exists():
+            print(f"File not found: {ca_crt}", file=sys.stderr)
+            exit(1)
+        ssl_context = ssl.create_default_context(cafile=ca_crt)
 
     if "remote_username" in vars(args) and mpi_rank == 0:
         server_context = ReverseSshTunnel(
@@ -446,6 +421,6 @@ if __name__ == '__main__':
         server_context = contextlib.nullcontext()
 
     with server_context:
-        WsPixelClassificationWorkflow().run(
+        WsPixelClassificationWorkflow(ssl_context=ssl_context).run(
             unix_socket_path=str(args.listen_socket)
         )

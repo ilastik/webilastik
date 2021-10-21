@@ -3,26 +3,71 @@
 For motivation on the design decisions, have a look at the [presentation](https://docs.google.com/presentation/d/110_1IOqel1QU1aKrznDaZIT5Rr1HbTbUVOfxwVnFFO0/edit?usp=sharing)
 
 
-Webilastik heavily uses [ndstructs](https://github.com/ilastik/ndstructs) to have sane 5D arrays, slices and data sources.
+Webilastik heavily uses [ndstructs](https://github.com/ilastik/ndstructs) to have sane 5D arrays, points and slices.
 
 # Server
 
-In order to use ilastik over the web, a user must first allocate a session (which for now can run either locally as a separate process or remotely on CSCS). This session allocation is done by `webilastik/server/__init__.py` (see `examples/start_manager_for_local_sessions.sh` for an example on how to launch it). This executable is an HTTP handler that will itself spawn other HTTP servers, which are the user sessions, and those sessions will actually run computations for the user.
+In order to use ilastik over the web, a user must first allocate a session (which for now can run either locally as a separate process or remotely on CSCS). This session allocation is done by `webilastik/server/__init__.py`. This executable is an HTTP handler that will itself spawn other HTTP servers, which are the user sessions, and those sessions will actually run computations for the user.
 
-An HTTP server to expose webilastik should be configured with options analogous to those in `examples/nginx_session_proxy.conf`. The important thing to note is the redirection from requests of the form `session-<session-id>` to `http://unix:/tmp/to-session-$session_id`, since those unix sockets will tunnel back to the user sessions, which might be running in different machines than that which is hosting `webilastik/server/__init__.py`. Also, CORS must be enabled since ilastik will probably not be running on the same server as the viewer.
+An HTTP server to expose webilastik should be configured with options analogous to those in `package_tree/etc/nginx/sites-available/webilastik.conf`. The important thing to note is the redirection from requests of the form `session-<session-id>` to `http://unix:/tmp/to-session-$session_id`, since those unix sockets will tunnel back to the user sessions, which might be running in different machines than that which is hosting `webilastik/server/__init__.py`. Also, CORS must be enabled since ilastik will probably not be running on the same server as the viewer.
 
 # Client (Overlay)
 
 This project contains an npm project in `./overlay`, which can be used to build the ilastik client. It is an overlay that can be applied on top of neuroglancer or vanilla HTML `<img/>` tags (for now, via bookmarklet injection), and contains all controls required to request a session, add brush strokes, select image features and visualize predictions.
 
-There is a compiled neuroglancer at `overlay/public/nehuba/index.html` which can be accessed once the session allocation server is running (`webilastik/server/__init__.py`). You can access that and inject ilastik on top of it by first compiling the appropriate target in the overlay project (e.g.: `npm run bundle-ng-inject` or `npm run bundle-img-inject`), then adding the bookmarlets at `overlay/bookmarklets` to your bookmarks toolbar in your browser, and then just executing the bookmark once the page with neuroglancer is loaded.
+# Building
+ - Install build dependencies:
+    - [conda-pack](https://conda.github.io/conda-pack/) (for wrapping the cnoda environment)
+    - [go-task](https://taskfile.dev/#/installation) (make-like application to build the targets in Taskfile.yml)
+    - npm (for building neuroglancer and the overlay)
+ - Build the `.deb` package: `task create-deb-package`
+
+# Running
+ Right now webilastik _needs_ to run via HTTPS because, as it is meant to be used as an overlay, it must be able to set cookies in cross origin sites, and that is only posible (or at least, way easier) via HTTPS.
+
+## Production
+- Install nginx
+- Configure SSL if that's the first time setup (e.g.: `sudo certbot --nginx -d app.ilastik.org`)
+- Install the newly created `.deb` package: `sudo apt install ./webilastik*.deb`
+- And start the service if it doens't automatically: `systemctl start webilastik.service`
+
+## Local dev server
+Even the local server needs Nginx to be running. This is because webilastik allocates worker sessions for the users, and those sessions can be running in remote worker servers. These worker sessions create SSH tunnels on the main server, and nginx will redirect session requests into those tunnels sockets.
+
+- Install nginx
+- Add `webilastik.conf` to nginx configuration:
+    ```
+    cp package_tree/etc/nginx/sites-available/webilastik.conf /etc/nginx/sites-available/
+    ln -s /etc/nginx/sites-available/webilastik.conf /etc/nginx/sites-enabled/webilastik.conf
+    ```
+- Configure SSL:
+    - Add `127.0.0.1 app.ilastik.org` to your `/etc/hosts` file
+    - Install a ca cert and create a cert and key, probably via [mkcert](https://github.com/FiloSottile/mkcert):
+        - `mkcert -install`
+        - `mkcert app.ilastik.org # use the output files from this command in the next step`
+    - You can uncomment the following lines in `/etc/nginx/sites-enabled/webilastik.conf` and make them point to your cert and key generated by `mkcert`:
+        ```
+        #listen 443 ssl;
+        #ssl_certificate /etc/webilastik/cert.pem;
+        #ssl_certificate_key /etc/webilastik/cert-key.pem;
+        ```
+- Restart nginx after SSL is configured: `sudo systemctl restart nginx.service`
+
+- Run the "dev" server locally: `task start-local-server`. This task will do some basic checking to see if you have completed the previous steps before attempting to run the server. Now every time you edit something anywhere in the project you can just restart the server by re-running the `start-local-server` task.
+
+## Testing it out:
+
+Here's webilastik with a sample 2D image:
+
+https://app.ilastik.org/api/nehuba/index.html#!%7B%22layers%22:%5B%7B%22source%22:%22precomputed://https://app.ilastik.org/api/images/c_cells_2.precomputed%22%2C%22type%22:%22image%22%2C%22blend%22:%22default%22%2C%22name%22:%22c_cells_2.precomputed%22%7D%5D%2C%22navigation%22:%7B%22pose%22:%7B%22position%22:%7B%22voxelSize%22:%5B1%2C1%2C1%5D%2C%22voxelCoordinates%22:%5B348.5%2C225%2C0.5%5D%7D%7D%2C%22zoomFactor%22:1%7D%2C%22layout%22:%22xy%22%7D
+
 
 # Concepts
 
 
 ## Operators
 
-A refinement of the Operator concept in classic ilastik; they represent a lazy computation that usually can be applied to a `ndstructs.datasource.DataRoi`.
+A refinement of the Operator concept in classic ilastik; they represent a lazy computation that usually can be applied to a `webilastik.datasource.DataRoi`.
 
 Operators inherit from the base `Operator[IN, OUT]` class and must implement `.compute(roi: IN) -> OUT` . The most common implementation being `.compute(roi: DataRoi) -> Array5D` when dealing with operators that use halos. This means that once you have an operator instantiated, you can apply it over any slice of any `DataSource` and the operator will be able to retrieve any extra data if needs from the `DataRoi` object.
 

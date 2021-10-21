@@ -10,7 +10,8 @@ from http.server import SimpleHTTPRequestHandler
 
 import pytest
 
-from webilastik.filesystem import HttpPyFs
+from webilastik.filesystem.http_fs import HttpFs
+from webilastik.utility.url import Url
 
 
 def eprint(*args, **kwargs):
@@ -47,7 +48,7 @@ def start_test_server(tmp_path: Path, port: int) -> HTTPServer:
 def test_httpfs(tmp_path):
     httpd = start_test_server(tmp_path, port=8123)
     try:
-        fs = HttpPyFs("http://localhost:8123/")
+        fs = HttpFs(read_url=Url.parse("http://localhost:8123/"))
 
         eprint("  -->  Opening some file...")
         with fs.openbin("/dir1/file1.txt", "r") as f:
@@ -57,14 +58,14 @@ def test_httpfs(tmp_path):
         dir1 = fs.opendir("dir2")
         assert dir1.openbin("file2.txt", "r").read() == "file2_contents".encode("ascii")
 
-        fs2 = HttpPyFs("http://localhost:8123/dir1")
+        fs2 = HttpFs(read_url=Url.parse("http://localhost:8123/dir1"))
         assert fs2.desc("file2.txt") == "http://localhost:8123/dir1/file2.txt"
 
         # check that "/" maps to the base url that was used to create the filesystem
         assert fs2.desc("/file2.txt") == "http://localhost:8123/dir1/file2.txt"
 
         #check that .. works even when creating the fs
-        fs_updir = HttpPyFs("http://localhost:8123/dir1/..")
+        fs_updir = HttpFs(read_url=Url.parse("http://localhost:8123/dir1/.."))
         with fs_updir.openbin("dir1/file1.txt", "r") as f:
             assert f.read() == "file1_contents".encode("ascii")
 

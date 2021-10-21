@@ -3,7 +3,7 @@ import numpy as np
 from typing import Optional, Set
 
 from ndstructs import Array5D, Interval5D, ScalarData
-from ndstructs.datasource import DataRoi
+from webilastik.datasource import DataRoi
 
 from webilastik.operator import Operator, OpRetriever
 

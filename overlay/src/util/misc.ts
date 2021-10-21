@@ -316,3 +316,19 @@ export function show_if_changed(key: string, value: any, suffix = ""){
         console.log(`===> ${key} is now ${str_value} ${suffix}`)
     }
 }
+
+export class StaleResult<T>{
+    constructor(public readonly result: T){}
+}
+
+const asyncReferences = new Map<string, number>()
+
+export async function awaitStalable<T>(params: {referenceKey: string, callable: () => Promise<T>}): Promise<T | StaleResult<T>> {
+    const localReference = performance.now()
+    asyncReferences.set(params.referenceKey, localReference)
+    const result = await params.callable()
+    if(localReference !== asyncReferences.get(params.referenceKey)){
+        return new StaleResult(result)
+    }
+    return result
+}
