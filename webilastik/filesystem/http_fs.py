@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 import io
-from typing import Collection, Dict, List, Any, Optional, Tuple, Union
+from typing import Collection, Dict, List, Any, Mapping, Optional, Tuple, Union
 import requests
 from requests import HTTPError
 import sys
@@ -25,15 +25,19 @@ def eprint(*args, **kwargs):
 
 
 class HttpFs(JsonableFilesystem):
-    def __init__(self, read_url: Url, write_url: Optional[Url] = None):
+    def __init__(self, read_url: Url, write_url: Optional[Url] = None, headers: Optional[Mapping[str, str]] = None):
         super().__init__()
         self.read_url = read_url
         self.write_url = write_url or read_url
+
         if not set([self.read_url.protocol, self.write_url.protocol]).issubset([Protocol.HTTP, Protocol.HTTPS]):
             raise ValueError("Can only handle http procotols")
         self.requests_verify: Union[str, bool] = os.environ.get("CA_CERT_PATH", True)
         if isinstance(self.requests_verify, str) and not Path(self.requests_verify).exists():
             raise ValueError(f"CA_CERT_PATH '{self.requests_verify}' not found")
+
+        self.session = requests.Session()
+        self.session.headers.update(headers or {})
 
     def to_json_value(self) -> JsonObject:
         return {
@@ -46,9 +50,16 @@ class HttpFs(JsonableFilesystem):
     def from_json_value(cls, value: JsonValue) -> "JsonableFilesystem":
         value_obj = ensureJsonObject(value)
         raw_write_url = value_obj.get("write_url")
+        raw_headers = value_obj.get("headers")
+        if raw_headers is None:
+            headers = {}
+        else:
+            headers_obj = ensureJsonObject(raw_headers)
+            headers = {ensureJsonString(k): ensureJsonString(v) for k,v in headers_obj.items()}
         return cls(
             read_url=Url.parse(ensureJsonString(value_obj.get("read_url"))),
-            write_url=None if raw_write_url is None else Url.parse(ensureJsonString(raw_write_url))
+            write_url=None if raw_write_url is None else Url.parse(ensureJsonString(raw_write_url)),
+            headers=headers,
         )
 
     def __getstate__(self) -> JsonObject:
@@ -58,6 +69,7 @@ class HttpFs(JsonableFilesystem):
         self.__init__(
             read_url=Url.parse(data["read_url"]),
             write_url=Url.parse(data["write_url"]),
+            headers=data["headers"],
         )
 
     def desc(self, path: str) -> str:
@@ -69,7 +81,7 @@ class HttpFs(JsonableFilesystem):
     def _delete_object(self, subpath: str) -> None:
         full_path = self.write_url.concatpath(subpath)
         eprint(f"Removing object at {full_path}")
-        resp = requests.delete(full_path.raw, verify=self.requests_verify)
+        resp = self.session.delete(full_path.raw, verify=self.requests_verify)
         resp.raise_for_status()
 
     def _put_object(self, subpath: str, contents: bytes):
@@ -86,20 +98,20 @@ class HttpFs(JsonableFilesystem):
         #     if e.response.status_code == 404:
         #         pass
 
-        response = requests.put(
+        response = self.session.put(
             full_path.raw, data=contents, headers={"Content-Type": "application/octet-stream"}, verify=self.requests_verify
         )
         response.raise_for_status()
 
     def _get_object(self, subpath: str) -> Tuple["CaseInsensitiveDict[str]", bytes]:
         full_path = self.read_url.concatpath(subpath)
-        response = requests.get(full_path.raw, verify=self.requests_verify)
+        response = self.session.get(full_path.raw, verify=self.requests_verify)
         response.raise_for_status()
         return response.headers, response.content
 
     def _head_object(self, subpath: str) -> "CaseInsensitiveDict[str]":
         full_path = self.read_url.concatpath(subpath)
-        resp = requests.head(full_path.raw, verify=self.requests_verify)
+        resp = self.session.head(full_path.raw, verify=self.requests_verify)
         if resp.status_code == 404:
             raise ResourceNotFound(subpath)
         else:
