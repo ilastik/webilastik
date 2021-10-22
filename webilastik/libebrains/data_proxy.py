@@ -1,62 +1,21 @@
-import json
 from pathlib import PurePosixPath
-from typing import Any, Mapping, Optional, Union, Dict, List
+import io
+from typing import Any, Collection, Optional, Union, Dict, List
 from datetime import datetime
 
-import aiohttp
-from ndstructs.utils.json_serializable import JsonValue, ensureJsonInt, ensureJsonObject, ensureJsonString
 import requests
-from webilastik.filesystem.http_fs import HttpFs
+from fs.base import FS
+from fs.subfs import SubFS
+from fs.info import Info
+from fs.errors import ResourceNotFound
+from fs.permissions import Permissions
+from fs.enums import ResourceType
+from ndstructs.utils.json_serializable import JsonValue, ensureJsonInt, ensureJsonObject, ensureJsonString, ensureJsonArray
 
+from webilastik.filesystem.RemoteFile import RemoteFile
 from webilastik.libebrains.user_token import UserToken
 from webilastik.utility.url import Url
 
-HtmlParams = Mapping[str, Union[str, List[str]]]
-HtmlHeaders = Mapping[str, str]
-
-def _clean_params(params: Mapping[str, Any]) -> Dict[str, str]:
-    return {key: str(value) for key, value in params.items() if value is not None}
-
-class Bucket:
-    def __init__(
-        self, name: str, user_token: UserToken, session: aiohttp.ClientSession
-    ):
-        self._api_url = Url.parse("https://data-proxy.ebrains.eu/api")
-        self.name = name
-        self.user_token = user_token
-        self.session = session
-
-    async def _get(
-        self, endpoint: str, *, params: Optional[HtmlParams] = None, headers: Optional[HtmlHeaders] = None
-    ) -> JsonValue:
-        headers = {**(headers or {}), **self.user_token.as_auth_header()}
-        async with self.session.get(self._api_url.joinpath(endpoint).raw, params=params or {}, headers=headers) as response:
-            response.raise_for_status()
-            return await response.json()
-
-    async def list_objects(
-        self,
-        *,
-        prefix: Optional[str] = None,
-        delimiter: Optional[str] = None,
-        limit: Optional[int] = None,
-    ): # FIXME
-        data = await self._get(f"buckets/{self.name}", params=_clean_params({"prefix": prefix, "delimiter": delimiter, "limit": limit}))
-        print(json.dumps(data, indent=4))
-
-    async def get_temp_url(
-        self, *, prefix: Optional[str] = None, lifetime: str = "very_long"
-    ): # FIXME
-        data = await self._get(f"tempurl/{self.name}", params=_clean_params({"lifetime": lifetime, "prefix": prefix}))
-        print(json.dumps(data, indent=4))
-
-    @staticmethod
-    def default_bucket(*, user_token: UserToken, session: aiohttp.ClientSession) -> "Bucket":
-        return Bucket(
-            name="hbp-image-service",
-            user_token=user_token,
-            session=session,
-        )
 
 class BucketObject:
     def __init__(
@@ -94,25 +53,141 @@ class BucketObject:
             "content_type": self.content_type,
         }
 
-class BucketFs(HttpFs):
-    def __init__(self, bucket: Bucket):
-        super().__init__(
-            read_url=bucket._api_url.concatpath(f"buckets/{bucket.name}").updated_with(search={"redirect": "true"}),
-            write_url=bucket._api_url.concatpath(f"buckets/{bucket.name}"),
-            headers=bucket.user_token.as_auth_header()
+class BucketSubdir:
+    def __init__(self, subdir: PurePosixPath):
+        self.subdir = subdir
+        # self.bytes = bytes
+        # self.last_modified = last_modified
+        # self.objects_count = objects_count
+
+    @property
+    def name(self) -> str:
+        return str(self.subdir) + "/"
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "BucketSubdir":
+        value_obj = ensureJsonObject(value)
+        return BucketSubdir(
+            subdir=PurePosixPath(ensureJsonString(value_obj.get("subdir")))
         )
-        self.writing_session = requests.Session()
 
-    def _put_object(self, subpath: str, contents: bytes) -> requests.Response:
-        full_path = self.write_url.concatpath(subpath)
-        assert full_path.raw != "/"
+class BucketFs(FS):
+    API_URL = Url.parse("https://data-proxy.ebrains.eu/api/buckets")
 
-        response = self.session.put(full_path.raw, verify=self.requests_verify)
-        response.raise_for_status()
-        tmp_url = response.json()["url"]
+    def __init__(self, bucket_name: str, prefix: PurePosixPath, ebrains_user_token: UserToken):
+        self.bucket_name = bucket_name
+        self.prefix = prefix
+        self.ebrains_user_token = ebrains_user_token
+        self.bucket_url = self.API_URL.concatpath(bucket_name)
+        self.url = self.bucket_url.concatpath(prefix)
+        super().__init__()
 
-        response = self.writing_session.put(
-            tmp_url, data=contents, headers={"Content-Type": "application/octet-stream"}, verify=self.requests_verify
+        self.session = requests.Session()
+        self.session.headers.update(ebrains_user_token.as_auth_header())
+        self.write_session = requests.Session()
+
+    def _make_prefix(self, subpath: str) -> PurePosixPath:
+        return self.prefix.joinpath(
+            str(PurePosixPath("/").joinpath(subpath)).lstrip("/")
         )
+
+    def _list_objects(self, *, prefix: str, limit: int = 50) -> List[Union[BucketObject, BucketSubdir]]:
+        list_objects_path = self.bucket_url.updated_with(extra_search={
+            "delimiter": "/",
+            "prefix": prefix.lstrip("/"),
+            "limit": str(limit)
+        })
+        response = self.session.get(list_objects_path.raw)
         response.raise_for_status()
-        return response
+        payload_obj = ensureJsonObject(response.json())
+        raw_objects = ensureJsonArray(payload_obj.get("objects"))
+
+        items: List[Union[BucketObject, BucketSubdir]] = []
+        for raw_obj in raw_objects:
+            if "subdir" in ensureJsonObject(raw_obj):
+                items.append(BucketSubdir.from_json_value(raw_obj))
+            else:
+                items.append(BucketObject.from_json_value(raw_obj))
+        return items
+
+    def _get_tmp_url(self, path: str) -> Optional[Url]:
+        object_url = self.url.concatpath(path)
+        response = self.session.get(object_url.raw)
+
+        if response.status_code == 200:
+            response_obj = ensureJsonObject(response.json())
+            return Url.parse(ensureJsonString(response_obj.get("url")))
+        if response.status_code == 404:
+            return None
+        response.raise_for_status()
+        return None # FIXME?
+
+    def getinfo(self, path: str, namespaces: Optional[Collection[str]] = ("basic",)) -> Info:
+        if self._get_tmp_url(path) != None:
+            is_dir = False
+        else:
+            sub_items = self.listdir(path)
+            if len(sub_items) == 0:
+                raise ResourceNotFound(path)
+            else:
+                is_dir = True
+
+        return Info(
+            raw_info={
+                "basic": {
+                    "name": PurePosixPath(path).name,
+                    "is_dir": is_dir,
+                },
+                "details": {"type": ResourceType.directory if is_dir else ResourceType.file},
+            }
+        )
+
+    def listdir(self, path: str) -> List[str]:
+        prefix = str(self._make_prefix(path))
+        if not prefix.endswith("/"):
+            prefix += "/"
+        return [str(item.name) for item in self._list_objects(prefix=prefix)]
+
+    def makedir(self, path: str, permissions: Optional[Permissions] = None, recreate: bool = False) -> SubFS[FS]:
+        return BucketFs(
+            bucket_name=self.bucket_name, prefix=self._make_prefix(path), ebrains_user_token=self.ebrains_user_token
+        ) #type: ignore
+
+    def openbin(self, path: str, mode: str = "r", buffering: int = -1, **options: Dict[str, Any]) -> RemoteFile:
+        def close_callback(f: RemoteFile):
+            if mode == "r":
+                return
+            f.seek(0)
+            payload = f.read()
+            url = self.url.concatpath(path).raw
+            response = self.session.put(url)
+            response.raise_for_status()
+            response_obj = ensureJsonObject(response.json())
+            url = ensureJsonString(response_obj.get("url"))
+            response = self.write_session.put(url, data=payload)
+            response.raise_for_status()
+
+        contents = bytes()
+        if mode in ("r", "r+", "w+", "a", "a+"):
+            try:
+                response = self.session.get(self.url.concatpath(path).updated_with(extra_search={"redirect": "true"}).raw)
+                response.raise_for_status()
+                contents = response.content
+            except requests.HTTPError as e:
+                if e.response.status_code == 404 and "r" in mode:
+                    raise ResourceNotFound(path) from e
+        remote_file = RemoteFile(close_callback=close_callback, mode=mode, data=contents)
+        if "a" in mode:
+            remote_file.seek(0, io.SEEK_END)
+        return remote_file
+
+    def remove(self, path: str) -> None:
+        self.session.delete(self.url.concatpath(path).raw).raise_for_status()
+
+    def removedir(self, path: str) -> None:
+        raise NotImplemented
+        return super().removedir(path)
+
+    def setinfo(self, path: str, info) -> None:
+        raise NotImplemented
+        return super().setinfo(path, info)
