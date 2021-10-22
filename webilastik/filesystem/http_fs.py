@@ -84,7 +84,7 @@ class HttpFs(JsonableFilesystem):
         resp = self.session.delete(full_path.raw, verify=self.requests_verify)
         resp.raise_for_status()
 
-    def _put_object(self, subpath: str, contents: bytes):
+    def _put_object(self, subpath: str, contents: bytes) -> requests.Response:
         full_path = self.write_url.concatpath(subpath)
         assert full_path.raw != "/"
 
@@ -102,6 +102,7 @@ class HttpFs(JsonableFilesystem):
             full_path.raw, data=contents, headers={"Content-Type": "application/octet-stream"}, verify=self.requests_verify
         )
         response.raise_for_status()
+        return response
 
     def _get_object(self, subpath: str) -> Tuple["CaseInsensitiveDict[str]", bytes]:
         full_path = self.read_url.concatpath(subpath)

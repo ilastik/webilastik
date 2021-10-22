@@ -1,5 +1,5 @@
 from pathlib import PurePosixPath
-from typing import Optional, Mapping, Union
+from typing import Dict, Optional, Mapping, Union
 
 import requests
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, JsonableValue, ensureJsonObject
@@ -33,6 +33,9 @@ class UserToken:
         # self.session_state = session_state
         # self.scope = scope
 
+    def as_auth_header(self) -> Dict[str, str]:
+        return {"Authorization": f"Bearer {self.access_token}"}
+
     def _get(
         self,
         path: PurePosixPath,
@@ -47,7 +50,7 @@ class UserToken:
             params={**url.search, **(params or {})},
             headers={
                 **(headers or {}),
-                "Authorization": f"Bearer {self.access_token}",
+                **self.as_auth_header(),
             },
             verify=https_verify,
         )
