@@ -420,7 +420,6 @@ class SkimageDataSource(ArrayDataSource):
         )
 
     def __getstate__(self) -> JsonObject:
-        print(json.dumps(self.to_json_value(), indent=4))
         return self.to_json_value()
 
     def __setstate__(self, data: JsonObject):
