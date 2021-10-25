@@ -10,7 +10,8 @@ from fs.info import Info
 from fs.errors import ResourceNotFound
 from fs.permissions import Permissions
 from fs.enums import ResourceType
-from ndstructs.utils.json_serializable import JsonValue, ensureJsonInt, ensureJsonObject, ensureJsonString, ensureJsonArray
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonInt, ensureJsonObject, ensureJsonString, ensureJsonArray
+from webilastik.filesystem import JsonableFilesystem
 
 from webilastik.filesystem.RemoteFile import RemoteFile
 from webilastik.libebrains.user_token import UserToken
@@ -71,7 +72,8 @@ class BucketSubdir:
             subdir=PurePosixPath(ensureJsonString(value_obj.get("subdir")))
         )
 
-class BucketFs(FS):
+
+class BucketFs(JsonableFilesystem):
     API_URL = Url.parse("https://data-proxy.ebrains.eu/api/buckets")
 
     def __init__(self, bucket_name: str, prefix: PurePosixPath, ebrains_user_token: UserToken):
@@ -153,6 +155,9 @@ class BucketFs(FS):
             bucket_name=self.bucket_name, prefix=self._make_prefix(path), ebrains_user_token=self.ebrains_user_token
         ) #type: ignore
 
+    def makedirs(self, path: str, permissions: Optional[Permissions] = None, recreate: bool = False) -> SubFS[FS]:
+        return self.makedir(path=path, permissions=permissions, recreate=recreate)
+
     def openbin(self, path: str, mode: str = "r", buffering: int = -1, **options: Dict[str, Any]) -> RemoteFile:
         def close_callback(f: RemoteFile):
             if mode == "r":
@@ -191,3 +196,30 @@ class BucketFs(FS):
     def setinfo(self, path: str, info) -> None:
         raise NotImplemented
         return super().setinfo(path, info)
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "BucketFs":
+        value_obj = ensureJsonObject(value)
+        return BucketFs(
+            bucket_name=ensureJsonString(value_obj.get("bucket_name")),
+            prefix=PurePosixPath(ensureJsonString(value_obj.get("prefix"))),
+            ebrains_user_token=UserToken.from_json_value(value_obj.get("ebrains_user_token"))
+        )
+
+    def __setstate__(self, value_obj: Dict[str, Any]):
+        self.__init__(
+            bucket_name=ensureJsonString(value_obj.get("bucket_name")),
+            prefix=PurePosixPath(ensureJsonString(value_obj.get("prefix"))),
+            ebrains_user_token=UserToken.from_json_value(value_obj.get("ebrains_user_token"))
+        )
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": self.__class__.__name__,
+            "bucket_name": self.bucket_name,
+            "prefix": self.prefix.as_posix(),
+            "ebrains_user_token": self.ebrains_user_token.to_json_value(),
+        }
+
+    def __getstate__(self) -> JsonObject:
+        return self.to_json_value()
