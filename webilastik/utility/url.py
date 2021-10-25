@@ -195,8 +195,9 @@ class Url:
         return self.updated_with(path=self.path / subpath)
 
     def concatpath(self, subpath: Union[str, PurePosixPath]) -> "Url":
-        """Always concatenates path, even if subpath starts with a /"""
-        return self.joinpath(str(subpath).lstrip("/"))
+        """Always concatenates path, event if starting with '/'. Disallows going up the path with .."""
+        fixed_subpath = PurePosixPath("/").joinpath(subpath).as_posix().lstrip("/")
+        return self.joinpath(fixed_subpath)
 
     def ensure_datascheme(self, datascheme: DataScheme) -> "Url":
         if self.datascheme != datascheme:
