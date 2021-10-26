@@ -38,6 +38,8 @@ from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.ui.applet.brushing_applet import BrushingApplet
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
 from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
+from webilastik.libebrains.user_token import UserToken
+
 
 
 def _decode_datasource(datasource_json_b64_altchars_dash_underline: str) -> DataSource:
@@ -195,8 +197,9 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
 
 
 class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
-    def __init__(self, ssl_context: Optional[ssl.SSLContext] = None):
+    def __init__(self, ebrains_user_token: UserToken, ssl_context: Optional[ssl.SSLContext] = None):
         self.ssl_context = ssl_context
+        self.ebrains_user_token = ebrains_user_token
         self.websockets: List[web.WebSocketResponse] = []
         brushing_applet = WsBrushingApplet("brushing_applet")
         feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", datasources=brushing_applet.datasources)
@@ -383,6 +386,7 @@ if __name__ == '__main__':
     from argparse import ArgumentParser
 
     parser = ArgumentParser()
+    parser.add_argument("--ebrains-access-token", type=str, required=True)
     parser.add_argument("--listen-socket", type=Path, required=True)
     parser.add_argument("--ca-cert-path", "--ca_cert_path", help="Path to CA crt file. Useful e.g. for testing with mkcert")
 
@@ -421,6 +425,9 @@ if __name__ == '__main__':
         server_context = contextlib.nullcontext()
 
     with server_context:
-        WsPixelClassificationWorkflow(ssl_context=ssl_context).run(
-            unix_socket_path=str(args.listen_socket)
+        WsPixelClassificationWorkflow(
+            ebrains_user_token=UserToken(access_token=args.ebrains_access_token),
+            ssl_context=ssl_context
+        ).run(
+            unix_socket_path=str(args.listen_socket),
         )

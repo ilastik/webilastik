@@ -181,7 +181,7 @@ tasks:
         --master-host=localhost
         --master-username=www-data
         --external-url=https://app.ilastik.org/
-        --oidc-client-json=skip
+        --oidc-client-json=/etc/webilastik/oidc_client.json
 
   clean:
     - rm -rf {{.BUILD_DIR}}/*

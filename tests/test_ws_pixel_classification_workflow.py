@@ -23,6 +23,7 @@ from webilastik.annotations import Annotation, Color
 from webilastik.filesystem.http_fs import HttpFs
 from webilastik.datasource import SkimageDataSource
 from webilastik.utility.url import Url
+from webilastik.server import EbrainsSession
 
 
 finished = False
@@ -36,8 +37,9 @@ async def read_server_status(websocket: ClientWebSocketResponse):
 async def main():
     ds = SkimageDataSource(filesystem=HttpFs(read_url=Url.parse("https://app.ilastik.org/")), path=Path("api/images/c_cells_1.png"))
 
-    async with aiohttp.ClientSession() as session:
-
+    async with aiohttp.ClientSession(
+        cookies={EbrainsSession.AUTH_COOKIE_KEY: os.environ["EBRAINS_ACCESS_TOKEN"]}
+    ) as session:
         print(f"Creating new session--------------")
         async with session.post(f"https://app.ilastik.org/api/session", json={"session_duration": 30}) as response:
             response.raise_for_status()
@@ -69,7 +71,6 @@ async def main():
             })
             print("done sending feature extractors<<<<<")
 
-            asyncio.get_event_loop().create_task(read_server_status(ws))
             print("sending some annotations=======")
             brush_strokes = [
                 Annotation.interpolate_from_points(

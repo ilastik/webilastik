@@ -8,6 +8,7 @@ from typing import Type, TypeVar, Generic
 import uuid
 from uuid import UUID
 import sys
+from webilastik.libebrains.user_token import UserToken
 
 import webilastik.ui.workflow.ws_pixel_classification_workflow
 
@@ -26,6 +27,7 @@ class Session(ABC):
         master_host: str,
         socket_at_master: Path,
         time_limit_seconds: int,
+        ebrains_user_token: UserToken,
     ) -> "Session": # SELF:
         pass
 
@@ -46,11 +48,13 @@ class LocalSession(Session):
         master_host: str,
         socket_at_master: Path,
         time_limit_seconds: int,
+        ebrains_user_token: UserToken,
     ) -> "LocalSession":
         local_socket = Path(f"/tmp/{session_id}-to-master")
         process = await asyncio.create_subprocess_exec(
             sys.executable,
             webilastik.ui.workflow.ws_pixel_classification_workflow.__file__,
+            f"--ebrains-access-token={ebrains_user_token.access_token}",
             f"--listen-socket={local_socket}",
             "tunnel",
             f"--remote-username={master_username}",
