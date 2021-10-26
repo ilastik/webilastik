@@ -84,6 +84,7 @@ class Job(Generic[IN, OUT]):
 
     def to_json_value(self) -> JsonObject:
         return {
+            "name": self.name,
             "job_id": str(self.job_id),
             "total_num_steps": self.total_num_steps,
             "finished_step_count": self.finished_step_count,
