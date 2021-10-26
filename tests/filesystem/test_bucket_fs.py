@@ -21,13 +21,13 @@ from webilastik.datasource import DataRoi, DataSource, SkimageDataSource
 from webilastik.filesystem.http_fs import HttpFs
 from webilastik.utility.url import Url
 
-# @pytest.fixture(scope="session")
+@pytest.fixture(scope="session")
 def ebrains_user_token() -> UserToken:
     return UserToken(
         access_token=os.environ["EBRAINS_ACCESS_TOKEN"]
     )
 
-# @pytest.fixture(scope="session")
+@pytest.fixture(scope="session")
 def bucket_fs(ebrains_user_token: UserToken) -> BucketFs:
     now = datetime.datetime.now()
     now_str = f"{now.year:02}y{now.month:02}m{now.day:02}d__{now.hour:02}h{now.minute:02}m{now.second:02}s"
@@ -37,7 +37,7 @@ def bucket_fs(ebrains_user_token: UserToken) -> BucketFs:
         ebrains_user_token=ebrains_user_token
     )
 
-# @pytest.fixture(scope="session")
+@pytest.fixture(scope="session")
 def raw_data_source() -> SkimageDataSource:
     return SkimageDataSource(
         path=Path("c_cells_1.png"),
@@ -88,7 +88,7 @@ def test_bucket_read_write(raw_data_source: SkimageDataSource, bucket_fs: Bucket
     assert np.all(retrieved_data.raw("yxc") == raw_data_source.retrieve().raw("yxc"))
 
 
-test_bucket_read_write(
-    raw_data_source=raw_data_source(),
-    bucket_fs=bucket_fs(ebrains_user_token())
-)
+# test_bucket_read_write(
+#     raw_data_source=raw_data_source(),
+#     bucket_fs=bucket_fs(ebrains_user_token())
+# )
