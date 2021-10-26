@@ -8,16 +8,12 @@ from pathlib import Path
 import aiohttp
 import asyncio
 import json
-import uuid
-from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, Any, Optional
-import subprocess
-import ssl
+from typing import Dict, Any
 
 import numpy as np
 from aiohttp.client_ws import ClientWebSocketResponse
-from ndstructs.point5D import Interval5D, Shape5D
-from ndstructs import Array5D, Point5D
+from ndstructs.point5D import Shape5D, Point5D
+from ndstructs.array5D import Array5D
 
 from webilastik.annotations import Annotation, Color
 from webilastik.filesystem.http_fs import HttpFs
@@ -102,29 +98,42 @@ async def main():
             print("done sending annotations<<<<<")
 
 
-        from base64 import b64encode
-        encoded_ds: str = b64encode(json.dumps(ds.to_json_value()).encode("utf8"), altchars=b'-_').decode("utf8")
+            from base64 import b64encode
+            encoded_ds: str = b64encode(json.dumps(ds.to_json_value()).encode("utf8"), altchars=b'-_').decode("utf8")
 
-        response_tasks = {}
-        for tile in ds.roi.get_tiles(tile_shape=Shape5D(x=256, y=256, c=2), tiles_origin=Point5D.zero()):
-            url = f"{session_url}/predictions/raw_data={encoded_ds}/run_id=123456/data/{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_0-1"
-            print(f"---> Requesting {url}")
-            response_tasks[tile] = session.get(url)
+            response_tasks = {}
+            for tile in ds.roi.get_tiles(tile_shape=Shape5D(x=256, y=256, c=2), tiles_origin=Point5D.zero()):
+                url = f"{session_url}/predictions/raw_data={encoded_ds}/run_id=123456/data/{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_0-1"
+                print(f"---> Requesting {url}")
+                response_tasks[tile] = session.get(url)
 
-        for tile, resp in response_tasks.items():
-            async with resp as response:
-                print("Status:", response.status)
-                print("Content-type:", response.headers['content-type'])
+            for tile, resp in response_tasks.items():
+                async with resp as response:
+                    print("Status:", response.status)
+                    print("Content-type:", response.headers['content-type'])
 
-                tile_bytes = await response.content.read()
-                print(f"Got predictions<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+                    tile_bytes = await response.content.read()
+                    print(f"Got predictions<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 
-                raw_data = np.frombuffer(tile_bytes, dtype=np.uint8).reshape(2, tile.shape.y, tile.shape.x)
-                a = Array5D(raw_data, axiskeys="cyx")
-                # a.show_channels()
+                    raw_data = np.frombuffer(tile_bytes, dtype=np.uint8).reshape(2, tile.shape.y, tile.shape.x)
+                    a = Array5D(raw_data, axiskeys="cyx")
+                    # a.show_channels()
 
-            global finished;
-            finished = True
+            import time
+
+            url = f"{session_url}/export"
+            print(f"---> Scheduling a job at {url}:")
+            resp = await session.post(url, json={
+                "raw_data": ds.to_json_value(),
+                "bucket_name": "hbp-image-service",
+                "prefix": f"job_output_{int(time.time())}.precomputed",
+            })
+            resp.raise_for_status()
+            print(f"---> Job successfully scheduled?")
+            await asyncio.sleep(10)
+
+        global finished;
+        finished = True
 
 
 

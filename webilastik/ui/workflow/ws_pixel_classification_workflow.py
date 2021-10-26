@@ -1,27 +1,36 @@
 from abc import abstractmethod
+from dataclasses import dataclass
+from functools import partial
+import time
 import sys
 import os
 import signal
 import asyncio
-from typing import Iterable, List, Optional, Mapping, Sequence, Set
+from typing import Dict, Iterable, List, Optional, Mapping, Sequence, Set
 import json
 from base64 import b64decode
 import ssl
-
-from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
-from webilastik.utility.url import Url
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonArray, ensureJsonObject, ensureJsonString
-from webilastik.scheduling.hashing_executor import HashingExecutor
-
-from webilastik.datasource import DataSource
-from webilastik.server.tunnel import ReverseSshTunnel
-from pathlib import Path
+import uuid
+from aiohttp import web
+import numpy as np
 import contextlib
+from pathlib import Path, PurePosixPath
 
 import aiohttp
-from aiohttp import web
-from webilastik.datasource import DataRoi
+from ndstructs.utils.json_serializable import JsonArray, JsonObject, JsonValue, ensureJsonArray, ensureJsonObject, ensureJsonString
 
+from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
+from webilastik.datasink import DataSink
+from webilastik.filesystem.bucket_fs import BucketFs
+from webilastik.scheduling.job import Job, JobStatus
+from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
+from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale, RawEncoder
+from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
+from webilastik.utility.url import Url
+from webilastik.scheduling.hashing_executor import HashingExecutor
+from webilastik.datasource import DataSource
+from webilastik.server.tunnel import ReverseSshTunnel
+from webilastik.datasource import DataRoi
 from webilastik.features.channelwise_fastfilters import (
     StructureTensorEigenvalues,
     GaussianGradientMagnitude,
@@ -39,7 +48,6 @@ from webilastik.ui.applet.brushing_applet import BrushingApplet
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
 from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
 from webilastik.libebrains.user_token import UserToken
-
 
 
 def _decode_datasource(datasource_json_b64_altchars_dash_underline: str) -> DataSource:
@@ -195,24 +203,141 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
             content_type="application/octet-stream",
         )
 
+@dataclass
+class PixelExportRequest:
+    raw_data: DataSource
+    bucket_name: str
+    prefix: PurePosixPath
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "PixelExportRequest":
+        value_obj = ensureJsonObject(value)
+        return PixelExportRequest(
+            raw_data=DataSource.from_json_value(value_obj.get("raw_data")),
+            bucket_name=ensureJsonString(value_obj.get("bucket_name")),
+            prefix=PurePosixPath(ensureJsonString(value_obj.get("prefix"))),
+            # filesystem=JsonableFilesystem.from_json_value(value_obj.get("filesystem")),
+        )
+
+class WsExportApplet(WsApplet, Applet):
+    def __init__(
+        self,
+        *,
+        name: str,
+        executor: HashingExecutor,
+        pixel_classifier: Slot[VigraPixelClassifier[IlpFilter]],
+        websockets: List[web.WebSocketResponse],
+    ):
+        super().__init__(name=name)
+        self.executor = executor
+        self._in_pixel_classifier = pixel_classifier
+        self.websockets = websockets
+        self.jobs: Dict[uuid.UUID, Job[DataRoi, None]] = {}
+        asyncio.get_event_loop().create_task(self._monitor_jobs())
+
+    async def start_export_job(self, request: web.Request, ebrains_user_token: UserToken) -> web.Response:
+        pixel_export_request = PixelExportRequest.from_json_value(await request.json())
+        raw_data = pixel_export_request.raw_data
+        output_filesystem = BucketFs(
+            bucket_name=pixel_export_request.bucket_name,
+            prefix=PurePosixPath("/"),
+            ebrains_user_token=ebrains_user_token,
+        )
+
+        pixel_classifier = self._in_pixel_classifier()
+        num_channels = len(pixel_classifier.color_map)
+
+        chunks_scale_sink = PrecomputedChunksSink.create(
+            base_path=Path(pixel_export_request.prefix), #FIXME
+            filesystem=output_filesystem,
+            info=PrecomputedChunksInfo(
+                data_type=np.dtype("float32"),
+                type_="image",
+                num_channels=num_channels,
+                scales=tuple([
+                    PrecomputedChunksScale(
+                        key=Path("exported_data"),
+                        size=(raw_data.shape.x, raw_data.shape.y, raw_data.shape.z),
+                        chunk_sizes=tuple([
+                            (raw_data.tile_shape.x, raw_data.tile_shape.y, raw_data.tile_shape.z)
+                        ]),
+                        encoding=RawEncoder(),
+                        voxel_offset=(raw_data.location.x, raw_data.location.y, raw_data.location.z),
+                        resolution=raw_data.spatial_resolution
+                    )
+                ]),
+            )
+        ).scale_sinks[0]
+
+        classifier = self._in_pixel_classifier()
+
+        job = Job(
+            name=f"pixel_classification__export_job-{time.time()}",
+            target=_ExportApplet_step_target(classifier=classifier, sink=chunks_scale_sink),
+            steps=raw_data.roi.get_datasource_tiles(),
+            executor=self.executor,
+        )
+        self.jobs[job.job_id] = job
+        self._update_remote()
+        return web.json_response(job.to_json_value(), status=202)
+
+    async def _clear_job(self, job: Job[DataRoi, None]):
+        del self.jobs[job.job_id]
+        self._update_remote()
+
+    async def _monitor_jobs(self):
+        while True:
+            await asyncio.sleep(2)
+            if any(job.status == JobStatus.RUNNING for job in self.jobs.values()):
+                self._update_remote()
+
+    def _update_remote(self):
+        print(f"Just how many sockets are there? {len(self.websockets)}")
+        for websocket in self.websockets:
+            payload = json.dumps(self._get_json_state())
+            print(f"Should be notifying the client now................")
+            asyncio.get_event_loop().create_task(websocket.send_str(payload))
+
+    def _get_json_state(self) -> JsonArray:
+        return tuple([job.to_json_value() for job in self.jobs.values()])
+
+    def _set_json_state(self, state: JsonValue):
+        pass
+
+class _ExportApplet_step_target():
+    def __init__(self, classifier: VigraPixelClassifier[IlpFilter], sink: DataSink):
+        self.classifier = classifier
+        self.sink = sink
+
+    def __call__(self, step: DataRoi):
+        tile = self.classifier.compute(step)
+        self.sink.write(tile)
+
+
 
 class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
     def __init__(self, ebrains_user_token: UserToken, ssl_context: Optional[ssl.SSLContext] = None):
         self.ssl_context = ssl_context
         self.ebrains_user_token = ebrains_user_token
         self.websockets: List[web.WebSocketResponse] = []
+        executor = HashingExecutor(num_workers=1)
         brushing_applet = WsBrushingApplet("brushing_applet")
         feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", datasources=brushing_applet.datasources)
         pixel_classifier_applet = WsPixelClassificationApplet(
             "pixel_classification_applet",
             feature_extractors=feature_selection_applet.feature_extractors,
             annotations=brushing_applet.annotations,
-            runner=HashingExecutor(num_workers=8),
+            runner=executor,
+        )
+        # FIXME: looks like 'websockets' should be an input slot...
+        export_applet = WsExportApplet(
+            name="export_applet", executor=executor, pixel_classifier=pixel_classifier_applet.pixel_classifier, websockets=self.websockets
         )
         self.wsapplets : Mapping[str, WsApplet] = {
             feature_selection_applet.name: feature_selection_applet,
             brushing_applet.name: brushing_applet,
             pixel_classifier_applet.name: pixel_classifier_applet,
+            export_applet.name: export_applet,
         }
         super().__init__(
             feature_selection_applet=feature_selection_applet,
@@ -242,6 +367,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
                 "/stripped_precomputed/url={encoded_original_url}/resolution={resolution_x}_{resolution_y}_{resolution_z}/{rest:.*}",
                 self.forward_chunk_request
             ),
+            web.post("/export", partial(export_applet.start_export_job, ebrains_user_token=self.ebrains_user_token)),
         ])
 
     async def get_status(self, request: web.Request) -> web.Response:
@@ -278,6 +404,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         websocket = web.WebSocketResponse()
         await websocket.prepare(request)
         self.websockets.append(websocket)
+        print(f"JUST STABILISHED A NEW CONNECTION!!!! {len(self.websockets)}")
         await self._update_clients_state([websocket]) # when a new client connects, send it the current state
         async for msg in websocket:
             if msg.type == aiohttp.WSMsgType.TEXT:
@@ -298,6 +425,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
                 print(f'ws connection closed with exception {websocket.exception()}')
         if websocket in self.websockets:
             self.websockets.remove(websocket)
+            print(f"AAAAAAAAAAAAAAAAAAAAAAAAA removing websocket! {len(self.websockets)}")
         print('websocket connection closed')
         return websocket
 
