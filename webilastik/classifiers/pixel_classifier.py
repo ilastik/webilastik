@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Iterator, List, Generic, Optional, Sequence, Dict, TypeVar, Type
+from typing import Iterator, List, Generic, Optional, Sequence, Dict, TypeVar
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 import tempfile
@@ -14,10 +14,11 @@ import numpy as np
 from vigra.learning import RandomForest as VigraRandomForest
 from sklearn.ensemble import RandomForestClassifier as ScikitRandomForestClassifier
 
-from ndstructs import Array5D, Interval5D, Point5D, Shape5D
-from webilastik.features.feature_extractor import FeatureExtractor, FeatureData
+from ndstructs.array5D import Array5D
+from ndstructs.point5D import Interval5D, Point5D
+from webilastik.features.feature_extractor import FeatureExtractor
 from webilastik.features.feature_extractor import FeatureExtractorCollection
-from webilastik.annotations import Annotation, FeatureSamples, Color
+from webilastik.annotations import Annotation, Color
 from webilastik import Project
 from webilastik.operator import Operator
 from webilastik.datasource import DataRoi
