@@ -7,7 +7,7 @@ from fs.base import FS
 
 
 
-class JsonableFilesystem(FS, IJsonable):
+class JsonableFilesystem(IJsonable, FS):
     @classmethod
     @abstractmethod
     def from_json_value(cls, value: JsonValue) -> "JsonableFilesystem":
