@@ -7,7 +7,7 @@ from ndstructs.point5D import Shape5D
 import numpy as np
 from fs.osfs import OSFS
 
-from ndstructs import Point5D
+from ndstructs.point5D import Point5D
 from webilastik.datasource import DataRoi
 from webilastik.datasource import SkimageDataSource
 
