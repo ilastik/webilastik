@@ -5,7 +5,6 @@ from webilastik.scheduling.hashing_executor import HashingExecutor
 from ndstructs.point5D import Shape5D
 
 import numpy as np
-from fs.osfs import OSFS
 
 from ndstructs.point5D import Point5D
 from webilastik.datasource import DataRoi
