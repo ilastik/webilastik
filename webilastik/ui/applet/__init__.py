@@ -49,7 +49,6 @@ class Applet(ABC):
                     self.upstream_applets.add(field.applet)
                     self.upstream_applets.update(field.applet.upstream_applets)
 
-
     @abstractmethod
     def take_snapshot(self) -> Any:
         raise NotImplementedError
@@ -61,6 +60,27 @@ class Applet(ABC):
     @abstractmethod
     def on_dependencies_changed(self, confirmer: CONFIRMER) -> RefreshResult:
         raise NotImplementedError
+
+    @final
+    def notify_downstream(self, confirmer: CONFIRMER) -> RefreshResult:
+        applet_snapshots : Dict["Applet", Any] = {}
+
+        def restore_snapshots():
+            for applet, snap in applet_snapshots.items():
+                applet.restore_snaphot(snap)
+
+        try:
+            refresh_result = RefreshOk()
+            for applet in self.get_downstream_applets():
+                applet_snapshots[applet] = applet.take_snapshot()
+                refresh_result = applet.on_dependencies_changed(confirmer=confirmer)
+                if not refresh_result.is_ok():
+                    restore_snapshots()
+                    return refresh_result
+            return refresh_result
+        except:
+            restore_snapshots()
+            raise
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} name={self.name}>"
@@ -90,29 +110,16 @@ class UserInteraction(Generic[P]):
         self._applet_method = applet_method
 
     def __call__(self, confirmer: CONFIRMER, *args: P.args, **kwargs: P.kwargs) -> RefreshResult:
-        applet_snapshots : Dict["Applet", Any] = {}
-
-        def restore_snapshots():
-            for applet, snap in applet_snapshots.items():
-                applet.restore_snaphot(snap)
-
+        applet_snapshot = self.applet.take_snapshot()
         try:
-            applet_snapshots[self.applet] = self.applet.take_snapshot()
             action_result = self._applet_method(self.applet, confirmer, *args, **kwargs)
             if not action_result.is_ok():
-                restore_snapshots()
+                self.applet.restore_snaphot(applet_snapshot)
                 return action_result
-
-            for applet in self.applet.get_downstream_applets():
-                applet_snapshots[applet] = applet.take_snapshot()
-                refresh_result = applet.on_dependencies_changed(confirmer=confirmer)
-                if not refresh_result.is_ok():
-                    restore_snapshots()
-                    return refresh_result
-
-            return action_result
+            propagation_result = self.applet.notify_downstream(confirmer)
+            return action_result if propagation_result.is_ok() else propagation_result
         except:
-            restore_snapshots()
+            self.applet.restore_snaphot(applet_snapshot)
             raise
 
 class _UserInteractionDescriptor(Generic[P]):
