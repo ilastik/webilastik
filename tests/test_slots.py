@@ -1,7 +1,7 @@
 # pyright: strict
 
 from typing import Any, Optional
-from webilastik.ui.applet import DidNotConfirm, RefreshOk, RefreshResult, Output, Applet, StatelessApplet, UserInteraction, noop_confirmer, CONFIRMER
+from webilastik.ui.applet import DidNotConfirm, RefreshOk, RefreshResult, AppletOutput, Applet, StatelessApplet, UserInteraction, noop_confirmer, CONFIRMER
 
 
 class InputIdentityApplet(StatelessApplet):
@@ -14,35 +14,35 @@ class InputIdentityApplet(StatelessApplet):
         self._value = value
         return RefreshOk()
 
-    @Output.describe
+    @AppletOutput.describe
     def value(self) -> Optional[int]:
         return self._value
 
 
 class ForwarderApplet(StatelessApplet):
-    def __init__(self, name: str, source: Output[Optional[int]]) -> None:
+    def __init__(self, name: str, source: AppletOutput[Optional[int]]) -> None:
         self._source = source
         super().__init__(name)
 
-    @Output.describe
+    @AppletOutput.describe
     def out(self) -> Optional[int]:
         return self._source()
 
 
 class AdderApplet(StatelessApplet):
-    def __init__(self, name: str, source1: Output[Optional[int]], source2: Output[Optional[int]]) -> None:
+    def __init__(self, name: str, source1: AppletOutput[Optional[int]], source2: AppletOutput[Optional[int]]) -> None:
         self._source1 = source1
         self._source2 = source2
         super().__init__(name)
 
-    @Output.describe
+    @AppletOutput.describe
     def out(self) -> Optional[int]:
         val1 = self._source1()
         val2 = self._source2()
         return val1 and (val2 and (val1 + val2))
 
 class RefreshCounterApplet(Applet):
-    def __init__(self, name: str, source: Output[Optional[int]]) -> None:
+    def __init__(self, name: str, source: AppletOutput[Optional[int]]) -> None:
         self._source = source
         self.refresh_count = 0
         super().__init__(name)
@@ -58,7 +58,7 @@ class RefreshCounterApplet(Applet):
         return RefreshOk()
 
 class CachingTripplerApplet(Applet):
-    def __init__(self, name: str, source: Output[Optional[int]]) -> None:
+    def __init__(self, name: str, source: AppletOutput[Optional[int]]) -> None:
         self._source = source
         self._trippled_cache: Optional[int] = None
         super().__init__(name)
@@ -74,7 +74,7 @@ class CachingTripplerApplet(Applet):
         self._trippled_cache = in_value if in_value is None else in_value * 3
         return RefreshOk()
 
-    @Output.describe
+    @AppletOutput.describe
     def trippled(self) -> Optional[int]:
         return self._trippled_cache
 
@@ -83,8 +83,8 @@ class MultiInputRefreshingApplet(Applet):
         self,
         *,
         name: str,
-        value1: Output[Optional[int]],
-        value2: Output[Optional[int]],
+        value1: AppletOutput[Optional[int]],
+        value2: AppletOutput[Optional[int]],
     ) -> None:
         self._source1 = value1
         self._source2 = value2
@@ -102,7 +102,7 @@ class MultiInputRefreshingApplet(Applet):
         return RefreshOk()
 
 class FailingRefreshApplet(Applet):
-    def __init__(self, name: str, fail_after: int, source: Output[Optional[int]]) -> None:
+    def __init__(self, name: str, fail_after: int, source: AppletOutput[Optional[int]]) -> None:
         self._source = source
         self._fail_after = fail_after
         self._num_refreshes = 0
@@ -123,12 +123,12 @@ class FailingRefreshApplet(Applet):
         return result
 
 class MultiDependencyApplet(StatelessApplet):
-    def __init__(self, name: str, value1: Output[Optional[int]], value2: Output[Optional[int]]) -> None:
+    def __init__(self, name: str, value1: AppletOutput[Optional[int]], value2: AppletOutput[Optional[int]]) -> None:
         self._source1 = value1
         self._source2 = value2
         super().__init__(name)
 
-    @Output.describe
+    @AppletOutput.describe
     def inputs_sum(self) -> Optional[int]:
         val1 = self._source1()
         val2 = self._source2()

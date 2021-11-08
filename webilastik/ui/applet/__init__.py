@@ -37,7 +37,7 @@ class Applet(ABC):
             getattr(self, field_name)
 
         self.upstream_applets: Set[Applet] = set()
-        self.outputs: Dict[str, Output[Any]] = {}
+        self.outputs: Dict[str, AppletOutput[Any]] = {}
         self.user_interactions: Dict[str, UserInteraction[Any]] = {}
         for field_name, field in self.__dict__.items():
             if isinstance(field, UserInteraction):
@@ -45,7 +45,7 @@ class Applet(ABC):
                     self.user_interactions[field_name] = field # type: ignore
                 else:
                     raise Exception("Borrowing UserInputs messes up dirty propagation")
-            elif isinstance(field, Output):
+            elif isinstance(field, AppletOutput):
                 if field.applet == self:
                     self.outputs[field_name] = field
                 else:
@@ -132,7 +132,7 @@ class _UserInteractionDescriptor(Generic[P]):
 
 OUT = TypeVar("OUT", covariant=True)
 
-class Output(Generic[OUT]):
+class AppletOutput(Generic[OUT]):
     @classmethod
     def describe(cls, method: Callable[[Applet], OUT]) -> "_OutputDescriptor[OUT]":
         return _OutputDescriptor(method)
@@ -164,9 +164,9 @@ class _OutputDescriptor(Generic[OUT]):
         self._method = method
         self.private_name = "__output_slot_" + method.__name__
 
-    def __get__(self, instance: APPLET, owner: Type[APPLET]) -> "Output[OUT]":
+    def __get__(self, instance: APPLET, owner: Type[APPLET]) -> "AppletOutput[OUT]":
         if not hasattr(instance, self.private_name):
-            output_slot = Output[OUT](applet=instance, method=self._method)
+            output_slot = AppletOutput[OUT](applet=instance, method=self._method)
             setattr(instance, self.private_name, output_slot)
         return getattr(instance, self.private_name)
 
