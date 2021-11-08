@@ -1,8 +1,8 @@
 #pyright: strict
 
 from abc import abstractmethod, ABC
-from typing import Any, Callable, Dict, Generic, List, Set, Type, TypeVar
-from typing_extensions import ParamSpec, Concatenate
+from typing import Any, Callable, Dict, Generic, Iterable, List, Set, Type, TypeVar
+from typing_extensions import ParamSpec, Concatenate, final
 
 
 CONFIRMER = Callable[[str], bool]
@@ -29,7 +29,7 @@ class RefreshOk(RefreshResult):
 
 
 class Applet(ABC):
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str, dependencies: Iterable["AppletOutput[Any]"]) -> None:
         self.name = name
 
         # touch descriptors to initialize them. FIXME: could this be removed?
@@ -37,21 +37,18 @@ class Applet(ABC):
             getattr(self, field_name)
 
         self.upstream_applets: Set[Applet] = set()
+        for dependency in dependencies:
+            dependency.subscribe(self)
+            self.upstream_applets.add(dependency.applet)
+            self.upstream_applets.update(dependency.applet.upstream_applets)
+
         self.outputs: Dict[str, AppletOutput[Any]] = {}
-        self.user_interactions: Dict[str, UserInteraction[Any]] = {}
         for field_name, field in self.__dict__.items():
             if isinstance(field, UserInteraction):
-                if field.applet == self:
-                    self.user_interactions[field_name] = field # type: ignore
-                else:
-                    raise Exception("Borrowing UserInputs messes up dirty propagation")
+                assert field.applet == self, "Borrowing UserInputs messes up dirty propagation"
             elif isinstance(field, AppletOutput):
                 if field.applet == self:
                     self.outputs[field_name] = field
-                else:
-                    field.subscribe(self)
-                    self.upstream_applets.add(field.applet)
-                    self.upstream_applets.update(field.applet.upstream_applets)
 
     @abstractmethod
     def take_snapshot(self) -> Any:
@@ -171,18 +168,26 @@ class _OutputDescriptor(Generic[OUT]):
         return getattr(instance, self.private_name)
 
 
-class IndependentApplet(Applet):
-    """An applet that takes no applet Outputs in its constructor (no dependencies)"""
+class InertApplet(Applet):
+    @final
     def on_dependencies_changed(self, confirmer: CONFIRMER) -> RefreshResult:
         return RefreshOk()
 
-class StatelessApplet(Applet):
-    """An applet that is 'functional'. It keeps no state and therefore has no need for snapshotting"""
+
+class NoSnapshotApplet(Applet):
+    @final
     def take_snapshot(self) -> Any:
         return
 
+    @final
     def restore_snaphot(self, snapshot: Any) -> None:
         return
 
-    def on_dependencies_changed(self, confirmer: CONFIRMER) -> RefreshResult:
-        return RefreshOk()
+
+class StatelesApplet(NoSnapshotApplet, InertApplet):
+    pass
+
+
+class IndependentApplet(InertApplet):
+    def __init__(self, name: str) -> None:
+        super().__init__(name, dependencies=())

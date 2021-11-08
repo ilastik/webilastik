@@ -1,10 +1,10 @@
 # pyright: strict
 
 from typing import Any, Optional
-from webilastik.ui.applet import DidNotConfirm, RefreshOk, RefreshResult, AppletOutput, Applet, StatelessApplet, UserInteraction, noop_confirmer, CONFIRMER
+from webilastik.ui.applet import DidNotConfirm, IndependentApplet, RefreshOk, RefreshResult, AppletOutput, Applet, NoSnapshotApplet, StatelesApplet, UserInteraction, noop_confirmer, CONFIRMER
 
 
-class InputIdentityApplet(StatelessApplet):
+class InputIdentityApplet(NoSnapshotApplet, IndependentApplet):
     def __init__(self, name: str) -> None:
         self._value: Optional[int] = None
         super().__init__(name)
@@ -19,21 +19,21 @@ class InputIdentityApplet(StatelessApplet):
         return self._value
 
 
-class ForwarderApplet(StatelessApplet):
+class ForwarderApplet(StatelesApplet):
     def __init__(self, name: str, source: AppletOutput[Optional[int]]) -> None:
         self._source = source
-        super().__init__(name)
+        super().__init__(name, dependencies=[source])
 
     @AppletOutput.describe
     def out(self) -> Optional[int]:
         return self._source()
 
 
-class AdderApplet(StatelessApplet):
+class AdderApplet(StatelesApplet):
     def __init__(self, name: str, source1: AppletOutput[Optional[int]], source2: AppletOutput[Optional[int]]) -> None:
         self._source1 = source1
         self._source2 = source2
-        super().__init__(name)
+        super().__init__(name, dependencies=[source1, source2])
 
     @AppletOutput.describe
     def out(self) -> Optional[int]:
@@ -41,17 +41,11 @@ class AdderApplet(StatelessApplet):
         val2 = self._source2()
         return val1 and (val2 and (val1 + val2))
 
-class RefreshCounterApplet(Applet):
+class RefreshCounterApplet(NoSnapshotApplet):
     def __init__(self, name: str, source: AppletOutput[Optional[int]]) -> None:
         self._source = source
         self.refresh_count = 0
-        super().__init__(name)
-
-    def take_snapshot(self) -> Any:
-        return
-
-    def restore_snaphot(self, snapshot: Any) -> None:
-        return
+        super().__init__(name, dependencies=[source])
 
     def on_dependencies_changed(self, confirmer: CONFIRMER) -> RefreshResult:
         self.refresh_count += 1
@@ -61,7 +55,7 @@ class CachingTripplerApplet(Applet):
     def __init__(self, name: str, source: AppletOutput[Optional[int]]) -> None:
         self._source = source
         self._trippled_cache: Optional[int] = None
-        super().__init__(name)
+        super().__init__(name, dependencies=[source])
 
     def take_snapshot(self) -> Any:
         return self._trippled_cache
@@ -75,44 +69,15 @@ class CachingTripplerApplet(Applet):
         return RefreshOk()
 
     @AppletOutput.describe
-    def trippled(self) -> Optional[int]:
+    def out_trippled(self) -> Optional[int]:
         return self._trippled_cache
 
-class MultiInputRefreshingApplet(Applet):
-    def __init__(
-        self,
-        *,
-        name: str,
-        value1: AppletOutput[Optional[int]],
-        value2: AppletOutput[Optional[int]],
-    ) -> None:
-        self._source1 = value1
-        self._source2 = value2
-        self.refresh_count = 0
-        super().__init__(name)
-
-    def take_snapshot(self) -> Any:
-        return
-
-    def restore_snaphot(self, snapshot: Any):
-        return
-
-    def on_dependencies_changed(self, confirmer: CONFIRMER) -> RefreshResult:
-        self.refresh_count += 1
-        return RefreshOk()
-
-class FailingRefreshApplet(Applet):
+class FailingRefreshApplet(NoSnapshotApplet):
     def __init__(self, name: str, fail_after: int, source: AppletOutput[Optional[int]]) -> None:
         self._source = source
         self._fail_after = fail_after
         self._num_refreshes = 0
-        super().__init__(name)
-
-    def take_snapshot(self) -> Any:
-        return
-
-    def restore_snaphot(self, snapshot: Any) -> None:
-        return
+        super().__init__(name, dependencies=[source])
 
     def on_dependencies_changed(self, confirmer: CONFIRMER) -> RefreshResult:
         if self._num_refreshes >= self._fail_after:
@@ -121,18 +86,6 @@ class FailingRefreshApplet(Applet):
             result = RefreshOk()
         self._num_refreshes += 1
         return result
-
-class MultiDependencyApplet(StatelessApplet):
-    def __init__(self, name: str, value1: AppletOutput[Optional[int]], value2: AppletOutput[Optional[int]]) -> None:
-        self._source1 = value1
-        self._source2 = value2
-        super().__init__(name)
-
-    @AppletOutput.describe
-    def inputs_sum(self) -> Optional[int]:
-        val1 = self._source1()
-        val2 = self._source2()
-        return val1 and (val2 and (val1 + val2))
 
 def test_descriptors_produce_independent_slots():
     input_applet_1 = InputIdentityApplet("input1")
@@ -208,13 +161,13 @@ def test_forking_then_joining_applets():
     input_applet = InputIdentityApplet("input")
     forwarder_1 = ForwarderApplet("forwarder 1", source=input_applet.value)
     forwarder_2 = ForwarderApplet("forwarder 2", source=forwarder_1.out)
-    multi_dep_applet = MultiDependencyApplet("multi_dep_applet", value1=forwarder_1.out, value2=forwarder_2.out)
+    adder = AdderApplet("adder", source1=forwarder_1.out, source2=forwarder_2.out)
 
     _ = input_applet.set_value(noop_confirmer, 123)
-    assert multi_dep_applet.inputs_sum() == 123 + 123
+    assert adder.out() == 123 + 123
 
     _ = input_applet.set_value(noop_confirmer, 456)
-    assert multi_dep_applet.inputs_sum() == 456 + 456
+    assert adder.out() == 456 + 456
 
 def test_refreshing_applet():
     input_applet = InputIdentityApplet("input")
@@ -222,10 +175,10 @@ def test_refreshing_applet():
     caching_trippler_applet = CachingTripplerApplet(name="caching trippler", source=forwarder_1.out)
 
     _ = input_applet.set_value(noop_confirmer, 789)
-    assert caching_trippler_applet.trippled() == 789 * 3
+    assert caching_trippler_applet.out_trippled() == 789 * 3
 
     _ = input_applet.set_value(noop_confirmer, 111)
-    assert caching_trippler_applet.trippled() == 111 * 3
+    assert caching_trippler_applet.out_trippled() == 111 * 3
 
 def test_snapshotting_on_cancelled_refresh():
     input_applet = InputIdentityApplet("input")
@@ -234,13 +187,13 @@ def test_snapshotting_on_cancelled_refresh():
     _ = FailingRefreshApplet(
         name="failing refresh",
         fail_after=1,
-        source=caching_trippler_applet.trippled
+        source=caching_trippler_applet.out_trippled
     )
 
     result = input_applet.set_value(noop_confirmer, 10)
     assert isinstance(result, RefreshOk)
-    assert caching_trippler_applet.trippled() == 30
+    assert caching_trippler_applet.out_trippled() == 30
 
     result = input_applet.set_value(noop_confirmer, 20)
     assert isinstance(result, DidNotConfirm)
-    assert caching_trippler_applet.trippled() == 30 # check if value restored back from 60 to 30
+    assert caching_trippler_applet.out_trippled() == 30 # check if value restored back from 60 to 30
