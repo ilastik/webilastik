@@ -19,7 +19,7 @@ class RefreshResult(ABC):
     def is_ok(self) -> bool:
         return isinstance(self, RefreshOk)
 
-class DidNotConfirm(RefreshResult):
+class UserCancelled(RefreshResult):
     def _abstract_sentinel(self):
         return
 

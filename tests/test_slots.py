@@ -1,7 +1,7 @@
 # pyright: strict
 
 from typing import Any, Optional
-from webilastik.ui.applet import DidNotConfirm, IndependentApplet, RefreshOk, RefreshResult, AppletOutput, Applet, NoSnapshotApplet, StatelesApplet, UserInteraction, noop_confirmer, CONFIRMER
+from webilastik.ui.applet import UserCancelled, IndependentApplet, RefreshOk, RefreshResult, AppletOutput, Applet, NoSnapshotApplet, StatelesApplet, UserInteraction, noop_confirmer, CONFIRMER
 
 
 class InputIdentityApplet(NoSnapshotApplet, IndependentApplet):
@@ -81,7 +81,7 @@ class FailingRefreshApplet(NoSnapshotApplet):
 
     def on_dependencies_changed(self, confirmer: CONFIRMER) -> RefreshResult:
         if self._num_refreshes >= self._fail_after:
-            result = DidNotConfirm()
+            result = UserCancelled()
         else:
             result = RefreshOk()
         self._num_refreshes += 1
@@ -195,5 +195,5 @@ def test_snapshotting_on_cancelled_refresh():
     assert caching_trippler_applet.out_trippled() == 30
 
     result = input_applet.set_value(noop_confirmer, 20)
-    assert isinstance(result, DidNotConfirm)
+    assert isinstance(result, UserCancelled)
     assert caching_trippler_applet.out_trippled() == 30 # check if value restored back from 60 to 30
