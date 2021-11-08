@@ -1,7 +1,7 @@
 # pyright: strict
 
 from typing import Any, Optional
-from webilastik.ui.applet import RefreshOk, RefreshResult, Output, Applet, StatelessApplet, UserInteraction, noop_confirmer, CONFIRMER
+from webilastik.ui.applet import DidNotConfirm, RefreshOk, RefreshResult, Output, Applet, StatelessApplet, UserInteraction, noop_confirmer, CONFIRMER
 
 
 class InputIdentityApplet(StatelessApplet):
@@ -72,6 +72,28 @@ class MultiInputRefreshingApplet(Applet):
     def on_dependencies_changed(self, confirmer: CONFIRMER) -> RefreshResult:
         self.refresh_count += 1
         return RefreshOk()
+
+class FailingRefreshApplet(Applet):
+    def __init__(self, name: str, fail_after: int, source: Output[Optional[int]]) -> None:
+        self._source = source
+        self._fail_after = fail_after
+        self._num_refreshes = 0
+        super().__init__(name)
+
+    def take_snapshot(self) -> Any:
+        return
+
+    def restore_snaphot(self, snapshot: Any) -> None:
+        return
+
+    def on_dependencies_changed(self, confirmer: CONFIRMER) -> RefreshResult:
+        if self._num_refreshes >= self._fail_after:
+            result = DidNotConfirm()
+        else:
+            result = RefreshOk()
+        self._num_refreshes += 1
+        print(f"Refreshed {self._num_refreshes} times, returning {result}")
+        return result
 
 class MultiDependencyApplet(StatelessApplet):
     def __init__(self, name: str, value1: Output[Optional[int]], value2: Output[Optional[int]]) -> None:
@@ -160,3 +182,21 @@ def test_refresh_doesnt_trigger_twice():
     _ = input_applet.set_value(noop_confirmer, 111)
     assert multi_input_refreshing_applet1.refresh_count == 2
     assert multi_input_refreshing_applet2.refresh_count == 1
+
+def test_snapshotting_on_cancelled_refresh():
+    input_applet = InputIdentityApplet("input")
+    single_in_single_out_1 = SingleInSingleOutApplet("single in, single out 1", value=input_applet.value)
+    caching_trippler_applet = CachingTripplerApplet(name="caching trippler", value=single_in_single_out_1.out)
+    _ = FailingRefreshApplet(
+        name="failing refresh",
+        fail_after=1,
+        source=caching_trippler_applet.trippled
+    )
+
+    result = input_applet.set_value(noop_confirmer, 10)
+    assert isinstance(result, RefreshOk)
+    assert caching_trippler_applet.trippled() == 30
+
+    result = input_applet.set_value(noop_confirmer, 20)
+    assert isinstance(result, DidNotConfirm)
+    assert caching_trippler_applet.trippled() == 30 # check if value restored back from 60 to 30
