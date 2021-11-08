@@ -1,7 +1,7 @@
 #pyright: strict
 
 from abc import abstractmethod, ABC
-from typing import Any, Callable, Dict, Generic, Iterable, List, Set, Type, TypeVar
+from typing import Any, Callable, Dict, Generic, List, Set, Type, TypeVar
 from typing_extensions import ParamSpec, Concatenate, final
 
 
@@ -29,7 +29,7 @@ class RefreshOk(RefreshResult):
 
 
 class Applet(ABC):
-    def __init__(self, name: str, dependencies: Iterable["AppletOutput[Any]"]) -> None:
+    def __init__(self, name: str) -> None:
         self.name = name
 
         # touch descriptors to initialize them. FIXME: could this be removed?
@@ -37,11 +37,6 @@ class Applet(ABC):
             getattr(self, field_name)
 
         self.upstream_applets: Set[Applet] = set()
-        for dependency in dependencies:
-            dependency.subscribe(self)
-            self.upstream_applets.add(dependency.applet)
-            self.upstream_applets.update(dependency.applet.upstream_applets)
-
         self.outputs: Dict[str, AppletOutput[Any]] = {}
         for field_name, field in self.__dict__.items():
             if isinstance(field, UserInteraction):
@@ -49,6 +44,11 @@ class Applet(ABC):
             elif isinstance(field, AppletOutput):
                 if field.applet == self:
                     self.outputs[field_name] = field
+                else:
+                    field.subscribe(self)
+                    self.upstream_applets.add(field.applet)
+                    self.upstream_applets.update(field.applet.upstream_applets)
+
 
     @abstractmethod
     def take_snapshot(self) -> Any:
@@ -186,8 +186,3 @@ class NoSnapshotApplet(Applet):
 
 class StatelesApplet(NoSnapshotApplet, InertApplet):
     pass
-
-
-class IndependentApplet(InertApplet):
-    def __init__(self, name: str) -> None:
-        super().__init__(name, dependencies=())

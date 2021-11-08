@@ -1,10 +1,10 @@
 # pyright: strict
 
 from typing import Any, Optional
-from webilastik.ui.applet import UserCancelled, IndependentApplet, RefreshOk, RefreshResult, AppletOutput, Applet, NoSnapshotApplet, StatelesApplet, UserInteraction, noop_confirmer, CONFIRMER
+from webilastik.ui.applet import InertApplet, UserCancelled, RefreshOk, RefreshResult, AppletOutput, Applet, NoSnapshotApplet, StatelesApplet, UserInteraction, noop_confirmer, CONFIRMER
 
 
-class InputIdentityApplet(NoSnapshotApplet, IndependentApplet):
+class InputIdentityApplet(NoSnapshotApplet, InertApplet):
     def __init__(self, name: str) -> None:
         self._value: Optional[int] = None
         super().__init__(name)
@@ -22,7 +22,7 @@ class InputIdentityApplet(NoSnapshotApplet, IndependentApplet):
 class ForwarderApplet(StatelesApplet):
     def __init__(self, name: str, source: AppletOutput[Optional[int]]) -> None:
         self._source = source
-        super().__init__(name, dependencies=[source])
+        super().__init__(name)
 
     @AppletOutput.describe
     def out(self) -> Optional[int]:
@@ -33,7 +33,7 @@ class AdderApplet(StatelesApplet):
     def __init__(self, name: str, source1: AppletOutput[Optional[int]], source2: AppletOutput[Optional[int]]) -> None:
         self._source1 = source1
         self._source2 = source2
-        super().__init__(name, dependencies=[source1, source2])
+        super().__init__(name)
 
     @AppletOutput.describe
     def out(self) -> Optional[int]:
@@ -45,7 +45,7 @@ class RefreshCounterApplet(NoSnapshotApplet):
     def __init__(self, name: str, source: AppletOutput[Optional[int]]) -> None:
         self._source = source
         self.refresh_count = 0
-        super().__init__(name, dependencies=[source])
+        super().__init__(name)
 
     def on_dependencies_changed(self, confirmer: CONFIRMER) -> RefreshResult:
         self.refresh_count += 1
@@ -55,7 +55,7 @@ class CachingTripplerApplet(Applet):
     def __init__(self, name: str, source: AppletOutput[Optional[int]]) -> None:
         self._source = source
         self._trippled_cache: Optional[int] = None
-        super().__init__(name, dependencies=[source])
+        super().__init__(name)
 
     def take_snapshot(self) -> Any:
         return self._trippled_cache
@@ -77,7 +77,7 @@ class FailingRefreshApplet(NoSnapshotApplet):
         self._source = source
         self._fail_after = fail_after
         self._num_refreshes = 0
-        super().__init__(name, dependencies=[source])
+        super().__init__(name)
 
     def on_dependencies_changed(self, confirmer: CONFIRMER) -> RefreshResult:
         if self._num_refreshes >= self._fail_after:
