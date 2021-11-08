@@ -19,19 +19,47 @@ class InputIdentityApplet(StatelessApplet):
         return self._value
 
 
-class SingleInSingleOutApplet(StatelessApplet):
-    def __init__(self, name: str, value: Output[Optional[int]]) -> None:
-        self._value_source = value
+class ForwarderApplet(StatelessApplet):
+    def __init__(self, name: str, source: Output[Optional[int]]) -> None:
+        self._source = source
         super().__init__(name)
 
     @Output.describe
     def out(self) -> Optional[int]:
-        return self._value_source()
+        return self._source()
 
+
+class AdderApplet(StatelessApplet):
+    def __init__(self, name: str, source1: Output[Optional[int]], source2: Output[Optional[int]]) -> None:
+        self._source1 = source1
+        self._source2 = source2
+        super().__init__(name)
+
+    @Output.describe
+    def out(self) -> Optional[int]:
+        val1 = self._source1()
+        val2 = self._source2()
+        return val1 and (val2 and (val1 + val2))
+
+class RefreshCounterApplet(Applet):
+    def __init__(self, name: str, source: Output[Optional[int]]) -> None:
+        self._source = source
+        self.refresh_count = 0
+        super().__init__(name)
+
+    def take_snapshot(self) -> Any:
+        return
+
+    def restore_snaphot(self, snapshot: Any) -> None:
+        return
+
+    def on_dependencies_changed(self, confirmer: CONFIRMER) -> RefreshResult:
+        self.refresh_count += 1
+        return RefreshOk()
 
 class CachingTripplerApplet(Applet):
-    def __init__(self, name: str, value: Output[Optional[int]]) -> None:
-        self._value_source = value
+    def __init__(self, name: str, source: Output[Optional[int]]) -> None:
+        self._source = source
         self._trippled_cache: Optional[int] = None
         super().__init__(name)
 
@@ -42,7 +70,7 @@ class CachingTripplerApplet(Applet):
         self._trippled_cache = snapshot
 
     def on_dependencies_changed(self, confirmer: CONFIRMER) -> RefreshResult:
-        in_value = self._value_source()
+        in_value = self._source()
         self._trippled_cache = in_value if in_value is None else in_value * 3
         return RefreshOk()
 
@@ -58,8 +86,8 @@ class MultiInputRefreshingApplet(Applet):
         value1: Output[Optional[int]],
         value2: Output[Optional[int]],
     ) -> None:
-        self._value_source1 = value1
-        self._value_source2 = value2
+        self._source1 = value1
+        self._source2 = value2
         self.refresh_count = 0
         super().__init__(name)
 
@@ -92,19 +120,18 @@ class FailingRefreshApplet(Applet):
         else:
             result = RefreshOk()
         self._num_refreshes += 1
-        print(f"Refreshed {self._num_refreshes} times, returning {result}")
         return result
 
 class MultiDependencyApplet(StatelessApplet):
     def __init__(self, name: str, value1: Output[Optional[int]], value2: Output[Optional[int]]) -> None:
-        self._value_source1 = value1
-        self._value_source2 = value2
+        self._source1 = value1
+        self._source2 = value2
         super().__init__(name)
 
     @Output.describe
     def inputs_sum(self) -> Optional[int]:
-        val1 = self._value_source1()
-        val2 = self._value_source2()
+        val1 = self._source1()
+        val2 = self._source2()
         return val1 and (val2 and (val1 + val2))
 
 def test_descriptors_produce_independent_slots():
@@ -117,24 +144,71 @@ def test_descriptors_produce_independent_slots():
     assert input_applet_1.set_value != input_applet_2.set_value
     assert id(input_applet_1.set_value) != id(input_applet_2.set_value)
 
+def test_topographic_sorting_of_applets():
+    # input -> forwarder_1 -> adder_1 ---> adder_2 -->  forwarder_4 --> adder_3 --> refresh_counter
+    # | | |                      ^          ^                            ^
+    # | | |                      |          |                            |
+    # | | +----> forwarder_2 ----+          |                            |
+    # | +-----------------------------------+                            |
+    # +------------------------------------------forwarder_3-------------+
+
+    input_applet = InputIdentityApplet("input")
+    forwarder_1 = ForwarderApplet("forwarder_1", source=input_applet.value)
+    forwarder_2 = ForwarderApplet("forwarder_2", source=input_applet.value)
+    forwarder_3 = ForwarderApplet("forwarder_3", source=input_applet.value)
+
+    adder_1 = AdderApplet(name="adder_1", source1=forwarder_1.out, source2=forwarder_2.out)
+    adder_2 = AdderApplet(name="adder_1", source1=adder_1.out, source2=input_applet.value)
+
+    forwarder_4 = ForwarderApplet(name="forwarder_4", source=adder_2.out)
+
+    adder_3 = AdderApplet(name="adder_3", source1=forwarder_4.out, source2=forwarder_3.out)
+
+    refresh_counter = RefreshCounterApplet(name="refresh_counter", source = adder_3.out)
+
+    assert len(adder_3.upstream_applets) == 7
+    assert adder_3.upstream_applets == set([
+        input_applet, forwarder_1, forwarder_2, forwarder_3, adder_1, adder_2, forwarder_4
+    ])
+
+    assert len(forwarder_4.upstream_applets) == 5
+    assert forwarder_4.upstream_applets == set([
+        input_applet, forwarder_1, forwarder_2, adder_1, adder_2
+    ])
+
+    assert len(adder_2.upstream_applets) == 4
+    assert adder_2.upstream_applets == set([
+        input_applet, forwarder_1, forwarder_2, adder_1
+    ])
+
+    assert refresh_counter.refresh_count == 0
+
+    result = input_applet.set_value(noop_confirmer, 123)
+    assert result.is_ok()
+    assert refresh_counter.refresh_count == 1
+
+    result = input_applet.set_value(noop_confirmer, 456)
+    assert result.is_ok()
+    assert refresh_counter.refresh_count == 2
+
 def test_linear_propagation():
     input_applet = InputIdentityApplet("input")
-    single_in_single_out_1 = SingleInSingleOutApplet("single in, single out 1", value=input_applet.value)
-    single_in_single_out_2 = SingleInSingleOutApplet("single in, single out 2", value=single_in_single_out_1.out)
-    single_in_single_out_3 = SingleInSingleOutApplet("single in, single out 3", value=single_in_single_out_2.out)
+    forwarder_1 = ForwarderApplet("forwarder 1", source=input_applet.value)
+    forwarder_2 = ForwarderApplet("forwarder 2", source=forwarder_1.out)
+    forwarder_3 = ForwarderApplet("forwarder 3", source=forwarder_2.out)
 
     _ = input_applet.set_value(noop_confirmer, 123)
-    assert single_in_single_out_3.out() == 123
+    assert forwarder_3.out() == 123
 
     _ = input_applet.set_value(noop_confirmer, 456)
-    assert single_in_single_out_3.out() == 456
+    assert forwarder_3.out() == 456
 
 
 def test_forking_then_joining_applets():
     input_applet = InputIdentityApplet("input")
-    single_in_single_out_1 = SingleInSingleOutApplet("single in, single out 1", value=input_applet.value)
-    single_in_single_out_2 = SingleInSingleOutApplet("single in, single out 2", value=single_in_single_out_1.out)
-    multi_dep_applet = MultiDependencyApplet("multi_dep_applet", value1=single_in_single_out_1.out, value2=single_in_single_out_2.out)
+    forwarder_1 = ForwarderApplet("forwarder 1", source=input_applet.value)
+    forwarder_2 = ForwarderApplet("forwarder 2", source=forwarder_1.out)
+    multi_dep_applet = MultiDependencyApplet("multi_dep_applet", value1=forwarder_1.out, value2=forwarder_2.out)
 
     _ = input_applet.set_value(noop_confirmer, 123)
     assert multi_dep_applet.inputs_sum() == 123 + 123
@@ -144,8 +218,8 @@ def test_forking_then_joining_applets():
 
 def test_refreshing_applet():
     input_applet = InputIdentityApplet("input")
-    single_in_single_out_1 = SingleInSingleOutApplet("single in, single out 1", value=input_applet.value)
-    caching_trippler_applet = CachingTripplerApplet(name="caching trippler", value=single_in_single_out_1.out)
+    forwarder_1 = ForwarderApplet("forwarder 1", source=input_applet.value)
+    caching_trippler_applet = CachingTripplerApplet(name="caching trippler", source=forwarder_1.out)
 
     _ = input_applet.set_value(noop_confirmer, 789)
     assert caching_trippler_applet.trippled() == 789 * 3
@@ -153,40 +227,10 @@ def test_refreshing_applet():
     _ = input_applet.set_value(noop_confirmer, 111)
     assert caching_trippler_applet.trippled() == 111 * 3
 
-def test_refresh_doesnt_trigger_twice():
-    # updating 'input_applet' should refresh multi_input_refreshing_applet only once
-    #
-    # input_applet -> single_in_single_out_1 --> multi_input_refreshing_applet
-    #  \                                         ^
-    #   \                                        |
-    #    +-> single_in_single_out_2 -------------+
-
-    input_applet = InputIdentityApplet("input")
-    single_in_single_out_1 = SingleInSingleOutApplet("single in, single out 1", value=input_applet.value)
-    single_in_single_out_2 = SingleInSingleOutApplet("single in, single out 2", value=input_applet.value)
-    multi_input_refreshing_applet1 = MultiInputRefreshingApplet(
-        name="caching trippler",
-        value1=single_in_single_out_1.out,
-        value2=single_in_single_out_2.out,
-    )
-
-    _ = input_applet.set_value(noop_confirmer, 789)
-    assert multi_input_refreshing_applet1.refresh_count == 1
-
-    multi_input_refreshing_applet2 = MultiInputRefreshingApplet(
-        name="caching trippler 2",
-        value1=single_in_single_out_2.out,
-        value2=single_in_single_out_1.out,
-    )
-
-    _ = input_applet.set_value(noop_confirmer, 111)
-    assert multi_input_refreshing_applet1.refresh_count == 2
-    assert multi_input_refreshing_applet2.refresh_count == 1
-
 def test_snapshotting_on_cancelled_refresh():
     input_applet = InputIdentityApplet("input")
-    single_in_single_out_1 = SingleInSingleOutApplet("single in, single out 1", value=input_applet.value)
-    caching_trippler_applet = CachingTripplerApplet(name="caching trippler", value=single_in_single_out_1.out)
+    forwarder_1 = ForwarderApplet("forwarder 1", source=input_applet.value)
+    caching_trippler_applet = CachingTripplerApplet(name="caching trippler", source=forwarder_1.out)
     _ = FailingRefreshApplet(
         name="failing refresh",
         fail_after=1,
