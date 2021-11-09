@@ -1,7 +1,7 @@
 # pyright: strict
 
 from typing import Any, Optional
-from webilastik.ui.applet import InertApplet, UserCancelled, RefreshOk, RefreshResult, AppletOutput, Applet, NoSnapshotApplet, StatelesApplet, UserInteraction, noop_confirmer, CONFIRMER
+from webilastik.ui.applet import InertApplet, UserCancelled, PropagationOk, PropagationResult, AppletOutput, Applet, NoSnapshotApplet, StatelesApplet, UserInteraction, dummy_prompt, UserPrompt
 
 
 class InputIdentityApplet(NoSnapshotApplet, InertApplet):
@@ -10,9 +10,9 @@ class InputIdentityApplet(NoSnapshotApplet, InertApplet):
         super().__init__(name)
 
     @UserInteraction.describe
-    def set_value(self, confirmer: CONFIRMER, value: Optional[int]) -> RefreshResult:
+    def set_value(self, user_prompt: UserPrompt, value: Optional[int]) -> PropagationResult:
         self._value = value
-        return RefreshOk()
+        return PropagationOk()
 
     @AppletOutput.describe
     def value(self) -> Optional[int]:
@@ -41,15 +41,15 @@ class AdderApplet(StatelesApplet):
         val2 = self._source2()
         return val1 and (val2 and (val1 + val2))
 
-class RefreshCounterApplet(NoSnapshotApplet):
+class PropagationCounterApplet(NoSnapshotApplet):
     def __init__(self, name: str, source: AppletOutput[Optional[int]]) -> None:
         self._source = source
         self.refresh_count = 0
         super().__init__(name)
 
-    def on_dependencies_changed(self, confirmer: CONFIRMER) -> RefreshResult:
+    def on_dependencies_changed(self, user_prompt: UserPrompt) -> PropagationResult:
         self.refresh_count += 1
-        return RefreshOk()
+        return PropagationOk()
 
 class CachingTripplerApplet(Applet):
     def __init__(self, name: str, source: AppletOutput[Optional[int]]) -> None:
@@ -63,27 +63,27 @@ class CachingTripplerApplet(Applet):
     def restore_snaphot(self, snapshot: Any):
         self._trippled_cache = snapshot
 
-    def on_dependencies_changed(self, confirmer: CONFIRMER) -> RefreshResult:
+    def on_dependencies_changed(self, user_prompt: UserPrompt) -> PropagationResult:
         in_value = self._source()
         self._trippled_cache = in_value if in_value is None else in_value * 3
-        return RefreshOk()
+        return PropagationOk()
 
     @AppletOutput.describe
     def out_trippled(self) -> Optional[int]:
         return self._trippled_cache
 
-class FailingRefreshApplet(NoSnapshotApplet):
+class FailingPropagationApplet(NoSnapshotApplet):
     def __init__(self, name: str, fail_after: int, source: AppletOutput[Optional[int]]) -> None:
         self._source = source
         self._fail_after = fail_after
         self._num_refreshes = 0
         super().__init__(name)
 
-    def on_dependencies_changed(self, confirmer: CONFIRMER) -> RefreshResult:
+    def on_dependencies_changed(self, user_prompt: UserPrompt) -> PropagationResult:
         if self._num_refreshes >= self._fail_after:
             result = UserCancelled()
         else:
-            result = RefreshOk()
+            result = PropagationOk()
         self._num_refreshes += 1
         return result
 
@@ -117,7 +117,7 @@ def test_topographic_sorting_of_applets():
 
     adder_3 = AdderApplet(name="adder_3", source1=forwarder_4.out, source2=forwarder_3.out)
 
-    refresh_counter = RefreshCounterApplet(name="refresh_counter", source = adder_3.out)
+    refresh_counter = PropagationCounterApplet(name="refresh_counter", source = adder_3.out)
 
     assert len(adder_3.upstream_applets) == 7
     assert adder_3.upstream_applets == set([
@@ -136,11 +136,11 @@ def test_topographic_sorting_of_applets():
 
     assert refresh_counter.refresh_count == 0
 
-    result = input_applet.set_value(noop_confirmer, 123)
+    result = input_applet.set_value(dummy_prompt, 123)
     assert result.is_ok()
     assert refresh_counter.refresh_count == 1
 
-    result = input_applet.set_value(noop_confirmer, 456)
+    result = input_applet.set_value(dummy_prompt, 456)
     assert result.is_ok()
     assert refresh_counter.refresh_count == 2
 
@@ -150,10 +150,10 @@ def test_linear_propagation():
     forwarder_2 = ForwarderApplet("forwarder 2", source=forwarder_1.out)
     forwarder_3 = ForwarderApplet("forwarder 3", source=forwarder_2.out)
 
-    _ = input_applet.set_value(noop_confirmer, 123)
+    _ = input_applet.set_value(dummy_prompt, 123)
     assert forwarder_3.out() == 123
 
-    _ = input_applet.set_value(noop_confirmer, 456)
+    _ = input_applet.set_value(dummy_prompt, 456)
     assert forwarder_3.out() == 456
 
 
@@ -163,10 +163,10 @@ def test_forking_then_joining_applets():
     forwarder_2 = ForwarderApplet("forwarder 2", source=forwarder_1.out)
     adder = AdderApplet("adder", source1=forwarder_1.out, source2=forwarder_2.out)
 
-    _ = input_applet.set_value(noop_confirmer, 123)
+    _ = input_applet.set_value(dummy_prompt, 123)
     assert adder.out() == 123 + 123
 
-    _ = input_applet.set_value(noop_confirmer, 456)
+    _ = input_applet.set_value(dummy_prompt, 456)
     assert adder.out() == 456 + 456
 
 def test_refreshing_applet():
@@ -174,26 +174,26 @@ def test_refreshing_applet():
     forwarder_1 = ForwarderApplet("forwarder 1", source=input_applet.value)
     caching_trippler_applet = CachingTripplerApplet(name="caching trippler", source=forwarder_1.out)
 
-    _ = input_applet.set_value(noop_confirmer, 789)
+    _ = input_applet.set_value(dummy_prompt, 789)
     assert caching_trippler_applet.out_trippled() == 789 * 3
 
-    _ = input_applet.set_value(noop_confirmer, 111)
+    _ = input_applet.set_value(dummy_prompt, 111)
     assert caching_trippler_applet.out_trippled() == 111 * 3
 
 def test_snapshotting_on_cancelled_refresh():
     input_applet = InputIdentityApplet("input")
     forwarder_1 = ForwarderApplet("forwarder 1", source=input_applet.value)
     caching_trippler_applet = CachingTripplerApplet(name="caching trippler", source=forwarder_1.out)
-    _ = FailingRefreshApplet(
+    _ = FailingPropagationApplet(
         name="failing refresh",
         fail_after=1,
         source=caching_trippler_applet.out_trippled
     )
 
-    result = input_applet.set_value(noop_confirmer, 10)
-    assert isinstance(result, RefreshOk)
+    result = input_applet.set_value(dummy_prompt, 10)
+    assert isinstance(result, PropagationOk)
     assert caching_trippler_applet.out_trippled() == 30
 
-    result = input_applet.set_value(noop_confirmer, 20)
+    result = input_applet.set_value(dummy_prompt, 20)
     assert isinstance(result, UserCancelled)
     assert caching_trippler_applet.out_trippled() == 30 # check if value restored back from 60 to 30

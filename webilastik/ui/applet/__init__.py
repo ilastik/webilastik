@@ -1,32 +1,42 @@
 #pyright: strict
 
 from abc import abstractmethod, ABC
-from typing import Any, Callable, Dict, Generic, List, Set, Type, TypeVar
+import threading
+from typing import Any, Callable, Dict, Generic, List, Optional, Protocol, Set, Type, TypeVar
 from typing_extensions import ParamSpec, Concatenate, final
 
 
-CONFIRMER = Callable[[str], bool]
+T = TypeVar("T")
 
-def noop_confirmer(msg: str) -> bool:
-    return True
+class UserPrompt(Protocol):
+    def __call__(self, options: Dict[str, T]) -> Optional[T]:
+        ...
 
-class RefreshResult(ABC):
+def dummy_prompt(options: Dict[str, T]) -> Optional[T]:
+    for value in options.values():
+        return value
+    return None
+
+x: UserPrompt = dummy_prompt
+
+class PropagationResult(ABC):
     @abstractmethod
     def _abstract_sentinel(self):
         """Prevents this class from being instantiated"""
         pass
 
     def is_ok(self) -> bool:
-        return isinstance(self, RefreshOk)
+        return isinstance(self, PropagationOk)
 
-class UserCancelled(RefreshResult):
+class UserCancelled(PropagationResult):
     def _abstract_sentinel(self):
         return
 
-class RefreshOk(RefreshResult):
+class PropagationOk(PropagationResult):
     def _abstract_sentinel(self):
         return
 
+_propagation_lock = threading.RLock()
 
 class Applet(ABC):
     def __init__(self, name: str) -> None:
@@ -58,11 +68,11 @@ class Applet(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def on_dependencies_changed(self, confirmer: CONFIRMER) -> RefreshResult:
+    def on_dependencies_changed(self, user_prompt: UserPrompt) -> PropagationResult:
         raise NotImplementedError
 
     @final
-    def notify_downstream(self, confirmer: CONFIRMER) -> RefreshResult:
+    def propagate_downstream(self, user_prompt: UserPrompt) -> PropagationResult:
         applet_snapshots : Dict["Applet", Any] = {}
 
         def restore_snapshots():
@@ -70,14 +80,15 @@ class Applet(ABC):
                 applet.restore_snaphot(snap)
 
         try:
-            refresh_result = RefreshOk()
-            for applet in self.get_downstream_applets():
-                applet_snapshots[applet] = applet.take_snapshot()
-                refresh_result = applet.on_dependencies_changed(confirmer=confirmer)
-                if not refresh_result.is_ok():
-                    restore_snapshots()
-                    return refresh_result
-            return refresh_result
+            with _propagation_lock:
+                propagation_result = PropagationOk()
+                for applet in self.get_downstream_applets():
+                    applet_snapshots[applet] = applet.take_snapshot()
+                    propagation_result = applet.on_dependencies_changed(user_prompt=user_prompt)
+                    if not propagation_result.is_ok():
+                        restore_snapshots()
+                        return propagation_result
+                return propagation_result
         except:
             restore_snapshots()
             raise
@@ -101,29 +112,30 @@ P = ParamSpec("P")
 
 class UserInteraction(Generic[P]):
     @classmethod
-    def describe(cls, applet_method: Callable[Concatenate[Applet, CONFIRMER, P], RefreshResult]) -> "_UserInteractionDescriptor[P]":
+    def describe(cls, applet_method: Callable[Concatenate[Applet, UserPrompt, P], PropagationResult]) -> "_UserInteractionDescriptor[P]":
         return _UserInteractionDescriptor[P](applet_method=applet_method)
 
     # @private
-    def __init__(self, *, applet: APPLET, applet_method: Callable[Concatenate[APPLET, CONFIRMER, P], RefreshResult]):
+    def __init__(self, *, applet: APPLET, applet_method: Callable[Concatenate[APPLET, UserPrompt, P], PropagationResult]):
         self.applet = applet
         self._applet_method = applet_method
 
-    def __call__(self, confirmer: CONFIRMER, *args: P.args, **kwargs: P.kwargs) -> RefreshResult:
+    def __call__(self, user_prompt: UserPrompt, *args: P.args, **kwargs: P.kwargs) -> PropagationResult:
         applet_snapshot = self.applet.take_snapshot()
         try:
-            action_result = self._applet_method(self.applet, confirmer, *args, **kwargs)
-            if not action_result.is_ok():
-                self.applet.restore_snaphot(applet_snapshot)
-                return action_result
-            propagation_result = self.applet.notify_downstream(confirmer)
-            return action_result if propagation_result.is_ok() else propagation_result
+            with _propagation_lock:
+                action_result = self._applet_method(self.applet, user_prompt, *args, **kwargs)
+                if not action_result.is_ok():
+                    self.applet.restore_snaphot(applet_snapshot)
+                    return action_result
+                propagation_result = self.applet.propagate_downstream(user_prompt)
+                return action_result if propagation_result.is_ok() else propagation_result
         except:
             self.applet.restore_snaphot(applet_snapshot)
             raise
 
 class _UserInteractionDescriptor(Generic[P]):
-    def __init__(self, applet_method: Callable[Concatenate[Applet, CONFIRMER, P], RefreshResult]):
+    def __init__(self, applet_method: Callable[Concatenate[Applet, UserPrompt, P], PropagationResult]):
         self._applet_method = applet_method
         self.private_name: str = "__user_interaction_" + applet_method.__name__
 
@@ -177,8 +189,8 @@ class _OutputDescriptor(Generic[OUT]):
 
 class InertApplet(Applet):
     @final
-    def on_dependencies_changed(self, confirmer: CONFIRMER) -> RefreshResult:
-        return RefreshOk()
+    def on_dependencies_changed(self, user_prompt: UserPrompt) -> PropagationResult:
+        return PropagationOk()
 
 
 class NoSnapshotApplet(Applet):
