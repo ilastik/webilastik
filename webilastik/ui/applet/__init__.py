@@ -111,10 +111,6 @@ APPLET = TypeVar("APPLET", bound="Applet")
 P = ParamSpec("P")
 
 class UserInteraction(Generic[P]):
-    @classmethod
-    def describe(cls, applet_method: Callable[Concatenate[Applet, UserPrompt, P], PropagationResult]) -> "_UserInteractionDescriptor[P]":
-        return _UserInteractionDescriptor[P](applet_method=applet_method)
-
     # @private
     def __init__(self, *, applet: APPLET, applet_method: Callable[Concatenate[APPLET, UserPrompt, P], PropagationResult]):
         self.applet = applet
@@ -134,7 +130,9 @@ class UserInteraction(Generic[P]):
             self.applet.restore_snaphot(applet_snapshot)
             raise
 
-class _UserInteractionDescriptor(Generic[P]):
+class user_interaction(Generic[P]):
+    """A decorator for user interaction methods on applets"""
+
     def __init__(self, applet_method: Callable[Concatenate[Applet, UserPrompt, P], PropagationResult]):
         self._applet_method = applet_method
         self.private_name: str = "__user_interaction_" + applet_method.__name__
@@ -149,9 +147,7 @@ class _UserInteractionDescriptor(Generic[P]):
 OUT = TypeVar("OUT", covariant=True)
 
 class AppletOutput(Generic[OUT]):
-    @classmethod
-    def describe(cls, method: Callable[[Applet], OUT]) -> "_OutputDescriptor[OUT]":
-        return _OutputDescriptor(method)
+    """A decorator for applet outputs"""
 
     # private method
     def __init__(self, applet: APPLET, method: Callable[[APPLET], OUT]):
@@ -174,7 +170,7 @@ class AppletOutput(Generic[OUT]):
         return sorted(out)
 
 
-class _OutputDescriptor(Generic[OUT]):
+class applet_output(Generic[OUT]):
     # private method
     def __init__(self, method: Callable[[Applet], OUT]):
         self._method = method
