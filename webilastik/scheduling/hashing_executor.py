@@ -61,6 +61,7 @@ class PriorityFuture(Generic[IN, OUT], Future[OUT]):
             self._cancelled = True
             if self.future:
                 return self.future.cancel()
+            self.done_event.set()
         return False #FIXME
 
     def cancelled(self) -> bool:
@@ -182,12 +183,9 @@ class HashingExecutor:
         def _enqueuer_target():
             while not self._finished:
                 try:
-                    # print(f"trying to get stuff from work queue")
                     priority_future = self._work_queue.get(timeout=2)
                 except queue.Empty:
-                    # print(f"Nothing on work queue. Retrying...")
                     continue
-                print(f"got work from queue")
                 if priority_future.group_id in self._cancelled_groups:
                     continue
                 executor = self._get_executor(priority_future.arg)
@@ -197,6 +195,15 @@ class HashingExecutor:
             for idx, executor in enumerate(self._executors):
                 print(f"===> Shutting down executor {idx} from {self}")
                 executor.shutdown(wait=True)
+
+            cancelled_futures = 0
+            while True:
+                try:
+                    _ = self._work_queue.get_nowait().cancel()
+                    cancelled_futures += 1
+                except queue.Empty:
+                    break
+            print(f"Cancelled {cancelled_futures} futures")
 
         self.enqueuer_thread = threading.Thread(group=None, target=_enqueuer_target)
         self.enqueuer_thread.start()
