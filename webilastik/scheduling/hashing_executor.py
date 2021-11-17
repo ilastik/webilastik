@@ -1,9 +1,9 @@
 # pyright: strict
 
 from concurrent import futures
-from concurrent.futures import Future
+from concurrent.futures import Future, TimeoutError
 import queue
-from typing import Any, Generic, Hashable, Optional, TypeVar, Callable, Set, List
+from typing import Any, Generic, Hashable, Iterable, Iterator, Literal, Optional, Protocol, TypeVar, Callable, Set, List
 from concurrent.futures import ProcessPoolExecutor
 import multiprocessing
 import time
@@ -66,7 +66,7 @@ class PriorityFuture(Generic[IN, OUT], Future[OUT]):
     def cancelled(self) -> bool:
         if self.future:
             return self.future.cancelled()
-        return False
+        return self._cancelled
 
     def running(self) -> bool:
         if self.future:
@@ -86,15 +86,87 @@ class PriorityFuture(Generic[IN, OUT], Future[OUT]):
                 self.done_callbacks.append(fn)
 
     def result(self, timeout: Optional[float] = None) -> OUT:
-        _ = self.done_event.wait()
-        if self.future is None:
-            assert False, "expected future to be present!"
-        return self.future.result(timeout)
+        t0 = time.time()
+        if not self.done_event.wait(timeout):
+            raise TimeoutError
+        assert self.future != None, "expected future to be present!"
+        time_spent_waiting = time.time() - t0
+        leftover_timeout = None if timeout is None else max(0, timeout - time_spent_waiting)
+        return self.future.result(leftover_timeout)
 
     def exception(self, timeout: Optional[float] = None) -> Optional[BaseException]:
         if self.future:
             return self.future.exception()
         return None
+
+class JobProgressCallback(Protocol):
+    def __call__(self, job_id: uuid.UUID, step_index: int) -> Any:
+        ...
+
+class JobCompletedCallback(Protocol):
+    def __call__(self, job_id: uuid.UUID) -> Any:
+        ...
+
+class Job(Generic[IN]):
+    def __init__(
+        self,
+        *,
+        target: Callable[[IN], None],
+        args: Iterable[IN],
+        on_progress: Optional[JobProgressCallback] = None,
+        on_complete: Optional[JobCompletedCallback] = None,
+    ):
+        self.target = target
+        self.args = args
+        self.num_args: Optional[int] = None
+        self.on_progress = on_progress
+        self.on_complete = on_complete
+
+        self.uuid = uuid.uuid4()
+        self.status: Literal["pending", "running", "cancelled", "failed", "succeeded"] = "pending"
+
+        self.num_completed_steps = 0
+        self.lock = threading.Lock()
+
+    def work_units(self) -> Iterator[PriorityFuture[IN, None]]:
+        def done_callback(future: Future[None]): # FIXME
+            with self.lock:
+                self.num_completed_steps += 1
+                num_completed_steps = self.num_completed_steps
+                if self.status == "pending" or self.status == "running":
+                    if future.cancelled():
+                        self.status = "cancelled"
+                    elif future.exception():
+                        self.status = "failed"
+                    elif self.num_args == None:
+                        self.status = "running"
+                    else:
+                        if num_completed_steps < self.num_args:
+                            self.status = "running"
+                        else:
+                            self.status = "succeeded"
+                            if self.on_complete:
+                                self.on_complete(self.uuid)
+            if self.on_progress:
+                self.on_progress(self.uuid, num_completed_steps)
+
+        num_args = 0
+        for arg in self.args:
+            num_args += 1
+            priority_future = PriorityFuture(
+                priority=WorkPriority.JOB, group_id=self.uuid, target=self.target, arg=arg
+            )
+            priority_future.add_done_callback(done_callback)
+            yield priority_future
+
+        with self.lock:
+            self.num_args = num_args
+            if self.num_completed_steps == num_args and self.status == "pending" or self.status == "running":
+                self.status = "succeeded"
+                if self.on_complete:
+                    self.on_complete(self.uuid)
+
+
 
 
 # Does not inherit from concurrent.futures.Executor because the typing there is looser (too many Any's)
@@ -121,6 +193,10 @@ class HashingExecutor:
                 executor = self._get_executor(priority_future.arg)
                 inner_future = executor.submit(priority_future.target, priority_future.arg)
                 priority_future.set_future(inner_future)
+            print("Shutting down!")
+            for idx, executor in enumerate(self._executors):
+                print(f"===> Shutting down executor {idx} from {self}")
+                executor.shutdown(wait=True)
 
         self.enqueuer_thread = threading.Thread(group=None, target=_enqueuer_target)
         self.enqueuer_thread.start()
@@ -132,11 +208,7 @@ class HashingExecutor:
         self.shutdown()
 
     def shutdown(self, wait: bool = True):
-        print("Shutting down!")
         self._finished = True
-        for idx, executor in enumerate(self._executors):
-            print(f"===> Shutting down executor {idx} from {self}")
-            executor.shutdown(wait)
         self.enqueuer_thread.join()
 
 
@@ -146,3 +218,22 @@ class HashingExecutor:
         )
         self._work_queue.put(priority_future)
         return priority_future
+
+    def submit_job(
+        self,
+        *,
+        target: Callable[[IN], None],
+        args: Iterable[IN],
+        on_progress: Optional[JobProgressCallback] = None,
+        on_complete: Optional[JobCompletedCallback] = None
+    ) -> Job[IN]:
+        job = Job(
+            target=target,
+            args=args,
+            on_progress=on_progress,
+            on_complete=on_complete,
+        )
+        #FIXME: don't flood the queue with job steps. Maybe put the job itself in the queue?
+        for unit_of_work in job.work_units():
+            self._work_queue.put(unit_of_work)
+        return job
