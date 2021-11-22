@@ -19,10 +19,11 @@ OUT = TypeVar("OUT")
 
 class WorkPriority(IntEnum):
     JOB = 100
-    INTERACTIVE = 0
+    INTERACTIVE = 10
+    CONTROL = 1
 
 
-class PriorityFuture(Generic[IN, OUT], Future[OUT]):
+class _PriorityFuture(Generic[IN, OUT], Future[OUT]):
     def __init__(
         self,
         *,
@@ -44,7 +45,7 @@ class PriorityFuture(Generic[IN, OUT], Future[OUT]):
         self.done_event = threading.Event()
         self._cancelled = False
 
-    def __lt__(self, other: "PriorityFuture[Any, Any]") -> bool:
+    def __lt__(self, other: "_PriorityFuture[Any, Any]") -> bool:
         return (self.priority, self.creation_time) < (other.priority, other.creation_time)
 
     def set_future(self, future: Future[OUT]):
@@ -100,6 +101,16 @@ class PriorityFuture(Generic[IN, OUT], Future[OUT]):
             return self.future.exception()
         return None
 
+
+class EndWorker(_PriorityFuture[Any, Any]):
+    def __init__(self) -> None:
+        super().__init__(
+            priority=WorkPriority.CONTROL,
+            group_id=uuid.uuid4(),
+            target=lambda _: None,
+            arg=None
+        )
+
 class JobProgressCallback(Protocol):
     def __call__(self, job_id: uuid.UUID, step_index: int) -> Any:
         ...
@@ -129,7 +140,7 @@ class Job(Generic[IN]):
         self.num_completed_steps = 0
         self.lock = threading.Lock()
 
-    def work_units(self) -> Iterator[PriorityFuture[IN, None]]:
+    def work_units(self) -> Iterator[_PriorityFuture[IN, None]]:
         def done_callback(future: Future[None]): # FIXME
             with self.lock:
                 self.num_completed_steps += 1
@@ -139,6 +150,7 @@ class Job(Generic[IN]):
                         self.status = "cancelled"
                     elif future.exception():
                         self.status = "failed"
+                        print(future.exception())
                     elif self.num_args == None:
                         self.status = "running"
                     else:
@@ -154,7 +166,7 @@ class Job(Generic[IN]):
         num_args = 0
         for arg in self.args:
             num_args += 1
-            priority_future = PriorityFuture(
+            priority_future = _PriorityFuture(
                 priority=WorkPriority.JOB, group_id=self.uuid, target=self.target, arg=arg
             )
             priority_future.add_done_callback(done_callback)
@@ -169,61 +181,81 @@ class Job(Generic[IN]):
 
 
 
-
-# Does not inherit from concurrent.futures.Executor because the typing there is looser (too many Any's)
-class HashingExecutor:
-
-    def __init__(self, max_workers: Optional[int] = None):
-        self.max_workers = max_workers or max(1, multiprocessing.cpu_count() - 1)
-        self._executors = [ProcessPoolExecutor(max_workers=1) for _ in range(self.max_workers)]
-        self._work_queue: "PriorityQueue[PriorityFuture[Any, Any]]" = PriorityQueue()
+class _Worker:
+    def __init__(self, *, name: str) -> None:
+        self.name = name
+        self._executor = ProcessPoolExecutor(max_workers=1)
+        self._work_queue: "PriorityQueue[_PriorityFuture[Any, Any]]" = PriorityQueue()
         self._cancelled_groups: Set[uuid.UUID] = set()
-        self._finished = False
+        self._shutting_down = False
+        self._lock = threading.Lock()
+        self._executor_is_free = threading.Event()
+        self._executor_is_free.set()
 
-        def _enqueuer_target():
-            while not self._finished:
-                try:
-                    priority_future = self._work_queue.get(timeout=2)
-                except queue.Empty:
-                    continue
-                if priority_future.group_id in self._cancelled_groups:
-                    continue
-                executor = self._get_executor(priority_future.arg)
-                inner_future = executor.submit(priority_future.target, priority_future.arg)
-                priority_future.set_future(inner_future)
-            print("Shutting down!")
-            for idx, executor in enumerate(self._executors):
-                print(f"===> Shutting down executor {idx} from {self}")
-                executor.shutdown(wait=True)
-
-            cancelled_futures = 0
-            while True:
-                try:
-                    _ = self._work_queue.get_nowait().cancel()
-                    cancelled_futures += 1
-                except queue.Empty:
-                    break
-            print(f"Cancelled {cancelled_futures} futures")
-
-        self.enqueuer_thread = threading.Thread(group=None, target=_enqueuer_target)
+        self.enqueuer_thread = threading.Thread(group=None, target=self._enqueuer_target)
         self.enqueuer_thread.start()
 
-    def _get_executor(self, arg: Hashable) -> ProcessPoolExecutor:
-        return self._executors[hash(arg) % len(self._executors)]
+    def submit_work(self, priority_future: _PriorityFuture[Any, Any]):
+        with self._lock:
+            if self._shutting_down:
+                raise Exception(f"_Worker {self.name} has shut down")
+            self._work_queue.put(priority_future)
+
+    def _enqueuer_target(self):
+        while True:
+            _ = self._executor_is_free.wait()
+            self._executor_is_free.clear()
+
+            priority_future = self._work_queue.get()
+            if isinstance(priority_future, EndWorker):
+                self._executor.shutdown(wait=True)
+                while True:
+                    try:
+                        _ = self._work_queue.get_nowait().cancel()
+                    except queue.Empty:
+                        return
+            if priority_future.group_id in self._cancelled_groups:
+                _ = priority_future.cancel()
+                continue
+            inner_future = self._executor.submit(priority_future.target, priority_future.arg)
+            inner_future.add_done_callback(lambda _: self._executor_is_free.set())
+            priority_future.set_future(inner_future)
+
+    def shutdown(self, wait: bool = True):
+        with self._lock:
+            if self._shutting_down:
+                return
+            self._shutting_down = True
+            self._work_queue.put(EndWorker())
+            self._executor_is_free.set()
+            self.enqueuer_thread.join()
 
     def __del__(self):
         self.shutdown()
 
-    def shutdown(self, wait: bool = True):
-        self._finished = True
-        self.enqueuer_thread.join()
+# Does not inherit from concurrent.futures.Executor because the typing there is looser (too many Any's)
+class HashingExecutor:
+    def __init__(self, name: str, max_workers: Optional[int] = None):
+        self.max_workers = max_workers or max(1, multiprocessing.cpu_count() - 1)
+        self._workers = [
+            _Worker(name=f"{name} worker {i}") for i in range(self.max_workers)
+        ]
 
+    def shutdown(self, wait: bool = True):
+        for executor in self._workers:
+            executor.shutdown(wait)
+
+    def __del__(self):
+        self.shutdown()
+
+    def _get_worker(self, arg: Hashable) -> _Worker:
+        return self._workers[hash(arg) % len(self._workers)]
 
     def submit(self, target: Callable[[IN], OUT], arg: IN) -> Future[OUT]:
-        priority_future = PriorityFuture[IN, OUT](
+        priority_future = _PriorityFuture[IN, OUT](
             priority=WorkPriority.INTERACTIVE, group_id=uuid.uuid4(), target=target, arg=arg
         )
-        self._work_queue.put(priority_future)
+        self._get_worker(arg).submit_work(priority_future)
         return priority_future
 
     def submit_job(
@@ -241,6 +273,7 @@ class HashingExecutor:
             on_complete=on_complete,
         )
         #FIXME: don't flood the queue with job steps. Maybe put the job itself in the queue?
-        for unit_of_work in job.work_units():
-            self._work_queue.put(unit_of_work)
+        for priority_future in job.work_units():
+            executor = self._get_worker(priority_future.arg)
+            executor.submit_work(priority_future)
         return job
