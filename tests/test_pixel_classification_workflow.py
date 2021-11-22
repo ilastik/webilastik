@@ -1,5 +1,7 @@
 from pathlib import Path
 from typing import Tuple
+
+import numpy
 from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale, RawEncoder
 from webilastik.filesystem.osfs import OsFs
@@ -62,7 +64,8 @@ def test_pixel_classification_workflow(
 
     # calculate predictions on the entire data source
     preds_future = executor.submit(classifier.compute, raw_data_source.roi)
-    preds_future.result().as_uint8().show_channels()
+    local_predictions = preds_future.result()
+    local_predictions.as_uint8().show_channels()
 
     # calculate predictions on just a piece of arbitrary data
     exported_tile = executor.submit(classifier.compute, DataRoi(datasource=raw_data_source, x=(100, 200), y=(100, 200)))
@@ -74,7 +77,7 @@ def test_pixel_classification_workflow(
         base_path=basic_pixel_classification_test_path,
         filesystem=bucket_fs,
         info=PrecomputedChunksInfo(
-            data_type=raw_data_source.dtype,
+            data_type=numpy.dtype("float32"),
             type_="image",
             num_channels=classifier.num_classes,
             scales=tuple([
@@ -111,6 +114,9 @@ def test_pixel_classification_workflow(
         time.sleep(1)
     assert job.status == "succeeded"
 
+    retrieved_predictions = sink.to_datasource().retrieve()
+    assert local_predictions == retrieved_predictions
+    retrieved_predictions.as_uint8().show_channels()
 
     #try removing a brush stroke
     _ = brushing_applet.remove_annotations(dummy_prompt, pixel_annotations[0:1])
