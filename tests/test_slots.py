@@ -1,7 +1,7 @@
 # pyright: strict
 
 from typing import Any, Optional
-from webilastik.ui.applet import InertApplet, UserCancelled, PropagationOk, PropagationResult, AppletOutput, Applet, NoSnapshotApplet, StatelesApplet, UserInteraction, dummy_prompt, UserPrompt
+from webilastik.ui.applet import InertApplet, UserCancelled, PropagationOk, PropagationResult, AppletOutput, applet_output, Applet, NoSnapshotApplet, StatelesApplet, user_interaction, dummy_prompt, UserPrompt
 
 
 class InputIdentityApplet(NoSnapshotApplet, InertApplet):
@@ -9,12 +9,12 @@ class InputIdentityApplet(NoSnapshotApplet, InertApplet):
         self._value: Optional[int] = None
         super().__init__(name)
 
-    @UserInteraction.describe
+    @user_interaction
     def set_value(self, user_prompt: UserPrompt, value: Optional[int]) -> PropagationResult:
         self._value = value
         return PropagationOk()
 
-    @AppletOutput.describe
+    @applet_output
     def value(self) -> Optional[int]:
         return self._value
 
@@ -24,7 +24,7 @@ class ForwarderApplet(StatelesApplet):
         self._source = source
         super().__init__(name)
 
-    @AppletOutput.describe
+    @applet_output
     def out(self) -> Optional[int]:
         return self._source()
 
@@ -35,7 +35,7 @@ class AdderApplet(StatelesApplet):
         self._source2 = source2
         super().__init__(name)
 
-    @AppletOutput.describe
+    @applet_output
     def out(self) -> Optional[int]:
         val1 = self._source1()
         val2 = self._source2()
@@ -68,7 +68,7 @@ class CachingTripplerApplet(Applet):
         self._trippled_cache = in_value if in_value is None else in_value * 3
         return PropagationOk()
 
-    @AppletOutput.describe
+    @applet_output
     def out_trippled(self) -> Optional[int]:
         return self._trippled_cache
 
