@@ -21,7 +21,7 @@ from webilastik.features.feature_extractor import FeatureExtractorCollection
 from webilastik.annotations import Annotation, Color
 from webilastik import Project
 from webilastik.operator import Operator
-from webilastik.datasource import DataRoi
+from webilastik.datasource import DataRoi, DataSource
 
 try:
     import ilastik_operator_cache # type: ignore
@@ -134,6 +134,12 @@ class PixelClassifier(Operator[DataRoi, Predictions], Generic[FE]):
         c_start = data_slice.c[0]
         c_stop = c_start + self.num_classes
         return data_slice.updated(c=(c_start, c_stop))
+
+    def is_applicable_to(self, datasource: DataSource) -> bool:
+        return (
+            self.feature_extractor.is_applicable_to(datasource) and
+            datasource.roi.c == self.num_input_channels
+        )
 
     @operator_cache # type: ignore
     def compute(self, roi: DataRoi) -> Predictions:

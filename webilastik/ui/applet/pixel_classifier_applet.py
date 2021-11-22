@@ -1,10 +1,10 @@
-from typing import Generic, Mapping, Optional, Sequence, Dict, Any, Iterator, TypeVar
+from typing import Generic, Mapping, Optional, Sequence, Dict, Any, Iterator, Tuple, TypeVar
 import textwrap
 
 from webilastik.datasource import DataRoi
 import numpy as np
 
-from webilastik.ui.applet  import Applet, DerivedSlot, NotReadyException, Slot, CONFIRMER
+from webilastik.ui.applet  import Applet, AppletOutput, PropagationOk, PropagationResult, UserPrompt, applet_output
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.annotations.annotation import Annotation, Color
 from webilastik.features.ilp_filter import IlpFilter
@@ -49,83 +49,97 @@ DEFAULT_ILP_CLASSIFIER_FACTORY = textwrap.dedent(
         ]
     ).encode("utf8")
 
+Classifier = VigraPixelClassifier[IlpFilter]
+ColorMap = Dict[Color, np.uint8]
 
 class PixelClassificationApplet(Applet):
-    pixel_classifier: Slot[VigraPixelClassifier[IlpFilter]]
-
     def __init__(
         self,
         name: str,
         *,
-        feature_extractors: Slot[Sequence[IlpFilter]],
-        annotations: Slot[Sequence[Annotation]],
+        feature_extractors: AppletOutput[Sequence[IlpFilter]],
+        annotations: AppletOutput[Sequence[Annotation]],
     ):
         self._in_feature_extractors = feature_extractors
         self._in_annotations = annotations
-        self.pixel_classifier = DerivedSlot[VigraPixelClassifier[IlpFilter]](
-            owner=self,
-            refresher=self._create_pixel_classifier
-        )
-        self.color_map = DerivedSlot[Dict[Color, np.uint8]](
-            owner=self,
-            refresher=self._create_color_map
-        )
+        self._pixel_classifier: Optional[Classifier] = None
+        self._color_map: Optional[ColorMap] = None
         super().__init__(name=name)
 
-    def _create_pixel_classifier(self, confirmer: CONFIRMER) -> Optional[VigraPixelClassifier[IlpFilter]]:
-        classifier = VigraPixelClassifier[IlpFilter].train(
-            annotations=self._in_annotations(),
-            feature_extractors=self._in_feature_extractors()
-        )
-        classifier.__getstate__() #warm up pickle cache?
-        return classifier
+    def take_snapshot(self) -> Tuple[Optional[Classifier], Optional[ColorMap]]:
+        return (self._pixel_classifier, self._color_map)
 
-    def _create_color_map(self, confirmer: CONFIRMER) -> Optional[Dict[Color, np.uint8]]:
-        annotations = self._in_annotations.get() or []
-        return Color.create_color_map([a.color for a in annotations])
+    def restore_snaphot(self, snapshot: Tuple[Optional[Classifier], Optional[ColorMap]]) -> None:
+        self._pixel_classifier = snapshot[0]
+        self._color_map = snapshot[1]
 
-    def predict(self, roi: DataRoi) -> Predictions:
-        classifier = self.pixel_classifier()
-        return classifier.compute(roi)
+    @applet_output
+    def pixel_classifier(self) -> Optional[VigraPixelClassifier[IlpFilter]]:
+        return self._pixel_classifier
 
-    def get_ilp_classifier_feature_names(self) -> Iterator[bytes]:
-        num_input_channels = self._in_annotations()[0].raw_data.shape.c #FIXME: all lanes always have same c?
-        for fe in sorted(self._in_feature_extractors(), key=lambda ex: FeatureSelectionApplet.ilp_feature_names.index(ex.__class__.__name__)):
-            for c in range(num_input_channels * fe.channel_multiplier):
-                name_and_channel = fe.ilp_name + f" [{c}]"
-                yield name_and_channel.encode("utf8")
+    @applet_output
+    def color_map(self) -> Optional[Dict[Color, np.uint8]]:
+        return self._color_map
 
-    def get_classifier_ilp_data(self) -> Mapping[str, Any]:
-        classifier = self.pixel_classifier()
-        out = classifier.get_forest_data()
-        feature_names: Iterator[bytes] = self.get_ilp_classifier_feature_names()
-        out["feature_names"] = np.asarray(list(feature_names))
-        out[
-            "pickled_type"
-        ] = b"clazyflow.classifiers.parallelVigraRfLazyflowClassifier\nParallelVigraRfLazyflowClassifier\np0\n."
-        out["known_labels"] = np.asarray(classifier.classes).astype(np.uint32)
-        return out
+    def on_dependencies_changed(self, user_prompt: UserPrompt) -> PropagationResult:
+        print(f"[DEBUG] Running refresh on pixel classification applet")
+        annotations = self._in_annotations()
+        feature_extractors = self._in_feature_extractors()
+        if not annotations or not feature_extractors:
+            self._pixel_classifier = None
+            self._color_map = None
+        else:
+            self._pixel_classifier = VigraPixelClassifier[IlpFilter].train(
+                annotations=annotations,
+                feature_extractors=feature_extractors
+            )
+            self._color_map = Color.create_color_map([a.color for a in annotations])
+            _ = self._pixel_classifier.__getstate__() #warm up pickle cache?
+        return PropagationOk()
 
-    @property
-    def ilp_data(self) -> Dict[str, Any]:
-        out = {
-            "Bookmarks": {"0000": []},
-            "StorageVersion": "0.1",
-            "ClassifierFactory": DEFAULT_ILP_CLASSIFIER_FACTORY,
-        }
-        try:
-            out["ClassifierForests"] = self.get_classifier_ilp_data()
-        except NotReadyException:
-            pass
 
-        out["LabelSets"] = labelSets = {"labels000": {}}  # empty labels still produce this in classic ilastik
-        color_map = self.color_map()
-        datasources = {a.raw_data for a in self._in_annotations.get() or []} # FIXME: is order important?
-        for lane_idx, datasource in enumerate(datasources):
-            lane_annotations = [annot for annot in self._in_annotations() or [] if annot.raw_data == datasource]
-            label_data = Annotation.dump_as_ilp_data(lane_annotations, color_map=color_map)
-            labelSets[f"labels{lane_idx:03d}"] = label_data
-        out["LabelColors"] = np.asarray([color.rgba[:-1] for color in color_map.keys()], dtype=np.int64)
-        out["PmapColors"] = out["LabelColors"]
-        out["LabelNames"] = np.asarray([color.name.encode("utf8") for color in color_map.keys()])
-        return out
+
+
+    # def get_ilp_classifier_feature_names(self) -> Iterator[bytes]:
+    #     # FIXME: annotations can be empty!
+    #     num_input_channels = self._in_annotations()[0].raw_data.shape.c #FIXME: all lanes always have same c?
+    #     for fe in sorted(self._in_feature_extractors(), key=lambda ex: FeatureSelectionApplet.ilp_feature_names.index(ex.__class__.__name__)):
+    #         for c in range(num_input_channels * fe.channel_multiplier):
+    #             name_and_channel = fe.ilp_name + f" [{c}]"
+    #             yield name_and_channel.encode("utf8")
+
+    # def get_classifier_ilp_data(self) -> Mapping[str, Any]:
+    #     classifier = self._pixel_classifier
+    #     if classifier is None:
+    #         return {} # FIXME
+    #     out = classifier.get_forest_data()
+    #     feature_names: Iterator[bytes] = self.get_ilp_classifier_feature_names()
+    #     out["feature_names"] = np.asarray(list(feature_names))
+    #     out[
+    #         "pickled_type"
+    #     ] = b"clazyflow.classifiers.parallelVigraRfLazyflowClassifier\nParallelVigraRfLazyflowClassifier\np0\n."
+    #     out["known_labels"] = np.asarray(classifier.classes).astype(np.uint32)
+    #     return out
+
+    # @property
+    # def ilp_data(self) -> Dict[str, Any]:
+    #     out = {
+    #         "Bookmarks": {"0000": []},
+    #         "StorageVersion": "0.1",
+    #         "ClassifierFactory": DEFAULT_ILP_CLASSIFIER_FACTORY,
+    #     }
+    #     classifier_forests = self.get_classifier_ilp_data()
+    #     if classifier_forests:
+    #         out["ClassifierForests"] = classifier_forests
+
+    #     out["LabelSets"] = labelSets = {"labels000": {}}  # empty labels still produce this in classic ilastik
+    #     color_map = self.color_map()
+    #     datasources = {a.raw_data for a in self._in_annotations()} # FIXME: is order important?
+    #     for lane_idx, datasource in enumerate(datasources):
+    #         lane_annotations = [annot for annot in self._in_annotations() if annot.raw_data == datasource]
+    #         label_data = Annotation.dump_as_ilp_data(lane_annotations, color_map=color_map)
+    #         labelSets[f"labels{lane_idx:03d}"] = label_data
+    #     out["LabelColors"] = np.asarray([color.rgba[:-1] for color in color_map.keys()], dtype=np.int64)
+    #     out["PmapColors"] = out["LabelColors"]
+    #     out["LabelNames"] = np.asarray([color.name.encode("utf8") for color in color_map.keys()])
+    #     return out

@@ -9,10 +9,10 @@ from typing_extensions import ParamSpec, Concatenate, final
 T = TypeVar("T")
 
 class UserPrompt(Protocol):
-    def __call__(self, options: Dict[str, T]) -> Optional[T]:
+    def __call__(self, message: str, options: Dict[str, T]) -> Optional[T]:
         ...
 
-def dummy_prompt(options: Dict[str, T]) -> Optional[T]:
+def dummy_prompt(message: str, options: Dict[str, T]) -> Optional[T]:
     for value in options.values():
         return value
     return None
@@ -115,6 +115,8 @@ class UserInteraction(Generic[P]):
     def __init__(self, *, applet: APPLET, applet_method: Callable[Concatenate[APPLET, UserPrompt, P], PropagationResult]):
         self.applet = applet
         self._applet_method = applet_method
+        self.__name__ = applet_method.__name__
+        self.__self__ = applet
 
     def __call__(self, user_prompt: UserPrompt, *args: P.args, **kwargs: P.kwargs) -> PropagationResult:
         applet_snapshot = self.applet.take_snapshot()
@@ -130,10 +132,10 @@ class UserInteraction(Generic[P]):
             self.applet.restore_snaphot(applet_snapshot)
             raise
 
-class user_interaction(Generic[P]):
+class user_interaction(Generic[APPLET, P]):
     """A decorator for user interaction methods on applets"""
 
-    def __init__(self, applet_method: Callable[Concatenate[Applet, UserPrompt, P], PropagationResult]):
+    def __init__(self, applet_method: Callable[Concatenate[APPLET, UserPrompt, P], PropagationResult]):
         self._applet_method = applet_method
         self.private_name: str = "__user_interaction_" + applet_method.__name__
 
@@ -154,6 +156,8 @@ class AppletOutput(Generic[OUT]):
         self._method = method
         self._subscribers: List["Applet"] = []
         self.applet = applet
+        self.__name__ = method.__name__
+        self.__self__ = applet
 
     def __call__(self) -> OUT:
         return self._method(self.applet)
@@ -170,9 +174,9 @@ class AppletOutput(Generic[OUT]):
         return sorted(out)
 
 
-class applet_output(Generic[OUT]):
+class applet_output(Generic[APPLET, OUT]):
     # private method
-    def __init__(self, method: Callable[[Applet], OUT]):
+    def __init__(self, method: Callable[[APPLET], OUT]):
         self._method = method
         self.private_name = "__output_slot_" + method.__name__
 

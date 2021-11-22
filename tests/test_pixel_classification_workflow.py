@@ -1,10 +1,12 @@
 from pathlib import Path
+from typing import Tuple
+from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
+from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale, RawEncoder
 from webilastik.filesystem.osfs import OsFs
 from webilastik.scheduling.hashing_executor import HashingExecutor
 # from webilastik.scheduling.multiprocess_runner import MultiprocessRunner
 from ndstructs.point5D import Shape5D
-
-import numpy as np
+import uuid
 
 from ndstructs.point5D import Point5D
 from webilastik.datasource import DataRoi
@@ -12,19 +14,18 @@ from webilastik.datasource import SkimageDataSource
 
 from webilastik.annotations import Annotation, Color
 from webilastik.features.channelwise_fastfilters import GaussianSmoothing, HessianOfGaussianEigenvalues
+from webilastik.ui.applet.datasource_batch_processing_applet import DatasourceBatchProcessingApplet
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.ui.applet.brushing_applet import BrushingApplet
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
+from webilastik.ui.applet import dummy_prompt
+from webilastik.filesystem.bucket_fs import BucketFs
 
 
-#dummy_confirmer = lambda msg: True
-def dummy_confirmer(msg: str) -> bool:
-    return input(msg + ": ") == "y"
 
-def crashing_confirmer(msg: str) -> bool:
-    raise ValueError("Test failed! his was not supposed to be called!")
-
-def test_pixel_classification_workflow():
+def test_pixel_classification_workflow(
+    raw_data_source: SkimageDataSource, pixel_annotations: Tuple[Annotation, ...], bucket_fs: BucketFs
+):
     brushing_applet = BrushingApplet("brushing_applet")
     feature_selection_applet = FeatureSelectionApplet("feature_selection_applet", datasources=brushing_applet.datasources)
     pixel_classifier_applet = PixelClassificationApplet(
@@ -32,59 +33,90 @@ def test_pixel_classification_workflow():
         feature_extractors=feature_selection_applet.feature_extractors,
         annotations=brushing_applet.annotations
     )
-    # wf = PixelClassificationWorkflow(
-    #     feature_selection_applet=feature_selection_applet,
-    #     brushing_applet=brushing_applet,
-    #     pixel_classifier_applet=pixel_classifier_applet,
-    #     predictions_export_applet=predictions_export_applet
-    # )
-
-    # GUI creates a datasource somewhere...
-    ds = SkimageDataSource(Path("public/images/c_cells_1.png"), filesystem=OsFs("."), tile_shape=Shape5D(x=400, y=400))
+    batch_applet = DatasourceBatchProcessingApplet(
+        name="batch applet",
+        executor=HashingExecutor(max_workers=8, name="batch executor"),
+        operator=pixel_classifier_applet.pixel_classifier
+    )
 
     # GUI creates some feature extractors
-    feature_selection_applet.feature_extractors.set_value(
+    _ = feature_selection_applet.add_feature_extractors(
+        dummy_prompt,
         [
             GaussianSmoothing.from_ilp_scale(scale=0.3, axis_2d="z"),
             HessianOfGaussianEigenvalues.from_ilp_scale(scale=0.7, axis_2d="z"),
         ],
-        confirmer=dummy_confirmer
     )
+    assert len(feature_selection_applet.feature_extractors()) == 2
 
     # GUI creates some annotations
-    brush_strokes = [
-            Annotation.interpolate_from_points(
-                voxels=[Point5D.zero(x=140, y=150), Point5D.zero(x=145, y=155)],
-                color=Color(r=np.uint8(0), g=np.uint8(0), b=np.uint8(255)),
-                raw_data=ds
-            ),
-            Annotation.interpolate_from_points(
-                voxels=[Point5D.zero(x=238, y=101), Point5D.zero(x=229, y=139)],
-                color=Color(r=np.uint8(0), g=np.uint8(0), b=np.uint8(255)),
-                raw_data=ds
-            ),
-            Annotation.interpolate_from_points(
-                voxels=[Point5D.zero(x=283, y=87), Point5D.zero(x=288, y=92)],
-                color=Color(r=np.uint8(255), g=np.uint8(0), b=np.uint8(0)),
-                raw_data=ds
-            ),
-            Annotation.interpolate_from_points(
-                voxels=[Point5D.zero(x=274, y=168), Point5D.zero(x=256, y=191)],
-                color=Color(r=np.uint8(255), g=np.uint8(0), b=np.uint8(0)),
-                raw_data=ds
-            ),
-    ]
-    brushing_applet.annotations.set_value(brush_strokes, confirmer=dummy_confirmer)
-
-
-    # preds = predictions_export_applet.compute(DataRoi(ds))
+    _ = brushing_applet.add_annotations(
+        dummy_prompt,
+        pixel_annotations,
+    )
 
     classifier = pixel_classifier_applet.pixel_classifier()
-    executor = HashingExecutor(num_workers=8)
+    assert classifier != None
+    executor = batch_applet.executor
 
-    # calculate predictions on an arbitrary data
-    preds = executor.submit(classifier.compute, ds.roi)
-    preds.result().as_uint8().show_channels()
+
+    # calculate predictions on the entire data source
+    preds_future = executor.submit(classifier.compute, raw_data_source.roi)
+    preds_future.result().as_uint8().show_channels()
+
+    # calculate predictions on just a piece of arbitrary data
+    exported_tile = executor.submit(classifier.compute, DataRoi(datasource=raw_data_source, x=(100, 200), y=(100, 200)))
+    exported_tile.result().show_channels()
+
+    # try running an export job
+    basic_pixel_classification_test_path = Path("basic_pixel_classification_test")
+    sink = PrecomputedChunksSink.create(
+        base_path=basic_pixel_classification_test_path,
+        filesystem=bucket_fs,
+        info=PrecomputedChunksInfo(
+            data_type=raw_data_source.dtype,
+            type_="image",
+            num_channels=classifier.num_classes,
+            scales=tuple([
+                PrecomputedChunksScale(
+                    key=Path("exported_data"),
+                    size=(raw_data_source.shape.x, raw_data_source.shape.y, raw_data_source.shape.z),
+                    chunk_sizes=tuple([
+                        (raw_data_source.tile_shape.x, raw_data_source.tile_shape.y, raw_data_source.tile_shape.z)
+                    ]),
+                    encoding=RawEncoder(),
+                    voxel_offset=(raw_data_source.location.x, raw_data_source.location.y, raw_data_source.location.z),
+                    resolution=raw_data_source.spatial_resolution
+                )
+            ]),
+        )
+    ).scale_sinks[0]
+
+    def on_progress(job_id: uuid.UUID, step_index: int):
+        print(f"===>>> Job {job_id} completed step {step_index}")
+
+    def on_complete(job_id: uuid.UUID):
+        print(f"===>>> Job {job_id} is finished!")
+
+    job = batch_applet.start_export_job(
+        user_prompt=dummy_prompt,
+        source=raw_data_source,
+        sink=sink,
+        on_progress=on_progress,
+        on_complete=on_complete
+    )
+
+    import time
+    while job.status in ("pending", "running"):
+        time.sleep(1)
+    assert job.status == "succeeded"
+
+
+    #try removing a brush stroke
+    _ = brushing_applet.remove_annotations(dummy_prompt, pixel_annotations[0:1])
+    assert tuple(brushing_applet.annotations()) == tuple(pixel_annotations[1:])
+
+
 
     # for png_bytes in preds.to_z_slice_pngs():
     #     path = f"/tmp/junk_test_image_{uuid.uuid4()}.png"
@@ -92,13 +124,4 @@ def test_pixel_classification_workflow():
     #         outfile.write(png_bytes.getbuffer())
     #     os.system(f"gimp {path}")
 
-
-    # calculate predictions on just a piece of arbitrary data
-    exported_tile = executor.submit(classifier.compute, DataRoi(datasource=ds, x=(100, 200), y=(100, 200)))
-    exported_tile.result().show_channels()
-
-    # wf.save_as(Path("/tmp/blas.ilp"))
-
-    #try removing a brush stroke
-    brushing_applet.annotations.set_value(brush_strokes[1:], confirmer=dummy_confirmer)
-    assert tuple(brushing_applet.annotations()) == tuple(brush_strokes[1:])
+    executor.shutdown()
