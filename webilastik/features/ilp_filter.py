@@ -44,6 +44,7 @@ class IlpFilter(FeatureExtractor):
         name += " in 2D" if self.axis_2d is not None else " in 3D"
         return name
 
+    @abstractmethod
     def to_json_data(self) -> JsonValue:
         pass
 
