@@ -92,6 +92,7 @@ def test_descriptors_produce_independent_slots():
     input_applet_2 = InputIdentityApplet("input2")
 
     assert input_applet_1.value != input_applet_2.value
+    assert id(input_applet_1.value) == id(input_applet_1.value)
     assert id(input_applet_1.value) != id(input_applet_2.value)
 
     assert input_applet_1.set_value != input_applet_2.set_value
@@ -197,3 +198,29 @@ def test_snapshotting_on_cancelled_refresh():
     result = input_applet.set_value(dummy_prompt, 20)
     assert isinstance(result, UserCancelled)
     assert caching_trippler_applet.out_trippled() == 30 # check if value restored back from 60 to 30
+
+
+def test_applet_inheritance():
+    class A(InputIdentityApplet):
+        pass
+
+    class B(NoSnapshotApplet, InertApplet):
+        def __init__(self, value: AppletOutput[Optional[int]]) -> None:
+            self._in_value = value
+            super().__init__(name="b")
+
+    class C(NoSnapshotApplet, InertApplet):
+        def __init__(self, value: AppletOutput[Optional[int]]) -> None:
+            self._in_value = value
+            super().__init__(name="b")
+
+    a = A(name="a")
+
+    b = B(value=a.value)
+    a_downstream = a.get_downstream_applets()
+    assert b in a_downstream and len(a_downstream) == 1
+
+    c = C(value=a.value)
+    a_downstream = a.get_downstream_applets()
+    assert b in a_downstream and c in a_downstream and len(a_downstream) == 2
+

@@ -36,25 +36,25 @@ class PropagationOk(PropagationResult):
     def _abstract_sentinel(self):
         return
 
+class PropagationError(PropagationResult):
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+    def _abstract_sentinel(self):
+        return
+
+
 _propagation_lock = threading.RLock()
 
 class Applet(ABC):
     def __init__(self, name: str) -> None:
         self.name = name
-
-        # touch descriptors to initialize them. FIXME: could this be removed?
-        for field_name in vars(self.__class__).keys():
-            getattr(self, field_name)
-
         self.upstream_applets: Set[Applet] = set()
-        self.outputs: Dict[str, AppletOutput[Any]] = {}
-        for field_name, field in self.__dict__.items():
+        for field in self.__dict__.values():
             if isinstance(field, UserInteraction):
                 assert field.applet == self, "Borrowing UserInputs messes up dirty propagation"
             elif isinstance(field, AppletOutput):
-                if field.applet == self:
-                    self.outputs[field_name] = field
-                else:
+                if field.applet is not self:
                     field.subscribe(self)
                     self.upstream_applets.add(field.applet)
                     self.upstream_applets.update(field.applet.upstream_applets)
@@ -99,8 +99,9 @@ class Applet(ABC):
     def get_downstream_applets(self) -> List["Applet"]:
         """Returns a list of the topologically sorted descendants of this applet"""
         out : Set[Applet] = set()
-        for output in self.outputs.values():
-            out.update(output.get_downstream_applets())
+        for field in self.__dict__.values():
+            if isinstance(field, AppletOutput) and field.applet is self:
+                out.update(field.get_downstream_applets())
         return sorted(out)
 
     def __lt__(self, other: "Applet") -> bool:
@@ -159,6 +160,9 @@ class AppletOutput(Generic[OUT]):
         self.__name__ = method.__name__
         self.__self__ = applet
 
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} {self.applet.name}.{self._method.__name__}>"
+
     def __call__(self) -> OUT:
         return self._method(self.applet)
 
@@ -170,6 +174,7 @@ class AppletOutput(Generic[OUT]):
         """Returns a list of the topologically sorted applets consuming this output"""
         out : Set["Applet"] = set(self._subscribers)
         for applet in self._subscribers:
+            out.add(applet)
             out.update(applet.get_downstream_applets())
         return sorted(out)
 
