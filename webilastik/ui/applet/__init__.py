@@ -55,7 +55,7 @@ class Applet(ABC):
                 assert field.applet == self, "Borrowing UserInputs messes up dirty propagation"
             elif isinstance(field, AppletOutput):
                 if field.applet is not self:
-                    field.subscribe(self)
+                    _ = field.subscribe(self) # FIXME: maybe no __dict__ magic and explicit subscribe?
                     self.upstream_applets.add(field.applet)
                     self.upstream_applets.update(field.applet.upstream_applets)
 
@@ -96,6 +96,7 @@ class Applet(ABC):
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} name={self.name}>"
 
+    @final
     def get_downstream_applets(self) -> List["Applet"]:
         """Returns a list of the topologically sorted descendants of this applet"""
         out : Set[Applet] = set()
@@ -166,9 +167,10 @@ class AppletOutput(Generic[OUT]):
     def __call__(self) -> OUT:
         return self._method(self.applet)
 
-    def subscribe(self, applet: "Applet"):
+    def subscribe(self, applet: "Applet") -> "AppletOutput[OUT]":
         """Registers 'applet' as an observer of this output. Should only be used in Applet's __init__"""
         self._subscribers.append(applet)
+        return self
 
     def get_downstream_applets(self) -> List["Applet"]:
         """Returns a list of the topologically sorted applets consuming this output"""
