@@ -1,3 +1,5 @@
+# pyright: reportUnusedCallResult=false
+
 from functools import wraps
 import json
 from typing import Any, Callable, Coroutine, Dict, NoReturn, TypeVar,  Type, Generic, Optional
@@ -5,20 +7,13 @@ from pathlib import Path, PurePosixPath
 import tempfile
 import uuid
 import asyncio
-import sys
 
-import aiohttp
+from aiohttp import web
 
 from webilastik.libebrains.user_token import UserToken
 from webilastik.libebrains.oidc_client import OidcClient
-from aiohttp import web
-import os
-import logging
-
 from webilastik.utility.url import Url, Protocol
 from webilastik.server.session import Session, LocalSession
-
-# logging.basicConfig(level=logging.DEBUG)
 
 SESSION_TYPE = TypeVar("SESSION_TYPE", bound=Session)
 
@@ -90,7 +85,6 @@ def require_ebrains_login(
         return ebrains_session.set_cookie(response)
 
     return wrapper
-
 
 class SessionAllocator(Generic[SESSION_TYPE]):
     def __init__(

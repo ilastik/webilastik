@@ -1,3 +1,5 @@
+# pyright: reportUnusedCallResult=false
+
 from abc import ABC, abstractmethod
 from pathlib import Path
 import signal
@@ -8,8 +10,8 @@ from typing import Type, TypeVar, Generic
 import uuid
 from uuid import UUID
 import sys
-from webilastik.libebrains.user_token import UserToken
 
+from webilastik.libebrains.user_token import UserToken
 import webilastik.ui.workflow.ws_pixel_classification_workflow
 
 SESSION_SCRIPT_PATH = Path(__file__).parent.joinpath("reverse_tunnel_to_master.sh")
