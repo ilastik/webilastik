@@ -16,7 +16,7 @@ from webilastik.datasource import SkimageDataSource
 
 from webilastik.annotations import Annotation, Color
 from webilastik.features.channelwise_fastfilters import GaussianSmoothing, HessianOfGaussianEigenvalues
-from webilastik.ui.applet.datasource_batch_processing_applet import DatasourceBatchProcessingApplet
+from webilastik.ui.applet.datasource_batch_processing_applet import DatasourceBatchProcessingApplet, PixelClasificationExportingApplet
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.ui.applet.brushing_applet import BrushingApplet
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
@@ -35,10 +35,10 @@ def test_pixel_classification_workflow(
         feature_extractors=feature_selection_applet.feature_extractors,
         annotations=brushing_applet.annotations
     )
-    batch_applet = DatasourceBatchProcessingApplet(
+    batch_applet = PixelClasificationExportingApplet(
         name="batch applet",
         executor=HashingExecutor(max_workers=8, name="batch executor"),
-        operator=pixel_classifier_applet.pixel_classifier
+        classifier=pixel_classifier_applet.pixel_classifier
     )
 
     # GUI creates some feature extractors
