@@ -7,8 +7,7 @@
   "reportMissingTypeArgument": true,
   "reportMissingTypeStubs": "warning",
   "useLibraryCodeForTypes": true,
-
-
-  "pythonVersion": "3.7",
+  "reportUnusedVariable": "warning",
+  "pythonVersion": "3.8",
   "pythonPlatform": "Linux"
 }

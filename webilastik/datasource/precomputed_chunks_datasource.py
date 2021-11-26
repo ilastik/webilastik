@@ -2,7 +2,8 @@ from typing import Optional, Tuple
 from pathlib import Path
 import json
 
-from ndstructs import Point5D, Shape5D, Interval5D, Array5D
+from ndstructs.point5D import Point5D, Shape5D, Interval5D
+from ndstructs.array5D import Array5D
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonIntTripplet, ensureJsonObject, ensureJsonString
 
 from webilastik.datasource import DataSource

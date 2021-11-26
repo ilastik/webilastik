@@ -6,6 +6,7 @@ from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonO
 from ndstructs.array5D import Array5D
 
 from webilastik.datasink import DataSink, DATASINK_FROM_JSON_CONSTRUCTORS
+from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.filesystem import JsonableFilesystem
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale5D
 
@@ -69,6 +70,13 @@ class PrecomputedChunksScaleSink(DataSink):
             tile_shape=self.scale.chunk_sizes_5d[0], #FIXME
             interval=self.scale.interval,
             dtype=dtype, #type: ignore
+        )
+
+    def to_datasource(self) -> PrecomputedChunksDataSource:
+        return PrecomputedChunksDataSource(
+            filesystem=self.filesystem,
+            path=self.base_path,
+            resolution=self.scale.resolution,
         )
 
     def to_json_value(self) -> JsonObject:

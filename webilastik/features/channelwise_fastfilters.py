@@ -4,10 +4,9 @@ import math
 import fastfilters #type: ignore
 
 import numpy
-from ndstructs import Array5D
-from ndstructs.array5D import All
+from ndstructs.array5D import All, Array5D
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString, ensureJsonFloat
-from ndstructs import Point5D, Interval5D, Shape5D
+from ndstructs.point5D import Point5D, Shape5D
 
 from .feature_extractor import FeatureData
 from .ilp_filter import IlpFilter

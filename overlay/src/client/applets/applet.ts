@@ -1,5 +1,4 @@
-import { JsonableValue, IDeserializer, toJsonValue, ensureJsonObject } from "../../util/serialization";
-
+import { JsonableValue, IDeserializer, ensureJsonObject, IJsonableObject, toJsonValue } from "../../util/serialization";
 
 export class Applet<STATE extends JsonableValue>{
     public readonly name: string
@@ -27,18 +26,18 @@ export class Applet<STATE extends JsonableValue>{
                 return
             }
             console.log(`vvvvvvvv ${this.name} got this state from server:\n${JSON.stringify(applet_payload, null, 4)}`)
-            let new_state = this.deserializer(applet_payload)
             if(onNewState){
+                let new_state = this.deserializer(applet_payload)
                 onNewState(new_state)
             }
         })
     }
 
-    protected updateUpstreamState(new_state: STATE){
-        const args = toJsonValue(new_state)
-        console.debug(`^^^^^^^ ${this.name} is pushing following state:\n${JSON.stringify(args, null, 4)}`)
-        this.socket.send(JSON.stringify({
-            [this.name]: toJsonValue(new_state)
+    protected doRPC(method_name: string, method_arguments: IJsonableObject){
+        return this.socket.send(JSON.stringify({
+            applet_name: this.name,
+            method_name,
+            arguments: toJsonValue(method_arguments),
         }))
     }
 }

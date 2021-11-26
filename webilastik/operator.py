@@ -1,10 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Callable, Generic, Optional, Type, TypeVar
+from typing import Generic, TypeVar
 
-import numpy as np
-
-from webilastik.datasource import DataRoi, DataSource
-from ndstructs import Array5D, Shape5D
+from webilastik.datasource import DataRoi
+from ndstructs.array5D import Array5D
 
 IN = TypeVar("IN", contravariant=True)
 OUT = TypeVar("OUT", covariant=True)

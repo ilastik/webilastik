@@ -2,8 +2,8 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import List, Sequence, Mapping, Tuple, Dict, Iterable, Sequence, Any, Optional
 
 import numpy as np
-from ndstructs import Interval5D, Point5D, Shape5D
-from ndstructs import Array5D, All, ScalarData, StaticLine
+from ndstructs.point5D import Interval5D, Point5D, Shape5D
+from ndstructs.array5D import Array5D, All, ScalarData, StaticLine
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonArray, ensureJsonInt, ensureJsonObject, ensureJsonString
 
 from webilastik.datasource import DataSource, DataRoi

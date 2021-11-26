@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Iterator, List, Generic, Optional, Sequence, Dict, TypeVar, Type
+from typing import Iterator, List, Generic, Optional, Sequence, Dict, TypeVar
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 import tempfile
@@ -14,13 +14,14 @@ import numpy as np
 from vigra.learning import RandomForest as VigraRandomForest
 from sklearn.ensemble import RandomForestClassifier as ScikitRandomForestClassifier
 
-from ndstructs import Array5D, Interval5D, Point5D, Shape5D
-from webilastik.features.feature_extractor import FeatureExtractor, FeatureData
+from ndstructs.array5D import Array5D
+from ndstructs.point5D import Interval5D, Point5D
+from webilastik.features.feature_extractor import FeatureExtractor
 from webilastik.features.feature_extractor import FeatureExtractorCollection
-from webilastik.annotations import Annotation, FeatureSamples, Color
+from webilastik.annotations import Annotation, Color
 from webilastik import Project
 from webilastik.operator import Operator
-from webilastik.datasource import DataRoi
+from webilastik.datasource import DataRoi, DataSource
 
 try:
     import ilastik_operator_cache # type: ignore
@@ -134,6 +135,12 @@ class PixelClassifier(Operator[DataRoi, Predictions], Generic[FE]):
         c_stop = c_start + self.num_classes
         return data_slice.updated(c=(c_start, c_stop))
 
+    def is_applicable_to(self, datasource: DataSource) -> bool:
+        return (
+            self.feature_extractor.is_applicable_to(datasource) and
+            datasource.roi.c == self.num_input_channels
+        )
+
     @operator_cache # type: ignore
     def compute(self, roi: DataRoi) -> Predictions:
         self.feature_extractor.ensure_applicable(roi.datasource)
@@ -231,7 +238,6 @@ class VigraPixelClassifier(PixelClassifier[FE]):
     @lru_cache() #FIMXE: double check classifier __hash__/__eq__
     def __getstate__(self):
         out = self.__dict__.copy()
-        forest_data = self.get_forest_data()
         out["forests"] = self.get_forest_data()
         return out
 

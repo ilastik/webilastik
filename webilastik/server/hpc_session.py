@@ -9,6 +9,7 @@ import signal
 import tempfile
 from argparse import ArgumentParser
 from uuid import UUID
+from webilastik.libebrains.user_token import UserToken
 
 from webilastik.server.session import Session, SESSION_SCRIPT_PATH
 from webilastik.hpc.job import EBrainsClient, JobDescription, JobImport, JobResources
@@ -32,9 +33,11 @@ class HpcSession(Session):
         master_host: str,
         socket_at_master: Path,
         time_limit_seconds: int,
+        ebrains_user_token: UserToken,
     ) -> "HpcSession":
         process = await asyncio.create_subprocess_exec(
             __file__,
+            "--ebrains-access-token=" + ebrains_user_token.access_token,
             "--master-username=" + master_username,
             "--master-host=" + master_host,
             "--socket-at-master=" + str(socket_at_master),
@@ -70,6 +73,7 @@ class HpcSession(Session):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
+    parser.add_argument("--ebrains-access-token", type=str, required=True)
     parser.add_argument("--master-host")
     parser.add_argument("--master-username", default="wwww-data")
     parser.add_argument("--socket-at-session", type=Path)
@@ -85,6 +89,7 @@ if __name__ == '__main__':
             HPC_PYTHON_EXECUTABLE,
             "-u",
             f"{HPC_WEBILASTIK_DIR}/webilastik/ui/workflow/ws_pixel_classification_workflow.py",
+            f"--ebrains-access-token={args.ebrains_access_token}",
             f"--listen-socket=to-master",
             "tunnel",
             f"--remote-username={args.master_username}",

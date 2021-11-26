@@ -1,8 +1,8 @@
 from pathlib import PurePosixPath
-from typing import Optional, Mapping, Union
+from typing import Dict, Optional, Mapping, Union
 
 import requests
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, JsonableValue, ensureJsonObject
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, JsonableValue, ensureJsonObject, ensureJsonString
 
 from webilastik.utility.url import Url
 
@@ -33,6 +33,28 @@ class UserToken:
         # self.session_state = session_state
         # self.scope = scope
 
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "UserToken":
+        value_obj = ensureJsonObject(value)
+        raw_refresh_token = value_obj.get("access_token")
+        if raw_refresh_token is not None:
+            refresh_token = ensureJsonString(raw_refresh_token)
+        else:
+            refresh_token = None
+        return UserToken(
+            access_token=ensureJsonString(value_obj.get("access_token")),
+            refresh_token=refresh_token
+        )
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "access_token": self.access_token,
+            "refresh_token": self.refresh_token,
+        }
+
+    def as_auth_header(self) -> Dict[str, str]:
+        return {"Authorization": f"Bearer {self.access_token}"}
+
     def _get(
         self,
         path: PurePosixPath,
@@ -47,7 +69,7 @@ class UserToken:
             params={**url.search, **(params or {})},
             headers={
                 **(headers or {}),
-                "Authorization": f"Bearer {self.access_token}",
+                **self.as_auth_header(),
             },
             verify=https_verify,
         )

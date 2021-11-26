@@ -11,9 +11,8 @@ import h5py
 import numpy as np
 import skimage.io #type: ignore
 
-from ndstructs import Array5D, Shape5D, Interval5D, Point5D
-from ndstructs.array5D import SPAN_OVERRIDE, All
-from ndstructs.point5D import SPAN
+from ndstructs.point5D import Shape5D, Interval5D, Point5D, SPAN
+from ndstructs.array5D import Array5D, SPAN_OVERRIDE, All
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 
 try:
@@ -420,7 +419,6 @@ class SkimageDataSource(ArrayDataSource):
         )
 
     def __getstate__(self) -> JsonObject:
-        print(json.dumps(self.to_json_value(), indent=4))
         return self.to_json_value()
 
     def __setstate__(self, data: JsonObject):

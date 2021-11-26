@@ -2,13 +2,13 @@ name: webilastik
 channels:
   - defaults
   - conda-forge
-  - ilastik-forge
+  - ilastik-forge/label/freepy
 dependencies:
-  - python>=3.7
+  - python>=3.8
   - numpy
   - fastfilters
   - fs
-  - lemon=1.3.1=he9d42e9_3
+  - lemon
   - vigra
   - scikit-image
   - scikit-learn

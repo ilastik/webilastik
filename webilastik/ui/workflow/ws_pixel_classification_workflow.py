@@ -1,27 +1,36 @@
+# pyright: reportUnusedCallResult=false
+
+
 from abc import abstractmethod
+from dataclasses import dataclass
 import sys
 import os
 import signal
 import asyncio
-from typing import Iterable, List, Optional, Mapping, Sequence, Set
+from typing import Any, Dict, Iterable, List, Optional, Mapping, Sequence
 import json
 from base64 import b64decode
 import ssl
-
-from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
-from webilastik.utility.url import Url
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonArray, ensureJsonObject, ensureJsonString
-from webilastik.scheduling.hashing_executor import HashingExecutor
-
-from webilastik.datasource import DataSource
-from webilastik.server.tunnel import ReverseSshTunnel
-from pathlib import Path
+import uuid
+from aiohttp import web
+import numpy as np
 import contextlib
+from pathlib import Path, PurePosixPath
 
 import aiohttp
-from aiohttp import web
-from webilastik.datasource import DataRoi
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonArray, ensureJsonBoolean, ensureJsonObject, ensureJsonString
 
+from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
+from webilastik.filesystem.bucket_fs import BucketFs
+from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
+from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale, RawEncoder
+from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
+from webilastik.ui.applet.datasource_batch_processing_applet import PixelClasificationExportingApplet
+from webilastik.utility.url import Url
+from webilastik.scheduling.hashing_executor import HashingExecutor, Job
+from webilastik.datasource import DataSource
+from webilastik.server.tunnel import ReverseSshTunnel
+from webilastik.datasource import DataRoi
 from webilastik.features.channelwise_fastfilters import (
     StructureTensorEigenvalues,
     GaussianGradientMagnitude,
@@ -33,17 +42,50 @@ from webilastik.features.channelwise_fastfilters import (
 from webilastik.annotations.annotation import Annotation
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.annotations import Annotation
-from webilastik.ui.applet import Applet, Slot
+from webilastik.ui.applet import Applet, AppletOutput, PropagationError, PropagationOk, PropagationResult, UserPrompt, dummy_prompt
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.ui.applet.brushing_applet import BrushingApplet
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
 from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
+from webilastik.libebrains.user_token import UserToken
+
+
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+sh = logging.StreamHandler(sys.stdout)
+sh.setFormatter(logging.Formatter(
+    '[%(asctime)s] %(levelname)s [%(filename)s.%(funcName)s:%(lineno)d] %(message)s', datefmt='%a, %d %b %Y %H:%M:%S'
+))
+logger.addHandler(sh)
 
 
 def _decode_datasource(datasource_json_b64_altchars_dash_underline: str) -> DataSource:
     json_str = b64decode(datasource_json_b64_altchars_dash_underline.encode('utf8'), altchars=b'-_').decode('utf8')
     return DataSource.from_json_value(json.loads(json_str))
 
+@dataclass
+class RPCPayload:
+    applet_name: str
+    method_name: str
+    arguments: JsonObject
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "RPCPayload":
+        value_obj = ensureJsonObject(value)
+        return RPCPayload(
+            applet_name=ensureJsonString(value_obj.get("applet_name")),
+            method_name=ensureJsonString(value_obj.get("method_name")),
+            arguments=ensureJsonObject(value_obj.get("arguments")),
+        )
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "applet_name": self.applet_name,
+            "method_name": self.method_name,
+            "arguments": self.arguments,
+        }
 
 class WsApplet(Applet):
     @abstractmethod
@@ -51,18 +93,38 @@ class WsApplet(Applet):
         pass
 
     @abstractmethod
-    def _set_json_state(self, state: JsonValue):
-        pass
+    def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> PropagationResult:
+        ...
 
 class WsBrushingApplet(WsApplet, BrushingApplet):
-    def _get_json_state(self) -> JsonValue:
-        return tuple(annotation.to_json_data() for annotation in self.annotations.get() or [])
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
+        self.brushing_enabled = False
 
-    def _set_json_state(self, state: JsonValue):
-        self.annotations.set_value(
-            [Annotation.from_json_value(raw_annotation) for raw_annotation in ensureJsonArray(state)],
-            confirmer=lambda msg: True
-        )
+    def _get_json_state(self) -> JsonValue:
+        return {
+            "annotations": tuple(annotation.to_json_data() for annotation in self.annotations()),
+            "brushing_enabled": self.brushing_enabled,
+        }
+
+    def set_brushing_enabled(self, enabled: bool) -> PropagationResult:
+        self.brushing_enabled = enabled
+        return PropagationOk()
+
+    def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> PropagationResult:
+        if method_name == "brushing_enabled":
+            enabled = ensureJsonBoolean(arguments.get("enabled"))
+            return self.set_brushing_enabled(enabled=enabled)
+
+        raw_annotations = ensureJsonArray(arguments.get("annotations"))
+        annotations = [Annotation.from_json_value(raw_annotation) for raw_annotation in raw_annotations]
+
+        if method_name == "add_annotations":
+            return self.add_annotations(user_prompt, annotations)
+        if method_name == "remove_annotations":
+            return self.remove_annotations(user_prompt, annotations)
+
+        raise ValueError(f"Invalid method name: '{method_name}'")
 
 
 class WsFeatureSelectionApplet(WsApplet, FeatureSelectionApplet):
@@ -84,14 +146,17 @@ class WsFeatureSelectionApplet(WsApplet, FeatureSelectionApplet):
         raise ValueError(f"Could not convert {data} into a Feature Extractor")
 
     def _get_json_state(self) -> JsonValue:
-        return tuple(extractor.to_json_data() for extractor in self.feature_extractors.get() or [])
+        return {"feature_extractors": tuple(extractor.to_json_data() for extractor in self.feature_extractors())}
 
-    def _set_json_state(self, state: JsonValue):
-        raw_feature_array = ensureJsonArray(state)
-        return self.feature_extractors.set_value(
-            [self._item_from_json_data(raw_feature) for raw_feature in raw_feature_array],
-            confirmer=lambda msg: True
-        )
+    def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> PropagationResult:
+        raw_feature_array = ensureJsonArray(arguments.get("feature_extractors"))
+        feature_extractors = [self._item_from_json_data(raw_feature) for raw_feature in raw_feature_array]
+
+        if method_name == "add_feature_extractors":
+            return self.add_feature_extractors(dummy_prompt, feature_extractors)
+        if method_name == "remove_feature_extractors":
+            return self.remove_feature_extractors(user_prompt, feature_extractors)
+        raise ValueError(f"Invalid method name: '{method_name}'")
 
 
 class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
@@ -99,34 +164,34 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
         self,
         name: str,
         *,
-        feature_extractors: Slot[Sequence[IlpFilter]],
-        annotations: Slot[Sequence[Annotation]],
+        feature_extractors: AppletOutput[Sequence[IlpFilter]],
+        annotations: AppletOutput[Sequence[Annotation]],
         runner: HashingExecutor,
     ):
         self.runner = runner
         super().__init__(name=name, feature_extractors=feature_extractors, annotations=annotations)
 
     def _get_json_state(self) -> JsonValue:
-        classifier = self.pixel_classifier.get()
+        classifier = self.pixel_classifier()
         if classifier:
-            producer_is_ready = True
             channel_colors = tuple(color.to_json_data() for color in classifier.color_map.keys())
         else:
-            producer_is_ready = False
             channel_colors = tuple()
 
         return {
-            "producer_is_ready": producer_is_ready,
+            "producer_is_ready": classifier is not None,
             "channel_colors": channel_colors,
         }
 
-    def _set_json_state(self, state: JsonValue):
-        pass
+    def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> PropagationResult:
+        raise ValueError(f"Invalid method name: '{method_name}'")
 
-    async def predictions_precomputed_chunks_info(self, request: web.Request):
+    async def predictions_precomputed_chunks_info(self, request: web.Request) -> web.Response:
         classifier = self.pixel_classifier()
-        expected_num_channels = len(classifier.color_map)
-        encoded_raw_data_url = str(request.match_info.get("encoded_raw_data")) # type: ignore
+        if classifier is None:
+            return web.json_response({"error": "Classifier is not ready yet"}, status=412)
+
+        encoded_raw_data_url = str(request.match_info.get("encoded_raw_data"))
         datasource = _decode_datasource(encoded_raw_data_url)
 
         return web.Response(
@@ -134,7 +199,7 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
                 "@type": "neuroglancer_multiscale_volume",
                 "type": "image",
                 "data_type": "uint8",  # DONT FORGET TO CONVERT PREDICTIONS TO UINT8!
-                "num_channels": expected_num_channels,
+                "num_channels": classifier.num_classes,
                 "scales": [
                     {
                         "key": "data",
@@ -163,10 +228,14 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
         zEnd = int(request.match_info.get("zEnd")) # type: ignore
 
         datasource = _decode_datasource(encoded_raw_data)
-        predictions = await self.runner.async_submit(
-            self.pixel_classifier().compute,
+        classifier = self.pixel_classifier()
+        if classifier is None:
+            return web.json_response({"error": "Classifier is not ready yet"}, status=412)
+
+        predictions = await asyncio.wrap_future(self.runner.submit(
+            classifier.compute,
             DataRoi(datasource, x=(xBegin, xEnd), y=(yBegin, yEnd), z=(zBegin, zEnd))
-        )
+        ))
 
         if "format" in request.query:
             requested_format = request.query["format"]
@@ -193,24 +262,130 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
             content_type="application/octet-stream",
         )
 
+@dataclass
+class PixelExportRequest:
+    raw_data: DataSource
+    bucket_name: str
+    prefix: PurePosixPath
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "PixelExportRequest":
+        value_obj = ensureJsonObject(value)
+        return PixelExportRequest(
+            raw_data=DataSource.from_json_value(value_obj.get("raw_data")),
+            bucket_name=ensureJsonString(value_obj.get("bucket_name")),
+            prefix=PurePosixPath(ensureJsonString(value_obj.get("prefix"))),
+            # filesystem=JsonableFilesystem.from_json_value(value_obj.get("filesystem")),
+        )
+
+class WsExportApplet(WsApplet, PixelClasificationExportingApplet):
+    def __init__(
+        self,
+        *,
+        name: str,
+        executor: HashingExecutor,
+        pixel_classifier: AppletOutput[Optional[VigraPixelClassifier[IlpFilter]]],
+        ebrains_user_token: UserToken
+    ):
+        self.jobs: Dict[uuid.UUID, Job[Any]] = {}
+        self.ebrains_user_token = ebrains_user_token
+
+        super().__init__(name=name, executor=executor, classifier=pixel_classifier)
+
+    def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> PropagationResult:
+        if method_name == "start_export_job":
+            pixel_export_request = PixelExportRequest.from_json_value(arguments)
+            raw_data = pixel_export_request.raw_data
+            output_filesystem = BucketFs(
+                bucket_name=pixel_export_request.bucket_name,
+                prefix=PurePosixPath("/"),
+                ebrains_user_token=self.ebrains_user_token,
+            )
+
+            pixel_classifier = self._in_classifier()
+            if pixel_classifier is None:
+                return PropagationError("Classifier is not ready")
+
+            chunks_scale_sink = PrecomputedChunksSink.create(
+                base_path=Path(pixel_export_request.prefix), #FIXME
+                filesystem=output_filesystem,
+                info=PrecomputedChunksInfo(
+                    data_type=np.dtype("float32"),
+                    type_="image",
+                    num_channels=pixel_classifier.num_classes,
+                    scales=tuple([
+                        PrecomputedChunksScale(
+                            key=Path("exported_data"),
+                            size=(raw_data.shape.x, raw_data.shape.y, raw_data.shape.z),
+                            chunk_sizes=tuple([
+                                (raw_data.tile_shape.x, raw_data.tile_shape.y, raw_data.tile_shape.z)
+                            ]),
+                            encoding=RawEncoder(),
+                            voxel_offset=(raw_data.location.x, raw_data.location.y, raw_data.location.z),
+                            resolution=raw_data.spatial_resolution
+                        )
+                    ]),
+                )
+            ).scale_sinks[0]
+
+
+            def on_job_step_completed(job_id: Any, step_index: int):
+                print(f"** Job step {job_id}:{step_index} done")
+
+            def on_job_completed(job_id: Any):
+                print(f"**** Job {job_id} completed")
+
+            job = self.start_export_job(
+                user_prompt=dummy_prompt,
+                source=raw_data,
+                sink=chunks_scale_sink,
+                on_progress=on_job_step_completed,
+                on_complete=on_job_completed,
+            )
+            self.jobs[job.uuid] = job
+            return PropagationOk()
+        if method_name == "cancel_job":
+            job_id = uuid.UUID(ensureJsonString(arguments.get("job_id")))
+            self.executor.cancel_group(job_id)
+            _ = self.jobs.pop(job_id, None)
+            return PropagationOk()
+        raise ValueError(f"Invalid method name: '{method_name}'")
+
+    def _get_json_state(self) -> JsonObject:
+        return {
+            "jobs": {str(job.uuid): job.to_json_value() for job in self.jobs.values()}
+        }
+
 
 class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
-    def __init__(self, ssl_context: Optional[ssl.SSLContext] = None):
+    def __init__(self, ebrains_user_token: UserToken, ssl_context: Optional[ssl.SSLContext] = None):
         self.ssl_context = ssl_context
+        self.ebrains_user_token = ebrains_user_token
         self.websockets: List[web.WebSocketResponse] = []
+        executor = HashingExecutor(name="Pixel Classification Executor")
+
         brushing_applet = WsBrushingApplet("brushing_applet")
         feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", datasources=brushing_applet.datasources)
         pixel_classifier_applet = WsPixelClassificationApplet(
             "pixel_classification_applet",
             feature_extractors=feature_selection_applet.feature_extractors,
             annotations=brushing_applet.annotations,
-            runner=HashingExecutor(num_workers=8),
+            runner=executor,
         )
+        export_applet = WsExportApplet(
+            name="export_applet",
+            executor=executor,
+            pixel_classifier=pixel_classifier_applet.pixel_classifier,
+            ebrains_user_token=ebrains_user_token
+        )
+
         self.wsapplets : Mapping[str, WsApplet] = {
             feature_selection_applet.name: feature_selection_applet,
             brushing_applet.name: brushing_applet,
             pixel_classifier_applet.name: pixel_classifier_applet,
+            export_applet.name: export_applet,
         }
+
         super().__init__(
             feature_selection_applet=feature_selection_applet,
             brushing_applet=brushing_applet,
@@ -249,21 +424,20 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             content_type="application/json",
         )
 
-
     async def close_session(self, request: web.Request) -> web.Response:
         #FIXME: this is not properly killing the server
-        asyncio.get_event_loop().create_task(self._self_destruct())
+        _ = asyncio.get_event_loop().create_task(self._self_destruct())
         return web.Response()
 
     async def _self_destruct(self, after_seconds: int = 5):
-        await asyncio.sleep(5)
+        _ = await asyncio.sleep(5)
         try:
             pid = os.getpid()
             pgid = os.getpgid(pid)
-            print(f"===>>>> gently killing local session (pid={pid}) with SIGINT on group....")
+            logger.info(f"Gently killing local session (pid={pid}) with SIGINT on group....")
             os.killpg(pgid, signal.SIGINT)
-            await asyncio.sleep(10)
-            print(f"===>>>> Killing local session (pid={pid}) with SIGKILL on group....")
+            _ = await asyncio.sleep(10)
+            logger.info(f"Killing local session (pid={pid}) with SIGKILL on group....")
             os.killpg(pgid, signal.SIGKILL)
         except ProcessLookupError:
             pass
@@ -273,63 +447,59 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
 
     async def open_websocket(self, request: web.Request):
         websocket = web.WebSocketResponse()
-        await websocket.prepare(request)
+        _ = await websocket.prepare(request)
         self.websockets.append(websocket)
+        logger.debug(f"JUST STABILISHED A NEW CONNECTION!!!! {len(self.websockets)}")
         await self._update_clients_state([websocket]) # when a new client connects, send it the current state
         async for msg in websocket:
             if msg.type == aiohttp.WSMsgType.TEXT:
                 if msg.data == 'close':
-                    await websocket.close()
+                    _ = await websocket.close()
                     continue
                 try:
-                    payload = json.loads(msg.data)
-                    await self._update_local_state(new_state=payload, originator=websocket)
+                    parsed_payload = json.loads(msg.data)
+                    logger.debug(f"Got new rpc call:\n{json.dumps(parsed_payload, indent=4)}\n")
+                    payload = RPCPayload.from_json_value(parsed_payload)
+                    await self._do_rpc(payload=payload, originator=websocket)
                 except Exception as e:
-                    print(f"Exception happened on set state:\n\033[31m{e}\033[0m")
+                    logger.error(f"Exception happened on set state:\n{e}")
                     import traceback
                     traceback.print_exc()
                     await self._update_clients_state([websocket]) # restore last known good state of offending client
             elif msg.type == aiohttp.WSMsgType.BINARY:
-                print(f'Unexpected binary message')
+                logger.error(f'Unexpected binary message')
             elif msg.type == aiohttp.WSMsgType.ERROR:
-                print(f'ws connection closed with exception {websocket.exception()}')
+                logger.error(f'ws connection closed with exception {websocket.exception()}')
         if websocket in self.websockets:
             self.websockets.remove(websocket)
-        print('websocket connection closed')
+            logger.debug(f"Removing websocket! {len(self.websockets)}")
+        logger.debug('websocket connection closed')
         return websocket
 
-    async def _update_local_state(self, new_state: JsonValue, originator: web.WebSocketResponse):
-        print(f"\033[34m Got new state:\n{json.dumps(new_state, indent=4)}\n \033[0m")
-        state_obj = ensureJsonObject(new_state)
-        # FIXME: sort applets maybe? only allow for a single applet update?
-        updated_wsapplets: Set[WsApplet] = set()
-        for applet_name, raw_applet_state in state_obj.items():
-            wsapplet = self.wsapplets[applet_name]
-            wsapplet._set_json_state(raw_applet_state)
-            updated_wsapplets.update([wsapplet])
-            updated_wsapplets.update([ap for ap in wsapplet.get_downstream_applets() if isinstance(ap, WsApplet)])
-
-        updated_state = {applet.name: applet._get_json_state() for applet in updated_wsapplets}
-        originator_updated_state = {key: value for key, value in updated_state.items() if key not in state_obj} # FIXME
+    async def _do_rpc(self, originator: web.WebSocketResponse, payload: RPCPayload):
+        _ = self.wsapplets[payload.applet_name].run_rpc(user_prompt=dummy_prompt, method_name=payload.method_name, arguments=payload.arguments)
+        updated_state = {name: applet._get_json_state() for name, applet in self.wsapplets.items()}
 
         for websocket in self.websockets:
             try:
                 if websocket == originator:
+                    # FIXME: this will break if the applet refuses or alters the new state
+                    originator_updated_state = {key: value for key, value in updated_state.items() if key != payload.applet_name} # FIXME
                     await websocket.send_str(json.dumps(originator_updated_state))
                 else:
                     await websocket.send_str(json.dumps(updated_state))
             except ConnectionResetError as e:
-                print(f"!!!!!+++!!!! Got an exception while updating remote:\n{e}\n\nRemoving websocket...")
+                logger.error(f"Got an exception while updating remote:\n{e}\n\nRemoving websocket...")
                 self.websockets.remove(websocket)
 
     async def _update_clients_state(self, websockets: Iterable[web.WebSocketResponse] = ()):
         state : JsonObject = {applet.name: applet._get_json_state() for applet in self.wsapplets.values()}
-        print(f"\033[32m  Updating remote to following state:\n{json.dumps(state, indent=4)}  \033[0m")
+        logger.debug(f"Updating remote to following state:\n{json.dumps(state, indent=4)}")
         for websocket in list(websockets):
             try:
                 await websocket.send_str(json.dumps(state))
             except ConnectionResetError as e:
-                print(f"!!!!!+++!!!! Got an exception while updating remote:\n{e}\n\nRemoving websocket...")
+                logger.error(f"Got an exception while updating remote:\n{e}\n\nRemoving websocket...")
                 self.websockets.remove(websocket)
 
     async def ilp_download(self, request: web.Request):
@@ -358,7 +528,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             return web.Response(status=400, text="Missing parameter: url")
 
         info_url = Url.parse(b64decode(encoded_original_url, altchars=b'-_').decode('utf8')).joinpath("info")
-        print(f"+++++ Will request this info: {info_url.schemeless_raw}", file=sys.stderr)
+        logger.debug(f"Will request this info: {info_url.schemeless_raw}")
         async with aiohttp.ClientSession() as session:
             async with session.get(info_url.schemeless_raw, ssl=self.ssl_context) as response:
                 response_text = await response.text()
@@ -383,6 +553,7 @@ if __name__ == '__main__':
     from argparse import ArgumentParser
 
     parser = ArgumentParser()
+    parser.add_argument("--ebrains-access-token", type=str, required=True)
     parser.add_argument("--listen-socket", type=Path, required=True)
     parser.add_argument("--ca-cert-path", "--ca_cert_path", help="Path to CA crt file. Useful e.g. for testing with mkcert")
 
@@ -406,7 +577,7 @@ if __name__ == '__main__':
 
     if ca_crt is not None:
         if not Path(ca_crt).exists():
-            print(f"File not found: {ca_crt}", file=sys.stderr)
+            logger.error(f"File not found: {ca_crt}")
             exit(1)
         ssl_context = ssl.create_default_context(cafile=ca_crt)
 
@@ -421,6 +592,9 @@ if __name__ == '__main__':
         server_context = contextlib.nullcontext()
 
     with server_context:
-        WsPixelClassificationWorkflow(ssl_context=ssl_context).run(
-            unix_socket_path=str(args.listen_socket)
+        WsPixelClassificationWorkflow(
+            ebrains_user_token=UserToken(access_token=args.ebrains_access_token),
+            ssl_context=ssl_context
+        ).run(
+            unix_socket_path=str(args.listen_socket),
         )

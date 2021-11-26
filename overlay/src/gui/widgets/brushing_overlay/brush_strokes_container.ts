@@ -1,12 +1,13 @@
 import { vec3 } from "gl-matrix";
 import { Applet } from "../../../client/applets/applet";
 import { createElement, createInput, removeElement, vec3ToRgb, vecToString } from "../../../util/misc";
-import { ensureJsonArray } from "../../../util/serialization";
+import { ensureJsonArray, ensureJsonBoolean, ensureJsonObject } from "../../../util/serialization";
 import { BrushStroke } from "./brush_stroke";
 
 export type resolution = vec3;
 
-export class BrushStrokesContainer extends Applet<Array<BrushStroke>>{
+
+export class BrushStrokesContainer extends Applet<{brushing_enabled: boolean, annotations: Array<BrushStroke>}>{
     public readonly element: HTMLTableElement;
 
     private brushStrokeWidgets: BrushStrokeWidget[] = [];
@@ -22,8 +23,13 @@ export class BrushStrokesContainer extends Applet<Array<BrushStroke>>{
         super({
             name: applet_name,
             deserializer: (data) => {
-                let raw_annotations = ensureJsonArray(data);
-                return raw_annotations.map(a => BrushStroke.fromJsonValue(gl, a))
+                let data_obj = ensureJsonObject(data)
+                let brushing_enabled = ensureJsonBoolean(data_obj["brushing_enabled"])
+                let raw_annotations = ensureJsonArray(data_obj["annotations"]);
+                return {
+                    brushing_enabled,
+                    annotations: raw_annotations.map(a => BrushStroke.fromJsonValue(gl, a))
+                }
             },
             socket,
             onNewState: (new_state) => this.onNewState(new_state)
@@ -34,7 +40,7 @@ export class BrushStrokesContainer extends Applet<Array<BrushStroke>>{
 
     public addBrushStroke(brushStroke: BrushStroke){
         this.doAddBrushStroke(brushStroke)
-        this.updateUpstreamState(this.brushStrokeWidgets.map(bsw => bsw.brushStroke))
+        this.doRPC("add_annotations", {annotations: this.brushStrokeWidgets.map(bsw => bsw.brushStroke)})
     }
 
     public getBrushStrokes(): Array<BrushStroke>{
@@ -52,17 +58,17 @@ export class BrushStrokesContainer extends Applet<Array<BrushStroke>>{
                 },
                 onDeleteClicked: (stroke) => {
                     let updated_strokes = this.getBrushStrokes().filter(stk => stk != stroke)
-                    this.onNewState(updated_strokes)
-                    this.updateUpstreamState(updated_strokes)
+                    this.onNewState({brushing_enabled: true, annotations: updated_strokes}) // FIXME: move brushing enable dinto this class
+                    this.doRPC("remove_annotations", {annotations: [stroke]})
                 }
             })
         )
     }
 
-    protected onNewState(brush_strokes: Array<BrushStroke>){
+    protected onNewState(state: {brushing_enabled: boolean, annotations: Array<BrushStroke>}){
         this.brushStrokeWidgets.forEach(bsw => bsw.destroy())
         this.brushStrokeWidgets = []
-        brush_strokes.forEach(stroke => this.doAddBrushStroke(stroke))
+        state.annotations.forEach(stroke => this.doAddBrushStroke(stroke))
     }
 
     public destroy(){

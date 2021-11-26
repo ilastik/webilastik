@@ -1,22 +1,19 @@
+# pyright: reportUnusedCallResult=false
+
 from functools import wraps
 import json
-from typing import Any, Callable, Coroutine, Dict, TypeVar,  Type, Generic, Optional
+from typing import Any, Callable, Coroutine, Dict, NoReturn, TypeVar,  Type, Generic, Optional
 from pathlib import Path, PurePosixPath
 import tempfile
 import uuid
 import asyncio
-import sys
+
+from aiohttp import web
 
 from webilastik.libebrains.user_token import UserToken
 from webilastik.libebrains.oidc_client import OidcClient
-from aiohttp import web
-import os
-import logging
-
 from webilastik.utility.url import Url, Protocol
 from webilastik.server.session import Session, LocalSession
-
-logging.basicConfig(level=logging.DEBUG)
 
 SESSION_TYPE = TypeVar("SESSION_TYPE", bound=Session)
 
@@ -33,7 +30,7 @@ def get_requested_url(request: web.Request) -> Url:
     url = Url(protocol=protocol, hostname=hostname, port=port, path=path)
     return  url
 
-def redirect_to_ebrains_login(request: web.Request, oidc_client: OidcClient):
+def redirect_to_ebrains_login(request: web.Request, oidc_client: OidcClient) -> NoReturn:
     raise web.HTTPFound(location=oidc_client.create_user_login_url(
         redirect_uri=get_requested_url(request),
     ).raw)
@@ -62,6 +59,10 @@ class EbrainsSession:
         user_token = oidc_client.get_user_token(code=auth_code, redirect_uri=get_requested_url(request))
         return EbrainsSession(user_token=user_token)
 
+    @classmethod
+    def try_from_request(cls, request: web.Request, oidc_client: OidcClient) -> Optional["EbrainsSession"]:
+        return cls.from_cookie(request) or EbrainsSession.from_code(request, oidc_client=oidc_client)
+
     def set_cookie(self, response: web.Response) -> web.Response:
         response.set_cookie(
             name=self.AUTH_COOKIE_KEY, value=self.user_token.access_token, secure=True
@@ -77,14 +78,13 @@ def require_ebrains_login(
     async def wrapper(self: "SessionAllocator[SESSION_TYPE]", request: web.Request) -> web.Response:
         if self.oidc_client is None:
             return await endpoint(self, request)
-        ebrains_session = EbrainsSession.from_cookie(request) or EbrainsSession.from_code(request, oidc_client=self.oidc_client)
+        ebrains_session = EbrainsSession.try_from_request(request, oidc_client=self.oidc_client)
         if ebrains_session is None:
             redirect_to_ebrains_login(request, oidc_client=self.oidc_client)
         response = await endpoint(self, request)
         return ebrains_session.set_cookie(response)
 
     return wrapper
-
 
 class SessionAllocator(Generic[SESSION_TYPE]):
     def __init__(
@@ -95,7 +95,7 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         external_url: Url,
         sockets_dir_at_master: Path,
         master_username: str,
-        oidc_client: Optional[OidcClient],
+        oidc_client: OidcClient,
     ):
         self.session_type = session_type
         self.sockets_dir_at_master = sockets_dir_at_master
@@ -127,7 +127,7 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         return web.json_response("hello!", status=200)
 
     async def check_login(self, request: web.Request) -> web.Response:
-        if self.oidc_client and EbrainsSession.from_cookie(request) is None:
+        if EbrainsSession.from_cookie(request) is None:
             return web.json_response({"logged_in": False}, status=401)
         return web.json_response({"logged_in": True}, status=200)
 
@@ -158,13 +158,18 @@ class SessionAllocator(Generic[SESSION_TYPE]):
             return web.json_response({"error": "Bad payload"}, status=400)
         session_id = uuid.uuid4()
 
+        ebrains_session = EbrainsSession.try_from_request(request, oidc_client=self.oidc_client)
+        if ebrains_session is None:
+            redirect_to_ebrains_login(request, self.oidc_client)
+
         #FIXME: remove stuff from self.sessions
         self.sessions[session_id] = await self.session_type.create(
             session_id=session_id,
             master_host=self.master_host,
             master_username=self.master_username,
             socket_at_master=self._make_socket_path_at_master(session_id),
-            time_limit_seconds=session_duration
+            time_limit_seconds=session_duration,
+            ebrains_user_token=ebrains_session.user_token
         )
 
         return web.json_response(
@@ -220,11 +225,14 @@ if __name__ == '__main__':
         from webilastik.server.hpc_session import HpcSession
         session_type = HpcSession
 
-    if args.oidc_client_json == "skip":
-        oidc_client = None
-    else:
-        with open(args.oidc_client_json) as f:
-            oidc_client = OidcClient.from_json_value(json.load(f))
+    # if args.oidc_client_json == "skip":
+    #     oidc_client = None
+    # else:
+    #     with open(args.oidc_client_json) as f:
+    #         oidc_client = OidcClient.from_json_value(json.load(f))
+
+    with open(args.oidc_client_json) as f:
+        oidc_client = OidcClient.from_json_value(json.load(f))
 
     SessionAllocator(
         session_type=session_type,
