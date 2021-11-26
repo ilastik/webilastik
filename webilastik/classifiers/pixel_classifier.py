@@ -238,7 +238,6 @@ class VigraPixelClassifier(PixelClassifier[FE]):
     @lru_cache() #FIMXE: double check classifier __hash__/__eq__
     def __getstate__(self):
         out = self.__dict__.copy()
-        forest_data = self.get_forest_data()
         out["forests"] = self.get_forest_data()
         return out
 
