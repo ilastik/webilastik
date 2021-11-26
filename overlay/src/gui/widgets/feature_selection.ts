@@ -1,16 +1,66 @@
 import { createElement, createInput } from '../../util/misc';
-import * as itk from '../../client/ilastik'
 import { CollapsableWidget } from './collapsable_applet_gui';
 import { Applet } from '../../client/applets/applet';
+import { DifferenceOfGaussians, FeatureExtractor, GaussianGradientMagnitude, GaussianSmoothing, HessianOfGaussianEigenvalues, LaplacianOfGaussian, StructureTensorEigenvalues } from '../../client/ilastik';
+import { ensureJsonObject } from '../../util/serialization';
 
-// class FeatureCheckbox<FE extends itk.FeatureExtractor>{
+// class FeatureCheckbox<FE extends FeatureExtractor>{
 //     constructor()
 // }
 
-export class FeatureSelectionWidget extends Applet<itk.FeatureExtractor[]>{
+type Scale = number;
+
+class FeatureSelectionCheckbox{
+    public readonly element: HTMLInputElement;
+    public readonly featureExtractor: FeatureExtractor;
+    public lastUpstreamState: boolean
+    constructor({parentElement, featureExtractor, lastUpstreamState, onClick}: {
+        parentElement: HTMLElement,
+        featureExtractor: FeatureExtractor,
+        lastUpstreamState: boolean,
+        onClick?: (feature_checkbox: FeatureSelectionCheckbox) => void,
+    }){
+        this.featureExtractor = featureExtractor
+        this.lastUpstreamState = lastUpstreamState
+        this.element = createInput({inputType: "checkbox", parentElement, onClick: () => {
+            this.updateHighlight()
+            if(onClick){
+                onClick(this)
+            }
+        }})
+        this.element.checked = lastUpstreamState
+    }
+
+    public setLastUpstreamState(checked: boolean){
+        this.lastUpstreamState = checked
+        this.updateHighlight()
+    }
+
+    public setChecked(checked: boolean){
+        this.element.checked = checked
+        this.updateHighlight()
+    }
+
+    public getStagedChanges(): {action: "add" | "remove" | "nothing", featureExtractor: FeatureExtractor}{
+        let action: "add" | "remove" | "nothing" = "nothing"
+        if(this.element.checked != this.lastUpstreamState){
+            action = this.element.checked ? 'add' : 'remove'
+        }
+        return {
+            action,
+            featureExtractor: this.featureExtractor
+        }
+    }
+
+    private updateHighlight(){
+        let uncommited_changes = this.element.checked != this.lastUpstreamState
+        this.element.style.boxShadow = uncommited_changes ? "0px 0px 0px 4px orange" : ""
+    }
+}
+
+export class FeatureSelectionWidget extends Applet<{feature_extractors: FeatureExtractor[]}>{
     public readonly element: HTMLElement;
-    private selected_features: Array<itk.FeatureExtractor> = [];
-    private feature_to_checkbox: Map<itk.FeatureExtractor, HTMLInputElement>
+    private checkboxes = new Array<FeatureSelectionCheckbox>();
 
     public constructor({name, socket, parentElement}: {
         name: string, socket: WebSocket, parentElement: HTMLElement
@@ -18,75 +68,84 @@ export class FeatureSelectionWidget extends Applet<itk.FeatureExtractor[]>{
         super({
             name,
             socket,
-            deserializer: itk.FeatureExtractor.fromJsonArray,
+            deserializer: (data) => {
+                let value_obj = ensureJsonObject(data)
+                return {
+                    feature_extractors: FeatureExtractor.fromJsonArray(value_obj["feature_extractors"])
+                }
+            },
             onNewState: (new_state) => this.onNewState(new_state)
         })
         this.element = new CollapsableWidget({display_name: "Select Image Features", parentElement}).element
         this.element.classList.add("ItkFeatureSelectionWidget")
-        this.feature_to_checkbox = new Map<itk.FeatureExtractor, HTMLInputElement>()
+
+        const scales: Array<Scale> = [0.3, 0.7, 1.0, 1.6, 3.5, 5.0, 10.0]
+        const feature_extractor_creators = new Map<string, (scale: Scale) => FeatureExtractor>([
+            ["Gaussian Smoothing", (scale) => new GaussianSmoothing({sigma: scale})],
+            ["Laplacian Of Gaussian", (scale) => new LaplacianOfGaussian({scale: scale})],
+            ["Gaussian Gradient Magnitude", (scale) => new GaussianGradientMagnitude({sigma: scale})],
+            ["Difference Of Gaussians", (scale) => new DifferenceOfGaussians({sigma0: scale, sigma1: scale * 0.66})],
+            ["Structure Tensor Eigenvalues", (scale) => new StructureTensorEigenvalues({innerScale: scale, outerScale: 0.5 * scale})],
+            ["Hessian Of Gaussian Eigenvalues", (scale) => new HessianOfGaussianEigenvalues({scale: scale})]
+        ])
+
         const table = createElement({tagName: 'table', parentElement: this.element})
-        const column_values = [0.3, 0.7, 1.0, 1.6, 3.5, 5.0, 10.0]
 
-        var tr = createElement({tagName: 'tr', parentElement: table})
-        createElement({tagName: 'th', innerHTML: 'Feature / sigma', parentElement: tr})
-        column_values.forEach(scale => createElement({tagName: 'th', innerHTML: scale.toFixed(1), parentElement: tr}))
+        let header_row = createElement({tagName: 'tr', parentElement: table})
+        createElement({tagName: 'th', innerHTML: 'Feature / sigma', parentElement: header_row})
+        scales.forEach(scale => createElement({tagName: "th", parentElement: header_row, innerHTML: scale.toFixed(1)}))
 
-        let createFeatureTr = <FE extends itk.FeatureExtractor>(
-            extractor_name: string,
-            extractor_from_scale: (scale: number) => FE,
-        ) => {
-            let tr = createElement({tagName: 'tr', parentElement: table});
-            createElement({tagName: 'td', innerHTML: extractor_name, parentElement: tr});
-            for(let scale of column_values){
-                let td = createElement({tagName: 'td', parentElement: tr});
-                let extractor = extractor_from_scale(scale)
-                if(!(extractor instanceof itk.GaussianSmoothing) && scale == 0.3){
-                    continue
-                }
-                let checkbox = createInput({inputType: 'checkbox', parentElement: td, onClick: (e) => {
-                    let cb = <HTMLInputElement>e.target
-                    if(cb.checked){
-                        this.selected_features.push(extractor)
-                    }else{
-                        this.selected_features = this.selected_features.filter((fe) => {return !fe.equals(extractor)})
-                    }
-                }})
-                this.feature_to_checkbox.set(extractor_from_scale(scale), checkbox)
-            }
-        }
-
-        createFeatureTr("Gaussian Smoothing", (scale) => new itk.GaussianSmoothing({sigma: scale}))
-        createFeatureTr("Laplacian Of Gaussian", (scale) => new itk.LaplacianOfGaussian({scale: scale}))
-        createFeatureTr("Gaussian Gradient Magnitude", (scale) => new itk.GaussianGradientMagnitude({sigma: scale}));
-        createFeatureTr("Difference Of Gaussians", (scale) => new itk.DifferenceOfGaussians({sigma0: scale, sigma1: scale * 0.66}))
-        createFeatureTr("Structure Tensor Eigenvalues", (scale) => new itk.StructureTensorEigenvalues({innerScale: scale, outerScale: 0.5 * scale}));
-        createFeatureTr("Hessian Of Gaussian Eigenvalues", (scale) => new itk.HessianOfGaussianEigenvalues({scale: scale}));
-
-        createInput({inputType: "button", parentElement: this.element, value: "All", onClick: (e) => {
-            let button = <HTMLInputElement>e.target;
-            this.element.querySelectorAll("input[type=checkbox]").forEach((checkbox) => {
-                let cb = <HTMLInputElement>checkbox
-                if((button.value == "All" && !cb.checked) || (button.value == "None" && cb.checked)){
-                    cb.click()
-                }
+        feature_extractor_creators.forEach((creator, label) => {
+            let tr = createElement({tagName: "tr", parentElement: table})
+            createElement({tagName: "td", parentElement: tr, innerHTML: label})
+            scales.forEach(scale => {
+                this.checkboxes.push(new FeatureSelectionCheckbox({
+                    parentElement: createElement({tagName: "td", parentElement: tr}),
+                    featureExtractor: creator(scale),
+                    lastUpstreamState: false, // FIXME? Maybe initialize straight with the upstream state?
+                }))
             })
-            button.value = button.value == "All" ? "None" : "All"
-        }})
+        })
 
+        createInput({inputType: "button", parentElement: this.element, value: "All", onClick: () => {
+            this.checkboxes.filter(cb => !cb.element.checked).forEach(cb => cb.element.click())
+        }})
+        createInput({inputType: "button", parentElement: this.element, value: "None", onClick: () => {
+            this.checkboxes.filter(cb => cb.element.checked).forEach(cb => cb.element.click())
+        }})
         createInput({inputType: 'button', parentElement: this.element, value: 'Ok', onClick: async () => {
-            this.updateUpstreamState(this.selected_features)
+            let extractors_to_add = new Array<FeatureExtractor>();
+            let extractors_to_remove = new Array<FeatureExtractor>();
+            for(let cb of this.checkboxes){
+                let changes = cb.getStagedChanges()
+                if(changes.action == "add"){
+                    extractors_to_add.push(changes.featureExtractor)
+                    cb.setLastUpstreamState(true)
+                }else if(changes.action == "remove"){
+                    extractors_to_remove.push(changes.featureExtractor)
+                    cb.setLastUpstreamState(false)
+                }
+            }
+            if(extractors_to_add.length > 0){
+                this.doRPC("add_feature_extractors", {feature_extractors: extractors_to_add})
+            }
+            if(extractors_to_remove.length > 0){
+                this.doRPC("remove_feature_extractors", {feature_extractors: extractors_to_remove})
+            }
         }})
     }
 
-    protected onNewState(features: Array<itk.FeatureExtractor>){
-        this.selected_features = []
-        this.feature_to_checkbox.forEach((checkbox, feature) => {
-            checkbox.checked = false
-            for(let i=0; i<features.length; i++){
-                if(feature.equals(features[i])){
-                    checkbox.click()
+    protected onNewState(state: {feature_extractors: Array<FeatureExtractor>}){
+        for(let cb of this.checkboxes){
+            cb.setLastUpstreamState(false)
+            cb.setChecked(false)
+            for(let fe of state.feature_extractors){
+                if(cb.featureExtractor.equals(fe)){
+                    cb.setLastUpstreamState(true)
+                    cb.setChecked(true)
+                    break
                 }
             }
-        })
+        }
     }
 }

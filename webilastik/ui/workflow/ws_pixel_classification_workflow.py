@@ -179,7 +179,7 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
             channel_colors = tuple()
 
         return {
-            "pixel_classifier": classifier is not None,
+            "producer_is_ready": classifier is not None,
             "channel_colors": channel_colors,
         }
 
