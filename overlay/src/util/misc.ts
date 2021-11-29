@@ -40,26 +40,15 @@ export type InlineCss = Partial<Omit<
     "getPropertyPriority" | "getPropertyValue" | "item" | "removeProperty" | "setProperty"
 >>
 
-export interface CreateElementParams{
-    tagName:string,
+export function createElement<K extends keyof HTMLElementTagNameMap>({tagName, parentElement, innerHTML, cssClasses, inlineCss={}, onClick}:{
+    tagName: K,
     parentElement:HTMLElement,
     innerHTML?:string,
     cssClasses?:Array<string>,
     inlineCss?: InlineCss,
-    onClick?: (event: MouseEvent) => void,
-}
+    onClick?(event: any): void},
+): HTMLElementTagNameMap[K]{
 
-
-export interface CreateInputParams extends Omit<CreateElementParams, "tagName">{
-    inputType: string,
-    parentElement:HTMLElement,
-    value?:string,
-    name?:string,
-    disabled?:boolean,
-    required?:boolean,
-}
-
-export function createElement({tagName, parentElement, innerHTML, cssClasses, inlineCss={}, onClick}: CreateElementParams): HTMLElement{
     const element = document.createElement(tagName);
     parentElement.appendChild(element)
     if(innerHTML !== undefined){
@@ -96,8 +85,16 @@ export function createImage({src, parentElement, cssClasses, onClick}:
     return image
 }
 
+export type InputType = "button" | "text" | "checkbox" | "submit" | "url" | "radio" | "number" | "color"
 
-export function createInput(params : CreateInputParams): HTMLInputElement{
+export function createInput(params: {
+        inputType: InputType,
+        value?: string,
+        name?: string,
+        disabled?:boolean,
+        required?: boolean,
+    } & Omit<Parameters<typeof createElement>[0], "tagName">
+): HTMLInputElement{
     const input = <HTMLInputElement>createElement({tagName:'input', ...params})
     input.type = params.inputType;
     if(params.value !== undefined){
@@ -119,7 +116,7 @@ export function createSelect({parentElement, values, name, onClick}:
     const select = <HTMLSelectElement>createElement({tagName: 'select', parentElement, onClick})
     if(values !== undefined){
         values.forEach((value:string, displayValue:string) => {
-            let option = <HTMLInputElement>createElement({tagName: 'option', innerHTML: displayValue, parentElement: select, onClick})
+            let option = createElement({tagName: 'option', innerHTML: displayValue, parentElement: select, onClick})
             option.value = value
         })
     }

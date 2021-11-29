@@ -1,4 +1,4 @@
-import { CreateInputParams, createElement, createInput, vecToString } from "../../util/misc";
+import { createElement, createInput, vecToString } from "../../util/misc";
 
 export class VecDisplayWidget{
     public readonly element: HTMLElement;
@@ -7,7 +7,7 @@ export class VecDisplayWidget{
     constructor(params: {
         label?: string,
         value?: Float32Array
-    } & Omit<CreateInputParams, "value" | "inputType" | "disabled">){
+    } & Omit<Parameters<typeof createInput>[0], "value" | "inputType" | "disabled">){
         this.element = createElement({
             tagName: "p", ...params, cssClasses: (params.cssClasses || []).concat(["VecDisplayWidget"])
         })
