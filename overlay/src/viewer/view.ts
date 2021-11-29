@@ -102,7 +102,7 @@ export class PredictionsView extends View{
         let url = Url.parse(native_view.url)
 
         let predictions_regex = /predictions\/raw_data=(?<raw_data>[^/?]+)/
-        let match = url.path.match(predictions_regex)
+        let match = url.path.raw.match(predictions_regex)
         if(!match){
             return undefined
         }

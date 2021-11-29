@@ -1,6 +1,6 @@
 import { vec3 } from "gl-matrix"
 import { sleep } from "../util/misc"
-import { Url } from "../util/parsed_url"
+import { Path, Url } from "../util/parsed_url"
 import { PrecomputedChunks } from "../util/precomputed_chunks"
 import { ensureJsonArray, ensureJsonNumberTripplet, ensureJsonObject, ensureJsonString, IJsonable, JsonObject, JsonValue } from "../util/serialization"
 
@@ -333,10 +333,10 @@ export class HttpFs extends FileSystem{
 
 export abstract class DataSource implements IJsonable{
     public readonly filesystem: FileSystem
-    public readonly path: string
+    public readonly path: Path
     public readonly spatial_resolution: vec3
 
-    constructor({filesystem, path, spatial_resolution=vec3.fromValues(1,1,1)}: {filesystem: FileSystem, path: string, spatial_resolution?: vec3}){
+    constructor({filesystem, path, spatial_resolution=vec3.fromValues(1,1,1)}: {filesystem: FileSystem, path: Path, spatial_resolution?: vec3}){
         this.filesystem = filesystem
         this.path = path
         this.spatial_resolution = spatial_resolution
@@ -359,7 +359,7 @@ export abstract class DataSource implements IJsonable{
         const spatial_resolution = json_object["spatial_resolution"]
         return {
             filesystem: FileSystem.fromJsonValue(json_object["filesystem"]),
-            path: ensureJsonString(json_object["path"]),
+            path: Path.parse(ensureJsonString(json_object["path"])),
             spatial_resolution: spatial_resolution === undefined ? vec3.fromValues(1,1,1) : ensureJsonNumberTripplet(spatial_resolution)
         }
     }
@@ -367,7 +367,7 @@ export abstract class DataSource implements IJsonable{
     public toJsonValue(): JsonObject{
         return {
             filesystem: this.filesystem.toJsonValue(),
-            path: this.path,
+            path: this.path.raw,
             spatial_resolution: [this.spatial_resolution[0], this.spatial_resolution[1], this.spatial_resolution[2]],
             ...this.doToJsonValue()
         }
@@ -384,7 +384,7 @@ export abstract class DataSource implements IJsonable{
         return (
             this.constructor.name == other.constructor.name &&
             this.filesystem.equals(other.filesystem) &&
-            this.path == other.path &&
+            this.path.equals(other.path) &&
             vec3.equals(this.spatial_resolution, other.spatial_resolution)
         )
     }
@@ -407,7 +407,7 @@ export class PrecomputedChunksDataSource extends DataSource{
 
     public static async tryGetTrainingRawData(url: Url): Promise<PrecomputedChunksDataSource | undefined>{
         let training_regex = /stripped_precomputed\/url=(?<url>[^/]+)\/resolution=(?<resolution>\d+_\d+_\d+)/
-        let match = url.path.match(training_regex)
+        let match = url.path.raw.match(training_regex)
         if(!match){
             return undefined
         }
@@ -415,14 +415,14 @@ export class PrecomputedChunksDataSource extends DataSource{
         const raw_resolution = match.groups!["resolution"].split("_").map(axis => parseInt(axis));
         const resolution = vec3.fromValues(raw_resolution[0], raw_resolution[1], raw_resolution[2]);
         return new PrecomputedChunksDataSource({
-            filesystem: new HttpFs({read_url: original_url.updatedWith({path: "/"})}),
+            filesystem: new HttpFs({read_url: original_url.root}),
             path: url.path,
             spatial_resolution: resolution
         })
     }
 
     public toTrainingUrl(session: Session): Url{
-        const original_url = this.filesystem.getUrl().joinPath(this.path)
+        const original_url = this.filesystem.getUrl().joinPath(this.path.raw)
         const resolution_str = `${this.spatial_resolution[0]}_${this.spatial_resolution[1]}_${this.spatial_resolution[2]}`
         return Url.parse(session.session_url)
             .ensureDataScheme("precomputed")
@@ -465,7 +465,7 @@ export class SkimageDataSource extends DataSource{
         }
         //FIXME: maybe do a HEAD and check mime type?
         return new SkimageDataSource({
-            filesystem: new HttpFs({read_url: url.updatedWith({path: "/"})}),
+            filesystem: new HttpFs({read_url: url.root}),
             path: url.path,
         })
     }
@@ -480,7 +480,7 @@ export class SkimageDataSource extends DataSource{
     }
 
     public toTrainingUrl(_session: Session): Url{
-        return this.filesystem.getUrl().joinPath(this.path)
+        return this.filesystem.getUrl().joinPath(this.path.raw)
     }
 }
 

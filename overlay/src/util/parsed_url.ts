@@ -18,13 +18,74 @@ export function ensureProtocol(value: string): Protocol{
     return variant
 }
 
+export class Path{
+    public readonly components: Array<string>;
+
+    public static parse(raw: string): Path{
+        if(!raw.startsWith("/")){
+            throw Error(`Path '${raw}' is not absolute`)
+        }
+        return new Path({components: raw.split("/")})
+    }
+
+    constructor({components}: {components: Array<string>}){
+        var clean_components = new Array<string>()
+        for(let component of  components){
+            if(component == "." || component == ""){
+                continue;
+            }if(component == ".."){
+                if(clean_components.length > 0){
+                    clean_components.pop()
+                }
+            }else{
+                clean_components.push(component)
+            }
+        }
+        this.components = clean_components
+    }
+
+    public get raw(): string{
+        return "/" + this.components.join("/")
+    }
+
+    public get name(): string{
+        return this.components[this.components.length - 1] || "/" //FIXME ?
+    }
+
+    public get parent(): Path{
+        let new_components = this.components.slice()
+        new_components.pop()
+        return new Path({components: new_components})
+    }
+
+    public get extension(): string | undefined{
+        if(!this.name.includes(".")){
+            return undefined
+        }
+        return this.name.split(".").slice(-1)[0]
+    }
+
+    public joinPath(subpath: string): Path{
+        return new Path({components: this.components.concat(subpath.split("/"))})
+    }
+
+    public equals(other: Path): boolean{
+        for(let i=0; i < Math.max(this.components.length, other.components.length); i++){
+            if(this.components[i] != other.components[i]){
+                return false
+            }
+        }
+        return true
+    }
+}
+
 export class Url{
     public readonly datascheme?: DataScheme
     public readonly protocol: Protocol
     public readonly hostname: string
     public readonly host: string
     public readonly port?: number
-    public readonly path: string
+    public readonly path: Path
     public readonly search: Map<string, string>
     public readonly hash?: string
     public readonly schemeless_raw: string
@@ -36,35 +97,19 @@ export class Url{
         protocol: Protocol,
         hostname: string,
         port?: number,
-        path: string,
+        path: Path,
         search?: Map<string, string>,
         hash?: string,
     }){
-        if(!params.path.startsWith("/")){
-            throw Error(`Path '${params.path}' is not absolute`)
-        }
-        var path_parts = new Array<string>()
-        for(let part of  params.path.split("/")){
-            if(part == "." || part == ""){
-                continue;
-            }if(part == ".."){
-                if(path_parts.length > 0){
-                    path_parts.pop()
-                }
-            }else{
-                path_parts.push(part)
-            }
-        }
-
         this.datascheme = params.datascheme
         this.protocol = params.protocol
         this.hostname = params.hostname
         this.host = params.hostname + (params.port === undefined ? "" : `:${params.port}`)
         this.port = params.port
-        this.path = "/" + path_parts.join("/")
+        this.path = params.path
         this.search = params.search || new Map<string, string>()
         this.hash = params.hash
-        this.schemeless_raw = `${this.protocol}://${this.host}${this.path}`
+        this.schemeless_raw = `${this.protocol}://${this.host}${this.path.raw}`
 
         if(this.search.size > 0){
             const encoded_search = "?" + Array.from(this.search)
@@ -128,7 +173,7 @@ export class Url{
             protocol: ensureProtocol(groups["protocol"]),
             hostname: groups["hostname"],
             port: raw_port === undefined ? undefined : parseInt(raw_port),
-            path: groups["path"],
+            path: Path.parse(groups["path"]),
             search: search,
             hash: groups["hash"]
         })
@@ -139,7 +184,7 @@ export class Url{
         protocol?: Protocol,
         hostname?: string,
         port?: number,
-        path?: string,
+        path?: Path,
         search?: Map<string, string>,
         extra_search?: Map<string, string>
         hash?: string,
@@ -160,12 +205,11 @@ export class Url{
     }
 
     public get parent(): Url{
-        return this.joinPath("..")
+        return this.updatedWith({path: this.path.parent})
     }
 
     public joinPath(subpath: string): Url{
-        var new_path = this.path.endsWith("/") ? this.path + subpath + "/" : this.path + "/" + subpath
-        return this.updatedWith({path: new_path})
+        return this.updatedWith({path: this.path.joinPath(subpath)})
     }
 
     public ensureDataScheme(datascheme: DataScheme): Url{
@@ -178,7 +222,7 @@ export class Url{
     }
 
     public get name(): string{
-        return this.path.split("/").slice(-1)[0]
+        return this.path.name
     }
 
     public equals(other: Url): boolean{
@@ -186,6 +230,6 @@ export class Url{
     }
 
     public get root(): Url{
-        return this.updatedWith({path: "/"})
+        return this.updatedWith({path: Path.parse("/")})
     }
 }
