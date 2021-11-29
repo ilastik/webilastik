@@ -1,6 +1,6 @@
-import { JsonableValue, IDeserializer, ensureJsonObject, IJsonableObject, toJsonValue } from "../../util/serialization";
+import { IDeserializer, ensureJsonObject, IJsonableObject, toJsonValue } from "../../util/serialization";
 
-export class Applet<STATE extends JsonableValue>{
+export class Applet<STATE>{
     public readonly name: string
     public readonly socket: WebSocket
     public readonly deserializer: IDeserializer<STATE>
