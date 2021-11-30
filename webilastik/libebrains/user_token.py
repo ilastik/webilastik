@@ -79,7 +79,7 @@ class UserToken:
     def is_valid(self) -> bool:
         #FIXME: maybe just validate signature + time ?
         try:
-            self.get_userinfo()
+            _ = self.get_userinfo()
             return True
         except requests.exceptions.HTTPError:
             return False
