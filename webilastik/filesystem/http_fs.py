@@ -142,19 +142,19 @@ class HttpFs(JsonableFilesystem):
         def close_callback(f: RemoteFile):
             if mode == "r":
                 return
-            f.seek(0)
-            self._put_object(path, f.read())
+            _ = f.seek(0)
+            self._put_object(path, f.read()).raise_for_status()
 
         contents = bytes()
         if mode in ("r", "r+", "w+", "a", "a+"):
             try:
-                _meta, contents = self._get_object(path)
+                _, contents = self._get_object(path)
             except HTTPError as e:
                 if e.response.status_code == 404 and "r" in mode:
                     raise ResourceNotFound(path) from e
         remote_file = RemoteFile(close_callback=close_callback, mode=mode, data=contents)
         if "a" in mode:
-            remote_file.seek(0, io.SEEK_END)
+            _ = remote_file.seek(0, io.SEEK_END)
         return remote_file
 
     def opendir(self, path: str, factory=None) -> SubFS[FS]:
@@ -182,7 +182,7 @@ class SwiftTempUrlFs(HttpFs):
     def exists(self, path: str) -> bool:
         # FIXME: folders with never exist
         try:
-            self._get_object(path)
+            _ = self._get_object(path)
             return True
         except HTTPError as e:
             if e.response.status_code == 404:
