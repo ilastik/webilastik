@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Tuple
+import json
+from typing import Optional, Tuple
 from pathlib import Path
 import io
 from dataclasses import dataclass
@@ -14,6 +15,7 @@ from ndstructs.point5D import Point5D, Shape5D, Interval5D
 from ndstructs.array5D import Array5D
 
 from webilastik.datasource import DataSource
+from webilastik.filesystem import JsonableFilesystem
 
 class PrecomputedChunksEncoder(ABC):
     @abstractmethod
@@ -269,6 +271,14 @@ class PrecomputedChunksInfo:
             self.num_channels == other.num_channels and
             self.scales == other.scales
         )
+
+    @classmethod
+    def tryLoad(cls, filesystem: JsonableFilesystem, path: Path) -> Optional["PrecomputedChunksInfo"]:
+        if not filesystem.exists(path.as_posix()):
+            return None
+        with filesystem.openbin(path.as_posix(), "r") as f:
+            info_json = f.read().decode("utf8")
+        return PrecomputedChunksInfo.from_json_value(json.loads(info_json))
 
     @classmethod
     def from_json_value(cls, data: JsonValue):

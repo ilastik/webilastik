@@ -88,6 +88,19 @@ class BucketFs(JsonableFilesystem):
         self.session.headers.update(ebrains_user_token.as_auth_header())
         self.write_session = requests.Session()
 
+    @classmethod
+    def try_from_url(cls, url: Url, ebrains_user_token: UserToken) -> Optional["BucketFs"]:
+        if not url.raw.startswith(cls.API_URL.raw):
+            return None
+        bucket_name_part_index = len(cls.API_URL.path.parts)
+        if len(url.path.parts) <= bucket_name_part_index:
+            return None
+        return BucketFs(
+            bucket_name=url.path.parts[bucket_name_part_index],
+            prefix=PurePosixPath("/".join(url.path.parts[bucket_name_part_index + 1:])),
+            ebrains_user_token=ebrains_user_token,
+        )
+
     def _make_prefix(self, subpath: str) -> PurePosixPath:
         return self.prefix.joinpath(
             str(PurePosixPath("/").joinpath(subpath)).lstrip("/")

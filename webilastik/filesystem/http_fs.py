@@ -39,6 +39,12 @@ class HttpFs(JsonableFilesystem):
         self.session = requests.Session()
         self.session.headers.update(headers or {})
 
+    @classmethod
+    def try_from_url(cls, url: Url) -> Optional["HttpFs"]:
+        if url.protocol not in (Protocol.HTTP, Protocol.HTTPS):
+            return None
+        return HttpFs(read_url=url)
+
     def to_json_value(self) -> JsonObject:
         return {
             "read_url": self.read_url.raw,

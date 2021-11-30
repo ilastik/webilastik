@@ -24,6 +24,7 @@ from webilastik.annotations import Annotation, Color
 from webilastik.filesystem.http_fs import HttpFs
 from webilastik.datasource import SkimageDataSource
 from webilastik.utility.url import Url
+from webilastik.libebrains.user_token import UserToken
 from webilastik.server import EbrainsSession
 
 
@@ -39,7 +40,7 @@ async def main():
     ds = SkimageDataSource(filesystem=HttpFs(read_url=Url.parse("https://app.ilastik.org/")), path=Path("api/images/c_cells_1.png"))
 
     async with aiohttp.ClientSession(
-        cookies={EbrainsSession.AUTH_COOKIE_KEY: os.environ["EBRAINS_ACCESS_TOKEN"]}
+        cookies={EbrainsSession.AUTH_COOKIE_KEY: UserToken.from_environment().access_token}
     ) as session:
         print(f"Creating new session--------------")
         async with session.post(f"https://app.ilastik.org/api/session", json={"session_duration": 30}) as response:
@@ -146,7 +147,9 @@ async def main():
                 applet_name="export_applet",
                 method_name="start_export_job",
                 arguments={
-                    "raw_data": ds.to_json_value(),
+                    "raw_data_params": {
+                        "url": "https://app.ilastik.org/api/images/c_cells_1.png",
+                    },
                     "bucket_name": "hbp-image-service",
                     "prefix": f"job_output_{int(time.time())}.precomputed",
                 }

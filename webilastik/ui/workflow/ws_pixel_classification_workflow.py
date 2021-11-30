@@ -26,6 +26,8 @@ from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale, RawEncoder
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
 from webilastik.ui.applet.datasource_batch_processing_applet import PixelClasificationExportingApplet
+from webilastik.ui.datasource import DataSourceLoadParams
+from webilastik.ui.usage_error import UsageError
 from webilastik.utility.url import Url
 from webilastik.scheduling.hashing_executor import HashingExecutor, Job
 from webilastik.datasource import DataSource
@@ -264,7 +266,7 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
 
 @dataclass
 class PixelExportRequest:
-    raw_data: DataSource
+    raw_data_params: DataSourceLoadParams
     bucket_name: str
     prefix: PurePosixPath
 
@@ -272,10 +274,9 @@ class PixelExportRequest:
     def from_json_value(cls, value: JsonValue) -> "PixelExportRequest":
         value_obj = ensureJsonObject(value)
         return PixelExportRequest(
-            raw_data=DataSource.from_json_value(value_obj.get("raw_data")),
+            raw_data_params=DataSourceLoadParams.from_json_value(value_obj.get("raw_data_params")),
             bucket_name=ensureJsonString(value_obj.get("bucket_name")),
             prefix=PurePosixPath(ensureJsonString(value_obj.get("prefix"))),
-            # filesystem=JsonableFilesystem.from_json_value(value_obj.get("filesystem")),
         )
 
 class WsExportApplet(WsApplet, PixelClasificationExportingApplet):
@@ -295,7 +296,9 @@ class WsExportApplet(WsApplet, PixelClasificationExportingApplet):
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> PropagationResult:
         if method_name == "start_export_job":
             pixel_export_request = PixelExportRequest.from_json_value(arguments)
-            raw_data = pixel_export_request.raw_data
+            raw_data = pixel_export_request.raw_data_params.try_load(ebrains_user_token=self.ebrains_user_token)
+            if isinstance(raw_data, UsageError):
+                return PropagationError(str(raw_data)) # FIXME
             output_filesystem = BucketFs(
                 bucket_name=pixel_export_request.bucket_name,
                 prefix=PurePosixPath("/"),
