@@ -353,7 +353,7 @@ class WsExportApplet(WsApplet, PixelClasificationExportingApplet):
 
     def _get_json_state(self) -> JsonObject:
         return {
-            "jobs": {str(job.uuid): job.to_json_value() for job in self.jobs.values()}
+            "jobs": tuple(job.to_json_value() for job in self.jobs.values())
         }
 
 
