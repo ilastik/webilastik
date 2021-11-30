@@ -1,14 +1,17 @@
+import os
 from pathlib import PurePosixPath
-from typing import Dict, Optional, Mapping, Union
+from typing import Dict, Optional, Mapping
 
 import requests
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, JsonableValue, ensureJsonObject, ensureJsonString
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 
 from webilastik.utility.url import Url
 
 
 
 class UserToken:
+    ENV_VAR_NAME = "EBRAINS_USER_ACCESS_TOKEN"
+
     def __init__(
         self,
         *,
@@ -32,6 +35,10 @@ class UserToken:
         # self.not_before_policy = not_before_policy
         # self.session_state = session_state
         # self.scope = scope
+
+    @classmethod
+    def from_environment(cls) -> "UserToken":
+        return UserToken(access_token=os.environ[cls.ENV_VAR_NAME])
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "UserToken":

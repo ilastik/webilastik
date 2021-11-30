@@ -1,5 +1,4 @@
 import datetime
-import os
 from pathlib import Path, PurePosixPath
 from typing import Tuple
 
@@ -16,9 +15,7 @@ from webilastik.filesystem.bucket_fs import BucketFs
 
 @pytest.fixture(scope="session")
 def ebrains_user_token() -> UserToken:
-    return UserToken(
-        access_token=os.environ["EBRAINS_ACCESS_TOKEN"]
-    )
+    return UserToken.from_environment()
 
 @pytest.fixture(scope="session")
 def bucket_fs(ebrains_user_token: UserToken) -> BucketFs:
