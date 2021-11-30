@@ -36,7 +36,7 @@ def redirect_to_ebrains_login(request: web.Request, oidc_client: OidcClient) -> 
     ).raw)
 
 class EbrainsSession:
-    AUTH_COOKIE_KEY = "ebrains_access_token"
+    AUTH_COOKIE_KEY = "ebrains_user_access_token"
 
     def __init__(self, user_token: UserToken):
         self.user_token = user_token
@@ -169,7 +169,7 @@ class SessionAllocator(Generic[SESSION_TYPE]):
             master_username=self.master_username,
             socket_at_master=self._make_socket_path_at_master(session_id),
             time_limit_seconds=session_duration,
-            ebrains_user_token=ebrains_session.user_token
+            user_token=ebrains_session.user_token
         )
 
         return web.json_response(

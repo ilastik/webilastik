@@ -553,7 +553,7 @@ if __name__ == '__main__':
     from argparse import ArgumentParser
 
     parser = ArgumentParser()
-    parser.add_argument("--ebrains-access-token", type=str, required=True)
+    parser.add_argument("--ebrains-user-access-token", type=str, required=True)
     parser.add_argument("--listen-socket", type=Path, required=True)
     parser.add_argument("--ca-cert-path", "--ca_cert_path", help="Path to CA crt file. Useful e.g. for testing with mkcert")
 
@@ -593,7 +593,7 @@ if __name__ == '__main__':
 
     with server_context:
         WsPixelClassificationWorkflow(
-            ebrains_user_token=UserToken(access_token=args.ebrains_access_token),
+            ebrains_user_token=UserToken(access_token=args.ebrains_user_access_token),
             ssl_context=ssl_context
         ).run(
             unix_socket_path=str(args.listen_socket),

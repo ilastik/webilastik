@@ -29,7 +29,7 @@ class Session(ABC):
         master_host: str,
         socket_at_master: Path,
         time_limit_seconds: int,
-        ebrains_user_token: UserToken,
+        user_token: UserToken,
     ) -> "Session": # SELF:
         pass
 
@@ -50,13 +50,13 @@ class LocalSession(Session):
         master_host: str,
         socket_at_master: Path,
         time_limit_seconds: int,
-        ebrains_user_token: UserToken,
+        user_token: UserToken,
     ) -> "LocalSession":
         local_socket = Path(f"/tmp/{session_id}-to-master")
         process = await asyncio.create_subprocess_exec(
             sys.executable,
             webilastik.ui.workflow.ws_pixel_classification_workflow.__file__,
-            f"--ebrains-access-token={ebrains_user_token.access_token}",
+            f"--ebrains-user-access-token={user_token.access_token}",
             f"--listen-socket={local_socket}",
             "tunnel",
             f"--remote-username={master_username}",

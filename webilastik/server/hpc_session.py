@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# pyright: reportUnusedCallResult=false
+
 
 from pathlib import Path
 from typing import Type
@@ -33,11 +35,11 @@ class HpcSession(Session):
         master_host: str,
         socket_at_master: Path,
         time_limit_seconds: int,
-        ebrains_user_token: UserToken,
+        user_token: UserToken,
     ) -> "HpcSession":
         process = await asyncio.create_subprocess_exec(
             __file__,
-            "--ebrains-access-token=" + ebrains_user_token.access_token,
+            "--ebrains-user-access-token=" + user_token.access_token,
             "--master-username=" + master_username,
             "--master-host=" + master_host,
             "--socket-at-master=" + str(socket_at_master),
@@ -73,7 +75,7 @@ class HpcSession(Session):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument("--ebrains-access-token", type=str, required=True)
+    parser.add_argument("--ebrains-user-access-token", type=str, required=True)
     parser.add_argument("--master-host")
     parser.add_argument("--master-username", default="wwww-data")
     parser.add_argument("--socket-at-session", type=Path)
@@ -89,7 +91,7 @@ if __name__ == '__main__':
             HPC_PYTHON_EXECUTABLE,
             "-u",
             f"{HPC_WEBILASTIK_DIR}/webilastik/ui/workflow/ws_pixel_classification_workflow.py",
-            f"--ebrains-access-token={args.ebrains_access_token}",
+            f"--ebrains-user-access-token={args.ebrains_user_access_token}",
             f"--listen-socket=to-master",
             "tunnel",
             f"--remote-username={args.master_username}",
