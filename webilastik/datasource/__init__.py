@@ -52,7 +52,7 @@ class DataSource(ABC):
         dtype: np.dtype,
         interval: Interval5D,
         axiskeys: str,
-        spatial_resolution: Tuple[int, int, int] = (1,1,1), # FIXME: experimental, like precomp chunks resolution
+        spatial_resolution: Optional[Tuple[int, int, int]], # FIXME: experimental, like precomp chunks resolution
     ):
         self.tile_shape = tile_shape
         self.dtype = dtype
@@ -60,7 +60,7 @@ class DataSource(ABC):
         self.shape = interval.shape
         self.location = interval.start
         self.axiskeys = axiskeys
-        self.spatial_resolution = spatial_resolution
+        self.spatial_resolution = spatial_resolution or (1,1,1)
         self.roi = DataRoi(self, **self.interval.to_dict())
 
     def __repr__(self) -> str:
@@ -86,7 +86,6 @@ class DataSource(ABC):
                 return constructor(value)
         raise ValueError(f"Can't deserialize {json.dumps(value)}")
 
-    @abstractmethod
     def __hash__(self) -> int:
         return hash((
             self.tile_shape,
@@ -96,7 +95,6 @@ class DataSource(ABC):
             self.spatial_resolution,
         ))
 
-    @abstractmethod
     def __eq__(self, other: object) -> bool:
         return (
             isinstance(other, self.__class__) and
@@ -344,6 +342,7 @@ class ArrayDataSource(DataSource):
         axiskeys: str,
         tile_shape: Optional[Shape5D] = None,
         location: Point5D = Point5D.zero(),
+        spatial_resolution: Optional[Tuple[int, int, int]] = None,
     ):
         self._data = Array5D(data, axiskeys=axiskeys, location=location)
         if tile_shape is None:
@@ -353,6 +352,7 @@ class ArrayDataSource(DataSource):
             tile_shape=tile_shape,
             interval=self._data.interval,
             axiskeys=axiskeys,
+            spatial_resolution=spatial_resolution,
         )
 
     def to_json_value(self) -> JsonObject:
@@ -387,7 +387,13 @@ class SkimageDataSource(ArrayDataSource):
     """A naive implementation of DataSource that can read images using skimage"""
 
     def __init__(
-        self, path: Path, *, location: Point5D = Point5D.zero(), filesystem: JsonableFilesystem, tile_shape: Optional[Shape5D] = None
+        self,
+        *,
+        path: Path,
+        location: Point5D = Point5D.zero(),
+        filesystem: JsonableFilesystem,
+        tile_shape: Optional[Shape5D] = None,
+        spatial_resolution: Optional[Tuple[int, int, int]] = None,
     ):
         self.path = path
         self.filesystem = filesystem
@@ -398,6 +404,7 @@ class SkimageDataSource(ArrayDataSource):
             axiskeys=axiskeys,
             location=location,
             tile_shape=tile_shape,
+            spatial_resolution=spatial_resolution,
         )
 
     def to_json_value(self) -> JsonObject:
