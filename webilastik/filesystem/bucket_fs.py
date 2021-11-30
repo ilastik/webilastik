@@ -162,7 +162,7 @@ class BucketFs(JsonableFilesystem):
         def close_callback(f: RemoteFile):
             if mode == "r":
                 return
-            f.seek(0)
+            _ = f.seek(0)
             payload = f.read()
             url = self.url.concatpath(path).raw
             response = self.session.put(url)
@@ -183,7 +183,7 @@ class BucketFs(JsonableFilesystem):
                     raise ResourceNotFound(path) from e
         remote_file = RemoteFile(close_callback=close_callback, mode=mode, data=contents)
         if "a" in mode:
-            remote_file.seek(0, io.SEEK_END)
+            _ = remote_file.seek(0, io.SEEK_END)
         return remote_file
 
     def remove(self, path: str) -> None:
