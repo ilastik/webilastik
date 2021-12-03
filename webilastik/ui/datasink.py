@@ -88,7 +88,6 @@ class PrecomputedChunksScaleSink_CreationParams(DataSinkCreationParams):
         fs_url = self.url.parent
         base_path = Path(self.url.path.name)
 
-        print(f"Getting filesystem at {fs_url.raw}, using this token:\n{ebrains_user_token.access_token}")
         filesystem = try_filesystem_from_url(url=fs_url, allowed_protocols=allowed_protocols, ebrains_user_token=ebrains_user_token)
         if not filesystem:
             return UsageError(f"Can't retrieve data from {fs_url}")
