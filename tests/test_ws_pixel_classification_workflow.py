@@ -1,7 +1,9 @@
 # pyright: reportUnusedCallResult=false
 
 import os
+from webilastik.datasource.precomputed_chunks_info import RawEncoder
 from webilastik.features.channelwise_fastfilters import GaussianSmoothing, HessianOfGaussianEigenvalues
+from webilastik.ui.datasink import PrecomputedChunksScaleSink_CreationParams
 
 from webilastik.ui.workflow.ws_pixel_classification_workflow import RPCPayload
 # ensure requests will use the mkcert cert. Requests uses certifi by default, i think
@@ -43,7 +45,7 @@ async def main():
         cookies={EbrainsSession.AUTH_COOKIE_KEY: UserToken.from_environment().access_token}
     ) as session:
         print(f"Creating new session--------------")
-        async with session.post(f"https://app.ilastik.org/api/session", json={"session_duration": 30}) as response:
+        async with session.post(f"https://app.ilastik.org/api/session", json={"session_duration": 50}) as response:
             response.raise_for_status()
             session_data : Dict[str, Any] = await response.json()
             session_id = session_data["id"]
@@ -147,11 +149,13 @@ async def main():
                 applet_name="export_applet",
                 method_name="start_export_job",
                 arguments={
-                    "raw_data_params": {
+                    "data_source_params": {
                         "url": "https://app.ilastik.org/api/images/c_cells_1.png",
                     },
-                    "bucket_name": "hbp-image-service",
-                    "prefix": f"job_output_{int(time.time())}.precomputed",
+                    "data_sink_params": PrecomputedChunksScaleSink_CreationParams(
+                        url=Url.parse(f"https://data-proxy.ebrains.eu/api/buckets/hbp-image-service/job_output_{int(time.time())}.precomputed"),
+                        encoding=RawEncoder(),
+                    ).to_json_value()
                 }
             ).to_json_value())
             print(f"---> Job successfully scheduled?")

@@ -26,6 +26,7 @@ from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale, RawEncoder
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
 from webilastik.ui.applet.datasource_batch_processing_applet import PixelClasificationExportingApplet
+from webilastik.ui.datasink import DataSinkCreationParams
 from webilastik.ui.datasource import DataSourceLoadParams
 from webilastik.ui.usage_error import UsageError
 from webilastik.utility.url import Url
@@ -266,17 +267,15 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
 
 @dataclass
 class PixelExportRequest:
-    raw_data_params: DataSourceLoadParams
-    bucket_name: str
-    prefix: PurePosixPath
+    data_source_params: DataSourceLoadParams
+    data_sink_params: DataSinkCreationParams
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "PixelExportRequest":
         value_obj = ensureJsonObject(value)
         return PixelExportRequest(
-            raw_data_params=DataSourceLoadParams.from_json_value(value_obj.get("raw_data_params")),
-            bucket_name=ensureJsonString(value_obj.get("bucket_name")),
-            prefix=PurePosixPath(ensureJsonString(value_obj.get("prefix"))),
+            data_source_params=DataSourceLoadParams.from_json_value(value_obj.get("data_source_params")),
+            data_sink_params=DataSinkCreationParams.from_json_value(value_obj.get("data_sink_params")),
         )
 
 class WsExportApplet(WsApplet, PixelClasificationExportingApplet):
@@ -295,42 +294,26 @@ class WsExportApplet(WsApplet, PixelClasificationExportingApplet):
 
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> PropagationResult:
         if method_name == "start_export_job":
+            classifier = self._in_classifier()
+            if classifier is None:
+                raise Exception("Classifier not ready yet") #FIXME
+
             pixel_export_request = PixelExportRequest.from_json_value(arguments)
-            raw_data = pixel_export_request.raw_data_params.try_load(ebrains_user_token=self.ebrains_user_token)
+
+            raw_data = pixel_export_request.data_source_params.try_load(ebrains_user_token=self.ebrains_user_token)
             if isinstance(raw_data, UsageError):
                 return PropagationError(str(raw_data)) # FIXME
-            output_filesystem = BucketFs(
-                bucket_name=pixel_export_request.bucket_name,
-                prefix=PurePosixPath("/"),
+
+            sink = pixel_export_request.data_sink_params.try_load(
                 ebrains_user_token=self.ebrains_user_token,
+                dtype=np.dtype("float32"),
+                location=raw_data.location,
+                interval=raw_data.interval.updated(c=(0, classifier.num_classes)),
+                chunk_size=raw_data.tile_shape,
+                spatial_resolution=raw_data.spatial_resolution,
             )
-
-            pixel_classifier = self._in_classifier()
-            if pixel_classifier is None:
-                return PropagationError("Classifier is not ready")
-
-            chunks_scale_sink = PrecomputedChunksSink.create(
-                base_path=Path(pixel_export_request.prefix), #FIXME
-                filesystem=output_filesystem,
-                info=PrecomputedChunksInfo(
-                    data_type=np.dtype("float32"),
-                    type_="image",
-                    num_channels=pixel_classifier.num_classes,
-                    scales=tuple([
-                        PrecomputedChunksScale(
-                            key=Path("exported_data"),
-                            size=(raw_data.shape.x, raw_data.shape.y, raw_data.shape.z),
-                            chunk_sizes=tuple([
-                                (raw_data.tile_shape.x, raw_data.tile_shape.y, raw_data.tile_shape.z)
-                            ]),
-                            encoding=RawEncoder(),
-                            voxel_offset=(raw_data.location.x, raw_data.location.y, raw_data.location.z),
-                            resolution=raw_data.spatial_resolution
-                        )
-                    ]),
-                )
-            ).scale_sinks[0]
-
+            if isinstance(sink, UsageError):
+                return PropagationError(str(sink)) # FIXME
 
             def on_job_step_completed(job_id: Any, step_index: int):
                 print(f"** Job step {job_id}:{step_index} done")
@@ -341,7 +324,7 @@ class WsExportApplet(WsApplet, PixelClasificationExportingApplet):
             job = self.start_export_job(
                 user_prompt=dummy_prompt,
                 source=raw_data,
-                sink=chunks_scale_sink,
+                sink=sink,
                 on_progress=on_job_step_completed,
                 on_complete=on_job_completed,
             )

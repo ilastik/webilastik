@@ -50,7 +50,6 @@ class DataSourceLoadParams:
                 spatial_resolution=self.spatial_resolution,
             )
 
-        #FIXME: add other datasource types, don't immediately assume precomp chunks
         if PrecomputedChunksInfo.tryLoad(filesystem=filesystem, path=Path("/info")):
             if self.spatial_resolution is None:
                 return UsageError("Precomputed chunks must specify a resolution")
@@ -58,5 +57,6 @@ class DataSourceLoadParams:
                 filesystem=filesystem,
                 path=ds_path,
                 resolution=self.spatial_resolution,
+                location=self.location_override,
             )
         return UsageError(f"Could not open {self.url}")
