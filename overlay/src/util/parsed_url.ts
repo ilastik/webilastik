@@ -1,3 +1,5 @@
+import { ensureJsonString, IJsonable, JsonValue } from "./serialization";
+
 export const data_schemes = ["precomputed"] as const;
 export type DataScheme = typeof data_schemes[number];
 export function ensureDataScheme(value: string): DataScheme{
@@ -79,7 +81,7 @@ export class Path{
     }
 }
 
-export class Url{
+export class Url implements IJsonable{
     public readonly datascheme?: DataScheme
     public readonly protocol: Protocol
     public readonly hostname: string
@@ -128,6 +130,14 @@ export class Url{
             this.raw = this.schemeless_raw
             this.double_protocol_raw = this.raw
         }
+    }
+
+    public toJsonValue(): string{
+        return this.raw
+    }
+
+    public fromJsonValue(value: JsonValue): Url{
+        return Url.parse(ensureJsonString(value))
     }
 
     public static readonly url_pattern = new RegExp(

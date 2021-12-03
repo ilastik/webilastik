@@ -498,3 +498,52 @@ export class Lane implements IJsonable{
         return array.map((v: JsonValue) => Lane.fromJsonValue(v))
     }
 }
+
+export class DataSourceLoadParams implements IJsonable{
+    public readonly url: Url
+    public readonly spatial_resolution?: vec3
+
+    constructor({url, spatial_resolution}: {
+        url: Url
+        spatial_resolution?: vec3
+    }){
+        this.url = url
+        this.spatial_resolution = spatial_resolution
+    }
+
+    public toJsonValue(): JsonObject{
+        return {
+            url: this.url.toJsonValue(),
+            spatial_resolution: this.spatial_resolution === undefined ? null : [
+                this.spatial_resolution[0], this.spatial_resolution[1], this.spatial_resolution[2]
+            ],
+        }
+    }
+}
+
+export abstract class DataSinkCreationParams implements IJsonable{
+    public readonly url: Url;
+    constructor({url}: {url: Url}){
+        this.url = url
+    }
+
+    public abstract toJsonValue(): JsonValue;
+}
+
+export type PrecomputedChunksEncoder = "raw"
+
+export class PrecomputedChunksScaleSink_CreationParams extends DataSinkCreationParams{
+    public readonly encoding: string;
+    constructor(params: {url: Url, encoding: PrecomputedChunksEncoder}){
+        super(params)
+        this.encoding = params.encoding
+    }
+
+    public toJsonValue(): JsonValue{
+        return {
+            url: this.url.toJsonValue(),
+            encoding: this.encoding,
+            __class__: "PrecomputedChunksScaleSink_CreationParams",
+        }
+    }
+}

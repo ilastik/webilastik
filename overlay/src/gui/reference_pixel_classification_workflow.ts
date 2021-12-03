@@ -5,12 +5,15 @@ import { PredictingWidget } from "./widgets/predicting_widget";
 import { BrushingWidget } from "./widgets/brushing_overlay/brushing_widget";
 import { FeatureSelectionWidget } from "./widgets/feature_selection";
 import { Viewer } from "../viewer/viewer";
+import { PredictionsExportApplet } from "./widgets/predictions_export_applet";
 
 export class ReferencePixelClassificationWorkflowGui{
     public readonly element: HTMLElement
     public readonly feature_selection_applet: FeatureSelectionWidget
     public readonly brushing_applet: BrushingWidget;
     public readonly live_updater: PredictingWidget;
+    public readonly exporter_applet: PredictionsExportApplet;
+
     public readonly session: Session;
     public readonly viewer: Viewer;
     private readonly socket: WebSocket;
@@ -44,6 +47,12 @@ export class ReferencePixelClassificationWorkflowGui{
             session,
             socket: this.socket,
             viewer: this.viewer
+        })
+        this.exporter_applet = new PredictionsExportApplet({
+            name: "export_applet",
+            parentElement: this.element,
+            session,
+            socket: this.socket
         })
     }
 

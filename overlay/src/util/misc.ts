@@ -110,14 +110,30 @@ export function createInput(params: {
     return input
 }
 
-export function createSelect({parentElement, values, name, onClick}:
-    {parentElement:HTMLElement, values?: Map<string, string>, name?:string, onClick?: (event: MouseEvent) => void}
-): HTMLSelectElement{
+export function createInputParagraph(params: Parameters<typeof createInput>[0] & {label_text?: string}): ReturnType<typeof createInput>{
+    let p = createElement({tagName: "p", parentElement: params.parentElement})
+    if(params.label_text !== undefined){
+        createElement({tagName: "label", parentElement: p, innerHTML: params.label_text})
+    }
+    return createInput({...params, parentElement: p})
+}
+
+export function createSelect<T extends {toString: () => string}>({
+    parentElement,
+    values,
+    name,
+    onClick
+}:{
+    parentElement:HTMLElement,
+    values?: Map<string, T>,
+    name?:string,
+    onClick?: (event: MouseEvent) => void
+}): HTMLSelectElement{
     const select = <HTMLSelectElement>createElement({tagName: 'select', parentElement, onClick})
     if(values !== undefined){
-        values.forEach((value:string, displayValue:string) => {
+        values.forEach((value: T, displayValue: string) => {
             let option = createElement({tagName: 'option', innerHTML: displayValue, parentElement: select, onClick})
-            option.value = value
+            option.value = value.toString()
         })
     }
     if(name !== undefined){
