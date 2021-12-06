@@ -14,8 +14,6 @@ import { Viewer } from "../../../viewer/viewer"
 import { PredictionsView, RawDataView, TrainingView } from "../../../viewer/view"
 
 export class BrushingWidget{
-    public static training_view_name_prefix = "ilastik training: "
-
     public readonly gl: WebGL2RenderingContext
     public readonly viewer: Viewer
     public readonly element: HTMLElement
