@@ -12,6 +12,8 @@ from queue import PriorityQueue
 import uuid
 import threading
 
+from ndstructs.utils.json_serializable import JsonObject
+
 IN = TypeVar("IN", bound=Hashable)
 OUT = TypeVar("OUT")
 
@@ -179,6 +181,13 @@ class Job(Generic[IN]):
                 if self.on_complete:
                     self.on_complete(self.uuid)
 
+    def to_json_value(self) -> JsonObject:
+        return {
+            "num_args": self.num_args,
+            "uuid": str(self.uuid),
+            "status": self.status,
+            "num_completed_steps": self.num_completed_steps,
+        }
 
 
 class _Worker:
@@ -220,6 +229,10 @@ class _Worker:
             inner_future = self._executor.submit(priority_future.target, priority_future.arg)
             inner_future.add_done_callback(lambda _: self._executor_is_free.set())
             priority_future.set_future(inner_future)
+
+    def cancel_group(self, group_id: uuid.UUID):
+        with self._lock:
+            self._cancelled_groups.add(group_id)
 
     def shutdown(self, wait: bool = True):
         with self._lock:
@@ -277,3 +290,7 @@ class HashingExecutor:
             executor = self._get_worker(priority_future.arg)
             executor.submit_work(priority_future)
         return job
+
+    def cancel_group(self, group_id: uuid.UUID):
+        for worker in self._workers:
+            worker.cancel_group(group_id)
