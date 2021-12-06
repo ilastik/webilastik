@@ -316,7 +316,7 @@ class OidcClient:
 
         filename = f"/tmp/oidc_client_{clientId}.json"
         with open(filename, "w") as f:
-            f.write(json.dumps(payload, indent=4))
+            _ = f.write(json.dumps(payload, indent=4))
         print(f"Dumped {clientId} info to {filename}")
         return OidcClient.from_json_value(payload)
 
