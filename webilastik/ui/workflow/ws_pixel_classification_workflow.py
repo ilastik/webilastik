@@ -463,17 +463,13 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         return websocket
 
     async def _do_rpc(self, originator: web.WebSocketResponse, payload: RPCPayload):
+        #FIXME: show bad results to user
         _ = self.wsapplets[payload.applet_name].run_rpc(user_prompt=dummy_prompt, method_name=payload.method_name, arguments=payload.arguments)
         updated_state = {name: applet._get_json_state() for name, applet in self.wsapplets.items()}
 
         for websocket in self.websockets:
             try:
-                if websocket == originator:
-                    # FIXME: this will break if the applet refuses or alters the new state
-                    originator_updated_state = {key: value for key, value in updated_state.items() if key != payload.applet_name} # FIXME
-                    await websocket.send_str(json.dumps(originator_updated_state))
-                else:
-                    await websocket.send_str(json.dumps(updated_state))
+                await websocket.send_str(json.dumps(updated_state))
             except ConnectionResetError as e:
                 logger.error(f"Got an exception while updating remote:\n{e}\n\nRemoving websocket...")
                 self.websockets.remove(websocket)

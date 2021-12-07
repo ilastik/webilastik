@@ -120,10 +120,8 @@ export class FeatureSelectionWidget extends Applet<{feature_extractors: FeatureE
                 let changes = cb.getStagedChanges()
                 if(changes.action == "add"){
                     extractors_to_add.push(changes.featureExtractor)
-                    cb.setLastUpstreamState(true)
                 }else if(changes.action == "remove"){
                     extractors_to_remove.push(changes.featureExtractor)
-                    cb.setLastUpstreamState(false)
                 }
             }
             if(extractors_to_add.length > 0){

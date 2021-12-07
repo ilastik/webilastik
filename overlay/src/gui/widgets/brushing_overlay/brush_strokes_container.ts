@@ -39,36 +39,30 @@ export class BrushStrokesContainer extends Applet<{brushing_enabled: boolean, an
     }
 
     public addBrushStroke(brushStroke: BrushStroke){
-        this.doAddBrushStroke(brushStroke)
-        this.doRPC("add_annotations", {annotations: this.brushStrokeWidgets.map(bsw => bsw.brushStroke)})
+        this.doRPC("add_annotations", {annotations: [brushStroke]})
+    }
+
+    public removeBrushStroke(brushStroke: BrushStroke){
+        this.doRPC("remove_annotations", {annotations: [brushStroke]})
     }
 
     public getBrushStrokes(): Array<BrushStroke>{
         return this.brushStrokeWidgets.map(bsw => bsw.brushStroke)
     }
 
-    protected doAddBrushStroke(brushStroke: BrushStroke){
-        this.brushStrokeWidgets.push(
-            new BrushStrokeWidget({
-                brushStroke,
-                parentElement: this.element,
-                onColorClicked: this.onBrushColorClicked,
-                onLabelClicked: (_) => {
-                    //FIXME: snap viewer to coord
-                },
-                onDeleteClicked: (stroke) => {
-                    let updated_strokes = this.getBrushStrokes().filter(stk => stk != stroke)
-                    this.onNewState({brushing_enabled: true, annotations: updated_strokes}) // FIXME: move brushing enable dinto this class
-                    this.doRPC("remove_annotations", {annotations: [stroke]})
-                }
-            })
-        )
-    }
-
     protected onNewState(state: {brushing_enabled: boolean, annotations: Array<BrushStroke>}){
         this.brushStrokeWidgets.forEach(bsw => bsw.destroy())
         this.brushStrokeWidgets = []
-        state.annotations.forEach(stroke => this.doAddBrushStroke(stroke))
+        for(let brushStroke of state.annotations){
+            let brush_widget = new BrushStrokeWidget({
+                brushStroke,
+                parentElement: this.element,
+                onColorClicked: this.onBrushColorClicked,
+                onLabelClicked: (_) => {}, //FIXME: snap viewer to coord
+                onDeleteClicked: (stroke) => this.removeBrushStroke(stroke)
+            })
+            this.brushStrokeWidgets.push(brush_widget)
+        }
     }
 
     public destroy(){

@@ -75,6 +75,7 @@ export class BrushingWidget{
     }
 
     private resetWidgets(){
+        window.cancelAnimationFrame(this.animationRequestId)
         this.trainingWidget?.destroy()
         this.controlsContainer.innerHTML = ""
         this.showCanvas(false)
@@ -143,7 +144,7 @@ export class BrushingWidget{
             this.trainingWidget?.render(this.brushStrokeContainer.getBrushStrokes())
             this.animationRequestId = window.requestAnimationFrame(render)
         }
-        this.animationRequestId = window.requestAnimationFrame(render)
+        render()
     }
 
     public destroy(){
@@ -216,7 +217,10 @@ export class TrainingWidget{
                     })
                     return this.staging_brush_stroke
                 },
-                handleFinishedBrushStroke: onNewBrushStroke
+                handleFinishedBrushStroke: (stroke) => {
+                    this.staging_brush_stroke = undefined
+                    onNewBrushStroke(stroke)
+                }
             },
         })
     }
