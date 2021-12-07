@@ -23,29 +23,6 @@ export class VertexArrayObject{
     public delete(){
         this.gl.deleteVertexArray(this.glAttributeObject)
     }
-
-    /** Configures this VAO to use 'buffer' as an attribute in location 'location'*/
-    protected vertexAttribPointer<Arr extends BinaryArray>({buffer, location, byteOffset=0, normalize, numComponents, elementType}:{
-        buffer: Buffer<Arr>,
-        location: AttributeLocation,
-        byteOffset?: number,
-        normalize: boolean,
-        numComponents: AttributeNumComponents,
-        elementType: AttributeElementType
-    }){
-        this.bind();
-        this.gl.enableVertexAttribArray(location.raw);
-        buffer.bind()
-        this.gl.vertexAttribPointer(
-            /*index=*/location.raw,
-            /*size=*/numComponents,
-            /*type=*/elementType,
-            /*normalize=*/normalize,
-            /*stride=*/0,
-            /*offset=*/byteOffset
-        )
-        this.unbind()
-    }
 }
 
 export enum BindTarget {
@@ -114,6 +91,7 @@ export abstract class VertexAttributeBuffer extends Buffer<Float32Array>{
         return BindTarget.ARRAY_BUFFER
     }
 
+    /** Configures the VertexArrayObject 'vao' to use this buffer as an attribute in location 'location'*/
     protected vertexAttribPointer({vao, location, byteOffset=0, normalize, numComponents, elementType}:{
         vao: VertexArrayObject,
         location: AttributeLocation,

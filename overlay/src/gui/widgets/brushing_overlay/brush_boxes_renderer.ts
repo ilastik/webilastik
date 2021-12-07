@@ -231,7 +231,7 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
             this.gl.drawArraysInstanced( //instance-draw a bunch of cubes, one cube for each voxel in the brush stroke
                 /*mode=*/this.box.getDrawingMode(),
                 /*first=*/0,
-                /*count=*/this.box.numVerts,
+                /*count=*/this.box.vertCapacity,
                 /*instanceCount=*/brush_stroke.num_points
             );
         }

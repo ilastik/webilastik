@@ -14,7 +14,7 @@ export class BrushStroke extends VertexArray implements IJsonable{
 
     private constructor({gl, points_vx, color, camera_orientation, annotated_data_source}: {
         gl: WebGL2RenderingContext,
-        points_vx: vec3[],
+        points_vx: vec3[], // points in "voxel-space" (i.e. cooridnates are pixel indices into the image array)
         color: vec3,
         camera_orientation: quat,
         annotated_data_source: DataSource,

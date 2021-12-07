@@ -4,13 +4,13 @@ import { DrawingMode, FrontFace } from "./gl";
 
 export class VertexArray{
     public readonly data: Float32Array
-    public readonly numVerts: number
+    public readonly vertCapacity: number
     constructor(arr: Float32Array){
         if(arr.length % 3){
             throw `Bad array length when creating VertexArray: ${arr.length}`
         }
         this.data = arr
-        this.numVerts = arr.length / 3
+        this.vertCapacity = arr.length / 3
     }
 
     public getVertRef(index: number) : vec3{
@@ -105,7 +105,7 @@ export class TriangleArray extends VertexPrimitive{
         }
         super(arr)
         this.vertexOrder = vertexOrder
-        this.numTriangles = this.numVerts / 3
+        this.numTriangles = this.vertCapacity / 3
     }
 
     public getDrawingMode(): DrawingMode{
