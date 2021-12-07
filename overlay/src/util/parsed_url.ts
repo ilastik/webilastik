@@ -204,13 +204,13 @@ export class Url implements IJsonable{
         Array.from(params.extra_search || new Map<string, string>()).forEach(([key, value]) => new_search.set(key, value))
 
         return new Url({
-            datascheme: params.datascheme === undefined ? this.datascheme : params.datascheme,
+            datascheme: "datascheme" in params ? params.datascheme : this.datascheme,
             protocol: params.protocol === undefined ? this.protocol : params.protocol,
             hostname: params.hostname === undefined ? this.hostname : params.hostname,
-            port: params.port === undefined ? this.port : params.port,
+            port: "port" in params ? params.port : this.port,
             path: params.path === undefined ? this.path : params.path,
             search: new_search,
-            hash: params.hash === undefined ? this.hash : params.hash,
+            hash: "hash" in params ? params.hash : this.hash,
         })
     }
 
