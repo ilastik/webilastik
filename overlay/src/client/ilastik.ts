@@ -301,7 +301,7 @@ export class HttpFs extends FileSystem{
     public readonly read_url: Url
     public constructor({read_url}: {read_url: Url}){
         super()
-        this.read_url = read_url
+        this.read_url = read_url.updatedWith({datascheme: undefined})
     }
 
     public getDisplayString(): string{
