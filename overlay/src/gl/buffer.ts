@@ -1,6 +1,7 @@
 import { AttributeElementType, AttributeNumComponents, BinaryArray } from "./gl";
 import { AttributeLocation } from "./shader";
 
+/**Collects shader attribute configuration (what buffers supply what attributes and how) */
 export class VertexArrayObject{
     private glAttributeObject : WebGLVertexArrayObject
     constructor(public readonly gl: WebGL2RenderingContext){
@@ -23,6 +24,7 @@ export class VertexArrayObject{
         this.gl.deleteVertexArray(this.glAttributeObject)
     }
 
+    /** Configures this VAO to use 'buffer' as an attribute in location 'location'*/
     protected vertexAttribPointer<Arr extends BinaryArray>({buffer, location, byteOffset=0, normalize, numComponents, elementType}:{
         buffer: Buffer<Arr>,
         location: AttributeLocation,
