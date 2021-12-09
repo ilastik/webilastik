@@ -158,7 +158,7 @@ export class PredictionsExportApplet extends Applet<{jobs: Job[]}>{
 
         createInputParagraph({inputType: "submit", value: "Create Job", parentElement: this.new_job_form})
 
-        this.job_table = createElement({tagName: "table", parentElement: this.element}) as HTMLTableElement;
+        this.job_table = createElement({tagName: "table", parentElement: this.element, cssClasses: ["ItkPredictionsExportApplet_job_table"]});
 
         this.new_job_form.addEventListener("submit", (ev) => {
             ev.preventDefault()
