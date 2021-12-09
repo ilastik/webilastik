@@ -111,7 +111,7 @@ export function createInput(params: {
 }
 
 export function createInputParagraph(params: Parameters<typeof createInput>[0] & {label_text?: string}): ReturnType<typeof createInput>{
-    let p = createElement({tagName: "p", parentElement: params.parentElement})
+    let p = createElement({tagName: "p", parentElement: params.parentElement, cssClasses: ["ItkInputParagraph"]})
     if(params.label_text !== undefined){
         createElement({tagName: "label", parentElement: p, innerHTML: params.label_text})
     }
