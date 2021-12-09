@@ -294,7 +294,7 @@ class WsExportApplet(WsApplet, PixelClasificationExportingApplet):
         self.jobs: Dict[uuid.UUID, Job[Any]] = {}
         self.ebrains_user_token = ebrains_user_token
         self.lock = threading.Lock()
-        self.last_update = time.time()
+        self.last_update = time.monotonic()
         super().__init__(name=name, executor=executor, classifier=pixel_classifier)
 
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> PropagationResult:
@@ -348,13 +348,13 @@ class WsExportApplet(WsApplet, PixelClasificationExportingApplet):
 
     def _mark_updated(self):
         with self.lock:
-            self.last_update = time.time()
+            self.last_update = time.monotonic()
 
     def get_updated_status(self, last_seen_update: float) -> Tuple[float, Optional[JsonObject]]:
         with self.lock:
             if last_seen_update < self.last_update:
                 return (self.last_update, self._get_json_state())
-        return (self.last_update, None)
+            return (self.last_update, None)
 
     def _get_json_state(self) -> JsonObject:
         return {
