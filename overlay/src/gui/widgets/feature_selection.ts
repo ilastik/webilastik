@@ -1,7 +1,7 @@
 import { createElement, createInput } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
 import { Applet } from '../../client/applets/applet';
-import { DifferenceOfGaussians, FeatureExtractor, GaussianGradientMagnitude, GaussianSmoothing, HessianOfGaussianEigenvalues, LaplacianOfGaussian, StructureTensorEigenvalues } from '../../client/ilastik';
+import { DifferenceOfGaussians, FeatureExtractor, GaussianGradientMagnitude, GaussianSmoothing, HessianOfGaussianEigenvalues, LaplacianOfGaussian, Session, StructureTensorEigenvalues } from '../../client/ilastik';
 import { ensureJsonObject } from '../../util/serialization';
 
 // class FeatureCheckbox<FE extends FeatureExtractor>{
@@ -62,12 +62,12 @@ export class FeatureSelectionWidget extends Applet<{feature_extractors: FeatureE
     public readonly element: HTMLElement;
     private checkboxes = new Array<FeatureSelectionCheckbox>();
 
-    public constructor({name, socket, parentElement}: {
-        name: string, socket: WebSocket, parentElement: HTMLElement
+    public constructor({name, session, parentElement}: {
+        name: string, session: Session, parentElement: HTMLElement
     }){
         super({
             name,
-            socket,
+            session,
             deserializer: (data) => {
                 let value_obj = ensureJsonObject(data)
                 return {

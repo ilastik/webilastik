@@ -1,5 +1,6 @@
 import { vec3 } from "gl-matrix";
 import { Applet } from "../../../client/applets/applet";
+import { Session } from "../../../client/ilastik";
 import { createElement, createInput, removeElement, vec3ToRgb, vecToString } from "../../../util/misc";
 import { ensureJsonArray, ensureJsonBoolean, ensureJsonObject } from "../../../util/serialization";
 import { BrushStroke } from "./brush_stroke";
@@ -13,11 +14,11 @@ export class BrushStrokesContainer extends Applet<{brushing_enabled: boolean, an
     private brushStrokeWidgets: BrushStrokeWidget[] = [];
     private onBrushColorClicked: (color: vec3) => void;
 
-    constructor({applet_name, gl, parentElement, socket, onBrushColorClicked}: {
+    constructor({applet_name, gl, parentElement, session, onBrushColorClicked}: {
         applet_name: string,
         gl: WebGL2RenderingContext,
         parentElement: HTMLElement,
-        socket: WebSocket,
+        session: Session,
         onBrushColorClicked: (color: vec3) => void,
     }){
         super({
@@ -31,7 +32,7 @@ export class BrushStrokesContainer extends Applet<{brushing_enabled: boolean, an
                     annotations: raw_annotations.map(a => BrushStroke.fromJsonValue(gl, a))
                 }
             },
-            socket,
+            session,
             onNewState: (new_state) => this.onNewState(new_state)
         })
         this.element = createElement({tagName: "table", parentElement, cssClasses: ["ItkBrushStrokesContainer"]}) as HTMLTableElement;

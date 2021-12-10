@@ -16,7 +16,6 @@ export class ReferencePixelClassificationWorkflowGui{
 
     public readonly session: Session;
     public readonly viewer: Viewer;
-    private readonly socket: WebSocket;
 
     public constructor({parentElement, session, viewer_driver}: {
         parentElement: HTMLElement,
@@ -27,32 +26,24 @@ export class ReferencePixelClassificationWorkflowGui{
         this.element = createElement({tagName: "div", parentElement, cssClasses: ["ReferencePixelClassificationWorkflowGui"]})
         this.viewer = new Viewer({driver: viewer_driver, ilastik_session: session})
 
-        this.socket = session.createSocket()
-        this.socket.addEventListener("error", (ev) => {
-            console.error(`Session socket has throw an error: ${ev}`)
-        })
-
         this.feature_selection_applet = new FeatureSelectionWidget({
             name: "feature_selection_applet",
-            socket: this.socket,
+            session: this.session,
             parentElement: this.element,
         })
         this.brushing_applet = new BrushingWidget({
-            session,
-            socket: this.socket,
+            session: this.session,
             parentElement: this.element,
             viewer: this.viewer,
         })
         this.live_updater = new PredictingWidget({
-            session,
-            socket: this.socket,
+            session: this.session,
             viewer: this.viewer
         })
         this.exporter_applet = new PredictionsExportApplet({
             name: "export_applet",
             parentElement: this.element,
-            session,
-            socket: this.socket
+            session: this.session
         })
     }
 

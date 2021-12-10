@@ -2,18 +2,36 @@ import { vec3 } from "gl-matrix"
 import { sleep } from "../util/misc"
 import { Path, Url } from "../util/parsed_url"
 import { PrecomputedChunks } from "../util/precomputed_chunks"
-import { ensureJsonArray, ensureJsonNumberTripplet, ensureJsonObject, ensureJsonString, IJsonable, JsonObject, JsonValue } from "../util/serialization"
+import { ensureJsonArray, ensureJsonNumberTripplet, ensureJsonObject, ensureJsonString, IJsonable, IJsonableObject, JsonObject, JsonValue, toJsonValue } from "../util/serialization"
 
 export class Session{
-    public readonly ilastik_url: string
-    public readonly session_url: string
+    public readonly ilastikUrl: Url
+    public readonly sessionUrl: Url
+    private websocket: WebSocket
+    private message_handlers = new Array<(ev: MessageEvent) => void>();
 
-    protected constructor({ilastik_url, session_url}: {
-        ilastik_url: URL,
-        session_url: URL,
+
+    protected constructor(params: {
+        ilastikUrl: Url,
+        sessionUrl: Url,
+        websocket: WebSocket,
     }){
-        this.ilastik_url = ilastik_url.toString().replace(/\/$/, "")
-        this.session_url = session_url.toString().replace(/\/$/, "")
+        this.ilastikUrl = params.ilastikUrl
+        this.sessionUrl = params.sessionUrl
+        this.websocket = params.websocket
+    }
+
+    public addMessageListener(handler: (ev: MessageEvent) => void){
+        this.message_handlers.push(handler)
+        this.websocket.addEventListener("message", handler)
+    }
+
+    public doRPC(params: {applet_name: string, method_name: string, method_arguments: IJsonableObject}){
+        return this.websocket.send(JSON.stringify({
+            applet_name: params.applet_name,
+            method_name: params.method_name,
+            arguments: toJsonValue(params.method_arguments),
+        }))
     }
 
     public static btoa(url: String): string{
@@ -43,16 +61,15 @@ export class Session{
             .find(row => row.startsWith('ebrains_user_access_token='))?.split('=')[1];
     }
 
-    public static async create({ilastik_url, session_duration_seconds, timeout_s, onProgress=(_) => {}}: {
-        ilastik_url: URL,
+    public static async create({ilastikUrl, session_duration_seconds, timeout_s, onProgress=(_) => {}}: {
+        ilastikUrl: Url,
         session_duration_seconds: number,
         timeout_s: number,
         onProgress?: (message: string) => void,
     }): Promise<Session>{
-        const clean_ilastik_url = ilastik_url.toString().replace(/\/$/, "")
-        const new_session_url = clean_ilastik_url + "/session"
+        const newSessionUrl = ilastikUrl.joinPath("session")
         while(timeout_s > 0){
-            let session_creation_response = await fetch(new_session_url, {
+            let session_creation_response = await fetch(newSessionUrl.schemeless_raw, {
                 method: "POST",
                 body: JSON.stringify({session_duration: session_duration_seconds})
             })
@@ -65,9 +82,9 @@ export class Session{
                 continue
             }
             onProgress(`Successfully requested a session!`)
-            let raw_session_data: {url: string, id: string, token: string} = await session_creation_response.json()
+            let rawSession_data: {url: string, id: string, token: string} = await session_creation_response.json()
             while(timeout_s){
-                let session_status_response = await fetch(clean_ilastik_url + `/session/${raw_session_data.id}`)
+                let session_status_response = await fetch(ilastikUrl.joinPath(`/session/${rawSession_data.id}`).schemeless_raw)
                 if(session_status_response.ok  && (await session_status_response.json())["status"] == "ready"){
                     onProgress(`Session has become ready!`)
                     break
@@ -76,39 +93,32 @@ export class Session{
                 timeout_s -= 2
                 await sleep(2000)
             }
-            return new Session({
-                ilastik_url: new URL(clean_ilastik_url),
-                session_url: new URL(raw_session_data.url),
-            })
+
+            const sessionUrl = Url.parse(rawSession_data.url);
+            const wsUrl = sessionUrl.updatedWith({
+                protocol: sessionUrl.protocol == "http" ? "ws" : "wss"
+            }).joinPath("ws")
+            const websocket = new WebSocket(wsUrl.schemeless_raw)
+
+            return new Session({ilastikUrl, sessionUrl, websocket})
         }
         throw `Could not create a session`
     }
 
-    public static async load({ilastik_url, session_url}: {
-        ilastik_url: URL, session_url:URL
+    public static async load({ilastikUrl, sessionUrl}: {
+        ilastikUrl: Url, sessionUrl:Url
     }): Promise<Session>{
-        const status_endpoint = session_url.toString().replace(/\/?$/, "/status")
-        let session_status_resp = await fetch(status_endpoint)
+        let session_status_resp = await fetch(sessionUrl.joinPath("status").schemeless_raw)
         if(!session_status_resp.ok){
             throw Error(`Bad response from session: ${session_status_resp.status}`)
         }
-        return new Session({
-            ilastik_url: ilastik_url,
-            session_url: session_url,
-        })
-    }
-
-    public createSocket(): WebSocket{
-        //FIXME  is there a point to handling socket errors?:
-        let ws_url = new URL(this.session_url)
-        ws_url.protocol = ws_url.protocol == "http:" ? "ws:" : "wss:";
-        ws_url.pathname = ws_url.pathname + '/ws'
-        return new WebSocket(ws_url.toString())
+        let websocket = new WebSocket(sessionUrl.schemeless_raw)
+        return new Session({ilastikUrl, sessionUrl, websocket})
     }
 
     public async close(): Promise<true | undefined>{
-        let close_session_response = await fetch(this.session_url + `/close`, {method: "DELETE"})
-        if(close_session_response.ok){
+        let closeSession_response = await fetch(this.sessionUrl + `/close`, {method: "DELETE"})
+        if(closeSession_response.ok){
             return undefined
         }
         return true
@@ -429,7 +439,7 @@ export class PrecomputedChunksDataSource extends DataSource{
     public toTrainingUrl(session: Session): Url{
         const original_url = this.filesystem.getUrl().joinPath(this.path.raw)
         const resolution_str = `${this.spatial_resolution[0]}_${this.spatial_resolution[1]}_${this.spatial_resolution[2]}`
-        return Url.parse(session.session_url)
+        return session.sessionUrl
             .ensureDataScheme("precomputed")
             .joinPath(`stripped_precomputed/url=${Session.btoa(original_url.raw)}/resolution=${resolution_str}`)
     }

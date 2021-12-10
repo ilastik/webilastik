@@ -1,6 +1,7 @@
 import { IViewerDriver } from "../..";
 import { Session } from "../../client/ilastik";
 import { createInput } from "../../util/misc";
+import { Url } from "../../util/parsed_url";
 import { ReferencePixelClassificationWorkflowGui } from "../reference_pixel_classification_workflow";
 import { CollapsableWidget } from "./collapsable_applet_gui";
 import { SessionCreatorWidget } from "./session_creator";
@@ -12,8 +13,8 @@ export class SessionManagerWidget{
     workflow?: ReferencePixelClassificationWorkflowGui
     session_creator: SessionCreatorWidget;
     session_loader: SessionLoaderWidget;
-    constructor({parentElement, ilastik_url=new URL("https://app.ilastik.org/api"), viewer_driver, workflow_container}: {
-        parentElement: HTMLElement, ilastik_url?: URL, viewer_driver: IViewerDriver, workflow_container: HTMLElement
+    constructor({parentElement, ilastikUrl=Url.parse("https://app.ilastik.org/api"), viewer_driver, workflow_container}: {
+        parentElement: HTMLElement, ilastikUrl?: Url, viewer_driver: IViewerDriver, workflow_container: HTMLElement
     }){
         this.element = new CollapsableWidget({display_name: "Session Management", parentElement}).element;
         this.element.classList.add("ItkLauncherWidget")
@@ -29,12 +30,12 @@ export class SessionManagerWidget{
             this.session_creator.set_disabled(true)
             this.session_loader.set_disabled(true)
             this.session_loader.setFields({
-                ilastik_url,
-                session_url: new URL(new_session.session_url),
+                ilastikUrl,
+                sessionUrl: new_session.sessionUrl,
             })
         }
-        this.session_creator = new SessionCreatorWidget({parentElement: this.element, ilastik_url, onNewSession})
-        this.session_loader = new SessionLoaderWidget({parentElement: this.element, ilastik_url, onNewSession})
+        this.session_creator = new SessionCreatorWidget({parentElement: this.element, ilastikUrl, onNewSession})
+        this.session_loader = new SessionLoaderWidget({parentElement: this.element, ilastikUrl, onNewSession})
 
         const onLeaveSession = () => {
             this.workflow?.destroy()

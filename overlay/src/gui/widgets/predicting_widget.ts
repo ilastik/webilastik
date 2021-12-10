@@ -41,11 +41,11 @@ export class PredictingWidget extends Applet<PredictingAppletState>{
     public readonly viewer: Viewer;
     public readonly session: Session
 
-    constructor({socket, session, viewer}: {socket: WebSocket, session: Session, viewer: Viewer}){
+    constructor({session, viewer}: {session: Session, viewer: Viewer}){
         super({
             deserializer: PredictingAppletState.fromJsonValue,
             name: "pixel_classification_applet",
-            socket,
+            session,
             onNewState: async (new_state: PredictingAppletState) => {
                 if(!new_state.producer_is_ready){
                     return

@@ -4,9 +4,9 @@ import { Url } from "../../util/parsed_url"
 
 export class SessionCreatorWidget{
     element: HTMLElement
-    constructor({parentElement, ilastik_url, onNewSession}:{
+    constructor({parentElement, ilastikUrl, onNewSession}:{
         parentElement: HTMLElement,
-        ilastik_url: URL,
+        ilastikUrl: Url,
         onNewSession: (new_session: Session) => void,
     }){
         this.element = createElement({tagName: "div", parentElement, cssClasses: ["ItkSessionCreatorWidget"]})
@@ -15,7 +15,7 @@ export class SessionCreatorWidget{
         const form = createElement({tagName: "form", parentElement: this.element})
 
         const url_input = createInputParagraph({
-            label_text: "Ilastik api URL: ",inputType: "url", parentElement: form, required: true, value: ilastik_url.toString(), name: "itk_api_url"
+            label_text: "Ilastik api URL: ",inputType: "url", parentElement: form, required: true, value: ilastikUrl.toString(), name: "itk_api_url"
         })
 
         const timeout_input = createInputParagraph({
@@ -51,7 +51,7 @@ export class SessionCreatorWidget{
                     status_messages.innerHTML = "";
 
                     let session = await Session.create({
-                        ilastik_url: new URL(url_input.value),
+                        ilastikUrl: Url.parse(url_input.value),
                         timeout_s: parseInt(timeout_input.value) * 60,
                         session_duration_seconds: parseInt(duration_input.value) * 60,
                         onProgress: (message) => {

@@ -1,14 +1,15 @@
 import { IViewerDriver } from "../../drivers/viewer_driver";
 import { createElement, injectCss } from "../../util/misc";
+import { Url } from "../../util/parsed_url";
 import { SessionManagerWidget } from "./session_manager";
 // import { SessionManagerWidget } from "./session_manager";
 
 export class OverlayControls{
     element: HTMLElement;
     constructor({
-        parentElement=document.body, ilastik_url, viewer_driver, draggable=true, css
+        parentElement=document.body, ilastikUrl, viewer_driver, draggable=true, css
     }: {
-        parentElement: HTMLElement, ilastik_url?: URL, viewer_driver: IViewerDriver, draggable?: boolean, css?: URL
+        parentElement: HTMLElement, ilastikUrl?: Url, viewer_driver: IViewerDriver, draggable?: boolean, css?: Url
     }){
         if(css){
             injectCss(css)
@@ -43,7 +44,7 @@ export class OverlayControls{
 
 
         new SessionManagerWidget({
-            parentElement: this.element, ilastik_url, viewer_driver, workflow_container: this.element
+            parentElement: this.element, ilastikUrl, viewer_driver, workflow_container: this.element
         })
     }
 }

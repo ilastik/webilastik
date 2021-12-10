@@ -115,7 +115,7 @@ export class PredictionsView extends View{
 
     public static createFor({raw_data, ilastik_session}: {raw_data: DataSource, ilastik_session: Session}): PredictionsView{
         let raw_data_json = JSON.stringify(raw_data.toJsonValue())
-        let predictions_url = Url.parse(ilastik_session.session_url)
+        let predictions_url = ilastik_session.sessionUrl
             .updatedWith({datascheme: "precomputed"})
             .joinPath(`predictions/raw_data=${Session.btoa(raw_data_json)}/run_id=${uuidv4()}`);
         return new PredictionsView({

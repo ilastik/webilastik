@@ -1,4 +1,5 @@
 import { vec3, mat4, vec4, quat } from "gl-matrix";
+import { Url } from "./parsed_url";
 
 export function project(out: vec3, v: vec3, onto: vec3){
     // a . b = |a| * |b| * cos(alpha)
@@ -319,10 +320,10 @@ export function sleep(ms: number){
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-export function injectCss(url: URL){
+export function injectCss(url: Url){
     let link_element = createElement({tagName: "link", parentElement: document.head}) as HTMLLinkElement
     link_element.rel = "stylesheet"
-    link_element.href = url.toString()
+    link_element.href = url.schemeless_raw
 }
 
 export function removeElement(element: HTMLElement){

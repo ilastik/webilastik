@@ -28,12 +28,10 @@ export class BrushingWidget{
 
     constructor({
         session,
-        socket,
         parentElement,
         viewer,
     }: {
         session: Session,
-        socket: WebSocket,
         parentElement: HTMLElement,
         viewer: Viewer,
     }){
@@ -50,7 +48,7 @@ export class BrushingWidget{
         let p = createElement({tagName: "p", parentElement: this.element})
         createElement({tagName: "label", innerHTML: "Brush Strokes:", parentElement: p})
         this.brushStrokeContainer = new BrushStrokesContainer({
-            socket,
+            session,
             parentElement: this.element,
             applet_name: "brushing_applet",
             gl: this.gl,

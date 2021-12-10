@@ -113,12 +113,12 @@ export class PredictionsExportApplet extends Applet<{jobs: Job[]}>{
     private job_table: HTMLTableElement;
     private new_job_form: HTMLFormElement;
 
-    public constructor({name, socket, parentElement}: {
-        name: string, socket: WebSocket, parentElement: HTMLElement, session: Session
+    public constructor({name, parentElement, session}: {
+        name: string, parentElement: HTMLElement, session: Session
     }){
         super({
             name,
-            socket,
+            session,
             deserializer: (data) => {
                 let data_obj = ensureJsonObject(data)
                 let raw_jobs = ensureJsonArray(data_obj["jobs"])

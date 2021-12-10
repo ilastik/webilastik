@@ -10,7 +10,7 @@ export function ensureDataScheme(value: string): DataScheme{
     return variant
 }
 
-export const protocols = ["http", "https"] as const;
+export const protocols = ["http", "https", "ws", "wss"] as const;
 export type Protocol = typeof protocols[number];
 export function ensureProtocol(value: string): Protocol{
     const variant = protocols.find(variant => variant === value)
@@ -241,5 +241,9 @@ export class Url implements IJsonable{
 
     public get root(): Url{
         return this.updatedWith({path: Path.parse("/")})
+    }
+
+    public toString(): string{
+        return this.raw
     }
 }
