@@ -39,10 +39,12 @@ export class BrushStrokesContainer extends Applet<{brushing_enabled: boolean, an
     }
 
     public addBrushStroke(brushStroke: BrushStroke){
+        this.doAddBrushStroke(brushStroke) //mask loading time by updating local state
         this.doRPC("add_annotations", {annotations: [brushStroke]})
     }
 
     public removeBrushStroke(brushStroke: BrushStroke){
+        this.doRemoveBrushStroke(brushStroke) //mask loading time by updating local state
         this.doRPC("remove_annotations", {annotations: [brushStroke]})
     }
 
@@ -54,15 +56,29 @@ export class BrushStrokesContainer extends Applet<{brushing_enabled: boolean, an
         this.brushStrokeWidgets.forEach(bsw => bsw.destroy())
         this.brushStrokeWidgets = []
         for(let brushStroke of state.annotations){
-            let brush_widget = new BrushStrokeWidget({
-                brushStroke,
-                parentElement: this.element,
-                onColorClicked: this.onBrushColorClicked,
-                onLabelClicked: (_) => {}, //FIXME: snap viewer to coord
-                onDeleteClicked: (stroke) => this.removeBrushStroke(stroke)
-            })
-            this.brushStrokeWidgets.push(brush_widget)
+            this.doAddBrushStroke(brushStroke)
         }
+    }
+
+    protected doAddBrushStroke(brushStroke: BrushStroke){
+        let brush_widget = new BrushStrokeWidget({
+            brushStroke,
+            parentElement: this.element,
+            onColorClicked: this.onBrushColorClicked,
+            onLabelClicked: (_) => {}, //FIXME: snap viewer to coord
+            onDeleteClicked: (stroke) => this.removeBrushStroke(stroke)
+        })
+        this.brushStrokeWidgets.push(brush_widget)
+    }
+
+    protected doRemoveBrushStroke(brushStroke: BrushStroke){
+        this.brushStrokeWidgets = this.brushStrokeWidgets.filter( bsw => {
+            if(bsw.brushStroke == brushStroke){
+                bsw.destroy()
+                return false
+            }
+            return true
+        })
     }
 
     public destroy(){
