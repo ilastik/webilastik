@@ -93,6 +93,7 @@ export function createInput(params: {
         name?: string,
         disabled?:boolean,
         required?: boolean,
+        id?: string,
     } & Omit<Parameters<typeof createElement>[0], "tagName">
 ): HTMLInputElement{
     const input = <HTMLInputElement>createElement({tagName:'input', ...params})
@@ -106,14 +107,20 @@ export function createInput(params: {
     if(params.required !== undefined){
         input.required = params.required
     }
+    if(params.id !== undefined){
+        input.id = params.id
+    }
     input.disabled = params.disabled ? true : false
     return input
 }
 
 export function createInputParagraph(params: Parameters<typeof createInput>[0] & {label_text?: string}): ReturnType<typeof createInput>{
-    let p = createElement({tagName: "p", parentElement: params.parentElement})
+    let p = createElement({tagName: "p", parentElement: params.parentElement, cssClasses: ["ItkInputParagraph"]})
     if(params.label_text !== undefined){
-        createElement({tagName: "label", parentElement: p, innerHTML: params.label_text})
+        const label = createElement({tagName: "label", parentElement: p, innerHTML: params.label_text})
+        if(params.id !== undefined){
+            label.htmlFor = params.id
+        }
     }
     return createInput({...params, parentElement: p})
 }

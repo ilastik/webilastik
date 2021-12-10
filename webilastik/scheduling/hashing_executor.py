@@ -12,6 +12,8 @@ from queue import PriorityQueue
 import uuid
 import threading
 
+from ndstructs.utils.json_serializable import JsonObject
+
 IN = TypeVar("IN", bound=Hashable)
 OUT = TypeVar("OUT")
 
@@ -123,11 +125,13 @@ class Job(Generic[IN]):
     def __init__(
         self,
         *,
+        name: str,
         target: Callable[[IN], None],
         args: Iterable[IN],
         on_progress: Optional[JobProgressCallback] = None,
         on_complete: Optional[JobCompletedCallback] = None,
     ):
+        self.name = name
         self.target = target
         self.args = args
         self.num_args: Optional[int] = None
@@ -179,6 +183,15 @@ class Job(Generic[IN]):
                 if self.on_complete:
                     self.on_complete(self.uuid)
 
+    def to_json_value(self) -> JsonObject:
+        with self.lock:
+            return {
+                "name": self.name,
+                "num_args": self.num_args,
+                "uuid": str(self.uuid),
+                "status": self.status,
+                "num_completed_steps": self.num_completed_steps,
+            }
 
 
 class _Worker:
@@ -221,6 +234,10 @@ class _Worker:
             inner_future.add_done_callback(lambda _: self._executor_is_free.set())
             priority_future.set_future(inner_future)
 
+    def cancel_group(self, group_id: uuid.UUID):
+        with self._lock:
+            self._cancelled_groups.add(group_id)
+
     def shutdown(self, wait: bool = True):
         with self._lock:
             if self._shutting_down:
@@ -261,12 +278,14 @@ class HashingExecutor:
     def submit_job(
         self,
         *,
+        name: str,
         target: Callable[[IN], None],
         args: Iterable[IN],
         on_progress: Optional[JobProgressCallback] = None,
         on_complete: Optional[JobCompletedCallback] = None
     ) -> Job[IN]:
         job = Job(
+            name=name,
             target=target,
             args=args,
             on_progress=on_progress,
@@ -277,3 +296,7 @@ class HashingExecutor:
             executor = self._get_worker(priority_future.arg)
             executor.submit_work(priority_future)
         return job
+
+    def cancel_group(self, group_id: uuid.UUID):
+        for worker in self._workers:
+            worker.cancel_group(group_id)

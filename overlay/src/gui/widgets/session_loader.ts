@@ -1,5 +1,5 @@
 import { Session } from "../../client/ilastik";
-import { createElement, createInput } from "../../util/misc";
+import { createElement, createInputParagraph } from "../../util/misc";
 
 export class SessionLoaderWidget{
     element: HTMLElement;
@@ -16,20 +16,16 @@ export class SessionLoaderWidget{
         createElement({tagName: "h3", parentElement: this.element, innerHTML: "Rejoin Session"})
 
         const form = createElement({tagName: "form", parentElement: this.element})
-        let p: HTMLElement;
 
-        p = createElement({tagName: "p", parentElement: form})
-        createElement({tagName: "label", innerHTML: "Ilastik api URL: ", parentElement: p})
-        this.url_input = createInput({inputType: "url", parentElement: p, required: true, value: ilastik_url.toString()})
-
-        p = createElement({tagName: "p", parentElement: form})
-        createElement({tagName: "label", parentElement: p, innerHTML: "Session url: "})
-        this.session_url_field = createInput({
-            inputType: "url", parentElement: p, required: true, value: session_url?.toString() || ""
+        this.url_input = createInputParagraph({
+            label_text: "Ilastik api URL: ", inputType: "url", parentElement: form, required: true, value: ilastik_url.toString()
         })
 
-        p = createElement({tagName: "p", parentElement: form})
-        const load_session_button = createInput({inputType: "submit", value: "Rejoin Session", parentElement: p})
+        this.session_url_field = createInputParagraph({
+            label_text: "Session url: ", inputType: "url", parentElement: form, required: true, value: session_url?.toString() || ""
+        })
+
+        const load_session_button = createInputParagraph({inputType: "submit", value: "Rejoin Session", parentElement: form})
 
         const message_p = createElement({tagName: "p", parentElement: form})
 

@@ -38,6 +38,11 @@ export class Session{
         throw new Error(`Checking loging faield with ${response.status}:\n${contents}`)
     }
 
+    public static getEbrainsToken(): string | undefined{
+        return document.cookie.split('; ')
+            .find(row => row.startsWith('ebrains_user_access_token='))?.split('=')[1];
+    }
+
     public static async create({ilastik_url, session_duration_seconds, timeout_s, onProgress=(_) => {}}: {
         ilastik_url: URL,
         session_duration_seconds: number,
@@ -301,7 +306,7 @@ export class HttpFs extends FileSystem{
     public readonly read_url: Url
     public constructor({read_url}: {read_url: Url}){
         super()
-        this.read_url = read_url
+        this.read_url = read_url.updatedWith({datascheme: undefined})
     }
 
     public getDisplayString(): string{

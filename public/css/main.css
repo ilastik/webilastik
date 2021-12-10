@@ -48,7 +48,7 @@
     margin-bottom: 2px;
 }
 
-.ItkFeatureSelectionWidget td, .ItkFeatureSelectionWidget th{
+.ItkFeatureSelectionWidget td, .ItkFeatureSelectionWidget th, .ItkPredictionsExportApplet_job_table td, .ItkPredictionsExportApplet_job_table th{
     border: solid 1px grey;
     padding: 0.3em;
 }
@@ -76,7 +76,6 @@
     background-color: rgba(0,0,0, 0.1);
 }
 
-
 /*https://stackoverflow.com/a/21457838*/
 .ItkGrayedOut {
     position: relative;
@@ -92,4 +91,21 @@
     left: 0;
     right: 0;
     background: rgba(0, 0, 0, 0.5);
+}
+
+.ItkInputParagraph{
+    display: flex;
+}
+
+.ItkInputParagraph label{
+    margin-left: 5px;
+    margin-right: 5px;
+}
+
+.ItkInputParagraph input[type=text], .ItkInputParagraph input[type=url]{
+    flex-grow: 1; /*make input stretch to occupy all remaining space*/
+}
+
+.ItkInputParagraph input[type=number]{
+    width: 4em;
 }

@@ -142,13 +142,13 @@ export class PredictionsExportApplet extends Applet<{jobs: Job[]}>{
                     createElement({tagName: "legend", parentElement: spatial_resolution_fs, innerHTML: "Spatial Resolution (nm): "})
 
                     createElement({tagName: "label", parentElement: spatial_resolution_fs, innerHTML: "x: "})
-                    /* const spatial_resolution_x_input = */createInput({inputType: "number", parentElement: spatial_resolution_fs});
+                    /* const spatial_resolution_x_input = */createInput({inputType: "number", parentElement: spatial_resolution_fs, inlineCss: {width: "4em"}});
 
-                    createElement({tagName: "label", parentElement: spatial_resolution_fs, innerHTML: "y: "})
-                    /* const spatial_resolution_y_input = */createInput({inputType: "number", parentElement: spatial_resolution_fs});
+                    createElement({tagName: "label", parentElement: spatial_resolution_fs, innerHTML: " y: "})
+                    /* const spatial_resolution_y_input = */createInput({inputType: "number", parentElement: spatial_resolution_fs, inlineCss: {width: "4em"}});
 
-                    createElement({tagName: "label", parentElement: spatial_resolution_fs, innerHTML: "z: "})
-                    /* const spatial_resolution_z_input = */createInput({inputType: "number", parentElement: spatial_resolution_fs});
+                    createElement({tagName: "label", parentElement: spatial_resolution_fs, innerHTML: " z: "})
+                    /* const spatial_resolution_z_input = */createInput({inputType: "number", parentElement: spatial_resolution_fs, inlineCss: {width: "4em"}});
 
 
             const datasink_fs = createElement({tagName: "fieldset", parentElement: this.new_job_form})
@@ -158,7 +158,7 @@ export class PredictionsExportApplet extends Applet<{jobs: Job[]}>{
 
         createInputParagraph({inputType: "submit", value: "Create Job", parentElement: this.new_job_form})
 
-        this.job_table = createElement({tagName: "table", parentElement: this.element}) as HTMLTableElement;
+        this.job_table = createElement({tagName: "table", parentElement: this.element, cssClasses: ["ItkPredictionsExportApplet_job_table"]});
 
         this.new_job_form.addEventListener("submit", (ev) => {
             ev.preventDefault()

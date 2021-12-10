@@ -1,6 +1,7 @@
 export {}
 import { HtmlImgDriver, OverlayControls } from "..";
 import { injectCss } from "../util/misc";
+import "../util/fetch_wrapper";
 
 (window as any).inject_ilastik_into_images = (ilastik_url?: URL, css_url?: URL) => {
     document.addEventListener("dblclick", (ev: MouseEvent) => {

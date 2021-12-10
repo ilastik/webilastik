@@ -4,7 +4,7 @@ import re
 from pathlib import PurePosixPath
 import enum
 from typing import Optional, List, Dict, Mapping, Union
-from urllib.parse import parse_qs, urlencode
+from urllib.parse import parse_qs, urlencode, quote_plus, quote
 
 from fs.base import FS as FileSystem
 from fs.osfs import OSFS
@@ -46,6 +46,9 @@ class Protocol(enum.Enum):
             return Protocol.FILE
         return Url.parse(filesystem.geturl("")).protocol #FIXME: is this reliable ?
 
+class SearchQuotingMethod(enum.Enum):
+    QUOTE = 0
+    QUOTE_PLUS = 1
 
 class Url:
     hostname_pattern = r"[0-9a-z\-\.]*"
@@ -116,6 +119,7 @@ class Url:
         path: PurePosixPath,
         search: Optional[Mapping[str, str]] = None,
         hash_: Optional[str] = None,
+        search_quoting_method: SearchQuotingMethod = SearchQuotingMethod.QUOTE_PLUS,
     ):
         if not path.is_absolute():
             raise ValueError("Path '{path}' is not absolute")
@@ -125,7 +129,7 @@ class Url:
                 continue;
             if part == "..":
                 if len(path_parts) > 0:
-                    path_parts.pop()
+                    _ = path_parts.pop()
             else:
                 path_parts.append(part)
 
@@ -137,9 +141,16 @@ class Url:
         self.path = PurePosixPath("/") / "/".join(path_parts)
         self.search = search or {}
         self.hash_ = hash_
-        self.schemeless_raw = f"{protocol}://{self.host}{path}"
+        self.schemeless_raw = f"{protocol}://{self.host}"
+        if self.port:
+            self.schemeless_raw += f":{self.port}"
+        self.schemeless_raw += str(path)
         if self.search:
-            self.schemeless_raw += "?" + urlencode(self.search, doseq=True)
+            if search_quoting_method == SearchQuotingMethod.QUOTE_PLUS:
+                quote_via = quote_plus
+            else:
+                quote_via = quote
+            self.schemeless_raw += "?" + urlencode(self.search, doseq=True, quote_via=quote_via)
         if self.hash_:
             self.schemeless_raw += "#" + self.hash_
 

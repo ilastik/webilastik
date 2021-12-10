@@ -1,5 +1,5 @@
 import { Session } from "../../client/ilastik"
-import { createElement, createInput } from "../../util/misc"
+import { createElement, createInputParagraph } from "../../util/misc"
 import { Url } from "../../util/parsed_url"
 
 export class SessionCreatorWidget{
@@ -14,22 +14,21 @@ export class SessionCreatorWidget{
 
         const form = createElement({tagName: "form", parentElement: this.element})
 
-        let p = createElement({tagName: "p", parentElement: form})
-        createElement({tagName: "label", innerHTML: "Ilastik api URL: ", parentElement: p})
-        const url_input = createInput({inputType: "url", parentElement: p, required: true, value: ilastik_url.toString(), name: "itk_api_url"})
+        const url_input = createInputParagraph({
+            label_text: "Ilastik api URL: ",inputType: "url", parentElement: form, required: true, value: ilastik_url.toString(), name: "itk_api_url"
+        })
 
-        p = createElement({tagName: "p", parentElement: form})
-        createElement({tagName: "label", innerHTML: "Timeout (minutes): ", parentElement: p})
-        const timeout_input = createInput({inputType: "number", parentElement: p, required: true, value: "5", name: "itk_session_request_timeout"})
+        const timeout_input = createInputParagraph({
+            label_text: "Timeout (minutes): ", inputType: "number", parentElement: form, required: true, value: "5", name: "itk_session_request_timeout"
+        })
         timeout_input.min = "1"
 
-        p = createElement({tagName: "p", parentElement: form})
-        createElement({tagName: "label", innerHTML: "Session Duration (minutes): ", parentElement: p})
-        const duration_input = createInput({inputType: "number", parentElement: p, required: true, value: "5", name: "itk_session_request_duration"})
+        const duration_input = createInputParagraph({
+            label_text: "Session Duration (minutes): ", inputType: "number", parentElement: form, required: true, value: "5", name: "itk_session_request_duration"
+        })
         duration_input.min = "5"
 
-        p = createElement({tagName: "p", parentElement: form})
-        const create_session_btn = createInput({inputType: "submit", value: "Create", parentElement: p})
+        const create_session_btn = createInputParagraph({inputType: "submit", value: "Create", parentElement: form})
 
         const creation_log_p = createElement({tagName: "p", parentElement: form, inlineCss: {display: "none"}})
         createElement({tagName: "label", innerHTML: "Creation Log: ", parentElement: creation_log_p})

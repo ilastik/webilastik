@@ -98,6 +98,7 @@ tasks:
     deps: [create-packed-conda-environment, compile-neuroglancer, compile-overlay]
     sources:
       - "{{.PROJECT_ROOT}}/package_tree/**/*"
+      - "{{.PROJECT_ROOT}}/public/**/*"
       - "{{.PACKED_ENV_PATH}}"
       - "{{.PROJECT_ROOT}}/webilastik/**/*.py"
       - "{{.OVERLAY_BUNDLE_PATH}}"

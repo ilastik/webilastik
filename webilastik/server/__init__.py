@@ -11,7 +11,7 @@ import asyncio
 from aiohttp import web
 
 from webilastik.libebrains.user_token import UserToken
-from webilastik.libebrains.oidc_client import OidcClient
+from webilastik.libebrains.oidc_client import OidcClient, Scope
 from webilastik.utility.url import Url, Protocol
 from webilastik.server.session import Session, LocalSession
 
@@ -31,9 +31,12 @@ def get_requested_url(request: web.Request) -> Url:
     return  url
 
 def redirect_to_ebrains_login(request: web.Request, oidc_client: OidcClient) -> NoReturn:
-    raise web.HTTPFound(location=oidc_client.create_user_login_url(
-        redirect_uri=get_requested_url(request),
-    ).raw)
+    raise web.HTTPFound(
+        location=oidc_client.create_user_login_url(
+            redirect_uri=get_requested_url(request),
+            scopes=set([Scope.OPENID, Scope.GROUP, Scope.TEAM, Scope.EMAIL, Scope.PROFILE]),
+        ).raw
+    )
 
 class EbrainsSession:
     AUTH_COOKIE_KEY = "ebrains_user_access_token"
