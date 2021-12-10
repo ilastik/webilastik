@@ -8,22 +8,58 @@ export class Session{
     public readonly ilastikUrl: Url
     public readonly sessionUrl: Url
     private websocket: WebSocket
-    private message_handlers = new Array<(ev: MessageEvent) => void>();
+    private messageHandlers = new Array<(ev: MessageEvent) => void>();
 
 
     protected constructor(params: {
         ilastikUrl: Url,
         sessionUrl: Url,
-        websocket: WebSocket,
     }){
         this.ilastikUrl = params.ilastikUrl
         this.sessionUrl = params.sessionUrl
-        this.websocket = params.websocket
+        this.websocket = this.openWebsocket()
+    }
+
+    private openWebsocket(): WebSocket{
+        const wsUrl = this.sessionUrl.updatedWith({
+            protocol: this.sessionUrl.protocol == "http" ? "ws" : "wss"
+        }).joinPath("ws")
+        let websocket = new WebSocket(wsUrl.schemeless_raw)
+        websocket.addEventListener("close", this.refreshWebsocket)
+        websocket.addEventListener("error", this.refreshWebsocket)
+        for(let handler of this.messageHandlers){
+            websocket.addEventListener("message", handler)
+        }
+        return websocket
+    }
+
+    private closeWebsocket(){
+        this.websocket.removeEventListener("close", this.refreshWebsocket)
+        this.websocket.removeEventListener("error", this.refreshWebsocket)
+        for(let handler of this.messageHandlers){
+            this.websocket.removeEventListener("message", handler)
+        }
+        this.websocket.close()
+    }
+
+    private refreshWebsocket = () => {
+        debugger
+        this.closeWebsocket()
+        this.websocket = this.openWebsocket()
     }
 
     public addMessageListener(handler: (ev: MessageEvent) => void){
-        this.message_handlers.push(handler)
+        this.messageHandlers.push(handler)
         this.websocket.addEventListener("message", handler)
+    }
+
+    public async close(): Promise<true | undefined>{
+        this.closeWebsocket()
+        let closeSession_response = await fetch(this.sessionUrl.joinPath("close").schemeless_raw, {method: "DELETE"})
+        if(closeSession_response.ok){
+            return undefined
+        }
+        return true
     }
 
     public doRPC(params: {applet_name: string, method_name: string, method_arguments: IJsonableObject}){
@@ -93,14 +129,7 @@ export class Session{
                 timeout_s -= 2
                 await sleep(2000)
             }
-
-            const sessionUrl = Url.parse(rawSession_data.url);
-            const wsUrl = sessionUrl.updatedWith({
-                protocol: sessionUrl.protocol == "http" ? "ws" : "wss"
-            }).joinPath("ws")
-            const websocket = new WebSocket(wsUrl.schemeless_raw)
-
-            return new Session({ilastikUrl, sessionUrl, websocket})
+            return new Session({ilastikUrl, sessionUrl: Url.parse(rawSession_data.url)})
         }
         throw `Could not create a session`
     }
@@ -112,16 +141,7 @@ export class Session{
         if(!session_status_resp.ok){
             throw Error(`Bad response from session: ${session_status_resp.status}`)
         }
-        let websocket = new WebSocket(sessionUrl.schemeless_raw)
-        return new Session({ilastikUrl, sessionUrl, websocket})
-    }
-
-    public async close(): Promise<true | undefined>{
-        let closeSession_response = await fetch(this.sessionUrl + `/close`, {method: "DELETE"})
-        if(closeSession_response.ok){
-            return undefined
-        }
-        return true
+        return new Session({ilastikUrl, sessionUrl})
     }
 }
 
