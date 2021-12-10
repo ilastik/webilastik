@@ -1,7 +1,7 @@
 import { quat, vec3 } from "gl-matrix"
 import { BrushStroke } from "../../.."
 import { DataSource, Session } from "../../../client/ilastik"
-import { createElement, createInput, removeElement } from "../../../util/misc"
+import { createElement, createInputParagraph, removeElement } from "../../../util/misc"
 import { CollapsableWidget } from "../collapsable_applet_gui"
 import { OneShotSelectorWidget, SelectorWidget } from "../selector_widget"
 import { Vec3ColorPicker } from "../vec3_color_picker"
@@ -136,6 +136,7 @@ export class BrushingWidget{
             parentElement: this.controlsContainer,
             onNewBrushStroke: stroke => this.brushStrokeContainer.addBrushStroke(stroke),
             datasource,
+            brushingEnabled: this.trainingWidget ? this.trainingWidget.getBrushingEnabled() : false,
             viewer: this.viewer
         })
         this.showStatus(`Now training on ${datasource.getDisplayString()}`)
@@ -164,27 +165,26 @@ export class TrainingWidget{
     public readonly rendererSelector: SelectorWidget<BrushRenderer>
     public readonly colorPicker: Vec3ColorPicker
     public readonly datasource: DataSource
+    public readonly brushing_enabled_checkbox: HTMLInputElement
 
-    constructor({gl, parentElement, datasource, viewer, onNewBrushStroke}: {
+    constructor({gl, parentElement, datasource, viewer, brushingEnabled, onNewBrushStroke}: {
         gl: WebGL2RenderingContext,
         parentElement: HTMLElement,
         datasource: DataSource,
         viewer: Viewer,
+        brushingEnabled: boolean,
         onNewBrushStroke: (stroke: BrushStroke) => void,
     }){
         this.element = createElement({tagName: "div", parentElement})
         this.datasource = datasource
 
-        let p: HTMLElement;
+        this.brushing_enabled_checkbox = createInputParagraph({
+            label_text: "Enable Brushing: ", inputType: "checkbox", parentElement: this.element, onClick: () => {
+                this.overlay.setBrushingEnabled(this.brushing_enabled_checkbox.checked)
+            }
+        })
 
-        p = createElement({tagName:"p", parentElement: this.element})
-        const brushing_enabled_checkbox = createInput({inputType: "checkbox", parentElement: p, onClick: () => {
-            this.overlay.setBrushingEnabled(brushing_enabled_checkbox.checked)
-        }})
-        const enable_brushing_label = createElement({tagName: "label", innerHTML: "Enable Brushing", parentElement: p});
-        (enable_brushing_label as HTMLLabelElement).htmlFor = brushing_enabled_checkbox.id = "brushing_enabled_checkbox"
-
-        p = createElement({tagName: "p", parentElement: this.element})
+        let p = createElement({tagName: "p", parentElement: this.element})
         createElement({tagName: "label", innerHTML: "Brush Color: ", parentElement: p})
         this.colorPicker = new Vec3ColorPicker({parentElement: p})
 
@@ -223,6 +223,14 @@ export class TrainingWidget{
                 }
             },
         })
+
+        if(brushingEnabled){
+            this.brushing_enabled_checkbox.click()
+        }
+    }
+
+    public getBrushingEnabled(): boolean{
+        return this.brushing_enabled_checkbox.checked
     }
 
     public render(brushStrokes: Array<BrushStroke>){
