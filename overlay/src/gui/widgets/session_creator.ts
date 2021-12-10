@@ -24,7 +24,8 @@ export class SessionCreatorWidget{
         timeout_input.min = "1"
 
         const duration_input = createInputParagraph({
-            label_text: "Session Duration (minutes): ", inputType: "number", parentElement: form, required: true, value: "5", name: "itk_session_request_duration"})
+            label_text: "Session Duration (minutes): ", inputType: "number", parentElement: form, required: true, value: "5", name: "itk_session_request_duration"
+        })
         duration_input.min = "5"
 
         const create_session_btn = createInputParagraph({inputType: "submit", value: "Create", parentElement: form})
