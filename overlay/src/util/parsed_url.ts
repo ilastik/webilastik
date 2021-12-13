@@ -79,6 +79,10 @@ export class Path{
         }
         return true
     }
+
+    public toString(){
+        return this.raw
+    }
 }
 
 export class Url implements IJsonable{

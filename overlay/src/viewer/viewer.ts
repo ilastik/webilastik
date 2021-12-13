@@ -98,4 +98,8 @@ export class Viewer{
         }
         return undefined
     }
+
+    public destroy(){
+        //FIXME: unregister events from native viewer using the driver
+    }
 }

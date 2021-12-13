@@ -50,6 +50,7 @@ export class ReferencePixelClassificationWorkflowGui{
     public destroy(){
         //FIXME: close predictions and stuff
         this.brushing_applet.destroy()
+        this.viewer.destroy()
         removeElement(this.element)
     }
 }
