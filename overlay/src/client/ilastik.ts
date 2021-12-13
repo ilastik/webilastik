@@ -43,7 +43,6 @@ export class Session{
     }
 
     private refreshWebsocket = () => {
-        debugger
         this.closeWebsocket()
         this.websocket = this.openWebsocket()
     }
