@@ -8,33 +8,45 @@
  */
 
 import { Session } from "../client/ilastik";
+import { Url } from "./parsed_url";
 
 export {}
 
 const __origFetch = window.fetch;
 const hijackedFetch = async (input: RequestInfo, init?: RequestInit) => {
     const ebrainsToken = Session.getEbrainsToken()
-    //FIXME: we should probably prompt the user to log in?
-    if(ebrainsToken === undefined){
-        return __origFetch(input, init)
+    const url = Url.parse(typeof input === "string" ? input : input.destination)
+    if(
+        ebrainsToken === undefined || //FIXME: we should probably prompt the user to log in?
+        url.hostname !== "data-proxy.ebrains.eu" ||
+        !url.path.raw.startsWith("/api/buckets/") ||
+        url.path.name == "stat" ||
+        (init?.method !== undefined && init.method.toLowerCase() !== "get")
+    ){
+        return __origFetch(input, init);
     }
-    const requestedUrl: string = typeof input === "string" ? input : input.destination
     const authHeaderName = "Authorization"
     const authHeaderValue = `Bearer ${ebrainsToken}`
-    if(requestedUrl.startsWith("https://data-proxy.ebrains.eu/api/")){
-        init = init || {}
-        let headers: HeadersInit | undefined = init.headers
-        if(headers === undefined){
-            init.headers = {[authHeaderName]: authHeaderValue}
-        }else if(Array.isArray(headers)){
-            headers.push([authHeaderName, authHeaderValue])
-        }else if(headers instanceof Headers){
-            headers.set(authHeaderName, authHeaderValue)
-        }else{
-            headers[authHeaderName] = authHeaderValue
-        }
+
+    let headers: HeadersInit | undefined = init?.headers
+    let fixedHeaders: HeadersInit
+    if(headers === undefined){
+        fixedHeaders = {[authHeaderName]: authHeaderValue}
+    }else if(Array.isArray(headers)){
+        fixedHeaders = [...headers, [authHeaderName, authHeaderValue]]
+    }else if(headers instanceof Headers){
+        fixedHeaders = [...headers.entries(), [authHeaderName, authHeaderValue]]
+    }else{
+        fixedHeaders = {...headers, [authHeaderName]: authHeaderValue}
     }
-    return __origFetch(input, init);
+
+    const responsePromise = __origFetch(input, {...init, headers: fixedHeaders});
+    const response = await responsePromise
+    if(!response.ok){
+        return responsePromise
+    }
+    const cscsObjectUrl = (await response.json())["url"]
+    return fetch(cscsObjectUrl)
 };
 
 window.fetch = hijackedFetch
