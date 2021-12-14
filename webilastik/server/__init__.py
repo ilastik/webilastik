@@ -111,13 +111,25 @@ class SessionAllocator(Generic[SESSION_TYPE]):
 
         self.app = web.Application()
         self.app.add_routes([
+            web.get('/', self.open_viewer),
             web.get('/api/check_login', self.check_login),
             web.get('/api/login_then_close', self.login_then_close),
             web.get('/api/hello', self.hello),
             web.post('/api/session', self.spawn_session),
             web.get('/api/session/{session_id}', self.session_status),
-            web.static('/public', Path(__file__) / "../../../public", follow_symlinks=True, show_index=True),
+            web.static(
+                '/public',
+                Path(__file__).joinpath("../../../public"), # FIXME: how does this work?
+                follow_symlinks=True, show_index=True
+            ),
         ])
+
+    async def open_viewer(self, request: web.Request) -> web.Response:
+        protocol = request.headers['X-Forwarded-Proto']
+        prefix = PurePosixPath(request.headers.get("X-Forwarded-Prefix", "/"))
+        host = request.headers['X-Forwarded-Host']
+        redirect_url = f"{protocol}://{host}{prefix.joinpath('public/nehuba/index.html')}"
+        raise web.HTTPFound(location=redirect_url)
 
     def _make_session_url(self, session_id: uuid.UUID) -> Url:
         return self.external_url.joinpath(f"session-{session_id}")
