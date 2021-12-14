@@ -41,7 +41,7 @@ export class SessionCreatorWidget{
                     const ilastikUrl = Url.parse(ilastikUrlInput.value)
                     let is_logged_in = await Session.check_login({ilastikUrl})
                     if(!is_logged_in){
-                        const login_url = ilastikUrl.joinPath("login_then_close").raw
+                        const login_url = ilastikUrl.joinPath("api/login_then_close").raw
                         status_messages.innerHTML = `<p><a target="_blank" rel="noopener noreferrer" href="${login_url}">Login on ebrains</a> required.</p>`
                         window.open(login_url)
                         return

@@ -26,7 +26,7 @@ def get_requested_url(request: web.Request) -> Url:
     else:
         hostname = host
         port = None
-    path = PurePosixPath(request.headers['X-Forwarded-Prefix']) / request.url.path.lstrip("/")
+    path = PurePosixPath(request.get('X-Forwarded-Prefix', "/")) / request.url.path.lstrip("/")
     url = Url(protocol=protocol, hostname=hostname, port=port, path=path)
     return  url
 
@@ -125,11 +125,8 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         ])
 
     async def open_viewer(self, request: web.Request) -> web.Response:
-        protocol = request.headers['X-Forwarded-Proto']
-        prefix = PurePosixPath(request.headers.get("X-Forwarded-Prefix", "/"))
-        host = request.headers['X-Forwarded-Host']
-        redirect_url = f"{protocol}://{host}{prefix.joinpath('public/nehuba/index.html')}"
-        raise web.HTTPFound(location=redirect_url)
+        redirect_url = get_requested_url(request).joinpath("public/nehuba/index.html")
+        raise web.HTTPFound(location=redirect_url.raw)
 
     def _make_session_url(self, session_id: uuid.UUID) -> Url:
         return self.external_url.joinpath(f"session-{session_id}")
