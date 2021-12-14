@@ -59,7 +59,7 @@ export class PrecomputedChunksSinkFields{
         this.element = createElement({tagName: "fieldset", parentElement: params.parentElement})
             createElement({tagName: "legend", parentElement: this.element, innerHTML: "Precomputed Chunks Sink Params"})
 
-            this.url_input = createInputParagraph({inputType: "url", parentElement: this.element, label_text: "Url: "})
+            this.url_input = createInputParagraph({inputType: "url", parentElement: this.element, label_text: "Url: ", value: `https://data-proxy.ebrains.eu/api/buckets/hbp-image-service/webilastik_job_${new Date().getTime()}.precomputed`})
 
             let p = createElement({tagName: "p", parentElement: this.element})
                 createElement({tagName: "label", parentElement: p, innerHTML: "Compression: "})
