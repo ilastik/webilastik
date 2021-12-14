@@ -39,7 +39,7 @@ async def read_server_status(websocket: ClientWebSocketResponse):
             break
 
 async def main():
-    ds = SkimageDataSource(filesystem=HttpFs(read_url=Url.parse("https://app.ilastik.org/")), path=Path("api/images/c_cells_1.png"))
+    ds = SkimageDataSource(filesystem=HttpFs(read_url=Url.parse("https://app.ilastik.org/")), path=Path("public/images/c_cells_1.png"))
 
     async with aiohttp.ClientSession(
         cookies={EbrainsSession.AUTH_COOKIE_KEY: UserToken.from_environment().access_token}

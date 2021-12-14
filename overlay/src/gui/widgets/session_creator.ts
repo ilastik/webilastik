@@ -14,8 +14,8 @@ export class SessionCreatorWidget{
 
         const form = createElement({tagName: "form", parentElement: this.element})
 
-        const url_input = createInputParagraph({
-            label_text: "Ilastik api URL: ",inputType: "url", parentElement: form, required: true, value: ilastikUrl.toString(), name: "itk_api_url"
+        const ilastikUrlInput = createInputParagraph({
+            label_text: "Ilastik URL: ",inputType: "url", parentElement: form, required: true, value: ilastikUrl.toString(), name: "itk_api_url"
         })
 
         const timeout_input = createInputParagraph({
@@ -38,10 +38,10 @@ export class SessionCreatorWidget{
             (async () => {
                 try{
                     creation_log_p.style.display = "block"
-                    const ilastik_api_url = Url.parse(url_input.value)
-                    let is_logged_in = await Session.check_login({ilastik_api_url})
+                    const ilastikUrl = Url.parse(ilastikUrlInput.value)
+                    let is_logged_in = await Session.check_login({ilastikUrl})
                     if(!is_logged_in){
-                        const login_url = ilastik_api_url.joinPath("login_then_close").raw
+                        const login_url = ilastikUrl.joinPath("login_then_close").raw
                         status_messages.innerHTML = `<p><a target="_blank" rel="noopener noreferrer" href="${login_url}">Login on ebrains</a> required.</p>`
                         window.open(login_url)
                         return
@@ -51,7 +51,7 @@ export class SessionCreatorWidget{
                     status_messages.innerHTML = "";
 
                     let session = await Session.create({
-                        ilastikUrl: Url.parse(url_input.value),
+                        ilastikUrl: Url.parse(ilastikUrlInput.value),
                         timeout_s: parseInt(timeout_input.value) * 60,
                         session_duration_seconds: parseInt(duration_input.value) * 60,
                         onProgress: (message) => {

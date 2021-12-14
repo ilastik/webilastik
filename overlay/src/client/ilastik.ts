@@ -77,8 +77,8 @@ export class Session{
         return atob(encoded.replace("-", "+").replace("_", "/"))
     }
 
-    public static async check_login({ilastik_api_url}: {ilastik_api_url: Url}): Promise<boolean>{
-        let response = await fetch(ilastik_api_url.joinPath("check_login").raw, {
+    public static async check_login({ilastikUrl}: {ilastikUrl: Url}): Promise<boolean>{
+        let response = await fetch(ilastikUrl.joinPath("/api/check_login").raw, {
             credentials: "include"
         });
         if(response.ok){
@@ -102,7 +102,7 @@ export class Session{
         timeout_s: number,
         onProgress?: (message: string) => void,
     }): Promise<Session>{
-        const newSessionUrl = ilastikUrl.joinPath("session")
+        const newSessionUrl = ilastikUrl.joinPath("/api/session")
         while(timeout_s > 0){
             let session_creation_response = await fetch(newSessionUrl.schemeless_raw, {
                 method: "POST",
@@ -119,7 +119,7 @@ export class Session{
             onProgress(`Successfully requested a session!`)
             let rawSession_data: {url: string, id: string, token: string} = await session_creation_response.json()
             while(timeout_s){
-                let session_status_response = await fetch(ilastikUrl.joinPath(`/session/${rawSession_data.id}`).schemeless_raw)
+                let session_status_response = await fetch(ilastikUrl.joinPath(`/api/session/${rawSession_data.id}`).schemeless_raw)
                 if(session_status_response.ok  && (await session_status_response.json())["status"] == "ready"){
                     onProgress(`Session has become ready!`)
                     break
@@ -136,7 +136,7 @@ export class Session{
     public static async load({ilastikUrl, sessionUrl}: {
         ilastikUrl: Url, sessionUrl:Url
     }): Promise<Session>{
-        let session_status_resp = await fetch(sessionUrl.joinPath("status").schemeless_raw)
+        let session_status_resp = await fetch(sessionUrl.joinPath("/api/status").schemeless_raw)
         if(!session_status_resp.ok){
             throw Error(`Bad response from session: ${session_status_resp.status}`)
         }

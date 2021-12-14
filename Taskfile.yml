@@ -53,11 +53,11 @@ tasks:
     deps: [create-neuroglancer-git-dir]
     dir: "{{.NEUROGLANCER_GIT_DIR}}"
     vars:
-      COMMIT_HASH: "origin/with-ilastik-overlay"
+      COMMIT_HASH: "b4a5ef89ad9610aba1c387199541c68e7befd7c6"
     cmds:
       - git clone https://github.com/ilastik/neuroglancer . || git fetch
       - git checkout {{.COMMIT_HASH}}
-    status:
+    status: # FIXME: this doesn't update the ng repo
       - git status > /dev/null 2>&1
       - test "$(git rev-parse HEAD)" = "$(git rev-parse {{.COMMIT_HASH}})"
 
@@ -76,7 +76,7 @@ tasks:
     sources: ["{{.NEUROGLANCER_GIT_DIR}}/**/*"]
     generates: ["{{.NEUROGLANCER_BUNDLE_PATH}}"]
     env:
-      ILASTIK_API_URL: https://app.ilastik.org/api #needed for 'npm run build-with-ilastik-overlay'
+      ILASTIK_URL: https://app.ilastik.org/ #needed for 'npm run build-with-ilastik-overlay'
     cmds:
       - rm -rf dist/
       - npm run build-with-ilastik-overlay

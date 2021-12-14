@@ -111,12 +111,12 @@ class SessionAllocator(Generic[SESSION_TYPE]):
 
         self.app = web.Application()
         self.app.add_routes([
-            web.get('/check_login', self.check_login),
-            web.get('/login_then_close', self.login_then_close),
-            web.get('/hello', self.hello),
-            web.post('/session', self.spawn_session),
-            web.get('/session/{session_id}', self.session_status),
-            web.static('/', Path(__file__) / "../../../public", follow_symlinks=True, show_index=True),
+            web.get('/api/check_login', self.check_login),
+            web.get('/api/login_then_close', self.login_then_close),
+            web.get('/api/hello', self.hello),
+            web.post('/api/session', self.spawn_session),
+            web.get('/api/session/{session_id}', self.session_status),
+            web.static('/public', Path(__file__) / "../../../public", follow_symlinks=True, show_index=True),
         ])
 
     def _make_session_url(self, session_id: uuid.UUID) -> Url:

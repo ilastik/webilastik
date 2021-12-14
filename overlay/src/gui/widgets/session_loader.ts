@@ -4,7 +4,7 @@ import { Url } from "../../util/parsed_url";
 
 export class SessionLoaderWidget{
     element: HTMLElement;
-    public readonly url_input: HTMLInputElement;
+    public readonly ilastikUrlInput: HTMLInputElement;
     public readonly sessionUrlField: HTMLInputElement;
     constructor({
         ilastikUrl, sessionUrl, parentElement, onNewSession}: {
@@ -18,7 +18,7 @@ export class SessionLoaderWidget{
 
         const form = createElement({tagName: "form", parentElement: this.element})
 
-        this.url_input = createInputParagraph({
+        this.ilastikUrlInput = createInputParagraph({
             label_text: "Ilastik api URL: ", inputType: "url", parentElement: form, required: true, value: ilastikUrl.toString()
         })
 
@@ -35,7 +35,7 @@ export class SessionLoaderWidget{
             message_p.innerHTML = ""
             load_session_button.disabled = true
             Session.load({
-                ilastikUrl: Url.parse(this.url_input.value),
+                ilastikUrl: Url.parse(this.ilastikUrlInput.value),
                 sessionUrl: Url.parse(this.sessionUrlField.value.trim()),
             }).then(
                 session => onNewSession(session),
@@ -56,7 +56,7 @@ export class SessionLoaderWidget{
     }
 
     public setFields(params: {ilastikUrl: Url, sessionUrl: Url}){
-        this.url_input.value = params.sessionUrl.raw
+        this.ilastikUrlInput.value = params.sessionUrl.raw
         this.sessionUrlField.value = params.sessionUrl.raw
     }
 }

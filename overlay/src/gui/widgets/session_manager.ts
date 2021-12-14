@@ -13,7 +13,7 @@ export class SessionManagerWidget{
     workflow?: ReferencePixelClassificationWorkflowGui
     session_creator: SessionCreatorWidget;
     session_loader: SessionLoaderWidget;
-    constructor({parentElement, ilastikUrl=Url.parse("https://app.ilastik.org/api"), viewer_driver, workflow_container}: {
+    constructor({parentElement, ilastikUrl=Url.parse("https://app.ilastik.org/"), viewer_driver, workflow_container}: {
         parentElement: HTMLElement, ilastikUrl?: Url, viewer_driver: IViewerDriver, workflow_container: HTMLElement
     }){
         this.element = new CollapsableWidget({display_name: "Session Management", parentElement}).element;
