@@ -18,6 +18,7 @@ import numpy as np
 import contextlib
 from pathlib import Path
 import time
+import traceback
 
 import aiohttp
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonArray, ensureJsonBoolean, ensureJsonObject, ensureJsonString
@@ -497,10 +498,14 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
 
     async def _do_rpc(self, originator: web.WebSocketResponse, payload: RPCPayload):
         #FIXME: show bad results to user
-        result = self.wsapplets[payload.applet_name].run_rpc(user_prompt=dummy_prompt, method_name=payload.method_name, arguments=payload.arguments)
-        if isinstance(result, UsageError):
-            logger.error(f"UsageError: {result}")
-            await originator.send_json({"error": str(result)})
+        try:
+            result = self.wsapplets[payload.applet_name].run_rpc(user_prompt=dummy_prompt, method_name=payload.method_name, arguments=payload.arguments)
+            if isinstance(result, UsageError):
+                logger.error(f"UsageError: {result}")
+                await originator.send_json({"error": str(result)})
+        except Exception as e:
+            logger.error("".join(traceback.format_exception(None, e, None)))
+            await originator.send_json({"error": f"Unhandled Exception: {e}"})
         await self._update_clients_state()
 
     async def _update_clients_state(self, websockets: Optional[Iterable[web.WebSocketResponse]] = None, applets: Optional[Iterable[WsApplet]] = None):
