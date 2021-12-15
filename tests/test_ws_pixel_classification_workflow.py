@@ -150,7 +150,8 @@ async def main():
                 method_name="start_export_job",
                 arguments={
                     "data_source_params": {
-                        "url": "https://app.ilastik.org/api/images/c_cells_1.png",
+                        "url": "https://app.ilastik.org/public/images/c_cells_2.precomputed",
+                        "spatial_resolution": tuple([1,1,1]),
                     },
                     "data_sink_params": PrecomputedChunksScaleSink_CreationParams(
                         url=Url.parse(f"https://data-proxy.ebrains.eu/api/buckets/hbp-image-service/job_output_{int(time.time())}.precomputed"),

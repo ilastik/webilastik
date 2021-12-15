@@ -6,6 +6,8 @@ import { CollapsableWidget } from './collapsable_applet_gui';
 import { DataSource, DataSourceLoadParams, PrecomputedChunksEncoder, PrecomputedChunksScaleSink_CreationParams, Session } from '../../client/ilastik';
 import { SelectorWidget } from './selector_widget';
 import { Url } from '../../util/parsed_url';
+import { ErrorPopupWidget } from './popup';
+import { vec3 } from 'gl-matrix';
 
 
 
@@ -142,13 +144,13 @@ export class PredictionsExportApplet extends Applet<{jobs: Job[]}>{
                     createElement({tagName: "legend", parentElement: spatial_resolution_fs, innerHTML: "Spatial Resolution (nm): "})
 
                     createElement({tagName: "label", parentElement: spatial_resolution_fs, innerHTML: "x: "})
-                    /* const spatial_resolution_x_input = */createInput({inputType: "number", parentElement: spatial_resolution_fs, inlineCss: {width: "4em"}});
+                    const spatial_resolution_x_input = createInput({inputType: "number", parentElement: spatial_resolution_fs, inlineCss: {width: "4em"}});
 
                     createElement({tagName: "label", parentElement: spatial_resolution_fs, innerHTML: " y: "})
-                    /* const spatial_resolution_y_input = */createInput({inputType: "number", parentElement: spatial_resolution_fs, inlineCss: {width: "4em"}});
+                    const spatial_resolution_y_input = createInput({inputType: "number", parentElement: spatial_resolution_fs, inlineCss: {width: "4em"}});
 
                     createElement({tagName: "label", parentElement: spatial_resolution_fs, innerHTML: " z: "})
-                    /* const spatial_resolution_z_input = */createInput({inputType: "number", parentElement: spatial_resolution_fs, inlineCss: {width: "4em"}});
+                    const spatial_resolution_z_input = createInput({inputType: "number", parentElement: spatial_resolution_fs, inlineCss: {width: "4em"}});
 
 
             const datasink_fs = createElement({tagName: "fieldset", parentElement: this.new_job_form})
@@ -162,6 +164,27 @@ export class PredictionsExportApplet extends Applet<{jobs: Job[]}>{
 
         this.new_job_form.addEventListener("submit", (ev) => {
             ev.preventDefault()
+
+            let resolution_inputs = [
+                spatial_resolution_x_input,
+                spatial_resolution_y_input,
+                spatial_resolution_z_input,
+            ]
+            const configured_resolution_axes = resolution_inputs.filter(inp => inp.value != "")
+            let spatial_resolution: vec3 | undefined = undefined
+            if(configured_resolution_axes.length == 0){
+                spatial_resolution = undefined
+            }else if(configured_resolution_axes.length == 3){
+                spatial_resolution = vec3.fromValues(
+                    parseFloat(spatial_resolution_x_input.value),
+                    parseFloat(spatial_resolution_y_input.value),
+                    parseFloat(spatial_resolution_z_input.value),
+                )
+            }else{
+                new ErrorPopupWidget({message: "Either set all or none of the spatial resolution inputs for the Raw Data"})
+                return false
+            }
+
             const sink_params = precomp_chunks_sink_fields.getValue();
             if(sink_params === undefined){
                 alert("Missing sink params") //FIXME ?
@@ -169,7 +192,8 @@ export class PredictionsExportApplet extends Applet<{jobs: Job[]}>{
             }
             this.doRPC("start_export_job", {
                 data_source_params: new DataSourceLoadParams({
-                    url: Url.parse(data_source_url_input.value)
+                    url: Url.parse(data_source_url_input.value),
+                    spatial_resolution
                 }),
                 data_sink_params: sink_params,
             })
@@ -178,16 +202,6 @@ export class PredictionsExportApplet extends Applet<{jobs: Job[]}>{
             return false
         })
     }
-
-    // private async inferFileSystem(url: Url): FileSystem | Error{
-    //     if(url.hostname == "data-proxy.ebrains.eu"){
-    //         let path_components = url.path.split("/")
-    //         if(path_components[0] != "api" || path_components[1] != "buckets" || path_components.length < 3){
-    //             return Error(`Bad data-proxy bucket url: ${url.raw}`)
-    //         }
-    //         return new DataProxyBucketFs({bucket_name})
-    //     }
-    // }
 
     protected onNewState(new_state: {jobs: Array<Job>}){
         this.job_table.innerHTML = ""

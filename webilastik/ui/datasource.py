@@ -50,7 +50,7 @@ class DataSourceLoadParams:
                 spatial_resolution=self.spatial_resolution,
             )
 
-        if PrecomputedChunksInfo.tryLoad(filesystem=filesystem, path=Path("/info")):
+        if PrecomputedChunksInfo.tryLoad(filesystem=filesystem, path=ds_path.joinpath("info")):
             if self.spatial_resolution is None:
                 return UsageError("Precomputed chunks must specify a resolution")
             return PrecomputedChunksDataSource(
