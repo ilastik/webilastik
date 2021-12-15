@@ -7,10 +7,12 @@ export class SessionLoaderWidget{
     public readonly ilastikUrlInput: HTMLInputElement;
     public readonly sessionUrlField: HTMLInputElement;
     constructor({
-        ilastikUrl, sessionUrl, parentElement, onNewSession}: {
+        ilastikUrl, sessionUrl, parentElement, onUsageError, onNewSession
+    }: {
         ilastikUrl: Url,
         sessionUrl?: Url,
         parentElement: HTMLElement,
+        onUsageError: (message: string) => void,
         onNewSession: (session: Session) => void,
     }){
         this.element = createElement({tagName: "div", parentElement, cssClasses: ["ItkSessionLoaderWidget"]})
@@ -37,6 +39,7 @@ export class SessionLoaderWidget{
             Session.load({
                 ilastikUrl: Url.parse(this.ilastikUrlInput.value),
                 sessionUrl: Url.parse(this.sessionUrlField.value.trim()),
+                onUsageError,
             }).then(
                 session => onNewSession(session),
                 failure => {message_p.innerHTML = failure.message},

@@ -4,9 +4,10 @@ import { Url } from "../../util/parsed_url"
 
 export class SessionCreatorWidget{
     element: HTMLElement
-    constructor({parentElement, ilastikUrl, onNewSession}:{
+    constructor({parentElement, ilastikUrl, onUsageError, onNewSession}:{
         parentElement: HTMLElement,
         ilastikUrl: Url,
+        onUsageError: (message: string) => void,
         onNewSession: (new_session: Session) => void,
     }){
         this.element = createElement({tagName: "div", parentElement, cssClasses: ["ItkSessionCreatorWidget"]})
@@ -57,7 +58,8 @@ export class SessionCreatorWidget{
                         onProgress: (message) => {
                             status_messages.innerHTML += `<p><em>${new Date().toLocaleString()}</em> ${message}</p>`
                             status_messages.scrollTop = status_messages.scrollHeight
-                        }
+                        },
+                        onUsageError,
                     })
                     onNewSession(session)
                     create_session_btn.value = "Create"

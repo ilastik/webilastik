@@ -4,6 +4,7 @@ import { createInput } from "../../util/misc";
 import { Url } from "../../util/parsed_url";
 import { ReferencePixelClassificationWorkflowGui } from "../reference_pixel_classification_workflow";
 import { CollapsableWidget } from "./collapsable_applet_gui";
+import { ErrorPopupWidget } from "./popup";
 import { SessionCreatorWidget } from "./session_creator";
 import { SessionLoaderWidget } from "./session_loader";
 
@@ -34,8 +35,11 @@ export class SessionManagerWidget{
                 sessionUrl: new_session.sessionUrl,
             })
         }
-        this.session_creator = new SessionCreatorWidget({parentElement: this.element, ilastikUrl, onNewSession})
-        this.session_loader = new SessionLoaderWidget({parentElement: this.element, ilastikUrl, onNewSession})
+        const onUsageError = (message: string) => {
+            new ErrorPopupWidget({message})
+        };
+        this.session_creator = new SessionCreatorWidget({parentElement: this.element, ilastikUrl, onNewSession, onUsageError})
+        this.session_loader = new SessionLoaderWidget({parentElement: this.element, ilastikUrl, onNewSession, onUsageError})
 
         const onLeaveSession = () => {
             this.workflow?.destroy()

@@ -1,4 +1,4 @@
-import { createElement, removeElement } from "../../util/misc";
+import { createElement, createInputParagraph, removeElement } from "../../util/misc";
 
 export class PopupWidget{
     public readonly background: HTMLElement
@@ -28,5 +28,15 @@ export class PopupWidget{
     public destroy(){
         removeElement(this.background)
         removeElement(this.element)
+    }
+}
+
+export class ErrorPopupWidget extends PopupWidget{
+    constructor(params: {message: string}){
+        super("Error")
+        createElement({tagName: "span", parentElement: this.element, innerHTML: params.message})
+        createInputParagraph({inputType: "button", parentElement:  this.element, value: "Ok", onClick: () => {
+            this.destroy()
+        }})
     }
 }

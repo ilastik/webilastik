@@ -9,15 +9,19 @@ export class Session{
     public readonly sessionUrl: Url
     private websocket: WebSocket
     private messageHandlers = new Array<(ev: MessageEvent) => void>();
+    private readonly onUsageError: (message: string) => void
 
 
     protected constructor(params: {
         ilastikUrl: Url,
         sessionUrl: Url,
+        onUsageError: (message: string) => void,
     }){
         this.ilastikUrl = params.ilastikUrl
         this.sessionUrl = params.sessionUrl
+        this.onUsageError = params.onUsageError
         this.websocket = this.openWebsocket()
+
     }
 
     private openWebsocket(): WebSocket{
@@ -27,6 +31,13 @@ export class Session{
         let websocket = new WebSocket(wsUrl.schemeless_raw)
         websocket.addEventListener("close", this.refreshWebsocket)
         websocket.addEventListener("error", this.refreshWebsocket)
+        websocket.addEventListener("message", (ev: MessageEvent) => {
+            let payload = JSON.parse(ev.data)
+            let payload_obj = ensureJsonObject(payload)
+            if("error" in payload_obj){
+                this.onUsageError(ensureJsonString(payload_obj.error))
+            }
+        })
         for(let handler of this.messageHandlers){
             websocket.addEventListener("message", handler)
         }
@@ -42,7 +53,8 @@ export class Session{
         this.websocket.close()
     }
 
-    private refreshWebsocket = () => {
+    private refreshWebsocket = (ev: Event) => {
+        console.warn("Refreshing socket because of this:", ev)
         this.closeWebsocket()
         this.websocket = this.openWebsocket()
     }
@@ -96,11 +108,13 @@ export class Session{
             .find(row => row.startsWith('ebrains_user_access_token='))?.split('=')[1];
     }
 
-    public static async create({ilastikUrl, session_duration_seconds, timeout_s, onProgress=(_) => {}}: {
+    public static async create({ilastikUrl, session_duration_seconds, timeout_s, onProgress=(_) => {}, onUsageError}: {
         ilastikUrl: Url,
         session_duration_seconds: number,
         timeout_s: number,
         onProgress?: (message: string) => void,
+        onUsageError: (message: string) => void
+
     }): Promise<Session>{
         const newSessionUrl = ilastikUrl.joinPath("/api/session")
         while(timeout_s > 0){
@@ -128,19 +142,19 @@ export class Session{
                 timeout_s -= 2
                 await sleep(2000)
             }
-            return new Session({ilastikUrl, sessionUrl: Url.parse(rawSession_data.url)})
+            return new Session({ilastikUrl, sessionUrl: Url.parse(rawSession_data.url), onUsageError})
         }
         throw `Could not create a session`
     }
 
-    public static async load({ilastikUrl, sessionUrl}: {
-        ilastikUrl: Url, sessionUrl:Url
+    public static async load({ilastikUrl, sessionUrl, onUsageError}: {
+        ilastikUrl: Url, sessionUrl:Url, onUsageError: (message: string) => void
     }): Promise<Session>{
         let session_status_resp = await fetch(sessionUrl.joinPath("/api/status").schemeless_raw)
         if(!session_status_resp.ok){
             throw Error(`Bad response from session: ${session_status_resp.status}`)
         }
-        return new Session({ilastikUrl, sessionUrl})
+        return new Session({ilastikUrl, sessionUrl, onUsageError})
     }
 }
 

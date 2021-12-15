@@ -100,7 +100,7 @@ class WsApplet(Applet):
         pass
 
     @abstractmethod
-    def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> PropagationResult:
+    def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
         ...
 
 class WsBrushingApplet(WsApplet, BrushingApplet):
@@ -118,18 +118,18 @@ class WsBrushingApplet(WsApplet, BrushingApplet):
         self.brushing_enabled = enabled
         return PropagationOk()
 
-    def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> PropagationResult:
+    def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
         if method_name == "brushing_enabled":
             enabled = ensureJsonBoolean(arguments.get("enabled"))
-            return self.set_brushing_enabled(enabled=enabled)
+            return UsageError.check(self.set_brushing_enabled(enabled=enabled))
 
         raw_annotations = ensureJsonArray(arguments.get("annotations"))
         annotations = [Annotation.from_json_value(raw_annotation) for raw_annotation in raw_annotations]
 
         if method_name == "add_annotations":
-            return self.add_annotations(user_prompt, annotations)
+            return UsageError.check(self.add_annotations(user_prompt, annotations))
         if method_name == "remove_annotations":
-            return self.remove_annotations(user_prompt, annotations)
+            return UsageError.check(self.remove_annotations(user_prompt, annotations))
 
         raise ValueError(f"Invalid method name: '{method_name}'")
 
@@ -155,14 +155,14 @@ class WsFeatureSelectionApplet(WsApplet, FeatureSelectionApplet):
     def _get_json_state(self) -> JsonValue:
         return {"feature_extractors": tuple(extractor.to_json_data() for extractor in self.feature_extractors())}
 
-    def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> PropagationResult:
+    def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
         raw_feature_array = ensureJsonArray(arguments.get("feature_extractors"))
         feature_extractors = [self._item_from_json_data(raw_feature) for raw_feature in raw_feature_array]
 
         if method_name == "add_feature_extractors":
-            return self.add_feature_extractors(dummy_prompt, feature_extractors)
+            return UsageError.check(self.add_feature_extractors(dummy_prompt, feature_extractors))
         if method_name == "remove_feature_extractors":
-            return self.remove_feature_extractors(user_prompt, feature_extractors)
+            return UsageError.check(self.remove_feature_extractors(user_prompt, feature_extractors))
         raise ValueError(f"Invalid method name: '{method_name}'")
 
 
@@ -190,7 +190,7 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
             "channel_colors": channel_colors,
         }
 
-    def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> PropagationResult:
+    def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
         raise ValueError(f"Invalid method name: '{method_name}'")
 
     async def predictions_precomputed_chunks_info(self, request: web.Request) -> web.Response:
@@ -297,17 +297,17 @@ class WsExportApplet(WsApplet, PixelClasificationExportingApplet):
         self.last_update = time.monotonic()
         super().__init__(name=name, executor=executor, classifier=pixel_classifier)
 
-    def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> PropagationResult:
+    def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
         if method_name == "start_export_job":
             classifier = self._in_classifier()
             if classifier is None:
-                raise Exception("Classifier not ready yet") #FIXME
+                return UsageError("Classifier not ready yet")
 
             pixel_export_request = PixelExportRequest.from_json_value(arguments)
 
             raw_data = pixel_export_request.data_source_params.try_load(ebrains_user_token=self.ebrains_user_token)
             if isinstance(raw_data, UsageError):
-                return PropagationError(str(raw_data)) # FIXME
+                return raw_data
 
             sink = pixel_export_request.data_sink_params.try_load(
                 ebrains_user_token=self.ebrains_user_token,
@@ -318,7 +318,7 @@ class WsExportApplet(WsApplet, PixelClasificationExportingApplet):
                 spatial_resolution=raw_data.spatial_resolution,
             )
             if isinstance(sink, UsageError):
-                return PropagationError(str(sink)) # FIXME
+                return sink
 
             def on_job_step_completed(job_id: uuid.UUID, step_index: int):
                 logger.debug(f"** Job step {job_id}:{step_index} done")
@@ -338,12 +338,12 @@ class WsExportApplet(WsApplet, PixelClasificationExportingApplet):
             self.jobs[job.uuid] = job
 
             logger.info(f"Started job {job.uuid}")
-            return PropagationOk()
+            return None
         if method_name == "cancel_job":
             job_id = uuid.UUID(ensureJsonString(arguments.get("job_id")))
             self.executor.cancel_group(job_id)
             _ = self.jobs.pop(job_id, None)
-            return PropagationOk()
+            return None
         raise ValueError(f"Invalid method name: '{method_name}'")
 
     def _mark_updated(self):
@@ -497,7 +497,10 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
 
     async def _do_rpc(self, originator: web.WebSocketResponse, payload: RPCPayload):
         #FIXME: show bad results to user
-        _ = self.wsapplets[payload.applet_name].run_rpc(user_prompt=dummy_prompt, method_name=payload.method_name, arguments=payload.arguments)
+        result = self.wsapplets[payload.applet_name].run_rpc(user_prompt=dummy_prompt, method_name=payload.method_name, arguments=payload.arguments)
+        if isinstance(result, UsageError):
+            logger.error(f"UsageError: {result}")
+            await originator.send_json({"error": str(result)})
         await self._update_clients_state()
 
     async def _update_clients_state(self, websockets: Optional[Iterable[web.WebSocketResponse]] = None, applets: Optional[Iterable[WsApplet]] = None):
