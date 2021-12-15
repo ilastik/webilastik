@@ -451,9 +451,9 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         try:
             pid = os.getpid()
             pgid = os.getpgid(pid)
-            logger.info(f"Gently killing local session (pid={pid}) with SIGINT on group....")
-            os.killpg(pgid, signal.SIGINT)
-            _ = await asyncio.sleep(10)
+            # logger.info(f"Gently killing local session (pid={pid}) with SIGINT on group....")
+            # os.killpg(pgid, signal.SIGINT)
+            # _ = await asyncio.sleep(10)
             logger.info(f"Killing local session (pid={pid}) with SIGKILL on group....")
             os.killpg(pgid, signal.SIGKILL)
         except ProcessLookupError:
