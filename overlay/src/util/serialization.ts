@@ -81,7 +81,7 @@ export function ensureJsonNumber(value: JsonValue): number{
 
 export function ensureJsonString(value: JsonValue): string{
     if(typeof(value) !== "string"){
-        throw `Expected number, found ${JSON.stringify(value)}`
+        throw `Expected string, found ${JSON.stringify(value)}`
     }
     return value
 }
@@ -95,7 +95,7 @@ export function ensureJsonObject(value: JsonValue): JsonObject{
 
 export function ensureJsonArray(value: JsonValue): JsonArray{
     if(!isJsonableArray(value)){
-        throw `Expected JSON object, found this: ${JSON.stringify(value)}`
+        throw `Expected JSON array, found this: ${JSON.stringify(value)}`
     }
     return value
 }
