@@ -177,7 +177,7 @@ tasks:
       - echo "Running local server as www-data (because that's nginx's user)"
       - >
         sudo -u www-data -g www-data --preserve-env=PYTHONPATH,REQUESTS_CA_BUNDLE,SSL_CERT_DIR
-        {{.PKG_TREE_PATH}}/opt/webilastik_conda_env/bin/python3 -B {{.PKG_TREE_PATH}}/opt/webilastik/webilastik/server/__init__.py
+        {{.PKG_TREE_PATH}}/opt/webilastik_conda_env/bin/python3 -B {{.PKG_TREE_PATH}}/opt/webilastik/webilastik/server/session_allocator.py
         --session-type=Local
         --master-host=localhost
         --master-username=www-data

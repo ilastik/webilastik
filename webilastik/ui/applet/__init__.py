@@ -50,12 +50,13 @@ class Applet(ABC):
     def __init__(self, name: str) -> None:
         self.name = name
         self.upstream_applets: Set[Applet] = set()
+        # FIXME: maybe no __dict__ magic and explicit subscribe?
         for field in self.__dict__.values():
             if isinstance(field, UserInteraction):
                 assert field.applet == self, "Borrowing UserInputs messes up dirty propagation"
             elif isinstance(field, AppletOutput):
                 if field.applet is not self:
-                    _ = field.subscribe(self) # FIXME: maybe no __dict__ magic and explicit subscribe?
+                    _ = field.subscribe(self) # type: ignore
                     self.upstream_applets.add(field.applet)
                     self.upstream_applets.update(field.applet.upstream_applets)
 

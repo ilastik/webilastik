@@ -74,11 +74,11 @@ class EbrainsSession:
 
 
 def require_ebrains_login(
-    endpoint: Callable[["SessionAllocator[SESSION_TYPE]", web.Request], Coroutine[Any, Any, web.Response]]
-) -> Callable[["SessionAllocator[SESSION_TYPE]", web.Request], Coroutine[Any, Any, web.Response]]:
+    endpoint: Callable[["SessionAllocator[Any]", web.Request], Coroutine[Any, Any, web.Response]]
+) -> Callable[["SessionAllocator[Any]", web.Request], Coroutine[Any, Any, web.Response]]:
 
     @wraps(endpoint)
-    async def wrapper(self: "SessionAllocator[SESSION_TYPE]", request: web.Request) -> web.Response:
+    async def wrapper(self: "SessionAllocator[Any]", request: web.Request) -> web.Response:
         if self.oidc_client is None:
             return await endpoint(self, request)
         ebrains_session = EbrainsSession.try_from_request(request, oidc_client=self.oidc_client)

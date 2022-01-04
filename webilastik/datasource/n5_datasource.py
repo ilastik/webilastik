@@ -11,6 +11,7 @@ from ndstructs import Point5D, Interval5D, Array5D
 
 from webilastik.datasource.n5_attributes import N5Compressor, N5DatasetAttributes
 from webilastik.datasource import DataSource
+from webilastik.utility.url import Url
 
 class N5Block(Array5D):
     class Modes(enum.IntEnum):
@@ -74,11 +75,14 @@ class N5DataSource(DataSource):
             attributes_json = f.read().decode("utf8")
         self.attributes = N5DatasetAttributes.from_json_data(json.loads(attributes_json), location_override=location)
 
+        url = Url.parse(filesystem.geturl(path.as_posix()))
+        assert url is not None
         super().__init__(
             tile_shape=self.attributes.blockSize,
             interval=self.attributes.interval,
             dtype=self.attributes.dataType,
             axiskeys=self.attributes.axiskeys,
+            url=url,
         )
 
     def to_json_value(self) -> JsonObject:

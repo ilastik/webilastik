@@ -1,54 +1,33 @@
 # pyright: reportUnusedCallResult=false
 
-
-from abc import abstractmethod
 from asyncio.tasks import Task
 from dataclasses import dataclass
 import os
 import signal
 import asyncio
-import threading
-from typing import Any, Dict, Iterable, List, Optional, Mapping, Sequence, Tuple
+from typing import Any, Iterable, List, Optional, Mapping
 import json
 from base64 import b64decode
 import ssl
-import uuid
-from aiohttp import web
-import numpy as np
 import contextlib
 from pathlib import Path
-import time
 import traceback
 
 import aiohttp
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonArray, ensureJsonBoolean, ensureJsonObject, ensureJsonString
+from aiohttp import web
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 
-from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
-from webilastik.ui.applet.datasource_batch_processing_applet import PixelClasificationExportingApplet
-from webilastik.ui.datasink import DataSinkCreationParams
-from webilastik.ui.datasource import DataSourceLoadParams
 from webilastik.ui.usage_error import UsageError
+from webilastik.ui.workflow.ws_pixel_classification_export_applet import WsPixelClassificationExportApplet
 from webilastik.utility.url import Url
-from webilastik.scheduling.hashing_executor import HashingExecutor, Job
-from webilastik.datasource import DataSource
+from webilastik.scheduling.hashing_executor import HashingExecutor
 from webilastik.server.tunnel import ReverseSshTunnel
-from webilastik.datasource import DataRoi
-from webilastik.features.channelwise_fastfilters import (
-    StructureTensorEigenvalues,
-    GaussianGradientMagnitude,
-    GaussianSmoothing,
-    DifferenceOfGaussians,
-    HessianOfGaussianEigenvalues,
-    LaplacianOfGaussian,
-)
-from webilastik.annotations.annotation import Annotation
-from webilastik.features.ilp_filter import IlpFilter
-from webilastik.annotations import Annotation
-from webilastik.ui.applet import Applet, AppletOutput, PropagationError, PropagationOk, PropagationResult, UserPrompt, dummy_prompt
-from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
-from webilastik.ui.applet.brushing_applet import BrushingApplet
-from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
+from webilastik.ui.applet import dummy_prompt
+from webilastik.ui.applet.ws_applet import WsApplet
+from webilastik.ui.applet.ws_feature_selection_applet import WsFeatureSelectionApplet
+from webilastik.ui.applet.ws_brushing_applet import WsBrushingApplet
+from webilastik.ui.applet.ws_pixel_classification_applet import WsPixelClassificationApplet
 from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
 from webilastik.libebrains.user_token import UserToken
 
@@ -68,10 +47,6 @@ class MyLogger:
 
 
 logger = MyLogger()
-
-def _decode_datasource(datasource_json_b64_altchars_dash_underline: str) -> DataSource:
-    json_str = b64decode(datasource_json_b64_altchars_dash_underline.encode('utf8'), altchars=b'-_').decode('utf8')
-    return DataSource.from_json_value(json.loads(json_str))
 
 @dataclass
 class RPCPayload:
@@ -93,273 +68,6 @@ class RPCPayload:
             "applet_name": self.applet_name,
             "method_name": self.method_name,
             "arguments": self.arguments,
-        }
-
-class WsApplet(Applet):
-    @abstractmethod
-    def _get_json_state(self) -> JsonValue:
-        pass
-
-    @abstractmethod
-    def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
-        ...
-
-class WsBrushingApplet(WsApplet, BrushingApplet):
-    def __init__(self, name: str) -> None:
-        super().__init__(name)
-        self.brushing_enabled = False
-
-    def _get_json_state(self) -> JsonValue:
-        return {
-            "annotations": tuple(annotation.to_json_data() for annotation in self.annotations()),
-            "brushing_enabled": self.brushing_enabled,
-        }
-
-    def set_brushing_enabled(self, enabled: bool) -> PropagationResult:
-        self.brushing_enabled = enabled
-        return PropagationOk()
-
-    def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
-        if method_name == "brushing_enabled":
-            enabled = ensureJsonBoolean(arguments.get("enabled"))
-            return UsageError.check(self.set_brushing_enabled(enabled=enabled))
-
-        raw_annotations = ensureJsonArray(arguments.get("annotations"))
-        annotations = [Annotation.from_json_value(raw_annotation) for raw_annotation in raw_annotations]
-
-        if method_name == "add_annotations":
-            return UsageError.check(self.add_annotations(user_prompt, annotations))
-        if method_name == "remove_annotations":
-            return UsageError.check(self.remove_annotations(user_prompt, annotations))
-
-        raise ValueError(f"Invalid method name: '{method_name}'")
-
-
-class WsFeatureSelectionApplet(WsApplet, FeatureSelectionApplet):
-    def _item_from_json_data(self, data: JsonValue) -> IlpFilter:
-        data_dict = ensureJsonObject(data)
-        class_name = ensureJsonString(data_dict.get("__class__"))
-        if class_name == StructureTensorEigenvalues.__name__:
-            return StructureTensorEigenvalues.from_json_data(data)
-        if class_name == GaussianGradientMagnitude.__name__:
-            return GaussianGradientMagnitude.from_json_data(data)
-        if class_name == GaussianSmoothing.__name__:
-            return GaussianSmoothing.from_json_data(data)
-        if class_name == DifferenceOfGaussians.__name__:
-            return DifferenceOfGaussians.from_json_data(data)
-        if class_name == HessianOfGaussianEigenvalues.__name__:
-            return HessianOfGaussianEigenvalues.from_json_data(data)
-        if class_name == LaplacianOfGaussian.__name__:
-            return LaplacianOfGaussian.from_json_data(data)
-        raise ValueError(f"Could not convert {data} into a Feature Extractor")
-
-    def _get_json_state(self) -> JsonValue:
-        return {"feature_extractors": tuple(extractor.to_json_data() for extractor in self.feature_extractors())}
-
-    def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
-        raw_feature_array = ensureJsonArray(arguments.get("feature_extractors"))
-        feature_extractors = [self._item_from_json_data(raw_feature) for raw_feature in raw_feature_array]
-
-        if method_name == "add_feature_extractors":
-            return UsageError.check(self.add_feature_extractors(dummy_prompt, feature_extractors))
-        if method_name == "remove_feature_extractors":
-            return UsageError.check(self.remove_feature_extractors(user_prompt, feature_extractors))
-        raise ValueError(f"Invalid method name: '{method_name}'")
-
-
-class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
-    def __init__(
-        self,
-        name: str,
-        *,
-        feature_extractors: AppletOutput[Sequence[IlpFilter]],
-        annotations: AppletOutput[Sequence[Annotation]],
-        runner: HashingExecutor,
-    ):
-        self.runner = runner
-        super().__init__(name=name, feature_extractors=feature_extractors, annotations=annotations)
-
-    def _get_json_state(self) -> JsonValue:
-        classifier = self.pixel_classifier()
-        if classifier:
-            channel_colors = tuple(color.to_json_data() for color in classifier.color_map.keys())
-        else:
-            channel_colors = tuple()
-
-        return {
-            "producer_is_ready": classifier is not None,
-            "channel_colors": channel_colors,
-        }
-
-    def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
-        raise ValueError(f"Invalid method name: '{method_name}'")
-
-    async def predictions_precomputed_chunks_info(self, request: web.Request) -> web.Response:
-        classifier = self.pixel_classifier()
-        if classifier is None:
-            return web.json_response({"error": "Classifier is not ready yet"}, status=412)
-
-        encoded_raw_data_url = str(request.match_info.get("encoded_raw_data"))
-        datasource = _decode_datasource(encoded_raw_data_url)
-
-        return web.Response(
-            text=json.dumps({
-                "@type": "neuroglancer_multiscale_volume",
-                "type": "image",
-                "data_type": "uint8",  # DONT FORGET TO CONVERT PREDICTIONS TO UINT8!
-                "num_channels": classifier.num_classes,
-                "scales": [
-                    {
-                        "key": "data",
-                        "size": [int(v) for v in datasource.shape.to_tuple("xyz")],
-                        "resolution": datasource.spatial_resolution,
-                        "voxel_offset": [0, 0, 0],
-                        "chunk_sizes": [datasource.tile_shape.to_tuple("xyz")],
-                        "encoding": "raw",
-                    }
-                ],
-            }),
-            headers={
-                "Cache-Control": "no-store, must-revalidate",
-                "Expires": "0",
-            },
-            content_type="application/json",
-        )
-
-    async def precomputed_chunks_compute(self, request: web.Request) -> web.Response:
-        encoded_raw_data = str(request.match_info.get("encoded_raw_data")) # type: ignore
-        xBegin = int(request.match_info.get("xBegin")) # type: ignore
-        xEnd = int(request.match_info.get("xEnd")) # type: ignore
-        yBegin = int(request.match_info.get("yBegin")) # type: ignore
-        yEnd = int(request.match_info.get("yEnd")) # type: ignore
-        zBegin = int(request.match_info.get("zBegin")) # type: ignore
-        zEnd = int(request.match_info.get("zEnd")) # type: ignore
-
-        datasource = _decode_datasource(encoded_raw_data)
-        classifier = self.pixel_classifier()
-        if classifier is None:
-            return web.json_response({"error": "Classifier is not ready yet"}, status=412)
-
-        predictions = await asyncio.wrap_future(self.runner.submit(
-            classifier.compute,
-            DataRoi(datasource, x=(xBegin, xEnd), y=(yBegin, yEnd), z=(zBegin, zEnd))
-        ))
-
-        if "format" in request.query:
-            requested_format = request.query["format"]
-            if requested_format != "png":
-                return web.Response(status=400, text="Server-side rendering only available in png, not in {requested_format}")
-            if predictions.shape.z > 1:
-                return web.Response(status=400, text="Server-side rendering only available for 2d images")
-
-            prediction_png_bytes = list(predictions.to_z_slice_pngs())[0]
-            return web.Response(
-                body=prediction_png_bytes.getbuffer(),
-                headers={
-                    "Cache-Control": "no-store, must-revalidate",
-                    "Expires": "0",
-                },
-                content_type="image/png",
-            )
-
-        # https://github.com/google/neuroglancer/tree/master/src/neuroglancer/datasource/precomputed#raw-chunk-encoding
-        # "(...) data for the chunk is stored directly in little-endian binary format in [x, y, z, channel] Fortran order"
-        resp = predictions.as_uint8().raw("xyzc").tobytes("F")
-        return web.Response(
-            body=resp,
-            content_type="application/octet-stream",
-        )
-
-@dataclass
-class PixelExportRequest:
-    data_source_params: DataSourceLoadParams
-    data_sink_params: DataSinkCreationParams
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "PixelExportRequest":
-        value_obj = ensureJsonObject(value)
-        return PixelExportRequest(
-            data_source_params=DataSourceLoadParams.from_json_value(value_obj.get("data_source_params")),
-            data_sink_params=DataSinkCreationParams.from_json_value(value_obj.get("data_sink_params")),
-        )
-
-class WsExportApplet(WsApplet, PixelClasificationExportingApplet):
-    def __init__(
-        self,
-        *,
-        name: str,
-        executor: HashingExecutor,
-        pixel_classifier: AppletOutput[Optional[VigraPixelClassifier[IlpFilter]]],
-        ebrains_user_token: UserToken,
-    ):
-        self.jobs: Dict[uuid.UUID, Job[Any]] = {}
-        self.ebrains_user_token = ebrains_user_token
-        self.lock = threading.Lock()
-        self.last_update = time.monotonic()
-        super().__init__(name=name, executor=executor, classifier=pixel_classifier)
-
-    def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
-        if method_name == "start_export_job":
-            classifier = self._in_classifier()
-            if classifier is None:
-                return UsageError("Classifier not ready yet")
-
-            pixel_export_request = PixelExportRequest.from_json_value(arguments)
-
-            raw_data = pixel_export_request.data_source_params.try_load(ebrains_user_token=self.ebrains_user_token)
-            if isinstance(raw_data, UsageError):
-                return raw_data
-
-            sink = pixel_export_request.data_sink_params.try_load(
-                ebrains_user_token=self.ebrains_user_token,
-                dtype=np.dtype("float32"),
-                location=raw_data.location,
-                interval=raw_data.interval.updated(c=(0, classifier.num_classes)),
-                chunk_size=raw_data.tile_shape,
-                spatial_resolution=raw_data.spatial_resolution,
-            )
-            if isinstance(sink, UsageError):
-                return sink
-
-            def on_job_step_completed(job_id: uuid.UUID, step_index: int):
-                logger.debug(f"** Job step {job_id}:{step_index} done")
-                self._mark_updated()
-
-            def on_job_completed(job_id: uuid.UUID):
-                logger.debug(f"**** Job {job_id} completed")
-                self._mark_updated()
-
-            job = self.start_export_job(
-                user_prompt=dummy_prompt,
-                source=raw_data,
-                sink=sink,
-                on_progress=on_job_step_completed,
-                on_complete=on_job_completed,
-            )
-            self.jobs[job.uuid] = job
-
-            logger.info(f"Started job {job.uuid}")
-            return None
-        if method_name == "cancel_job":
-            job_id = uuid.UUID(ensureJsonString(arguments.get("job_id")))
-            self.executor.cancel_group(job_id)
-            _ = self.jobs.pop(job_id, None)
-            return None
-        raise ValueError(f"Invalid method name: '{method_name}'")
-
-    def _mark_updated(self):
-        with self.lock:
-            self.last_update = time.monotonic()
-
-    def get_updated_status(self, last_seen_update: float) -> Tuple[float, Optional[JsonObject]]:
-        with self.lock:
-            if last_seen_update < self.last_update:
-                return (self.last_update, self._get_json_state())
-            return (self.last_update, None)
-
-    def _get_json_state(self) -> JsonObject:
-        return {
-            "jobs": tuple(job.to_json_value() for job in self.jobs.values())
         }
 
 
@@ -390,7 +98,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             runner=executor,
         )
 
-        self.export_applet = WsExportApplet(
+        self.export_applet = WsPixelClassificationExportApplet(
             name="export_applet",
             executor=executor,
             pixel_classifier=pixel_classifier_applet.pixel_classifier,
@@ -499,10 +207,13 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
     async def _do_rpc(self, originator: web.WebSocketResponse, payload: RPCPayload):
         #FIXME: show bad results to user
         try:
+            # FIXME: should UsageError be returned as a value at all?
             result = self.wsapplets[payload.applet_name].run_rpc(user_prompt=dummy_prompt, method_name=payload.method_name, arguments=payload.arguments)
-            if isinstance(result, UsageError):
-                logger.error(f"UsageError: {result}")
-                await originator.send_json({"error": str(result)})
+            if isinstance(result, UsageError): # FIXME
+                raise result
+        except UsageError as e:
+            logger.error(f"UsageError: {e}")
+            await originator.send_json({"error": str(e)})
         except Exception as e:
             logger.error("".join(traceback.format_exception(None, e, None)))
             await originator.send_json({"error": f"Unhandled Exception: {e}"})
@@ -548,7 +259,11 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         if not encoded_original_url:
             return web.Response(status=400, text="Missing parameter: url")
 
-        info_url = Url.parse(b64decode(encoded_original_url, altchars=b'-_').decode('utf8')).joinpath("info")
+        decoded_url = b64decode(encoded_original_url, altchars=b'-_').decode('utf8')
+        base_url = Url.parse(decoded_url)
+        if base_url is None:
+            return web.Response(status=400, text=f"Bad url: {decoded_url}")
+        info_url = base_url.joinpath("info")
         logger.debug(f"Will request this info: {info_url.schemeless_raw}")
         async with aiohttp.ClientSession() as session:
             async with session.get(info_url.schemeless_raw, ssl=self.ssl_context) as response:
@@ -565,9 +280,12 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         encoded_original_url = request.match_info.get("encoded_original_url")
         if not encoded_original_url:
             return web.Response(status=400, text="Missing parameter: url")
-        info_url = Url.parse(b64decode(encoded_original_url, altchars=b'-_').decode('utf8'))
+        decoded_url = b64decode(encoded_original_url, altchars=b'-_').decode('utf8')
+        url = Url.parse(decoded_url)
+        if url is None:
+            return web.Response(status=400, text=f"Bad url: {decoded_url}")
         rest = request.match_info.get("rest", "").lstrip("/")
-        raise web.HTTPFound(location=info_url.joinpath(rest).schemeless_raw)
+        raise web.HTTPFound(location=url.joinpath(rest).schemeless_raw)
 
 
 if __name__ == '__main__':

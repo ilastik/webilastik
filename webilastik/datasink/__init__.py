@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
 import json
-from typing import Callable, Dict
+from typing import Callable, Dict, Optional
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 
 import numpy as np
 
 from ndstructs import Shape5D, Interval5D, Array5D
+from webilastik.utility.url import Url
 
 DATASINK_FROM_JSON_CONSTRUCTORS: Dict[str, Callable[[JsonValue], "DataSink"]] = {}
 
@@ -16,10 +17,12 @@ class DataSink(ABC):
         tile_shape: Shape5D,
         interval: Interval5D,
         dtype: np.dtype, #type: ignore
+        url: Optional[Url] = None
     ):
         self.tile_shape = tile_shape
         self.interval = interval
         self.dtype = dtype # type: ignore
+        self.url = url
 
         self.shape = self.interval.shape
         self.location = interval.start

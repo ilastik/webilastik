@@ -6,8 +6,6 @@ import enum
 from typing import Optional, List, Dict, Mapping, Union
 from urllib.parse import parse_qs, urlencode, quote_plus, quote
 
-from fs.base import FS as FileSystem
-from fs.osfs import OSFS
 from ndstructs.utils.json_serializable import JsonValue, ensureJsonString
 
 
@@ -39,12 +37,6 @@ class Protocol(enum.Enum):
             if protocol.value == value.lower():
                 return protocol
         raise ValueError(f"Bad protocol: {value}")
-
-    @classmethod
-    def from_filesystem(cls, filesystem: FileSystem) -> "Protocol":
-        if isinstance(filesystem, OSFS):
-            return Protocol.FILE
-        return Url.parse(filesystem.geturl("")).protocol #FIXME: is this reliable ?
 
 class SearchQuotingMethod(enum.Enum):
     QUOTE = 0
@@ -83,13 +75,16 @@ class Url:
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "Url":
-        return Url.parse(ensureJsonString(value))
+        url = Url.parse(ensureJsonString(value))
+        if url is not None:
+            return url
+        raise ValueError(f"Bad url: {value}")
 
-    @classmethod
-    def parse(cls, url: str) -> "Url":
+    @staticmethod
+    def parse(url: str) -> Optional["Url"]:
         match = Url.url_pattern.fullmatch(url)
         if match is None:
-            raise ValueError(f"Invalid URL: {url}");
+            return None
         raw_datascheme = match.group("datascheme")
         raw_port = match.group("port")
         raw_search = match.group("search")

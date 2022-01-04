@@ -14,6 +14,7 @@ from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
 
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksEncoder, PrecomputedChunksInfo, PrecomputedChunksScale, RawEncoder
 from webilastik.libebrains.user_token import UserToken
+from webilastik.ui import parse_url
 from webilastik.ui.filesystem import try_filesystem_from_url
 from webilastik.ui.usage_error import UsageError
 
@@ -33,12 +34,11 @@ class DataSinkCreationParams:
 
     @classmethod
     @abstractmethod
-    def from_json_value(cls, value: JsonValue) -> "DataSinkCreationParams":
+    def from_json_value(cls, value: JsonValue) -> Union["DataSinkCreationParams", UsageError]:
         value_obj = ensureJsonObject(value)
         marker = ensureJsonString(value_obj.get("__class__"))
         a = DataSinkCreationParams.registry[marker].from_json_value(value)
         return a
-
 
     @abstractmethod
     def try_load(
@@ -60,10 +60,13 @@ class PrecomputedChunksScaleSink_CreationParams(DataSinkCreationParams):
         self.encoding = encoding
 
     @classmethod
-    def from_json_value(cls, value: JsonValue) -> "PrecomputedChunksScaleSink_CreationParams":
+    def from_json_value(cls, value: JsonValue) -> Union["PrecomputedChunksScaleSink_CreationParams", UsageError]:
         value_obj = ensureJsonObject(value)
+        url = parse_url(ensureJsonString(value_obj.get("url")))
+        if isinstance(url, UsageError):
+            return url
         return PrecomputedChunksScaleSink_CreationParams(
-            url=Url.parse(ensureJsonString(value_obj.get("url"))),
+            url=url,
             encoding=PrecomputedChunksEncoder.from_json_value(value_obj.get("encoding")),
         )
 

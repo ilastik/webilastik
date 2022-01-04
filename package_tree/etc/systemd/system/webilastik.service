@@ -22,7 +22,7 @@ Type=simple
 # FIXME/BUG: aiohttp must be told where certs are when running from packed environment
 Environment=SSL_CERT_DIR=/etc/ssl/certs/
 Environment=PYTHONPATH=/opt/webilastik/
-ExecStart=/opt/webilastik_conda_env/bin/python3 -B /opt/webilastik/webilastik/server/__init__.py \
+ExecStart=/opt/webilastik_conda_env/bin/python3 -B /opt/webilastik/webilastik/server/session_allocator.py \
     --session-type=Local \
     --master-host=localhost \
     --master-username=www-data \

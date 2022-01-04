@@ -9,6 +9,7 @@ from webilastik.datasink import DataSink, DATASINK_FROM_JSON_CONSTRUCTORS
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.filesystem import JsonableFilesystem
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale5D
+from webilastik.utility.url import Url
 
 class PrecomputedChunksSink:
     def __init__(
@@ -66,10 +67,14 @@ class PrecomputedChunksScaleSink(DataSink):
         self.base_path = base_path
         self.scale = scale
 
+        base_url = Url.parse(self.filesystem.geturl(self.base_path.as_posix()))
+        assert base_url is not None
+
         super().__init__( #type: ignore
             tile_shape=self.scale.chunk_sizes_5d[0], #FIXME
             interval=self.scale.interval,
             dtype=dtype, #type: ignore
+            url=base_url.updated_with(hash_=f"resolution={'_'.join(map(str, self.scale.resolution))}"),
         )
 
     def to_datasource(self) -> PrecomputedChunksDataSource:

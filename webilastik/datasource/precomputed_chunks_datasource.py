@@ -9,6 +9,7 @@ from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonI
 from webilastik.datasource import DataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo
 from webilastik.filesystem import JsonableFilesystem
+from webilastik.utility.url import Url
 
 
 class PrecomputedChunksDataSource(DataSource):
@@ -35,12 +36,15 @@ class PrecomputedChunksDataSource(DataSource):
         else:
             tile_shape = self.scale.chunk_sizes_5d[0]
 
+        base_url = Url.parse(filesystem.geturl(path.as_posix()))
+        assert base_url is not None
         super().__init__( #type: ignore
             tile_shape=tile_shape,
             dtype=self.info.data_type, #type: ignore
             interval=self.scale.shape.to_interval5d(location or self.scale.location),
             axiskeys="zyxc",  # externally reported axiskeys are always c-ordered
-            spatial_resolution=self.scale.resolution #FIXME: maybe delete this altogether?
+            spatial_resolution=self.scale.resolution, #FIXME: maybe delete this altogether?
+            url=base_url.updated_with(hash_=f"resolution={'_'.join(map(str, resolution))}")
         )
 
     def to_json_value(self) -> JsonObject:
