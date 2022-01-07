@@ -15,7 +15,7 @@ from webilastik.filesystem import JsonableFilesystem
 
 from webilastik.filesystem.RemoteFile import RemoteFile
 from webilastik.libebrains.user_token import UserToken
-from webilastik.utility.url import Url
+from webilastik.utility.url import Protocol, Url
 
 
 class BucketObject:
@@ -74,7 +74,7 @@ class BucketSubdir:
 
 
 class BucketFs(JsonableFilesystem):
-    API_URL = Url.parse("https://data-proxy.ebrains.eu/api/buckets")
+    API_URL = Url(protocol=Protocol.HTTPS, hostname="data-proxy.ebrains.eu", path=PurePosixPath("/api/buckets"))
 
     def __init__(self, bucket_name: str, prefix: PurePosixPath, ebrains_user_token: UserToken):
         self.bucket_name = bucket_name
