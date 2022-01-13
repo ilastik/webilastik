@@ -3,13 +3,12 @@ import json
 from typing import Optional, Tuple
 from pathlib import Path
 import io
-from dataclasses import dataclass
 
 import numpy as np
 import skimage.io #type: ignore
 
 from ndstructs.utils.json_serializable import (
-    JsonValue, JsonObject, ensureJsonObject, ensureJsonString, ensureJsonIntTripplet, ensureJsonArray, ensureJsonInt
+    JsonValue, JsonObject, ensureJsonObject, ensureJsonString, ensureJsonIntTripplet, ensureJsonArray, ensureJsonInt, ensureOptional
 )
 from ndstructs.point5D import Point5D, Shape5D, Interval5D
 from ndstructs.array5D import Array5D
@@ -92,14 +91,23 @@ class JpegEncoder(PrecomputedChunksEncoder):
     def encode(self, data: Array5D) -> bytes:
         raise NotImplementedError
 
-@dataclass
+
 class PrecomputedChunksScale:
-    key: Path
-    size: Tuple[int, int, int]
-    resolution: Tuple[int, int, int]
-    voxel_offset: Tuple[int, int, int]
-    chunk_sizes: Tuple[Tuple[int, int, int], ...]
-    encoding: PrecomputedChunksEncoder
+    def __init__(
+        self,
+        key: Path,
+        size: Tuple[int, int, int],
+        resolution: Tuple[int, int, int],
+        voxel_offset: Optional[Tuple[int, int, int]],
+        chunk_sizes: Tuple[Tuple[int, int, int], ...],
+        encoding: PrecomputedChunksEncoder,
+    ) -> None:
+        self.key = key
+        self.size = size
+        self.resolution = resolution
+        self.voxel_offset = (0,0,0) if voxel_offset is None else voxel_offset
+        self.chunk_sizes = chunk_sizes
+        self.encoding = encoding
 
     @classmethod
     def from_datasource(
@@ -133,7 +141,7 @@ class PrecomputedChunksScale:
             key=Path(ensureJsonString(value_obj.get("key"))),
             size=ensureJsonIntTripplet(value_obj.get("size")),
             resolution=ensureJsonIntTripplet(value_obj.get("resolution")),
-            voxel_offset=ensureJsonIntTripplet(value_obj.get("voxel_offset")),
+            voxel_offset=ensureOptional(ensureJsonIntTripplet, value_obj.get("voxel_offset")),
             chunk_sizes=tuple([
                 ensureJsonIntTripplet(v)
                 for v in ensureJsonArray(value_obj.get("chunk_sizes"))
