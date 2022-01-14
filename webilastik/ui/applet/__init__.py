@@ -150,16 +150,23 @@ class user_interaction(Generic[APPLET, P]):
 
 
 OUT = TypeVar("OUT", covariant=True)
+OUT2 = TypeVar("OUT2", covariant=True)
 
 class AppletOutput(Generic[OUT]):
     """A decorator for applet outputs"""
 
     # private method
-    def __init__(self, applet: APPLET, method: Callable[[APPLET], OUT]):
+    def __init__(
+        self,
+        applet: APPLET,
+        method: Callable[[APPLET], OUT],
+        name: Optional[str] = None,
+        subscribers: Optional[List[Applet]] = None
+    ):
         self._method = method
-        self._subscribers: List["Applet"] = []
+        self._subscribers: List["Applet"] = subscribers or []
         self.applet = applet
-        self.__name__ = method.__name__
+        self.__name__ = name or method.__name__
         self.__self__ = applet
 
     def __repr__(self) -> str:
@@ -180,6 +187,11 @@ class AppletOutput(Generic[OUT]):
             out.add(applet)
             out.update(applet.get_downstream_applets())
         return sorted(out)
+
+    def transformed_with(self, transformer: Callable[[OUT], OUT2]) -> "AppletOutput[OUT2]":
+        def wrapper(applet: Applet) -> OUT2:
+            return transformer(self())
+        return AppletOutput(applet=self.applet, method=wrapper, name=self.__name__, subscribers=self._subscribers)
 
 
 class applet_output(Generic[APPLET, OUT]):
