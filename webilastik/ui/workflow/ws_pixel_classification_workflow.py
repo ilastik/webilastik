@@ -18,9 +18,11 @@ from aiohttp import web
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
+from webilastik.ui.applet.datasink_selector import WsDataSinkSelectorApplet
+from webilastik.ui.applet.pixel_classification_export_applet import WsPixelClassificationExportApplet
+from webilastik.ui.applet.datasource_picker import WsDataSourcePicker
 from webilastik.ui.usage_error import UsageError
-from webilastik.ui.workflow.ws_pixel_classification_export_applet import WsPixelClassificationExportApplet
-from webilastik.utility.url import Url
+from webilastik.utility.url import Protocol, Url
 from webilastik.scheduling.hashing_executor import HashingExecutor
 from webilastik.server.tunnel import ReverseSshTunnel
 from webilastik.ui.applet import dummy_prompt
@@ -91,31 +93,49 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
 
         brushing_applet = WsBrushingApplet("brushing_applet")
         feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", datasources=brushing_applet.datasources)
-        pixel_classifier_applet = WsPixelClassificationApplet(
+        self.pixel_classifier_applet = WsPixelClassificationApplet(
             "pixel_classification_applet",
             feature_extractors=feature_selection_applet.feature_extractors,
             annotations=brushing_applet.annotations,
             runner=executor,
         )
 
+        self.export_datasource_applet = WsDataSourcePicker(
+            name="export_datasource_applet",
+            allowed_protocols=tuple([Protocol.HTTPS, Protocol.HTTP]),
+            ebrains_user_token=self.ebrains_user_token,
+        )
+
+        self.export_datasink_applet = WsDataSinkSelectorApplet(
+            name="export_datasink_applet",
+            ebrains_user_token=self.ebrains_user_token,
+            shape=self.export_datasource_applet.datasource.transformed_with(lambda ds: ds and ds.shape),
+            tile_shape=self.export_datasource_applet.datasource.transformed_with(lambda ds: ds and ds.tile_shape),
+            spatial_resolution=self.export_datasource_applet.datasource.transformed_with(lambda ds: ds and ds.spatial_resolution),
+            num_channels_override=self.pixel_classifier_applet.pixel_classifier.transformed_with(lambda pc: pc and pc.num_classes),
+        )
+
         self.export_applet = WsPixelClassificationExportApplet(
             name="export_applet",
             executor=executor,
-            pixel_classifier=pixel_classifier_applet.pixel_classifier,
-            ebrains_user_token=ebrains_user_token,
+            classifier=self.pixel_classifier_applet.pixel_classifier,
+            datasource=self.export_datasource_applet.datasource,
+            datasink=self.export_datasink_applet.datasink,
         )
 
         self.wsapplets : Mapping[str, WsApplet] = {
             feature_selection_applet.name: feature_selection_applet,
             brushing_applet.name: brushing_applet,
-            pixel_classifier_applet.name: pixel_classifier_applet,
+            self.pixel_classifier_applet.name: self.pixel_classifier_applet,
+            self.export_datasource_applet.name: self.export_datasource_applet,
+            self.export_datasink_applet.name: self.export_datasink_applet,
             self.export_applet.name: self.export_applet,
         }
 
         super().__init__(
             feature_selection_applet=feature_selection_applet,
             brushing_applet=brushing_applet,
-            pixel_classifier_applet=pixel_classifier_applet,
+            pixel_classifier_applet=self.pixel_classifier_applet,
         )
 
         self.app = web.Application()
@@ -124,11 +144,11 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             web.get('/ws', self.open_websocket), # type: ignore
             web.get(
                 "/predictions/raw_data={encoded_raw_data}/run_id={run_id}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}",
-                pixel_classifier_applet.precomputed_chunks_compute
+                self.pixel_classifier_applet.precomputed_chunks_compute
             ),
             web.get(
                 "/predictions/raw_data={encoded_raw_data}/run_id={run_id}/info",
-                pixel_classifier_applet.predictions_precomputed_chunks_info
+                self.pixel_classifier_applet.predictions_precomputed_chunks_info
             ),
             web.post("/ilp_project", self.ilp_download),
             web.delete("/close", self.close_session),
@@ -188,6 +208,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
                     parsed_payload = json.loads(msg.data)
                     logger.debug(f"Got new rpc call:\n{json.dumps(parsed_payload, indent=4)}\n")
                     payload = RPCPayload.from_json_value(parsed_payload)
+                    print("GOT PAYLOAD OK")
                     await self._do_rpc(payload=payload, originator=websocket)
                 except Exception as e:
                     logger.error(f"Exception happened on set state:\n{e}")
@@ -215,8 +236,13 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             logger.error(f"UsageError: {e}")
             await originator.send_json({"error": str(e)})
         except Exception as e:
-            logger.error("".join(traceback.format_exception(None, e, None)))
-            await originator.send_json({"error": f"Unhandled Exception: {e}"})
+            # logger.error("".join(traceback.format_exception(None, e, None)))
+            traceback_messages = traceback.format_exc()
+            logger.error("".join(traceback_messages))
+            await originator.send_json({\
+                "error": f"Unhandled Exception: {e}",
+                "trace": traceback_messages,
+            })
         await self._update_clients_state()
 
     async def _update_clients_state(self, websockets: Optional[Iterable[web.WebSocketResponse]] = None, applets: Optional[Iterable[WsApplet]] = None):
