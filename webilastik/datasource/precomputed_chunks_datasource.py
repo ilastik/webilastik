@@ -1,16 +1,19 @@
 from typing import Optional, Tuple
 from pathlib import Path
 import json
+import logging
 
 from ndstructs.point5D import Point5D, Shape5D, Interval5D
 from ndstructs.array5D import Array5D
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonIntTripplet, ensureJsonObject, ensureJsonString
+from fs.errors import ResourceNotFound
 
 from webilastik.datasource import DataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo
 from webilastik.filesystem import JsonableFilesystem
 from webilastik.utility.url import Url
 
+logger = logging.getLogger(__name__)
 
 class PrecomputedChunksDataSource(DataSource):
     def __init__(
@@ -81,9 +84,13 @@ class PrecomputedChunksDataSource(DataSource):
         if self.location != self.scale.voxel_offset:
             tile = tile.translated(-self.location).translated(self.scale.location)
         tile_path = self.path / self.scale.get_tile_path(tile)
-        with self.filesystem.openbin(tile_path.as_posix()) as f:
-            raw_tile_bytes = f.read()
-        tile_5d = self.scale.encoding.decode(roi=tile, dtype=self.dtype, raw_chunk=raw_tile_bytes) #type: ignore
+        try:
+            with self.filesystem.openbin(tile_path.as_posix()) as f:
+                raw_tile_bytes = f.read()
+            tile_5d = self.scale.encoding.decode(roi=tile, dtype=self.dtype, raw_chunk=raw_tile_bytes) #type: ignore
+        except ResourceNotFound:
+            logger.warn(f"tile {tile} not found. Returning zeros")
+            tile_5d = Array5D.allocate(interval=tile, dtype=self.info.data_type, value=0)
         return tile_5d
 
     def __getstate__(self) -> JsonObject:
