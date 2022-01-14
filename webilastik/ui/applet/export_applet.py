@@ -33,17 +33,17 @@ class ExportTask(Generic[IN]):
 
 ClassifierOutput = AppletOutput[Optional[VigraPixelClassifier[IlpFilter]]]
 
-class PixelClasificationExportingApplet(NoSnapshotApplet, InertApplet):
+class ExportApplet(NoSnapshotApplet, InertApplet):
     def __init__(
         self,
         *,
         name: str,
         executor: HashingExecutor,
-        classifier: ClassifierOutput,
+        operator: AppletOutput[Optional[Operator[DataRoi, Array5D]]],
         datasource: AppletOutput[Optional[DataSource]],
         datasink: AppletOutput[Optional[DataSink]],
     ):
-        self._in_classifier = classifier
+        self._in_operator = operator
         self._in_datasource = datasource
         self._in_datasink = datasink
         self.executor = executor
@@ -55,9 +55,9 @@ class PixelClasificationExportingApplet(NoSnapshotApplet, InertApplet):
         on_progress: Optional[JobProgressCallback] = None,
         on_complete: Optional[JobCompletedCallback] = None,
     ) -> Union[Job[DataRoi], UsageError]:
-        classifier = self._in_classifier()
-        if classifier is None:
-            return UsageError("Classifier not ready yet")
+        operator = self._in_operator()
+        if operator is None:
+            return UsageError("operator not ready yet")
         datasource = self._in_datasource()
         if datasource is None:
             return UsageError("No datasource selected")
@@ -67,7 +67,7 @@ class PixelClasificationExportingApplet(NoSnapshotApplet, InertApplet):
 
         job = Job(
             name="Pixel Classification Export", # FIXME
-            target=ExportTask(operator=classifier, sink=datasink),
+            target=ExportTask(operator=operator, sink=datasink),
             args=datasource.roi.get_datasource_tiles(),
             on_progress=on_progress,
             on_complete=on_complete,
@@ -76,20 +76,20 @@ class PixelClasificationExportingApplet(NoSnapshotApplet, InertApplet):
         return job
 
 
-class WsPixelClassificationExportApplet(WsApplet, PixelClasificationExportingApplet):
+class WsExportApplet(WsApplet, ExportApplet):
     def __init__(
         self,
         *,
         name: str,
         executor: HashingExecutor,
-        classifier: ClassifierOutput,
+        operator: AppletOutput[Optional[Operator[DataRoi, Array5D]]],
         datasource: AppletOutput[Optional[DataSource]],
         datasink: AppletOutput[Optional[DataSink]]
     ):
         self.jobs: Dict[uuid.UUID, Job[DataRoi]] = {}
         self.lock = threading.Lock()
         self.last_update = time.monotonic()
-        super().__init__(name=name, executor=executor, classifier=classifier, datasource=datasource, datasink=datasink)
+        super().__init__(name=name, executor=executor, operator=operator, datasource=datasource, datasink=datasink)
 
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
         if method_name == "start_export_job":

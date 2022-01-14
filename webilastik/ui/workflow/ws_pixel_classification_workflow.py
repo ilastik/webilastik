@@ -19,7 +19,7 @@ from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonO
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
 from webilastik.ui.applet.datasink_selector import WsDataSinkSelectorApplet
-from webilastik.ui.applet.pixel_classification_export_applet import WsPixelClassificationExportApplet
+from webilastik.ui.applet.export_applet import WsExportApplet
 from webilastik.ui.applet.datasource_picker import WsDataSourcePicker
 from webilastik.ui.usage_error import UsageError
 from webilastik.utility.url import Protocol, Url
@@ -115,10 +115,10 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             num_channels_override=self.pixel_classifier_applet.pixel_classifier.transformed_with(lambda pc: pc and pc.num_classes),
         )
 
-        self.export_applet = WsPixelClassificationExportApplet(
+        self.export_applet = WsExportApplet(
             name="export_applet",
             executor=executor,
-            classifier=self.pixel_classifier_applet.pixel_classifier,
+            operator=self.pixel_classifier_applet.pixel_classifier,
             datasource=self.export_datasource_applet.datasource,
             datasink=self.export_datasink_applet.datasink,
         )
