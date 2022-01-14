@@ -2,14 +2,16 @@
 
 import threading
 import time
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, Generic, Optional, Tuple, Union
 import logging
 import uuid
+from ndstructs.array5D import Array5D
 
 from ndstructs.utils.json_serializable import JsonObject, ensureJsonString
 
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.features.ilp_filter import IlpFilter
+from webilastik.operator import Operator, IN
 from webilastik.scheduling.hashing_executor import HashingExecutor, Job, JobCompletedCallback, JobProgressCallback
 from webilastik.ui.applet import AppletOutput, InertApplet, NoSnapshotApplet, UserPrompt
 from webilastik.datasource import DataRoi, DataSource
@@ -19,34 +21,14 @@ from webilastik.ui.usage_error import UsageError
 
 logger = logging.getLogger(__name__)
 
-class PixelClassificationExportTask:
-    def __init__(self, classifier: VigraPixelClassifier[IlpFilter], sink: DataSink):
-        self.classifier = classifier
+class ExportTask(Generic[IN]):
+    def __init__(self, operator: Operator[IN, Array5D], sink: DataSink):
+        self.operator = operator
         self.sink = sink
 
-    def __call__(self, step: DataRoi):
-        tile = self.classifier.compute(step)
+    def __call__(self, step_arg: IN):
+        tile = self.operator.compute(step_arg)
         self.sink.write(tile)
-
-
-class PixelClassificationExportJob(Job[DataRoi]):
-    def __init__(
-        self,
-        *,
-        classifier: VigraPixelClassifier[IlpFilter],
-        source: DataSource,
-        sink: DataSink,
-        on_progress: Optional[JobProgressCallback] = None,
-        on_complete: Optional[JobCompletedCallback] = None
-    ):
-        print(f"+++++ Starting export to sink {sink.shape}")
-        super().__init__(
-            name="Pixel Classification Export",
-            target=PixelClassificationExportTask(classifier=classifier, sink=sink),
-            args=source.roi.get_datasource_tiles(),
-            on_progress=on_progress,
-            on_complete=on_complete
-        )
 
 
 ClassifierOutput = AppletOutput[Optional[VigraPixelClassifier[IlpFilter]]]
@@ -72,7 +54,7 @@ class PixelClasificationExportingApplet(NoSnapshotApplet, InertApplet):
         *,
         on_progress: Optional[JobProgressCallback] = None,
         on_complete: Optional[JobCompletedCallback] = None,
-    ) -> Union[PixelClassificationExportJob, UsageError]:
+    ) -> Union[Job[DataRoi], UsageError]:
         classifier = self._in_classifier()
         if classifier is None:
             return UsageError("Classifier not ready yet")
@@ -83,10 +65,10 @@ class PixelClasificationExportingApplet(NoSnapshotApplet, InertApplet):
         if datasink is None:
             return UsageError("No datasink selected")
 
-        job = PixelClassificationExportJob(
-            classifier=classifier,
-            source=datasource,
-            sink=datasink,
+        job = Job(
+            name="Pixel Classification Export", # FIXME
+            target=ExportTask(operator=classifier, sink=datasink),
+            args=datasource.roi.get_datasource_tiles(),
             on_progress=on_progress,
             on_complete=on_complete,
         )
@@ -104,7 +86,7 @@ class WsPixelClassificationExportApplet(WsApplet, PixelClasificationExportingApp
         datasource: AppletOutput[Optional[DataSource]],
         datasink: AppletOutput[Optional[DataSink]]
     ):
-        self.jobs: Dict[uuid.UUID, PixelClassificationExportJob] = {}
+        self.jobs: Dict[uuid.UUID, Job[DataRoi]] = {}
         self.lock = threading.Lock()
         self.last_update = time.monotonic()
         super().__init__(name=name, executor=executor, classifier=classifier, datasource=datasource, datasink=datasink)
