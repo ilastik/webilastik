@@ -206,11 +206,11 @@ class BucketFs(JsonableFilesystem):
         self.session.delete(self.url.concatpath(path).raw).raise_for_status()
 
     def removedir(self, path: str) -> None:
-        raise NotImplemented
+        raise NotImplementedError("Can't delete directories yet. Use the Data-Proxy GUI for now")
         return super().removedir(path)
 
     def setinfo(self, path: str, info) -> None:
-        raise NotImplemented
+        raise NotImplementedError
         return super().setinfo(path, info)
 
     @classmethod
