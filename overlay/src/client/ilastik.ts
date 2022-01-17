@@ -339,6 +339,9 @@ export abstract class FileSystem implements IJsonable{
         if(class_name == "HttpFs"){
             return HttpFs.fromJsonValue(value)
         }
+        if(class_name == "BucketFs"){
+            return BucketFs.fromJsonValue(value)
+        }
         throw Error(`Could not deserialize FileSystem from ${JSON.stringify(value)}`)
     }
     public abstract equals(other: FileSystem): boolean;
@@ -378,6 +381,59 @@ export class HttpFs extends FileSystem{
         return this.read_url
     }
 }
+
+export class BucketFs extends FileSystem{
+    public static readonly API_URL = Url.parse("https://data-proxy.ebrains.eu/api/buckets")
+    public readonly bucket_name: string
+    public readonly prefix: Path
+    public readonly ebrains_user_token: string // FIXME?
+
+    constructor(params: {bucket_name: string, prefix: Path, ebrains_user_token: string}){
+        super()
+        this.bucket_name = params.bucket_name
+        this.prefix = params.prefix
+        this.ebrains_user_token = params.ebrains_user_token
+    }
+
+    public equals(other: FileSystem): boolean {
+        return (
+            other instanceof BucketFs &&
+            other.bucket_name == this.bucket_name &&
+            other.prefix == this.prefix
+        )
+    }
+
+    public getUrl(): Url {
+        return BucketFs.API_URL.joinPath(`${this.bucket_name}/${this.prefix}`)
+    }
+
+    public getDisplayString(): string {
+        return this.getUrl().toString()
+    }
+
+    public static fromJsonValue(value: JsonValue): BucketFs {
+        const valueObj = ensureJsonObject(value)
+        const ebrains_token_obj = ensureJsonObject(valueObj.ebrains_user_token)
+        return new this({
+            bucket_name: ensureJsonString(valueObj.bucket_name),
+            prefix: Path.parse(ensureJsonString(valueObj.prefix)),
+            ebrains_user_token: ensureJsonString(ebrains_token_obj.access_token),
+        })
+    }
+
+    public toJsonValue(): JsonObject {
+        return {
+            bucket_name: this.bucket_name,
+            prefix: this.prefix.toString(),
+            ebrains_user_token: {
+                access_token: this.ebrains_user_token
+            },
+            __class__: "BucketFs"
+        }
+    }
+}
+
+
 
 export abstract class DataSource implements IJsonable{
     public readonly filesystem: FileSystem
