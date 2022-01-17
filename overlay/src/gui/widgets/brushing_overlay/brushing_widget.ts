@@ -181,16 +181,18 @@ export class TrainingWidget{
             display: (window as any).ilastik_debug ? "block" : "none"}
         })
         createElement({tagName: "label", innerHTML: "Rendering style: ", parentElement: p})
+        const renderers = [
+            new BrushelBoxRenderer({gl: this.gl, highlightCrossSection: false, onlyCrossSection: true}),
+            new BrushelLinesRenderer(this.gl),
+            new BrushelBoxRenderer({gl: this.gl, debugColors: false, highlightCrossSection: false, onlyCrossSection: false}),
+            new BrushelBoxRenderer({gl: this.gl, debugColors: true, highlightCrossSection: true, onlyCrossSection: false}),
+        ];
         this.rendererSelector = new SelectorWidget<BrushRenderer>({
             parentElement: p,
-            options: [
-                new BrushelBoxRenderer({gl: this.gl, highlightCrossSection: false, onlyCrossSection: true}),
-                new BrushelLinesRenderer(this.gl),
-                new BrushelBoxRenderer({gl: this.gl, debugColors: false, highlightCrossSection: false, onlyCrossSection: false}),
-                new BrushelBoxRenderer({gl: this.gl, debugColors: true, highlightCrossSection: true, onlyCrossSection: false}),
-            ],
+            options: renderers,
             optionRenderer: (_, index) => ["Boxes - Cross Section", "Lines", "Boxes", "Boxes (debug colors)"][index],
             onSelection: (_) => {},
+            initial_selection: renderers[0],
         })
     }
 
@@ -234,7 +236,7 @@ export class TrainingWidget{
             if(this.staging_brush_stroke){
                 strokes.push(this.staging_brush_stroke)
             }
-            overlay.render(strokes, this.rendererSelector.getSelection())
+            overlay.render(strokes, this.rendererSelector.getSelection()!) //FIXME? remove this optional override?
             this.animationRequestId = window.requestAnimationFrame(render)
         }
         render()

@@ -1,4 +1,4 @@
-import { createElement, createInput, removeElement, uuidv4 } from "../../util/misc";
+import { createElement, createInput, createInputParagraph, removeElement, uuidv4 } from "../../util/misc";
 
 export class WidgetSelector<T extends {element: HTMLElement}>{
     public readonly element: HTMLElement;
@@ -50,46 +50,90 @@ export class WidgetSelector<T extends {element: HTMLElement}>{
     }
 }
 
+export class SelectorOption<T>{
+    private _value: T;
+    public readonly radio: HTMLInputElement;
+    constructor(params: {
+        parentElement: HTMLElement,
+        value: T,
+        label: string,
+        checked: boolean,
+        name: string,
+        onClick: (value: T) => void
+    }){
+        this._value = params.value
+        this.radio = createInputParagraph({
+            inputType: "radio",
+            parentElement: params.parentElement,
+            label_text: params.label,
+            name: params.name,
+            onClick: () => params.onClick(this._value)
+        })
+        if(params.checked){
+            this.radio.checked = true
+        }
+    }
+
+    public check(checked: boolean){
+        this.radio.checked = checked
+    }
+
+    public isChecked(): boolean{
+        return this.radio.checked
+    }
+
+    public getValue(): T{
+        return this._value
+    }
+}
 
 export class SelectorWidget<T>{
     public readonly element: HTMLElement;
-    private selection: T;
-    constructor({options, optionRenderer, onSelection, parentElement}: {
+    protected selector_options: SelectorOption<T>[];
+    constructor({options, optionRenderer, onSelection, parentElement, initial_selection, comparator=(a: T, b: T) => a == b}: {
         options: Array<T>,
         optionRenderer: (option: T, option_index: number) => string,
-        onSelection: (selection: T) => void,
+        onSelection: (selection: T, selection_index: number) => void,
         parentElement: HTMLElement,
+        initial_selection?: T,
+        comparator?: (a: T, b:T) => boolean,
     }){
         if(options.length == 0){
             throw `Trying to create selector widget with empty options list`
         }
-        this.selection = options[0]
-        this.element = createElement({tagName: "form", parentElement, cssClasses: ["ItkSelector"]})
-        options.forEach((opt, opt_index) => {
-            const p = createElement({tagName: "p", parentElement: this.element, onClick: () => {
-                this.selection = opt
-            }})
-            let radio = createInput({inputType: "radio", name: "option_selection", parentElement: p, onClick: () => {
-                onSelection(opt)
-            }})
-            radio.id = uuidv4()
-            const label =createElement({tagName: "label", parentElement: p, innerHTML: " " + optionRenderer(opt, opt_index)}) as HTMLLabelElement;
-            label.htmlFor = radio.id
-            if(opt_index == 0){
-                label.click()
+        const define_checked = (opt: T): boolean => {
+            if(initial_selection === undefined){
+                return false
             }
-        })
+            return comparator ? comparator(initial_selection, opt) : initial_selection == opt
+        }
+        this.element = createElement({tagName: "div", parentElement, cssClasses: ["ItkSelector"]})
+        const radio_group_name = uuidv4()
+        this.selector_options = options.map((opt, opt_index) => new SelectorOption({
+            parentElement: this.element,
+            value: opt,
+            label: optionRenderer(opt, opt_index),
+            name: radio_group_name,
+            checked: define_checked(opt),
+            onClick: _ => onSelection(opt, opt_index)
+        }))
     }
 
-    public getSelection() : T{
-        return this.selection
+    public getSelection() : T | undefined{
+        return this.selector_options.find(so => so.isChecked())!.getValue()
+    }
+
+    public setSelection({selection, comparator=(a, b) => {return a == b}}: {
+        selection: T, comparator?: (a: T, b: T) => boolean
+    }){
+        this.selector_options.find(sel_opt => comparator(selection, sel_opt.getValue()))!.check(true)
     }
 }
 
 export class OneShotSelectorWidget<T> extends SelectorWidget<T>{
     constructor({options, optionRenderer, onSelection = (_) => {}, parentElement, onOk}: {
         options: Array<T>,
-        optionRenderer: (option: T) => string,
+        optionRenderer: (option: T, option_index: number) => string,
         onSelection?: (selection: T) => void,
         parentElement: HTMLElement,
         onOk: (option: T) => void,
@@ -97,8 +141,12 @@ export class OneShotSelectorWidget<T> extends SelectorWidget<T>{
         super({options, optionRenderer, onSelection, parentElement})
         let p = createElement({tagName: "p", parentElement: this.element})
         createInput({inputType: "button", parentElement: p, value: "Ok", onClick: () => {
+            const value = this.getSelection()
+            if(value === undefined){
+                return
+            }
             removeElement(this.element)
-            onOk(this.getSelection())
+            onOk(value)
         }});
         createInput({inputType: "button", parentElement: p, value: "Cancel", onClick: () => {
             removeElement(this.element)
