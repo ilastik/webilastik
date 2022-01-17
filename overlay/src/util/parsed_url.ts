@@ -24,9 +24,6 @@ export class Path{
     public readonly components: Array<string>;
 
     public static parse(raw: string): Path{
-        if(!raw.startsWith("/")){
-            throw Error(`Path '${raw}' is not absolute`)
-        }
         return new Path({components: raw.split("/")})
     }
 
