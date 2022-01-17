@@ -1,7 +1,7 @@
 from typing import Optional, Sequence
 import json
 
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonInt, ensureJsonString, toJsonValue
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonInt, ensureJsonString, ensureOptional, toJsonValue
 
 from webilastik.libebrains.user_token import UserToken
 from webilastik.ui import parse_url
@@ -24,26 +24,42 @@ class DataSourcePicker(InertApplet, NoSnapshotApplet):
         self.ebrains_user_token = ebrains_user_token
         self.allowed_protocols = allowed_protocols
 
-        self._datasource_url: Optional[Url] = None
+        self._datasource_url: Optional[str] = None
         self._datasource_choices: Optional[Sequence[DataSource]] = None
         self._datasource: Optional[DataSource] = None
+        self._error_message: Optional[str] = None
         super().__init__(name)
+
+    @user_interaction
+    def reset(self, user_prompt: UserPrompt) -> PropagationResult:
+        self._do_reset()
+        return PropagationOk()
+
+    def _do_reset(self, error_message: Optional[str] = None):
+        self._datasource_choices = None
+        self._datasource = None
+        self._error_message = error_message or None
 
     @applet_output
     def datasource(self) -> Optional[DataSource]:
         return self._datasource
 
     @user_interaction
-    def set_url(self, user_prompt: UserPrompt, url: Url) -> PropagationResult:
+    def set_url(self, user_prompt: UserPrompt, url: str) -> PropagationResult:
+        self._do_reset()
+        self._datasource_url = url
+        parsed_url = Url.parse(url)
+        if parsed_url is None:
+            self._error_message = "Invalid Url"
+            return PropagationOk()
         datasource_result = try_get_datasources_from_url(
-            url=url,
+            url=parsed_url,
             ebrains_user_token=self.ebrains_user_token,
             allowed_protocols=self.allowed_protocols
         )
         if isinstance(datasource_result, UsageError):
-            return PropagationError(str(datasource_result))
-            self._datasource_url = None
-        self._datasource_url = url
+            self._do_reset(error_message=str(datasource_result))
+            return PropagationOk()
         self._datasource_choices = datasource_result
         if len(self._datasource_choices) == 1:
             self._datasource = self._datasource_choices[0]
@@ -62,30 +78,25 @@ class DataSourcePicker(InertApplet, NoSnapshotApplet):
 
 class WsDataSourcePicker(WsApplet, DataSourcePicker):
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
-        if method_name == "set_url":
-            url_result = parse_url(ensureJsonString(arguments.get("url")))
-            if isinstance(url_result, UsageError):
-                return url_result
-            rpc_result = self.set_url(
-                user_prompt=user_prompt,
-                url=url_result
-            )
-            if isinstance(rpc_result, PropagationError):
-                return UsageError(rpc_result.message)
-            return
-
-        if method_name == "pick_datasource":
+        if method_name == "reset":
+            rpc_result = self.reset(user_prompt=user_prompt)
+        elif method_name == "set_url":
+            rpc_result = self.set_url(user_prompt=user_prompt, url=ensureJsonString(arguments.get("url")))
+        elif method_name == "pick_datasource":
             datasource_index = ensureJsonInt(arguments.get("datasource_index"))
             rpc_result = self.pick_datasource(user_prompt, datasource_index=datasource_index)
-            if isinstance(rpc_result, PropagationError):
-                return UsageError(rpc_result.message)
-            return
+        else:
+            return UsageError(f"Method not found: {method_name}")
 
-        return UsageError(f"Method not found: {method_name}")
+        if isinstance(rpc_result, PropagationError):
+            return UsageError(rpc_result.message)
+        return None
+
 
     def _get_json_state(self) -> JsonValue:
         return {
             "datasource_url": toJsonValue(self._datasource_url),
             "datasource_choices": toJsonValue(tuple(self._datasource_choices or ()) or None),
             "datasource": toJsonValue(self._datasource),
+            "error_message": toJsonValue(self._error_message),
         }

@@ -13,7 +13,7 @@ from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.operator import Operator, IN
 from webilastik.scheduling.hashing_executor import HashingExecutor, Job, JobCompletedCallback, JobProgressCallback
-from webilastik.ui.applet import AppletOutput, InertApplet, NoSnapshotApplet, UserPrompt
+from webilastik.ui.applet import AppletOutput, NoSnapshotApplet, PropagationOk, PropagationResult, UserPrompt
 from webilastik.datasource import DataRoi, DataSource
 from webilastik.datasink import DataSink
 from webilastik.ui.applet.ws_applet import WsApplet
@@ -33,7 +33,7 @@ class ExportTask(Generic[IN]):
 
 ClassifierOutput = AppletOutput[Optional[VigraPixelClassifier[IlpFilter]]]
 
-class ExportApplet(NoSnapshotApplet, InertApplet):
+class ExportApplet(NoSnapshotApplet):
     def __init__(
         self,
         *,
@@ -41,38 +41,57 @@ class ExportApplet(NoSnapshotApplet, InertApplet):
         executor: HashingExecutor,
         operator: AppletOutput[Optional[Operator[DataRoi, Array5D]]],
         datasource: AppletOutput[Optional[DataSource]],
-        datasink: AppletOutput[Optional[DataSink]],
+        datasink: AppletOutput[Union[DataSink, UsageError, None]],
     ):
         self._in_operator = operator
         self._in_datasource = datasource
         self._in_datasink = datasink
+
+        self._error_message: Optional[str] = None
+
         self.executor = executor
         super().__init__(name=name)
+
+    def on_dependencies_changed(self, user_prompt: UserPrompt) -> PropagationResult:
+        self._check_dependencies()
+        return PropagationOk()
+
+    def _check_dependencies(self):
+        if self._in_operator() is None:
+            self._error_message = "Upstream applet is not ready yet"
+        elif self._in_datasource() is None:
+            self._error_message = "No datasource selected"
+        else:
+            self._error_message = None
 
     def start_export_job(
         self,
         *,
         on_progress: Optional[JobProgressCallback] = None,
         on_complete: Optional[JobCompletedCallback] = None,
-    ) -> Union[Job[DataRoi], UsageError]:
+    ) -> Optional[Job[DataRoi]]:
+        self._check_dependencies()
         operator = self._in_operator()
-        if operator is None:
-            return UsageError("operator not ready yet")
         datasource = self._in_datasource()
-        if datasource is None:
-            return UsageError("No datasource selected")
-        datasink = self._in_datasink()
-        if datasink is None:
-            return UsageError("No datasink selected")
+        if operator is None or datasource is None:
+            return None
+        sink_result = self._in_datasink()
+        if sink_result is None:
+            self._error_message = "No datasink selected"
+            return None
+        elif isinstance(sink_result, UsageError):
+            self._error_message = f"Failed to create datasink: {sink_result}"
+            return None
 
         job = Job(
             name="Pixel Classification Export", # FIXME
-            target=ExportTask(operator=operator, sink=datasink),
+            target=ExportTask(operator=operator, sink=sink_result),
             args=datasource.roi.get_datasource_tiles(),
             on_progress=on_progress,
             on_complete=on_complete,
         )
         self.executor.submit_job(job)
+        self._error_message = None
         return job
 
 
@@ -105,8 +124,8 @@ class WsExportApplet(WsApplet, ExportApplet):
                 on_progress=on_job_step_completed,
                 on_complete=on_job_completed,
             )
-            if isinstance(job_result, UsageError):
-                return job_result
+            if job_result is None:
+                return None
             self.jobs[job_result.uuid] = job_result
 
             logger.info(f"Started job {job_result.uuid}")
@@ -132,4 +151,5 @@ class WsExportApplet(WsApplet, ExportApplet):
     def _get_json_state(self) -> JsonObject:
         return {
             "jobs": tuple(job.to_json_value() for job in self.jobs.values()),
+            "error_message": self._error_message,
         }

@@ -1,5 +1,6 @@
-from typing import Optional, Tuple, TypedDict
+from typing import Optional, Tuple, Union
 from pathlib import Path, PurePosixPath
+from dataclasses import dataclass
 
 from numpy import dtype
 
@@ -10,14 +11,19 @@ from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksEncod
 from webilastik.libebrains.user_token import UserToken
 from webilastik.ui import parse_url
 
-from webilastik.ui.applet import Applet, AppletOutput, PropagationError, PropagationOk, PropagationResult, UserPrompt, applet_output, user_interaction
+from webilastik.ui.applet import Applet, AppletOutput, InertApplet, PropagationError, PropagationOk, PropagationResult, UserPrompt, applet_output, user_interaction
 from webilastik.datasink import DataSink
 from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
 from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.usage_error import UsageError
+from webilastik.utility import get_now_string
 
-class DataSinkSelectorApplet(Applet):
+@dataclass
+class State:
+    sink: Optional[DataSink]
+
+class DataSinkSelectorApplet(InertApplet):
     def __init__(
         self,
         *,
@@ -34,22 +40,18 @@ class DataSinkSelectorApplet(Applet):
         self._in_spatial_resolution = spatial_resolution
         self._in_num_channels_override = num_channels_override
 
-        self._bucket_name: Optional[str] = None
-        self._prefix: Optional[PurePosixPath] = None
+        self._bucket_name: Optional[str] = "hbp-image-service"
+        self._prefix: Optional[PurePosixPath] = PurePosixPath(f"/webilastik_job_{get_now_string()}.precomputed")
         self._voxel_offset: Tuple[int, int, int] = (0,0,0)
         self._encoder: PrecomputedChunksEncoder = RawEncoder()
         self._datasink: Optional[DataSink] = None
         super().__init__(name)
 
-    def on_dependencies_changed(self, user_prompt: UserPrompt) -> PropagationResult:
-        self._refresh_datasink()
-        return PropagationOk()
+    def take_snapshot(self) -> State:
+        return State(sink=self._datasink) # FIXME: double check this
 
-    def take_snapshot(self) -> Optional[DataSink]:
-        return self._datasink # FIXME: double check this
-
-    def restore_snaphot(self, snapshot: Optional[DataSink]) -> None:
-        self._datasink = snapshot # FIXME: double check this
+    def restore_snaphot(self, snapshot: State) -> None:
+        self._datasink = snapshot.sink
 
     @user_interaction
     def set_params(
@@ -64,14 +66,10 @@ class DataSinkSelectorApplet(Applet):
         self._prefix = prefix
         self._voxel_offset = voxel_offset or (0, 0, 0)
         self._encoder = encoder or RawEncoder()
-        self._refresh_datasink()
         return PropagationOk()
 
     @applet_output
-    def datasink(self) -> Optional[DataSink]:
-        return self._datasink
-
-    def _refresh_datasink(self):
+    def datasink(self) -> Union[DataSink, UsageError, None]:
         shape = self._in_shape()
         tile_shape = self._in_tile_shape()
         spatial_resolution = self._in_spatial_resolution()
@@ -84,35 +82,42 @@ class DataSinkSelectorApplet(Applet):
             self._prefix is None or
             self._encoder is None
         ):
-            self._datasink = None
-            return
+            return None
+
         num_channels = (self._in_num_channels_override and self._in_num_channels_override()) or shape.c
         shape = shape.updated(c=num_channels)
-        filesystem = BucketFs(
-            bucket_name=self._bucket_name,
-            prefix=PurePosixPath(self._prefix),
-            ebrains_user_token=self.ebrains_user_token,
-        )
-        sink = PrecomputedChunksSink.create(
-            base_path=Path(self._prefix), #FIXME
-            filesystem=filesystem,
-            info=PrecomputedChunksInfo(
-                data_type=dtype("float32"), #FIXME? maybe operator.expected_dtype or smth?
-                type_="image",
-                num_channels=shape.c,
-                scales=tuple([
-                     PrecomputedChunksScale(
-                        key=Path("exported_data"),
-                        size=(shape.x, shape.y, shape.z),
-                        chunk_sizes=( (tile_shape.x, tile_shape.y, tile_shape.z), ),
-                        encoding=self._encoder,
-                        voxel_offset=self._voxel_offset,
-                        resolution=spatial_resolution
-                    )
-                ]),
+        try:
+            print(f"++++++++++++ trying to generate a data sink.....")
+            filesystem = BucketFs(
+                bucket_name=self._bucket_name,
+                prefix=PurePosixPath(self._prefix),
+                ebrains_user_token=self.ebrains_user_token,
             )
-        ).scale_sinks[0]
-        self._datasink = sink
+            sink = PrecomputedChunksSink.create(
+                base_path=Path(self._prefix), #FIXME
+                filesystem=filesystem,
+                info=PrecomputedChunksInfo(
+                    data_type=dtype("float32"), #FIXME? maybe operator.expected_dtype or smth?
+                    type_="image",
+                    num_channels=shape.c,
+                    scales=tuple([
+                        PrecomputedChunksScale(
+                            key=Path("exported_data"),
+                            size=(shape.x, shape.y, shape.z),
+                            chunk_sizes=( (tile_shape.x, tile_shape.y, tile_shape.z), ),
+                            encoding=self._encoder,
+                            voxel_offset=self._voxel_offset,
+                            resolution=spatial_resolution
+                        )
+                    ]),
+                )
+            ).scale_sinks[0]
+            return sink
+        except Exception as e:
+            import traceback
+            print(f"++++++++++++++ Could not create a datasink: {e}")
+            traceback.print_exc()
+            return UsageError(str(e))
 
 class WsDataSinkSelectorApplet(WsApplet, DataSinkSelectorApplet):
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
@@ -140,5 +145,4 @@ class WsDataSinkSelectorApplet(WsApplet, DataSinkSelectorApplet):
             "prefix": toJsonValue(self._prefix and str(self._prefix)),
             "voxel_offset": toJsonValue(self._voxel_offset),
             "encoder": toJsonValue(self._encoder),
-            "datasink": toJsonValue(self._datasink),
         }

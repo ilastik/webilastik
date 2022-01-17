@@ -1,7 +1,7 @@
 import { vec3 } from "gl-matrix"
 import { sleep } from "../util/misc"
 import { Path, Url } from "../util/parsed_url"
-import { PrecomputedChunks } from "../util/precomputed_chunks"
+import { DataType, ensureDataType, PrecomputedChunks, Scale } from "../util/precomputed_chunks"
 import { ensureJsonArray, ensureJsonNumberTripplet, ensureJsonObject, ensureJsonString, IJsonable, IJsonableObject, JsonObject, JsonValue, toJsonValue } from "../util/serialization"
 
 export class Session{
@@ -10,7 +10,6 @@ export class Session{
     private websocket: WebSocket
     private messageHandlers = new Array<(ev: MessageEvent) => void>();
     private readonly onUsageError: (message: string) => void
-
 
     protected constructor(params: {
         ilastikUrl: Url,
@@ -21,7 +20,6 @@ export class Session{
         this.sessionUrl = params.sessionUrl
         this.onUsageError = params.onUsageError
         this.websocket = this.openWebsocket()
-
     }
 
     private openWebsocket(): WebSocket{
@@ -548,6 +546,8 @@ export class PrecomputedChunksDataSource extends DataSource{
     }
 }
 
+const image_content_types = ["image/png", "image/gif", "image/jpeg"]
+
 export class SkimageDataSource extends DataSource{
     public static fromJsonValue(data: JsonValue) : SkimageDataSource{
         const data_obj = ensureJsonObject(data)
@@ -567,7 +567,10 @@ export class SkimageDataSource extends DataSource{
         if(url.protocol !== "http" && url.protocol !== "https"){
             return undefined
         }
-        //FIXME: maybe do a HEAD and check mime type?
+        const head = await fetch(url.toString(), {method: "HEAD"});
+        if(!head.ok || !image_content_types.includes(head.headers.get("Content-Type")!)){
+            return undefined
+        }
         return new SkimageDataSource({
             filesystem: new HttpFs({read_url: url.root}),
             path: url.path,
@@ -603,51 +606,54 @@ export class Lane implements IJsonable{
     }
 }
 
-export class DataSourceLoadParams implements IJsonable{
-    public readonly url: Url
-    public readonly spatial_resolution?: vec3
-
-    constructor({url, spatial_resolution}: {
-        url: Url
-        spatial_resolution?: vec3
-    }){
-        this.url = url
-        this.spatial_resolution = spatial_resolution
-    }
-
-    public toJsonValue(): JsonObject{
-        return {
-            url: this.url.toJsonValue(),
-            spatial_resolution: this.spatial_resolution === undefined ? null : [
-                this.spatial_resolution[0], this.spatial_resolution[1], this.spatial_resolution[2]
-            ],
-        }
-    }
-}
-
-export abstract class DataSinkCreationParams implements IJsonable{
-    public readonly url: Url;
-    constructor({url}: {url: Url}){
-        this.url = url
-    }
+export abstract class DataSink implements IJsonable{
+    // public readonly url: Url;
+    // constructor({url}: {url: Url}){
+    //     this.url = url
+    // }
 
     public abstract toJsonValue(): JsonValue;
 }
 
-export type PrecomputedChunksEncoder = "raw"
+export class PrecomputedChunksScaleSink extends DataSink{
+    public readonly filesystem: FileSystem
+    public readonly base_path: Path
+    public readonly scale: Scale
+    public readonly dtype: DataType
 
-export class PrecomputedChunksScaleSink_CreationParams extends DataSinkCreationParams{
-    public readonly encoding: string;
-    constructor(params: {url: Url, encoding: PrecomputedChunksEncoder}){
-        super(params)
-        this.encoding = params.encoding
+    constructor(params: {
+        filesystem: FileSystem,
+        base_path: Path,
+        scale: Scale,
+        dtype: DataType,
+    }){
+        super()
+        this.filesystem = params.filesystem
+        this.base_path = params.base_path
+        this.scale = params.scale
+        this.dtype = params.dtype
+    }
+
+    public static fromJsonValue(value: JsonValue): PrecomputedChunksScaleSink{
+        const valueObject = ensureJsonObject(value)
+        const filesystem = FileSystem.fromJsonValue(valueObject.filesystem)
+        const base_path = Path.parse(ensureJsonString(valueObject.base_path))
+        const url = filesystem.getUrl().joinPath(base_path.toString())
+        return new PrecomputedChunksScaleSink({
+            filesystem,
+            base_path,
+            scale: Scale.fromJsonValue(url, valueObject.scale),
+            dtype: ensureDataType(ensureJsonString(valueObject.dtype)),
+        })
     }
 
     public toJsonValue(): JsonValue{
         return {
-            url: this.url.toJsonValue(),
-            encoding: this.encoding,
-            __class__: "PrecomputedChunksScaleSink_CreationParams",
+            filesystem: this.filesystem.toJsonValue(),
+            base_path: this.base_path.toString(),
+            scale: this.scale.toJsonValue(),
+            dtype: this.dtype,
+            __class__: "PrecomputedChunksScaleSinkCreationParams",
         }
     }
 }
