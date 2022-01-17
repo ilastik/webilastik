@@ -25,7 +25,9 @@ class UserToken:
         # session_state: str,
         # scope: str
     ):
-        self._api_url = Url.parse("https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect")
+        api_url = Url.parse("https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect")
+        assert api_url is not None
+        self._api_url = api_url
         self.access_token = access_token
         self.refresh_token = refresh_token
         # self.expires_in = expires_in
