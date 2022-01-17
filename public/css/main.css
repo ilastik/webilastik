@@ -109,3 +109,18 @@
 .ItkInputParagraph input[type=number]{
     width: 4em;
 }
+
+.ItkErrorText{
+    font-style: italic;
+    color: red;
+}
+
+.ItkSuccessText{
+    font-style: italic;
+    color: green;
+}
+
+.ItkInfoText{
+    font-style: italic;
+    color: grey;
+}
