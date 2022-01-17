@@ -107,3 +107,10 @@ export function ensureJsonNumberTripplet(value: JsonValue): [number, number, num
     }
     return [number_array[0], number_array[1], number_array[2]]
 }
+
+export function ensureOptional<T>(f: (value: JsonValue) => T, value: JsonValue): T | undefined{
+    if(value === null || value === undefined){
+        return undefined
+    }
+    return f(value)
+}
