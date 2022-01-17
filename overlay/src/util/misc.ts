@@ -117,13 +117,12 @@ export function createInput(params: {
 
 export function createInputParagraph(params: Parameters<typeof createInput>[0] & {label_text?: string}): ReturnType<typeof createInput>{
     let p = createElement({tagName: "p", parentElement: params.parentElement, cssClasses: ["ItkInputParagraph"]})
+    const id = params.id === undefined ? uuidv4() : params.id
     if(params.label_text !== undefined){
         const label = createElement({tagName: "label", parentElement: p, innerHTML: params.label_text})
-        if(params.id !== undefined){
-            label.htmlFor = params.id
-        }
+        label.htmlFor = id
     }
-    return createInput({...params, parentElement: p})
+    return createInput({...params, parentElement: p, id : id})
 }
 
 export function createSelect<T extends {toString: () => string}>({
