@@ -47,7 +47,7 @@ export function createElement<K extends keyof HTMLElementTagNameMap>({tagName, p
     innerHTML?:string,
     cssClasses?:Array<string>,
     inlineCss?: InlineCss,
-    onClick?(event: any): void},
+    onClick?(event: Event): void},
 ): HTMLElementTagNameMap[K]{
 
     const element = document.createElement(tagName);
