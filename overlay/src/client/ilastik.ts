@@ -1,7 +1,7 @@
 import { vec3 } from "gl-matrix"
 import { sleep } from "../util/misc"
 import { Path, Url } from "../util/parsed_url"
-import { DataType, ensureDataType, PrecomputedChunks, Scale } from "../util/precomputed_chunks"
+import { PrecomputedChunks } from "../util/precomputed_chunks"
 import { ensureJsonArray, ensureJsonNumberTripplet, ensureJsonObject, ensureJsonString, IJsonable, IJsonableObject, JsonObject, JsonValue, toJsonValue } from "../util/serialization"
 
 export class Session{
@@ -603,57 +603,5 @@ export class Lane implements IJsonable{
     public static fromJsonArray(data: JsonValue): Lane[]{
         const array = ensureJsonArray(data)
         return array.map((v: JsonValue) => Lane.fromJsonValue(v))
-    }
-}
-
-export abstract class DataSink implements IJsonable{
-    // public readonly url: Url;
-    // constructor({url}: {url: Url}){
-    //     this.url = url
-    // }
-
-    public abstract toJsonValue(): JsonValue;
-}
-
-export class PrecomputedChunksScaleSink extends DataSink{
-    public readonly filesystem: FileSystem
-    public readonly base_path: Path
-    public readonly scale: Scale
-    public readonly dtype: DataType
-
-    constructor(params: {
-        filesystem: FileSystem,
-        base_path: Path,
-        scale: Scale,
-        dtype: DataType,
-    }){
-        super()
-        this.filesystem = params.filesystem
-        this.base_path = params.base_path
-        this.scale = params.scale
-        this.dtype = params.dtype
-    }
-
-    public static fromJsonValue(value: JsonValue): PrecomputedChunksScaleSink{
-        const valueObject = ensureJsonObject(value)
-        const filesystem = FileSystem.fromJsonValue(valueObject.filesystem)
-        const base_path = Path.parse(ensureJsonString(valueObject.base_path))
-        const url = filesystem.getUrl().joinPath(base_path.toString())
-        return new PrecomputedChunksScaleSink({
-            filesystem,
-            base_path,
-            scale: Scale.fromJsonValue(url, valueObject.scale),
-            dtype: ensureDataType(ensureJsonString(valueObject.dtype)),
-        })
-    }
-
-    public toJsonValue(): JsonValue{
-        return {
-            filesystem: this.filesystem.toJsonValue(),
-            base_path: this.base_path.toString(),
-            scale: this.scale.toJsonValue(),
-            dtype: this.dtype,
-            __class__: "PrecomputedChunksScaleSinkCreationParams",
-        }
     }
 }

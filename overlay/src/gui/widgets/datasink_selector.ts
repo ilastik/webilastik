@@ -1,5 +1,5 @@
 import { Applet } from "../../client/applets/applet";
-import { PrecomputedChunksScaleSink, Session } from "../../client/ilastik";
+import { Session } from "../../client/ilastik";
 import { createElement, createInputParagraph } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
 import { Encoding, ensureEncoding, encodings as precomputed_encodings} from "../../util/precomputed_chunks";
@@ -33,7 +33,6 @@ export class DataSinkSelectorWidget extends Applet<State>{
                     prefix: ensureOptional((raw) => Path.parse(ensureJsonString(raw)), valueObject.prefix),
                     voxel_offset: ensureOptional(ensureJsonNumberTripplet, valueObject.voxel_offset),
                     encoder: ensureEncoding(ensureJsonString(valueObject.encoder)),
-                    datasink: ensureOptional(PrecomputedChunksScaleSink.fromJsonValue, valueObject.datasink),
                 }
             },
             session: params.session,
