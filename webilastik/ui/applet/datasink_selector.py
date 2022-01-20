@@ -90,7 +90,7 @@ class DataSinkSelectorApplet(InertApplet):
             print(f"++++++++++++ trying to generate a data sink.....")
             filesystem = BucketFs(
                 bucket_name=self._bucket_name,
-                prefix=PurePosixPath(self._prefix),
+                prefix=PurePosixPath("/"),
                 ebrains_user_token=self.ebrains_user_token,
             )
             sink = PrecomputedChunksSink.create(
