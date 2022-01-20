@@ -103,12 +103,6 @@ export class BrushingWidget{
         if(!(view instanceof RawDataView)){
             throw `Unexpected view type (${view.constructor.name}): ${JSON.stringify(view)}`
         }
-        if(view.datasources.length == 1){
-            const datasource = view.datasources[0]
-            const training_view = view.toTrainingView({resolution: datasource.spatial_resolution, session: this.session})
-            this.openTrainingView(training_view)
-            return this.startTraining(training_view.raw_data)
-        }
 
         createElement({tagName: "label", innerHTML: "Select a voxel size to annotate on:", parentElement: this.resolutionSelectionContainer});
         new OneShotSelectorWidget<DataSource>({
