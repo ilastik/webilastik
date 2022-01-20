@@ -87,7 +87,7 @@ export class NeuroglancerDriver implements IViewerDriver{
     }
     onViewportsChanged(handler: () => void){
         this.viewer.layerManager.layersChanged.add(() => {
-            if(this.viewer.state.toJSON().layers.find((layer: INeuroglancerLayer) => layer.type === undefined)){
+            if(this.getImageLayers().find((layer: INeuroglancerLayer) => layer.type === undefined)){
                 return // if any layer has no type, then the viwer hasn't settled yet
             }
             handler()
