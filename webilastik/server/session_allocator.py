@@ -117,6 +117,7 @@ class SessionAllocator(Generic[SESSION_TYPE]):
             web.get('/api/hello', self.hello),
             web.post('/api/session', self.spawn_session),
             web.get('/api/session/{session_id}', self.session_status),
+            web.post('/api/get_ebrains_token', self.get_ebrains_token), #FIXME: I'm using this in NG web workers
             web.get('/service_worker.js', self.serve_service_worker),
             web.static(
                 '/public',
@@ -124,6 +125,15 @@ class SessionAllocator(Generic[SESSION_TYPE]):
                 follow_symlinks=True, show_index=True
             ),
         ])
+
+    async def get_ebrains_token(self, request: web.Request) -> web.Response:
+        origin = request.headers.get("Origin")
+        if origin != "https://app.ilastik.org":
+            return web.json_response({"error": f"Bad origin: {origin}"}, status=400)
+        session = EbrainsSession.from_cookie(request)
+        if session is None:
+            return web.json_response({"error": f"Not logged in"}, status=400)
+        return web.json_response({EbrainsSession.AUTH_COOKIE_KEY: session.user_token.access_token})
 
     async def serve_service_worker(self, request: web.Request) -> web.StreamResponse:
         public_dir_path = Path(__file__).parent.parent.parent.joinpath("public")
