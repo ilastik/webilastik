@@ -1,6 +1,5 @@
 import { NeuroglancerDriver, OverlayControls } from "..";
 import { injectCss } from "../util/misc";
-import "../util/fetch_wrapper";
 import { Url } from "../util/parsed_url";
 
 //You can bundle the entire project using this as the main script. Then, inject it

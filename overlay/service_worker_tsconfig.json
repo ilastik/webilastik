@@ -1,12 +1,12 @@
 {
   "files": [
-    "src/index.ts"
+    "src/service_worker.ts"
   ],
   "compilerOptions": {
     "strictFunctionTypes": true,
     "isolatedModules": true,
     "esModuleInterop": true,
-    "outDir": "build/cjs",
+    "outDir": "build/service_worker",
     "declaration": true,
     "noImplicitAny": true,
     "noImplicitReturns": true,
@@ -23,6 +23,6 @@
     "target": "ES2018",
     "newLine": "LF",
     "typeRoots": [],
-    "module": "CommonJS"
+    "module": "ESNext"
   }
 }

@@ -88,11 +88,13 @@ tasks:
       - "{{.OVERLAY_DIR}}/package.json"
       - "{{.OVERLAY_DIR}}/src/**/*"
       - "{{.OVERLAY_DIR}}/tsconfig.json"
-    generates: ["{{.OVERLAY_BUNDLE_PATH}}"]
+      - "{{.OVERLAY_DIR}}/service_worker_tsconfig.json"
+    generates: ["{{.OVERLAY_BUNDLE_PATH}}", "{{.OVERLAY_DIR}}/build/service_worker.js*"]
     cmds:
       - rm -rf node_modules
       - npm ci
       - npm run bundle-ng-inject
+      - npm run build-service-worker
 
   create-deb-tree:
     deps: [create-packed-conda-environment, compile-neuroglancer, compile-overlay]
@@ -102,6 +104,7 @@ tasks:
       - "{{.PACKED_ENV_PATH}}"
       - "{{.PROJECT_ROOT}}/webilastik/**/*.py"
       - "{{.OVERLAY_BUNDLE_PATH}}"
+      - "{{.OVERLAY_DIR}}/build/service_worker.js*"
       - "{{.NEUROGLANCER_BUNDLE_PATH}}"
     generates:
       - "{{.PKG_TREE_PATH}}/**/*"
@@ -138,6 +141,7 @@ tasks:
       - echo 2>&1 '[INFO] Copying overlay bundle to public dir'
       - mkdir -p {{.PKG_TREE_PATH}}/opt/webilastik/public/js/
       - cp {{.OVERLAY_BUNDLE_PATH}} {{.PKG_TREE_PATH}}/opt/webilastik/public/js/
+      - cp {{.OVERLAY_DIR}}/build/service_worker.js* {{.PKG_TREE_PATH}}/opt/webilastik/public/js
 
       - echo 2>&1 '[INFO] Copying nehuba to public dir'
       - cp -r {{.NEUROGLANCER_BUILD_PATH}} {{.PKG_TREE_PATH}}/opt/webilastik/public/nehuba

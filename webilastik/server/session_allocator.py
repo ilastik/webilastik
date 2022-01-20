@@ -117,12 +117,17 @@ class SessionAllocator(Generic[SESSION_TYPE]):
             web.get('/api/hello', self.hello),
             web.post('/api/session', self.spawn_session),
             web.get('/api/session/{session_id}', self.session_status),
+            web.get('/service_worker.js', self.serve_service_worker),
             web.static(
                 '/public',
                 Path(__file__).joinpath("../../../public"), # FIXME: how does this work?
                 follow_symlinks=True, show_index=True
             ),
         ])
+
+    async def serve_service_worker(self, request: web.Request) -> web.StreamResponse:
+        public_dir_path = Path(__file__).parent.parent.parent.joinpath("public")
+        return web.FileResponse(public_dir_path / "js/service_worker.js")
 
     async def open_viewer(self, request: web.Request) -> web.Response:
         redirect_url = get_requested_url(request).joinpath("public/nehuba/index.html")
