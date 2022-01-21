@@ -123,20 +123,26 @@ class OidcClient:
         raw_rootUrl = ensureJsonString(value_obj.get("rootUrl"))
         try:
             rootUrl = Url.parse(raw_rootUrl)
+            assert rootUrl is not None
         except ValueError:
             rootUrl = Url.parse(raw_rootUrl + "/") # it's possible to register a rootUrl without a path -.-
+            assert rootUrl is not None
 
         redirectUris: List[Url] = []
         for raw_redirect_uri in ensureJsonStringArray(value_obj.get("redirectUris")):
             try:
-                redirectUris.append(Url.parse(raw_redirect_uri))
+                redirect_uri = Url.parse(raw_redirect_uri)
+                assert redirect_uri is not None
+                redirectUris.append(redirect_uri)
             except ValueError:
                 uri = rootUrl.joinpath(PurePosixPath(raw_redirect_uri)) # FIXME: do leading slashes mean root here too?
                 redirectUris.append(uri)
 
+        baseUrl = Url.parse(ensureJsonString(value_obj.get("baseUrl")))
+        assert baseUrl is not None
         return OidcClient(
             alwaysDisplayInConsole=ensureJsonBoolean(value_obj.get("alwaysDisplayInConsole")),
-            baseUrl=Url.parse(ensureJsonString(value_obj.get("baseUrl"))),
+            baseUrl=baseUrl,
             bearerOnly=ensureJsonBoolean(value_obj.get("bearerOnly")),
             clientAuthenticatorType=ensureJsonString(value_obj.get("clientAuthenticatorType")),
             clientId=ensureJsonString(value_obj.get("clientId")),
