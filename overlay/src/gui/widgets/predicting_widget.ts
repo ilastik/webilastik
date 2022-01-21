@@ -56,7 +56,6 @@ export class PredictingWidget extends Applet<State>{
         for(let view of this.viewer.getViews()){
             // All training views need a prediction view...
             if(view instanceof TrainingView){
-                console.log(`Tentatively op[ening predictions view for ${view.raw_data.getDisplayString()}`)
                 let predictions_view = PredictionsView.createFor({
                     raw_data: view.raw_data,
                     ilastik_session: this.session,
@@ -72,11 +71,9 @@ export class PredictingWidget extends Applet<State>{
             }
             if(view.classifier_generation == new_state.classifier_generation){
                 // ... but predictions views with the same classifier generation need no refresh ...
-                console.log(`Will not update view ${view.native_view.url}`)
                 viewsToOpen.delete(view.raw_data)
             }else{
                 // ... and predictions with an old classifier_generation need to be closed
-                console.log(`Closing stale view ${view.native_view.url}`)
                 this.viewer.closeView(view)
             }
         }

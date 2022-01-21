@@ -1,6 +1,6 @@
 import { vec3, mat4, quat } from "gl-matrix"
 import { IViewportDriver, IViewerDriver } from "..";
-import { getElementContentRect, uuidv4} from "../util/misc";
+import { getElementContentRect } from "../util/misc";
 import { Url } from "../util/parsed_url";
 import { INativeView } from "./viewer_driver";
 
@@ -114,10 +114,11 @@ export class NeuroglancerDriver implements IViewerDriver{
     }
     refreshView(params: {native_view: INativeView, similar_url_hint?: string, channel_colors?: vec3[]}){
         let shader: string | undefined = undefined;
+        let similar_url_hint = params.similar_url_hint && Url.parse(params.similar_url_hint).double_protocol_raw
         if(params.channel_colors !== undefined){
             shader = this.makePredictionsShader(params.channel_colors)
-        }else if(params.similar_url_hint !== undefined){
-            const similar_layers = this.getImageLayers().filter(layer => layer.sourceUrl == params.similar_url_hint)
+        }else if(similar_url_hint !== undefined){
+            const similar_layers = this.getImageLayers().filter(layer => layer.sourceUrl == similar_url_hint)
             if(similar_layers.length > 0){
                 shader = similar_layers[0].fragmentShader
             }
@@ -125,16 +126,13 @@ export class NeuroglancerDriver implements IViewerDriver{
         this.refreshLayer({name: params.native_view.name, url: params.native_view.url, shader})
     }
 
+    closeView(params: { native_view: INativeView; }){
+        this.dropLayer(params.native_view.name)
+    }
+
     private refreshLayer({name, url, shader}: {name: string, url: string, shader?: string}){
         this.dropLayer(name)
-        const cache_busting_url = Url.parse(url)
-            // .updatedWith({ //FIXME: this needs patching NG to handle query params
-            //     extra_search: new Map<string, string>([["cache_busting_random", uuidv4()]])
-            // })
-            .double_protocol_raw
-            .replace(/run_id=[^/?]+/, `run_id=${uuidv4()}`) // FIXME
-        console.log(`Refreshing layer '${name}' with url ${cache_busting_url}`)
-        this.openNewDataSource({name, url: cache_busting_url, shader})
+        this.openNewDataSource({name, url: Url.parse(url).double_protocol_raw, shader})
     }
 
     private getLayerManager(): any {
@@ -155,7 +153,7 @@ export class NeuroglancerDriver implements IViewerDriver{
     private openNewDataSource(params: {name: string, url: string, shader?: string}){
         const newPredictionsLayer = this.viewer.layerSpecification.getLayer(
             params.name,
-            {source: params.url, shader: params.shader}
+            {source: Url.parse(params.url).double_protocol_raw, shader: params.shader}
         );
         this.viewer.layerSpecification.add(newPredictionsLayer);
     }
