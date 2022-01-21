@@ -15,6 +15,7 @@ import traceback
 
 import aiohttp
 from aiohttp import web
+from aiohttp.client import ClientSession
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
@@ -83,11 +84,18 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
                 logger.warn(f"Updating jobs status")
                 await self._update_clients_state(applets=[self.export_applet])
 
+    @property
+    def http_client_session(self) -> ClientSession:
+        if self._http_client_session is None:
+            self._http_client_session = aiohttp.ClientSession()
+        return self._http_client_session
+
     def __init__(self, ebrains_user_token: UserToken, ssl_context: Optional[ssl.SSLContext] = None):
         self.ssl_context = ssl_context
         self.ebrains_user_token = ebrains_user_token
         self.websockets: List[web.WebSocketResponse] = []
         self.job_updater_task: Optional[Task[Any]] = None
+        self._http_client_session: Optional[ClientSession] = None
 
         executor = HashingExecutor(name="Pixel Classification Executor")
 
@@ -291,12 +299,17 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             return web.Response(status=400, text=f"Bad url: {decoded_url}")
         info_url = base_url.joinpath("info")
         logger.debug(f"Will request this info: {info_url.schemeless_raw}")
-        async with aiohttp.ClientSession() as session:
-            async with session.get(info_url.schemeless_raw, ssl=self.ssl_context) as response:
-                response_text = await response.text()
-                if response.status // 100 != 2:
-                    return web.Response(status=response.status, text=response_text)
-                info = PrecomputedChunksInfo.from_json_value(json.loads(response_text))
+
+        async with self.http_client_session.get(
+            info_url.schemeless_raw,
+            ssl=self.ssl_context,
+            headers=self.ebrains_user_token.as_auth_header() if info_url.hostname == "data-proxy.ebrains.eu" else {},
+            params={"redirect": "true"} if info_url.hostname == "data-proxy.ebrains.eu" else {},
+        ) as response:
+            response_text = await response.text()
+            if response.status // 100 != 2:
+                return web.Response(status=response.status, text=response_text)
+            info = PrecomputedChunksInfo.from_json_value(json.loads(response_text))
 
         stripped_info = info.stripped(resolution=resolution)
         return web.json_response(stripped_info.to_json_value())
@@ -311,7 +324,19 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         if url is None:
             return web.Response(status=400, text=f"Bad url: {decoded_url}")
         rest = request.match_info.get("rest", "").lstrip("/")
-        raise web.HTTPFound(location=url.joinpath(rest).schemeless_raw)
+        tile_url = url.joinpath(rest)
+
+        if tile_url.hostname != "data-proxy.ebrains.eu":
+            raise web.HTTPFound(location=tile_url.schemeless_raw)
+
+        async with self.http_client_session.get(
+            tile_url.schemeless_raw,
+            ssl=self.ssl_context,
+            headers=self.ebrains_user_token.as_auth_header(),
+        ) as response:
+            cscs_url = (await response.json())["url"]
+            print(f"@@@@@@@@@@@@@ FINAL REDIRECT URL IS {cscs_url}")
+            raise web.HTTPFound(location=cscs_url)
 
 
 if __name__ == '__main__':
