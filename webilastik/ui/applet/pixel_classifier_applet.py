@@ -64,6 +64,8 @@ class PixelClassificationApplet(Applet):
         self._in_annotations = annotations
         self._pixel_classifier: Optional[Classifier] = None
         self._color_map: Optional[ColorMap] = None
+
+        self.classifier_generation = 0
         super().__init__(name=name)
 
     def take_snapshot(self) -> Tuple[Optional[Classifier], Optional[ColorMap]]:
@@ -95,6 +97,7 @@ class PixelClassificationApplet(Applet):
             )
             self._color_map = Color.create_color_map([a.color for a in annotations])
             _ = self._pixel_classifier.__getstate__() #warm up pickle cache?
+        self.classifier_generation += 1
         return PropagationOk()
 
 

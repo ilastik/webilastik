@@ -39,6 +39,7 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
             channel_colors = tuple()
 
         return {
+            "classifier_generation": self.classifier_generation,
             "producer_is_ready": classifier is not None,
             "channel_colors": channel_colors,
         }

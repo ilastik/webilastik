@@ -2,77 +2,88 @@ import { vec3 } from "gl-matrix";
 import { Applet } from "../../client/applets/applet";
 import { DataSource, Session } from "../../client/ilastik";
 import { HashMap } from "../../util/hashmap";
-import { awaitStalable } from "../../util/misc";
-import { ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonObject, JsonObject, JsonValue } from "../../util/serialization";
+import { ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonObject, JsonValue } from "../../util/serialization";
 import { PredictionsView, TrainingView } from "../../viewer/view";
 import { Viewer } from "../../viewer/viewer";
 
-class PredictingAppletState{
-    constructor(
-        public readonly producer_is_ready: boolean,
-        public readonly channel_colors: Array<vec3>,
-    ){}
-
-    public toJsonValue(): JsonObject{
-        return {
-            producer_is_ready: this.producer_is_ready,
-            channel_colors: this.channel_colors.map(cc => ({
-                r: cc[0],
-                g: cc[1],
-                b: cc[2],
-            }))
-        }
-    }
-
-    public static fromJsonValue(value: JsonValue): PredictingAppletState{
-        let obj = ensureJsonObject(value)
-        let producer_is_ready = ensureJsonBoolean(obj["producer_is_ready"])
-        let channel_colors = ensureJsonArray(obj["channel_colors"]).map(raw_color => {
-            const color_obj = ensureJsonObject(raw_color)
-            return vec3.fromValues(
-                ensureJsonNumber(color_obj["r"]), ensureJsonNumber(color_obj["g"]), ensureJsonNumber(color_obj["b"])
-            )
-        })
-        return new PredictingAppletState(producer_is_ready, channel_colors)
-    }
+type State = {
+    classifier_generation: number;
+    producer_is_ready: boolean;
+    channel_colors: Array<{r: number, g: number, b: number}>;
 }
 
-export class PredictingWidget extends Applet<PredictingAppletState>{
+export class PredictingWidget extends Applet<State>{
     public readonly viewer: Viewer;
     public readonly session: Session
 
     constructor({session, viewer}: {session: Session, viewer: Viewer}){
         super({
-            deserializer: PredictingAppletState.fromJsonValue,
-            name: "pixel_classification_applet",
-            session,
-            onNewState: async (new_state: PredictingAppletState) => {
-                if(!new_state.producer_is_ready){
-                    return
-                }
-                let predictionViews = await awaitStalable({referenceKey: "getPredictionsViews", callable: this.getPredictionsViews})
-                if(predictionViews instanceof Array){
-                    predictionViews.forEach(view => this.viewer.refreshView({view, channel_colors: new_state.channel_colors}))
+            deserializer: (value: JsonValue) => {
+                let obj = ensureJsonObject(value)
+                return {
+                    classifier_generation: ensureJsonNumber(obj["classifier_generation"]),
+                    producer_is_ready: ensureJsonBoolean(obj["producer_is_ready"]),
+                    channel_colors: ensureJsonArray(obj["channel_colors"]).map(raw_color => {
+                        const color_obj = ensureJsonObject(raw_color)
+                        return {
+                            r: ensureJsonNumber(color_obj["r"]),
+                            g: ensureJsonNumber(color_obj["g"]),
+                            b: ensureJsonNumber(color_obj["b"]),
+                        }
+                    })
                 }
             },
+            name: "pixel_classification_applet",
+            session,
+            onNewState: (new_state: State) => this.onNewState(new_state),
         })
         this.viewer = viewer
         this.session = session
     }
 
-    private getPredictionsViews = async (): Promise<Array<PredictionsView>> => {
-        let views_to_refresh = new HashMap<DataSource, PredictionsView>({hash_function: ds => JSON.stringify(ds.toJsonValue())})
+    private async onNewState(new_state: State){
+        if(!new_state.producer_is_ready){
+            this.viewer.getViews().forEach(view => {
+                if(view instanceof PredictingWidget){
+                    this.viewer.closeView(view)
+                }
+            })
+            return
+        }
+
+        let viewsToOpen = new HashMap<DataSource, PredictionsView>({hash_function: ds => JSON.stringify(ds.toJsonValue())})
+
         for(let view of this.viewer.getViews()){
-            if(view instanceof PredictionsView){
-                views_to_refresh.set(view.raw_data, view)
-            }else if(view instanceof TrainingView){
+            // All training views need a prediction view...
+            if(view instanceof TrainingView){
+                console.log(`Tentatively op[ening predictions view for ${view.raw_data.getDisplayString()}`)
                 let predictions_view = PredictionsView.createFor({
                     raw_data: view.raw_data,
                     ilastik_session: this.session,
+                    classifier_generation: new_state.classifier_generation,
                 })
-                views_to_refresh.set(predictions_view.raw_data, predictions_view)
+                viewsToOpen.set(predictions_view.raw_data, predictions_view)
             }
         }
-        return views_to_refresh.values()
+
+        for(let view of this.viewer.getViews()){
+            if(!(view instanceof PredictionsView)){
+                continue
+            }
+            if(view.classifier_generation == new_state.classifier_generation){
+                // ... but predictions views with the same classifier generation need no refresh ...
+                console.log(`Will not update view ${view.native_view.url}`)
+                viewsToOpen.delete(view.raw_data)
+            }else{
+                // ... and predictions with an old classifier_generation need to be closed
+                console.log(`Closing stale view ${view.native_view.url}`)
+                this.viewer.closeView(view)
+            }
+        }
+
+        viewsToOpen.values().forEach(view => this.viewer.refreshView({
+            view,
+            channel_colors: new_state.channel_colors.map(color => vec3.fromValues(color.r, color.g, color.b))
+        }))
     }
 }
