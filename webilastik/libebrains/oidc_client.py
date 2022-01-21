@@ -1,6 +1,8 @@
 from pathlib import Path, PurePosixPath
 from typing import Optional, Set, Tuple, Union, Iterable, List
 import json
+
+from aiohttp.client import ClientSession
 from webilastik.libebrains.developer_token import DeveloperToken
 from webilastik.libebrains.user_token import UserToken
 import requests
@@ -337,7 +339,7 @@ class OidcClient:
                 return True
         return False
 
-    def get_user_token(self, *, code: str, redirect_uri: Url) -> "UserToken":
+    async def get_user_token(self, *, code: str, redirect_uri: Url, http_client_session: ClientSession) -> "UserToken":
         if not self.can_redirect_to(redirect_uri):
             raise ValueError(f"Can't redirect to {redirect_uri.raw}")
         data = {
@@ -349,15 +351,16 @@ class OidcClient:
             "scope": "email team",
         }
         print(f"postin this: \n{json.dumps(data)}")
-        resp = requests.post(
-            "https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect/token",
+        resp = await http_client_session.request(
+            method="post",
+            url="https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect/token",
             allow_redirects=False,
             data=data
         )
         print(f"Got this response: \n\n{resp.text}")
         resp.raise_for_status()
 
-        data = ensureJsonObject(resp.json())
+        data = ensureJsonObject(await resp.json())
         return UserToken(
             access_token=ensureJsonString(data.get("access_token")),
             refresh_token=ensureJsonString(data.get("refresh_token")),

@@ -1,6 +1,8 @@
 import os
 from pathlib import PurePosixPath
 from typing import Dict, Optional, Mapping
+from aiohttp.client import ClientSession
+from aiohttp.client_exceptions import ClientResponseError
 
 import requests
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
@@ -64,34 +66,37 @@ class UserToken:
     def as_auth_header(self) -> Dict[str, str]:
         return {"Authorization": f"Bearer {self.access_token}"}
 
-    def _get(
+    async def _get(
         self,
         path: PurePosixPath,
         *,
         params: Optional[Mapping[str, str]] = None,
         headers: Optional[Mapping[str, str]] = None,
-        https_verify: bool = True,
+        http_client_session: ClientSession,
     ) -> JsonValue:
-        url = self._api_url.joinpath(path).updated_with(search={})
-        resp = requests.get(
-            url.raw,
+        url = self._api_url.concatpath(path).updated_with(search={})
+        resp = await http_client_session.request(
+            method="GET",
+            url=url.raw,
             params={**url.search, **(params or {})},
             headers={
                 **(headers or {}),
                 **self.as_auth_header(),
             },
-            verify=https_verify,
+            raise_for_status=True,
         )
-        resp.raise_for_status()
-        return resp.json()
+        resp.raise_for_status
+        return await resp.json()
 
-    def is_valid(self) -> bool:
+    async def is_valid(self, http_client_session: ClientSession) -> bool:
         #FIXME: maybe just validate signature + time ?
         try:
-            _ = self.get_userinfo()
+            _ = await self.get_userinfo(http_client_session)
             return True
-        except requests.exceptions.HTTPError:
+        except ClientResponseError:
             return False
 
-    def get_userinfo(self) -> JsonObject:
-        return ensureJsonObject(self._get(PurePosixPath("userinfo")))
+    async def get_userinfo(self, http_client_session: ClientSession) -> JsonObject:
+        return ensureJsonObject(await self._get(
+            path=PurePosixPath("userinfo"), http_client_session=http_client_session
+        ))

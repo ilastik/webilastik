@@ -9,6 +9,8 @@ import uuid
 import asyncio
 
 from aiohttp import web
+import aiohttp
+from aiohttp.client import ClientSession
 
 from webilastik.libebrains.user_token import UserToken
 from webilastik.libebrains.oidc_client import OidcClient, Scope
@@ -45,26 +47,31 @@ class EbrainsSession:
         self.user_token = user_token
 
     @classmethod
-    def from_cookie(cls, request: web.Request) -> Optional["EbrainsSession"]:
+    async def from_cookie(cls, request: web.Request, http_client_session: ClientSession) -> Optional["EbrainsSession"]:
         access_token = request.cookies.get(cls.AUTH_COOKIE_KEY)
         if access_token is None:
             return None
         user_token = UserToken(access_token=access_token)
-        if not user_token.is_valid():
+        if not await user_token.is_valid(http_client_session):
             return None
         return EbrainsSession(user_token=user_token)
 
     @classmethod
-    def from_code(cls, request: web.Request, oidc_client: OidcClient) -> Optional["EbrainsSession"]:
+    async def from_code(cls, request: web.Request, oidc_client: OidcClient, http_client_session: ClientSession) -> Optional["EbrainsSession"]:
         auth_code = request.query.get("code")
         if auth_code is None:
             return None
-        user_token = oidc_client.get_user_token(code=auth_code, redirect_uri=get_requested_url(request))
+        user_token = await oidc_client.get_user_token(
+            code=auth_code, redirect_uri=get_requested_url(request), http_client_session=http_client_session
+        )
         return EbrainsSession(user_token=user_token)
 
     @classmethod
-    def try_from_request(cls, request: web.Request, oidc_client: OidcClient) -> Optional["EbrainsSession"]:
-        return cls.from_cookie(request) or EbrainsSession.from_code(request, oidc_client=oidc_client)
+    async def try_from_request(cls, request: web.Request, oidc_client: OidcClient, http_client_session: ClientSession) -> Optional["EbrainsSession"]:
+        return (
+            (await cls.from_cookie(request, http_client_session=http_client_session)) or
+            (await EbrainsSession.from_code(request, oidc_client=oidc_client, http_client_session=http_client_session))
+        )
 
     def set_cookie(self, response: web.Response) -> web.Response:
         response.set_cookie(
@@ -81,7 +88,9 @@ def require_ebrains_login(
     async def wrapper(self: "SessionAllocator[Any]", request: web.Request) -> web.Response:
         if self.oidc_client is None:
             return await endpoint(self, request)
-        ebrains_session = EbrainsSession.try_from_request(request, oidc_client=self.oidc_client)
+        ebrains_session = await EbrainsSession.try_from_request(
+            request, oidc_client=self.oidc_client, http_client_session=self.http_client_session
+        )
         if ebrains_session is None:
             redirect_to_ebrains_login(request, oidc_client=self.oidc_client)
         response = await endpoint(self, request)
@@ -106,6 +115,8 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         self.master_host = master_host
         self.external_url = external_url
         self.oidc_client = oidc_client
+        self._http_client_session: Optional[ClientSession] = None
+
 
         self.sessions : Dict[uuid.UUID, Session] = {}
 
@@ -126,11 +137,17 @@ class SessionAllocator(Generic[SESSION_TYPE]):
             ),
         ])
 
+    @property
+    def http_client_session(self) -> ClientSession:
+        if self._http_client_session is None:
+            self._http_client_session = aiohttp.ClientSession()
+        return self._http_client_session
+
     async def get_ebrains_token(self, request: web.Request) -> web.Response:
         origin = request.headers.get("Origin")
         if origin != "https://app.ilastik.org":
             return web.json_response({"error": f"Bad origin: {origin}"}, status=400)
-        session = EbrainsSession.from_cookie(request)
+        session = await EbrainsSession.from_cookie(request, http_client_session=self.http_client_session)
         if session is None:
             return web.json_response({"error": f"Not logged in"}, status=400)
         return web.json_response({EbrainsSession.AUTH_COOKIE_KEY: session.user_token.access_token})
@@ -154,7 +171,7 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         return web.json_response("hello!", status=200)
 
     async def check_login(self, request: web.Request) -> web.Response:
-        if EbrainsSession.from_cookie(request) is None:
+        if (await EbrainsSession.from_cookie(request, http_client_session=self.http_client_session)) is None:
             return web.json_response({"logged_in": False}, status=401)
         return web.json_response({"logged_in": True}, status=200)
 
@@ -185,7 +202,9 @@ class SessionAllocator(Generic[SESSION_TYPE]):
             return web.json_response({"error": "Bad payload"}, status=400)
         session_id = uuid.uuid4()
 
-        ebrains_session = EbrainsSession.try_from_request(request, oidc_client=self.oidc_client)
+        ebrains_session = await EbrainsSession.try_from_request(
+            request, oidc_client=self.oidc_client, http_client_session=self.http_client_session
+        )
         if ebrains_session is None:
             redirect_to_ebrains_login(request, self.oidc_client)
 
