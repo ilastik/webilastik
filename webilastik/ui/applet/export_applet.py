@@ -103,7 +103,7 @@ class WsExportApplet(WsApplet, ExportApplet):
         executor: HashingExecutor,
         operator: AppletOutput[Optional[Operator[DataRoi, Array5D]]],
         datasource: AppletOutput[Optional[DataSource]],
-        datasink: AppletOutput[Optional[DataSink]]
+        datasink: AppletOutput[Union[DataSink, UsageError, None]]
     ):
         self.jobs: Dict[uuid.UUID, Job[DataRoi]] = {}
         self.lock = threading.Lock()
