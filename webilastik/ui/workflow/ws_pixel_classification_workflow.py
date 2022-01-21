@@ -254,7 +254,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         await self._update_clients_state()
 
     async def _update_clients_state(self, websockets: Optional[Iterable[web.WebSocketResponse]] = None, applets: Optional[Iterable[WsApplet]] = None):
-        ws = list(websockets) if websockets is not None else self.websockets
+        ws = list(websockets) if websockets is not None else self.websockets[:]
         logger.debug(f"Updating {len(ws)} clients")
         state : JsonObject = {
             applet.name: applet._get_json_state()
