@@ -88,7 +88,7 @@ export class BrushingWidget{
 
         const view = this.viewer.getActiveView()
         if(view === undefined){
-            return
+            return this.showStatus("No data")
         }
         if(view instanceof Error){ //FIXME: remove this? or return error from viewer?
             return this.showStatus(`${view}`)
@@ -103,6 +103,7 @@ export class BrushingWidget{
         if(!(view instanceof RawDataView)){
             throw `Unexpected view type (${view.constructor.name}): ${JSON.stringify(view)}`
         }
+        this.showStatus(`Viewing multi-resolution datasource`)
 
         createElement({tagName: "label", innerHTML: "Select a voxel size to annotate on:", parentElement: this.resolutionSelectionContainer});
         new OneShotSelectorWidget<DataSource>({
