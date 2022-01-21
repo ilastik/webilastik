@@ -344,6 +344,14 @@ export abstract class FileSystem implements IJsonable{
     }
     public abstract equals(other: FileSystem): boolean;
     public abstract getUrl(): Url;
+
+    public static fromUrl(url: Url): FileSystem{
+        if(url.hostname == "data-proxy.ebrains.eu"){
+            return BucketFs.fromDataProxyUrl(url)
+        }else{
+            return new HttpFs({read_url: url})
+        }
+    }
 }
 
 export class HttpFs extends FileSystem{
@@ -429,9 +437,23 @@ export class BucketFs extends FileSystem{
             __class__: "BucketFs"
         }
     }
+
+    public static fromDataProxyUrl(url: Url): BucketFs{
+        if(!url.schemeless_raw.startsWith(BucketFs.API_URL.schemeless_raw)){
+            throw `Expected data-proxy url, got this: ${url.toString()}`
+        }
+        const ebrains_user_token = Session.getEbrainsToken()
+        if(ebrains_user_token === undefined){
+            throw `Can't create BucketFS yet: Not logged in`
+        }
+
+        return new BucketFs({
+            bucket_name: url.path.components[2],
+            prefix: new Path({components: url.path.components.slice(3)}),
+            ebrains_user_token,
+        })
+    }
 }
-
-
 
 export abstract class DataSource implements IJsonable{
     public readonly filesystem: FileSystem
@@ -517,8 +539,8 @@ export class PrecomputedChunksDataSource extends DataSource{
         const raw_resolution = match.groups!["resolution"].split("_").map(axis => parseInt(axis));
         const resolution = vec3.fromValues(raw_resolution[0], raw_resolution[1], raw_resolution[2]);
         return new PrecomputedChunksDataSource({
-            filesystem: new HttpFs({read_url: original_url.root}),
-            path: url.path,
+            filesystem: FileSystem.fromUrl(original_url),
+            path: Path.parse("/"),
             spatial_resolution: resolution
         })
     }
