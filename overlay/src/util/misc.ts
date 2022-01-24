@@ -92,6 +92,7 @@ export function createInput(params: {
         inputType: InputType,
         value?: string,
         name?: string,
+        title?: string,
         disabled?:boolean,
         required?: boolean,
         id?: string,
@@ -104,6 +105,9 @@ export function createInput(params: {
     }
     if(params.name !== undefined){
         input.name = params.name
+    }
+    if(params.title !== undefined){
+        input.title = params.title
     }
     if(params.required !== undefined){
         input.required = params.required

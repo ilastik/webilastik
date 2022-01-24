@@ -1,7 +1,7 @@
 import { vec3 } from "gl-matrix";
 import { Applet } from "../../../client/applets/applet";
 import { Session } from "../../../client/ilastik";
-import { createElement, createInput, removeElement, vec3ToRgb, vecToString } from "../../../util/misc";
+import { createElement, createInput, removeElement, vec3ToHexColor, vec3ToRgb, vecToString } from "../../../util/misc";
 import { ensureJsonArray, ensureJsonBoolean, ensureJsonObject } from "../../../util/serialization";
 import { BrushStroke } from "./brush_stroke";
 
@@ -115,6 +115,7 @@ class BrushStrokeWidget{
         createInput({
             inputType: "button",
             value: "🖌",
+            title: `Pick this color (${vec3ToHexColor(brushStroke.color)})`,
             parentElement: color_container,
             inlineCss: {
                 backgroundColor: vec3ToRgb(brushStroke.color),
@@ -136,6 +137,7 @@ class BrushStrokeWidget{
         createInput({
             inputType: "button",
             value: "✖",
+            title: "Delete this annotation",
             parentElement: close_button_cell,
             cssClasses: ["delete_brush_button"],
             onClick: () => onDeleteClicked(brushStroke),
