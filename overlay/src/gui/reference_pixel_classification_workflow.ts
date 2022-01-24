@@ -76,11 +76,12 @@ export class ReferencePixelClassificationWorkflowGui{
 
                 `Then, configure a Data Sink, i.e., a detination that will receive the results of the pixel classification.
                 For now, webilastik will only export to ebrains' data-proxy buckets; Fill in the name of the bucket and then
-                the prefix (i.e.: path within the bucket) where the results should be written to.`,
+                the prefix (i.e.: path within the bucket) where the results in Neuroglancer's precomputed chunks format
+                should be written to.`,
 
                 `Finally, click export button and eventually a new job shall be created if all the parameters were filled
                 in correctly.`,
-            ]
+            ].map(text => text.replace(/^ +/, "").replace("\n", " "))
         })
     }
 
