@@ -62,8 +62,8 @@ export class FeatureSelectionWidget extends Applet<{feature_extractors: FeatureE
     public readonly element: HTMLElement;
     private checkboxes = new Array<FeatureSelectionCheckbox>();
 
-    public constructor({name, session, parentElement}: {
-        name: string, session: Session, parentElement: HTMLElement
+    public constructor({name, session, parentElement, help}: {
+        name: string, session: Session, parentElement: HTMLElement, help: string[]
     }){
         super({
             name,
@@ -76,7 +76,7 @@ export class FeatureSelectionWidget extends Applet<{feature_extractors: FeatureE
             },
             onNewState: (new_state) => this.onNewState(new_state)
         })
-        this.element = new CollapsableWidget({display_name: "Select Image Features", parentElement}).element
+        this.element = new CollapsableWidget({display_name: "Select Image Features", parentElement, help}).element
         this.element.classList.add("ItkFeatureSelectionWidget")
 
         const scales: Array<Scale> = [0.3, 0.7, 1.0, 1.6, 3.5, 5.0, 10.0]

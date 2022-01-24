@@ -39,6 +39,7 @@ export class DataSourcePicker extends Applet<State>{
         })
         this.element = createElement({tagName: "div", parentElement: params.parentElement})
         let p = createElement({tagName: "p", parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph]})
+        createElement({tagName: "label", parentElement: p, innerHTML: "Url: "})
         this.datasourceUrlInput = createInput({inputType: "url", parentElement: p})
         const checkUrl = (ev: Event): false => {
             this.doRPC("set_url", {url: this.datasourceUrlInput.value})

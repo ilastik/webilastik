@@ -62,8 +62,8 @@ export class PredictionsExportWidget extends Applet<State>{
     private job_table: HTMLTableElement;
     private readonly errorMessageContainer: HTMLParagraphElement;
 
-    public constructor({name, parentElement, session}: {
-        name: string, parentElement: HTMLElement, session: Session
+    public constructor({name, parentElement, session, help}: {
+        name: string, parentElement: HTMLElement, session: Session, help: string[]
     }){
         super({
             name,
@@ -78,7 +78,7 @@ export class PredictionsExportWidget extends Applet<State>{
             },
             onNewState: (new_state) => this.onNewState(new_state)
         })
-        this.element = new CollapsableWidget({display_name: "Export Predictions", parentElement}).element
+        this.element = new CollapsableWidget({display_name: "Export Predictions", parentElement, help}).element
         this.element.classList.add("ItkPredictionsExportApplet")
 
         let fieldset = createElement({tagName: "fieldset", parentElement: this.element})

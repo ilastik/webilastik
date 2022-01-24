@@ -56,6 +56,10 @@ export class SessionManagerWidget{
             onClick: async () => {
                 this.session?.close()
                 onLeaveSession()
+                this.session_loader.setFields({
+                    ilastikUrl,
+                    sessionUrl: undefined,
+                })
             },
             inlineCss: {
                 marginTop: "10px",

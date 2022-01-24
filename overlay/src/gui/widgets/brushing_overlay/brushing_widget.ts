@@ -28,13 +28,19 @@ export class BrushingWidget{
         session,
         parentElement,
         viewer,
+        help,
     }: {
         session: Session,
         parentElement: HTMLElement,
         viewer: Viewer,
+        help: string[],
     }){
         this.session = session
-        this.element = new CollapsableWidget({display_name: "Training", parentElement}).element
+        this.element = new CollapsableWidget({
+            display_name: "Training",
+            parentElement,
+            help: help,
+        }).element
         this.element.classList.add("ItkBrushingWidget")
         this.viewer = viewer
 
@@ -163,7 +169,11 @@ export class TrainingWidget{
         this.onNewBrushStroke = onNewBrushStroke
 
         this.brushingEnabledCheckbox = createInputParagraph({
-            label_text: "Enable Brushing: ", inputType: "checkbox", parentElement: this.element, onClick: () => {
+            label_text: "Enable Brushing: ",
+            inputType: "checkbox",
+            title: "Enable to draw annotations by clicking and dragging. Disable to use the viewer's controls to navigate over the data.",
+            parentElement: this.element,
+            onClick: () => {
                 this.overlay?.setBrushingEnabled(this.brushingEnabledCheckbox.checked)
             }
         })
