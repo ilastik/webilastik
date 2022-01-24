@@ -22,7 +22,7 @@ export class Applet<STATE>{
             if(applet_payload === undefined){
                 return
             }
-            console.log(`vvvvvvvv ${this.name} got this state from server:\n${JSON.stringify(applet_payload, null, 4)}`)
+            // console.log(`vvvvvvvv ${this.name} got this state from server:\n${JSON.stringify(applet_payload, null, 4)}`)
             if(onNewState){
                 let new_state = this.deserializer(applet_payload)
                 onNewState(new_state)
