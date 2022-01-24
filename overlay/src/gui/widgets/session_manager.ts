@@ -37,6 +37,11 @@ export class SessionManagerWidget{
         }).element;
         this.element.classList.add("ItkLauncherWidget")
 
+        const onUnload = (event: BeforeUnloadEvent) => {
+            event.preventDefault();
+            return event.returnValue = "Are you sure you want to exit? Your compute session is still running.";
+        };
+
         const onNewSession = (new_session: Session) => {
             this.session = new_session
             this.workflow?.element.parentElement?.removeChild(this.workflow.element)
@@ -51,6 +56,7 @@ export class SessionManagerWidget{
                 ilastikUrl,
                 sessionUrl: new_session.sessionUrl,
             })
+            window.addEventListener("beforeunload", onUnload);
         }
         const onUsageError = (message: string) => {
             new ErrorPopupWidget({message})
@@ -64,6 +70,7 @@ export class SessionManagerWidget{
             leave_session_btn.disabled = true
             this.session_creator.set_disabled(false)
             this.session_loader.set_disabled(false)
+            window.removeEventListener("beforeunload", onUnload);
         }
 
         const close_session_btn = createInput({
