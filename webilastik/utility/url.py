@@ -192,6 +192,17 @@ class Url:
             hash_=hash_ if hash_ is not None else self.hash_,
         )
 
+    def schemeless(self) -> "Url":
+        return Url(
+            path=self.path,
+            datascheme=None,
+            protocol=self.protocol,
+            hostname=self.hostname,
+            port=self.port,
+            search={**self.search},
+            hash_=self.hash_,
+        )
+
     @property
     def parent(self) -> "Url":
         return self.updated_with(path=self.path.parent)

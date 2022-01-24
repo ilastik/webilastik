@@ -29,7 +29,7 @@ def try_get_datasources_from_url(
         if isinstance(parsing_result, UsageError):
             return parsing_result
         url = parsing_result
-    fs_url = url.parent
+    fs_url = url.parent.schemeless()
     ds_path = Path(url.path.name)
     hash_params: Dict[str, str]
     if url.hash_ is None:
