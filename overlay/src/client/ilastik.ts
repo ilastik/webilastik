@@ -405,7 +405,7 @@ export class BucketFs extends FileSystem{
         return (
             other instanceof BucketFs &&
             other.bucket_name == this.bucket_name &&
-            other.prefix == this.prefix
+            other.prefix.equals(this.prefix)
         )
     }
 
