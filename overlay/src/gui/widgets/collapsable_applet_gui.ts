@@ -17,6 +17,7 @@ export class CollapsableWidget{
             inlineCss: {float: "right"},
             onClick: () => this.set_collapsed(!this._is_collapsed)
         })
+        this.set_collapsed(false)
     }
 
     public get is_collapsed(): boolean{
@@ -26,6 +27,7 @@ export class CollapsableWidget{
     public set_collapsed(collapse: boolean){
         this._is_collapsed = collapse
         this.collapse_button.value = collapse ? "□" : "-"
+        this.collapse_button.title = collapse ? "Expand" : "Collapse"
         this.element.querySelectorAll("*").forEach(element => {
             if(!(element instanceof HTMLElement)){
                 console.error("Found bad element in applet:")
