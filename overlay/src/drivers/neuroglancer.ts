@@ -77,10 +77,39 @@ class Layer{
     public get sourceUrl(): string{
         return this.managedLayer.sourceUrl.replace(/\bgs:\/\//, "https://storage.googleapis.com/")
     }
+
+    public async getNumChannels(): Promise<number>{
+        return this.managedLayer.layer.multiscaleSource.then((mss: any) => mss.numChannels)
+    }
 }
 
+const defaultShader = 'void main() {\n  emitGrayscale(toNormalized(getDataValue()));\n}\n'
+
 export class NeuroglancerDriver implements IViewerDriver{
-    constructor(public readonly viewer: any){}
+    private layerUrlsWithFixedShaders = new Set<string>()
+    private generation = 0
+    constructor(public readonly viewer: any){
+        const guessShader = async () => {
+            const generation = this.generation += 1
+            for(let layer of this.getImageLayers()){
+                if(layer.fragmentShader != defaultShader || this.layerUrlsWithFixedShaders.has(layer.sourceUrl)){
+                    continue
+                }
+                let numChannels = await layer.getNumChannels()
+                if(generation != this.generation){
+                    return
+                }
+                if(numChannels == 3){
+                    layer.fragmentShader = this.makePredictionsShader([
+                        vec3.fromValues(255, 0, 0), vec3.fromValues(0, 255, 0), vec3.fromValues(0, 0, 255)
+                    ])
+                }
+                this.layerUrlsWithFixedShaders.add(layer.sourceUrl)
+            }
+        }
+        guessShader()
+        this.viewer.layerManager.layersChanged.add(guessShader);
+    }
     getTrackedElement() : HTMLElement{
         return document.querySelector("canvas")! //FIXME: double-check selector
     }
