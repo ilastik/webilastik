@@ -1,7 +1,9 @@
+import os
 from pathlib import PurePosixPath
 import io
 from typing import Any, Collection, Optional, Union, Dict, List
 from datetime import datetime
+import time
 
 import requests
 from fs.base import FS
@@ -86,7 +88,10 @@ class BucketFs(JsonableFilesystem):
 
         self.session = requests.Session()
         self.session.headers.update(ebrains_user_token.as_auth_header())
+        self.cscs_session = requests.Session()
         self.write_session = requests.Session()
+        self.pid = os.getpid()
+
 
     @classmethod
     def try_from_url(cls, url: Url, ebrains_user_token: UserToken) -> Optional["BucketFs"]:
@@ -190,13 +195,24 @@ class BucketFs(JsonableFilesystem):
 
         contents = bytes()
         if mode in ("r", "r+", "w+", "a", "a+"):
+            tile_url = self.url.concatpath(path).raw
             try:
-                response = self.session.get(self.url.concatpath(path).updated_with(extra_search={"redirect": "true"}).raw)
-                response.raise_for_status()
-                contents = response.content
+                # t0 = time.time()
+                data_proxy_response = self.session.get(tile_url)
+                # t1 = time.time()
+                data_proxy_response.raise_for_status()
+                cscs_url = data_proxy_response.json()["url"]
+                # t2 = time.time()
+                cscs_response = self.cscs_session.get(cscs_url)
+                # t3 = time.time()
+                cscs_response.raise_for_status()
+                # print(f"data-proxy time: \033[93m{t1 - t0}\033[0m  cscs time: \033[93m{t3 - t2}\033[0m  total: {t3 - t0}")
+                contents = cscs_response.content
             except requests.HTTPError as e:
+                print(f"~~~~~~>>>>>> something went wrong downloading load {tile_url}")
                 if e.response.status_code == 404 and "r" in mode:
                     raise ResourceNotFound(path) from e
+                raise e
         remote_file = RemoteFile(close_callback=close_callback, mode=mode, data=contents)
         if "a" in mode:
             _ = remote_file.seek(0, io.SEEK_END)
