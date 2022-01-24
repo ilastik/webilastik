@@ -17,7 +17,24 @@ export class SessionManagerWidget{
     constructor({parentElement, ilastikUrl=Url.parse("https://app.ilastik.org/"), viewer_driver, workflow_container}: {
         parentElement: HTMLElement, ilastikUrl?: Url, viewer_driver: IViewerDriver, workflow_container: HTMLElement
     }){
-        this.element = new CollapsableWidget({display_name: "Session Management", parentElement}).element;
+        this.element = new CollapsableWidget({
+            display_name: "Session Management",
+            parentElement,
+            help: [
+                `Normal ilastik operation can be computationally intensive, requiring dedicated compute resources
+                to be allocated to every user working with it.`,
+
+                `This widget allows you to request a compute session where ilastik will run; Select a session duration
+                and click 'Create' to create a new compute session. Eventually the compute session will be allocated,
+                opening up the other workflow widgets.`,
+
+                `You can also leave a session and rejoin it later if it is still running. To so so, just copy the session
+                URL from 'Rejoin Session' below and paste it in any other browser tab that is running webilastik.`,
+
+                `To close a session, click the 'Close Session' button. This will terminate the entire session and prevent
+                your account from being charged more node-hours than you need for your work.`
+            ]
+        }).element;
         this.element.classList.add("ItkLauncherWidget")
 
         const onNewSession = (new_session: Session) => {

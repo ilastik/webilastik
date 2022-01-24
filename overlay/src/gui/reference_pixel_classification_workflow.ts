@@ -74,13 +74,17 @@ export class ReferencePixelClassificationWorkflowGui{
                 `To do so, select a data source by typing in the URL of the datasource in the Data Source Url field and
                 select a scale from the data source.`,
 
-                `Then, configure a Data Sink, i.e., a detination that will receive the results of the pixel classification.
+                `Then, configure a Data Sink, i.e., a destination that will receive the results of the pixel classification.
                 For now, webilastik will only export to ebrains' data-proxy buckets; Fill in the name of the bucket and then
                 the prefix (i.e.: path within the bucket) where the results in Neuroglancer's precomputed chunks format
                 should be written to.`,
 
                 `Finally, click export button and eventually a new job shall be created if all the parameters were filled
                 in correctly.`,
+
+                `You'll be able to find your results in the data-proxy GUI, in a url that looks something like this:`,
+
+                `https://data-proxy.ebrains.eu/your-bucket-name?prefix=your/selected/prefix`
             ].map(text => text.replace(/^ +/, "").replace("\n", " "))
         })
     }
