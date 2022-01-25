@@ -1,6 +1,8 @@
 from pathlib import Path, PurePosixPath
 from typing import Optional, Set, Tuple, Union, Iterable, List
 import json
+
+from aiohttp.client import ClientSession
 from webilastik.libebrains.developer_token import DeveloperToken
 from webilastik.libebrains.user_token import UserToken
 import requests
@@ -123,20 +125,26 @@ class OidcClient:
         raw_rootUrl = ensureJsonString(value_obj.get("rootUrl"))
         try:
             rootUrl = Url.parse(raw_rootUrl)
+            assert rootUrl is not None
         except ValueError:
             rootUrl = Url.parse(raw_rootUrl + "/") # it's possible to register a rootUrl without a path -.-
+            assert rootUrl is not None
 
         redirectUris: List[Url] = []
         for raw_redirect_uri in ensureJsonStringArray(value_obj.get("redirectUris")):
             try:
-                redirectUris.append(Url.parse(raw_redirect_uri))
+                redirect_uri = Url.parse(raw_redirect_uri)
+                assert redirect_uri is not None
+                redirectUris.append(redirect_uri)
             except ValueError:
                 uri = rootUrl.joinpath(PurePosixPath(raw_redirect_uri)) # FIXME: do leading slashes mean root here too?
                 redirectUris.append(uri)
 
+        baseUrl = Url.parse(ensureJsonString(value_obj.get("baseUrl")))
+        assert baseUrl is not None
         return OidcClient(
             alwaysDisplayInConsole=ensureJsonBoolean(value_obj.get("alwaysDisplayInConsole")),
-            baseUrl=Url.parse(ensureJsonString(value_obj.get("baseUrl"))),
+            baseUrl=baseUrl,
             bearerOnly=ensureJsonBoolean(value_obj.get("bearerOnly")),
             clientAuthenticatorType=ensureJsonString(value_obj.get("clientAuthenticatorType")),
             clientId=ensureJsonString(value_obj.get("clientId")),
@@ -271,7 +279,6 @@ class OidcClient:
             },
             json=payload
         )
-        print(f"Update client respose: \n\n{resp.text}")
         resp.raise_for_status()
 
     @classmethod
@@ -331,7 +338,7 @@ class OidcClient:
                 return True
         return False
 
-    def get_user_token(self, *, code: str, redirect_uri: Url) -> "UserToken":
+    async def get_user_token(self, *, code: str, redirect_uri: Url, http_client_session: ClientSession) -> "UserToken":
         if not self.can_redirect_to(redirect_uri):
             raise ValueError(f"Can't redirect to {redirect_uri.raw}")
         data = {
@@ -342,16 +349,15 @@ class OidcClient:
             "client_secret": self.secret,
             "scope": "email team",
         }
-        print(f"postin this: \n{json.dumps(data)}")
-        resp = requests.post(
-            "https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect/token",
+        resp = await http_client_session.request(
+            method="post",
+            url="https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect/token",
             allow_redirects=False,
             data=data
         )
-        print(f"Got this response: \n\n{resp.text}")
         resp.raise_for_status()
 
-        data = ensureJsonObject(resp.json())
+        data = ensureJsonObject(await resp.json())
         return UserToken(
             access_token=ensureJsonString(data.get("access_token")),
             refresh_token=ensureJsonString(data.get("refresh_token")),
@@ -397,6 +403,5 @@ class OidcClient:
                 "Authorization": f"Bearer {dev_token.access_token}"
             },
         )
-        print(f"Retrieving Oidc Client response: \n{resp.json()}\n\n")
         resp.raise_for_status()
         return OidcClient.from_json_value(resp.json())

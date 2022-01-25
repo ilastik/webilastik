@@ -1,0 +1,55 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Welcome to web ilastik!</title>
+  <link rel="icon" href="/public/favicon.png">
+
+  <style>
+      body{
+        font-family: 'Istok Web', sans-serif;
+        display: flex;
+        flex-direction: column;
+      }
+
+      #main-header{
+        text-align: center;
+        font-weight: 400;
+      }
+
+      #main-header small{
+        color: #999
+      }
+
+      #demo-video{
+        width: 800px;
+        height: 487px;
+        align-self: center;
+      }
+
+      .introduction_p{
+          align-self: center;
+      }
+  </style>
+</head>
+
+<body>
+    <h1 id="main-header">
+        <img src="https://www.ilastik.org/assets/ilastik-logo.png" alt="ilastik">
+          web ilastik
+          <small>the interactive learning and segmentation toolkit, now in your browser</small>
+      </h1>
+
+      <video id="demo-video" controls autoplay mute>
+        <source src="/public/videos/webilastik_usage.webm" type="video/webm">
+      </video>
+
+      <p style="align-self: center;">You can now try the beta version of ilastik's Pixel Classification Workflow directly in your browser.</p>
+
+      <p style="align-self: center;">
+          <a href="/api/viewer" target="_blank" rel="noopener noreferrer">Try it with your ebrains account</a>
+      </p>
+</body>
+</html>

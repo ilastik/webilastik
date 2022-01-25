@@ -29,6 +29,17 @@ export class PopupWidget{
         removeElement(this.background)
         removeElement(this.element)
     }
+
+    public static OkPopup(params: {title: string, paragraphs: string[]}): PopupWidget{
+        let popup = new PopupWidget(params.title);
+        for(let paragraph of params.paragraphs){
+            createElement({tagName: "p", parentElement: popup.element, innerHTML: `<p>${paragraph}</p>`})
+        }
+        createInputParagraph({inputType: "button", parentElement:  popup.element, value: "Ok", onClick: () => {
+            popup.destroy()
+        }})
+        return popup
+    }
 }
 
 export class ErrorPopupWidget extends PopupWidget{

@@ -11,7 +11,6 @@ export class Session{
     private messageHandlers = new Array<(ev: MessageEvent) => void>();
     private readonly onUsageError: (message: string) => void
 
-
     protected constructor(params: {
         ilastikUrl: Url,
         sessionUrl: Url,
@@ -21,7 +20,6 @@ export class Session{
         this.sessionUrl = params.sessionUrl
         this.onUsageError = params.onUsageError
         this.websocket = this.openWebsocket()
-
     }
 
     private openWebsocket(): WebSocket{
@@ -339,10 +337,21 @@ export abstract class FileSystem implements IJsonable{
         if(class_name == "HttpFs"){
             return HttpFs.fromJsonValue(value)
         }
+        if(class_name == "BucketFs"){
+            return BucketFs.fromJsonValue(value)
+        }
         throw Error(`Could not deserialize FileSystem from ${JSON.stringify(value)}`)
     }
     public abstract equals(other: FileSystem): boolean;
     public abstract getUrl(): Url;
+
+    public static fromUrl(url: Url): FileSystem{
+        if(url.hostname == "data-proxy.ebrains.eu"){
+            return BucketFs.fromDataProxyUrl(url)
+        }else{
+            return new HttpFs({read_url: url})
+        }
+    }
 }
 
 export class HttpFs extends FileSystem{
@@ -376,6 +385,73 @@ export class HttpFs extends FileSystem{
 
     public getUrl(): Url{
         return this.read_url
+    }
+}
+
+export class BucketFs extends FileSystem{
+    public static readonly API_URL = Url.parse("https://data-proxy.ebrains.eu/api/buckets")
+    public readonly bucket_name: string
+    public readonly prefix: Path
+    public readonly ebrains_user_token: string // FIXME?
+
+    constructor(params: {bucket_name: string, prefix: Path, ebrains_user_token: string}){
+        super()
+        this.bucket_name = params.bucket_name
+        this.prefix = params.prefix
+        this.ebrains_user_token = params.ebrains_user_token
+    }
+
+    public equals(other: FileSystem): boolean {
+        return (
+            other instanceof BucketFs &&
+            other.bucket_name == this.bucket_name &&
+            other.prefix.equals(this.prefix)
+        )
+    }
+
+    public getUrl(): Url {
+        return BucketFs.API_URL.joinPath(`${this.bucket_name}/${this.prefix}`)
+    }
+
+    public getDisplayString(): string {
+        return this.getUrl().toString()
+    }
+
+    public static fromJsonValue(value: JsonValue): BucketFs {
+        const valueObj = ensureJsonObject(value)
+        const ebrains_token_obj = ensureJsonObject(valueObj.ebrains_user_token)
+        return new this({
+            bucket_name: ensureJsonString(valueObj.bucket_name),
+            prefix: Path.parse(ensureJsonString(valueObj.prefix)),
+            ebrains_user_token: ensureJsonString(ebrains_token_obj.access_token),
+        })
+    }
+
+    public toJsonValue(): JsonObject {
+        return {
+            bucket_name: this.bucket_name,
+            prefix: this.prefix.toString(),
+            ebrains_user_token: {
+                access_token: this.ebrains_user_token
+            },
+            __class__: "BucketFs"
+        }
+    }
+
+    public static fromDataProxyUrl(url: Url): BucketFs{
+        if(!url.schemeless_raw.startsWith(BucketFs.API_URL.schemeless_raw)){
+            throw `Expected data-proxy url, got this: ${url.toString()}`
+        }
+        const ebrains_user_token = Session.getEbrainsToken()
+        if(ebrains_user_token === undefined){
+            throw `Can't create BucketFS yet: Not logged in`
+        }
+
+        return new BucketFs({
+            bucket_name: url.path.components[2],
+            prefix: new Path({components: url.path.components.slice(3)}),
+            ebrains_user_token,
+        })
     }
 }
 
@@ -463,8 +539,8 @@ export class PrecomputedChunksDataSource extends DataSource{
         const raw_resolution = match.groups!["resolution"].split("_").map(axis => parseInt(axis));
         const resolution = vec3.fromValues(raw_resolution[0], raw_resolution[1], raw_resolution[2]);
         return new PrecomputedChunksDataSource({
-            filesystem: new HttpFs({read_url: original_url.root}),
-            path: url.path,
+            filesystem: FileSystem.fromUrl(original_url),
+            path: Path.parse("/"),
             spatial_resolution: resolution
         })
     }
@@ -492,6 +568,8 @@ export class PrecomputedChunksDataSource extends DataSource{
     }
 }
 
+const image_content_types = ["image/png", "image/gif", "image/jpeg"]
+
 export class SkimageDataSource extends DataSource{
     public static fromJsonValue(data: JsonValue) : SkimageDataSource{
         const data_obj = ensureJsonObject(data)
@@ -511,7 +589,10 @@ export class SkimageDataSource extends DataSource{
         if(url.protocol !== "http" && url.protocol !== "https"){
             return undefined
         }
-        //FIXME: maybe do a HEAD and check mime type?
+        const head = await fetch(url.toString(), {method: "HEAD"});
+        if(!head.ok || !image_content_types.includes(head.headers.get("Content-Type")!)){
+            return undefined
+        }
         return new SkimageDataSource({
             filesystem: new HttpFs({read_url: url.root}),
             path: url.path,
@@ -544,54 +625,5 @@ export class Lane implements IJsonable{
     public static fromJsonArray(data: JsonValue): Lane[]{
         const array = ensureJsonArray(data)
         return array.map((v: JsonValue) => Lane.fromJsonValue(v))
-    }
-}
-
-export class DataSourceLoadParams implements IJsonable{
-    public readonly url: Url
-    public readonly spatial_resolution?: vec3
-
-    constructor({url, spatial_resolution}: {
-        url: Url
-        spatial_resolution?: vec3
-    }){
-        this.url = url
-        this.spatial_resolution = spatial_resolution
-    }
-
-    public toJsonValue(): JsonObject{
-        return {
-            url: this.url.toJsonValue(),
-            spatial_resolution: this.spatial_resolution === undefined ? null : [
-                this.spatial_resolution[0], this.spatial_resolution[1], this.spatial_resolution[2]
-            ],
-        }
-    }
-}
-
-export abstract class DataSinkCreationParams implements IJsonable{
-    public readonly url: Url;
-    constructor({url}: {url: Url}){
-        this.url = url
-    }
-
-    public abstract toJsonValue(): JsonValue;
-}
-
-export type PrecomputedChunksEncoder = "raw"
-
-export class PrecomputedChunksScaleSink_CreationParams extends DataSinkCreationParams{
-    public readonly encoding: string;
-    constructor(params: {url: Url, encoding: PrecomputedChunksEncoder}){
-        super(params)
-        this.encoding = params.encoding
-    }
-
-    public toJsonValue(): JsonValue{
-        return {
-            url: this.url.toJsonValue(),
-            encoding: this.encoding,
-            __class__: "PrecomputedChunksScaleSink_CreationParams",
-        }
     }
 }

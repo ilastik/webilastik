@@ -9,6 +9,8 @@ import uuid
 import asyncio
 
 from aiohttp import web
+import aiohttp
+from aiohttp.client import ClientSession
 
 from webilastik.libebrains.user_token import UserToken
 from webilastik.libebrains.oidc_client import OidcClient, Scope
@@ -45,26 +47,31 @@ class EbrainsSession:
         self.user_token = user_token
 
     @classmethod
-    def from_cookie(cls, request: web.Request) -> Optional["EbrainsSession"]:
+    async def from_cookie(cls, request: web.Request, http_client_session: ClientSession) -> Optional["EbrainsSession"]:
         access_token = request.cookies.get(cls.AUTH_COOKIE_KEY)
         if access_token is None:
             return None
         user_token = UserToken(access_token=access_token)
-        if not user_token.is_valid():
+        if not await user_token.is_valid(http_client_session):
             return None
         return EbrainsSession(user_token=user_token)
 
     @classmethod
-    def from_code(cls, request: web.Request, oidc_client: OidcClient) -> Optional["EbrainsSession"]:
+    async def from_code(cls, request: web.Request, oidc_client: OidcClient, http_client_session: ClientSession) -> Optional["EbrainsSession"]:
         auth_code = request.query.get("code")
         if auth_code is None:
             return None
-        user_token = oidc_client.get_user_token(code=auth_code, redirect_uri=get_requested_url(request))
+        user_token = await oidc_client.get_user_token(
+            code=auth_code, redirect_uri=get_requested_url(request), http_client_session=http_client_session
+        )
         return EbrainsSession(user_token=user_token)
 
     @classmethod
-    def try_from_request(cls, request: web.Request, oidc_client: OidcClient) -> Optional["EbrainsSession"]:
-        return cls.from_cookie(request) or EbrainsSession.from_code(request, oidc_client=oidc_client)
+    async def try_from_request(cls, request: web.Request, oidc_client: OidcClient, http_client_session: ClientSession) -> Optional["EbrainsSession"]:
+        return (
+            (await cls.from_cookie(request, http_client_session=http_client_session)) or
+            (await EbrainsSession.from_code(request, oidc_client=oidc_client, http_client_session=http_client_session))
+        )
 
     def set_cookie(self, response: web.Response) -> web.Response:
         response.set_cookie(
@@ -74,14 +81,16 @@ class EbrainsSession:
 
 
 def require_ebrains_login(
-    endpoint: Callable[["SessionAllocator[SESSION_TYPE]", web.Request], Coroutine[Any, Any, web.Response]]
-) -> Callable[["SessionAllocator[SESSION_TYPE]", web.Request], Coroutine[Any, Any, web.Response]]:
+    endpoint: Callable[["SessionAllocator[Any]", web.Request], Coroutine[Any, Any, web.Response]]
+) -> Callable[["SessionAllocator[Any]", web.Request], Coroutine[Any, Any, web.Response]]:
 
     @wraps(endpoint)
-    async def wrapper(self: "SessionAllocator[SESSION_TYPE]", request: web.Request) -> web.Response:
+    async def wrapper(self: "SessionAllocator[Any]", request: web.Request) -> web.Response:
         if self.oidc_client is None:
             return await endpoint(self, request)
-        ebrains_session = EbrainsSession.try_from_request(request, oidc_client=self.oidc_client)
+        ebrains_session = await EbrainsSession.try_from_request(
+            request, oidc_client=self.oidc_client, http_client_session=self.http_client_session
+        )
         if ebrains_session is None:
             redirect_to_ebrains_login(request, oidc_client=self.oidc_client)
         response = await endpoint(self, request)
@@ -106,17 +115,22 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         self.master_host = master_host
         self.external_url = external_url
         self.oidc_client = oidc_client
+        self._http_client_session: Optional[ClientSession] = None
+
 
         self.sessions : Dict[uuid.UUID, Session] = {}
 
         self.app = web.Application()
         self.app.add_routes([
-            web.get('/', self.open_viewer),
+            web.get('/', self.welcome),
+            web.get('/api/viewer', self.login_then_open_viewer), #FIXME: this is only here because the oidc redirect URLs must start with /api
             web.get('/api/check_login', self.check_login),
             web.get('/api/login_then_close', self.login_then_close),
             web.get('/api/hello', self.hello),
             web.post('/api/session', self.spawn_session),
             web.get('/api/session/{session_id}', self.session_status),
+            web.post('/api/get_ebrains_token', self.get_ebrains_token), #FIXME: I'm using this in NG web workers
+            web.get('/service_worker.js', self.serve_service_worker),
             web.static(
                 '/public',
                 Path(__file__).joinpath("../../../public"), # FIXME: how does this work?
@@ -124,8 +138,32 @@ class SessionAllocator(Generic[SESSION_TYPE]):
             ),
         ])
 
-    async def open_viewer(self, request: web.Request) -> web.Response:
-        redirect_url = get_requested_url(request).joinpath("public/nehuba/index.html")
+    @property
+    def http_client_session(self) -> ClientSession:
+        if self._http_client_session is None:
+            self._http_client_session = aiohttp.ClientSession()
+        return self._http_client_session
+
+    async def get_ebrains_token(self, request: web.Request) -> web.Response:
+        origin = request.headers.get("Origin")
+        if origin != "https://app.ilastik.org":
+            return web.json_response({"error": f"Bad origin: {origin}"}, status=400)
+        session = await EbrainsSession.from_cookie(request, http_client_session=self.http_client_session)
+        if session is None:
+            return web.json_response({"error": f"Not logged in"}, status=400)
+        return web.json_response({EbrainsSession.AUTH_COOKIE_KEY: session.user_token.access_token})
+
+    async def serve_service_worker(self, request: web.Request) -> web.StreamResponse:
+        public_dir_path = Path(__file__).parent.parent.parent.joinpath("public")
+        return web.FileResponse(public_dir_path / "js/service_worker.js")
+
+    async def welcome(self, request: web.Request) -> web.Response:
+        redirect_url = get_requested_url(request).joinpath("public/html/welcome.html")
+        raise web.HTTPFound(location=redirect_url.raw)
+
+    @require_ebrains_login
+    async def login_then_open_viewer(self, request: web.Request) -> web.Response:
+        redirect_url = get_requested_url(request).updated_with(path=PurePosixPath("/public/nehuba/index.html"))
         raise web.HTTPFound(location=redirect_url.raw)
 
     def _make_session_url(self, session_id: uuid.UUID) -> Url:
@@ -139,7 +177,7 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         return web.json_response("hello!", status=200)
 
     async def check_login(self, request: web.Request) -> web.Response:
-        if EbrainsSession.from_cookie(request) is None:
+        if (await EbrainsSession.from_cookie(request, http_client_session=self.http_client_session)) is None:
             return web.json_response({"logged_in": False}, status=401)
         return web.json_response({"logged_in": True}, status=200)
 
@@ -170,7 +208,9 @@ class SessionAllocator(Generic[SESSION_TYPE]):
             return web.json_response({"error": "Bad payload"}, status=400)
         session_id = uuid.uuid4()
 
-        ebrains_session = EbrainsSession.try_from_request(request, oidc_client=self.oidc_client)
+        ebrains_session = await EbrainsSession.try_from_request(
+            request, oidc_client=self.oidc_client, http_client_session=self.http_client_session
+        )
         if ebrains_session is None:
             redirect_to_ebrains_login(request, self.oidc_client)
 

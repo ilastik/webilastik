@@ -47,7 +47,7 @@ export function createElement<K extends keyof HTMLElementTagNameMap>({tagName, p
     innerHTML?:string,
     cssClasses?:Array<string>,
     inlineCss?: InlineCss,
-    onClick?(event: any): void},
+    onClick?(event: Event): void},
 ): HTMLElementTagNameMap[K]{
 
     const element = document.createElement(tagName);
@@ -92,6 +92,7 @@ export function createInput(params: {
         inputType: InputType,
         value?: string,
         name?: string,
+        title?: string,
         disabled?:boolean,
         required?: boolean,
         id?: string,
@@ -105,6 +106,9 @@ export function createInput(params: {
     if(params.name !== undefined){
         input.name = params.name
     }
+    if(params.title !== undefined){
+        input.title = params.title
+    }
     if(params.required !== undefined){
         input.required = params.required
     }
@@ -117,13 +121,12 @@ export function createInput(params: {
 
 export function createInputParagraph(params: Parameters<typeof createInput>[0] & {label_text?: string}): ReturnType<typeof createInput>{
     let p = createElement({tagName: "p", parentElement: params.parentElement, cssClasses: ["ItkInputParagraph"]})
+    const id = params.id === undefined ? uuidv4() : params.id
     if(params.label_text !== undefined){
         const label = createElement({tagName: "label", parentElement: p, innerHTML: params.label_text})
-        if(params.id !== undefined){
-            label.htmlFor = params.id
-        }
+        label.htmlFor = id
     }
-    return createInput({...params, parentElement: p})
+    return createInput({...params, parentElement: p, id : id})
 }
 
 export function createSelect<T extends {toString: () => string}>({

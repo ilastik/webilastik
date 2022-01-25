@@ -1,8 +1,8 @@
 import { Url } from "../util/parsed_url";
-import { ensureJsonArray, ensureJsonNumber, ensureJsonNumberTripplet, ensureJsonObject, ensureJsonString, JsonValue } from "../util/serialization"
+import { ensureJsonArray, ensureJsonNumber, ensureJsonNumberTripplet, ensureJsonObject, ensureJsonString, JsonObject, JsonValue } from "../util/serialization"
 
 
-const encodings = ["raw", "jpeg", "compressed_segmentation"] as const;
+export const encodings = ["raw", "jpeg", "compressed_segmentation"] as const;
 export type Encoding = typeof encodings[number];
 export function ensureEncoding(value: string): Encoding{
     const variant = encodings.find(variant => variant === value)
@@ -50,10 +50,21 @@ export class Scale{
             key: ensureJsonString(obj.key),
             size: ensureJsonNumberTripplet(obj.size),
             resolution: ensureJsonNumberTripplet(obj.resolution),
-            voxel_offset: ensureJsonNumberTripplet(obj.voxel_offset),
+            voxel_offset: obj.voxel_offset === undefined ? [0,0,0] : ensureJsonNumberTripplet(obj.voxel_offset),
             chunk_sizes: ensureJsonArray(obj.chunk_sizes).map(element => ensureJsonNumberTripplet(element)),
             encoding: ensureEncoding(ensureJsonString(obj.encoding)),
         })
+    }
+
+    public toJsonValue(): JsonObject{
+        return {
+            key: this.key,
+            size: this.size,
+            resolution: this.resolution,
+            voxel_offset: this.voxel_offset,
+            chunk_sizes: this.chunk_sizes,
+            encoding: this.encoding,
+        }
     }
 }
 

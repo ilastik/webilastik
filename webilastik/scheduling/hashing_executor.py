@@ -275,27 +275,11 @@ class HashingExecutor:
         self._get_worker(arg).submit_work(priority_future)
         return priority_future
 
-    def submit_job(
-        self,
-        *,
-        name: str,
-        target: Callable[[IN], None],
-        args: Iterable[IN],
-        on_progress: Optional[JobProgressCallback] = None,
-        on_complete: Optional[JobCompletedCallback] = None
-    ) -> Job[IN]:
-        job = Job(
-            name=name,
-            target=target,
-            args=args,
-            on_progress=on_progress,
-            on_complete=on_complete,
-        )
+    def submit_job(self, job: Job[IN]):
         #FIXME: don't flood the queue with job steps. Maybe put the job itself in the queue?
         for priority_future in job.work_units():
             executor = self._get_worker(priority_future.arg)
             executor.submit_work(priority_future)
-        return job
 
     def cancel_group(self, group_id: uuid.UUID):
         for worker in self._workers:

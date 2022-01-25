@@ -64,6 +64,9 @@ export class HtmlImgDriver implements IViewerDriver{
             }
         })()
     }
+    public closeView(_params: {native_view: INativeView}){
+        return //FIXME?
+    }
     public getDataViewOnDisplay(): INativeView | undefined{
         return {name: this.data_url.name, url: this.data_url.schemeless_raw}
     }

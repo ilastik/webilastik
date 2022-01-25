@@ -1,9 +1,7 @@
 # pyright: reportUnusedCallResult=false
 
 import os
-from webilastik.datasource.precomputed_chunks_info import RawEncoder
 from webilastik.features.channelwise_fastfilters import GaussianSmoothing, HessianOfGaussianEigenvalues
-from webilastik.ui.datasink import PrecomputedChunksScaleSink_CreationParams
 
 from webilastik.ui.workflow.ws_pixel_classification_workflow import RPCPayload
 # ensure requests will use the mkcert cert. Requests uses certifi by default, i think
@@ -27,7 +25,7 @@ from webilastik.filesystem.http_fs import HttpFs
 from webilastik.datasource import SkimageDataSource
 from webilastik.utility.url import Url
 from webilastik.libebrains.user_token import UserToken
-from webilastik.server import EbrainsSession
+from webilastik.server.session_allocator import EbrainsSession
 
 
 finished = False
@@ -39,7 +37,9 @@ async def read_server_status(websocket: ClientWebSocketResponse):
             break
 
 async def main():
-    ds = SkimageDataSource(filesystem=HttpFs(read_url=Url.parse("https://app.ilastik.org/")), path=Path("public/images/c_cells_1.png"))
+    ilastik_root_url = Url.parse("https://app.ilastik.org/")
+    assert ilastik_root_url is not None
+    ds = SkimageDataSource(filesystem=HttpFs(read_url=ilastik_root_url), path=Path("public/images/c_cells_1.png"))
 
     async with aiohttp.ClientSession(
         cookies={EbrainsSession.AUTH_COOKIE_KEY: UserToken.from_environment().access_token}
@@ -115,6 +115,7 @@ async def main():
                 ).to_json_value()
             )
             print("done sending annotations<<<<<")
+            await asyncio.sleep(3)
 
 
             from base64 import b64encode
@@ -141,24 +142,59 @@ async def main():
                     a = Array5D(raw_data, axiskeys="cyx")
                     # a.show_channels()
 
-            import time
+            await ws.send_json(
+                RPCPayload(
+                    applet_name="export_datasource_applet",
+                    method_name="set_url",
+                    arguments={
+                        "url":"https://app.ilastik.org/public/images/c_cells_2.precomputed",
+                    }
+                ).to_json_value()
+            )
 
-            url = f"{session_url}/export"
-            print(f"---> Scheduling a job at {url}:")
-            await ws.send_json(RPCPayload(
-                applet_name="export_applet",
-                method_name="start_export_job",
-                arguments={
-                    "data_source_params": {
-                        "url": "https://app.ilastik.org/api/images/c_cells_1.png",
-                    },
-                    "data_sink_params": PrecomputedChunksScaleSink_CreationParams(
-                        url=Url.parse(f"https://data-proxy.ebrains.eu/api/buckets/hbp-image-service/job_output_{int(time.time())}.precomputed"),
-                        encoding=RawEncoder(),
-                    ).to_json_value()
-                }
-            ).to_json_value())
+            await asyncio.sleep(1)
+
+            await ws.send_json(
+                RPCPayload(
+                    applet_name="export_datasource_applet",
+                    method_name="pick_datasource",
+                    arguments={
+                        "datasource_index": 0
+                    }
+                ).to_json_value()
+            )
+
+            await asyncio.sleep(1)
+
+
+            import datetime
+            now = datetime.datetime.now()
+            now_str = f"{now.year:02}y{now.month:02}m{now.day:02}d__{now.hour:02}h{now.minute:02}m{now.second:02}s"
+
+            await ws.send_json(
+                RPCPayload(
+                    applet_name="export_datasink_applet",
+                    method_name="set_params",
+                    arguments={
+                        "bucket_name": "hbp-image-service",
+                        "prefix": f"/ilastik_test_{now_str}",
+                        "voxel_offset": tuple([0,0,0]),
+                        "encoder": "raw",
+                    }
+                ).to_json_value()
+            )
+
+            print(f"Sending job request??????")
+            await ws.send_json(
+                RPCPayload(
+                    applet_name="export_applet",
+                    method_name="start_export_job",
+                    arguments={}
+                ).to_json_value()
+            )
+
             print(f"---> Job successfully scheduled?")
+            await asyncio.sleep(10)
 
         global finished;
         finished = True

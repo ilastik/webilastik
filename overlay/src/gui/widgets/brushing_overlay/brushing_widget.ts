@@ -28,13 +28,19 @@ export class BrushingWidget{
         session,
         parentElement,
         viewer,
+        help,
     }: {
         session: Session,
         parentElement: HTMLElement,
         viewer: Viewer,
+        help: string[],
     }){
         this.session = session
-        this.element = new CollapsableWidget({display_name: "Training", parentElement}).element
+        this.element = new CollapsableWidget({
+            display_name: "Training",
+            parentElement,
+            help: help,
+        }).element
         this.element.classList.add("ItkBrushingWidget")
         this.viewer = viewer
 
@@ -88,7 +94,7 @@ export class BrushingWidget{
 
         const view = this.viewer.getActiveView()
         if(view === undefined){
-            return
+            return this.showStatus("No data")
         }
         if(view instanceof Error){ //FIXME: remove this? or return error from viewer?
             return this.showStatus(`${view}`)
@@ -103,12 +109,7 @@ export class BrushingWidget{
         if(!(view instanceof RawDataView)){
             throw `Unexpected view type (${view.constructor.name}): ${JSON.stringify(view)}`
         }
-        if(view.datasources.length == 1){
-            const datasource = view.datasources[0]
-            const training_view = view.toTrainingView({resolution: datasource.spatial_resolution, session: this.session})
-            this.openTrainingView(training_view)
-            return this.startTraining(training_view.raw_data)
-        }
+        this.showStatus(`Viewing multi-resolution datasource`)
 
         createElement({tagName: "label", innerHTML: "Select a voxel size to annotate on:", parentElement: this.resolutionSelectionContainer});
         new OneShotSelectorWidget<DataSource>({
@@ -168,7 +169,11 @@ export class TrainingWidget{
         this.onNewBrushStroke = onNewBrushStroke
 
         this.brushingEnabledCheckbox = createInputParagraph({
-            label_text: "Enable Brushing: ", inputType: "checkbox", parentElement: this.element, onClick: () => {
+            label_text: "Enable Brushing: ",
+            inputType: "checkbox",
+            title: "Enable to draw annotations by clicking and dragging. Disable to use the viewer's controls to navigate over the data.",
+            parentElement: this.element,
+            onClick: () => {
                 this.overlay?.setBrushingEnabled(this.brushingEnabledCheckbox.checked)
             }
         })
@@ -181,16 +186,18 @@ export class TrainingWidget{
             display: (window as any).ilastik_debug ? "block" : "none"}
         })
         createElement({tagName: "label", innerHTML: "Rendering style: ", parentElement: p})
+        const renderers = [
+            new BrushelBoxRenderer({gl: this.gl, highlightCrossSection: false, onlyCrossSection: true}),
+            new BrushelLinesRenderer(this.gl),
+            new BrushelBoxRenderer({gl: this.gl, debugColors: false, highlightCrossSection: false, onlyCrossSection: false}),
+            new BrushelBoxRenderer({gl: this.gl, debugColors: true, highlightCrossSection: true, onlyCrossSection: false}),
+        ];
         this.rendererSelector = new SelectorWidget<BrushRenderer>({
             parentElement: p,
-            options: [
-                new BrushelBoxRenderer({gl: this.gl, highlightCrossSection: false, onlyCrossSection: true}),
-                new BrushelLinesRenderer(this.gl),
-                new BrushelBoxRenderer({gl: this.gl, debugColors: false, highlightCrossSection: false, onlyCrossSection: false}),
-                new BrushelBoxRenderer({gl: this.gl, debugColors: true, highlightCrossSection: true, onlyCrossSection: false}),
-            ],
+            options: renderers,
             optionRenderer: (_, index) => ["Boxes - Cross Section", "Lines", "Boxes", "Boxes (debug colors)"][index],
             onSelection: (_) => {},
+            initial_selection: renderers[0],
         })
     }
 
@@ -234,7 +241,7 @@ export class TrainingWidget{
             if(this.staging_brush_stroke){
                 strokes.push(this.staging_brush_stroke)
             }
-            overlay.render(strokes, this.rendererSelector.getSelection())
+            overlay.render(strokes, this.rendererSelector.getSelection()!) //FIXME? remove this optional override?
             this.animationRequestId = window.requestAnimationFrame(render)
         }
         render()

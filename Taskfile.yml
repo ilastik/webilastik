@@ -53,7 +53,8 @@ tasks:
     deps: [create-neuroglancer-git-dir]
     dir: "{{.NEUROGLANCER_GIT_DIR}}"
     vars:
-      COMMIT_HASH: "b4a5ef89ad9610aba1c387199541c68e7befd7c6"
+      COMMIT_HASH: "041c183b9d8412cc08215bef5dfa6034376fc32d"
+      # COMMIT_HASH: "with-ilastik-overlay"
     cmds:
       - git clone https://github.com/ilastik/neuroglancer . || git fetch
       - git checkout {{.COMMIT_HASH}}
@@ -88,11 +89,13 @@ tasks:
       - "{{.OVERLAY_DIR}}/package.json"
       - "{{.OVERLAY_DIR}}/src/**/*"
       - "{{.OVERLAY_DIR}}/tsconfig.json"
-    generates: ["{{.OVERLAY_BUNDLE_PATH}}"]
+      - "{{.OVERLAY_DIR}}/service_worker_tsconfig.json"
+    generates: ["{{.OVERLAY_BUNDLE_PATH}}", "{{.OVERLAY_DIR}}/build/service_worker.js*"]
     cmds:
       - rm -rf node_modules
       - npm ci
       - npm run bundle-ng-inject
+      - npm run build-service-worker
 
   create-deb-tree:
     deps: [create-packed-conda-environment, compile-neuroglancer, compile-overlay]
@@ -102,6 +105,7 @@ tasks:
       - "{{.PACKED_ENV_PATH}}"
       - "{{.PROJECT_ROOT}}/webilastik/**/*.py"
       - "{{.OVERLAY_BUNDLE_PATH}}"
+      - "{{.OVERLAY_DIR}}/build/service_worker.js*"
       - "{{.NEUROGLANCER_BUNDLE_PATH}}"
     generates:
       - "{{.PKG_TREE_PATH}}/**/*"
@@ -138,6 +142,7 @@ tasks:
       - echo 2>&1 '[INFO] Copying overlay bundle to public dir'
       - mkdir -p {{.PKG_TREE_PATH}}/opt/webilastik/public/js/
       - cp {{.OVERLAY_BUNDLE_PATH}} {{.PKG_TREE_PATH}}/opt/webilastik/public/js/
+      - cp {{.OVERLAY_DIR}}/build/service_worker.js* {{.PKG_TREE_PATH}}/opt/webilastik/public/js
 
       - echo 2>&1 '[INFO] Copying nehuba to public dir'
       - cp -r {{.NEUROGLANCER_BUILD_PATH}} {{.PKG_TREE_PATH}}/opt/webilastik/public/nehuba
@@ -177,7 +182,7 @@ tasks:
       - echo "Running local server as www-data (because that's nginx's user)"
       - >
         sudo -u www-data -g www-data --preserve-env=PYTHONPATH,REQUESTS_CA_BUNDLE,SSL_CERT_DIR
-        {{.PKG_TREE_PATH}}/opt/webilastik_conda_env/bin/python3 -B {{.PKG_TREE_PATH}}/opt/webilastik/webilastik/server/__init__.py
+        {{.PKG_TREE_PATH}}/opt/webilastik_conda_env/bin/python3 -B {{.PKG_TREE_PATH}}/opt/webilastik/webilastik/server/session_allocator.py
         --session-type=Local
         --master-host=localhost
         --master-username=www-data

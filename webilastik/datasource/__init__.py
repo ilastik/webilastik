@@ -14,6 +14,7 @@ import skimage.io #type: ignore
 from ndstructs.point5D import Shape5D, Interval5D, Point5D, SPAN
 from ndstructs.array5D import Array5D, SPAN_OVERRIDE, All
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
+from webilastik.utility.url import Url
 
 try:
     import datasource_cache # type: ignore
@@ -52,7 +53,8 @@ class DataSource(ABC):
         dtype: np.dtype,
         interval: Interval5D,
         axiskeys: str,
-        spatial_resolution: Optional[Tuple[int, int, int]], # FIXME: experimental, like precomp chunks resolution
+        spatial_resolution: Optional[Tuple[int, int, int]] = None, # FIXME: experimental, like precomp chunks resolution
+        url: Optional[Url] = None,
     ):
         self.tile_shape = tile_shape
         self.dtype = dtype
@@ -62,6 +64,7 @@ class DataSource(ABC):
         self.axiskeys = axiskeys
         self.spatial_resolution = spatial_resolution or (1,1,1)
         self.roi = DataRoi(self, **self.interval.to_dict())
+        self.url = url
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} {self.interval}>"
@@ -74,6 +77,7 @@ class DataSource(ABC):
             "interval": self.interval.to_json_value(),
             "axiskeys": self.axiskeys,
             "spatial_resolution": self.spatial_resolution,
+            "url": None if self.url is None else self.url.to_json_value(),
         }
 
     @classmethod
@@ -265,11 +269,15 @@ class H5DataSource(DataSource):
             axiskeys = self.getAxisKeys(dataset)
             self._dataset = cast(h5py.Dataset, dataset)
             tile_shape = Shape5D.create(raw_shape=self._dataset.chunks or self._dataset.shape, axiskeys=axiskeys)
+            base_url = Url.parse(filesystem.geturl(outer_path.as_posix()))
+            assert base_url is not None
             super().__init__(
                 tile_shape=tile_shape,
                 interval=Shape5D.create(raw_shape=self._dataset.shape, axiskeys=axiskeys).to_interval5d(location),
                 dtype=self._dataset.dtype,
                 axiskeys=axiskeys,
+                url=base_url.updated_with(hash_=f"inner_path={inner_path.as_posix()}")
+                # spatial_resolution=(1,1,1) # FIXME
             )
         except Exception as e:
             f.close()
@@ -343,6 +351,7 @@ class ArrayDataSource(DataSource):
         tile_shape: Optional[Shape5D] = None,
         location: Point5D = Point5D.zero(),
         spatial_resolution: Optional[Tuple[int, int, int]] = None,
+        url: Optional[Url] = None,
     ):
         self._data = Array5D(data, axiskeys=axiskeys, location=location)
         if tile_shape is None:
@@ -353,6 +362,7 @@ class ArrayDataSource(DataSource):
             interval=self._data.interval,
             axiskeys=axiskeys,
             spatial_resolution=spatial_resolution,
+            url=url
         )
 
     def to_json_value(self) -> JsonObject:
@@ -399,12 +409,15 @@ class SkimageDataSource(ArrayDataSource):
         self.filesystem = filesystem
         raw_data: np.ndarray = skimage.io.imread(filesystem.openbin(path.as_posix())) # type: ignore
         axiskeys = "yxc"[: len(raw_data.shape)]
+        url = Url.parse(filesystem.geturl(path.as_posix()))
+        assert url is not None
         super().__init__(
             data=raw_data,
             axiskeys=axiskeys,
             location=location,
             tile_shape=tile_shape,
             spatial_resolution=spatial_resolution,
+            url=url,
         )
 
     def to_json_value(self) -> JsonObject:

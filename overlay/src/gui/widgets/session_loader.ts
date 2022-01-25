@@ -58,8 +58,8 @@ export class SessionLoaderWidget{
         })
     }
 
-    public setFields(params: {ilastikUrl: Url, sessionUrl: Url}){
-        this.ilastikUrlInput.value = params.sessionUrl.raw
-        this.sessionUrlField.value = params.sessionUrl.raw
+    public setFields(params: {ilastikUrl: Url, sessionUrl?: Url}){
+        this.ilastikUrlInput.value = params.ilastikUrl.raw
+        this.sessionUrlField.value = params.sessionUrl?.raw || ""
     }
 }

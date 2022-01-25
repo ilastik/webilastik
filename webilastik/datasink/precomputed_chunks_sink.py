@@ -9,6 +9,7 @@ from webilastik.datasink import DataSink, DATASINK_FROM_JSON_CONSTRUCTORS
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.filesystem import JsonableFilesystem
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale5D
+from webilastik.utility.url import Url
 
 class PrecomputedChunksSink:
     def __init__(
@@ -41,14 +42,14 @@ class PrecomputedChunksSink:
     ) -> "PrecomputedChunksSink":
         if filesystem.exists(base_path.as_posix()):
             filesystem.removedir(base_path.as_posix())
-        filesystem.makedirs(base_path.as_posix())
+        _ = filesystem.makedirs(base_path.as_posix())
 
         with filesystem.openbin(base_path.joinpath("info").as_posix(), "w") as info_file:
-            info_file.write(json.dumps(info.to_json_value()).encode("utf8"))
+            _ = info_file.write(json.dumps(info.to_json_value()).encode("utf8"))
 
         for scale in info.scales_5d:
             scale_path = base_path.joinpath(scale.key.as_posix().lstrip("/"))
-            filesystem.makedirs(scale_path.as_posix())
+            _ = filesystem.makedirs(scale_path.as_posix())
 
         return  PrecomputedChunksSink(filesystem=filesystem, base_path=base_path, info=info)
 
@@ -66,10 +67,14 @@ class PrecomputedChunksScaleSink(DataSink):
         self.base_path = base_path
         self.scale = scale
 
+        base_url = Url.parse(self.filesystem.geturl(self.base_path.as_posix()))
+        assert base_url is not None
+
         super().__init__( #type: ignore
             tile_shape=self.scale.chunk_sizes_5d[0], #FIXME
             interval=self.scale.interval,
             dtype=dtype, #type: ignore
+            url=base_url.updated_with(hash_=f"resolution={'_'.join(map(str, self.scale.resolution))}"),
         )
 
     def to_datasource(self) -> PrecomputedChunksDataSource:
@@ -115,6 +120,6 @@ class PrecomputedChunksScaleSink(DataSink):
         # https://github.com/google/neuroglancer/tree/master/src/neuroglancer/datasource/precomputed#raw-chunk-encoding
         # "(...) data for the chunk is stored directly in little-endian binary format in [x, y, z, channel] Fortran order"
         with self.filesystem.openbin(chunk_path.as_posix(), "w") as f:
-            f.write(self.scale.encoding.encode(data))
+            _ = f.write(self.scale.encoding.encode(data))
 
 DATASINK_FROM_JSON_CONSTRUCTORS[PrecomputedChunksScaleSink.__name__] = PrecomputedChunksScaleSink.from_json_value

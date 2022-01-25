@@ -1,3 +1,4 @@
+// navigator.serviceWorker.register('/service_worker.js', {scope: "/"});
 export {BrushStroke} from "./gui/widgets/brushing_overlay/brush_stroke";
 export {BrushingOverlay} from "./gui/widgets/brushing_overlay/brushing_overlay"
 export {BrushingWidget} from "./gui/widgets/brushing_overlay/brushing_widget"

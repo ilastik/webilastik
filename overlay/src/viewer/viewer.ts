@@ -56,6 +56,10 @@ export class Viewer{
         })
     }
 
+    public closeView(view: View){
+        this.driver.closeView({native_view: view.native_view})
+    }
+
     private createMissingViews = async (): Promise<Array<View>> => { //FIXME: detect old prediction/training views that are still open?
         let out = new Array<View>();
         for(let native_view of this.driver.getOpenDataViews()){

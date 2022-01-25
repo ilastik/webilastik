@@ -57,6 +57,8 @@
     border: dashed 1px grey;
     background-color: rgba(0,0,0, 0.1);
     padding: 0.2em;
+    max-width: 30em;
+    overflow: scroll;
 }
 
 .ItkBrushStrokesContainer{
@@ -108,4 +110,19 @@
 
 .ItkInputParagraph input[type=number]{
     width: 4em;
+}
+
+.ItkErrorText{
+    font-style: italic;
+    color: red;
+}
+
+.ItkSuccessText{
+    font-style: italic;
+    color: green;
+}
+
+.ItkInfoText{
+    font-style: italic;
+    color: grey;
 }
