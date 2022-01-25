@@ -279,7 +279,6 @@ class OidcClient:
             },
             json=payload
         )
-        print(f"Update client respose: \n\n{resp.text}")
         resp.raise_for_status()
 
     @classmethod
@@ -350,14 +349,12 @@ class OidcClient:
             "client_secret": self.secret,
             "scope": "email team",
         }
-        print(f"postin this: \n{json.dumps(data)}")
         resp = await http_client_session.request(
             method="post",
             url="https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect/token",
             allow_redirects=False,
             data=data
         )
-        print(f"Got this response: \n\n{resp.text}")
         resp.raise_for_status()
 
         data = ensureJsonObject(await resp.json())
@@ -406,6 +403,5 @@ class OidcClient:
                 "Authorization": f"Bearer {dev_token.access_token}"
             },
         )
-        print(f"Retrieving Oidc Client response: \n{resp.json()}\n\n")
         resp.raise_for_status()
         return OidcClient.from_json_value(resp.json())
