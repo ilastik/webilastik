@@ -122,7 +122,8 @@ class SessionAllocator(Generic[SESSION_TYPE]):
 
         self.app = web.Application()
         self.app.add_routes([
-            web.get('/', self.open_viewer),
+            web.get('/', self.welcome),
+            web.get('/api/viewer', self.login_then_open_viewer), #FIXME: this is only here because the oidc redirect URLs must start with /api
             web.get('/api/check_login', self.check_login),
             web.get('/api/login_then_close', self.login_then_close),
             web.get('/api/hello', self.hello),
@@ -156,8 +157,13 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         public_dir_path = Path(__file__).parent.parent.parent.joinpath("public")
         return web.FileResponse(public_dir_path / "js/service_worker.js")
 
-    async def open_viewer(self, request: web.Request) -> web.Response:
-        redirect_url = get_requested_url(request).joinpath("public/nehuba/index.html")
+    async def welcome(self, request: web.Request) -> web.Response:
+        redirect_url = get_requested_url(request).joinpath("public/html/welcome.html")
+        raise web.HTTPFound(location=redirect_url.raw)
+
+    @require_ebrains_login
+    async def login_then_open_viewer(self, request: web.Request) -> web.Response:
+        redirect_url = get_requested_url(request).updated_with(path=PurePosixPath("/public/nehuba/index.html"))
         raise web.HTTPFound(location=redirect_url.raw)
 
     def _make_session_url(self, session_id: uuid.UUID) -> Url:
