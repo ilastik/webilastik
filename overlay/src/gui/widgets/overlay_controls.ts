@@ -30,8 +30,8 @@ export class OverlayControls{
                 let current_pos = {x: parseInt(this.element.style.left), y: parseInt(this.element.style.top)}
                 let drag_handler = (move_event: MouseEvent) => {
                     let delta = {x: move_event.screenX - mouse_down_event.screenX, y: move_event.screenY - mouse_down_event.screenY}
-                    this.element.style.left = (current_pos.x + delta.x).toString() + "px"
-                    this.element.style.top = (current_pos.y + delta.y).toString() + "px"
+                    this.element.style.left = (Math.max(0, current_pos.x + delta.x)).toString() + "px"
+                    this.element.style.top = (Math.max(0, current_pos.y + delta.y)).toString() + "px"
                 }
                 let cleanup = () => {
                     document.removeEventListener("mousemove", drag_handler)
