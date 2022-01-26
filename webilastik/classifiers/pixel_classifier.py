@@ -27,7 +27,7 @@ try:
     import ilastik_operator_cache # type: ignore
     operator_cache = ilastik_operator_cache
 except ImportError:
-    operator_cache = lru_cache()
+    operator_cache = lru_cache(maxsize=32)
 
 class Predictions(Array5D):
     """An array of floats from 0.0 to 1.0. The value in each channel represents

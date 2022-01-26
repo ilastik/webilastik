@@ -21,7 +21,7 @@ try:
 except ImportError:
     from functools import lru_cache
 
-    ndstructs_datasource_cache = lru_cache(maxsize=4096)
+    ndstructs_datasource_cache = lru_cache(maxsize=32)
 
 @enum.unique
 class AddressMode(IntEnum):

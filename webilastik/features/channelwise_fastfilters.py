@@ -18,7 +18,7 @@ try:
     operator_cache = ilastik_operator_cache
 except ImportError:
     from functools import lru_cache
-    operator_cache = lru_cache()
+    operator_cache = lru_cache(maxsize=32)
 
 
 def get_axis_2d(data: JsonValue) -> Optional[str]:
