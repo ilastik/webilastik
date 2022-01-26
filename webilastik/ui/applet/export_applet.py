@@ -56,13 +56,25 @@ class ExportApplet(NoSnapshotApplet):
         self._check_dependencies()
         return PropagationOk()
 
-    def _check_dependencies(self):
-        if self._in_operator() is None:
+    def _check_dependencies(self) -> Optional[Tuple[Operator[DataRoi, Array5D], DataSource, DataSink]]:
+        operator = self._in_operator()
+        if operator is None:
             self._error_message = "Upstream applet is not ready yet"
-        elif self._in_datasource() is None:
+            return None
+        source = self._in_datasource()
+        if source is None:
             self._error_message = "No datasource selected"
-        else:
-            self._error_message = None
+            return None
+        sink = self._in_datasink()
+        if sink is None:
+            self._error_message = "No datasink selected"
+            return None
+        if isinstance(sink, UsageError):
+            self._error_message = f"Failed to create datasink: {sink}"
+            return None
+
+        self._error_message = None
+        return (operator, source, sink)
 
     def start_export_job(
         self,
@@ -71,21 +83,13 @@ class ExportApplet(NoSnapshotApplet):
         on_complete: Optional[JobCompletedCallback] = None,
     ) -> Optional[Job[DataRoi]]:
         self._check_dependencies()
-        operator = self._in_operator()
-        datasource = self._in_datasource()
-        if operator is None or datasource is None:
+        dependencies = self._check_dependencies()
+        if dependencies is None:
             return None
-        sink_result = self._in_datasink()
-        if sink_result is None:
-            self._error_message = "No datasink selected"
-            return None
-        elif isinstance(sink_result, UsageError):
-            self._error_message = f"Failed to create datasink: {sink_result}"
-            return None
-
+        operator, datasource, datasink = dependencies
         job = Job(
             name="Pixel Classification Export", # FIXME
-            target=ExportTask(operator=operator, sink=sink_result),
+            target=ExportTask(operator=operator, sink=datasink),
             args=datasource.roi.get_datasource_tiles(),
             on_progress=on_progress,
             on_complete=on_complete,
