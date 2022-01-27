@@ -4,6 +4,7 @@ import os
 from webilastik.features.channelwise_fastfilters import GaussianSmoothing, HessianOfGaussianEigenvalues
 
 from webilastik.ui.workflow.ws_pixel_classification_workflow import RPCPayload
+from webilastik.utility import get_now_string
 # ensure requests will use the mkcert cert. Requests uses certifi by default, i think
 os.environ["REQUESTS_CA_BUNDLE"] = "/etc/ssl/certs/ca-certificates.crt"
 # ensure aiohttp will use the mkcert certts. I don't really know where it otherwise gets its certs from
@@ -32,7 +33,8 @@ finished = False
 
 async def read_server_status(websocket: ClientWebSocketResponse):
     async for message in websocket:
-        print(f"Server status update: {message.data}")
+        parsed_message = message.json()
+        print(f"export applet status update: {parsed_message.get('export_applet')}")
         if finished:
             break
 
@@ -45,7 +47,7 @@ async def main():
         cookies={EbrainsSession.AUTH_COOKIE_KEY: UserToken.from_environment().access_token}
     ) as session:
         print(f"Creating new session--------------")
-        async with session.post(f"https://app.ilastik.org/api/session", json={"session_duration": 50}) as response:
+        async with session.post(f"https://app.ilastik.org/api/session", json={"session_duration": 150}) as response:
             response.raise_for_status()
             session_data : Dict[str, Any] = await response.json()
             session_id = session_data["id"]
@@ -147,7 +149,8 @@ async def main():
                     applet_name="export_datasource_applet",
                     method_name="set_url",
                     arguments={
-                        "url":"https://app.ilastik.org/public/images/c_cells_2.precomputed",
+                        # "url":"https://app.ilastik.org/public/images/c_cells_2.precomputed",
+                        "url":"precomputed://https://data-proxy.ebrains.eu/api/buckets/hbp-image-service/c_cells_2.precomputed",
                     }
                 ).to_json_value()
             )
@@ -166,23 +169,21 @@ async def main():
 
             await asyncio.sleep(1)
 
-
-            import datetime
-            now = datetime.datetime.now()
-            now_str = f"{now.year:02}y{now.month:02}m{now.day:02}d__{now.hour:02}h{now.minute:02}m{now.second:02}s"
-
             await ws.send_json(
                 RPCPayload(
-                    applet_name="export_datasink_applet",
-                    method_name="set_params",
+                    applet_name="export_applet",
+                    method_name="set_sink_params",
                     arguments={
                         "bucket_name": "hbp-image-service",
-                        "prefix": f"/ilastik_test_{now_str}",
+                        "prefix": f"/ilastik_test_{get_now_string()}",
                         "voxel_offset": tuple([0,0,0]),
                         "encoder": "raw",
+                        "mode": "SIMPLE_SEGMENTATION",
                     }
                 ).to_json_value()
             )
+
+            await asyncio.sleep(20)
 
             print(f"Sending job request??????")
             await ws.send_json(
@@ -194,7 +195,7 @@ async def main():
             )
 
             print(f"---> Job successfully scheduled?")
-            await asyncio.sleep(10)
+            await asyncio.sleep(100)
 
         global finished;
         finished = True

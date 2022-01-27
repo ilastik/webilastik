@@ -114,21 +114,12 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             ebrains_user_token=self.ebrains_user_token,
         )
 
-        self.export_datasink_applet = WsDataSinkSelectorApplet(
-            name="export_datasink_applet",
-            ebrains_user_token=self.ebrains_user_token,
-            shape=self.export_datasource_applet.datasource.transformed_with(lambda ds: ds and ds.shape),
-            tile_shape=self.export_datasource_applet.datasource.transformed_with(lambda ds: ds and ds.tile_shape),
-            spatial_resolution=self.export_datasource_applet.datasource.transformed_with(lambda ds: ds and ds.spatial_resolution),
-            num_channels_override=self.pixel_classifier_applet.pixel_classifier.transformed_with(lambda pc: pc and pc.num_classes),
-        )
-
         self.export_applet = WsExportApplet(
             name="export_applet",
+            ebrains_user_token=self.ebrains_user_token,
             executor=executor,
             operator=self.pixel_classifier_applet.pixel_classifier,
             datasource=self.export_datasource_applet.datasource,
-            datasink=self.export_datasink_applet.datasink,
         )
 
         self.wsapplets : Mapping[str, WsApplet] = {
@@ -136,7 +127,6 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             brushing_applet.name: brushing_applet,
             self.pixel_classifier_applet.name: self.pixel_classifier_applet,
             self.export_datasource_applet.name: self.export_datasource_applet,
-            self.export_datasink_applet.name: self.export_datasink_applet,
             self.export_applet.name: self.export_applet,
         }
 

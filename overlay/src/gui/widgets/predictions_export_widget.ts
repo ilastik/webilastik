@@ -1,12 +1,14 @@
-import { ensureJsonArray, ensureOptional } from '../../util/serialization';
+import { ensureJsonArray, ensureJsonNumberTripplet, ensureOptional, toJsonValue } from '../../util/serialization';
 import { Applet } from '../../client/applets/applet';
 import { ensureJsonNumber, ensureJsonObject, ensureJsonString, JsonValue } from '../../util/serialization';
 import { createElement, createInputParagraph } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
 import { Session } from '../../client/ilastik';
 import { DataSourcePicker } from './datasource_picker';
-import { DataSinkSelectorWidget } from './datasink_selector';
 import { CssClasses } from '../css_classes';
+import { Path } from '../../util/parsed_url';
+import { Encoding, ensureEncoding, encodings as precomputed_encodings } from '../../util/precomputed_chunks';
+import { SelectorWidget } from './selector_widget';
 
 
 
@@ -52,15 +54,48 @@ export class Job{
     }
 }
 
+export const export_modes = ["PREDICTIONS", "SIMPLE_SEGMENTATION"] as const;
+export type ExportMode = typeof export_modes[number];
+export function ensureExportMode(value: string): ExportMode{
+    const variant = export_modes.find(variant => variant === value)
+    if(variant === undefined){
+        throw Error(`Invalid encoding: ${value}`)
+    }
+    return variant
+}
+
+
 type State = {
     jobs: Array<Job>,
     error_message?: string,
+    sink_bucket_name?: string
+    sink_prefix?: Path
+    sink_voxel_offset: [number, number, number],
+    sink_encoder: Encoding,
+    mode: ExportMode,
+}
+
+function stateFromJsonValue(data: JsonValue): State{
+    let data_obj = ensureJsonObject(data)
+    return {
+        jobs: Job.fromJsonArray(ensureJsonArray(data_obj["jobs"])),
+        error_message: ensureOptional(ensureJsonString, data_obj.error_message),
+        sink_bucket_name: ensureOptional(ensureJsonString, data_obj["sink_bucket_name"]),
+        sink_prefix: ensureOptional((v) => Path.parse(ensureJsonString(v)), data_obj["sink_prefix"]),
+        sink_voxel_offset: ensureJsonNumberTripplet(data_obj["sink_voxel_offset"]),
+        sink_encoder: ensureEncoding(ensureJsonString(data_obj["sink_encoder"])),
+        mode: ensureExportMode(ensureJsonString(data_obj["mode"])),
+    }
 }
 
 export class PredictionsExportWidget extends Applet<State>{
     public readonly element: HTMLElement;
     private job_table: HTMLTableElement;
     private readonly errorMessageContainer: HTMLParagraphElement;
+    private bucketNameInput: HTMLInputElement;
+    private prefixInput: HTMLInputElement;
+    private encoderSelector: SelectorWidget<Encoding>;
+    exportModeSelector: SelectorWidget<"PREDICTIONS" | "SIMPLE_SEGMENTATION">;
 
     public constructor({name, parentElement, session, help}: {
         name: string, parentElement: HTMLElement, session: Session, help: string[]
@@ -68,14 +103,7 @@ export class PredictionsExportWidget extends Applet<State>{
         super({
             name,
             session,
-            deserializer: (data) => {
-                let data_obj = ensureJsonObject(data)
-                let raw_jobs = ensureJsonArray(data_obj["jobs"])
-                return {
-                    jobs: Job.fromJsonArray(raw_jobs),
-                    error_message: ensureOptional(ensureJsonString, data_obj.error_message)
-                }
-            },
+            deserializer: stateFromJsonValue,
             onNewState: (new_state) => this.onNewState(new_state)
         })
         this.element = new CollapsableWidget({display_name: "Export Predictions", parentElement, help}).element
@@ -89,7 +117,33 @@ export class PredictionsExportWidget extends Applet<State>{
         fieldset = createElement({tagName: "fieldset", parentElement: this.element})
         createElement({tagName: "legend", parentElement: fieldset, innerHTML: "Data Sink"})
 
-        new DataSinkSelectorWidget({name: "export_datasink_applet", parentElement: fieldset, session})
+        this.bucketNameInput = createInputParagraph({
+            inputType: "text", parentElement: fieldset, label_text: "Bucket name: "
+        })
+        this.bucketNameInput.addEventListener("focusout", () => this.setSinkParams())
+
+        this.prefixInput = createInputParagraph({
+            inputType: "text", parentElement: fieldset, label_text: "Path: "
+        })
+        this.prefixInput.addEventListener("focusout", () => this.setSinkParams())
+
+        let p = createElement({tagName: "p", parentElement: fieldset})
+        createElement({tagName: "label", parentElement: p, innerHTML: "Compression: "})
+        this.encoderSelector = new SelectorWidget({
+            parentElement: p,
+            options: precomputed_encodings.filter(e => e == "raw"), //FIXME?
+            optionRenderer: (opt) => opt,
+            onSelection: () => this.setSinkParams(),
+        })
+
+        p = createElement({tagName: "p", parentElement: this.element})
+        createElement({tagName: "label", parentElement: p, innerHTML: "Export Source: "})
+        this.exportModeSelector = new SelectorWidget({
+            parentElement: p,
+            options: export_modes.slice(), //FIXME?
+            optionRenderer: (opt) => opt,
+            onSelection: () => this.setSinkParams(),
+        })
 
         createInputParagraph({
             inputType: "button", value: "Create Job", parentElement: this.element, onClick: () => this.doRPC("start_export_job", {})
@@ -100,7 +154,21 @@ export class PredictionsExportWidget extends Applet<State>{
         this.job_table = createElement({tagName: "table", parentElement: this.element, cssClasses: ["ItkPredictionsExportApplet_job_table"]});
     }
 
+    private setSinkParams(){
+        this.doRPC("set_sink_params", {
+            sink_bucket_name: this.bucketNameInput.value || null,
+            sink_prefix: this.prefixInput.value || null,
+            sink_encoder: toJsonValue(this.encoderSelector.getSelection() || null),
+            mode: toJsonValue(this.exportModeSelector.getSelection() || null),
+        })
+    }
+
     protected onNewState(new_state: State){
+        this.bucketNameInput.value = new_state.sink_bucket_name || ""
+        this.prefixInput.value = new_state.sink_prefix?.toString() || ""
+        this.encoderSelector.setSelection({selection: new_state.sink_encoder})
+        this.exportModeSelector.setSelection({selection: new_state.mode})
+
         this.errorMessageContainer.innerHTML = ""
         if(new_state.error_message){
             createElement({
