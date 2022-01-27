@@ -89,7 +89,6 @@ class BucketFs(JsonableFilesystem):
         self.session = requests.Session()
         self.session.headers.update(ebrains_user_token.as_auth_header())
         self.cscs_session = requests.Session()
-        self.write_session = requests.Session()
         self.pid = os.getpid()
 
 
@@ -190,7 +189,7 @@ class BucketFs(JsonableFilesystem):
             response.raise_for_status()
             response_obj = ensureJsonObject(response.json())
             url = ensureJsonString(response_obj.get("url"))
-            response = self.write_session.put(url, data=payload)
+            response = self.cscs_session.put(url, data=payload)
             response.raise_for_status()
 
         contents = bytes()
