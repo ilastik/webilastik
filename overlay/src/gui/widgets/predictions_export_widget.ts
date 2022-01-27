@@ -1,7 +1,7 @@
 import { ensureJsonArray, ensureJsonNumberTripplet, ensureOptional, toJsonValue } from '../../util/serialization';
 import { Applet } from '../../client/applets/applet';
 import { ensureJsonNumber, ensureJsonObject, ensureJsonString, JsonValue } from '../../util/serialization';
-import { createElement, createInputParagraph } from '../../util/misc';
+import { createElement, createInput, createInputParagraph } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
 import { Session } from '../../client/ilastik';
 import { DataSourcePicker } from './datasource_picker';
@@ -110,24 +110,29 @@ export class PredictionsExportWidget extends Applet<State>{
         this.element.classList.add("ItkPredictionsExportApplet")
 
         let fieldset = createElement({tagName: "fieldset", parentElement: this.element})
-        createElement({tagName: "legend", parentElement: fieldset, innerHTML: "Data Source"})
+        let dataSourceLegend = createElement({tagName: "legend", parentElement: fieldset, innerHTML: "Input: "})
+        dataSourceLegend.title = `\
+            The URL for the dataset that should be batch-processed with the classifier you've just trained.
+            This could be the same URL of the dataset you've used during training
+        `.replace(/^ +/g, "")
 
         new DataSourcePicker({name: "export_datasource_applet", parentElement: fieldset, session})
 
         fieldset = createElement({tagName: "fieldset", parentElement: this.element})
-        createElement({tagName: "legend", parentElement: fieldset, innerHTML: "Data Sink"})
+        createElement({tagName: "legend", parentElement: fieldset, innerHTML: "Output:"})
 
         this.bucketNameInput = createInputParagraph({
             inputType: "text", parentElement: fieldset, label_text: "Bucket name: "
         })
         this.bucketNameInput.addEventListener("focusout", () => this.setSinkParams())
 
-        this.prefixInput = createInputParagraph({
-            inputType: "text", parentElement: fieldset, label_text: "Path: "
-        })
+        let p = createElement({tagName: "p", parentElement: fieldset, cssClasses: [CssClasses.ItkInputParagraph]})
+        let pathInputLabel = createElement({tagName: "label", innerHTML: "Path: ", parentElement: p})
+        pathInputLabel.title = "This is the path within the bucket, where the output should be saved"
+        this.prefixInput = createInput({inputType: "text", parentElement: p})
         this.prefixInput.addEventListener("focusout", () => this.setSinkParams())
 
-        let p = createElement({tagName: "p", parentElement: fieldset})
+        p = createElement({tagName: "p", parentElement: fieldset, cssClasses: [CssClasses.ItkInputParagraph]})
         createElement({tagName: "label", parentElement: p, innerHTML: "Compression: "})
         this.encoderSelector = new SelectorWidget({
             parentElement: p,
@@ -135,9 +140,14 @@ export class PredictionsExportWidget extends Applet<State>{
             optionRenderer: (opt) => opt,
             onSelection: () => this.setSinkParams(),
         })
+        p.style.display = "none" //FIXME: add jpeg compression
 
-        p = createElement({tagName: "p", parentElement: this.element})
-        createElement({tagName: "label", parentElement: p, innerHTML: "Export Source: "})
+        p = createElement({tagName: "p", parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph]})
+        let exportSourceLabel = createElement({tagName: "label", parentElement: p, innerHTML: "Export Source: "})
+        exportSourceLabel.title = `\
+            PREDICTIONS: Outputs an image with one float32 channel for each class, with values between 0.0 and 1.0 representing the likelyhood of this pixel belonging to this class.
+            SIMPLE_SEGMENTATION: Outputs a 3-channel image for each class, where each pixel is either red (255,0,0) if it most likely belongs to that class or black (0,0,0) otherwise.
+        `.replace(/^ +/g, "")
         this.exportModeSelector = new SelectorWidget({
             parentElement: p,
             options: export_modes.slice(), //FIXME?

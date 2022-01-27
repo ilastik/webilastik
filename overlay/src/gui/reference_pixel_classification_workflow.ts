@@ -72,7 +72,8 @@ export class ReferencePixelClassificationWorkflowGui{
                 or even the same dataset that was used to do the training on.`,
 
                 `To do so, select a data source by typing in the URL of the datasource in the Data Source Url field and
-                select a scale from the data source.`,
+                select a scale from the data source. This will the source of data that will be processed with the pixel
+                classifier that you've just trained.`,
 
                 `Then, configure a Data Sink, i.e., a destination that will receive the results of the pixel classification.
                 For now, webilastik will only export to ebrains' data-proxy buckets; Fill in the name of the bucket and then
