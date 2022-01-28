@@ -101,7 +101,7 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
         if "format" in request.query:
             requested_format = request.query["format"]
             if requested_format != "png":
-                return web.Response(status=400, text="Server-side rendering only available in png, not in {requested_format}")
+                return web.Response(status=400, text=f"Server-side rendering only available in png, not in {requested_format}")
             if predictions.shape.z > 1:
                 return web.Response(status=400, text="Server-side rendering only available for 2d images")
 
