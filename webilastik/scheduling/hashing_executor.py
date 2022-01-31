@@ -25,7 +25,7 @@ class WorkPriority(IntEnum):
     CONTROL = 1
 
 
-class _PriorityFuture(Generic[IN, OUT], Future[OUT]):
+class _PriorityFuture(Generic[IN, OUT], Future[OUT]): # type: ignore #FIXME
     def __init__(
         self,
         *,
