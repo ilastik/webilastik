@@ -1,15 +1,11 @@
-from abc import abstractmethod, ABC
-import functools
-from typing import List, Iterable, Optional, Type, Union, Iterator
-from joblib.externals.cloudpickle.cloudpickle import instance
-from ndstructs.array5D import All, SPAN_OVERRIDE
+from abc import abstractmethod
+from typing import List, Iterable
 
 import numpy as np
+from ndstructs.point5D import Point5D
+from ndstructs.array5D import Array5D
 
-from ndstructs import Interval5D, Point5D, Shape5D, SPAN
-from ndstructs import Array5D
 from webilastik.datasource import DataSource, DataRoi
-
 from webilastik.operator import Operator
 
 class FeatureData(Array5D):
