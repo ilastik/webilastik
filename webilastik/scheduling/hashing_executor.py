@@ -227,6 +227,8 @@ class _Worker:
                         _ = self._work_queue.get_nowait().cancel()
                     except queue.Empty:
                         return
+            if priority_future.cancelled():
+                continue
             if priority_future.group_id in self._cancelled_groups:
                 _ = priority_future.cancel()
                 continue
