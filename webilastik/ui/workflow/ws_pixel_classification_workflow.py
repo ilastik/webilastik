@@ -1,5 +1,6 @@
 # pyright: reportUnusedCallResult=false
 
+from asyncio.events import AbstractEventLoop
 from asyncio.tasks import Task
 from dataclasses import dataclass
 import os
@@ -22,6 +23,7 @@ from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunk
 from webilastik.ui.applet.datasink_selector import WsDataSinkSelectorApplet
 from webilastik.ui.applet.export_applet import WsExportApplet
 from webilastik.ui.applet.datasource_picker import WsDataSourcePicker
+from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
 from webilastik.ui.usage_error import UsageError
 from webilastik.utility.url import Protocol, Url
 from webilastik.scheduling.hashing_executor import HashingExecutor
@@ -97,15 +99,22 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         self.job_updater_task: Optional[Task[Any]] = None
         self._http_client_session: Optional[ClientSession] = None
 
-        executor = HashingExecutor(name="Pixel Classification Executor")
+        executor = HashingExecutor(name="Pixel Classification Executor", max_workers=8)
 
         brushing_applet = WsBrushingApplet("brushing_applet")
         feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", datasources=brushing_applet.datasources)
+
+        def on_classifier_trained(applet: PixelClassificationApplet):
+            loop = self.app.loop #FIXME? app.loop is deprecated but I don't know where else to get it
+            logger.warn(f"&&&&&&&&&&&&&&&&&Creating a task to update clients again.............")
+            loop.call_soon_threadsafe(lambda : loop.create_task(self._update_clients_state()))
+
         self.pixel_classifier_applet = WsPixelClassificationApplet(
             "pixel_classification_applet",
             feature_extractors=feature_selection_applet.feature_extractors,
             annotations=brushing_applet.annotations,
             runner=executor,
+            on_async_update=on_classifier_trained,
         )
 
         self.export_datasource_applet = WsDataSourcePicker(
@@ -206,7 +215,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
                     parsed_payload = json.loads(msg.data)
                     logger.debug(f"Got new rpc call:\n{json.dumps(parsed_payload, indent=4)}\n")
                     payload = RPCPayload.from_json_value(parsed_payload)
-                    print("GOT PAYLOAD OK")
+                    logger.debug("GOT PAYLOAD OK")
                     await self._do_rpc(payload=payload, originator=websocket)
                 except Exception as e:
                     logger.error(f"Exception happened on set state:\n{e}")

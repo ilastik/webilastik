@@ -2,52 +2,98 @@ import { vec3 } from "gl-matrix";
 import { Applet } from "../../client/applets/applet";
 import { DataSource, Session } from "../../client/ilastik";
 import { HashMap } from "../../util/hashmap";
-import { ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonObject, JsonValue } from "../../util/serialization";
+import { createElement, createInputParagraph } from "../../util/misc";
+import { ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonObject, ensureJsonString, JsonValue } from "../../util/serialization";
 import { PredictionsView, TrainingView } from "../../viewer/view";
 import { Viewer } from "../../viewer/viewer";
+import { CssClasses } from "../css_classes";
+
+const classifier_descriptions = ["disabled", "waiting for inputs", "training", "ready"] as const;
+export type ClassifierDescription = typeof classifier_descriptions[number];
+export function ensureClassifierDescription(value: string): ClassifierDescription{
+    const variant = classifier_descriptions.find(variant => variant === value)
+    if(variant === undefined){
+        throw Error(`Invalid classifier description: ${value}`)
+    }
+    return variant
+}
 
 type State = {
-    classifier_generation: number;
-    producer_is_ready: boolean;
-    channel_colors: Array<{r: number, g: number, b: number}>;
+    generation: number,
+    description: ClassifierDescription,
+    live_update: boolean,
+    channel_colors: Array<{r: number, g: number, b: number}>,
+}
+
+function deserializeState(value: JsonValue): State{
+    let obj = ensureJsonObject(value)
+    return {
+        generation: ensureJsonNumber(obj["generation"]),
+        description: ensureClassifierDescription(ensureJsonString(obj["description"])),
+        live_update: ensureJsonBoolean(obj["live_update"]),
+        channel_colors: ensureJsonArray(obj["channel_colors"]).map(raw_color => {
+            const color_obj = ensureJsonObject(raw_color)
+            return {
+                r: ensureJsonNumber(color_obj["r"]),
+                g: ensureJsonNumber(color_obj["g"]),
+                b: ensureJsonNumber(color_obj["b"]),
+            }
+        })
+    }
 }
 
 export class PredictingWidget extends Applet<State>{
     public readonly viewer: Viewer;
     public readonly session: Session
 
-    constructor({session, viewer}: {session: Session, viewer: Viewer}){
+    public readonly element: HTMLDivElement
+    private classifierDescriptionDisplay: HTMLParagraphElement
+    private liveUpdateCheckbox: HTMLInputElement
+
+    constructor({session, viewer, parentElement}: {session: Session, viewer: Viewer, parentElement: HTMLElement}){
         super({
-            deserializer: (value: JsonValue) => {
-                let obj = ensureJsonObject(value)
-                return {
-                    classifier_generation: ensureJsonNumber(obj["classifier_generation"]),
-                    producer_is_ready: ensureJsonBoolean(obj["producer_is_ready"]),
-                    channel_colors: ensureJsonArray(obj["channel_colors"]).map(raw_color => {
-                        const color_obj = ensureJsonObject(raw_color)
-                        return {
-                            r: ensureJsonNumber(color_obj["r"]),
-                            g: ensureJsonNumber(color_obj["g"]),
-                            b: ensureJsonNumber(color_obj["b"]),
-                        }
-                    })
-                }
-            },
+            deserializer: deserializeState,
             name: "pixel_classification_applet",
             session,
             onNewState: (new_state: State) => this.onNewState(new_state),
         })
         this.viewer = viewer
         this.session = session
+
+        this.element = createElement({tagName: "div", parentElement})
+        this.classifierDescriptionDisplay = createElement({tagName: "p", parentElement: this.element})
+        this.liveUpdateCheckbox = createInputParagraph({
+            inputType: "checkbox", parentElement: this.element, label_text: "Live Update", onClick: () => {
+                this.doRPC("set_live_update", {live_update: this.liveUpdateCheckbox.checked})
+            }
+        })
+        createInputParagraph({
+            inputType: "button", parentElement: this.element, value: "Clear Predictions", onClick: (ev) => {
+                this.closePredictionViews()
+                this.doRPC("set_live_update", {live_update: false})
+                ev.preventDefault() //FIXME: is this necessary to prevent form submition?
+                return false //FIXME: is this necessary to prevent form submition?
+            }
+        })
+    }
+
+    private closePredictionViews(){
+        this.viewer.getViews().forEach(view => {
+            if(view instanceof PredictionsView){
+                this.viewer.closeView(view)
+            }
+        })
+    }
+
+    private showInfo(message: string){
+        this.classifierDescriptionDisplay.innerHTML = message
+        this.classifierDescriptionDisplay.classList.add(CssClasses.InfoText)
+        this.classifierDescriptionDisplay.classList.remove(CssClasses.ErrorText)
     }
 
     private async onNewState(new_state: State){
-        if(!new_state.producer_is_ready){
-            this.viewer.getViews().forEach(view => {
-                if(view instanceof PredictingWidget){
-                    this.viewer.closeView(view)
-                }
-            })
+        this.showInfo(new_state.description)
+        if(new_state.description != "ready"){
             return
         }
 
@@ -59,7 +105,7 @@ export class PredictingWidget extends Applet<State>{
                 let predictions_view = PredictionsView.createFor({
                     raw_data: view.raw_data,
                     ilastik_session: this.session,
-                    classifier_generation: new_state.classifier_generation,
+                    classifier_generation: new_state.generation,
                 })
                 viewsToOpen.set(predictions_view.raw_data, predictions_view)
             }
@@ -69,7 +115,7 @@ export class PredictingWidget extends Applet<State>{
             if(!(view instanceof PredictionsView)){
                 continue
             }
-            if(view.classifier_generation == new_state.classifier_generation){
+            if(view.classifier_generation == new_state.generation){
                 // ... but predictions views with the same classifier generation need no refresh ...
                 viewsToOpen.delete(view.raw_data)
             }else{

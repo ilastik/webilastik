@@ -1,16 +1,14 @@
-from typing import Optional, Sequence
+from typing import Optional
 from base64 import b64decode
 import asyncio
 import json
 
-from ndstructs.utils.json_serializable import JsonObject, JsonValue
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonBoolean
 from aiohttp import web
+from webilastik.classifiers.pixel_classifier import PixelClassifier
 
-from webilastik.annotations.annotation import Annotation
 from webilastik.datasource import DataRoi, DataSource
-from webilastik.features.ilp_filter import IlpFilter
-from webilastik.scheduling.hashing_executor import HashingExecutor
-from webilastik.ui.applet import AppletOutput, UserPrompt
+from webilastik.ui.applet import PropagationError, UserPrompt
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.usage_error import UsageError
@@ -20,36 +18,35 @@ def _decode_datasource(datasource_json_b64_altchars_dash_underline: str) -> Data
     return DataSource.from_json_value(json.loads(json_str))
 
 class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
-    def __init__(
-        self,
-        name: str,
-        *,
-        feature_extractors: AppletOutput[Sequence[IlpFilter]],
-        annotations: AppletOutput[Sequence[Annotation]],
-        runner: HashingExecutor,
-    ):
-        self.runner = runner
-        super().__init__(name=name, feature_extractors=feature_extractors, annotations=annotations)
-
     def _get_json_state(self) -> JsonValue:
-        classifier = self.pixel_classifier()
-        if classifier:
-            channel_colors = tuple(color.to_json_data() for color in classifier.color_map.keys())
+        with self.lock:
+            state = self._state
+
+        if isinstance(state.classifier, PixelClassifier):
+            channel_colors = tuple(color.to_json_data() for color in state.classifier.color_map.keys())
         else:
             channel_colors = tuple()
 
         return {
-            "classifier_generation": self.classifier_generation,
-            "producer_is_ready": classifier is not None,
+            "generation": state.generation,
+            "description": state.description,
+            "live_update": state.live_update,
             "channel_colors": channel_colors,
         }
 
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
+        if(method_name == "set_live_update"):
+            live_update = ensureJsonBoolean(arguments.get("live_update"))
+            result = self.set_live_update(user_prompt=user_prompt, live_update=live_update)
+            if isinstance(result, PropagationError):
+                return UsageError(result.message)
+            return None
+
         raise ValueError(f"Invalid method name: '{method_name}'")
 
     async def predictions_precomputed_chunks_info(self, request: web.Request) -> web.Response:
-        classifier = self.pixel_classifier()
-        if classifier is None:
+        classifier = self._state.classifier
+        if not isinstance(classifier, PixelClassifier) :
             return web.json_response({"error": "Classifier is not ready yet"}, status=412)
 
         encoded_raw_data_url = str(request.match_info.get("encoded_raw_data"))

@@ -1,14 +1,19 @@
-from typing import Generic, Mapping, Optional, Sequence, Dict, Any, Iterator, Tuple, TypeVar
+# pyright: strict
+
+from concurrent.futures import Future
+from dataclasses import dataclass
+from functools import partial
+import threading
+from typing import Callable, Literal, Optional, Sequence, Dict, Union
 import textwrap
 
-from webilastik.datasource import DataRoi
 import numpy as np
+from webilastik.scheduling.hashing_executor import HashingExecutor
 
 from webilastik.ui.applet  import Applet, AppletOutput, PropagationOk, PropagationResult, UserPrompt, applet_output
-from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.annotations.annotation import Annotation, Color
 from webilastik.features.ilp_filter import IlpFilter
-from webilastik.classifiers.pixel_classifier import Predictions, VigraPixelClassifier
+from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 
 
 DEFAULT_ILP_CLASSIFIER_FACTORY = textwrap.dedent(
@@ -51,6 +56,39 @@ DEFAULT_ILP_CLASSIFIER_FACTORY = textwrap.dedent(
 
 Classifier = VigraPixelClassifier[IlpFilter]
 ColorMap = Dict[Color, np.uint8]
+Description = Literal["disabled", "waiting for inputs", "training", "ready"]
+
+@dataclass
+class _State:
+    live_update: bool
+    classifier: Union[Future[Classifier], Classifier, None]
+    generation: int
+
+    @property
+    def description(self) -> Description:
+        if not self.live_update:
+            return "disabled"
+        if self.classifier is None:
+            return "waiting for inputs"
+        if isinstance(self.classifier, Future):
+            return "training"
+        return "ready"
+
+    def updated_with(
+        self,
+        *,
+        classifier: Union[Future[Classifier], Classifier, None],
+        live_update: Optional[bool] = None,
+        generation: Optional[int] = None,
+    ) -> "_State":
+        if self.classifier != classifier and isinstance(self.classifier, Future):
+            _ = self.classifier.cancel()
+
+        return _State(
+            classifier=classifier,
+            live_update=live_update if live_update is not None else self.live_update,
+            generation=generation if generation is not None else self.generation + 1,
+        )
 
 class PixelClassificationApplet(Applet):
     def __init__(
@@ -59,49 +97,77 @@ class PixelClassificationApplet(Applet):
         *,
         feature_extractors: AppletOutput[Sequence[IlpFilter]],
         annotations: AppletOutput[Sequence[Annotation]],
+        runner: HashingExecutor,
+        on_async_update: Callable[["PixelClassificationApplet"], None],
     ):
         self._in_feature_extractors = feature_extractors
         self._in_annotations = annotations
-        self._pixel_classifier: Optional[Classifier] = None
-        self._color_map: Optional[ColorMap] = None
+        self.runner = runner
+        self.on_async_update = on_async_update
 
-        self.classifier_generation = 0
+        self._state: _State = _State(
+            live_update=False,
+            classifier=None,
+            generation=0,
+        )
+
+        self.lock = threading.Lock()
         super().__init__(name=name)
 
-    def take_snapshot(self) -> Tuple[Optional[Classifier], Optional[ColorMap]]:
-        return (self._pixel_classifier, self._color_map)
+    def take_snapshot(self) -> _State:
+        with self.lock:
+            return self._state
 
-    def restore_snaphot(self, snapshot: Tuple[Optional[Classifier], Optional[ColorMap]]) -> None:
-        self._pixel_classifier = snapshot[0]
-        self._color_map = snapshot[1]
+    def restore_snaphot(self, snapshot: _State) -> None:
+        with self.lock:
+            self._state = snapshot
 
     @applet_output
     def pixel_classifier(self) -> Optional[VigraPixelClassifier[IlpFilter]]:
-        return self._pixel_classifier
-
-    @applet_output
-    def color_map(self) -> Optional[Dict[Color, np.uint8]]:
-        return self._color_map
+        classifier = self._state.classifier
+        return classifier if isinstance(classifier, VigraPixelClassifier) else None #FIXME?
 
     def on_dependencies_changed(self, user_prompt: UserPrompt) -> PropagationResult:
-        print(f"[DEBUG] Running refresh on pixel classification applet")
-        annotations = self._in_annotations()
-        feature_extractors = self._in_feature_extractors()
-        if not annotations or not feature_extractors:
-            self._pixel_classifier = None
-            self._color_map = None
-        else:
-            self._pixel_classifier = VigraPixelClassifier[IlpFilter].train(
-                annotations=annotations,
-                feature_extractors=feature_extractors
+        with self.lock:
+            if not self._state.live_update:
+                # annotations or features changed, so classifier is stale
+                self._state = self._state.updated_with(classifier=None)
+                return PropagationOk()
+
+            annotations = self._in_annotations()
+            feature_extractors = self._in_feature_extractors()
+            if not annotations or not feature_extractors:
+                # annotations or features changed, so classifier is stale
+                self._state = self._state.updated_with(classifier=None)
+                return PropagationOk()
+
+            classifier_future = self.runner.submit(
+                partial(Classifier.train, feature_extractors), annotations
             )
-            self._color_map = Color.create_color_map([a.color for a in annotations])
-            _ = self._pixel_classifier.__getstate__() #warm up pickle cache?
-        self.classifier_generation += 1
+            previous_state = self._state = self._state.updated_with(classifier=classifier_future)
+
+        self.on_async_update(self) # update to "training"
+
+        def on_training_finished(future: Future[Classifier]):
+            with self.lock:
+                if self._state != previous_state:
+                    return
+                self._state = self._state.updated_with(classifier=future.result())
+                _ = self.propagate_downstream(user_prompt) # FIXME
+
+            if self.on_async_update:
+                self.on_async_update(self)
+
+        classifier_future.add_done_callback(on_training_finished)
         return PropagationOk()
 
 
 
+    #FIXME: making this an @user_interaction causes deadlocks for now
+    def set_live_update(self, user_prompt: UserPrompt, live_update: bool) -> PropagationResult:
+        with self.lock:
+            self._state = self._state.updated_with(classifier=self._state.classifier, live_update=live_update)
+        return self.on_dependencies_changed(user_prompt=user_prompt)
 
     # def get_ilp_classifier_feature_names(self) -> Iterator[bytes]:
     #     # FIXME: annotations can be empty!

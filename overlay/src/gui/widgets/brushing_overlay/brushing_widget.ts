@@ -12,6 +12,7 @@ import { BrushRenderer } from "./brush_renderer"
 import { BrushStrokesContainer } from "./brush_strokes_container"
 import { Viewer } from "../../../viewer/viewer"
 import { PredictionsView, RawDataView, TrainingView } from "../../../viewer/view"
+import { PredictingWidget } from "../predicting_widget";
 
 export class BrushingWidget{
     public readonly viewer: Viewer
@@ -49,7 +50,8 @@ export class BrushingWidget{
         this.trainingWidget = new TrainingWidget({
             parentElement: this.element,
             onNewBrushStroke: stroke => this.brushStrokeContainer.addBrushStroke(stroke),
-            viewer: this.viewer
+            viewer: this.viewer,
+            session,
         })
 
         this.resolutionSelectionContainer = createElement({tagName: "p", parentElement: this.element})
@@ -156,10 +158,12 @@ export class TrainingWidget{
     public readonly canvas: HTMLCanvasElement
     public readonly onNewBrushStroke: (stroke: BrushStroke) => void
     private animationRequestId: number = 0
+    public readonly liveUpdater: PredictingWidget
 
-    constructor({parentElement, viewer, onNewBrushStroke}: {
+    constructor({parentElement, viewer, session, onNewBrushStroke}: {
         parentElement: HTMLElement,
         viewer: Viewer,
+        session: Session
         onNewBrushStroke: (stroke: BrushStroke) => void,
     }){
         this.element = createElement({tagName: "div", parentElement, inlineCss: {display: "none"}})
@@ -167,6 +171,10 @@ export class TrainingWidget{
         this.gl = this.canvas.getContext("webgl2", {depth: true, stencil: true})!
         this.viewer = viewer
         this.onNewBrushStroke = onNewBrushStroke
+
+        this.liveUpdater = new PredictingWidget({
+            session, viewer, parentElement: this.element
+        })
 
         this.brushingEnabledCheckbox = createInputParagraph({
             label_text: "Enable Brushing: ",
