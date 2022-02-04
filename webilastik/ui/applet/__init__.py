@@ -129,6 +129,10 @@ class UserInteraction(Generic[P]):
                 if not action_result.is_ok():
                     self.applet.restore_snaphot(applet_snapshot)
                     return action_result
+                on_change_result = self.applet.on_dependencies_changed(user_prompt)
+                if not on_change_result.is_ok():
+                    self.applet.restore_snaphot(applet_snapshot)
+                    return on_change_result
                 propagation_result = self.applet.propagate_downstream(user_prompt)
                 return action_result if propagation_result.is_ok() else propagation_result
         except:

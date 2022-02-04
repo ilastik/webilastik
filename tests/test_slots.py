@@ -39,7 +39,9 @@ class AdderApplet(StatelesApplet):
     def out(self) -> Optional[int]:
         val1 = self._source1()
         val2 = self._source2()
-        return val1 and (val2 and (val1 + val2))
+        if val1 is None or val2 is None:
+            return None
+        return val1 + val2
 
 class PropagationCounterApplet(NoSnapshotApplet):
     def __init__(self, name: str, source: AppletOutput[Optional[int]]) -> None:
@@ -86,6 +88,7 @@ class FailingPropagationApplet(NoSnapshotApplet):
             result = PropagationOk()
         self._num_refreshes += 1
         return result
+
 
 def test_descriptors_produce_independent_slots():
     input_applet_1 = InputIdentityApplet("input1")
@@ -223,4 +226,42 @@ def test_applet_inheritance():
     c = C(value=a.value)
     a_downstream = a.get_downstream_applets()
     assert b in a_downstream and c in a_downstream and len(a_downstream) == 2
+
+
+def test_auto_update_on_user_interaction():
+    class A(Applet):
+        def __init__(self, name: str) -> None:
+            self._num_changes = 0
+            super().__init__(name)
+
+        def take_snapshot(self) -> Any:
+            return self._num_changes
+
+        def restore_snaphot(self, snapshot: int) -> None:
+            self._num_changes = snapshot
+
+        def on_dependencies_changed(self, user_prompt: UserPrompt) -> PropagationResult:
+            self._num_changes += 1
+            return PropagationOk()
+
+        @user_interaction
+        def do_something(self, user_prompt: UserPrompt) -> PropagationResult:
+            return PropagationOk()
+
+        @applet_output
+        def num_changes(self) -> int:
+            return self._num_changes
+
+    a = A(name="a")
+    b = ForwarderApplet(name="forwarder", source=a.num_changes)
+
+    assert a.num_changes() == 0
+    _ = a.do_something(dummy_prompt)
+    assert a.num_changes() == 1
+    assert b.out() == 1
+
+    _ = a.do_something(dummy_prompt)
+    _ = a.do_something(dummy_prompt)
+    assert a.num_changes() == 3
+    assert b.out() == 3
 
