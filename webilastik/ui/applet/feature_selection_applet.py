@@ -53,14 +53,14 @@ class FeatureSelectionApplet(Applet):
         self._feature_extractors = candidate_extractors.difference(incompatible_extractors)
         return PropagationOk()
 
-    @user_interaction
+    @user_interaction(refresh_self=True)
     def add_feature_extractors(self, user_prompt: UserPrompt, feature_extractors: Iterable[IlpFilter]) -> PropagationResult:
         return self._set_feature_extractors(
             user_prompt=user_prompt,
             feature_extractors=self._feature_extractors.union(feature_extractors)
         )
 
-    @user_interaction
+    @user_interaction(refresh_self=True)
     def remove_feature_extractors(self, user_prompt: UserPrompt, feature_extractors: Iterable[IlpFilter]) -> PropagationResult:
         return self._set_feature_extractors(
             user_prompt=user_prompt,

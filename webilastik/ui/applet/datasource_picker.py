@@ -30,7 +30,7 @@ class DataSourcePicker(InertApplet, NoSnapshotApplet):
         self._error_message: Optional[str] = None
         super().__init__(name)
 
-    @user_interaction
+    @user_interaction(refresh_self=True)
     def reset(self, user_prompt: UserPrompt) -> PropagationResult:
         self._do_reset()
         return PropagationOk()
@@ -44,7 +44,7 @@ class DataSourcePicker(InertApplet, NoSnapshotApplet):
     def datasource(self) -> Optional[DataSource]:
         return self._datasource
 
-    @user_interaction
+    @user_interaction(refresh_self=True)
     def set_url(self, user_prompt: UserPrompt, url: str) -> PropagationResult:
         self._do_reset()
         self._datasource_url = url
@@ -65,7 +65,7 @@ class DataSourcePicker(InertApplet, NoSnapshotApplet):
             self._datasource = self._datasource_choices[0]
         return PropagationOk()
 
-    @user_interaction
+    @user_interaction(refresh_self=True)
     def pick_datasource(self, user_prompt: UserPrompt, datasource_index: int) -> PropagationResult:
         if self._datasource_choices is None:
             return PropagationError("No DataSource choices available")

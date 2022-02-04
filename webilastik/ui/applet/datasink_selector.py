@@ -53,7 +53,7 @@ class DataSinkSelectorApplet(InertApplet):
     def restore_snaphot(self, snapshot: State) -> None:
         self._datasink = snapshot.sink
 
-    @user_interaction
+    @user_interaction(refresh_self=True)
     def set_params(
         self,
         user_prompt: UserPrompt,

@@ -9,7 +9,7 @@ class InputIdentityApplet(NoSnapshotApplet, InertApplet):
         self._value: Optional[int] = None
         super().__init__(name)
 
-    @user_interaction
+    @user_interaction(refresh_self=False)
     def set_value(self, user_prompt: UserPrompt, value: Optional[int]) -> PropagationResult:
         self._value = value
         return PropagationOk()
@@ -244,7 +244,7 @@ def test_auto_update_on_user_interaction():
             self._num_changes += 1
             return PropagationOk()
 
-        @user_interaction
+        @user_interaction(refresh_self=True)
         def do_something(self, user_prompt: UserPrompt) -> PropagationResult:
             return PropagationOk()
 

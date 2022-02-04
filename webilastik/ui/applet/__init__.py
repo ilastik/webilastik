@@ -1,4 +1,6 @@
-#pyright: strict
+#pyright: strict, reportSelfClsParameterName=false
+
+
 
 from abc import abstractmethod, ABC
 import threading
@@ -113,9 +115,17 @@ class Applet(ABC):
 APPLET = TypeVar("APPLET", bound="Applet")
 P = ParamSpec("P")
 
+
+def user_interaction(*, refresh_self: bool):
+    def wrapper(applet_method: Callable[Concatenate[APPLET, UserPrompt, P], PropagationResult]) -> _UserInteractionDescriptor[APPLET, P]:
+        return _UserInteractionDescriptor[APPLET, P](refresh_self=refresh_self, applet_method=applet_method)
+    return wrapper
+
+
 class UserInteraction(Generic[P]):
     # @private
-    def __init__(self, *, applet: APPLET, applet_method: Callable[Concatenate[APPLET, UserPrompt, P], PropagationResult]):
+    def __init__(self, *, refresh_self: bool, applet: APPLET, applet_method: Callable[Concatenate[APPLET, UserPrompt, P], PropagationResult]):
+        self.refresh_self = refresh_self
         self.applet = applet
         self._applet_method = applet_method
         self.__name__ = applet_method.__name__
@@ -129,26 +139,26 @@ class UserInteraction(Generic[P]):
                 if not action_result.is_ok():
                     self.applet.restore_snaphot(applet_snapshot)
                     return action_result
-                on_change_result = self.applet.on_dependencies_changed(user_prompt)
-                if not on_change_result.is_ok():
-                    self.applet.restore_snaphot(applet_snapshot)
-                    return on_change_result
+                if self.refresh_self:
+                    on_change_result = self.applet.on_dependencies_changed(user_prompt)
+                    if not on_change_result.is_ok():
+                        self.applet.restore_snaphot(applet_snapshot)
+                        return on_change_result
                 propagation_result = self.applet.propagate_downstream(user_prompt)
                 return action_result if propagation_result.is_ok() else propagation_result
         except:
             self.applet.restore_snaphot(applet_snapshot)
             raise
 
-class user_interaction(Generic[APPLET, P]):
-    """A decorator for user interaction methods on applets"""
-
-    def __init__(self, applet_method: Callable[Concatenate[APPLET, UserPrompt, P], PropagationResult]):
+class _UserInteractionDescriptor(Generic[APPLET, P]):
+    def __init__(self, refresh_self: bool, applet_method: Callable[Concatenate[APPLET, UserPrompt, P], PropagationResult]):
+        self.refresh_self = refresh_self
         self._applet_method = applet_method
         self.private_name: str = "__user_interaction_" + applet_method.__name__
 
     def __get__(self, instance: APPLET, owner: Type[APPLET]) -> "UserInteraction[P]":
         if not hasattr(instance, self.private_name):
-            user_input = UserInteraction[P](applet=instance, applet_method=self._applet_method)
+            user_input = UserInteraction[P](refresh_self=self.refresh_self, applet=instance, applet_method=self._applet_method)
             setattr(instance, self.private_name, user_input)
         return getattr(instance, self.private_name)
 
@@ -157,7 +167,7 @@ OUT = TypeVar("OUT", covariant=True)
 OUT2 = TypeVar("OUT2", covariant=True)
 
 class AppletOutput(Generic[OUT]):
-    """A decorator for applet outputs"""
+    """A subscribable method representing the output of an Applet"""
 
     # private method
     def __init__(
@@ -199,6 +209,8 @@ class AppletOutput(Generic[OUT]):
 
 
 class applet_output(Generic[APPLET, OUT]):
+    """A decorator for applet outputs"""
+
     # private method
     def __init__(self, method: Callable[[APPLET], OUT]):
         self._method = method
