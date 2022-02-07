@@ -110,11 +110,11 @@ class BucketFs(JsonableFilesystem):
             str(PurePosixPath("/").joinpath(subpath)).lstrip("/")
         )
 
-    def _list_objects(self, *, prefix: str, limit: int = 50) -> List[Union[BucketObject, BucketSubdir]]:
+    def _list_objects(self, *, prefix: str, limit: Optional[int] = None) -> List[Union[BucketObject, BucketSubdir]]:
         list_objects_path = self.bucket_url.updated_with(extra_search={
             "delimiter": "/",
             "prefix": prefix.lstrip("/"),
-            "limit": str(limit)
+            "limit": str(limit or 50)
         })
         response = self.session.get(list_objects_path.raw)
         response.raise_for_status()
@@ -129,27 +129,27 @@ class BucketFs(JsonableFilesystem):
                 items.append(BucketObject.from_json_value(raw_obj))
         return items
 
-    def _get_tmp_url(self, path: str) -> Optional[Url]:
+    def _get_tmp_url(self, path: str) -> Url:
         object_url = self.url.concatpath(path)
         response = self.session.get(object_url.raw)
-
-        if response.status_code == 200:
-            response_obj = ensureJsonObject(response.json())
-            return Url.parse(ensureJsonString(response_obj.get("url")))
-        if response.status_code == 404:
-            return None
         response.raise_for_status()
-        return None # FIXME?
+
+        response_obj = ensureJsonObject(response.json())
+        cscs_url = Url.parse(ensureJsonString(response_obj.get("url")))
+        assert cscs_url is not None
+        return cscs_url
 
     def getinfo(self, path: str, namespaces: Optional[Collection[str]] = ("basic",)) -> Info:
-        if self._get_tmp_url(path) != None:
-            is_dir = False
-        else:
-            sub_items = self.listdir(path)
-            if len(sub_items) == 0:
+        cscs_url = self._get_tmp_url(path)
+        head_response = self.cscs_session.head(cscs_url.raw)
+
+        if head_response.status_code == 404:
+            objects = self.listdir(path, limit=3)
+            if len(objects) == 0:
                 raise ResourceNotFound(path)
-            else:
-                is_dir = True
+            is_dir = True
+        else:
+            is_dir = False
 
         return Info(
             raw_info={
@@ -164,11 +164,11 @@ class BucketFs(JsonableFilesystem):
     def geturl(self, path: str, purpose: str = 'download') -> str:
         return self.url.concatpath(path).raw
 
-    def listdir(self, path: str) -> List[str]:
+    def listdir(self, path: str, limit: Optional[int] = None) -> List[str]:
         prefix = str(self._make_prefix(path))
         if not prefix.endswith("/"):
             prefix += "/"
-        return [str(item.name) for item in self._list_objects(prefix=prefix)]
+        return [str(item.name) for item in self._list_objects(prefix=prefix, limit=limit)]
 
     def makedir(self, path: str, permissions: Optional[Permissions] = None, recreate: bool = False) -> SubFS[FS]:
         return BucketFs(

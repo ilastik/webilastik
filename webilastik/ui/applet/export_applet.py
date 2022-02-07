@@ -97,7 +97,7 @@ class ExportApplet(NoSnapshotApplet):
     def on_dependencies_changed(self, user_prompt: UserPrompt) -> PropagationResult:
         return PropagationOk()
 
-    @user_interaction
+    @user_interaction(refresh_self=True)
     def set_sink_params(
         self,
         user_prompt: UserPrompt,

@@ -25,7 +25,7 @@ class WorkPriority(IntEnum):
     CONTROL = 1
 
 
-class _PriorityFuture(Generic[IN, OUT], Future[OUT]):
+class _PriorityFuture(Generic[IN, OUT], Future[OUT]): # type: ignore #FIXME
     def __init__(
         self,
         *,
@@ -227,6 +227,8 @@ class _Worker:
                         _ = self._work_queue.get_nowait().cancel()
                     except queue.Empty:
                         return
+            if priority_future.cancelled():
+                continue
             if priority_future.group_id in self._cancelled_groups:
                 _ = priority_future.cancel()
                 continue

@@ -50,7 +50,7 @@ export interface IDeserializer<T>{
 ///////////////////////////////////////////
 
 export function isJsonLeafValue(value: JsonableValue): value is JsonLeafValue{
-    return typeof value == "number" || typeof value == "string" || value === null
+    return typeof value == "number" || typeof value == "string" || typeof value == "boolean" || value === null
 }
 
 export function isJsonableArray(value: JsonableValue): value is JsonableArray{

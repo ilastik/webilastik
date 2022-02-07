@@ -30,12 +30,12 @@ class BrushingApplet(Applet):
     def datasources(self) -> Tuple[DataSource, ...]:
         return tuple(a.raw_data for a in self._annotations)
 
-    @user_interaction
+    @user_interaction(refresh_self=True)
     def add_annotations(self, user_prompt: UserPrompt, annotations: Sequence[Annotation]) -> PropagationResult:
         self._annotations = self._annotations + tuple(annotations)
         return PropagationOk()
 
-    @user_interaction
+    @user_interaction(refresh_self=True)
     def remove_annotations(self, user_prompt: UserPrompt, annotations: Sequence[Annotation]) -> PropagationResult:
         self._annotations = tuple(a for a in self._annotations if a not in annotations)
         return PropagationOk()

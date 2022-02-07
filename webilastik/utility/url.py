@@ -137,8 +137,6 @@ class Url:
         self.search = search or {}
         self.hash_ = hash_
         self.schemeless_raw = f"{protocol}://{self.host}"
-        if self.port:
-            self.schemeless_raw += f":{self.port}"
         self.schemeless_raw += str(path)
         if self.search:
             if search_quoting_method == SearchQuotingMethod.QUOTE_PLUS:

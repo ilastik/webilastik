@@ -126,3 +126,8 @@
     font-style: italic;
     color: grey;
 }
+
+.ItkInfoText img, .ItkErrorText img{
+    height: 1em;
+    width: 1em;
+}
