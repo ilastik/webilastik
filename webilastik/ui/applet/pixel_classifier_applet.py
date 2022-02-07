@@ -4,16 +4,17 @@ from concurrent.futures import Future
 from dataclasses import dataclass
 from functools import partial
 import threading
-from typing import Callable, Literal, Optional, Sequence, Dict, Union
+from typing import Any, Callable, Literal, Optional, Sequence, Dict, Union
 import textwrap
 
 import numpy as np
 from webilastik.scheduling.hashing_executor import HashingExecutor
 
-from webilastik.ui.applet  import Applet, AppletOutput, PropagationOk, PropagationResult, UserPrompt, applet_output
+from webilastik.ui.applet  import Applet, AppletOutput, PropagationOk, PropagationResult, UserPrompt, applet_output, user_interaction
 from webilastik.annotations.annotation import Annotation, Color
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
+from webilastik.ui.usage_error import UsageError
 
 
 DEFAULT_ILP_CLASSIFIER_FACTORY = textwrap.dedent(
@@ -56,12 +57,12 @@ DEFAULT_ILP_CLASSIFIER_FACTORY = textwrap.dedent(
 
 Classifier = VigraPixelClassifier[IlpFilter]
 ColorMap = Dict[Color, np.uint8]
-Description = Literal["disabled", "waiting for inputs", "training", "ready"]
+Description = Literal["disabled", "waiting for inputs", "training", "ready", "error"]
 
 @dataclass
 class _State:
     live_update: bool
-    classifier: Union[Future[Classifier], Classifier, None]
+    classifier: Union[Future[Classifier], Classifier, None, Exception]
     generation: int
 
     @property
@@ -72,12 +73,14 @@ class _State:
             return "waiting for inputs"
         if isinstance(self.classifier, Future):
             return "training"
+        if isinstance(self.classifier, Exception):
+            return "error"
         return "ready"
 
     def updated_with(
         self,
         *,
-        classifier: Union[Future[Classifier], Classifier, None],
+        classifier: Union[Future[Classifier], Classifier, None, Exception],
         live_update: Optional[bool] = None,
         generation: Optional[int] = None,
     ) -> "_State":
@@ -90,6 +93,8 @@ class _State:
             generation=generation if generation is not None else self.generation + 1,
         )
 
+Interaction = Callable[[], Optional[UsageError]]
+
 class PixelClassificationApplet(Applet):
     def __init__(
         self,
@@ -98,12 +103,12 @@ class PixelClassificationApplet(Applet):
         feature_extractors: AppletOutput[Sequence[IlpFilter]],
         annotations: AppletOutput[Sequence[Annotation]],
         runner: HashingExecutor,
-        on_async_update: Callable[["PixelClassificationApplet"], None],
+        enqueue_interaction: Callable[[Interaction], Any],
     ):
         self._in_feature_extractors = feature_extractors
         self._in_annotations = annotations
         self.runner = runner
-        self.on_async_update = on_async_update
+        self.enqueue_interaction = enqueue_interaction
 
         self._state: _State = _State(
             live_update=False,
@@ -146,28 +151,31 @@ class PixelClassificationApplet(Applet):
             )
             previous_state = self._state = self._state.updated_with(classifier=classifier_future)
 
-        self.on_async_update(self) # update to "training"
+        def interaction() -> Optional[UsageError]:
+            try:
+                classifier = classifier_future.result()
+            except Exception as e:
+                classifier = e
+            result = self._set_classifier(user_prompt, classifier, previous_state.generation)
+            return UsageError.check(result)
 
-        def on_training_finished(future: Future[Classifier]):
-            with self.lock:
-                if self._state != previous_state:
-                    return
-                self._state = self._state.updated_with(classifier=future.result())
-                _ = self.propagate_downstream(user_prompt) # FIXME
-
-            if self.on_async_update:
-                self.on_async_update(self)
-
-        classifier_future.add_done_callback(on_training_finished)
+        classifier_future.add_done_callback(lambda _: self.enqueue_interaction(interaction))
         return PropagationOk()
 
+    @user_interaction(refresh_self=False)
+    def _set_classifier(self, user_prompt: UserPrompt, classifier: Union[Classifier, Exception], generation: int) -> PropagationResult:
+        with self.lock:
+            if self._state.generation == generation:
+                self._state = self._state.updated_with(classifier=classifier)
+                if not isinstance(classifier, Exception):
+                    _ = classifier.__getstate__() #warm up pickle cache?
+        return PropagationOk()
 
-
-    #FIXME: making this an @user_interaction causes deadlocks for now
+    @user_interaction(refresh_self=True)
     def set_live_update(self, user_prompt: UserPrompt, live_update: bool) -> PropagationResult:
         with self.lock:
             self._state = self._state.updated_with(classifier=self._state.classifier, live_update=live_update)
-        return self.on_dependencies_changed(user_prompt=user_prompt)
+        return PropagationOk()
 
     # def get_ilp_classifier_feature_names(self) -> Iterator[bytes]:
     #     # FIXME: annotations can be empty!

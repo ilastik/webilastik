@@ -3,10 +3,11 @@
 from asyncio.events import AbstractEventLoop
 from asyncio.tasks import Task
 from dataclasses import dataclass
+from functools import partial
 import os
 import signal
 import asyncio
-from typing import Any, Iterable, List, Optional, Mapping
+from typing import Any, Callable, List, Optional, Mapping
 import json
 from base64 import b64decode
 import ssl
@@ -20,10 +21,8 @@ from aiohttp.client import ClientSession
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
-from webilastik.ui.applet.datasink_selector import WsDataSinkSelectorApplet
 from webilastik.ui.applet.export_applet import WsExportApplet
 from webilastik.ui.applet.datasource_picker import WsDataSourcePicker
-from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
 from webilastik.ui.usage_error import UsageError
 from webilastik.utility.url import Protocol, Url
 from webilastik.scheduling.hashing_executor import HashingExecutor
@@ -83,8 +82,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             await asyncio.sleep(1)
             last_seen_update, applet_status = self.export_applet.get_updated_status(last_seen_update)
             if applet_status is not None:
-                logger.warn(f"Updating jobs status")
-                await self._update_clients_state(applets=[self.export_applet])
+                await self._update_clients()
 
     @property
     def http_client_session(self) -> ClientSession:
@@ -92,29 +90,46 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             self._http_client_session = aiohttp.ClientSession()
         return self._http_client_session
 
+    @property
+    def loop(self) -> AbstractEventLoop:
+        if self._loop == None:
+            self._loop = self.app.loop
+        return self._loop
+
+    def enqueue_user_interaction(self, user_interaction: Callable[[], Optional[UsageError]]):
+        async def do_rpc():
+            error_message = None
+            try:
+                result = user_interaction()
+                if isinstance(result, UsageError):
+                    error_message = str(result)
+            except Exception as e:
+                traceback_messages = traceback.format_exc()
+                error_message = f"Unhandled Exception: {e}\n\n{traceback_messages}"
+                logger.error(error_message)
+            await self._update_clients(error_message=error_message)
+        self.loop.call_soon_threadsafe(lambda: self.loop.create_task(do_rpc()))
+
     def __init__(self, ebrains_user_token: UserToken, ssl_context: Optional[ssl.SSLContext] = None):
         self.ssl_context = ssl_context
         self.ebrains_user_token = ebrains_user_token
         self.websockets: List[web.WebSocketResponse] = []
         self.job_updater_task: Optional[Task[Any]] = None
         self._http_client_session: Optional[ClientSession] = None
+        self._loop: Optional[AbstractEventLoop] = None
 
         executor = HashingExecutor(name="Pixel Classification Executor", max_workers=8)
 
         brushing_applet = WsBrushingApplet("brushing_applet")
         feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", datasources=brushing_applet.datasources)
 
-        def on_classifier_trained(applet: PixelClassificationApplet):
-            loop = self.app.loop #FIXME? app.loop is deprecated but I don't know where else to get it
-            logger.warn(f"&&&&&&&&&&&&&&&&&Creating a task to update clients again.............")
-            loop.call_soon_threadsafe(lambda : loop.create_task(self._update_clients_state()))
 
         self.pixel_classifier_applet = WsPixelClassificationApplet(
             "pixel_classification_applet",
             feature_extractors=feature_selection_applet.feature_extractors,
             annotations=brushing_applet.annotations,
             runner=executor,
-            on_async_update=on_classifier_trained,
+            enqueue_interaction=self.enqueue_user_interaction
         )
 
         self.export_datasource_applet = WsDataSourcePicker(
@@ -205,7 +220,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         _ = await websocket.prepare(request)
         self.websockets.append(websocket)
         logger.debug(f"JUST STABILISHED A NEW CONNECTION!!!! {len(self.websockets)}")
-        await self._update_clients_state([websocket]) # when a new client connects, send it the current state
+        await self._update_clients() # when a new client connects, send it the current state
         async for msg in websocket:
             if msg.type == aiohttp.WSMsgType.TEXT:
                 if msg.data == 'close':
@@ -216,12 +231,17 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
                     logger.debug(f"Got new rpc call:\n{json.dumps(parsed_payload, indent=4)}\n")
                     payload = RPCPayload.from_json_value(parsed_payload)
                     logger.debug("GOT PAYLOAD OK")
-                    await self._do_rpc(payload=payload, originator=websocket)
-                except Exception as e:
-                    logger.error(f"Exception happened on set state:\n{e}")
+                    user_interaction = partial(
+                        self.wsapplets[payload.applet_name].run_rpc,
+                        user_prompt=dummy_prompt,
+                        method_name=payload.method_name,
+                        arguments=payload.arguments,
+                    )
+                    self.enqueue_user_interaction(user_interaction)
+                except Exception:
                     import traceback
                     traceback.print_exc()
-                    await self._update_clients_state([websocket]) # restore last known good state of offending client
+                    await self._update_clients() # restore last known good state of offending client
             elif msg.type == aiohttp.WSMsgType.BINARY:
                 logger.error(f'Unexpected binary message')
             elif msg.type == aiohttp.WSMsgType.ERROR:
@@ -232,40 +252,22 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         logger.info('websocket connection closed')
         return websocket
 
-    async def _do_rpc(self, originator: web.WebSocketResponse, payload: RPCPayload):
-        #FIXME: show bad results to user
-        try:
-            # FIXME: should UsageError be returned as a value at all?
-            result = self.wsapplets[payload.applet_name].run_rpc(user_prompt=dummy_prompt, method_name=payload.method_name, arguments=payload.arguments)
-            if isinstance(result, UsageError): # FIXME
-                raise result
-        except UsageError as e:
-            logger.error(f"UsageError: {e}")
-            await originator.send_json({"error": str(e)})
-        except Exception as e:
-            # logger.error("".join(traceback.format_exception(None, e, None)))
-            traceback_messages = traceback.format_exc()
-            logger.error("".join(traceback_messages))
-            await originator.send_json({\
-                "error": f"Unhandled Exception: {e}",
-                "trace": traceback_messages,
-            })
-        await self._update_clients_state()
+    async def _update_clients(self, error_message: Optional[str] = None):
+        if error_message is not None:
+            payload = {"error": error_message}
+        else:
+            payload = {name: applet._get_json_state() for name, applet in self.wsapplets.items()}
 
-    async def _update_clients_state(self, websockets: Optional[Iterable[web.WebSocketResponse]] = None, applets: Optional[Iterable[WsApplet]] = None):
-        ws = list(websockets) if websockets is not None else self.websockets[:]
-        logger.debug(f"Updating {len(ws)} clients")
-        state : JsonObject = {
-            applet.name: applet._get_json_state()
-            for applet in (applets if applets is not None else self.wsapplets.values())
-        }
-        # logger.debug(f"Updating remote to following state:\n{json.dumps(state, indent=4)}")
-        for websocket in ws:
+        async def do_update(ws: web.WebSocketResponse):
             try:
-                await websocket.send_str(json.dumps(state))
+                await websocket.send_str(json.dumps(payload))
             except ConnectionResetError as e:
                 logger.error(f"Got an exception while updating remote:\n{e}\n\nRemoving websocket...")
                 self.websockets.remove(websocket)
+
+        loop = self.app.loop # FIXME?
+        for websocket in self.websockets[:]:
+            loop.create_task(do_update(websocket))
 
     async def ilp_download(self, request: web.Request):
         return web.Response(

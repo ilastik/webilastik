@@ -117,7 +117,19 @@ async def main():
                 ).to_json_value()
             )
             print("done sending annotations<<<<<")
-            await asyncio.sleep(3)
+            await asyncio.sleep(2)
+
+            print("Enabling live update=======")
+            await ws.send_json(
+                RPCPayload(
+                    applet_name="pixel_classification_applet",
+                    method_name="set_live_update",
+                    arguments={
+                        "live_update": True
+                    }
+                ).to_json_value()
+            )
+            await asyncio.sleep(2)
 
 
             from base64 import b64encode
@@ -125,7 +137,7 @@ async def main():
 
             response_tasks = {}
             for tile in ds.roi.get_tiles(tile_shape=Shape5D(x=256, y=256, c=2), tiles_origin=Point5D.zero()):
-                url = f"{session_url}/predictions/raw_data={encoded_ds}/run_id=123456/data/{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_0-1"
+                url = f"{session_url}/predictions/raw_data={encoded_ds}/run_id=1/data/{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_0-1"
                 print(f"---> Requesting {url}")
                 response_tasks[tile] = session.get(url)
 
@@ -149,8 +161,8 @@ async def main():
                     applet_name="export_datasource_applet",
                     method_name="set_url",
                     arguments={
-                        # "url":"https://app.ilastik.org/public/images/c_cells_2.precomputed",
-                        "url":"precomputed://https://data-proxy.ebrains.eu/api/buckets/hbp-image-service/c_cells_2.precomputed",
+                        "url":"https://app.ilastik.org/public/images/c_cells_2.precomputed",
+                        # "url":"precomputed://https://data-proxy.ebrains.eu/api/buckets/hbp-image-service/c_cells_2.precomputed",
                     }
                 ).to_json_value()
             )
@@ -195,7 +207,7 @@ async def main():
             )
 
             print(f"---> Job successfully scheduled?")
-            await asyncio.sleep(100)
+            await asyncio.sleep(15)
 
         global finished;
         finished = True

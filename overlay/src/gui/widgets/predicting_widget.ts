@@ -2,13 +2,13 @@ import { vec3 } from "gl-matrix";
 import { Applet } from "../../client/applets/applet";
 import { DataSource, Session } from "../../client/ilastik";
 import { HashMap } from "../../util/hashmap";
-import { createElement, createInputParagraph } from "../../util/misc";
+import { createElement, createImage, createInputParagraph } from "../../util/misc";
 import { ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonObject, ensureJsonString, JsonValue } from "../../util/serialization";
 import { PredictionsView, TrainingView } from "../../viewer/view";
 import { Viewer } from "../../viewer/viewer";
 import { CssClasses } from "../css_classes";
 
-const classifier_descriptions = ["disabled", "waiting for inputs", "training", "ready"] as const;
+const classifier_descriptions = ["disabled", "waiting for inputs", "training", "ready", "error"] as const;
 export type ClassifierDescription = typeof classifier_descriptions[number];
 export function ensureClassifierDescription(value: string): ClassifierDescription{
     const variant = classifier_descriptions.find(variant => variant === value)
@@ -85,10 +85,21 @@ export class PredictingWidget extends Applet<State>{
         })
     }
 
-    private showInfo(message: string){
-        this.classifierDescriptionDisplay.innerHTML = message
-        this.classifierDescriptionDisplay.classList.add(CssClasses.InfoText)
-        this.classifierDescriptionDisplay.classList.remove(CssClasses.ErrorText)
+    private showInfo(description: ClassifierDescription){
+        this.classifierDescriptionDisplay.innerHTML = `Classifier status: ${description}`
+        if(description == "training"){
+            let loadingGif = createImage({src: "/public/images/loading.gif", parentElement: this.classifierDescriptionDisplay})
+            loadingGif.style.marginLeft = "5px"
+
+        }
+
+        if(description == "error"){
+            this.classifierDescriptionDisplay.classList.add(CssClasses.ErrorText)
+            this.classifierDescriptionDisplay.classList.remove(CssClasses.InfoText)
+        }else{
+            this.classifierDescriptionDisplay.classList.add(CssClasses.InfoText)
+            this.classifierDescriptionDisplay.classList.remove(CssClasses.ErrorText)
+        }
     }
 
     private async onNewState(new_state: State){
