@@ -165,11 +165,11 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             web.get('/status', self.get_status),
             web.get('/ws', self.open_websocket), # type: ignore
             web.get(
-                "/predictions/raw_data={encoded_raw_data}/run_id={run_id}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}",
+                "/predictions/raw_data={encoded_raw_data}/generation={generation}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}",
                 self.pixel_classifier_applet.precomputed_chunks_compute
             ),
             web.get(
-                "/predictions/raw_data={encoded_raw_data}/run_id={run_id}/info",
+                "/predictions/raw_data={encoded_raw_data}/generation={generation}/info",
                 self.pixel_classifier_applet.predictions_precomputed_chunks_info
             ),
             web.post("/ilp_project", self.ilp_download),

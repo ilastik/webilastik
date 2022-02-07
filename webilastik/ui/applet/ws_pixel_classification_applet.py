@@ -78,6 +78,7 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
 
     async def precomputed_chunks_compute(self, request: web.Request) -> web.Response:
         encoded_raw_data = str(request.match_info.get("encoded_raw_data")) # type: ignore
+        generation = int(request.match_info.get("generation")) # type: ignore
         xBegin = int(request.match_info.get("xBegin")) # type: ignore
         xEnd = int(request.match_info.get("xEnd")) # type: ignore
         yBegin = int(request.match_info.get("yBegin")) # type: ignore
@@ -89,6 +90,9 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
         classifier = self.pixel_classifier()
         if classifier is None:
             return web.json_response({"error": "Classifier is not ready yet"}, status=412)
+
+        if generation != self._state.generation:
+            return web.json_response({"error": "This classifier is stale"}, status=410)
 
         predictions = await asyncio.wrap_future(self.runner.submit(
             classifier.compute,

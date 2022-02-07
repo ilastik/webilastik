@@ -30,11 +30,15 @@ from webilastik.server.session_allocator import EbrainsSession
 
 
 finished = False
+classifier_generation = 0
 
 async def read_server_status(websocket: ClientWebSocketResponse):
+    global classifier_generation
     async for message in websocket:
         parsed_message = message.json()
-        print(f"export applet status update: {parsed_message.get('export_applet')}")
+        print(f"workflow state: {json.dumps(parsed_message)}")
+        if "pixel_classification_applet" in parsed_message:
+            classifier_generation = parsed_message["pixel_classification_applet"]["generation"]
         if finished:
             break
 
@@ -137,7 +141,7 @@ async def main():
 
             response_tasks = {}
             for tile in ds.roi.get_tiles(tile_shape=Shape5D(x=256, y=256, c=2), tiles_origin=Point5D.zero()):
-                url = f"{session_url}/predictions/raw_data={encoded_ds}/run_id=1/data/{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_0-1"
+                url = f"{session_url}/predictions/raw_data={encoded_ds}/generation={classifier_generation}/data/{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_0-1"
                 print(f"---> Requesting {url}")
                 response_tasks[tile] = session.get(url)
 
