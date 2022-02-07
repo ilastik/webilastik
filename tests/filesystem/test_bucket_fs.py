@@ -42,6 +42,9 @@ def test_bucket_read_write(raw_data_source: SkimageDataSource, bucket_fs: Bucket
         )
     ).scale_sinks[0]
 
+    assert bucket_fs.exists(precomp_path.joinpath("info").as_posix())
+    assert not bucket_fs.exists(precomp_path.joinpath("i_dont_exist").as_posix())
+
     with ProcessPoolExecutor() as executor:
         _ = list(executor.map(
             partial(_write_data, sink=sink),
