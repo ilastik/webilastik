@@ -17,6 +17,8 @@ import traceback
 import aiohttp
 from aiohttp import web
 from aiohttp.client import ClientSession
+from aiohttp.http_websocket import WSCloseCode
+from aiohttp.web_app import Application
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
@@ -101,6 +103,15 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             await self._update_clients(error_message=error_message)
         self.loop.call_soon_threadsafe(lambda: self.loop.create_task(do_rpc()))
 
+    async def close_websockets(self, app: Application):
+        for ws in self.websockets:
+            await ws.close(
+                code=WSCloseCode.GOING_AWAY,
+                message=json.dumps({
+                    "error": 'Server shutdown'
+                }).encode("utf8")
+            )
+
     def __init__(self, ebrains_user_token: UserToken, ssl_context: Optional[ssl.SSLContext] = None):
         self.ssl_context = ssl_context
         self.ebrains_user_token = ebrains_user_token
@@ -175,6 +186,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
                 self.forward_chunk_request
             ),
         ])
+        self.app.on_shutdown.append(self.close_websockets)
 
     async def get_status(self, request: web.Request) -> web.Response:
         return web.Response(
@@ -194,10 +206,10 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         try:
             pid = os.getpid()
             pgid = os.getpgid(pid)
-            # logger.info(f"Gently killing local session (pid={pid}) with SIGINT on group....")
-            # os.killpg(pgid, signal.SIGINT)
-            # _ = await asyncio.sleep(10)
-            logger.info(f"Killing local session (pid={pid}) with SIGKILL on group....")
+            logger.info(f"[SESSION KILL]Gently killing local session (pid={pid}) with SIGINT on group....")
+            os.killpg(pgid, signal.SIGINT)
+            _ = await asyncio.sleep(10)
+            logger.info(f"[SESSION KILL]Killing local session (pid={pid}) with SIGKILL on group....")
             os.killpg(pgid, signal.SIGKILL)
         except ProcessLookupError:
             pass
@@ -379,3 +391,8 @@ if __name__ == '__main__':
         ).run(
             unix_socket_path=str(args.listen_socket),
         )
+    try:
+        os.remove(args.listen_socket)
+    except FileNotFoundError:
+        pass
+

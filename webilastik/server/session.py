@@ -111,6 +111,12 @@ class LocalSession(Session):
 
         await self.process.wait()
 
-        await asyncio.create_subprocess_exec(
-            "ssh", f"{self.master_username}@{self.master_host}",  "--",  "rm", "-fv", str(self.socket_at_master)
-        )
+        try:
+            os.remove(self.socket_at_master)
+        except FileNotFoundError:
+            pass
+
+        try:
+            os.remove(self.local_socket)
+        except FileNotFoundError:
+            pass
