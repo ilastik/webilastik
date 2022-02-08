@@ -3,7 +3,7 @@
 import enum
 import threading
 import time
-from typing import Dict, Generic, Optional, Sequence, Tuple
+from typing import Callable, Dict, Generic, Optional, Sequence, Tuple
 import logging
 import uuid
 from ndstructs.array5D import Array5D
@@ -201,6 +201,7 @@ class ExportApplet(NoSnapshotApplet):
         self._error_message = None
         return job
 
+Interaction = Callable[[], Optional[UsageError]]
 
 class WsExportApplet(WsApplet, ExportApplet):
     def __init__(
@@ -211,10 +212,14 @@ class WsExportApplet(WsApplet, ExportApplet):
         executor: HashingExecutor,
         operator: AppletOutput[Optional[Operator[DataRoi, Array5D]]],
         datasource: AppletOutput[Optional[DataSource]],
+        on_job_step_completed: Optional[JobProgressCallback],
+        on_job_completed: Optional[JobCompletedCallback],
     ):
         self.jobs: Dict[uuid.UUID, Job[DataRoi]] = {}
         self.lock = threading.Lock()
         self.last_update = time.monotonic()
+        self.on_job_completed = on_job_completed
+        self.on_job_step_completed = on_job_step_completed
         super().__init__(
             name=name, executor=executor, operator=operator, datasource=datasource, ebrains_user_token=ebrains_user_token
         )
@@ -239,17 +244,9 @@ class WsExportApplet(WsApplet, ExportApplet):
             return None
 
         if method_name == "start_export_job":
-            def on_job_step_completed(job_id: uuid.UUID, step_index: int):
-                logger.debug(f"** Job step {job_id}:{step_index} done")
-                self._mark_updated()
-
-            def on_job_completed(job_id: uuid.UUID):
-                logger.debug(f"**** Job {job_id} completed")
-                self._mark_updated()
-
             job_result = self.start_export_job(
-                on_progress=on_job_step_completed,
-                on_complete=on_job_completed,
+                on_progress=self.on_job_step_completed,
+                on_complete=self.on_job_completed,
             )
             if job_result is None:
                 return None
@@ -264,16 +261,6 @@ class WsExportApplet(WsApplet, ExportApplet):
             _ = self.jobs.pop(job_id, None)
             return None
         raise ValueError(f"Invalid method name: '{method_name}'")
-
-    def _mark_updated(self):
-        with self.lock:
-            self.last_update = time.monotonic()
-
-    def get_updated_status(self, last_seen_update: float) -> Tuple[float, Optional[JsonObject]]:
-        with self.lock:
-            if last_seen_update < self.last_update:
-                return (self.last_update, self._get_json_state())
-            return (self.last_update, None)
 
     def _get_json_state(self) -> JsonObject:
         return {
