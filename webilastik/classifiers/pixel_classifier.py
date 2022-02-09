@@ -3,7 +3,6 @@ from typing import Iterator, List, Generic, Optional, Sequence, Dict, TypeVar
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 import tempfile
-from functools import lru_cache
 import os
 import h5py
 import PIL
@@ -22,12 +21,6 @@ from webilastik.annotations import Annotation, Color
 from webilastik import Project
 from webilastik.operator import Operator
 from webilastik.datasource import DataRoi, DataSource
-
-try:
-    import ilastik_operator_cache # type: ignore
-    operator_cache = ilastik_operator_cache
-except ImportError:
-    operator_cache = lru_cache(maxsize=32)
 
 class Predictions(Array5D):
     """An array of floats from 0.0 to 1.0. The value in each channel represents
@@ -141,7 +134,6 @@ class PixelClassifier(Operator[DataRoi, Predictions], Generic[FE]):
             datasource.roi.c == self.num_input_channels
         )
 
-    @operator_cache # type: ignore
     def compute(self, roi: DataRoi) -> Predictions:
         self.feature_extractor.ensure_applicable(roi.datasource)
         if roi.shape.c != self.num_input_channels:
@@ -164,6 +156,14 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         )
         self.forests = forests
         self.num_trees = sum(f.treeCount() for f in forests)
+
+        tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5")
+        os.close(tmp_file_handle)
+        for forest_index, forest in enumerate(self.forests):
+            forest.writeHDF5(tmp_file_path, f"/Forest{forest_index:04d}")
+        with h5py.File(tmp_file_path, "r") as f:
+            self.forest_data = Project.h5_group_to_dict(f["/"]) #type: ignore
+        os.remove(tmp_file_path)
 
     def get_expected_dtype(self, input_dtype: np.dtype) -> np.dtype:
         return np.dtype("float32")
@@ -225,28 +225,21 @@ class VigraPixelClassifier(PixelClassifier[FE]):
             channel_colors=Color.sort(self.color_map.keys()),
         )
 
-    def get_forest_data(self):
-        tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5")
-        os.close(tmp_file_handle)
-        for forest_index, forest in enumerate(self.forests):
-            forest.writeHDF5(tmp_file_path, f"/Forest{forest_index:04d}")
-        with h5py.File(tmp_file_path, "r") as f:
-            out = Project.h5_group_to_dict(f["/"]) #type: ignore
-        os.remove(tmp_file_path)
-        return out
-
-    @lru_cache() #FIMXE: double check classifier __hash__/__eq__
     def __getstate__(self):
-        out = self.__dict__.copy()
-        out["forests"] = self.get_forest_data()
-        return out
+        return {
+            "feature_extractors": self.feature_extractors,
+            "num_input_channels": self.num_input_channels,
+            "classes": self.classes,
+            "color_map": self.color_map,
+            "forests_data": self.forest_data
+        }
 
     def __setstate__(self, data):
         forests: List[VigraRandomForest] = []
         tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5")
         os.close(tmp_file_handle)
         with h5py.File(tmp_file_path, "r+") as f:
-            for forest_key, forest_data in data["forests"].items():
+            for forest_key, forest_data in data["forests_data"].items():
                 forest_group = f.create_group(forest_key)
                 Project.populate_h5_group(forest_group, forest_data)
                 forests.append(VigraRandomForest(tmp_file_path, forest_group.name))
