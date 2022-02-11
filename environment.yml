@@ -16,6 +16,7 @@ dependencies:
   - typing_extensions
   - aiohttp
   - requests
+  - redis-py
   - pip
   - pip:
     - git+https://git@github.com/ilastik/ndstructs@dev

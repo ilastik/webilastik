@@ -15,13 +15,7 @@ from ndstructs.point5D import Shape5D, Interval5D, Point5D, SPAN
 from ndstructs.array5D import Array5D, SPAN_OVERRIDE, All
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 from webilastik.utility.url import Url
-
-try:
-    import datasource_cache # type: ignore
-except ImportError:
-    from functools import lru_cache
-
-    ndstructs_datasource_cache = lru_cache(maxsize=32)
+from global_cache import global_cache
 
 @enum.unique
 class AddressMode(IntEnum):
@@ -112,7 +106,7 @@ class DataSource(ABC):
     def is_tile(self, tile: Interval5D) -> bool:
         return tile.is_tile(tile_shape=self.tile_shape, full_interval=self.interval, clamped=True)
 
-    @ndstructs_datasource_cache # type: ignore
+    @global_cache
     def get_tile(self, tile: Interval5D) -> Array5D:
         return self._get_tile(tile)
 

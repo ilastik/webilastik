@@ -12,13 +12,7 @@ from .feature_extractor import FeatureData
 from .ilp_filter import IlpFilter
 from webilastik.datasource import DataSource, DataRoi
 from webilastik.operator import Operator, OpRetriever
-
-try:
-    import ilastik_operator_cache # type: ignore
-    operator_cache = ilastik_operator_cache
-except ImportError:
-    from functools import lru_cache
-    operator_cache = lru_cache(maxsize=32)
+from global_cache import global_cache
 
 
 def get_axis_2d(data: JsonValue) -> Optional[str]:
@@ -88,7 +82,7 @@ class ChannelwiseFastFilter(IlpFilter):
     def is_applicable_to(self, datasource: DataSource) -> bool:
         return datasource.shape >= self.halo * 2
 
-    @operator_cache # type: ignore
+    @global_cache
     def compute(self, roi: DataRoi) -> FeatureData:
         roi_step: Shape5D = roi.shape.updated(c=1, t=1)  # compute features independently for each c and each t
         if self.axis_2d:

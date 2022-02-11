@@ -15,13 +15,13 @@
 [Unit]
 Description=Webilastik session allocator server
 Documentation=https://github.com/ilastik/webilastik
-Wants=nginx.service
+Wants=nginx.service redis-server.service
 
 [Service]
 Type=simple
 # FIXME/BUG: aiohttp must be told where certs are when running from packed environment
 Environment=SSL_CERT_DIR=/etc/ssl/certs/
-Environment=PYTHONPATH=/opt/webilastik/
+Environment=PYTHONPATH=/opt/webilastik/:/opt/webilastik/caching/redis_cache/
 ExecStart=/opt/webilastik_conda_env/bin/python3 -B /opt/webilastik/webilastik/server/session_allocator.py \
     --session-type=Local \
     --master-host=localhost \
