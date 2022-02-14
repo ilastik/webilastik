@@ -119,7 +119,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         self._http_client_session: Optional[ClientSession] = None
         self._loop: Optional[AbstractEventLoop] = None
 
-        executor = HashingExecutor(name="Pixel Classification Executor", max_workers=8)
+        executor = HashingExecutor(name="Pixel Classification Executor")
 
         brushing_applet = WsBrushingApplet("brushing_applet")
         feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", datasources=brushing_applet.datasources)
