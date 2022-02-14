@@ -1,7 +1,5 @@
 from abc import abstractmethod
 from typing import Iterator, List, Generic, Optional, Sequence, Dict, TypeVar
-import multiprocessing
-from concurrent.futures import ThreadPoolExecutor
 import tempfile
 import os
 import h5py
@@ -11,7 +9,6 @@ import io
 
 import numpy as np
 from vigra.learning import RandomForest as VigraRandomForest
-from sklearn.ensemble import RandomForestClassifier as ScikitRandomForestClassifier
 
 from ndstructs.array5D import Array5D
 from ndstructs.point5D import Interval5D, Point5D
@@ -175,7 +172,7 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         annotations: Sequence[Annotation],
         *,
         num_trees: int = 100,
-        num_forests: int = multiprocessing.cpu_count(),
+        num_forests: int = 8,
         random_seed: int = 0,
     ) -> "VigraPixelClassifier[FE]":
         training_data = TrainingData[FE](feature_extractors=feature_extractors, annotations=annotations)
@@ -186,8 +183,7 @@ class VigraPixelClassifier(PixelClassifier[FE]):
             forest.learnRF(training_data.X, training_data.y, random_seed)
             return forest
 
-        with ThreadPoolExecutor(max_workers=num_forests) as executor:
-            forests = list(executor.map(train_forest, range(num_forests)))
+        forests = list(map(train_forest, range(num_forests)))
 
         return cls(
             feature_extractors=feature_extractors,
@@ -211,9 +207,8 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         def do_predict(forest: VigraRandomForest):
             return forest.predictProbabilities(feature_data.linear_raw()) * forest.treeCount()
 
-        with ThreadPoolExecutor(max_workers=len(self.forests), thread_name_prefix="predictor") as executor:
-            for forest_predictions in executor.map(do_predict, self.forests):
-                raw_linear_predictions += forest_predictions
+        for forest_predictions in map(do_predict, self.forests):
+            raw_linear_predictions += forest_predictions
 
         raw_linear_predictions /= self.num_trees
         predictions.setflags(write=False)
