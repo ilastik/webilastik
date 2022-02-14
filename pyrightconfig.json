@@ -1,4 +1,5 @@
 {
+  "include": ["webilastik/", "test/", "caching/"],
   "exclude": ["build/"],
   "strict": ["webilastik/datasource", "webilastik/datasink"],
   "typeCheckingMode": "basic",
@@ -8,6 +9,7 @@
   "reportMissingTypeStubs": "warning",
   "useLibraryCodeForTypes": true,
   "extraPaths": ["caching/redis_cache/"],
+  "reportUnusedCallResult": "error",
   "reportUnusedVariable": "warning",
   "pythonVersion": "3.8",
   "pythonPlatform": "Linux"
