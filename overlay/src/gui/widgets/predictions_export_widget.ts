@@ -65,11 +65,21 @@ export function ensureExportMode(value: string): ExportMode{
 }
 
 
+const status_descriptions = ["upstream not ready", "no datasource selected", "missing bucket name", "missing bucket prefix", "ready"] as const;
+type StatusDescription = typeof status_descriptions[number];
+export function ensureStatuDescription(value: string): StatusDescription{
+    const variant = status_descriptions.find(variant => variant === value)
+    if(variant === undefined){
+        throw Error(`Invalid status description description: ${value}`)
+    }
+    return variant
+}
+
 type State = {
     jobs: Array<Job>,
-    error_message?: string,
-    sink_bucket_name?: string
-    sink_prefix?: Path
+    status_description: StatusDescription,
+    sink_bucket_name?: string,
+    sink_prefix?: Path,
     sink_voxel_offset: [number, number, number],
     sink_encoder: Encoding,
     mode: ExportMode,
@@ -79,7 +89,7 @@ function stateFromJsonValue(data: JsonValue): State{
     let data_obj = ensureJsonObject(data)
     return {
         jobs: Job.fromJsonArray(ensureJsonArray(data_obj["jobs"])),
-        error_message: ensureOptional(ensureJsonString, data_obj.error_message),
+        status_description: ensureStatuDescription(ensureJsonString(data_obj["status_description"])),
         sink_bucket_name: ensureOptional(ensureJsonString, data_obj["sink_bucket_name"]),
         sink_prefix: ensureOptional((v) => Path.parse(ensureJsonString(v)), data_obj["sink_prefix"]),
         sink_voxel_offset: ensureJsonNumberTripplet(data_obj["sink_voxel_offset"]),
@@ -91,7 +101,7 @@ function stateFromJsonValue(data: JsonValue): State{
 export class PredictionsExportWidget extends Applet<State>{
     public readonly element: HTMLElement;
     private job_table: HTMLTableElement;
-    private readonly errorMessageContainer: HTMLParagraphElement;
+    private readonly statusDescriptionContainer: HTMLParagraphElement;
     private bucketNameInput: HTMLInputElement;
     private prefixInput: HTMLInputElement;
     private encoderSelector: SelectorWidget<Encoding>;
@@ -159,7 +169,7 @@ export class PredictionsExportWidget extends Applet<State>{
             inputType: "button", value: "Create Job", parentElement: this.element, onClick: () => this.doRPC("start_export_job", {})
         })
 
-        this.errorMessageContainer = createElement({tagName: "p", parentElement: this.element})
+        this.statusDescriptionContainer = createElement({tagName: "p", parentElement: this.element})
 
         this.job_table = createElement({tagName: "table", parentElement: this.element, cssClasses: ["ItkPredictionsExportApplet_job_table"]});
     }
@@ -174,21 +184,25 @@ export class PredictionsExportWidget extends Applet<State>{
     }
 
     protected onNewState(new_state: State){
+        console.log(`vvvvvvvv ${this.name} got this state from server:\n${JSON.stringify(new_state, null, 4)}`)
+
         this.bucketNameInput.value = new_state.sink_bucket_name || ""
         this.prefixInput.value = new_state.sink_prefix?.toString() || ""
         this.encoderSelector.setSelection({selection: new_state.sink_encoder})
         this.exportModeSelector.setSelection({selection: new_state.mode})
 
-        this.errorMessageContainer.innerHTML = ""
-        if(new_state.error_message){
-            createElement({
-                tagName: "span",
-                parentElement: this.errorMessageContainer,
-                innerHTML: new_state.error_message,
-                cssClasses: [CssClasses.ErrorText]
-            })
-        }
+        this.statusDescriptionContainer.innerHTML = ""
+        const statusDescriptionElement = createElement({
+            tagName: "span",
+            parentElement: this.statusDescriptionContainer,
+            innerHTML: new_state.status_description,
+        })
+        statusDescriptionElement.classList.add(new_state.status_description == "ready" ? CssClasses.InfoText : CssClasses.ErrorText)
+
         this.job_table.innerHTML = ""
+        if(new_state.jobs.length == 0){
+            return
+        }
         let thead = createElement({tagName: "thead", parentElement: this.job_table})
             let head_tr = createElement({tagName: "tr", parentElement: thead})
                 createElement({tagName: "th", parentElement: head_tr, innerHTML: "name"})
