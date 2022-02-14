@@ -14,14 +14,14 @@ def _redis_cache(func: T) -> T:
     @wraps(func)
     def wrapper(*args, **kwargs):
         r = redis.Redis(connection_pool=redis_pool)
-        key_tuple = (tuple(args), sorted(kwargs.items(), key=lambda x: x[0])),
+        key_tuple = (func.__qualname__, tuple(args), sorted(kwargs.items(), key=lambda x: x[0])),
         key  = pickle.dumps(key_tuple)
-        raw_value = r.hget(func.__qualname__, key)
+        raw_value = r.get(key)
         if raw_value is not None:
             value = pickle.loads(raw_value)
         else:
             value = func(*args, **kwargs) #type: ignore
-            _ = r.hset(func.__qualname__,key, pickle.dumps(value))
+            _ = r.set(key, pickle.dumps(value))
         return value #type: ignore
     return wrapper #type: ignore
 
