@@ -150,6 +150,10 @@ class Annotation(ScalarData):
         color = Color.from_json_data(data_dict.get("color"))
         raw_data = DataSource.from_json_value(data_dict.get("raw_data"))
 
+        return cls.from_voxels(voxels=voxels, color=color, raw_data=raw_data)
+
+    @classmethod
+    def from_voxels(cls, voxels: Sequence[Point5D], color: Color, raw_data: DataSource) -> "Annotation":
         start = Point5D.min_coords(voxels)
         stop = Point5D.max_coords(voxels) + 1  # +1 because slice.stop is exclusive, but max_point isinclusive
         scribbling_roi = Interval5D.create_from_start_stop(start=start, stop=stop)
