@@ -117,7 +117,7 @@ tasks:
           Section: base
           Priority: optional
           Architecture: amd64
-          Depends:
+          Depends: redis, nginx
           Maintainer: ilastik Team <team@ilastik.org>
           Description: Webilastik
            Server and frontend for the web version of ilastik
