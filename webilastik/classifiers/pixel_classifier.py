@@ -1,5 +1,7 @@
 from abc import abstractmethod
-from typing import Iterator, List, Generic, Optional, Sequence, Dict, TypeVar
+from functools import partial
+import pickle
+from typing import Any, Iterator, List, Generic, Optional, Sequence, Dict, TypeVar
 import tempfile
 import os
 import h5py
@@ -9,6 +11,7 @@ import io
 
 import numpy as np
 from vigra.learning import RandomForest as VigraRandomForest
+from concurrent.futures import ProcessPoolExecutor
 
 from ndstructs.array5D import Array5D
 from ndstructs.point5D import Interval5D, Point5D
@@ -138,12 +141,51 @@ class PixelClassifier(Operator[DataRoi, Predictions], Generic[FE]):
         return self._do_predict(roi=roi)
 
 
+class PickableVigraRandomForest:
+    def __init__(self, forest: VigraRandomForest, forest_data: "Dict[str, Any] | None" = None) -> None:
+        self._forest: VigraRandomForest = forest
+        if forest_data:
+            self._forest_data = forest_data
+            return
+
+        tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5") # FIXME
+        os.close(tmp_file_handle)
+        self._forest.writeHDF5(tmp_file_path, f"/Forest")
+        with h5py.File(tmp_file_path, "r") as f:
+            self._forest_data = Project.h5_group_to_dict(f["/Forest"]) #type: ignore
+        os.remove(tmp_file_path)
+
+    def __getstate__(self) -> Dict[str, Any]:
+        return self._forest_data
+
+    def __setstate__(self, data: Dict[str, Any]):
+        tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5")
+        os.close(tmp_file_handle)
+        with h5py.File(tmp_file_path, "r+") as f:
+            forest_group = f.create_group("Forest")
+            Project.populate_h5_group(forest_group, data)
+            forest = VigraRandomForest(tmp_file_path, forest_group.name)
+        os.remove(tmp_file_path)
+        self.__init__(forest=forest, forest_data=data)
+
+    def predict(self, feature_data: Array5D) -> np.ndarray:
+        return self._forest.predictProbabilities(feature_data.linear_raw()) * self._forest.treeCount()
+
+    def treeCount(self) -> int:
+        return self._forest.treeCount()
+
+def _train_forest(random_seed: int, num_trees: int, training_data: TrainingData[FE]) -> PickableVigraRandomForest:
+    forest = VigraRandomForest(num_trees)
+    # forest.learnRF(training_data.X, training_data.y, random_seed)
+    forest.learnRF(training_data.X, training_data.y, 0)
+    return PickableVigraRandomForest(forest=forest)
+
 class VigraPixelClassifier(PixelClassifier[FE]):
     def __init__(
         self,
         *,
         feature_extractors: Sequence[FE],
-        forests: List[VigraRandomForest],
+        forests: List[PickableVigraRandomForest],
         classes: List[np.uint8],
         num_input_channels: int,
         color_map: Dict[Color, np.uint8],
@@ -153,14 +195,6 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         )
         self.forests = forests
         self.num_trees = sum(f.treeCount() for f in forests)
-
-        tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5")
-        os.close(tmp_file_handle)
-        for forest_index, forest in enumerate(self.forests):
-            forest.writeHDF5(tmp_file_path, f"/Forest{forest_index:04d}")
-        with h5py.File(tmp_file_path, "r") as f:
-            self.forest_data = Project.h5_group_to_dict(f["/"]) #type: ignore
-        os.remove(tmp_file_path)
 
     def get_expected_dtype(self, input_dtype: np.dtype) -> np.dtype:
         return np.dtype("float32")
@@ -176,14 +210,14 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         random_seed: int = 0,
     ) -> "VigraPixelClassifier[FE]":
         training_data = TrainingData[FE](feature_extractors=feature_extractors, annotations=annotations)
+        random_seeds = range(random_seed, random_seed + num_forests)
+        trees_per_forest = ((num_trees // num_forests) + (forest_index < num_trees % num_forests) for forest_index in range(num_forests))
 
-        def train_forest(forest_index: int) -> VigraRandomForest:
-            ntrees = (num_trees // num_forests) + (forest_index < num_trees % num_forests)
-            forest = VigraRandomForest(ntrees)
-            forest.learnRF(training_data.X, training_data.y, random_seed)
-            return forest
-
-        forests = list(map(train_forest, range(num_forests)))
+        forests = list(map(
+            partial(_train_forest, training_data=training_data),
+            random_seeds,
+            trees_per_forest
+        ))
 
         return cls(
             feature_extractors=feature_extractors,
@@ -192,6 +226,7 @@ class VigraPixelClassifier(PixelClassifier[FE]):
             classes=training_data.classes,
             color_map=training_data.color_map,
         )
+
 
     def _do_predict(self, roi: DataRoi) -> Predictions:
         feature_data = self.feature_extractor.compute(roi)
@@ -204,11 +239,8 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         assert predictions.interval == self.get_expected_roi(roi)
         raw_linear_predictions: np.ndarray = predictions.linear_raw()
 
-        def do_predict(forest: VigraRandomForest):
-            return forest.predictProbabilities(feature_data.linear_raw()) * forest.treeCount()
-
-        for forest_predictions in map(do_predict, self.forests):
-            raw_linear_predictions += forest_predictions
+        for forest in self.forests:
+            raw_linear_predictions += forest.predict(feature_data)
 
         raw_linear_predictions /= self.num_trees
         predictions.setflags(write=False)
@@ -226,23 +258,13 @@ class VigraPixelClassifier(PixelClassifier[FE]):
             "num_input_channels": self.num_input_channels,
             "classes": self.classes,
             "color_map": self.color_map,
-            "forests_data": self.forest_data
+            "forests": self.forests
         }
 
     def __setstate__(self, data):
-        forests: List[VigraRandomForest] = []
-        tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5")
-        os.close(tmp_file_handle)
-        with h5py.File(tmp_file_path, "r+") as f:
-            for forest_key, forest_data in data["forests_data"].items():
-                forest_group = f.create_group(forest_key)
-                Project.populate_h5_group(forest_group, forest_data)
-                forests.append(VigraRandomForest(tmp_file_path, forest_group.name))
-        os.remove(tmp_file_path)
-
         self.__init__(
             feature_extractors=data["feature_extractors"],
-            forests=forests,
+            forests=data["forests"],
             num_input_channels=data["num_input_channels"],
             classes=data["classes"],
             color_map=data["color_map"],
