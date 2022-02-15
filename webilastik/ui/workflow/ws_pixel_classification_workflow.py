@@ -1,13 +1,12 @@
 # pyright: reportUnusedCallResult=false
 
 from asyncio.events import AbstractEventLoop
-from asyncio.tasks import Task
 from dataclasses import dataclass
 from functools import partial
 import os
 import signal
 import asyncio
-from typing import Any, Callable, List, Optional, Mapping
+from typing import Callable, List, Optional, Mapping
 import json
 from base64 import b64decode
 import ssl
@@ -18,6 +17,8 @@ import traceback
 import aiohttp
 from aiohttp import web
 from aiohttp.client import ClientSession
+from aiohttp.http_websocket import WSCloseCode
+from aiohttp.web_app import Application
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
@@ -76,14 +77,6 @@ class RPCPayload:
 
 
 class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
-    async def update_remote_jobs(self):
-        last_seen_update = 0
-        while True:
-            await asyncio.sleep(1)
-            last_seen_update, applet_status = self.export_applet.get_updated_status(last_seen_update)
-            if applet_status is not None:
-                await self._update_clients()
-
     @property
     def http_client_session(self) -> ClientSession:
         if self._http_client_session is None:
@@ -110,15 +103,23 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             await self._update_clients(error_message=error_message)
         self.loop.call_soon_threadsafe(lambda: self.loop.create_task(do_rpc()))
 
+    async def close_websockets(self, app: Application):
+        for ws in self.websockets:
+            await ws.close(
+                code=WSCloseCode.GOING_AWAY,
+                message=json.dumps({
+                    "error": 'Server shutdown'
+                }).encode("utf8")
+            )
+
     def __init__(self, ebrains_user_token: UserToken, ssl_context: Optional[ssl.SSLContext] = None):
         self.ssl_context = ssl_context
         self.ebrains_user_token = ebrains_user_token
         self.websockets: List[web.WebSocketResponse] = []
-        self.job_updater_task: Optional[Task[Any]] = None
         self._http_client_session: Optional[ClientSession] = None
         self._loop: Optional[AbstractEventLoop] = None
 
-        executor = HashingExecutor(name="Pixel Classification Executor", max_workers=8)
+        executor = HashingExecutor(name="Pixel Classification Executor")
 
         brushing_applet = WsBrushingApplet("brushing_applet")
         feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", datasources=brushing_applet.datasources)
@@ -136,6 +137,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             name="export_datasource_applet",
             allowed_protocols=tuple([Protocol.HTTPS, Protocol.HTTP]),
             ebrains_user_token=self.ebrains_user_token,
+            datasource_suggestions=brushing_applet.datasources,
         )
 
         self.export_applet = WsExportApplet(
@@ -144,6 +146,8 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             executor=executor,
             operator=self.pixel_classifier_applet.pixel_classifier,
             datasource=self.export_datasource_applet.datasource,
+            on_job_step_completed=lambda job_id, step_index : self.enqueue_user_interaction(lambda: None),
+            on_job_completed=lambda job_id : self.enqueue_user_interaction(lambda: None),
         )
 
         self.wsapplets : Mapping[str, WsApplet] = {
@@ -183,6 +187,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
                 self.forward_chunk_request
             ),
         ])
+        self.app.on_shutdown.append(self.close_websockets)
 
     async def get_status(self, request: web.Request) -> web.Response:
         return web.Response(
@@ -202,10 +207,10 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         try:
             pid = os.getpid()
             pgid = os.getpgid(pid)
-            # logger.info(f"Gently killing local session (pid={pid}) with SIGINT on group....")
-            # os.killpg(pgid, signal.SIGINT)
-            # _ = await asyncio.sleep(10)
-            logger.info(f"Killing local session (pid={pid}) with SIGKILL on group....")
+            logger.info(f"[SESSION KILL]Gently killing local session (pid={pid}) with SIGINT on group....")
+            os.killpg(pgid, signal.SIGINT)
+            _ = await asyncio.sleep(10)
+            logger.info(f"[SESSION KILL]Killing local session (pid={pid}) with SIGKILL on group....")
             os.killpg(pgid, signal.SIGKILL)
         except ProcessLookupError:
             pass
@@ -214,8 +219,6 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         web.run_app(self.app, port=port, path=unix_socket_path)
 
     async def open_websocket(self, request: web.Request):
-        if self.job_updater_task is None:
-            self.job_updater_task = asyncio.create_task(self.update_remote_jobs())
         websocket = web.WebSocketResponse()
         _ = await websocket.prepare(request)
         self.websockets.append(websocket)
@@ -389,3 +392,8 @@ if __name__ == '__main__':
         ).run(
             unix_socket_path=str(args.listen_socket),
         )
+    try:
+        os.remove(args.listen_socket)
+    except FileNotFoundError:
+        pass
+

@@ -1,23 +1,28 @@
 import { Applet } from "../../client/applets/applet";
 import { DataSource, Session } from "../../client/ilastik";
-import { createElement, createInput } from "../../util/misc";
+import { createElement, createInput, createInputParagraph } from "../../util/misc";
+import { Url } from "../../util/parsed_url";
 import { ensureJsonArray, ensureJsonObject, ensureJsonString, ensureOptional, JsonValue } from "../../util/serialization";
 import { CssClasses } from "../css_classes";
-import { SelectorWidget } from "./selector_widget";
+import { ErrorPopupWidget, PopupWidget } from "./popup";
+import { OneShotSelectorWidget, SelectorWidget } from "./selector_widget";
 
 type State = {
     datasource_url?: string,
     datasource_choices?: Array<DataSource>,
     datasource?: DataSource,
     error_message?: string,
+    suggested_urls: Array<Url>,
 }
 
 export class DataSourcePicker extends Applet<State>{
     public readonly element: HTMLDivElement;
     private readonly datasourceUrlInput: HTMLInputElement;
-    private state: State = {}
+    private state: State = {suggested_urls: []}
     private readonly feedbackContainer: HTMLParagraphElement;
-    checkButton: HTMLInputElement;
+    private readonly suggestionsContainer: HTMLDivElement
+    public readonly checkButton: HTMLInputElement;
+    useDatasetFromTrainingButton: HTMLInputElement;
 
     constructor(params: {name: string, parentElement: HTMLElement, session: Session}){
         super({
@@ -32,7 +37,8 @@ export class DataSourcePicker extends Applet<State>{
                         valueObject.datasource_choices,
                     ),
                     datasource: ensureOptional(DataSource.fromJsonValue, valueObject.datasource),
-                    error_message: ensureOptional(ensureJsonString, valueObject.error_message)
+                    error_message: ensureOptional(ensureJsonString, valueObject.error_message),
+                    suggested_urls: ensureJsonArray(valueObject["suggested_urls"]).map(raw_url => Url.parse(ensureJsonString(raw_url)))
                 }
             },
             onNewState: (state: State) => this.onNewState(state),
@@ -55,6 +61,32 @@ export class DataSourcePicker extends Applet<State>{
         this.checkButton = createInput({inputType: "button", value: "check", parentElement: p, onClick: checkUrl})
 
         this.feedbackContainer = createElement({tagName: "p", parentElement: this.element})
+
+        this.suggestionsContainer = createElement({tagName: "div", parentElement: this.element})
+        this.useDatasetFromTrainingButton = createInputParagraph({inputType: "button", parentElement: this.suggestionsContainer, value: "Use dataset from training...", onClick: () => {
+            if(this.state.suggested_urls.length == 0){
+                new ErrorPopupWidget({message: "No suggestions."})
+                return
+            }
+            this.useDatasetFromTrainingButton.disabled = true
+            let popup = new PopupWidget("Input suggestions")
+            new OneShotSelectorWidget({
+                parentElement: popup.element,
+                options: this.state.suggested_urls,
+                optionRenderer: (url) => url.raw,
+                onOk: (url) => {
+                    this.doRPC("set_url", {url: url.raw})
+                    this.useDatasetFromTrainingButton.disabled = false
+                    popup.destroy()
+                },
+                onCancel: () => {
+                    this.useDatasetFromTrainingButton.disabled = false
+                    popup.destroy()
+                },
+            })
+        }})
+
+
     }
 
     private onNewState(state: State): void{
@@ -77,6 +109,7 @@ export class DataSourcePicker extends Applet<State>{
             })
         }
         if(state.datasource_choices !== undefined){
+            createElement({tagName: "p", parentElement: this.feedbackContainer, innerHTML: "Select a resolution:"})
             new SelectorWidget<DataSource>({
                 parentElement: this.feedbackContainer,
                 options: state.datasource_choices,

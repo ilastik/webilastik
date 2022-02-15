@@ -154,7 +154,7 @@ export class Url implements IJsonable{
             String.raw`(?<port>\d+)` +
         ")?" +
 
-        String.raw`(?<path>/[^?]*)` +
+        String.raw`(?<path>/[^?#]*)` +
 
         String.raw`(\?` +
             "(?<search>[^#]*)" +

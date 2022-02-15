@@ -5,7 +5,7 @@ from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonI
 
 from webilastik.libebrains.user_token import UserToken
 from webilastik.ui import parse_url
-from webilastik.ui.applet import InertApplet, NoSnapshotApplet, PropagationError, PropagationOk, PropagationResult, UserPrompt, applet_output, user_interaction
+from webilastik.ui.applet import AppletOutput, InertApplet, NoSnapshotApplet, PropagationError, PropagationOk, PropagationResult, UserPrompt, applet_output, user_interaction
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.datasource import  try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError
@@ -18,9 +18,12 @@ class DataSourcePicker(InertApplet, NoSnapshotApplet):
         self,
         *,
         name: str,
+        datasource_suggestions: "AppletOutput[Sequence[DataSource] | None]",
         ebrains_user_token: UserToken,
         allowed_protocols: Sequence[Protocol],
     ) -> None:
+        self._in_datasource_suggestions = datasource_suggestions
+
         self.ebrains_user_token = ebrains_user_token
         self.allowed_protocols = allowed_protocols
 
@@ -94,9 +97,11 @@ class WsDataSourcePicker(WsApplet, DataSourcePicker):
 
 
     def _get_json_state(self) -> JsonValue:
+        suggestion_datasource_urls = [ds.url for ds in (self._in_datasource_suggestions() or [])]
         return {
             "datasource_url": toJsonValue(self._datasource_url),
             "datasource_choices": toJsonValue(tuple(self._datasource_choices or ()) or None),
             "datasource": toJsonValue(self._datasource),
             "error_message": toJsonValue(self._error_message),
+            "suggested_urls": tuple([url.raw for url in suggestion_datasource_urls if url is not None]),
         }

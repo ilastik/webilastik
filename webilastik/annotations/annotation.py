@@ -1,4 +1,3 @@
-from concurrent.futures import ThreadPoolExecutor
 from typing import List, Sequence, Mapping, Tuple, Dict, Iterable, Sequence, Any, Optional
 
 import numpy as np
@@ -150,6 +149,10 @@ class Annotation(ScalarData):
         color = Color.from_json_data(data_dict.get("color"))
         raw_data = DataSource.from_json_value(data_dict.get("raw_data"))
 
+        return cls.from_voxels(voxels=voxels, color=color, raw_data=raw_data)
+
+    @classmethod
+    def from_voxels(cls, voxels: Sequence[Point5D], color: Color, raw_data: DataSource) -> "Annotation":
         start = Point5D.min_coords(voxels)
         stop = Point5D.max_coords(voxels) + 1  # +1 because slice.stop is exclusive, but max_point isinclusive
         scribbling_roi = Interval5D.create_from_start_stop(start=start, stop=stop)
@@ -184,11 +187,10 @@ class Annotation(ScalarData):
             return FeatureSamples.create(annotation_tile, feature_tile)
 
         tile_shape = self.raw_data.tile_shape.updated(c=self.raw_data.shape.c)
-        with ThreadPoolExecutor() as executor:
-            all_feature_samples = list(executor.map(
-                make_samples,
-                self.raw_data.roi.clamped(interval_under_annotation).get_tiles(tile_shape=tile_shape, tiles_origin=self.raw_data.location)
-            ))
+        all_feature_samples = list(map(
+            make_samples,
+            self.raw_data.roi.clamped(interval_under_annotation).get_tiles(tile_shape=tile_shape, tiles_origin=self.raw_data.location)
+        ))
 
         return all_feature_samples[0].concatenate(*all_feature_samples[1:])
 

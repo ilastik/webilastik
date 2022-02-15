@@ -155,6 +155,7 @@ class PixelClassificationApplet(Applet):
             try:
                 classifier = classifier_future.result()
             except Exception as e:
+                print(f"===>> Exception while training classifier: {e}")
                 classifier = e
             result = self._set_classifier(user_prompt, classifier, previous_state.generation)
             return UsageError.check(result)
@@ -167,8 +168,6 @@ class PixelClassificationApplet(Applet):
         with self.lock:
             if self._state.generation == generation:
                 self._state = self._state.updated_with(classifier=classifier)
-                if not isinstance(classifier, Exception):
-                    _ = classifier.__getstate__() #warm up pickle cache?
         return PropagationOk()
 
     @user_interaction(refresh_self=True)

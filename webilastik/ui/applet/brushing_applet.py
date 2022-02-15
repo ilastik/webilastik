@@ -28,7 +28,7 @@ class BrushingApplet(Applet):
 
     @applet_output
     def datasources(self) -> Tuple[DataSource, ...]:
-        return tuple(a.raw_data for a in self._annotations)
+        return tuple(set(a.raw_data for a in self._annotations))
 
     @user_interaction(refresh_self=True)
     def add_annotations(self, user_prompt: UserPrompt, annotations: Sequence[Annotation]) -> PropagationResult:

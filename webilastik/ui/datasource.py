@@ -52,8 +52,11 @@ def try_get_datasources_from_url(
         )]
 
     # Precomputed chunks URL should point to the top level folder and have a resolution=x_y_z hash (not query!) parameter
-    precomp_info = PrecomputedChunksInfo.tryLoad(filesystem=filesystem, path=ds_path.joinpath("info"))
-    if precomp_info:
+    precomp_info_result = PrecomputedChunksInfo.tryLoad(filesystem=filesystem, path=ds_path.joinpath("info"))
+    if isinstance(precomp_info_result, Exception):
+        return UsageError(str(precomp_info_result))
+    else:
+        precomp_info = precomp_info_result
         try:
             resolution = ensureJsonIntTripplet(tuple(int(axis) for axis in hash_params["resolution"].split("_")))
         except KeyError:

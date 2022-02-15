@@ -190,16 +190,15 @@ async def main():
                     applet_name="export_applet",
                     method_name="set_sink_params",
                     arguments={
-                        "bucket_name": "hbp-image-service",
-                        "prefix": f"/ilastik_test_{get_now_string()}",
-                        "voxel_offset": tuple([0,0,0]),
-                        "encoder": "raw",
+                        "sink_bucket_name": "hbp-image-service",
+                        "sink_prefix": f"/ilastik_test_{get_now_string()}",
+                        "sink_encoder": "raw",
                         "mode": "SIMPLE_SEGMENTATION",
                     }
                 ).to_json_value()
             )
 
-            await asyncio.sleep(20)
+            await asyncio.sleep(1)
 
             print(f"Sending job request??????")
             await ws.send_json(
@@ -212,6 +211,12 @@ async def main():
 
             print(f"---> Job successfully scheduled?")
             await asyncio.sleep(15)
+
+
+            close_url = f"{session_url}/close"
+            print(f"Closing session py sending delete to {close_url}")
+            r = await session.delete(close_url)
+            r.raise_for_status()
 
         global finished;
         finished = True
