@@ -281,12 +281,16 @@ class PrecomputedChunksInfo:
         )
 
     @classmethod
-    def tryLoad(cls, filesystem: JsonableFilesystem, path: Path) -> Optional["PrecomputedChunksInfo"]:
+    def tryLoad(cls, filesystem: JsonableFilesystem, path: Path) ->"PrecomputedChunksInfo | Exception":
+        url = filesystem.geturl(path.as_posix())
         if not filesystem.exists(path.as_posix()):
-            return None
+            return FileNotFoundError(f"Could not find info file at {url}")
         with filesystem.openbin(path.as_posix(), "r") as f:
-            info_json = f.read().decode("utf8")
-        return PrecomputedChunksInfo.from_json_value(json.loads(info_json))
+            try:
+                info_json = f.read().decode("utf8")
+                return PrecomputedChunksInfo.from_json_value(json.loads(info_json))
+            except Exception:
+                return ValueError(f"Could not interpret json info file at {url}")
 
     @classmethod
     def from_json_value(cls, data: JsonValue):
