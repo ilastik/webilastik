@@ -58,7 +58,7 @@ class Url:
             r"(?P<port>\d+)"
         ")?"
 
-        r"(?P<path>/[^?]*)"
+        r"(?P<path>/[^?#]*)"
 
         r"(\?"
             r"(?P<search>[^#]*)"
