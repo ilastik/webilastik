@@ -116,7 +116,6 @@ class PrecomputedChunksScaleSink(DataSink):
 
     def write(self, data: Array5D):
         chunk_path = self.base_path / self.scale.get_tile_path(data.interval)
-        print(f"Writing {data} to chunk at {chunk_path}")
         # https://github.com/google/neuroglancer/tree/master/src/neuroglancer/datasource/precomputed#raw-chunk-encoding
         # "(...) data for the chunk is stored directly in little-endian binary format in [x, y, z, channel] Fortran order"
         with self.filesystem.openbin(chunk_path.as_posix(), "w") as f:
