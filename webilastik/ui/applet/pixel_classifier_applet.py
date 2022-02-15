@@ -155,6 +155,7 @@ class PixelClassificationApplet(Applet):
             try:
                 classifier = classifier_future.result()
             except Exception as e:
+                print(f"===>> Exception while training classifier: {e}")
                 classifier = e
             result = self._set_classifier(user_prompt, classifier, previous_state.generation)
             return UsageError.check(result)

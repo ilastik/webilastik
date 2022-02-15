@@ -213,11 +213,12 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         random_seeds = range(random_seed, random_seed + num_forests)
         trees_per_forest = ((num_trees // num_forests) + (forest_index < num_trees % num_forests) for forest_index in range(num_forests))
 
-        forests = list(map(
-            partial(_train_forest, training_data=training_data),
-            random_seeds,
-            trees_per_forest
-        ))
+        with ProcessPoolExecutor(max_workers=num_trees) as executor:
+            forests = list(executor.map(
+                partial(_train_forest, training_data=training_data),
+                random_seeds,
+                trees_per_forest
+            ))
 
         return cls(
             feature_extractors=feature_extractors,
