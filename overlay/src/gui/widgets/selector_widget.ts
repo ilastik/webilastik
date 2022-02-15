@@ -131,12 +131,13 @@ export class SelectorWidget<T>{
 }
 
 export class OneShotSelectorWidget<T> extends SelectorWidget<T>{
-    constructor({options, optionRenderer, onSelection = (_) => {}, parentElement, onOk}: {
+    constructor({options, optionRenderer, onSelection = (_) => {}, parentElement, onOk, onCancel = () => {}}: {
         options: Array<T>,
         optionRenderer: (option: T, option_index: number) => string,
         onSelection?: (selection: T) => void,
         parentElement: HTMLElement,
         onOk: (option: T) => void,
+        onCancel?: () => void,
     }){
         super({options, optionRenderer, onSelection, parentElement})
         let p = createElement({tagName: "p", parentElement: this.element})
@@ -150,6 +151,7 @@ export class OneShotSelectorWidget<T> extends SelectorWidget<T>{
         }});
         createInput({inputType: "button", parentElement: p, value: "Cancel", onClick: () => {
             removeElement(this.element)
+            onCancel()
         }});
     }
 }

@@ -3,4 +3,5 @@ export enum CssClasses{
     SuccessText = "ItkSuccessText",
     InfoText = "ItkInfoText",
     ItkInputParagraph = "ItkInputParagraph",
+    ItkGrayedOut = "ItkGrayedOut",
 }

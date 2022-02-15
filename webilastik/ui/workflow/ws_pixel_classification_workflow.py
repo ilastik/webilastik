@@ -137,6 +137,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             name="export_datasource_applet",
             allowed_protocols=tuple([Protocol.HTTPS, Protocol.HTTP]),
             ebrains_user_token=self.ebrains_user_token,
+            datasource_suggestions=brushing_applet.datasources,
         )
 
         self.export_applet = WsExportApplet(
