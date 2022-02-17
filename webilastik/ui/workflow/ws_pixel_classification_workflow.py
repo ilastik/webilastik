@@ -148,6 +148,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             datasource=self.export_datasource_applet.datasource,
             on_job_step_completed=lambda job_id, step_index : self.enqueue_user_interaction(lambda: None),
             on_job_completed=lambda job_id : self.enqueue_user_interaction(lambda: None),
+            enqueue_interaction=self.enqueue_user_interaction,
         )
 
         self.wsapplets : Mapping[str, WsApplet] = {

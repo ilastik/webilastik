@@ -356,3 +356,37 @@ export async function awaitStalable<T>(params: {referenceKey: string, callable: 
     }
     return result
 }
+
+export function createTable<T extends {[key: string]: string}>(
+    params: {
+        parentElement: HTMLElement,
+        title?: {label: string} | {header: string},
+        headers: T,
+        rows: Array<{[Property in keyof T]: string}>,
+        cssClasses?: Array<string>,
+    }
+): HTMLTableElement{
+    if(params.title){
+        if("label" in params.title){
+            createElement({tagName: "label", parentElement: params.parentElement, innerHTML: params.title.label})
+        }else{
+            createElement({tagName: "h3", parentElement: params.parentElement, innerHTML: params.title.header})
+        }
+    }
+    const table = createElement({tagName: "table", parentElement: params.parentElement, cssClasses: params.cssClasses})
+
+    const header = createElement({tagName: "thead", parentElement: table})
+    for(let key in params.headers){
+        createElement({tagName: "th", parentElement: header, innerHTML: params.headers[key]})
+    }
+
+    const body = createElement({tagName: "tbody", parentElement: table})
+    for(let row of params.rows){
+        let tr = createElement({tagName: "tr", parentElement: body})
+        for(let key in row){
+            createElement({tagName: "td", parentElement: tr, innerHTML: row[key]})
+        }
+    }
+
+    return table
+}

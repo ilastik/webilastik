@@ -22,17 +22,42 @@ def test_simple_segmenter():
         ]), axiskeys="cyx")
     )
 
-    expected_segmentation = Array5D(np.asarray([
-        [[  0,   0, 255, 255],
-         [  0,   0, 255, 255],
-         [255, 255,   0, 255],
-         [255, 255, 255, 255]],
+    expected_segmentation = [
+        Array5D(np.asarray([
+           [[  0,   0, 255, 255],
+            [  0,   0, 255, 255],
+            [255, 255,   0, 255],
+            [255, 255, 255, 255]],
 
-        [[255, 255,   0,   0],
-         [255, 255,   0,   0],
-         [  0,   0, 255,   0],
-         [  0,   0,   0,   0]],
-    ]), axiskeys="cyx")
+           [[  0,   0,   0,   0],
+            [  0,   0,   0,   0],
+            [  0,   0,   0,   0],
+            [  0,   0,   0,   0]],
 
-    segmentation = segmenter.compute(input_data.roi).raw("cyx")
-    assert np.all(segmentation == expected_segmentation.raw("cyx"))
+           [[  0,   0,   0,   0],
+            [  0,   0,   0,   0],
+            [  0,   0,   0,   0],
+            [  0,   0,   0,   0]],
+        ]), axiskeys="cyx"),
+
+        Array5D(np.asarray([
+           [[255, 255,   0,   0],
+            [255, 255,   0,   0],
+            [  0,   0, 255,   0],
+            [  0,   0,   0,   0]],
+
+           [[  0,   0,   0,   0],
+            [  0,   0,   0,   0],
+            [  0,   0,   0,   0],
+            [  0,   0,   0,   0]],
+
+           [[  0,   0,   0,   0],
+            [  0,   0,   0,   0],
+            [  0,   0,   0,   0],
+            [  0,   0,   0,   0]],
+        ]), axiskeys="cyx")
+    ]
+
+    segmentations = segmenter.compute(input_data.roi)
+    for seg, expected_seg in zip(segmentations, expected_segmentation):
+        assert np.all(seg.raw("cyx") == expected_seg.raw("cyx"))

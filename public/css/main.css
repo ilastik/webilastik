@@ -48,7 +48,7 @@
     margin-bottom: 2px;
 }
 
-.ItkFeatureSelectionWidget td, .ItkFeatureSelectionWidget th, .ItkPredictionsExportApplet_job_table td, .ItkPredictionsExportApplet_job_table th{
+.ItkFeatureSelectionWidget td, .ItkFeatureSelectionWidget th, .ItkTable td, .ItkTable th{
     border: solid 1px grey;
     padding: 0.3em;
 }

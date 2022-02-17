@@ -7,7 +7,7 @@ from webilastik.datasource import DataRoi
 from webilastik.operator import OpRetriever, Operator
 
 
-class SimpleSegmenter(Operator[DataRoi, Array5D]):
+class SimpleSegmenter(Operator[DataRoi, List[Array5D]]):
     def __init__(
         self,
         *,
@@ -16,7 +16,7 @@ class SimpleSegmenter(Operator[DataRoi, Array5D]):
         super().__init__()
         self.preprocessor = preprocessor
 
-    def compute(self, roi: DataRoi) -> Array5D:
+    def compute(self, roi: DataRoi) -> List[Array5D]:
         data = self.preprocessor.compute(roi)
         winning_channel_indices = Array5D(
             arr=np.argmax(data.raw(data.axiskeys), axis=data.axiskeys.index("c")),
@@ -24,8 +24,13 @@ class SimpleSegmenter(Operator[DataRoi, Array5D]):
             location=roi.start,
         )
 
-        out = Array5D.allocate_like(data, dtype=np.dtype("uint8"))
-        for channel_index, out_channel in enumerate(out.split(shape=winning_channel_indices.shape)):
-            raw_segmentation = (winning_channel_indices.raw("tzyx") == channel_index).astype(np.dtype("uint8")) * 255
-            out_channel.raw("tzyx")[...] = raw_segmentation
-        return out
+        segmentations: List[Array5D] = []
+
+        for class_index in range(data.shape.c):
+            class_seg = Array5D.allocate(data.interval.updated(c=(0,3)), dtype=np.dtype("uint8"), value=0)
+            red_channel = class_seg.cut(c=0)
+            raw_segmentation = (winning_channel_indices.raw("tzyx") == class_index).astype(np.dtype("uint8")) * 255
+            red_channel.raw("tzyx")[...] = raw_segmentation
+            segmentations.append(class_seg)
+
+        return segmentations

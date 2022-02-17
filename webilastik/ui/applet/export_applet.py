@@ -3,12 +3,13 @@
 import enum
 import threading
 import time
-from typing import Callable, Dict, Generic, Literal, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Generic, List, Literal, Optional, Sequence, Tuple, TypeVar
 import logging
 import uuid
 from ndstructs.array5D import Array5D
 from pathlib import PurePosixPath, Path
 from dataclasses import dataclass
+from concurrent.futures import Future
 
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonIntTripplet, ensureJsonString
 import numpy as np
@@ -40,16 +41,15 @@ class ExportTask(Generic[IN]):
         tile = self.operator.compute(step_arg)
         self.sink.write(tile)
 
-
 class ExportAsSimpleSegmentationTask:
     def __init__(self, operator: Operator[DataRoi, Array5D], sinks: Sequence[DataSink]):
         self.operator = SimpleSegmenter(preprocessor=operator)
         self.sinks = sinks
 
     def __call__(self, step_arg: DataRoi):
-        tile = self.operator.compute(step_arg)
-        for channel_index, channel in enumerate(tile.split(tile.shape.updated(c=1))):
-            self.sinks[channel_index].write(channel)
+        segmentations = self.operator.compute(step_arg)
+        for segmentation, sink in zip(segmentations, self.sinks):
+            sink.write(segmentation)
 
 class ExportMode(enum.Enum):
     PREDICTIONS = "PREDICTIONS"
@@ -124,12 +124,108 @@ class _State:
             "status_description": self.get_status_description(),
         }
 
+    def try_to_data_sinks(self, ebrains_user_token: UserToken) -> "Sequence[DataSink] | UsageError":
+        datasource = self.datasource
+        classifier: VigraPixelClassifier[IlpFilter] = self.operator #type: ignore
+        sink_prefix = self.sink_prefix
+        sink_bucket_name = self.sink_bucket_name
+
+        if datasource is None:
+            return UsageError("Missing data source")
+        if classifier is None:
+            return UsageError("Upstream not ready yet")
+        if not sink_prefix:
+            return UsageError("Missing sink prefix")
+        if not sink_bucket_name:
+            return UsageError("Missing bucket name")
+
+        filesystem = BucketFs(
+            bucket_name=sink_bucket_name,
+            prefix=PurePosixPath("/"),
+            ebrains_user_token=ebrains_user_token,
+        )
+
+        if self.mode == ExportMode.PREDICTIONS:
+            return PrecomputedChunksSink.create(
+                base_path=Path(sink_prefix),
+                filesystem=filesystem,
+                info=PrecomputedChunksInfo(
+                    data_type=np.dtype("float32"),
+                    type_="image",
+                    num_channels=classifier.num_classes,
+                    scales=tuple([
+                        PrecomputedChunksScale(
+                            key=Path("exported_data"),
+                            size=(datasource.shape.x, datasource.shape.y, datasource.shape.z),
+                            chunk_sizes=tuple([(datasource.tile_shape.x, datasource.tile_shape.y, datasource.tile_shape.z)]),
+                            encoding=self.sink_encoder,
+                            voxel_offset=self.sink_voxel_offset,
+                            resolution=datasource.spatial_resolution
+                        )
+                    ]),
+                )
+            ).scale_sinks
+        elif self.mode == ExportMode.SIMPLE_SEGMENTATION:
+            return [
+                PrecomputedChunksSink.create(
+                    base_path=Path(sink_prefix).joinpath(f"class_{pixel_class}"),
+                    filesystem=filesystem,
+                    info=PrecomputedChunksInfo(
+                        data_type=np.dtype("uint8"),
+                        type_="image",
+                        num_channels=3,
+                        scales=tuple([
+                            PrecomputedChunksScale(
+                                key=Path("exported_data"),
+                                size=(datasource.shape.x, datasource.shape.y, datasource.shape.z),
+                                chunk_sizes=tuple([(datasource.tile_shape.x, datasource.tile_shape.y, datasource.tile_shape.z)]),
+                                encoding=self.sink_encoder,
+                                voxel_offset=self.sink_voxel_offset,
+                                resolution=datasource.spatial_resolution
+                            )
+                        ]),
+                    )
+                ).scale_sinks[0]
+                for pixel_class in range(classifier.num_classes)
+            ]
+        else:
+            raise NotImplementedError(f"{self.mode} is not implemented")
+
+
+
+T = TypeVar("T", covariant=True)
+
+class JsonableFuture(Generic[T]):
+    def __init__(self, name: str, future: Future[T]) -> None:
+        self.name = name
+        self.future = future
+
+    @property
+    def status(self) -> Literal["success", "failed", "running"]:
+        # FIXME: pending?
+        if not self.future.done():
+            return "running"
+        exception = self.future.exception()
+        if exception:
+            return "failed"
+        else:
+            return "success"
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "name": self.name,
+            "status": self.status,
+        }
+
+Interaction = Callable[[], Optional[UsageError]]
+
 class ExportApplet(NoSnapshotApplet):
     def __init__(
         self,
         *,
         name: str,
         ebrains_user_token: UserToken,
+        enqueue_interaction: Callable[[Interaction], Any],
         executor: HashingExecutor,
         operator: AppletOutput[Optional[RoiOperator]],
         datasource: AppletOutput[Optional[DataSource]],
@@ -141,6 +237,10 @@ class ExportApplet(NoSnapshotApplet):
         self.executor = executor
 
         self._state: _State = _State(operator=None, datasource=None)
+        self._lock = threading.Lock()
+        self._jobs: Dict[uuid.UUID, Job[DataRoi]] = {}
+        self._sink_creation_tasks: "List[  JsonableFuture[ Sequence[DataSink]|UsageError ]  ]" = []
+        self._enqueue_interaction = enqueue_interaction
 
         super().__init__(name=name)
 
@@ -172,81 +272,54 @@ class ExportApplet(NoSnapshotApplet):
         *,
         on_progress: Optional[JobProgressCallback] = None,
         on_complete: Optional[JobCompletedCallback] = None,
-    ) -> Optional[Job[DataRoi]]:
-        source = self._state.datasource
-        classifier: VigraPixelClassifier[IlpFilter] = self._state.operator #type: ignore
-        if (
-            source is None or
-            classifier is None or
-            self._state.datasource is None or
-            not self._state.sink_prefix or
-            not self._state.sink_bucket_name
-        ):
-            return None
+    ) -> "UsageError | None":
+        state = self._state
+        datasource = state.datasource
+        classifier: VigraPixelClassifier[IlpFilter] = state.operator #type: ignore #FIXME: make _State generic
 
-        filesystem = BucketFs(
-            bucket_name=self._state.sink_bucket_name,
-            prefix=PurePosixPath("/"),
-            ebrains_user_token=self.ebrains_user_token,
+        if datasource is None:
+            return UsageError("Missing data source")
+        if classifier is None:
+            return UsageError("Upstream not ready yet")
+
+        future_sinks = JsonableFuture(
+            name="Creating data sinks",
+            future=self.executor.submit(state.try_to_data_sinks, self.ebrains_user_token)
         )
+        with self._lock:
+            self._sink_creation_tasks.append(future_sinks)
 
-        if self._state.mode == ExportMode.PREDICTIONS:
-            sink = PrecomputedChunksSink.create(
-                base_path=Path(self._state.sink_prefix), #FIXME
-                filesystem=filesystem,
-                info=PrecomputedChunksInfo(
-                    data_type=np.dtype("float32"), #FIXME? maybe operator.expected_dtype or smth?
-                    type_="image",
-                    num_channels=classifier.num_classes,
-                    scales=tuple([
-                        PrecomputedChunksScale(
-                            key=Path("exported_data"),
-                            size=(source.shape.x, source.shape.y, source.shape.z),
-                            chunk_sizes=tuple([(source.tile_shape.x, source.tile_shape.y, source.tile_shape.z)]),
-                            encoding=self._state.sink_encoder,
-                            voxel_offset=self._state.sink_voxel_offset,
-                            resolution=source.spatial_resolution
-                        )
-                    ]),
+        def do_export_into_sinks() -> Optional[UsageError]:
+            try:
+                sinks_result = future_sinks.future.result()
+                if isinstance(sinks_result, UsageError):
+                    return sinks_result
+                if state.mode == ExportMode.PREDICTIONS:
+                    job_target = ExportTask(operator=classifier, sink=sinks_result[0])
+                    job_name = "Pixel Predictions Export"
+                else:
+                    job_target = ExportAsSimpleSegmentationTask(operator=classifier, sinks=sinks_result)
+                    job_name = "Simple Segmentation Export"
+                export_job = Job(
+                    name=job_name, # FIXME: add datasource url?
+                    target=job_target,
+                    args=datasource.roi.get_datasource_tiles(),
+                    on_progress=on_progress,
+                    on_complete=on_complete,
                 )
-            ).scale_sinks[0]
-            job_target = ExportTask(operator=classifier, sink=sink)
-            job_name = "Pixel Predictions Export"
-        else:
-            sinks = [
-                PrecomputedChunksSink.create(
-                    base_path=Path(self._state.sink_prefix).joinpath(f"class_{pixel_class}"), #FIXME
-                    filesystem=filesystem,
-                    info=PrecomputedChunksInfo(
-                        data_type=np.dtype("uint8"), #FIXME?
-                        type_="image",
-                        num_channels=1,
-                        scales=tuple([
-                            PrecomputedChunksScale(
-                                key=Path("exported_data"),
-                                size=(source.shape.x, source.shape.y, source.shape.z),
-                                chunk_sizes=tuple([(source.tile_shape.x, source.tile_shape.y, source.tile_shape.z)]),
-                                encoding=self._state.sink_encoder,
-                                voxel_offset=self._state.sink_voxel_offset,
-                                resolution=source.spatial_resolution
-                            )
-                        ]),
-                    )
-                ).scale_sinks[0]
-                for pixel_class in range(classifier.num_classes)
-            ]
-            job_target = ExportAsSimpleSegmentationTask(operator=classifier, sinks=sinks)
-            job_name = "Simple Segmentation Export"
+                self.executor.submit_job(export_job)
+                with self._lock:
+                    self._jobs[export_job.uuid] = export_job
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                return UsageError(f"Exception while creating data sinks: {e}")
+            finally:
+                with self._lock:
+                    self._sink_creation_tasks.remove(future_sinks)
 
-        job = Job(
-            name=job_name, # FIXME: add datasource url?
-            target=job_target,
-            args=source.roi.get_datasource_tiles(),
-            on_progress=on_progress,
-            on_complete=on_complete,
-        )
-        self.executor.submit_job(job)
-        return job
+        future_sinks.future.add_done_callback(lambda _: self._enqueue_interaction(do_export_into_sinks))
+
 
 Interaction = Callable[[], Optional[UsageError]]
 
@@ -259,16 +332,16 @@ class WsExportApplet(WsApplet, ExportApplet):
         executor: HashingExecutor,
         operator: AppletOutput[Optional[Operator[DataRoi, Array5D]]],
         datasource: AppletOutput[Optional[DataSource]],
+        enqueue_interaction: Callable[[Interaction], Any],
         on_job_step_completed: Optional[JobProgressCallback],
         on_job_completed: Optional[JobCompletedCallback],
     ):
-        self.jobs: Dict[uuid.UUID, Job[DataRoi]] = {}
         self.lock = threading.Lock()
         self.last_update = time.monotonic()
         self.on_job_completed = on_job_completed
         self.on_job_step_completed = on_job_step_completed
         super().__init__(
-            name=name, executor=executor, operator=operator, datasource=datasource, ebrains_user_token=ebrains_user_token
+            name=name, executor=executor, operator=operator, datasource=datasource, ebrains_user_token=ebrains_user_token, enqueue_interaction=enqueue_interaction
         )
 
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
@@ -295,22 +368,20 @@ class WsExportApplet(WsApplet, ExportApplet):
                 on_progress=self.on_job_step_completed,
                 on_complete=self.on_job_completed,
             )
-            if job_result is None:
-                return None
-            self.jobs[job_result.uuid] = job_result
-
-            logger.info(f"Started job {job_result.uuid}")
+            if isinstance(job_result, UsageError):
+                return job_result
             return None
 
         if method_name == "cancel_job":
             job_id = uuid.UUID(ensureJsonString(arguments.get("job_id")))
             self.executor.cancel_group(job_id)
-            _ = self.jobs.pop(job_id, None)
+            _ = self._jobs.pop(job_id, None)
             return None
         raise ValueError(f"Invalid method name: '{method_name}'")
 
     def _get_json_state(self) -> JsonObject:
         return {
-            "jobs": tuple(job.to_json_value() for job in self.jobs.values()),
+            "jobs": tuple(job.to_json_value() for job in self._jobs.values()),
+            "sink_creation_tasks": tuple(task.to_json_value() for task in self._sink_creation_tasks),
             **self._state.to_json_value()
         }

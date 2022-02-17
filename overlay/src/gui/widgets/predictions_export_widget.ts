@@ -1,7 +1,7 @@
 import { ensureJsonArray, ensureJsonNumberTripplet, ensureOptional, toJsonValue } from '../../util/serialization';
 import { Applet } from '../../client/applets/applet';
 import { ensureJsonNumber, ensureJsonObject, ensureJsonString, JsonValue } from '../../util/serialization';
-import { createElement, createInput, createInputParagraph } from '../../util/misc';
+import { createElement, createInput, createInputParagraph, createTable } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
 import { Session } from '../../client/ilastik';
 import { DataSourcePicker } from './datasource_picker';
@@ -10,8 +10,15 @@ import { Path } from '../../util/parsed_url';
 import { Encoding, ensureEncoding, encodings as precomputed_encodings } from '../../util/precomputed_chunks';
 import { SelectorWidget } from './selector_widget';
 
-
-
+const sink_creation_stati = ["success", "failed", "running" ] as const;
+export type SinkCreationStatus = typeof sink_creation_stati[number];
+export function ensureSinkCreationStatus(value: string): SinkCreationStatus{
+    const variant = sink_creation_stati.find(variant => variant === value)
+    if(variant === undefined){
+        throw Error(`Invalid sink creation status: ${value}`)
+    }
+    return variant
+}
 
 
 export class Job{
@@ -83,6 +90,7 @@ type State = {
     sink_voxel_offset: [number, number, number],
     sink_encoder: Encoding,
     mode: ExportMode,
+    sink_creation_tasks: Array<{name: string, status: SinkCreationStatus}>,
 }
 
 function stateFromJsonValue(data: JsonValue): State{
@@ -95,17 +103,24 @@ function stateFromJsonValue(data: JsonValue): State{
         sink_voxel_offset: ensureJsonNumberTripplet(data_obj["sink_voxel_offset"]),
         sink_encoder: ensureEncoding(ensureJsonString(data_obj["sink_encoder"])),
         mode: ensureExportMode(ensureJsonString(data_obj["mode"])),
+        sink_creation_tasks: ensureJsonArray(data_obj["sink_creation_tasks"]).map(v => {
+            const vobj = ensureJsonObject(v)
+            return {
+                name: ensureJsonString(vobj["name"]),
+                status: ensureSinkCreationStatus(ensureJsonString(vobj["status"]))
+            }
+        })
     }
 }
 
 export class PredictionsExportWidget extends Applet<State>{
     public readonly element: HTMLElement;
-    private job_table: HTMLTableElement;
     private readonly statusDescriptionContainer: HTMLParagraphElement;
     private bucketNameInput: HTMLInputElement;
     private prefixInput: HTMLInputElement;
     private encoderSelector: SelectorWidget<Encoding>;
     exportModeSelector: SelectorWidget<"PREDICTIONS" | "SIMPLE_SEGMENTATION">;
+    jobsDisplay: HTMLDivElement;
 
     public constructor({name, parentElement, session, help}: {
         name: string, parentElement: HTMLElement, session: Session, help: string[]
@@ -171,7 +186,7 @@ export class PredictionsExportWidget extends Applet<State>{
 
         this.statusDescriptionContainer = createElement({tagName: "p", parentElement: this.element})
 
-        this.job_table = createElement({tagName: "table", parentElement: this.element, cssClasses: ["ItkPredictionsExportApplet_job_table"]});
+        this.jobsDisplay = createElement({tagName: "div", parentElement: this.element});
     }
 
     private setSinkParams(){
@@ -199,23 +214,29 @@ export class PredictionsExportWidget extends Applet<State>{
         })
         statusDescriptionElement.classList.add(new_state.status_description == "ready" ? CssClasses.InfoText : CssClasses.ErrorText)
 
-        this.job_table.innerHTML = ""
-        if(new_state.jobs.length == 0){
-            return
+        this.jobsDisplay.innerHTML = ""
+        if(new_state.sink_creation_tasks.length > 0){
+            createTable({
+                parentElement: this.jobsDisplay,
+                cssClasses: [CssClasses.ItkTable],
+                title: {header: "Sink Creation Tasks:"},
+                headers: {name: "Name", status: "Status"},
+                rows: new_state.sink_creation_tasks,
+            })
         }
-        let thead = createElement({tagName: "thead", parentElement: this.job_table})
-            let head_tr = createElement({tagName: "tr", parentElement: thead})
-                createElement({tagName: "th", parentElement: head_tr, innerHTML: "name"})
-                createElement({tagName: "th", parentElement: head_tr, innerHTML: "status"})
-                createElement({tagName: "th", parentElement: head_tr, innerHTML: "progress"})
 
-        let tbody = createElement({tagName: "tbody", parentElement: this.job_table})
-        for(let job of new_state.jobs){
-            let job_progress = job.num_args === undefined ? "unknwown" : Math.round(job.num_completed_steps / job.num_args * 100).toString()
-            let job_tr = createElement({tagName: "tr", parentElement: tbody})
-                createElement({tagName: "td", parentElement: job_tr, innerHTML: job.name})
-                createElement({tagName: "td", parentElement: job_tr, innerHTML: job.status})
-                createElement({tagName: "td", parentElement: job_tr, innerHTML: `${job_progress}%` })
+        if(new_state.jobs.length > 0){
+            createTable({
+                parentElement: this.jobsDisplay,
+                cssClasses: [CssClasses.ItkTable],
+                title: {header: "Jobs:"},
+                headers: {name: "Name", status: "Status", progress: "Progress"},
+                rows: new_state.jobs.map(job => ({
+                    name: job.name,
+                    status: job.status,
+                    progress: job.num_args === undefined ? "unknwown" : `${Math.round(job.num_completed_steps / job.num_args * 100)}%`
+                }))
+            })
         }
     }
 }
