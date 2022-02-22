@@ -340,7 +340,6 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             headers=self.ebrains_user_token.as_auth_header(),
         ) as response:
             cscs_url = (await response.json())["url"]
-            print(f"@@@@@@@@@@@@@ FINAL REDIRECT URL IS {cscs_url}")
             raise web.HTTPFound(location=cscs_url)
 
 
