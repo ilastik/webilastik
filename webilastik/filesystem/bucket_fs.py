@@ -17,6 +17,7 @@ from webilastik.filesystem import JsonableFilesystem
 
 from webilastik.filesystem.RemoteFile import RemoteFile
 from webilastik.libebrains.user_token import UserToken
+from webilastik.ui.usage_error import UsageError
 from webilastik.utility.url import Protocol, Url
 
 
@@ -93,16 +94,19 @@ class BucketFs(JsonableFilesystem):
 
 
     @classmethod
-    def try_from_url(cls, url: Url, ebrains_user_token: UserToken) -> Optional["BucketFs"]:
+    def try_from_url(cls, url: Url, ebrains_user_token: "UserToken | None") -> "BucketFs | UsageError":
         if not url.raw.startswith(cls.API_URL.raw):
-            return None
+            return UsageError(f"Url must be inside the data-proxy ({cls.API_URL}. Got {url}")
         bucket_name_part_index = len(cls.API_URL.path.parts)
         if len(url.path.parts) <= bucket_name_part_index:
-            return None
+            return UsageError(f"Bad bucket url: {url}")
+        token_result = ebrains_user_token or UserToken.get_global_login_token()
+        if isinstance(token_result, UsageError):
+            return token_result
         return BucketFs(
             bucket_name=url.path.parts[bucket_name_part_index],
             prefix=PurePosixPath("/".join(url.path.parts[bucket_name_part_index + 1:])),
-            ebrains_user_token=ebrains_user_token,
+            ebrains_user_token=token_result,
         )
 
     def _make_prefix(self, subpath: str) -> PurePosixPath:
@@ -231,26 +235,45 @@ class BucketFs(JsonableFilesystem):
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "BucketFs":
         value_obj = ensureJsonObject(value)
+        raw_token = value_obj.get("ebrains_user_token")
+        if raw_token is not None:
+            token = UserToken.from_json_value(raw_token)
+        else:
+            token_resut = UserToken.get_global_login_token()
+            if isinstance(token_resut, UsageError):
+                raise token_resut
+            token = token_resut
         return BucketFs(
             bucket_name=ensureJsonString(value_obj.get("bucket_name")),
             prefix=PurePosixPath(ensureJsonString(value_obj.get("prefix"))),
-            ebrains_user_token=UserToken.from_json_value(value_obj.get("ebrains_user_token"))
+            ebrains_user_token=token
         )
 
     def __setstate__(self, value_obj: Dict[str, Any]):
+        raw_token = value_obj.get("ebrains_user_token")
+        if raw_token is not None:
+            token = UserToken.from_json_value(raw_token)
+        else:
+            token_resut = UserToken.get_global_login_token()
+            if isinstance(token_resut, UsageError):
+                raise token_resut
+            token = token_resut
+
         self.__init__(
             bucket_name=ensureJsonString(value_obj.get("bucket_name")),
             prefix=PurePosixPath(ensureJsonString(value_obj.get("prefix"))),
-            ebrains_user_token=UserToken.from_json_value(value_obj.get("ebrains_user_token"))
+            ebrains_user_token=token,
         )
 
-    def to_json_value(self) -> JsonObject:
-        return {
+    def to_json_value(self, omit_token: bool = False) -> JsonObject:
+        out: Dict[str, JsonValue] = {
             "__class__": self.__class__.__name__,
             "bucket_name": self.bucket_name,
             "prefix": self.prefix.as_posix(),
-            "ebrains_user_token": self.ebrains_user_token.to_json_value(),
         }
+        if not omit_token:
+            out["ebrains_user_token"] = self.ebrains_user_token.to_json_value()
+        return out
 
     def __getstate__(self) -> JsonObject:
         return self.to_json_value()

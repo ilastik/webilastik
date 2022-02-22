@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 import io
@@ -14,6 +15,7 @@ from fs.permissions import Permissions
 from fs.enums import ResourceType
 from requests.models import CaseInsensitiveDict
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
+from webilastik.ui.usage_error import UsageError
 
 from .RemoteFile import RemoteFile
 from webilastik.filesystem import JsonableFilesystem
@@ -36,13 +38,14 @@ class HttpFs(JsonableFilesystem):
         if isinstance(self.requests_verify, str) and not Path(self.requests_verify).exists():
             raise ValueError(f"CA_CERT_PATH '{self.requests_verify}' not found")
 
+        self.headers = headers or {}
         self.session = requests.Session()
-        self.session.headers.update(headers or {})
+        self.session.headers.update(self.headers)
 
     @classmethod
-    def try_from_url(cls, url: Url) -> Optional["HttpFs"]:
+    def try_from_url(cls, url: Url) -> "HttpFs | UsageError":
         if url.protocol not in (Protocol.HTTP, Protocol.HTTPS):
-            return None
+            return UsageError(f"Bad url for HttpFs: {url}")
         return HttpFs(read_url=url)
 
     def to_json_value(self) -> JsonObject:
@@ -53,18 +56,31 @@ class HttpFs(JsonableFilesystem):
         }
 
     @classmethod
-    def from_json_value(cls, value: JsonValue) -> "JsonableFilesystem":
+    def from_json_value(cls, value: JsonValue) -> "HttpFs":
         value_obj = ensureJsonObject(value)
-        raw_write_url = value_obj.get("write_url")
+
         raw_headers = value_obj.get("headers")
         if raw_headers is None:
             headers = {}
         else:
             headers_obj = ensureJsonObject(raw_headers)
             headers = {ensureJsonString(k): ensureJsonString(v) for k,v in headers_obj.items()}
+
+        read_url = Url.parse(ensureJsonString(value_obj.get("read_url")))
+        if read_url is None:
+            raise ValueError(f"Bad 'read_url' in json payload: {json.dumps(value, indent=4)}")
+
+        raw_write_url = value_obj.get("write_url")
+        if raw_write_url is None:
+            write_url = None
+        else:
+            write_url = Url.parse(ensureJsonString(raw_write_url))
+            if write_url is None:
+                raise ValueError(f"Bad write_url in HttpFs payload: {json.dumps(value, indent=4)}")
+
         return cls(
-            read_url=Url.parse(ensureJsonString(value_obj.get("read_url"))),
-            write_url=None if raw_write_url is None else Url.parse(ensureJsonString(raw_write_url)),
+            read_url=read_url,
+            write_url=write_url,
             headers=headers,
         )
 
@@ -72,10 +88,11 @@ class HttpFs(JsonableFilesystem):
         return self.to_json_value()
 
     def __setstate__(self, data: Dict[str, Any]):
+        url = HttpFs.from_json_value(data)
         self.__init__(
-            read_url=Url.parse(data["read_url"]),
-            write_url=Url.parse(data["write_url"]),
-            headers=data["headers"],
+            read_url=url.read_url,
+            write_url=url.write_url,
+            headers=url.headers,
         )
 
     def desc(self, path: str) -> str:

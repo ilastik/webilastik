@@ -21,9 +21,9 @@ from webilastik.utility.url import Url, Protocol
 def try_get_datasources_from_url(
     *,
     url: Union[Url, str],
-    ebrains_user_token: Optional[UserToken],
+    ebrains_user_token: Optional[UserToken] = None,
     allowed_protocols: Sequence[Protocol] = (Protocol.HTTP, Protocol.HTTPS)
-) -> Union[List[DataSource], UsageError]:
+) -> "List[DataSource] | UsageError":
     if isinstance(url, str):
         parsing_result = parse_url(url)
         if isinstance(parsing_result, UsageError):
@@ -40,9 +40,10 @@ def try_get_datasources_from_url(
             for k, v in parse_qs(url.hash_, keep_blank_values=True, strict_parsing=True, encoding='utf-8').items()
         }
 
-    filesystem = try_filesystem_from_url(url=fs_url, allowed_protocols=allowed_protocols, ebrains_user_token=ebrains_user_token)
-    if not filesystem:
-        return UsageError(f"Can't retrieve data from {fs_url}")
+    filesystem_result = try_filesystem_from_url(url=fs_url, allowed_protocols=allowed_protocols, ebrains_user_token=ebrains_user_token)
+    if isinstance(filesystem_result, UsageError):
+        return filesystem_result
+    filesystem = filesystem_result
 
     # FIXME: At least for now, these normal formats must have their formats in the url, just like a file extension
     if ds_path.suffix in (".png", ".jpg", ".jpeg", ".bmp", ".gif"):

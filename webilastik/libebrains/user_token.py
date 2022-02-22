@@ -1,11 +1,12 @@
 import os
 from pathlib import PurePosixPath
-from typing import Dict, Optional, Mapping
+from typing import ClassVar, Dict, Optional, Mapping
 from aiohttp.client import ClientSession
 from aiohttp.client_exceptions import ClientResponseError
 
 import requests
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
+from webilastik.ui.usage_error import UsageError
 
 from webilastik.utility.url import Url
 
@@ -13,6 +14,8 @@ from webilastik.utility.url import Url
 
 class UserToken:
     ENV_VAR_NAME = "EBRAINS_USER_ACCESS_TOKEN"
+
+    _global_login_token: "ClassVar[UserToken | None]" = None
 
     def __init__(
         self,
@@ -43,6 +46,21 @@ class UserToken:
     @classmethod
     def from_environment(cls) -> "UserToken":
         return UserToken(access_token=os.environ[cls.ENV_VAR_NAME])
+
+    @classmethod
+    def login_globally(cls, token: "UserToken"):
+        cls._global_login_token = token
+
+    @classmethod
+    def login_globally_from_environment(cls):
+        return cls.login_globally(cls.from_environment())
+
+    @classmethod
+    def get_global_login_token(cls) -> "UserToken | UsageError":
+        token = cls._global_login_token
+        if token is not None:
+            return token
+        return UsageError("Not logged in")
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "UserToken":
