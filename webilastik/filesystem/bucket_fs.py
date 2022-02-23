@@ -92,6 +92,12 @@ class BucketFs(JsonableFilesystem):
         self.cscs_session = requests.Session()
         self.pid = os.getpid()
 
+    @classmethod
+    def try_create(cls, bucket_name: str, prefix: PurePosixPath, ebrains_user_token: "UserToken | None" = None) -> "BucketFs | UsageError":
+        token_result = ebrains_user_token or UserToken.get_global_login_token()
+        if isinstance(token_result, UsageError):
+            return token_result
+        return BucketFs(bucket_name=bucket_name, prefix=prefix, ebrains_user_token=token_result)
 
     @classmethod
     def try_from_url(cls, url: Url, ebrains_user_token: "UserToken | None") -> "BucketFs | UsageError":

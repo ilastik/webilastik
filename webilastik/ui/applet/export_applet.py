@@ -17,7 +17,6 @@ import numpy as np
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksEncoder, PrecomputedChunksInfo, PrecomputedChunksScale, RawEncoder
 from webilastik.features.ilp_filter import IlpFilter
-from webilastik.libebrains.user_token import UserToken
 from webilastik.operator import Operator, IN
 from webilastik.scheduling.hashing_executor import HashingExecutor, Job, JobCompletedCallback, JobProgressCallback
 from webilastik.simple_segmenter import SimpleSegmenter
@@ -124,7 +123,8 @@ class _State:
             "status_description": self.get_status_description(),
         }
 
-    def try_to_data_sinks(self, ebrains_user_token: UserToken) -> "Sequence[DataSink] | UsageError":
+    # FIXME
+    def try_to_data_sinks(self, _: None) -> "Sequence[DataSink] | UsageError":
         datasource = self.datasource
         classifier: VigraPixelClassifier[IlpFilter] = self.operator #type: ignore
         sink_prefix = self.sink_prefix
@@ -139,16 +139,17 @@ class _State:
         if not sink_bucket_name:
             return UsageError("Missing bucket name")
 
-        filesystem = BucketFs(
+        filesystem_result = BucketFs.try_create(
             bucket_name=sink_bucket_name,
             prefix=PurePosixPath("/"),
-            ebrains_user_token=ebrains_user_token,
         )
+        if isinstance(filesystem_result, UsageError):
+            return filesystem_result
 
         if self.mode == ExportMode.PREDICTIONS:
             return PrecomputedChunksSink.create(
                 base_path=Path(sink_prefix),
-                filesystem=filesystem,
+                filesystem=filesystem_result,
                 info=PrecomputedChunksInfo(
                     data_type=np.dtype("float32"),
                     type_="image",
@@ -169,7 +170,7 @@ class _State:
             return [
                 PrecomputedChunksSink.create(
                     base_path=Path(sink_prefix).joinpath(f"class_{pixel_class}"),
-                    filesystem=filesystem,
+                    filesystem=filesystem_result,
                     info=PrecomputedChunksInfo(
                         data_type=np.dtype("uint8"),
                         type_="image",
@@ -224,14 +225,11 @@ class ExportApplet(NoSnapshotApplet):
         self,
         *,
         name: str,
-        ebrains_user_token: UserToken,
         enqueue_interaction: Callable[[Interaction], Any],
         executor: HashingExecutor,
         operator: AppletOutput[Optional[RoiOperator]],
         datasource: AppletOutput[Optional[DataSource]],
     ):
-        self.ebrains_user_token = ebrains_user_token
-
         self._in_operator = operator
         self._in_datasource = datasource
         self.executor = executor
@@ -284,7 +282,7 @@ class ExportApplet(NoSnapshotApplet):
 
         future_sinks = JsonableFuture(
             name="Creating data sinks",
-            future=self.executor.submit(state.try_to_data_sinks, self.ebrains_user_token)
+            future=self.executor.submit(state.try_to_data_sinks, None) #FIXME
         )
         with self._lock:
             self._sink_creation_tasks.append(future_sinks)
@@ -328,7 +326,6 @@ class WsExportApplet(WsApplet, ExportApplet):
         self,
         *,
         name: str,
-        ebrains_user_token: UserToken,
         executor: HashingExecutor,
         operator: AppletOutput[Optional[Operator[DataRoi, Array5D]]],
         datasource: AppletOutput[Optional[DataSource]],
@@ -341,7 +338,7 @@ class WsExportApplet(WsApplet, ExportApplet):
         self.on_job_completed = on_job_completed
         self.on_job_step_completed = on_job_step_completed
         super().__init__(
-            name=name, executor=executor, operator=operator, datasource=datasource, ebrains_user_token=ebrains_user_token, enqueue_interaction=enqueue_interaction
+            name=name, executor=executor, operator=operator, datasource=datasource, enqueue_interaction=enqueue_interaction
         )
 
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:

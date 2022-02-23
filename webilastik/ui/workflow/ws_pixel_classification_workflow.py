@@ -113,8 +113,9 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             )
 
     def __init__(self, ebrains_user_token: UserToken, ssl_context: Optional[ssl.SSLContext] = None):
+        UserToken.login_globally(ebrains_user_token)
+
         self.ssl_context = ssl_context
-        self.ebrains_user_token = ebrains_user_token
         self.websockets: List[web.WebSocketResponse] = []
         self._http_client_session: Optional[ClientSession] = None
         self._loop: Optional[AbstractEventLoop] = None
@@ -136,13 +137,11 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         self.export_datasource_applet = WsDataSourcePicker(
             name="export_datasource_applet",
             allowed_protocols=tuple([Protocol.HTTPS, Protocol.HTTP]),
-            ebrains_user_token=self.ebrains_user_token,
             datasource_suggestions=brushing_applet.datasources,
         )
 
         self.export_applet = WsExportApplet(
             name="export_applet",
-            ebrains_user_token=self.ebrains_user_token,
             executor=executor,
             operator=self.pixel_classifier_applet.pixel_classifier,
             datasource=self.export_datasource_applet.datasource,
@@ -305,10 +304,14 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         info_url = base_url.joinpath("info")
         logger.debug(f"Will request this info: {info_url.schemeless_raw}")
 
+        token = UserToken.get_global_login_token()
+        if isinstance(token, UsageError):
+            return web.Response(status=403, text="Token has expired") # FIXME
+
         async with self.http_client_session.get(
             info_url.schemeless_raw,
             ssl=self.ssl_context,
-            headers=self.ebrains_user_token.as_auth_header() if info_url.hostname == "data-proxy.ebrains.eu" else {},
+            headers=token.as_auth_header() if info_url.hostname == "data-proxy.ebrains.eu" else {},
             params={"redirect": "true"} if info_url.hostname == "data-proxy.ebrains.eu" else {},
         ) as response:
             response_text = await response.text()
@@ -334,10 +337,14 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         if tile_url.hostname != "data-proxy.ebrains.eu":
             raise web.HTTPFound(location=tile_url.schemeless_raw)
 
+        token = UserToken.get_global_login_token()
+        if isinstance(token, UsageError):
+            return web.Response(status=403, text="Token has expired") # FIXME
+
         async with self.http_client_session.get(
             tile_url.schemeless_raw,
             ssl=self.ssl_context,
-            headers=self.ebrains_user_token.as_auth_header(),
+            headers=token.as_auth_header(),
         ) as response:
             cscs_url = (await response.json())["url"]
             raise web.HTTPFound(location=cscs_url)

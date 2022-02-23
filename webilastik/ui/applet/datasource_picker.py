@@ -1,10 +1,7 @@
 from typing import Optional, Sequence
-import json
 
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonInt, ensureJsonString, ensureOptional, toJsonValue
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonInt, ensureJsonString, toJsonValue
 
-from webilastik.libebrains.user_token import UserToken
-from webilastik.ui import parse_url
 from webilastik.ui.applet import AppletOutput, InertApplet, NoSnapshotApplet, PropagationError, PropagationOk, PropagationResult, UserPrompt, applet_output, user_interaction
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.datasource import  try_get_datasources_from_url
@@ -19,12 +16,10 @@ class DataSourcePicker(InertApplet, NoSnapshotApplet):
         *,
         name: str,
         datasource_suggestions: "AppletOutput[Sequence[DataSource] | None]",
-        ebrains_user_token: UserToken,
         allowed_protocols: Sequence[Protocol],
     ) -> None:
         self._in_datasource_suggestions = datasource_suggestions
 
-        self.ebrains_user_token = ebrains_user_token
         self.allowed_protocols = allowed_protocols
 
         self._datasource_url: Optional[str] = None
@@ -57,7 +52,6 @@ class DataSourcePicker(InertApplet, NoSnapshotApplet):
             return PropagationOk()
         datasource_result = try_get_datasources_from_url(
             url=parsed_url,
-            ebrains_user_token=self.ebrains_user_token,
             allowed_protocols=self.allowed_protocols
         )
         if isinstance(datasource_result, UsageError):
