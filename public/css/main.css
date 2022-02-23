@@ -19,6 +19,7 @@
     resize: both;
     overflow: scroll;
     filter: drop-shadow(10px 10px 4px rgba(0,0,0, 0.3));
+    max-width: 30em;
 }
 
 .ItkOverlayControls_header{
