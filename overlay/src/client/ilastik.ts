@@ -148,7 +148,7 @@ export class Session{
     public static async load({ilastikUrl, sessionUrl, onUsageError}: {
         ilastikUrl: Url, sessionUrl:Url, onUsageError: (message: string) => void
     }): Promise<Session>{
-        let session_status_resp = await fetch(sessionUrl.joinPath("/api/status").schemeless_raw)
+        let session_status_resp = await fetch(sessionUrl.joinPath("status").schemeless_raw)
         if(!session_status_resp.ok){
             throw Error(`Bad response from session: ${session_status_resp.status}`)
         }
