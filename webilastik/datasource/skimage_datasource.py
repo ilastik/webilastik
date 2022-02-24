@@ -36,6 +36,17 @@ class SkimageDataSource(ArrayDataSource):
             url=url,
         )
 
+    def __hash__(self) -> int:
+        return hash((self.url, self.tile_shape, self.spatial_resolution))
+
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, SkimageDataSource) and
+            self.url == other.url and
+            self.tile_shape == other.tile_shape and
+            self.spatial_resolution == other.spatial_resolution
+        )
+
     def to_json_value(self) -> JsonObject:
         out = {**DataSource.to_json_value(self)}
         out["path"] = self.path.as_posix()

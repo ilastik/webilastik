@@ -41,6 +41,18 @@ class H5DataSource(DataSource):
             f.close()
             raise e
 
+    def __hash__(self) -> int:
+        return hash((self.outer_path, self.inner_path, self.location, self.filesystem))
+
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, H5DataSource) and
+            self.url == other.url and
+            self.inner_path == other.inner_path and
+            self.location == other.location and
+            self.filesystem == other.filesystem
+        )
+
     def to_json_value(self) -> JsonObject:
         out = {**super().to_json_value()}
         out["outer_path"] = self.outer_path.as_posix()

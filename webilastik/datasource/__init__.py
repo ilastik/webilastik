@@ -79,26 +79,13 @@ class DataSource(ABC):
                 return constructor(value)
         raise ValueError(f"Can't deserialize {json.dumps(value)}")
 
+    @abstractmethod
     def __hash__(self) -> int:
-        return hash((
-            self.tile_shape,
-            self.dtype, #type: ignore
-            self.interval,
-            self.axiskeys,
-            self.spatial_resolution,
-            self.url
-        ))
+        pass
 
+    @abstractmethod
     def __eq__(self, other: object) -> bool:
-        return (
-            isinstance(other, self.__class__) and
-            self.tile_shape == other.tile_shape and
-            self.dtype == other.dtype and #type: ignore
-            self.interval == other.interval and
-            self.axiskeys == other.axiskeys and
-            self.spatial_resolution == other.spatial_resolution and
-            self.url == other.url
-        )
+        pass
 
     def is_tile(self, tile: Interval5D) -> bool:
         return tile.is_tile(tile_shape=self.tile_shape, full_interval=self.interval, clamped=True)

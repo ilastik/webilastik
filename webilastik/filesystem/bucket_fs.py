@@ -174,6 +174,12 @@ class BucketFs(JsonableFilesystem):
     def geturl(self, path: str, purpose: str = 'download') -> str:
         return self.url.concatpath(path).raw
 
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, BucketFs) and self.geturl("/") == other.geturl("/")
+
+    def __hash__(self) -> int:
+        return hash(self.geturl("/"))
+
     def listdir(self, path: str, limit: Optional[int] = None) -> List[str]:
         prefix = str(self._make_prefix(path))
         if not prefix.endswith("/"):

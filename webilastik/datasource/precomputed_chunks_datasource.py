@@ -70,14 +70,14 @@ class PrecomputedChunksDataSource(DataSource):
         )
 
     def __hash__(self) -> int:
-        return hash((super().__hash__(), self.filesystem.geturl(self.path.as_posix()), self.scale.key))
+        return hash((self.url, self.scale.key, self.location))
 
     def __eq__(self, other: object) -> bool:
         return (
             isinstance(other, PrecomputedChunksDataSource) and
-            super().__eq__(other) and
+            self.url == other.url and
             self.scale.key == other.scale.key and
-            self.filesystem.geturl(self.path.as_posix()) == other.filesystem.geturl(other.path.as_posix())
+            self.location == other.location
         )
 
     def _get_tile(self, tile: Interval5D) -> Array5D:
@@ -90,7 +90,7 @@ class PrecomputedChunksDataSource(DataSource):
             tile_5d = self.scale.encoding.decode(roi=tile, dtype=self.dtype, raw_chunk=raw_tile_bytes) #type: ignore
         except ResourceNotFound:
             logger.warn(f"tile {tile} not found. Returning zeros")
-            tile_5d = Array5D.allocate(interval=tile, dtype=self.info.data_type, value=0)
+            tile_5d = Array5D.allocate(interval=tile, dtype=self.info.data_type, value=0) #type: ignore #FIXME
         return tile_5d
 
     def __getstate__(self) -> JsonObject:
