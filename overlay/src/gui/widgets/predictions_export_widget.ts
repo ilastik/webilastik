@@ -199,8 +199,6 @@ export class PredictionsExportWidget extends Applet<State>{
     }
 
     protected onNewState(new_state: State){
-        console.log(`vvvvvvvv ${this.name} got this state from server:\n${JSON.stringify(new_state, null, 4)}`)
-
         this.bucketNameInput.value = new_state.sink_bucket_name || ""
         this.prefixInput.value = new_state.sink_prefix?.toString() || ""
         this.encoderSelector.setSelection({selection: new_state.sink_encoder})
