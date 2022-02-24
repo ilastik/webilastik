@@ -11,7 +11,8 @@ from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunk
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale, RawEncoder
 
 from webilastik.filesystem.bucket_fs import BucketFs
-from webilastik.datasource import DataRoi, SkimageDataSource
+from webilastik.datasource import DataRoi
+from webilastik.datasource.skimage_datasource import SkimageDataSource
 
 
 def _write_data(tile: DataRoi, sink: DataSink):

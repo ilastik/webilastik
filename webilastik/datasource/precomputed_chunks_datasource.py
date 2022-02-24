@@ -70,14 +70,14 @@ class PrecomputedChunksDataSource(DataSource):
         )
 
     def __hash__(self) -> int:
-        return hash((super().__hash__(), self.filesystem.desc(self.path.as_posix()), self.scale.key))
+        return hash((super().__hash__(), self.filesystem.geturl(self.path.as_posix()), self.scale.key))
 
     def __eq__(self, other: object) -> bool:
         return (
             isinstance(other, PrecomputedChunksDataSource) and
             super().__eq__(other) and
             self.scale.key == other.scale.key and
-            self.filesystem.desc(self.path.as_posix()) == other.filesystem.desc(other.path.as_posix())
+            self.filesystem.geturl(self.path.as_posix()) == other.filesystem.geturl(other.path.as_posix())
         )
 
     def _get_tile(self, tile: Interval5D) -> Array5D:

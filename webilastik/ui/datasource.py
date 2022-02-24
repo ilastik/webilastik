@@ -6,7 +6,8 @@ from urllib.parse import parse_qs
 # import functools
 from ndstructs.utils.json_serializable import ensureJsonIntTripplet
 
-from webilastik.datasource import DataSource, SkimageDataSource
+from webilastik.datasource import DataSource
+from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo
 from webilastik.libebrains.user_token import UserToken

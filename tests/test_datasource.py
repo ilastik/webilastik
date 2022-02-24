@@ -15,12 +15,9 @@ from webilastik.datasource import DataRoi
 from webilastik.datasink.n5_dataset_sink import N5DatasetSink
 from webilastik.datasource.n5_datasource import N5DataSource
 from webilastik.datasource.n5_attributes import N5Compressor, N5DatasetAttributes, RawCompressor
-from webilastik.datasource import (
-    DataSource,
-    SkimageDataSource,
-    H5DataSource,
-    ArrayDataSource,
-)
+from webilastik.datasource import DataSource, ArrayDataSource
+from webilastik.datasource.skimage_datasource import SkimageDataSource
+from webilastik.datasource.h5_datasource import H5DataSource
 from webilastik.datasource.sequence_datasource import SequenceDataSource
 from webilastik.filesystem.osfs import OsFs
 
@@ -91,7 +88,7 @@ def create_h5(array: Array5D, axiskeys_style: str, chunk_shape: Optional[Shape5D
     raw_chunk_shape = (chunk_shape or Shape5D() * 2).clamped(maximum=array.shape).to_tuple(axiskeys)
 
     path = tempfile.mkstemp()[1] + ".h5"
-    f = h5py.File(path, "w")
+    f = h5py.File(path, "w") #type: ignore #FIXME
     ds = f.create_dataset("data", chunks=raw_chunk_shape, data=array.raw(axiskeys))
     if axiskeys_style == "dims":
         for key, dim in zip(axiskeys, ds.dims): # type: ignore
@@ -198,7 +195,7 @@ def test_h5_datasource():
 
 
 def test_skimage_datasource_tiles(png_image: Path):
-    bs = DataRoi(SkimageDataSource(png_image, filesystem=OsFs("/")))
+    bs = DataRoi(SkimageDataSource(path=png_image, filesystem=OsFs("/")))
     num_checked_tiles = 0
     for tile in bs.split(Shape5D(x=2, y=2)):
         if tile == Interval5D.zero(x=(0, 2), y=(0, 2)):

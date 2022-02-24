@@ -14,7 +14,7 @@ import uuid
 
 from ndstructs.point5D import Point5D
 from webilastik.datasource import DataRoi
-from webilastik.datasource import SkimageDataSource
+from webilastik.datasource.skimage_datasource import SkimageDataSource
 
 from webilastik.annotations import Annotation, Color
 from webilastik.features.channelwise_fastfilters import GaussianSmoothing, HessianOfGaussianEigenvalues

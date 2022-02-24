@@ -7,7 +7,7 @@ import numpy as np
 from ndstructs.point5D import Point5D
 from webilastik.annotations.annotation import Annotation, Color
 
-from webilastik.datasource import SkimageDataSource
+from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.filesystem.osfs import OsFs
 from webilastik.libebrains.user_token import UserToken
 from webilastik.filesystem.bucket_fs import BucketFs

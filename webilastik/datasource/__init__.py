@@ -2,14 +2,10 @@ import json
 import enum
 from abc import abstractmethod, ABC
 from enum import IntEnum
-from pathlib import Path, PurePosixPath
-from typing import Callable, ClassVar, Optional, Tuple, Union, cast, Iterator, Dict
+from typing import Any, Callable, ClassVar, Optional, Tuple, Union, Iterator, Dict
 from typing_extensions import Final
-from webilastik.filesystem import JsonableFilesystem
 
-import h5py
 import numpy as np
-import skimage.io #type: ignore
 
 from ndstructs.point5D import Shape5D, Interval5D, Point5D, SPAN
 from ndstructs.array5D import Array5D, SPAN_OVERRIDE, All
@@ -30,7 +26,7 @@ DATASOURCE_FROM_JSON_CONSTRUCTOR = Callable[[JsonValue], "DataSource"]
 
 class DataSource(ABC):
     tile_shape: Final[Shape5D]
-    dtype: Final[np.dtype]
+    dtype: "Final[np.dtype[Any]]" #FIXME
     interval: Final[Interval5D]
     shape: Final[Shape5D]
     location: Final[Point5D]
@@ -44,7 +40,7 @@ class DataSource(ABC):
         self,
         *,
         tile_shape: Shape5D,
-        dtype: np.dtype,
+        dtype: "np.dtype[Any]", #FIXME
         interval: Interval5D,
         axiskeys: str,
         spatial_resolution: Optional[Tuple[int, int, int]] = None, # FIXME: experimental, like precomp chunks resolution
@@ -75,7 +71,6 @@ class DataSource(ABC):
         }
 
     @classmethod
-    @abstractmethod
     def from_json_value(cls, value: JsonValue) -> "DataSource":
         json_obj = ensureJsonObject(value)
         datasource_name = ensureJsonString(json_obj.get("__class__"))
@@ -91,16 +86,18 @@ class DataSource(ABC):
             self.interval,
             self.axiskeys,
             self.spatial_resolution,
+            self.url
         ))
 
     def __eq__(self, other: object) -> bool:
         return (
             isinstance(other, self.__class__) and
             self.tile_shape == other.tile_shape and
-            self.dtype == other.dtype and
+            self.dtype == other.dtype and #type: ignore
             self.interval == other.interval and
             self.axiskeys == other.axiskeys and
-            self.spatial_resolution == other.spatial_resolution
+            self.spatial_resolution == other.spatial_resolution and
+            self.url == other.url
         )
 
     def is_tile(self, tile: Interval5D) -> bool:
@@ -247,100 +244,13 @@ class DataRoi(Interval5D):
             return None
         return neighbor.clamped(self.full())
 
-
-class H5DataSource(DataSource):
-    _dataset: h5py.Dataset
-    def __init__(self, *, outer_path: Path, inner_path: PurePosixPath, location: Point5D = Point5D.zero(), filesystem: JsonableFilesystem):
-        self.outer_path = outer_path
-        self.inner_path = inner_path
-        self.filesystem = filesystem
-        binfile = filesystem.openbin(outer_path.as_posix())
-        f = h5py.File(binfile, "r")
-        try:
-            dataset = f[inner_path.as_posix()]
-            if not isinstance(dataset, h5py.Dataset):
-                raise ValueError(f"{inner_path} is not a Dataset")
-            axiskeys = self.getAxisKeys(dataset)
-            self._dataset = cast(h5py.Dataset, dataset)
-            tile_shape = Shape5D.create(raw_shape=self._dataset.chunks or self._dataset.shape, axiskeys=axiskeys)
-            base_url = Url.parse(filesystem.geturl(outer_path.as_posix()))
-            assert base_url is not None
-            super().__init__(
-                tile_shape=tile_shape,
-                interval=Shape5D.create(raw_shape=self._dataset.shape, axiskeys=axiskeys).to_interval5d(location),
-                dtype=self._dataset.dtype,
-                axiskeys=axiskeys,
-                url=base_url.updated_with(hash_=f"inner_path={inner_path.as_posix()}")
-                # spatial_resolution=(1,1,1) # FIXME
-            )
-        except Exception as e:
-            f.close()
-            raise e
-
-    def to_json_value(self) -> JsonObject:
-        out = {**super().to_json_value()}
-        out["outer_path"] = self.outer_path.as_posix()
-        out["inner_path"] = self.inner_path.as_posix()
-        out["filesystem"] = self.filesystem.to_json_value()
-        return out
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "H5DataSource":
-        value_obj = ensureJsonObject(value)
-        raw_location = value_obj.get("location")
-        return H5DataSource(
-            outer_path=Path(ensureJsonString(value_obj.get("outer_path"))),
-            inner_path=PurePosixPath(ensureJsonString(value_obj.get("inner_path"))),
-            filesystem=JsonableFilesystem.from_json_value(value_obj.get("filesystem")),
-            location=Point5D.zero() if raw_location is None else Point5D.from_json_value(raw_location),
-        )
-
-    def __hash__(self) -> int:
-        return hash((
-            super().__hash__(),
-            self.filesystem.desc(self.outer_path.as_posix()),
-            self.inner_path,
-        ))
-
-    def __eq__(self, other: object) -> bool:
-        return (
-            isinstance(other, H5DataSource) and
-            super().__eq__(other) and
-            self.filesystem.desc(self.outer_path.as_posix()) == other.filesystem.desc(other.outer_path.as_posix()) and
-            self.inner_path == other.inner_path
-        )
-
-    def _get_tile(self, tile: Interval5D) -> Array5D:
-        slices = tile.translated(-self.location).to_slices(self.axiskeys)
-        raw: np.ndarray = self._dataset[slices]
-        return Array5D(raw, axiskeys=self.axiskeys, location=tile.start)
-
-    def close(self) -> None:
-        self._dataset.file.close()
-
-    @classmethod
-    def getAxisKeys(cls, dataset: h5py.Dataset) -> str:
-        dims_axiskeys = "".join([dim.label for dim in dataset.dims]) # type: ignore
-        if len(dims_axiskeys) != 0:
-            if len(dims_axiskeys) != len(dataset.shape):
-                raise ValueError("Axiskeys from 'dims' is inconsistent with shape: {dims_axiskeys} {dataset.shape}")
-            return dims_axiskeys
-
-        if "axistags" in dataset.attrs:
-            tag_dict = json.loads(cast(str, dataset.attrs["axistags"]))
-            return "".join(tag["key"] for tag in tag_dict["axes"])
-
-        return guess_axiskeys(dataset.shape)
-
-DataSource.datasource_from_json_constructors[H5DataSource.__name__] = H5DataSource.from_json_value
-
 class ArrayDataSource(DataSource):
     """A DataSource backed by an Array5D"""
 
     def __init__(
         self,
         *,
-        data: np.ndarray,
+        data: "np.ndarray[Any, Any]", #FIXME
         axiskeys: str,
         tile_shape: Optional[Shape5D] = None,
         location: Point5D = Point5D.zero(),
@@ -351,7 +261,7 @@ class ArrayDataSource(DataSource):
         if tile_shape is None:
             tile_shape = Shape5D.hypercube(256).to_interval5d().clamped(self._data.shape).shape
         super().__init__(
-            dtype=self._data.dtype,
+            dtype=self._data.dtype, #type: ignore
             tile_shape=tile_shape,
             interval=self._data.interval,
             axiskeys=axiskeys,
@@ -360,10 +270,6 @@ class ArrayDataSource(DataSource):
         )
 
     def to_json_value(self) -> JsonObject:
-        raise NotImplementedError
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "SkimageDataSource":
         raise NotImplementedError
 
     def __hash__(self) -> int:
@@ -385,58 +291,3 @@ class ArrayDataSource(DataSource):
 
     def _allocate(self, interval: Union[Shape5D, Interval5D], fill_value: int) -> Array5D:
         return self._data.__class__.allocate(interval, dtype=self.dtype, value=fill_value)
-
-
-class SkimageDataSource(ArrayDataSource):
-    """A naive implementation of DataSource that can read images using skimage"""
-
-    def __init__(
-        self,
-        *,
-        path: Path,
-        location: Point5D = Point5D.zero(),
-        filesystem: JsonableFilesystem,
-        tile_shape: Optional[Shape5D] = None,
-        spatial_resolution: Optional[Tuple[int, int, int]] = None,
-    ):
-        self.path = path
-        self.filesystem = filesystem
-        raw_data: np.ndarray = skimage.io.imread(filesystem.openbin(path.as_posix())) # type: ignore
-        axiskeys = "yxc"[: len(raw_data.shape)]
-        url = Url.parse(filesystem.geturl(path.as_posix()))
-        assert url is not None
-        super().__init__(
-            data=raw_data,
-            axiskeys=axiskeys,
-            location=location,
-            tile_shape=tile_shape,
-            spatial_resolution=spatial_resolution,
-            url=url,
-        )
-
-    def to_json_value(self) -> JsonObject:
-        out = {**DataSource.to_json_value(self)}
-        out["path"] = self.path.as_posix()
-        out["filesystem"] = self.filesystem.to_json_value()
-        return out
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "SkimageDataSource":
-        value_obj = ensureJsonObject(value)
-        raw_location = value_obj.get("location")
-        raw_tile_shape = value_obj.get("tile_shape")
-        return SkimageDataSource(
-            path=Path(ensureJsonString(value_obj.get("path"))),
-            location=Point5D.zero() if raw_location is None else Point5D.from_json_value(raw_location),
-            filesystem=JsonableFilesystem.from_json_value(value_obj.get("filesystem")),
-            tile_shape=None if raw_tile_shape is None else Shape5D.from_json_value(raw_tile_shape)
-        )
-
-    def __getstate__(self) -> JsonObject:
-        return self.to_json_value()
-
-    def __setstate__(self, data: JsonObject):
-        ds = SkimageDataSource.from_json_value(data)
-        self.__init__(path=ds.path, filesystem=ds.filesystem, tile_shape=ds.tile_shape, location=ds.location)
-
-DataSource.datasource_from_json_constructors[SkimageDataSource.__name__] = SkimageDataSource.from_json_value

@@ -23,7 +23,7 @@ from ndstructs.array5D import Array5D
 
 from webilastik.annotations import Annotation, Color
 from webilastik.filesystem.http_fs import HttpFs
-from webilastik.datasource import SkimageDataSource
+from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.utility.url import Url
 from webilastik.libebrains.user_token import UserToken
 from webilastik.server.session_allocator import EbrainsSession
