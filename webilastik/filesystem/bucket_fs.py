@@ -204,7 +204,7 @@ class BucketFs(JsonableFilesystem):
 
         contents = bytes()
         if mode in ("r", "r+", "w+", "a", "a+"):
-            tile_url = self.url.concatpath(path).raw
+            tile_url = self.url.concatpath(path).updated_with(extra_search={"redirect": "false"}).raw
             try:
                 # t0 = time.time()
                 data_proxy_response = self.session.get(tile_url)
