@@ -390,3 +390,13 @@ export function createTable<T extends {[key: string]: string}>(
 
     return table
 }
+
+export function hasFocus(element: HTMLElement): boolean{
+    return document.activeElement === element
+}
+
+export function setValueIfUnfocused(input: HTMLInputElement, value: string){
+    if(!hasFocus(input)){
+        input.value = value
+    }
+}

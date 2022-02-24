@@ -1,7 +1,7 @@
 import { ensureJsonArray, ensureJsonNumberTripplet, ensureOptional, toJsonValue } from '../../util/serialization';
 import { Applet } from '../../client/applets/applet';
 import { ensureJsonNumber, ensureJsonObject, ensureJsonString, JsonValue } from '../../util/serialization';
-import { createElement, createInput, createInputParagraph, createTable } from '../../util/misc';
+import { createElement, createInput, createInputParagraph, createTable, setValueIfUnfocused } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
 import { Session } from '../../client/ilastik';
 import { DataSourcePicker } from './datasource_picker';
@@ -199,8 +199,8 @@ export class PredictionsExportWidget extends Applet<State>{
     }
 
     protected onNewState(new_state: State){
-        this.bucketNameInput.value = new_state.sink_bucket_name || ""
-        this.prefixInput.value = new_state.sink_prefix?.toString() || ""
+        setValueIfUnfocused(this.bucketNameInput, new_state.sink_bucket_name || "")
+        setValueIfUnfocused(this.prefixInput, new_state.sink_prefix?.toString() || "")
         this.encoderSelector.setSelection({selection: new_state.sink_encoder})
         this.exportModeSelector.setSelection({selection: new_state.mode})
 
