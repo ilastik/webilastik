@@ -392,13 +392,11 @@ export class BucketFs extends FileSystem{
     public static readonly API_URL = Url.parse("https://data-proxy.ebrains.eu/api/buckets")
     public readonly bucket_name: string
     public readonly prefix: Path
-    public readonly ebrains_user_token: string // FIXME?
 
-    constructor(params: {bucket_name: string, prefix: Path, ebrains_user_token: string}){
+    constructor(params: {bucket_name: string, prefix: Path}){
         super()
         this.bucket_name = params.bucket_name
         this.prefix = params.prefix
-        this.ebrains_user_token = params.ebrains_user_token
     }
 
     public equals(other: FileSystem): boolean {
@@ -419,11 +417,9 @@ export class BucketFs extends FileSystem{
 
     public static fromJsonValue(value: JsonValue): BucketFs {
         const valueObj = ensureJsonObject(value)
-        const ebrains_token_obj = ensureJsonObject(valueObj.ebrains_user_token)
         return new this({
             bucket_name: ensureJsonString(valueObj.bucket_name),
             prefix: Path.parse(ensureJsonString(valueObj.prefix)),
-            ebrains_user_token: ensureJsonString(ebrains_token_obj.access_token),
         })
     }
 
@@ -431,9 +427,6 @@ export class BucketFs extends FileSystem{
         return {
             bucket_name: this.bucket_name,
             prefix: this.prefix.toString(),
-            ebrains_user_token: {
-                access_token: this.ebrains_user_token
-            },
             __class__: "BucketFs"
         }
     }
@@ -442,15 +435,10 @@ export class BucketFs extends FileSystem{
         if(!url.schemeless_raw.startsWith(BucketFs.API_URL.schemeless_raw)){
             throw `Expected data-proxy url, got this: ${url.toString()}`
         }
-        const ebrains_user_token = Session.getEbrainsToken()
-        if(ebrains_user_token === undefined){
-            throw `Can't create BucketFS yet: Not logged in`
-        }
 
         return new BucketFs({
             bucket_name: url.path.components[2],
             prefix: new Path({components: url.path.components.slice(3)}),
-            ebrains_user_token,
         })
     }
 }

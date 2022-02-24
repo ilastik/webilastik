@@ -277,14 +277,12 @@ class BucketFs(JsonableFilesystem):
             ebrains_user_token=token,
         )
 
-    def to_json_value(self, omit_token: bool = False) -> JsonObject:
+    def to_json_value(self) -> JsonObject:
         out: Dict[str, JsonValue] = {
             "__class__": self.__class__.__name__,
             "bucket_name": self.bucket_name,
             "prefix": self.prefix.as_posix(),
         }
-        if not omit_token:
-            out["ebrains_user_token"] = self.ebrains_user_token.to_json_value()
         return out
 
     def __getstate__(self) -> JsonObject:
