@@ -600,18 +600,3 @@ export class SkimageDataSource extends DataSource{
         return this.filesystem.getUrl().joinPath(this.path.raw)
     }
 }
-
-export class Lane implements IJsonable{
-    public constructor(public readonly raw_data: DataSource){
-    }
-    public static fromJsonValue(data: any): Lane{
-        return new Lane(DataSource.fromJsonValue(data["raw_data"]))
-    }
-    public toJsonValue(): JsonObject{
-        return {raw_data: this.raw_data.toJsonValue()}
-    }
-    public static fromJsonArray(data: JsonValue): Lane[]{
-        const array = ensureJsonArray(data)
-        return array.map((v: JsonValue) => Lane.fromJsonValue(v))
-    }
-}
