@@ -1,7 +1,7 @@
 # pyright:
 
 from functools import partial
-from pathlib import Path
+from pathlib import PurePosixPath
 from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
@@ -20,7 +20,7 @@ def _write_data(tile: DataRoi, sink: DataSink):
     sink.write(tile.retrieve())
 
 def test_bucket_read_write(raw_data_source: SkimageDataSource, bucket_fs: BucketFs):
-    precomp_path = Path("c_cells_1.precomputed")
+    precomp_path = PurePosixPath("c_cells_1.precomputed")
     sink = PrecomputedChunksSink.create(
         base_path=precomp_path,
         filesystem=bucket_fs,
@@ -30,7 +30,7 @@ def test_bucket_read_write(raw_data_source: SkimageDataSource, bucket_fs: Bucket
             num_channels=raw_data_source.shape.c,
             scales=tuple([
                 PrecomputedChunksScale(
-                    key=Path("exported_data"),
+                    key=PurePosixPath("exported_data"),
                     size=(raw_data_source.shape.x, raw_data_source.shape.y, raw_data_source.shape.z),
                     chunk_sizes=tuple([
                         (raw_data_source.tile_shape.x, raw_data_source.tile_shape.y, raw_data_source.tile_shape.z)

@@ -1,5 +1,5 @@
 from typing import Optional, Tuple
-from pathlib import Path
+from pathlib import PurePosixPath
 import json
 import logging
 
@@ -8,18 +8,18 @@ from ndstructs.array5D import Array5D
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonIntTripplet, ensureJsonObject, ensureJsonString
 from fs.errors import ResourceNotFound
 
-from webilastik.datasource import DataSource
+from webilastik.datasource import FsDataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo
 from webilastik.filesystem import JsonableFilesystem
 from webilastik.utility.url import Url
 
 logger = logging.getLogger(__name__)
 
-class PrecomputedChunksDataSource(DataSource):
+class PrecomputedChunksDataSource(FsDataSource):
     def __init__(
         self,
         *,
-        path: Path,
+        path: PurePosixPath,
         resolution: Tuple[int, int, int],
         location: Optional[Point5D] = None,
         chunk_size: Optional[Shape5D] = None,
@@ -41,20 +41,22 @@ class PrecomputedChunksDataSource(DataSource):
 
         base_url = Url.parse(filesystem.geturl(path.as_posix()))
         assert base_url is not None
-        super().__init__( #type: ignore
+        super().__init__(
+            filesystem=filesystem,
+            path=path,
             tile_shape=tile_shape,
-            dtype=self.info.data_type, #type: ignore
+            dtype=self.info.data_type,
             interval=self.scale.shape.to_interval5d(location or self.scale.location),
-            axiskeys="zyxc",  # externally reported axiskeys are always c-ordered
             spatial_resolution=self.scale.resolution, #FIXME: maybe delete this altogether?
-            url=base_url.updated_with(hash_=f"resolution={'_'.join(map(str, resolution))}")
         )
 
+    @property
+    def url(self) -> Url:
+        resolution_str = f"{self.spatial_resolution[0]}_{self.spatial_resolution[1]}_{self.spatial_resolution[2]}"
+        return super().url.updated_with(hash_=f"resolution={resolution_str}")
+
     def to_json_value(self) -> JsonObject:
-        out = {**super().to_json_value()}
-        out["path"] = self.path.as_posix()
-        out["filesystem"] = self.filesystem.to_json_value()
-        return out
+        return super().to_json_value()
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "PrecomputedChunksDataSource":
@@ -62,7 +64,7 @@ class PrecomputedChunksDataSource(DataSource):
         raw_location = value_obj.get("location")
         raw_chunk_size = value_obj.get("chunk_size")
         return PrecomputedChunksDataSource(
-            path=Path(ensureJsonString(value_obj.get("path"))),
+            path=PurePosixPath(ensureJsonString(value_obj.get("path"))),
             resolution=ensureJsonIntTripplet(value_obj.get("spatial_resolution")), # FIXME? change to just resolution?
             location=None if raw_location is None else Point5D.from_json_value(raw_location),
             chunk_size=None if raw_chunk_size is None else Shape5D.from_json_value(raw_chunk_size),
@@ -106,4 +108,4 @@ class PrecomputedChunksDataSource(DataSource):
             filesystem=ds.filesystem,
         )
 
-DataSource.datasource_from_json_constructors[PrecomputedChunksDataSource.__name__] = PrecomputedChunksDataSource.from_json_value
+FsDataSource.datasource_from_json_constructors[PrecomputedChunksDataSource.__name__] = PrecomputedChunksDataSource.from_json_value

@@ -1,34 +1,40 @@
 # pyright: reportUnusedCallResult=false
 
+from abc import ABC
 from asyncio.events import AbstractEventLoop
 from dataclasses import dataclass
 from functools import partial
 import os
 import signal
 import asyncio
-from typing import Callable, List, Optional, Mapping
+from typing import Callable, Dict, List, Optional, Mapping, Sequence, Tuple
 import json
 from base64 import b64decode
 import ssl
 import contextlib
 from pathlib import Path
 import traceback
+from base64 import b64encode
+import re
+
 
 import aiohttp
 from aiohttp import web
 from aiohttp.client import ClientSession
 from aiohttp.http_websocket import WSCloseCode
 from aiohttp.web_app import Application
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonIntTripplet, ensureJsonObject, ensureJsonString
+from webilastik.datasource import DataSource, FsDataSource
 
-from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
+from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource, PrecomputedChunksInfo
 from webilastik.ui.applet.export_applet import WsExportApplet
 from webilastik.ui.applet.datasource_picker import WsDataSourcePicker
+from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError
 from webilastik.utility.url import Protocol, Url
 from webilastik.scheduling.hashing_executor import HashingExecutor
 from webilastik.server.tunnel import ReverseSshTunnel
-from webilastik.ui.applet import dummy_prompt
+from webilastik.ui.applet import Applet, InertApplet, applet_output, dummy_prompt
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.applet.ws_feature_selection_applet import WsFeatureSelectionApplet
 from webilastik.ui.applet.ws_brushing_applet import WsBrushingApplet
@@ -186,8 +192,45 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
                 "/stripped_precomputed/url={encoded_original_url}/resolution={resolution_x}_{resolution_y}_{resolution_z}/{rest:.*}",
                 self.forward_chunk_request
             ),
+            web.post(
+                "/get_datasources_from_url",
+                self.get_datasources_from_url
+            ),
         ])
         self.app.on_shutdown.append(self.close_websockets)
+
+    async def get_datasources_from_url(self, request: web.Request) -> web.Response:
+        payload = await request.json()
+        raw_url = payload.get("url")
+        if raw_url is None:
+            return  web.json_response({"error", "Missing 'url' key in payload"}, status=400)
+        url = Url.parse(raw_url)
+        if url is None:
+            return  web.json_response({"error", "Bad url in payload"}, status=400)
+
+        selected_resolution: "Tuple[int, int, int] | None" = None
+        stripped_precomputed_url_regex = re.compile(r"/stripped_precomputed/url=(?P<url>[^/]+)/resolution=(?P<resolution>\d+_\d+_\d+)")
+        match = stripped_precomputed_url_regex.search(url.path.as_posix())
+        if match:
+            url = Url.from_base64(match.group("url"))
+            selected_resolution = tuple(int(axis) for axis in match.group("resolution").split("_"))
+
+        datasources_result = try_get_datasources_from_url(url=url, allowed_protocols=(Protocol.HTTP, Protocol.HTTPS))
+        if isinstance(datasources_result, UsageError):
+            return web.json_response({"error", str(datasources_result)}, status=400)
+
+        if selected_resolution:
+            datasources = [ds for ds in datasources_result if ds.spatial_resolution == selected_resolution]
+            if len(datasources) != 1:
+                return web.json_response({
+                    "error": f"Expected single datasource, found these: {json.dumps([ds.to_json_value() for ds in datasources], indent=4)}"
+                })
+        else:
+            datasources = datasources_result
+
+        return web.json_response({
+            "datasources": tuple([ds.to_json_value() for ds in datasources])
+        })
 
     async def get_status(self, request: web.Request) -> web.Response:
         return web.Response(

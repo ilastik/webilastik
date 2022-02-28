@@ -1,4 +1,4 @@
-from pathlib import Path
+from pathlib import PurePosixPath
 import json
 
 import numpy as np
@@ -16,7 +16,7 @@ class PrecomputedChunksSink:
         self,
         *,
         filesystem: JsonableFilesystem,
-        base_path: Path,
+        base_path: PurePosixPath,
         info: PrecomputedChunksInfo,
     ):
         self.filesystem = filesystem
@@ -37,7 +37,7 @@ class PrecomputedChunksSink:
         cls,
         *,
         filesystem: JsonableFilesystem,
-        base_path: Path, # path to the "directory" that should contain the info file
+        base_path: PurePosixPath, # path to the "directory" that should contain the info file
         info: PrecomputedChunksInfo,
     ) -> "PrecomputedChunksSink":
         if filesystem.exists(base_path.as_posix()):
@@ -59,7 +59,7 @@ class PrecomputedChunksScaleSink(DataSink):
         self,
         *,
         filesystem: JsonableFilesystem,
-        base_path: Path,
+        base_path: PurePosixPath,
         scale: PrecomputedChunksScale5D,
         dtype: np.dtype, #type: ignore
     ):
@@ -97,7 +97,7 @@ class PrecomputedChunksScaleSink(DataSink):
         value_obj = ensureJsonObject(value)
         return PrecomputedChunksScaleSink(
             filesystem=JsonableFilesystem.from_json_value(value_obj.get("filesystem")),
-            base_path=Path(ensureJsonString(value_obj.get("base_path"))),
+            base_path=PurePosixPath(ensureJsonString(value_obj.get("base_path"))),
             scale=PrecomputedChunksScale5D.from_json_value(value_obj.get("scale")),
             dtype=np.dtype(ensureJsonString(value_obj.get("dtype"))), #type: ignore
         )

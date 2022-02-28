@@ -1,7 +1,9 @@
 # pyright: reportUnusedCallResult=false
 
 import os
+from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.features.channelwise_fastfilters import GaussianSmoothing, HessianOfGaussianEigenvalues
+from webilastik.filesystem.bucket_fs import BucketFs
 
 from webilastik.ui.workflow.ws_pixel_classification_workflow import RPCPayload
 from webilastik.utility import get_now_string
@@ -10,7 +12,7 @@ os.environ["REQUESTS_CA_BUNDLE"] = "/etc/ssl/certs/ca-certificates.crt"
 # ensure aiohttp will use the mkcert certts. I don't really know where it otherwise gets its certs from
 os.environ["SSL_CERT_DIR"] = "/etc/ssl/certs/"
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import aiohttp
 import asyncio
 import json
@@ -36,7 +38,10 @@ async def read_server_status(websocket: ClientWebSocketResponse):
     global classifier_generation
     async for message in websocket:
         parsed_message = message.json()
-        print(f"workflow state: {json.dumps(parsed_message)}")
+        # print(f"workflow state: {json.dumps(parsed_message)}")
+
+        if "export_applet" in parsed_message:
+            print(f"export_applet state: {json.dumps(parsed_message['export_applet'], indent=4)}")
         if "pixel_classification_applet" in parsed_message:
             classifier_generation = parsed_message["pixel_classification_applet"]["generation"]
         if finished:
@@ -157,8 +162,7 @@ async def main():
                     print(f"Got predictions<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 
                     raw_data = np.frombuffer(tile_bytes, dtype=np.uint8).reshape(2, tile.shape.y, tile.shape.x)
-                    a = Array5D(raw_data, axiskeys="cyx")
-                    # a.show_channels()
+                    Array5D(raw_data, axiskeys="cyx").show_channels()
 
             await ws.send_json(
                 RPCPayload(
@@ -185,15 +189,18 @@ async def main():
 
             await asyncio.sleep(1)
 
+            sink_prefix = f"/ilastik_test_{get_now_string()}"
+
             await ws.send_json(
                 RPCPayload(
                     applet_name="export_applet",
                     method_name="set_sink_params",
                     arguments={
                         "sink_bucket_name": "hbp-image-service",
-                        "sink_prefix": f"/ilastik_test_{get_now_string()}",
+                        "sink_prefix": sink_prefix,
                         "sink_encoder": "raw",
-                        "mode": "SIMPLE_SEGMENTATION",
+                        # "mode": "SIMPLE_SEGMENTATION",
+                        "mode": "PREDICTIONS",
                     }
                 ).to_json_value()
             )
@@ -212,6 +219,17 @@ async def main():
             print(f"---> Job successfully scheduled?")
             await asyncio.sleep(15)
 
+            output = PrecomputedChunksDataSource(
+                filesystem=BucketFs(
+                    bucket_name="hbp-image-service",
+                    prefix=PurePosixPath("/"),
+                    ebrains_user_token=UserToken.get_global_token_or_raise(),
+                ),
+                path=PurePosixPath(sink_prefix),
+                resolution=(1,1,1)
+            )
+            for tile in output.roi.get_datasource_tiles():
+                tile.retrieve().as_uint8(normalized=True).show_channels()
 
             close_url = f"{session_url}/close"
             print(f"Closing session py sending delete to {close_url}")

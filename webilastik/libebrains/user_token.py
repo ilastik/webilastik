@@ -44,8 +44,11 @@ class UserToken:
         # self.scope = scope
 
     @classmethod
-    def from_environment(cls) -> "UserToken":
-        return UserToken(access_token=os.environ[cls.ENV_VAR_NAME])
+    def from_environment(cls) -> "UserToken | UsageError":
+        access_token = os.environ.get(cls.ENV_VAR_NAME)
+        if access_token is None:
+            return UsageError("Environment variable '{cls.ENV_VAR_NAME}' is not set")
+        return UserToken(access_token=access_token)
 
     @classmethod
     def login_globally(cls, token: "UserToken"):
@@ -53,14 +56,26 @@ class UserToken:
 
     @classmethod
     def login_globally_from_environment(cls):
-        return cls.login_globally(cls.from_environment())
+        token_result = cls.from_environment()
+        if isinstance(token_result, UsageError):
+            raise token_result
+        cls.login_globally(token_result)
 
     @classmethod
     def get_global_login_token(cls) -> "UserToken | UsageError":
-        token = cls._global_login_token
-        if token is not None:
-            return token
-        return UsageError("Not logged in")
+        if cls._global_login_token is None:
+            token_result = cls.from_environment()
+            if isinstance(token_result, UsageError):
+                return token_result
+            cls._global_login_token = token_result
+        return cls._global_login_token
+
+    @classmethod
+    def get_global_token_or_raise(cls) -> "UserToken":
+        token = cls.get_global_login_token()
+        if isinstance(token, UsageError):
+            raise token
+        return token
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "UserToken":

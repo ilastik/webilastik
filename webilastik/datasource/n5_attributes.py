@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Type, TypeVar
+from typing import Any, Optional, Type, TypeVar
 
 from pathlib import Path
 import gzip
@@ -162,7 +162,7 @@ class N5DatasetAttributes:
         dimensions: Shape5D,
         blockSize: Shape5D,
         axiskeys: str,
-        dataType: np.dtype,
+        dataType: "np.dtype[Any]", #FIXME
         compression: N5Compressor,
         location: Point5D = Point5D.zero(),
     ):

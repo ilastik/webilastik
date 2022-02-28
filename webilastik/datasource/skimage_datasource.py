@@ -1,75 +1,74 @@
-from pathlib import Path
+from pathlib import PurePosixPath
 from typing import Optional, Tuple
 
-from ndstructs.point5D import Point5D, Shape5D
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 import skimage.io #type: ignore
+import numpy as np
+from ndstructs.array5D import Array5D
+from ndstructs.point5D import Interval5D, Point5D, Shape5D
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonIntTripplet, ensureJsonObject, ensureJsonString, ensureOptional
 
-from webilastik.datasource import ArrayDataSource, DataSource
+from webilastik.datasource import FsDataSource
 from webilastik.filesystem import JsonableFilesystem
-from webilastik.utility.url import Url
 
-class SkimageDataSource(ArrayDataSource):
+class SkimageDataSource(FsDataSource):
     """A naive implementation of DataSource that can read images using skimage"""
-
     def __init__(
         self,
         *,
-        path: Path,
+        path: PurePosixPath,
         location: Point5D = Point5D.zero(),
         filesystem: JsonableFilesystem,
         tile_shape: Optional[Shape5D] = None,
         spatial_resolution: Optional[Tuple[int, int, int]] = None,
     ):
-        self.path = path
-        self.filesystem = filesystem
         raw_data: np.ndarray = skimage.io.imread(filesystem.openbin(path.as_posix())) # type: ignore
-        axiskeys = "yxc"[: len(raw_data.shape)]
-        url = Url.parse(filesystem.geturl(path.as_posix()))
-        assert url is not None
+        self._data = Array5D(raw_data, "yxc"[: len(raw_data.shape)], location=location)
+
+        if tile_shape is None:
+            tile_shape = Shape5D.hypercube(256).to_interval5d().clamped(self._data.shape).shape
+
         super().__init__(
-            data=raw_data,
-            axiskeys=axiskeys,
-            location=location,
+            filesystem=filesystem,
+            path=path,
+            dtype=self._data.dtype, #type: ignore
+            interval=self._data.interval,
             tile_shape=tile_shape,
             spatial_resolution=spatial_resolution,
-            url=url,
         )
+
+    def _get_tile(self, tile: Interval5D) -> Array5D:
+        return self._data.cut(tile, copy=True)
 
     def __hash__(self) -> int:
-        return hash((self.url, self.tile_shape, self.spatial_resolution))
+        return super().__hash__()
 
     def __eq__(self, other: object) -> bool:
-        return (
-            isinstance(other, SkimageDataSource) and
-            self.url == other.url and
-            self.tile_shape == other.tile_shape and
-            self.spatial_resolution == other.spatial_resolution
-        )
+        return super().__eq__(other)
 
     def to_json_value(self) -> JsonObject:
-        out = {**DataSource.to_json_value(self)}
-        out["path"] = self.path.as_posix()
-        out["filesystem"] = self.filesystem.to_json_value()
-        return out
+        return super().to_json_value()
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "SkimageDataSource":
         value_obj = ensureJsonObject(value)
-        raw_location = value_obj.get("location")
-        raw_tile_shape = value_obj.get("tile_shape")
         return SkimageDataSource(
-            path=Path(ensureJsonString(value_obj.get("path"))),
-            location=Point5D.zero() if raw_location is None else Point5D.from_json_value(raw_location),
+            path=PurePosixPath(ensureJsonString(value_obj.get("path"))),
+            location=ensureOptional(Point5D.from_json_value, value_obj.get("location")) or Point5D.zero(),
             filesystem=JsonableFilesystem.from_json_value(value_obj.get("filesystem")),
-            tile_shape=None if raw_tile_shape is None else Shape5D.from_json_value(raw_tile_shape)
+            tile_shape=ensureOptional(Shape5D.from_json_value, value_obj.get("tile_shape")),
+            spatial_resolution=ensureOptional(ensureJsonIntTripplet, value_obj.get("spatial_resolution")),
         )
 
     def __getstate__(self) -> JsonObject:
         return self.to_json_value()
 
-    def __setstate__(self, data: JsonObject):
-        ds = SkimageDataSource.from_json_value(data)
-        self.__init__(path=ds.path, filesystem=ds.filesystem, tile_shape=ds.tile_shape, location=ds.location)
+    def __setstate__(self, value_obj: JsonObject):
+        self.__init__(
+            path=PurePosixPath(ensureJsonString(value_obj.get("path"))),
+            location=ensureOptional(Point5D.from_json_value, value_obj.get("location")) or Point5D.zero(),
+            filesystem=JsonableFilesystem.from_json_value(value_obj.get("filesystem")),
+            tile_shape=ensureOptional(Shape5D.from_json_value, value_obj.get("tile_shape")),
+            spatial_resolution=ensureOptional(ensureJsonIntTripplet, value_obj.get("spatial_resolution")),
+        )
 
-DataSource.datasource_from_json_constructors[SkimageDataSource.__name__] = SkimageDataSource.from_json_value
+FsDataSource.datasource_from_json_constructors[SkimageDataSource.__name__] = SkimageDataSource.from_json_value

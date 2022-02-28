@@ -1,5 +1,6 @@
 # pyright: strict
 
+from base64 import b64decode, b64encode
 import re
 from pathlib import PurePosixPath
 import enum
@@ -218,3 +219,13 @@ class Url:
         if self.datascheme != datascheme:
             raise ValueError(f"Url {self.raw} had unexpected datascheme: {self.datascheme}. Expected {datascheme}")
         return self
+
+    def to_base64(self) -> str:
+        return b64encode(self.raw.encode("utf8"), altchars=b'-_').decode("utf8")
+
+    @staticmethod
+    def from_base64(encoded_url: str) -> "Url":
+        decoded_raw_url = b64decode(encoded_url, altchars=b'-_').decode('utf8')
+        url = Url.parse(decoded_raw_url)
+        assert url is not None
+        return url

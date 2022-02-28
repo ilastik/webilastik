@@ -1,5 +1,5 @@
 from typing import Set
-from pathlib import Path, PurePosixPath
+from pathlib import PurePosixPath
 import json
 from webilastik.filesystem import JsonableFilesystem
 
@@ -14,7 +14,7 @@ class N5DatasetSink(DataSink):
     def __init__(
         self,
         *,
-        path: Path,  # dataset path, e.g. "mydata.n5/mydataset"
+        path: PurePosixPath,  # dataset path, e.g. "mydata.n5/mydataset"
         filesystem: JsonableFilesystem,
         attributes: N5DatasetAttributes
     ):
@@ -31,7 +31,7 @@ class N5DatasetSink(DataSink):
     def create(
         cls,
         *,
-        outer_path: Path,
+        outer_path: PurePosixPath,
         inner_path: PurePosixPath,
         filesystem: JsonableFilesystem,
         attributes: N5DatasetAttributes,
@@ -47,7 +47,7 @@ class N5DatasetSink(DataSink):
             _ = f.write(json.dumps(attributes.to_json_data()).encode("utf-8"))
 
         # create all directories in the constructor to avoid races when processing tiles
-        created_dirs : Set[Path] = set()
+        created_dirs : Set[PurePosixPath] = set()
         for tile in attributes.interval.split(attributes.blockSize):
             dir_path = full_path / attributes.get_tile_path(tile).parent
             if dir_path and dir_path not in created_dirs:
@@ -62,7 +62,7 @@ class N5DatasetSink(DataSink):
         )
 
     @classmethod
-    def open(cls, *, path: Path, filesystem: JsonableFilesystem) -> "N5DatasetSink":
+    def open(cls, *, path: PurePosixPath, filesystem: JsonableFilesystem) -> "N5DatasetSink":
         with filesystem.openbin(path.joinpath("attributes.json").as_posix(), "r") as f:
             attributes_json = f.read().decode("utf8")
         attributes = N5DatasetAttributes.from_json_data(json.loads(attributes_json))

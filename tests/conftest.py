@@ -1,5 +1,5 @@
 import datetime
-from pathlib import Path, PurePosixPath
+from pathlib import PurePosixPath
 from typing import Tuple
 
 import pytest
@@ -30,7 +30,7 @@ def bucket_fs(ebrains_user_token: UserToken) -> BucketFs:
 @pytest.fixture(scope="session")
 def raw_data_source() -> SkimageDataSource:
     return SkimageDataSource(
-        path=Path("c_cells_1.png"),
+        path=PurePosixPath("c_cells_1.png"),
         filesystem=OsFs("public/images/")
     )
 

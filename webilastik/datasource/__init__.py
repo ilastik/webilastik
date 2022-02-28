@@ -2,6 +2,7 @@ import json
 import enum
 from abc import abstractmethod, ABC
 from enum import IntEnum
+from pathlib import PurePosixPath
 from typing import Any, Callable, ClassVar, Optional, Tuple, Union, Iterator, Dict
 from typing_extensions import Final
 
@@ -10,6 +11,7 @@ import numpy as np
 from ndstructs.point5D import Shape5D, Interval5D, Point5D, SPAN
 from ndstructs.array5D import Array5D, SPAN_OVERRIDE, All
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
+from webilastik.filesystem import JsonableFilesystem
 from webilastik.utility.url import Url
 from global_cache import global_cache
 
@@ -30,7 +32,6 @@ class DataSource(ABC):
     interval: Final[Interval5D]
     shape: Final[Shape5D]
     location: Final[Point5D]
-    axiskeys: Final[str]
     spatial_resolution: Final[Tuple[int, int, int]]
     roi: Final["DataRoi"]
 
@@ -42,33 +43,18 @@ class DataSource(ABC):
         tile_shape: Shape5D,
         dtype: "np.dtype[Any]", #FIXME
         interval: Interval5D,
-        axiskeys: str,
         spatial_resolution: Optional[Tuple[int, int, int]] = None, # FIXME: experimental, like precomp chunks resolution
-        url: Optional[Url] = None,
     ):
         self.tile_shape = tile_shape
         self.dtype = dtype
         self.interval = interval
         self.shape = interval.shape
         self.location = interval.start
-        self.axiskeys = axiskeys
         self.spatial_resolution = spatial_resolution or (1,1,1)
         self.roi = DataRoi(self, **self.interval.to_dict())
-        self.url = url
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} {self.interval}>"
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": self.__class__.__name__,
-            "tile_shape": self.tile_shape.to_json_value(),
-            "dtype": str(self.dtype.name),
-            "interval": self.interval.to_json_value(),
-            "axiskeys": self.axiskeys,
-            "spatial_resolution": self.spatial_resolution,
-            "url": None if self.url is None else self.url.to_json_value(),
-        }
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "DataSource":
@@ -81,11 +67,17 @@ class DataSource(ABC):
 
     @abstractmethod
     def __hash__(self) -> int:
-        pass
+        return hash((self.tile_shape, self.dtype, self.interval, self.spatial_resolution))
 
     @abstractmethod
     def __eq__(self, other: object) -> bool:
-        pass
+        return (
+            isinstance(other, self.__class__) and
+            self.tile_shape == other.tile_shape and
+            self.dtype == other.dtype and
+            self.spatial_resolution == other.spatial_resolution and
+            self.location == other.location
+        )
 
     def is_tile(self, tile: Interval5D) -> bool:
         return tile.is_tile(tile_shape=self.tile_shape, full_interval=self.interval, clamped=True)
@@ -102,7 +94,7 @@ class DataSource(ABC):
         pass
 
     def _allocate(self, interval: Union[Shape5D, Interval5D], fill_value: int) -> Array5D:
-        return Array5D.allocate(interval, dtype=self.dtype, value=fill_value)
+        return Array5D.allocate(interval, dtype=self.dtype, value=fill_value) #type: ignore #FIXME
 
     def retrieve(
         self,
@@ -189,7 +181,7 @@ class DataRoi(Interval5D):
         return self.datasource.tile_shape
 
     @property
-    def dtype(self) -> np.dtype:
+    def dtype(self) -> "np.dtype[Any]": #FIXME
         return self.datasource.dtype
 
     def is_datasource_tile(self) -> bool:
@@ -231,50 +223,49 @@ class DataRoi(Interval5D):
             return None
         return neighbor.clamped(self.full())
 
-class ArrayDataSource(DataSource):
-    """A DataSource backed by an Array5D"""
 
+class FsDataSource(DataSource):
     def __init__(
         self,
         *,
-        data: "np.ndarray[Any, Any]", #FIXME
-        axiskeys: str,
-        tile_shape: Optional[Shape5D] = None,
-        location: Point5D = Point5D.zero(),
+        filesystem: JsonableFilesystem,
+        path: PurePosixPath,
+        tile_shape: Shape5D,
+        dtype: "np.dtype[Any]",
+        interval: Interval5D,
         spatial_resolution: Optional[Tuple[int, int, int]] = None,
-        url: Optional[Url] = None,
     ):
-        self._data = Array5D(data, axiskeys=axiskeys, location=location)
-        if tile_shape is None:
-            tile_shape = Shape5D.hypercube(256).to_interval5d().clamped(self._data.shape).shape
-        super().__init__(
-            dtype=self._data.dtype, #type: ignore
-            tile_shape=tile_shape,
-            interval=self._data.interval,
-            axiskeys=axiskeys,
-            spatial_resolution=spatial_resolution,
-            url=url
-        )
+        super().__init__(tile_shape=tile_shape, dtype=dtype, interval=interval, spatial_resolution=spatial_resolution)
+        self.filesystem = filesystem
+        self.path = path
 
-    def to_json_value(self) -> JsonObject:
-        raise NotImplementedError
+    @property
+    def url(self) -> Url:
+        url = Url.parse(self.filesystem.geturl(self.path.as_posix()))
+        assert url is not None
+        return url
 
+    @abstractmethod
     def __hash__(self) -> int:
-        return hash((self._data, self.tile_shape))
+        return hash((super().__hash__(), self.url))
 
+    @abstractmethod
     def __eq__(self, other: object) -> bool:
         return (
-            isinstance(other, ArrayDataSource) and
             super().__eq__(other) and
-            self._data == other._data
+            isinstance(other, self.__class__) and
+            self.url == other.url
         )
 
-    @classmethod
-    def from_array5d(cls, arr: Array5D, *, tile_shape: Optional[Shape5D] = None, location: Point5D = Point5D.zero()):
-        return cls(data=arr.raw(Point5D.LABELS), axiskeys=Point5D.LABELS, location=location, tile_shape=tile_shape)
-
-    def _get_tile(self, tile: Interval5D) -> Array5D:
-        return self._data.cut(tile, copy=True)
-
-    def _allocate(self, interval: Union[Shape5D, Interval5D], fill_value: int) -> Array5D:
-        return self._data.__class__.allocate(interval, dtype=self.dtype, value=fill_value)
+    @abstractmethod
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": self.__class__.__name__,
+            "filesystem": self.filesystem.to_json_value(),
+            "path": self.path.as_posix(),
+            "tile_shape": self.tile_shape.to_json_value(),
+            "dtype": str(self.dtype.name),
+            "interval": self.interval.to_json_value(),
+            "spatial_resolution": self.spatial_resolution,
+            "url": self.url.raw,
+        }

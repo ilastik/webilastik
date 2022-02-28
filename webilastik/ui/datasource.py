@@ -1,12 +1,12 @@
 # pyright: strict
 
-from pathlib import Path
+from pathlib import PurePosixPath
 from typing import Dict, List, Optional, Sequence, Union
 from urllib.parse import parse_qs
 # import functools
 from ndstructs.utils.json_serializable import ensureJsonIntTripplet
 
-from webilastik.datasource import DataSource
+from webilastik.datasource import FsDataSource
 from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo
@@ -24,14 +24,14 @@ def try_get_datasources_from_url(
     url: Union[Url, str],
     ebrains_user_token: Optional[UserToken] = None,
     allowed_protocols: Sequence[Protocol] = (Protocol.HTTP, Protocol.HTTPS)
-) -> "List[DataSource] | UsageError":
+) -> "List[FsDataSource] | UsageError":
     if isinstance(url, str):
         parsing_result = parse_url(url)
         if isinstance(parsing_result, UsageError):
             return parsing_result
         url = parsing_result
     fs_url = url.parent.schemeless()
-    ds_path = Path(url.path.name)
+    ds_path = PurePosixPath(url.path.name)
     hash_params: Dict[str, str]
     if url.hash_ is None:
         hash_params = {}
