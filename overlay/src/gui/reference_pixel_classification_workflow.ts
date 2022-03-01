@@ -38,6 +38,7 @@ export class ReferencePixelClassificationWorkflowGui{
             ].map(text => text.replace(/^ +/, "").replace("\n", " "))
         })
         this.brushing_widget = new BrushingWidget({
+            applet_name: "brushing_applet",
             session: this.session,
             parentElement: this.element,
             viewer: this.viewer,

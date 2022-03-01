@@ -3,71 +3,146 @@ import { BrushStroke } from "../../.."
 import { DataSource, Session } from "../../../client/ilastik"
 import { createElement, createInputParagraph, removeElement } from "../../../util/misc"
 import { CollapsableWidget } from "../collapsable_applet_gui"
-import { OneShotSelectorWidget, SelectorWidget } from "../selector_widget"
+import { OneShotSelectorWidget } from "../selector_widget"
 import { Vec3ColorPicker } from "../vec3_color_picker"
 import { BrushingOverlay } from "./brushing_overlay"
 import { BrushelBoxRenderer } from "./brush_boxes_renderer"
-import { BrushelLinesRenderer } from "./brush_lines_renderer"
-import { BrushRenderer } from "./brush_renderer"
 import { BrushStrokesContainer } from "./brush_strokes_container"
 import { Viewer } from "../../../viewer/viewer"
 import { PredictionsView, RawDataView, TrainingView } from "../../../viewer/view"
+import { Applet } from "../../../client/applets/applet"
+import { ensureJsonArray, ensureJsonBoolean, ensureJsonObject, JsonValue } from "../../../util/serialization"
+import { HashMap } from "../../../util/hashmap"
 import { PredictingWidget } from "../predicting_widget";
 
-export class BrushingWidget{
+
+type State = {brushing_enabled: boolean, annotations: Array<BrushStroke>}
+
+export class BrushingWidget extends Applet<State>{
     public readonly viewer: Viewer
     public readonly element: HTMLElement
-    public readonly status_display: HTMLElement
-
-    public readonly brushStrokeContainer: BrushStrokesContainer
+    private readonly status_display: HTMLElement
     private readonly resolutionSelectionContainer: HTMLElement
+    private readonly trainingWidget: HTMLDivElement
+    private readonly colorPicker: Vec3ColorPicker
+    private readonly brushingEnabledCheckbox: HTMLInputElement
+    private readonly brushDisplayContainer: HTMLParagraphElement
+
     private animationRequestId: number = 0
-    private trainingWidget: TrainingWidget
     session: Session
+    public overlay?: BrushingOverlay
+    public staging_brush_stroke: BrushStroke | undefined = undefined
+    public readonly gl: WebGL2RenderingContext
+    public readonly canvas: HTMLCanvasElement
+    private brushStrokeContainers = new HashMap<DataSource, BrushStrokesContainer>({
+        hash_function: (ds => ds.getDisplayString()) //FIXME
+    });
+
 
     constructor({
+        applet_name,
         session,
         parentElement,
         viewer,
         help,
     }: {
+        applet_name: string,
         session: Session,
         parentElement: HTMLElement,
         viewer: Viewer,
         help: string[],
     }){
+        super({
+            name: applet_name,
+            deserializer: (value: JsonValue) => {
+                let data_obj = ensureJsonObject(value)
+                let raw_annotations = ensureJsonArray(data_obj["annotations"]);
+                return {
+                    brushing_enabled: ensureJsonBoolean(data_obj["brushing_enabled"]),
+                    annotations: raw_annotations.map(a => BrushStroke.fromJsonValue(this.gl, a))
+                }
+            },
+            session,
+            onNewState: (new_state) => this.onNewState(new_state)
+        })
         this.session = session
-        this.element = new CollapsableWidget({
-            display_name: "Training",
-            parentElement,
-            help: help,
-        }).element
+        this.canvas = createElement({tagName: "canvas", parentElement: document.body, inlineCss: {display: "none"}})
+        this.gl = this.canvas.getContext("webgl2", {depth: true, stencil: true})!
+
+        this.element = new CollapsableWidget({display_name: "Training", parentElement, help}).element
         this.element.classList.add("ItkBrushingWidget")
         this.viewer = viewer
 
-        this.status_display = createElement({tagName:"p", parentElement: this.element, cssClasses: ["ItkBrushingWidget_status_display"]})
 
-        this.trainingWidget = new TrainingWidget({
-            parentElement: this.element,
-            onNewBrushStroke: stroke => this.brushStrokeContainer.addBrushStroke(stroke),
-            viewer: this.viewer,
-            session,
-        })
+        this.status_display = createElement({tagName:"p", parentElement: this.element, cssClasses: ["ItkBrushingWidget_status_display"]})
 
         this.resolutionSelectionContainer = createElement({tagName: "p", parentElement: this.element})
 
-        let p = createElement({tagName: "p", parentElement: this.element})
-        createElement({tagName: "label", innerHTML: "Brush Strokes:", parentElement: p})
-        this.brushStrokeContainer = new BrushStrokesContainer({
-            session,
-            parentElement: this.element,
-            applet_name: "brushing_applet",
-            gl: this.trainingWidget.gl,
-            onBrushColorClicked: (color: vec3) => this.trainingWidget?.colorPicker.setColor(color)
-        })
+        this.trainingWidget = createElement({tagName: "div", parentElement: this.element})
+            new PredictingWidget({session, viewer: this.viewer, parentElement: this.trainingWidget})
+
+            this.brushingEnabledCheckbox = createInputParagraph({
+                parentElement: this.trainingWidget,
+                label_text: "Enable Brushing: ",
+                inputType: "checkbox",
+                title: "Enable to draw annotations by clicking and dragging. Disable to use the viewer's controls to navigate over the data.",
+                onClick: () => this.overlay?.setBrushingEnabled(this.brushingEnabledCheckbox.checked)
+            })
+
+            let p = createElement({tagName: "p", parentElement: this.trainingWidget})
+                createElement({tagName: "label", innerHTML: "Brush Color: ", parentElement: p})
+                this.colorPicker = new Vec3ColorPicker({parentElement: p})
+
+            this.brushDisplayContainer = createElement({tagName: "p", parentElement: this.trainingWidget})
 
         viewer.onViewportsChanged(() => this.handleViewerDataDisplayChange())
         this.handleViewerDataDisplayChange()
+    }
+
+    public hideTrainingUi(){
+        window.cancelAnimationFrame(this.animationRequestId)
+        this.trainingWidget.style.display = "none"
+        this.canvas.style.display = "none"
+        this.overlay?.destroy()
+        this.overlay = undefined
+    }
+
+    public showTrainingUi({trainingDatasource, brushStrokesGetter}: {trainingDatasource: DataSource, brushStrokesGetter: () => Array<BrushStroke>}){
+        this.trainingWidget.style.display = "block"
+        this.canvas.style.display = "block"
+        let overlay = this.overlay = new BrushingOverlay({
+            gl: this.gl,
+            trackedElement: this.viewer.getTrackedElement(),
+            viewport_drivers: this.viewer.getViewportDrivers(),
+            brush_stroke_handler: {
+                handleNewBrushStroke: (params: {start_position_uvw: vec3, camera_orientation_uvw: quat}) => {
+                    this.staging_brush_stroke = BrushStroke.create({
+                        gl: this.gl,
+                        start_postition_uvw: params.start_position_uvw, //FIXME put scale somewhere
+                        color: this.colorPicker.getColor(),
+                        annotated_data_source: trainingDatasource,
+                        camera_orientation: params.camera_orientation_uvw, //FIXME: realy data space? rename param in BrushStroke?
+                    })
+                    return this.staging_brush_stroke
+                },
+                handleFinishedBrushStroke: (stroke) => {
+                    this.staging_brush_stroke = undefined
+                    this.addBrushStroke(stroke)
+                }
+            },
+        })
+        overlay.setBrushingEnabled(this.brushingEnabledCheckbox.checked)
+
+        window.cancelAnimationFrame(this.animationRequestId)
+        const render = () => {
+            let strokes = brushStrokesGetter();
+            if(this.staging_brush_stroke){
+                strokes.push(this.staging_brush_stroke)
+            }
+            overlay.render(strokes, new BrushelBoxRenderer({gl: this.gl, highlightCrossSection: false, onlyCrossSection: true})) //FIXME? remove this optional override?
+            this.animationRequestId = window.requestAnimationFrame(render)
+        }
+        render()
     }
 
     public showStatus(message: string){
@@ -80,7 +155,7 @@ export class BrushingWidget{
 
     private resetWidgets(){
         window.cancelAnimationFrame(this.animationRequestId)
-        this.trainingWidget.hide()
+        this.hideTrainingUi()
         this.resolutionSelectionContainer.innerHTML = ""
         this.clearStatus()
     }
@@ -125,13 +200,78 @@ export class BrushingWidget{
         })
     }
 
+    public addBrushStroke(brushStroke: BrushStroke){
+        this.doAddBrushStroke(brushStroke)
+        this.doRPC("add_annotations", {annotations: [brushStroke]})
+    }
+
+    private doAddBrushStroke(brushStroke: BrushStroke){
+        let container = this.brushStrokeContainers.get(brushStroke.annotated_data_source)
+        if(container === undefined){
+            container = new BrushStrokesContainer({
+                parentElement: this.brushDisplayContainer,
+                datasource: brushStroke.annotated_data_source,
+                onBrushColorClicked: (color: vec3) => this.colorPicker.setColor(color),
+                onBrushRemoved: (brushStroke: BrushStroke) => {
+                    //mask loading time by updating local state
+                    let container = this.brushStrokeContainers.get(brushStroke.annotated_data_source)
+                    if(!container){
+                        return
+                    }
+                    if(container.getBrushStrokes().length == 0){
+                        this.brushStrokeContainers.delete(brushStroke.annotated_data_source)
+                        container.destroy()
+                    }
+                    this.doRPC("remove_annotations", {annotations: [brushStroke]})
+                }
+            })
+            this.brushStrokeContainers.set(brushStroke.annotated_data_source, container)
+        }
+        container.addBrushStroke(brushStroke) //mask loading time by updating local state
+    }
+
+    public removeBrushStroke(brushStroke: BrushStroke){
+        //mask loading time by updating local state
+        let container = this.brushStrokeContainers.get(brushStroke.annotated_data_source)
+        if(!container){
+            return
+        }
+        console.log(`Brush strokes before removing: ${container.getBrushStrokes().length}`)
+        container.removeBrushStroke(brushStroke)
+        console.log(`Brush strokes AFTER removing: ${container.getBrushStrokes().length}`)
+
+        if(container.getBrushStrokes().length == 0){
+            console.log(`REACHED 0 ANNOTAIONS!!!!!!!!!!!!!!!`)
+            this.brushStrokeContainers.delete(brushStroke.annotated_data_source)
+            container.destroy()
+        }
+        this.doRPC("remove_annotations", {annotations: [brushStroke]})
+    }
+
+    protected onNewState(newState: State){
+        this.brushDisplayContainer.innerHTML = ""
+        createElement({tagName: "label", innerHTML: "Brush Strokes:", parentElement: this.brushDisplayContainer})
+
+        this.brushStrokeContainers.values().forEach(bsc => bsc.destroy())
+        this.brushStrokeContainers = new HashMap({
+            hash_function: (ds) => ds.getDisplayString()
+        })
+
+        for(let brushStroke of newState.annotations){
+            this.doAddBrushStroke(brushStroke)
+        }
+    }
+
     private startTraining(datasource: DataSource){
         this.resetWidgets()
-        this.trainingWidget.show({
+        this.showTrainingUi({
             trainingDatasource: datasource,
             brushStrokesGetter: () => {
-                return this.brushStrokeContainer.getBrushStrokes()
-                    .filter(stroke => stroke.annotated_data_source.equals(datasource))
+                let container = this.brushStrokeContainers.get(datasource)
+                if(container){
+                    return container.getBrushStrokes()
+                }
+                return []
             }
         })
         this.showStatus(`Now training on ${datasource.getDisplayString()}`)
@@ -139,126 +279,12 @@ export class BrushingWidget{
 
     public destroy(){
         window.cancelAnimationFrame(this.animationRequestId)
-        this.trainingWidget?.destroy()
-        this.brushStrokeContainer.destroy()
-        removeElement(this.element)
-    }
-}
-
-
-export class TrainingWidget{
-    public readonly element: HTMLElement
-    public overlay?: BrushingOverlay
-    public staging_brush_stroke: BrushStroke | undefined = undefined
-    public readonly rendererSelector: SelectorWidget<BrushRenderer>
-    public readonly colorPicker: Vec3ColorPicker
-    public readonly brushingEnabledCheckbox: HTMLInputElement
-    public readonly viewer: Viewer
-    public readonly gl: WebGL2RenderingContext
-    public readonly canvas: HTMLCanvasElement
-    public readonly onNewBrushStroke: (stroke: BrushStroke) => void
-    private animationRequestId: number = 0
-    public readonly liveUpdater: PredictingWidget
-
-    constructor({parentElement, viewer, session, onNewBrushStroke}: {
-        parentElement: HTMLElement,
-        viewer: Viewer,
-        session: Session
-        onNewBrushStroke: (stroke: BrushStroke) => void,
-    }){
-        this.element = createElement({tagName: "div", parentElement, inlineCss: {display: "none"}})
-        this.canvas =  createElement({tagName: "canvas", parentElement: document.body, inlineCss: {display: "none"}})
-        this.gl = this.canvas.getContext("webgl2", {depth: true, stencil: true})!
-        this.viewer = viewer
-        this.onNewBrushStroke = onNewBrushStroke
-
-        this.liveUpdater = new PredictingWidget({
-            session, viewer, parentElement: this.element
-        })
-
-        this.brushingEnabledCheckbox = createInputParagraph({
-            label_text: "Enable Brushing: ",
-            inputType: "checkbox",
-            title: "Enable to draw annotations by clicking and dragging. Disable to use the viewer's controls to navigate over the data.",
-            parentElement: this.element,
-            onClick: () => {
-                this.overlay?.setBrushingEnabled(this.brushingEnabledCheckbox.checked)
-            }
-        })
-
-        let p = createElement({tagName: "p", parentElement: this.element})
-        createElement({tagName: "label", innerHTML: "Brush Color: ", parentElement: p})
-        this.colorPicker = new Vec3ColorPicker({parentElement: p})
-
-        p = createElement({tagName: "p", parentElement: this.element, inlineCss: {
-            display: (window as any).ilastik_debug ? "block" : "none"}
-        })
-        createElement({tagName: "label", innerHTML: "Rendering style: ", parentElement: p})
-        const renderers = [
-            new BrushelBoxRenderer({gl: this.gl, highlightCrossSection: false, onlyCrossSection: true}),
-            new BrushelLinesRenderer(this.gl),
-            new BrushelBoxRenderer({gl: this.gl, debugColors: false, highlightCrossSection: false, onlyCrossSection: false}),
-            new BrushelBoxRenderer({gl: this.gl, debugColors: true, highlightCrossSection: true, onlyCrossSection: false}),
-        ];
-        this.rendererSelector = new SelectorWidget<BrushRenderer>({
-            parentElement: p,
-            options: renderers,
-            optionRenderer: (_, index) => ["Boxes - Cross Section", "Lines", "Boxes", "Boxes (debug colors)"][index],
-            onSelection: (_) => {},
-            initial_selection: renderers[0],
-        })
-    }
-
-    public hide(){
-        window.cancelAnimationFrame(this.animationRequestId)
-        this.element.style.display = "none"
-        this.canvas.style.display = "none"
         this.overlay?.destroy()
-        this.overlay = undefined
-    }
-
-    public show({trainingDatasource, brushStrokesGetter}: {trainingDatasource: DataSource, brushStrokesGetter: () => Array<BrushStroke>}){
-        this.element.style.display = "block"
-        this.canvas.style.display = "block"
-        let overlay = this.overlay = new BrushingOverlay({
-            gl: this.gl,
-            trackedElement: this.viewer.getTrackedElement(),
-            viewport_drivers: this.viewer.getViewportDrivers(),
-            brush_stroke_handler: {
-                handleNewBrushStroke: (params: {start_position_uvw: vec3, camera_orientation_uvw: quat}) => {
-                    this.staging_brush_stroke = BrushStroke.create({
-                        gl: this.gl,
-                        start_postition_uvw: params.start_position_uvw, //FIXME put scale somewhere
-                        color: this.colorPicker.getColor(),
-                        annotated_data_source: trainingDatasource,
-                        camera_orientation: params.camera_orientation_uvw, //FIXME: realy data space? rename param in BrushStroke?
-                    })
-                    return this.staging_brush_stroke
-                },
-                handleFinishedBrushStroke: (stroke) => {
-                    this.staging_brush_stroke = undefined
-                    this.onNewBrushStroke(stroke)
-                }
-            },
-        })
-        overlay.setBrushingEnabled(this.brushingEnabledCheckbox.checked)
-
-        window.cancelAnimationFrame(this.animationRequestId)
-        const render = () => {
-            let strokes = brushStrokesGetter();
-            if(this.staging_brush_stroke){
-                strokes.push(this.staging_brush_stroke)
-            }
-            overlay.render(strokes, this.rendererSelector.getSelection()!) //FIXME? remove this optional override?
-            this.animationRequestId = window.requestAnimationFrame(render)
-        }
-        render()
-    }
-
-    public destroy(){
-        window.cancelAnimationFrame(this.animationRequestId)
-        this.overlay?.destroy()
-        removeElement(this.canvas)
+        removeElement(this.gl.canvas)
         removeElement(this.element)
+
+        this.brushStrokeContainers.values().forEach(bsc => bsc.destroy())
+        removeElement(this.element)
+        //FIXME: remove event from viewer
     }
 }

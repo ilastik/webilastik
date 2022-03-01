@@ -1,70 +1,42 @@
 import { vec3 } from "gl-matrix";
-import { Applet } from "../../../client/applets/applet";
-import { Session } from "../../../client/ilastik";
+import { DataSource } from "../../../client/ilastik";
 import { createElement, createInput, removeElement, vec3ToHexColor, vec3ToRgb, vecToString } from "../../../util/misc";
-import { ensureJsonArray, ensureJsonBoolean, ensureJsonObject } from "../../../util/serialization";
 import { BrushStroke } from "./brush_stroke";
 
 export type resolution = vec3;
 
 
-export class BrushStrokesContainer extends Applet<{brushing_enabled: boolean, annotations: Array<BrushStroke>}>{
-    public readonly element: HTMLTableElement;
+export class BrushStrokesContainer{
+    public readonly element: HTMLDivElement;
+    public readonly table: HTMLTableElement;
 
+    public readonly datasource: DataSource
     private brushStrokeWidgets: BrushStrokeWidget[] = [];
     private onBrushColorClicked: (color: vec3) => void;
+    private onBrushRemoved: (stroke: BrushStroke) => void;
 
-    constructor({applet_name, gl, parentElement, session, onBrushColorClicked}: {
-        applet_name: string,
-        gl: WebGL2RenderingContext,
+    constructor({datasource, parentElement, onBrushColorClicked, onBrushRemoved}: {
+        datasource: DataSource,
         parentElement: HTMLElement,
-        session: Session,
         onBrushColorClicked: (color: vec3) => void,
+        onBrushRemoved: (stroke: BrushStroke) => void,
     }){
-        super({
-            name: applet_name,
-            deserializer: (data) => {
-                let data_obj = ensureJsonObject(data)
-                let brushing_enabled = ensureJsonBoolean(data_obj["brushing_enabled"])
-                let raw_annotations = ensureJsonArray(data_obj["annotations"]);
-                return {
-                    brushing_enabled,
-                    annotations: raw_annotations.map(a => BrushStroke.fromJsonValue(gl, a))
-                }
-            },
-            session,
-            onNewState: (new_state) => this.onNewState(new_state)
-        })
-        this.element = createElement({tagName: "table", parentElement, cssClasses: ["ItkBrushStrokesContainer"]}) as HTMLTableElement;
+        this.element = createElement({tagName: "div", parentElement, cssClasses: ["ItkBrushStrokesContainer"]});
+        createElement({tagName: "label", parentElement: this.element, innerHTML: `Annotations on ${datasource.getDisplayString()}`});
+        this.table = createElement({tagName: "table", parentElement: this.element, cssClasses: ["ItkBrushStrokesContainer"]});
+        this.datasource = datasource
         this.onBrushColorClicked = onBrushColorClicked
-    }
-
-    public addBrushStroke(brushStroke: BrushStroke){
-        this.doAddBrushStroke(brushStroke) //mask loading time by updating local state
-        this.doRPC("add_annotations", {annotations: [brushStroke]})
-    }
-
-    public removeBrushStroke(brushStroke: BrushStroke){
-        this.doRemoveBrushStroke(brushStroke) //mask loading time by updating local state
-        this.doRPC("remove_annotations", {annotations: [brushStroke]})
+        this.onBrushRemoved = onBrushRemoved
     }
 
     public getBrushStrokes(): Array<BrushStroke>{
         return this.brushStrokeWidgets.map(bsw => bsw.brushStroke)
     }
 
-    protected onNewState(state: {brushing_enabled: boolean, annotations: Array<BrushStroke>}){
-        this.brushStrokeWidgets.forEach(bsw => bsw.destroy())
-        this.brushStrokeWidgets = []
-        for(let brushStroke of state.annotations){
-            this.doAddBrushStroke(brushStroke)
-        }
-    }
-
-    protected doAddBrushStroke(brushStroke: BrushStroke){
+    public addBrushStroke(brushStroke: BrushStroke){
         let brush_widget = new BrushStrokeWidget({
             brushStroke,
-            parentElement: this.element,
+            parentElement: this.table,
             onColorClicked: this.onBrushColorClicked,
             onLabelClicked: (_) => {}, //FIXME: snap viewer to coord
             onDeleteClicked: (stroke) => this.removeBrushStroke(stroke)
@@ -72,7 +44,7 @@ export class BrushStrokesContainer extends Applet<{brushing_enabled: boolean, an
         this.brushStrokeWidgets.push(brush_widget)
     }
 
-    protected doRemoveBrushStroke(brushStroke: BrushStroke){
+    public removeBrushStroke(brushStroke: BrushStroke){
         this.brushStrokeWidgets = this.brushStrokeWidgets.filter( bsw => {
             if(bsw.brushStroke == brushStroke){
                 bsw.destroy()
@@ -80,6 +52,7 @@ export class BrushStrokesContainer extends Applet<{brushing_enabled: boolean, an
             }
             return true
         })
+        this.onBrushRemoved(brushStroke)
     }
 
     public destroy(){
@@ -88,12 +61,6 @@ export class BrushStrokesContainer extends Applet<{brushing_enabled: boolean, an
     }
 }
 
-// class BrushStrokeScaleGroup{
-//     public readonly element: HTMLTableElement;
-//     constructor(parentElement: HTMLElement, scale: IDataSourceScale){
-//         this.element = createElement({tagName: "table", parentElement}) as HTMLTableElement
-//     }
-// }
 
 class BrushStrokeWidget{
     public readonly element: HTMLElement
