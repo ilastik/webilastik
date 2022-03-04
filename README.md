@@ -59,7 +59,7 @@ Even the local server needs Nginx to be running. This is because webilastik allo
 
 Here's webilastik with a sample 2D image:
 
-https://app.ilastik.org/api/nehuba/index.html#!%7B%22layers%22:%5B%7B%22source%22:%22precomputed://https://app.ilastik.org/api/images/c_cells_2.precomputed%22%2C%22type%22:%22image%22%2C%22blend%22:%22default%22%2C%22name%22:%22c_cells_2.precomputed%22%7D%5D%2C%22navigation%22:%7B%22pose%22:%7B%22position%22:%7B%22voxelSize%22:%5B1%2C1%2C1%5D%2C%22voxelCoordinates%22:%5B348.5%2C225%2C0.5%5D%7D%7D%2C%22zoomFactor%22:1%7D%2C%22layout%22:%22xy%22%7D
+https://app.ilastik.org/public/nehuba/index.html#!%7B%22layers%22:%5B%7B%22source%22:%22precomputed://https://app.ilastik.org/public/images/c_cells_2.precomputed%22%2C%22type%22:%22image%22%2C%22blend%22:%22default%22%2C%22shader%22:%22void%20main%28%29%20%7B%5Cn%20%20%20%20vec3%20color0%20=%20%28vec3%28255%2C%200%2C%200%29%20/%20255.0%29%20%2A%20toNormalized%28getDataValue%280%29%29%3B%5Cn%20%20%20%20vec3%20color1%20=%20%28vec3%280%2C%20255%2C%200%29%20/%20255.0%29%20%2A%20toNormalized%28getDataValue%281%29%29%3B%5Cn%20%20%20%20vec3%20color2%20=%20%28vec3%280%2C%200%2C%20255%29%20/%20255.0%29%20%2A%20toNormalized%28getDataValue%282%29%29%3B%5Cn%20%20%20%20emitRGBA%28%5Cn%20%20%20%20%20%20%20%20vec4%28color0%20+%20color1%20+%20color2%2C%201.0%29%5Cn%20%20%20%20%29%3B%5Cn%7D%22%2C%22name%22:%22c_Cells_2.precomputed%22%7D%5D%2C%22navigation%22:%7B%22pose%22:%7B%22position%22:%7B%22voxelSize%22:%5B1%2C1%2C1%5D%2C%22voxelCoordinates%22:%5B302.2521667480469%2C232.23617553710938%2C0.5%5D%7D%7D%2C%22zoomFactor%22:0.5488116360940264%7D%2C%22layout%22:%22xy%22%7D
 
 
 # Concepts
