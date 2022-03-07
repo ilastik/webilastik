@@ -5,7 +5,7 @@ from ndstructs.point5D import Interval5D, Point5D, Shape5D
 from ndstructs.array5D import Array5D, All, ScalarData, StaticLine
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonArray, ensureJsonInt, ensureJsonObject, ensureJsonString
 
-from webilastik.datasource import DataSource, DataRoi
+from webilastik.datasource import DataSource, DataRoi, FsDataSource
 from webilastik.features.feature_extractor import FeatureExtractor, FeatureData
 
 
@@ -119,7 +119,7 @@ class Annotation(ScalarData):
         self.color = color
         self.raw_data = raw_data
 
-    def rebuild(self, arr: np.ndarray, *, axiskeys: str, location: Point5D = None) -> "Annotation":
+    def rebuild(self, arr: np.ndarray, *, axiskeys: str, location: "Point5D | None" = None) -> "Annotation":
         location = self.location if location is None else location
         return self.__class__(arr, axiskeys=axiskeys, location=location, color=self.color, raw_data=self.raw_data)
 
@@ -166,6 +166,10 @@ class Annotation(ScalarData):
         return cls(scribblings._data, axiskeys=scribblings.axiskeys, color=color, raw_data=raw_data, location=start)
 
     def to_json_data(self) -> JsonObject:
+        if not isinstance(self.raw_data, FsDataSource):
+            #FIXME: maybe create a FsDatasourceAnnotation so we don't have to raise here?
+            raise ValueError(f"Can't serialize annotation over {self.raw_data}")
+
         voxels : List[Point5D] = []
 
         # FIXME: annotation should probably not be an Array6D
@@ -210,40 +214,40 @@ class Annotation(ScalarData):
             out.set(annot.colored(color_map[annot.color]), mask_value=0)
         return out
 
-    @staticmethod
-    def dump_as_ilp_data(
-        annotations: Sequence["Annotation"],
-        color_map: Optional[Dict[Color, np.uint8]] = None,
-        block_size: Optional[Shape5D] = None,
-    ) -> Dict[str, Any]:
-        if len(annotations) == 0:
-            return {}
-        if len(set(annot.raw_data for annot in annotations)) > 1:
-            raise ValueError(f"All Annotations must come from the same datasource!")
-        axiskeys = annotations[0].raw_data.axiskeys
-        merged_annotations = Annotation.merge(annotations, color_map=color_map)
+    # @staticmethod
+    # def dump_as_ilp_data(
+    #     annotations: Sequence["Annotation"],
+    #     color_map: Optional[Dict[Color, np.uint8]] = None,
+    #     block_size: Optional[Shape5D] = None,
+    # ) -> Dict[str, Any]:
+    #     if len(annotations) == 0:
+    #         return {}
+    #     if len(set(annot.raw_data for annot in annotations)) > 1:
+    #         raise ValueError(f"All Annotations must come from the same datasource!")
+    #     axiskeys = annotations[0].raw_data.axiskeys
+    #     merged_annotations = Annotation.merge(annotations, color_map=color_map)
 
-        out = {}
-        for block_index, block in enumerate(merged_annotations.split(block_size or merged_annotations.shape)):
-            out[f"block{block_index:04d}"] = {
-                "__data__": block.raw(axiskeys),
-                "__attrs__": {
-                    "blockSlice": "["
-                    + ",".join(f"{slc.start}:{slc.stop}" for slc in block.interval.to_slices(axiskeys))
-                    + "]"
-                },
-            }
-        return out
+    #     out = {}
+    #     for block_index, block in enumerate(merged_annotations.split(block_size or merged_annotations.shape)):
+    #         out[f"block{block_index:04d}"] = {
+    #             "__data__": block.raw(axiskeys),
+    #             "__attrs__": {
+    #                 "blockSlice": "["
+    #                 + ",".join(f"{slc.start}:{slc.stop}" for slc in block.interval.to_slices(axiskeys))
+    #                 + "]"
+    #             },
+    #         }
+    #     return out
 
-    @property
-    def ilp_data(self) -> Mapping[str, Any]:
-        axiskeys = self.raw_data.axiskeys
-        return {
-            "__data__": self.raw(axiskeys),
-            "__attrs__": {
-                "blockSlice": "[" + ",".join(f"{slc.start}:{slc.stop}" for slc in self.interval.to_slices(axiskeys)) + "]"
-            },
-        }
+    # @property
+    # def ilp_data(self) -> Mapping[str, Any]:
+    #     axiskeys = self.raw_data.axiskeys
+    #     return {
+    #         "__data__": self.raw(axiskeys),
+    #         "__attrs__": {
+    #             "blockSlice": "[" + ",".join(f"{slc.start}:{slc.stop}" for slc in self.interval.to_slices(axiskeys)) + "]"
+    #         },
+    #     }
 
     def __repr__(self):
         return f"<Annotation {self.shape} for raw_data: {self.raw_data}>"
