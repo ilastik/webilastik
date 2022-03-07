@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, Generic, List, Literal, Optional, Sequen
 import logging
 import uuid
 from ndstructs.array5D import Array5D
-from pathlib import PurePosixPath, Path
+from pathlib import PurePosixPath
 from dataclasses import dataclass
 from concurrent.futures import Future
 
@@ -148,7 +148,7 @@ class _State:
 
         if self.mode == ExportMode.PREDICTIONS:
             return PrecomputedChunksSink.create(
-                base_path=Path(sink_prefix),
+                base_path=PurePosixPath(sink_prefix),
                 filesystem=filesystem_result,
                 info=PrecomputedChunksInfo(
                     data_type=np.dtype("float32"),
@@ -156,7 +156,7 @@ class _State:
                     num_channels=classifier.num_classes,
                     scales=tuple([
                         PrecomputedChunksScale(
-                            key=Path("exported_data"),
+                            key=PurePosixPath("exported_data"),
                             size=(datasource.shape.x, datasource.shape.y, datasource.shape.z),
                             chunk_sizes=tuple([(datasource.tile_shape.x, datasource.tile_shape.y, datasource.tile_shape.z)]),
                             encoding=self.sink_encoder,
@@ -169,7 +169,7 @@ class _State:
         elif self.mode == ExportMode.SIMPLE_SEGMENTATION:
             return [
                 PrecomputedChunksSink.create(
-                    base_path=Path(sink_prefix).joinpath(f"class_{pixel_class}"),
+                    base_path=PurePosixPath(sink_prefix).joinpath(f"class_{pixel_class}"),
                     filesystem=filesystem_result,
                     info=PrecomputedChunksInfo(
                         data_type=np.dtype("uint8"),
@@ -177,7 +177,7 @@ class _State:
                         num_channels=3,
                         scales=tuple([
                             PrecomputedChunksScale(
-                                key=Path("exported_data"),
+                                key=PurePosixPath("exported_data"),
                                 size=(datasource.shape.x, datasource.shape.y, datasource.shape.z),
                                 chunk_sizes=tuple([(datasource.tile_shape.x, datasource.tile_shape.y, datasource.tile_shape.z)]),
                                 encoding=self.sink_encoder,
