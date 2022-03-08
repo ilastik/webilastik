@@ -7,7 +7,7 @@ from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.datasource import  try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError
 from webilastik.utility.url import Protocol, Url
-from webilastik.datasource import DataSource
+from webilastik.datasource import FsDataSource
 
 
 class DataSourcePicker(InertApplet, NoSnapshotApplet):
@@ -15,7 +15,7 @@ class DataSourcePicker(InertApplet, NoSnapshotApplet):
         self,
         *,
         name: str,
-        datasource_suggestions: "AppletOutput[Sequence[DataSource] | None]",
+        datasource_suggestions: "AppletOutput[Sequence[FsDataSource] | None]",
         allowed_protocols: Sequence[Protocol],
     ) -> None:
         self._in_datasource_suggestions = datasource_suggestions
@@ -23,8 +23,8 @@ class DataSourcePicker(InertApplet, NoSnapshotApplet):
         self.allowed_protocols = allowed_protocols
 
         self._datasource_url: Optional[str] = None
-        self._datasource_choices: Optional[Sequence[DataSource]] = None
-        self._datasource: Optional[DataSource] = None
+        self._datasource_choices: Optional[Sequence[FsDataSource]] = None
+        self._datasource: Optional[FsDataSource] = None
         self._error_message: Optional[str] = None
         super().__init__(name)
 
@@ -39,7 +39,7 @@ class DataSourcePicker(InertApplet, NoSnapshotApplet):
         self._error_message = error_message or None
 
     @applet_output
-    def datasource(self) -> Optional[DataSource]:
+    def datasource(self) -> Optional[FsDataSource]:
         return self._datasource
 
     @user_interaction(refresh_self=True)
@@ -65,7 +65,7 @@ class DataSourcePicker(InertApplet, NoSnapshotApplet):
     @user_interaction(refresh_self=True)
     def pick_datasource(self, user_prompt: UserPrompt, datasource_index: int) -> PropagationResult:
         if self._datasource_choices is None:
-            return PropagationError("No DataSource choices available")
+            return PropagationError("No FsDataSource choices available")
         num_datasources = len(self._datasource_choices)
         if  num_datasources <= datasource_index:
             return PropagationError("Bad datasource choice index: {datasource_index}. Must be smaller than {num_datasources}")
