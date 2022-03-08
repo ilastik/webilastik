@@ -7,7 +7,7 @@ from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.datasource import  try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError
 from webilastik.utility.url import Protocol, Url
-from webilastik.datasource import FsDataSource
+from webilastik.datasource import DataSource, FsDataSource
 
 
 class DataSourcePicker(InertApplet, NoSnapshotApplet):
@@ -15,7 +15,7 @@ class DataSourcePicker(InertApplet, NoSnapshotApplet):
         self,
         *,
         name: str,
-        datasource_suggestions: "AppletOutput[Sequence[FsDataSource] | None]",
+        datasource_suggestions: "AppletOutput[Sequence[DataSource] | None]",
         allowed_protocols: Sequence[Protocol],
     ) -> None:
         self._in_datasource_suggestions = datasource_suggestions
@@ -39,7 +39,7 @@ class DataSourcePicker(InertApplet, NoSnapshotApplet):
         self._error_message = error_message or None
 
     @applet_output
-    def datasource(self) -> Optional[FsDataSource]:
+    def datasource(self) -> Optional[DataSource]:
         return self._datasource
 
     @user_interaction(refresh_self=True)
@@ -91,7 +91,7 @@ class WsDataSourcePicker(WsApplet, DataSourcePicker):
 
 
     def _get_json_state(self) -> JsonValue:
-        suggestion_datasource_urls = [ds.url for ds in (self._in_datasource_suggestions() or [])]
+        suggestion_datasource_urls = [ds.url for ds in (self._in_datasource_suggestions() or []) if isinstance(ds, FsDataSource)] #FIXME
         return {
             "datasource_url": toJsonValue(self._datasource_url),
             "datasource_choices": toJsonValue(tuple(self._datasource_choices or ()) or None),
