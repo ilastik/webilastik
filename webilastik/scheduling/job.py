@@ -1,11 +1,11 @@
-from typing import Callable, Generic, Iterable, Iterator, Literal, Protocol, Any, Sized, TypeVar
+from typing import Callable, Generic, Iterable, List, Literal, Protocol, Any, Sized, TypeVar
 from collections.abc import Sized
 import threading
 from concurrent.futures import Future, Executor
 import uuid
-from enum import Enum
 
 from ndstructs.utils.json_serializable import JsonObject
+from webilastik.utility import PeekableIterator
 
 IN = TypeVar("IN", covariant=True)
 
@@ -23,60 +23,50 @@ class Job(Generic[IN], Future[None]):
         *,
         name: str,
         target: Callable[[IN], None],
+        on_progress: "JobProgressCallback | None" = None,
+        on_complete: "JobCompletedCallback | None" = None,
         args: Iterable[IN],
         num_args: "int | None" = None,
-        on_progress: "JobProgressCallback | None" = None,
     ):
+        super().__init__()
         self.name = name
         self.target = target
-        self.args = (a for a in args)
+        self.on_progress: "JobProgressCallback | None" = on_progress
+        self.on_complete: "JobCompletedCallback | None" = on_complete
+        self.args: PeekableIterator[IN] = PeekableIterator(args)
         self.num_args: "int | None" = num_args or (len(args) if isinstance(args, Sized) else None)
-        self.on_progress = on_progress
 
         self.uuid: uuid.UUID = uuid.uuid4()
         self.num_completed_steps = 0
         self.num_dispatched_steps = 0
-        self.fully_dispatched = False
         self.lock = threading.Lock()
 
-        super().__init__()
+    def _launch_next_step(self, executor: Executor) -> "Future[None] | None":
+        with self.lock:
+            if self.done() or not self.args.has_next():
+                return None
+            if not self.running():
+                _ = self.set_running_or_notify_cancel()
+            future = executor.submit(self.target, self.args.get_next())
+            self.num_dispatched_steps += 1
+            if not self.args.has_next():
+                self.num_args = self.num_dispatched_steps #FIXME
 
-    def launch_next_step(self, executor: Executor) -> "Future[None] | BaseException | None":
         def done_callback(future: Future[Any]): # FIXME
             with self.lock:
+                step_index = self.num_completed_steps
                 self.num_completed_steps += 1
-                if self.done():
-                    return
                 if future.cancelled():
                     _ = self.cancel()
-                    return
-                if future.exception():
+                elif future.exception():
                     self.set_exception(future.exception())
-                    return
-                if self.fully_dispatched and self.num_completed_steps == self.num_dispatched_steps:
+                elif not self.args.has_next() and self.num_dispatched_steps == self.num_completed_steps:
                     self.set_result(None)
+            if self.on_progress:
+                self.on_progress(self.uuid, step_index)
 
-        with self.lock:
-            exception = self.exception()
-            if exception:
-                return exception
-            if self.done():
-                return None
-            if not self.running(): #not done nor running -> pending
-                _ = self.set_running_or_notify_cancel()
-
-            try:
-                future = executor.submit(self.target, next(self.args))
-                future.add_done_callback(done_callback)
-                self.num_dispatched_steps += 1
-                on_progress = self.on_progress
-                if on_progress:
-                    future.add_done_callback(lambda _: on_progress(self.uuid, self.num_completed_steps))
-            except StopIteration:
-                self.fully_dispatched = True
-                if self.num_args is None:
-                    self.num_args = self.num_dispatched_steps
-                return None
+        future.add_done_callback(done_callback)
+        return future
 
     def status(self) -> Literal["pending", "running", "cancelled", "failed", "success"]:
         with self.lock:
@@ -102,3 +92,28 @@ class Job(Generic[IN], Future[None]):
                 "error_message": exception and str(exception)
             }
 
+class JobExecutor:
+    def __init__(self, executor: Executor, concurrent_job_steps: int) -> None:
+        self.executor = executor
+        self.concurrent_job_steps = concurrent_job_steps
+        self.jobs: "List[Job[Any]]" = []
+        self.lock = threading.Lock()
+
+    def _execute_step(self):
+        with self.lock:
+            if not self.jobs:
+                return
+            job = self.jobs[0]
+            future = job._launch_next_step(self.executor)
+            if future is None:
+                _ = self.jobs.pop(0)
+                future = self.executor.submit(lambda : None)
+        future.add_done_callback(lambda _: self._execute_step())
+
+    def submit(self, job: Job[Any]):
+        with self.lock:
+            self.jobs.append(job)
+            if len(self.jobs) != 1:
+                return
+            for _ in range(self.concurrent_job_steps):
+                _ = self.executor.submit(self._execute_step)
