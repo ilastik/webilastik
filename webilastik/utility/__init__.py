@@ -1,5 +1,5 @@
 # pyright: reportUnusedImport=false
-from typing import Callable, TypeVar
+from typing import Callable, Generic, Iterable, TypeVar
 
 from ndstructs.utils.json_serializable import JsonObject, JsonValue
 from .flatten import flatten, unflatten, listify
@@ -29,3 +29,30 @@ class Absent:
                 return value
             return parser(json_object[key])
         return Absent()
+
+A = TypeVar("A", covariant=True)
+
+class _Empty:
+    pass
+
+class PeekableIterator(Generic[A]):
+    def __init__(self, args: Iterable[A]) -> None:
+        self.args = iter(args)
+        self.next_arg: "A | _Empty" = _Empty()
+        try:
+            self.next_arg = next(self.args)
+        except StopIteration:
+            pass
+
+    def has_next(self) -> bool:
+        return not isinstance(self.next_arg, _Empty)
+
+    def get_next(self) -> "A":
+        if isinstance(self.next_arg, _Empty):
+            raise ValueError(f"Iterator is empty")
+        out = self.next_arg
+        try:
+            self.next_arg = next(self.args)
+        except StopIteration:
+            self.next_arg = _Empty()
+        return out
