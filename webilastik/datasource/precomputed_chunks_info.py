@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import json
-from typing import Any, Optional, Tuple
+from typing import Any, Literal, Optional, Tuple
 from pathlib import PurePosixPath
 import io
 
@@ -102,7 +102,7 @@ class PrecomputedChunksScale:
         chunk_sizes: Tuple[Tuple[int, int, int], ...],
         encoding: PrecomputedChunksEncoder,
     ) -> None:
-        self.key = key
+        self.key = PurePosixPath(key.as_posix().lstrip("/"))
         self.size = size
         self.resolution = resolution
         self.voxel_offset = (0,0,0) if voxel_offset is None else voxel_offset
@@ -220,12 +220,12 @@ class PrecomputedChunksInfo:
     def __init__(
         self,
         *,
-        type_: str,
+        type_: Literal["image"],
         data_type: "np.dtype[Any]", #FIXME
         num_channels: int,
         scales: Tuple[PrecomputedChunksScale, ...],
     ):
-        self.type_ = type_
+        self.type_: Literal["image"] = type_
         self.data_type = data_type
         self.num_channels = num_channels
         self.scales = scales
@@ -242,11 +242,18 @@ class PrecomputedChunksInfo:
 
     @classmethod
     def from_datasource(
-        cls, *, datasource: DataSource, scale_key: PurePosixPath, encoding: PrecomputedChunksEncoder) -> "PrecomputedChunksInfo":
+        cls,
+        *,
+        datasource: DataSource,
+        scale_key: PurePosixPath,
+        encoding: PrecomputedChunksEncoder = RawEncoder(),
+        num_channels: Optional[int] = None,
+        data_type: "np.dtype[Any] | None" = None, #FIXME: remove Any?
+    ) -> "PrecomputedChunksInfo":
         return PrecomputedChunksInfo(
             type_="image",
-            data_type=datasource.dtype, #type: ignore
-            num_channels=datasource.shape.c,
+            data_type=data_type or datasource.dtype,
+            num_channels=num_channels or datasource.shape.c,
             scales=tuple([
                 PrecomputedChunksScale.from_datasource(
                     datasource=datasource, key=scale_key, encoding=encoding
@@ -295,8 +302,11 @@ class PrecomputedChunksInfo:
     @classmethod
     def from_json_value(cls, data: JsonValue):
         data_dict = ensureJsonObject(data)
+        type_ = ensureJsonString(data_dict.get("type"))
+        if type_ != "image":
+            raise ValueError(f"Bad 'type' marker value: {type_}")
         return PrecomputedChunksInfo(
-            type_=ensureJsonString(data_dict.get("type")),
+            type_=type_,
             data_type=np.dtype(ensureJsonString(data_dict.get("data_type"))), #type: ignore
             num_channels=ensureJsonInt(data_dict.get("num_channels")),
             scales=tuple(

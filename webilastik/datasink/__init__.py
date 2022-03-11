@@ -1,11 +1,13 @@
 from abc import ABC, abstractmethod
 import json
-from typing import Callable, Dict, Optional
+from pathlib import PurePosixPath
+from typing import Any, Callable, Dict, Optional
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 
 import numpy as np
 
 from ndstructs import Shape5D, Interval5D, Array5D
+from webilastik.filesystem import JsonableFilesystem
 from webilastik.utility.url import Url
 
 DATASINK_FROM_JSON_CONSTRUCTORS: Dict[str, Callable[[JsonValue], "DataSink"]] = {}
@@ -16,13 +18,12 @@ class DataSink(ABC):
         *,
         tile_shape: Shape5D,
         interval: Interval5D,
-        dtype: np.dtype, #type: ignore
+        dtype: "np.dtype[Any]", #FIXME: remove Any
         url: Optional[Url] = None
     ):
         self.tile_shape = tile_shape
         self.interval = interval
         self.dtype = dtype # type: ignore
-        self.url = url
 
         self.shape = self.interval.shape
         self.location = interval.start
@@ -46,3 +47,24 @@ class DataSink(ABC):
         if class_name not in DATASINK_FROM_JSON_CONSTRUCTORS:
             raise ValueError(f"Could not deserialize DataSink from {json.dumps(value)}")
         return DATASINK_FROM_JSON_CONSTRUCTORS[class_name](value)
+
+class FsDataSink(DataSink):
+    def __init__(
+        self,
+        *,
+        filesystem: JsonableFilesystem,
+        path: PurePosixPath,
+        tile_shape: Shape5D,
+        interval: Interval5D,
+        dtype: "np.dtype[Any]",
+    ):
+        self.filesystem = filesystem
+        self.path = path
+        super().__init__(tile_shape=tile_shape, interval=interval, dtype=dtype)
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            **super().to_json_value(),
+            "filesystem": self.filesystem.to_json_value(),
+            "path": self.path.as_posix(),
+        }
