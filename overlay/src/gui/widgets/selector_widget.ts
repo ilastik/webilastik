@@ -90,10 +90,10 @@ export class SelectorOption<T>{
 export class SelectorWidget<T>{
     public readonly element: HTMLElement;
     protected selector_options: SelectorOption<T>[];
-    constructor({options, optionRenderer, onSelection, parentElement, initial_selection, comparator=(a: T, b: T) => a == b}: {
+    constructor({options, optionRenderer, onSelection=() => {}, parentElement, initial_selection, comparator=(a: T, b: T) => a == b}: {
         options: Array<T>,
         optionRenderer: (option: T, option_index: number) => string,
-        onSelection: (selection: T, selection_index: number) => void,
+        onSelection?: (selection: T, selection_index: number) => void,
         parentElement: HTMLElement,
         initial_selection?: T,
         comparator?: (a: T, b:T) => boolean,
