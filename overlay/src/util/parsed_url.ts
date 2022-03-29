@@ -137,7 +137,7 @@ export class Url implements IJsonable{
         return this.raw
     }
 
-    public fromJsonValue(value: JsonValue): Url{
+    public static fromJsonValue(value: JsonValue): Url{
         return Url.parse(ensureJsonString(value))
     }
 
@@ -219,8 +219,9 @@ export class Url implements IJsonable{
         return this.updatedWith({path: this.path.parent})
     }
 
-    public joinPath(subpath: string): Url{
-        return this.updatedWith({path: this.path.joinPath(subpath)})
+    public joinPath(subpath: string | Path): Url{
+        let pathStr = typeof subpath === "string" ? subpath : subpath.raw
+        return this.updatedWith({path: this.path.joinPath(pathStr)})
     }
 
     public ensureDataScheme(datascheme: DataScheme): Url{
