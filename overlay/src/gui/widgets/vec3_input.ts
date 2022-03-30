@@ -13,9 +13,9 @@ export class Vec3Input{
         let parent = createElement({tagName: "div", parentElement: params.parentElement})
         let disabled = params.disabled === undefined ? false : params.disabled
 
-        this.xInput = new NumberInput({parentElement: parent, withParagraph: !params.inlineFields, label: "x: ", disabled})
-        this.yInput = new NumberInput({parentElement: parent, withParagraph: !params.inlineFields, label: "y: ", disabled})
-        this.zInput = new NumberInput({parentElement: parent, withParagraph: !params.inlineFields, label: "z: ", disabled})
+        this.xInput = NumberInput.createLabeled({parentElement: parent, label: " x: ", disabled})
+        this.yInput = NumberInput.createLabeled({parentElement: parent, label: " y: ", disabled})
+        this.zInput = NumberInput.createLabeled({parentElement: parent, label: " z: ", disabled})
 
         this.value = params.value
     }

@@ -1,31 +1,19 @@
 import { createElement, createInput } from "../../util/misc"
+import { CssClasses } from "../css_classes"
 
 export class NumberInput{
     private input: HTMLInputElement
 
     constructor(params: {
         parentElement: HTMLElement,
-        withParagraph: boolean,
-        label?: string,
         value?: number,
         step?: number,
         min?: number,
         max?: number,
         disabled?: boolean,
     }){
-        let parent: HTMLElement
-        if(params.withParagraph){
-            parent = createElement({tagName: "p", parentElement: params.parentElement})
-        }else{
-            parent = params.parentElement
-        }
-
         let disabled = params.disabled === undefined ? false : true
-
-        if(params.label){
-            createElement({tagName: "label", parentElement: parent, innerHTML: params.label})
-        }
-        this.input = createInput({inputType: "number", parentElement: parent, disabled})
+        this.input = createInput({inputType: "number", parentElement: params.parentElement, disabled})
         if(params.value !== undefined){
             this.input.value = params.value.toString()
         }
@@ -54,5 +42,11 @@ export class NumberInput{
             return
         }
         this.input.value = value.toString()
+    }
+
+    public static createLabeled(params: {parentElement: HTMLElement, label: string, disabled: boolean}): NumberInput{
+        let span = createElement({tagName: "span", parentElement: params.parentElement})
+        createElement({tagName: "label", parentElement: span, innerHTML: " x: "})
+        return new NumberInput({parentElement: span, disabled: params.disabled})
     }
 }

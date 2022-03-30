@@ -8,25 +8,14 @@ export class Shape5DInput{
     public readonly zInput: NumberInput;
     public readonly tInput: NumberInput;
     public readonly cInput: NumberInput;
-    constructor(params: {
-        parentElement: HTMLElement, inlineFields: boolean, label?: string, value?: Shape5D, disabled?: boolean
-    }){
-        let container: HTMLElement
-        if(params.label){
-            container = createElement({tagName: "fieldset", parentElement: params.parentElement})
-            createElement({tagName: "legend", innerHTML: params.label, parentElement: container})
-        }else{
-            container = params.parentElement
-        }
-
+    constructor(params: {parentElement: HTMLElement, value?: Shape5D, disabled?: boolean}){
         let disabled = params.disabled === undefined ? false : params.disabled
-        let withParagraph = !params.inlineFields
 
-        this.xInput = new NumberInput({parentElement: container, withParagraph, label: "x: ", disabled})
-        this.yInput = new NumberInput({parentElement: container, withParagraph, label: "y: ", disabled})
-        this.zInput = new NumberInput({parentElement: container, withParagraph, label: "z: ", disabled})
-        this.tInput = new NumberInput({parentElement: container, withParagraph, label: "t: ", disabled})
-        this.cInput = new NumberInput({parentElement: container, withParagraph, label: "c: ", disabled})
+        this.xInput = NumberInput.createLabeled({parentElement: params.parentElement, disabled, label: " x :"})
+        this.yInput = NumberInput.createLabeled({parentElement: params.parentElement, disabled, label: " y :"})
+        this.zInput = NumberInput.createLabeled({parentElement: params.parentElement, disabled, label: " z :"})
+        this.tInput = NumberInput.createLabeled({parentElement: params.parentElement, disabled, label: " t :"})
+        this.cInput = NumberInput.createLabeled({parentElement: params.parentElement, disabled, label: " c :"})
 
         this.value = params.value
     }
@@ -49,5 +38,11 @@ export class Shape5DInput{
             return undefined
         }
         return new Shape5D({x, y, z, t, c})
+    }
+
+    public static createLabeledFieldset(params: {legend: string} & ConstructorParameters<typeof Shape5DInput>[0]): Shape5DInput{
+        let fieldset = createElement({tagName: "fieldset", parentElement: params.parentElement})
+        createElement({tagName: "legend", parentElement: fieldset, innerHTML: params.legend})
+        return new Shape5DInput({...params, parentElement: fieldset})
     }
 }
