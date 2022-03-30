@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import json
 from pathlib import PurePosixPath
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 
 import numpy as np
@@ -19,7 +19,6 @@ class DataSink(ABC):
         tile_shape: Shape5D,
         interval: Interval5D,
         dtype: "np.dtype[Any]", #FIXME: remove Any
-        url: Optional[Url] = None
     ):
         self.tile_shape = tile_shape
         self.interval = interval
@@ -62,9 +61,16 @@ class FsDataSink(DataSink):
         self.path = path
         super().__init__(tile_shape=tile_shape, interval=interval, dtype=dtype)
 
+    @property
+    def url(self) -> Url:
+        url = Url.parse(self.filesystem.geturl(self.path.as_posix()))
+        assert url is not None
+        return url
+
     def to_json_value(self) -> JsonObject:
         return {
             **super().to_json_value(),
             "filesystem": self.filesystem.to_json_value(),
             "path": self.path.as_posix(),
+            "url": self.url.raw,
         }
