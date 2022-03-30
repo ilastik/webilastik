@@ -132,6 +132,8 @@ class JobExecutor:
     def __init__(self, executor: Executor, concurrent_job_steps: int) -> None:
         self.executor = executor
         self.concurrent_job_steps = concurrent_job_steps
+        self._is_shutting_down = False
+        self._lock = threading.Lock()
 
         self.job_queue: "queue.Queue[Job[Any, Any] | _Stop]" = queue.Queue()
         self.step_token_queue: "queue.Queue[_StepToken | _Stop]" = queue.Queue(maxsize=concurrent_job_steps)
@@ -151,31 +153,44 @@ class JobExecutor:
             while True:
                 token = self.step_token_queue.get()
                 if isinstance(token, _Stop):
+                    _ = job.cancel()
                     return
                 future = job._launch_next_step(executor=self.executor)
                 if isinstance(future, Future):
-                    future.add_done_callback(lambda _: self.step_token_queue.task_done() or self.step_token_queue.put(token))
+                    future.add_done_callback(lambda _: self.step_token_queue.put(token))
                 else:
                     self.step_token_queue.put(token)
                     break
 
-    def _clear_queues(self):
-        queues: "List[queue.Queue[Any]]" = [self.job_queue, self.step_token_queue]
-        for q in queues:
+    def shutdown(self):
+        with self._lock:
+            if self._is_shutting_down:
+                return
+            self._is_shutting_down = True
+
             try:
                 while True:
-                    q.get_nowait()
+                    job = self.job_queue.get_nowait()
+                    if isinstance(job, Job):
+                        _ = job.cancel()
             except queue.Empty:
                 pass
+            self.job_queue.put(_Stop())
 
-    def shutdown(self):
-        self._clear_queues()
-        self.job_queue.put(_Stop())
-        self.step_token_queue.put(_Stop())
-        self.step_submitter_thread.join()
+            try:
+                while self.step_token_queue.get_nowait():
+                    pass
+            except queue.Empty:
+                pass
+            self.step_token_queue.put(_Stop())
+
+            self.step_submitter_thread.join()
 
     def __del__(self):
         self.shutdown()
 
     def submit(self, job: Job[Any, Any]):
-        self.job_queue.put(job)
+        with self._lock:
+            if self._is_shutting_down:
+                raise RuntimeError("Job executor is shutting down")
+            self.job_queue.put(job)
