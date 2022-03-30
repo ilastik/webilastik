@@ -43,7 +43,7 @@ export class NumberInput{
         this.input.value = value.toString()
     }
 
-    public static createLabeled(params: {parentElement: HTMLElement, label: string, disabled: boolean}): NumberInput{
+    public static createLabeled(params: {label: string} & ConstructorParameters<typeof NumberInput>[0]): NumberInput{
         let span = createElement({tagName: "span", parentElement: params.parentElement})
         createElement({tagName: "label", parentElement: span, innerHTML: " x: "})
         return new NumberInput({parentElement: span, disabled: params.disabled})
