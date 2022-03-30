@@ -108,6 +108,14 @@ export function ensureJsonNumberTripplet(value: JsonValue): [number, number, num
     return [number_array[0], number_array[1], number_array[2]]
 }
 
+export function ensureJsonNumberPair(value: JsonValue): [number, number]{
+    let number_array = ensureJsonArray(value).map(element => ensureJsonNumber(element))
+    if(number_array.length != 2){
+        throw Error(`Expected number pair, found this: ${JSON.stringify(value)}`)
+    }
+    return [number_array[0], number_array[1]]
+}
+
 export function ensureOptional<T>(f: (value: JsonValue) => T, value: JsonValue): T | undefined{
     if(value === null || value === undefined){
         return undefined
