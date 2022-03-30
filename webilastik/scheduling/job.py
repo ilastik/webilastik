@@ -36,8 +36,8 @@ class Job(Generic[IN, OUT], Future[OUT]):
         self.on_progress: "JobProgressCallback | None" = on_progress
         if on_complete:
             self.add_done_callback(lambda _: on_complete(self.uuid))
-        self.args: PeekableIterator[IN] = PeekableIterator(args)
         self.num_args: "int | None" = num_args or (len(args) if isinstance(args, Sized) else None)
+        self.args: PeekableIterator[IN] = PeekableIterator(args)
 
         self.uuid: uuid.UUID = uuid.uuid4()
         self.num_completed_steps = 0
