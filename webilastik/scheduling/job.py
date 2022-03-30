@@ -42,7 +42,7 @@ class Job(Generic[IN, OUT], Future[OUT]):
         self.uuid: uuid.UUID = uuid.uuid4()
         self.num_completed_steps = 0
         self.num_dispatched_steps = 0
-        self.lock = threading.Lock()
+        self.lock: threading.Condition = self._condition #type: ignore # Uses Future's internal/private condition object
 
     def _launch_next_step(self, executor: Executor) -> "Future[OUT] | None":
         with self.lock:
@@ -51,13 +51,13 @@ class Job(Generic[IN, OUT], Future[OUT]):
             if not self.running():
                 _ = self.set_running_or_notify_cancel()
             future = executor.submit(self.target, self.args.get_next())
+            step_index = self.num_dispatched_steps
             self.num_dispatched_steps += 1
             if not self.args.has_next():
                 self.num_args = self.num_dispatched_steps #FIXME
 
         def done_callback(future: Future[Any]): # FIXME
             with self.lock:
-                step_index = self.num_completed_steps
                 self.num_completed_steps += 1
                 if future.cancelled():
                     _ = self.cancel()
