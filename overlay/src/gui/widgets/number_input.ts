@@ -1,5 +1,4 @@
 import { createElement, createInput } from "../../util/misc"
-import { CssClasses } from "../css_classes"
 
 export class NumberInput{
     private input: HTMLInputElement
