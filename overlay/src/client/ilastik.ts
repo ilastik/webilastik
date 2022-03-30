@@ -1,8 +1,8 @@
 import { vec3 } from "gl-matrix"
 import { sleep } from "../util/misc"
 import { Path, Url } from "../util/parsed_url"
-import { PrecomputedChunks } from "../util/precomputed_chunks"
-import { ensureJsonArray, ensureJsonNumberTripplet, ensureJsonObject, ensureJsonString, IJsonable, IJsonableObject, JsonObject, JsonValue, toJsonValue } from "../util/serialization"
+import { DataType, PrecomputedChunks, Scale } from "../util/precomputed_chunks"
+import { ensureJsonArray, ensureJsonNumber, ensureJsonNumberPair, ensureJsonNumberTripplet, ensureJsonObject, ensureJsonString, ensureOptional, IJsonable, IJsonableObject, JsonObject, JsonValue, toJsonValue } from "../util/serialization"
 
 export class Session{
     public readonly ilastikUrl: Url
@@ -314,17 +314,105 @@ export class Annotation{
     }
 }
 
-export class Shape5D{
+export class Point5D{
     public readonly x: number;
     public readonly y: number;
     public readonly z: number;
     public readonly t: number;
     public readonly c: number;
-    constructor({x, y, z, t, c}: {x: number, y: number, z: number, t: number, c: number}){
+
+    constructor({x=0, y=0, z=0, t=0, c=0}: {
+        x?: number, y?: number, z?: number,t?: number, c?: number
+    }){
         this.x = x; this.y = y; this.z = z; this.t = t; this.c = c;
     }
+
+    public static fromJsonData(data: JsonValue){
+        let value_obj = ensureJsonObject(data)
+        return new this({
+            x: ensureOptional(ensureJsonNumber, value_obj.x) || 0,
+            y: ensureOptional(ensureJsonNumber, value_obj.y) || 0,
+            z: ensureOptional(ensureJsonNumber, value_obj.z) || 0,
+            t: ensureOptional(ensureJsonNumber, value_obj.t) || 0,
+            c: ensureOptional(ensureJsonNumber, value_obj.c) || 0,
+        })
+    }
+
+    public toJsonValue(): JsonValue {
+        return {x: this.x, y: this.y, z: this.z, t: this.t, c: this.c}
+    }
+}
+
+export class Shape5D extends Point5D{
+    constructor({x=1, y=1, z=1, t=1, c=1}: {
+        x?: number, y?: number, z?: number, t?: number, c?: number
+    }){
+        super({x, y, z, t, c})
+    }
+
+    public static fromJsonData(data: JsonValue){
+        let value_obj = ensureJsonObject(data)
+        return new this({
+            x: ensureOptional(ensureJsonNumber, value_obj.x) || 1,
+            y: ensureOptional(ensureJsonNumber, value_obj.y) || 1,
+            z: ensureOptional(ensureJsonNumber, value_obj.z) || 1,
+            t: ensureOptional(ensureJsonNumber, value_obj.t) || 1,
+            c: ensureOptional(ensureJsonNumber, value_obj.c) || 1,
+        })
+    }
+
+    public toInterval5D({offset=new Point5D({})}: {offset?: Point5D}): Interval5D{
+        return new Interval5D({
+            x: [offset.x, offset.x + this.x],
+            y: [offset.y, offset.y + this.y],
+            z: [offset.z, offset.z + this.z],
+            t: [offset.t, offset.t + this.t],
+            c: [offset.c, offset.c + this.c],
+        })
+    }
+}
+
+export class Interval5D{
+    to(): JsonValue {
+        throw new Error("Method not implemented.")
+    }
+    public readonly x: [number, number];
+    public readonly y: [number, number];
+    public readonly z: [number, number];
+    public readonly t: [number, number];
+    public readonly c: [number, number];
+    public readonly shape: Shape5D
+    public readonly start: Point5D
+    public readonly stop: Point5D
+
+    constructor({x, y, z, t, c}: {
+        x: [number, number],
+        y: [number, number],
+        z: [number, number],
+        t: [number, number],
+        c: [number, number],
+    }){
+        this.x = x; this.y = y; this.z = z; this.t = t; this.c = c;
+        this.shape = new Shape5D({
+            x: x[1] - x[0],
+            y: y[1] - y[0],
+            z: z[1] - z[0],
+            t: t[1] - t[0],
+            c: c[1] - c[0],
+        })
+        this.start = new Point5D({x: x[0], y: y[0], z: z[0], t: t[0], c: c[0]})
+        this.stop = new Point5D({x: x[1], y: y[1], z: z[1], t: t[1], c: c[1]})
+    }
+
     public static fromJsonData(data: any){
-        return new this(data)
+        let value_obj = ensureJsonObject(data)
+        return new this({
+            x: ensureJsonNumberPair(value_obj.x),
+            y: ensureJsonNumberPair(value_obj.y),
+            z: ensureJsonNumberPair(value_obj.z),
+            t: ensureJsonNumberPair(value_obj.t),
+            c: ensureJsonNumberPair(value_obj.c),
+        })
     }
 }
 
@@ -502,6 +590,18 @@ export abstract class DataSource implements IJsonable{
     }
 
     public abstract toTrainingUrl(_session: Session): Url;
+
+    public static async getDatasources(params: {datasource_url: Url, session: Session}): Promise<Array<DataSource> | Error>{
+        let response = await fetch(params.session.sessionUrl.joinPath("get_datasources_from_url").raw, {
+            method: "POST",
+            body: JSON.stringify({url: params.datasource_url.raw})
+        })
+        if(!response.ok){
+            let error_message = (await response.json())["error"]
+            return Error(error_message)
+        }
+        return ensureJsonArray(await response.json()).map(rds => DataSource.fromJsonValue(rds))
+    }
 }
 
 // Represents a single scale from precomputed chunks
@@ -598,5 +698,78 @@ export class SkimageDataSource extends DataSource{
 
     public toTrainingUrl(_session: Session): Url{
         return this.filesystem.getUrl().joinPath(this.path.raw)
+    }
+}
+
+export class FsDataSink{
+    public readonly tile_shape: Shape5D
+    public readonly interval: Interval5D
+    public readonly dtype: string
+    public readonly shape: any
+    public readonly location: any
+    public readonly filesystem: FileSystem
+    public readonly path: Path
+
+    constructor (params: {
+        filesystem: FileSystem,
+        path: Path,
+        tile_shape: Shape5D,
+        interval: Interval5D,
+        dtype: DataType,
+    }){
+        this.filesystem = params.filesystem
+        this.path = params.path
+        this.tile_shape = params.tile_shape
+        this.interval = params.interval
+        this.dtype = params.dtype
+        this.shape = this.interval.shape
+        this.location = params.interval.start
+    }
+
+    public toJsonValue(): JsonObject{
+        return {
+            filesystem: this.filesystem.toJsonValue(),
+            path: this.path.toString(),
+            tile_shape: this.tile_shape.toJsonValue(),
+            interval: this.interval.to(),
+            dtype: this.dtype.toString(),
+        }
+    }
+
+    public static fromJsonValue(value: JsonValue): "DataSink"{
+        let valueObj = ensureJsonObject(value)
+        let className = valueObj.__class__
+        if(className == "PrecomputedChunksScaleDataSink"){
+            return PrecomputedChunksScaleDataSink.fromJsonValue(value)
+        }
+        throw Error(`Unrecognized DataSink class name: ${className}`)
+    }
+}
+
+export class PrecomputedChunksScaleDataSink extends FsDataSink{
+    public readonly info_dir: Path
+    public readonly scale: Scale
+
+    constructor(params: {
+        filesystem: FileSystem,
+        info_dir: Path,
+        scale: Scale,
+        dtype: DataType,
+        num_channels: number,
+    }){
+        let shape = new Shape5D({x: params.scale.size[0], y: params.scale.size[1], z: params.scale.size[2], c: params.num_channels})
+        let location = new Point5D({x: params.scale.voxel_offset[0], y: params.scale.voxel_offset[1], z: params.scale.voxel_offset[2]})
+        let interval = shape.toInterval5D({offset: location})
+        let chunk_sizes_5d = params.scale.chunk_sizes.map(cs => new Shape5D({x: cs[0], y: cs[1], z: cs[2], c: params.num_channels}))
+
+        super({
+            filesystem: params.filesystem,
+            path: params.info_dir,
+            tile_shape: chunk_sizes_5d[0], //FIXME?
+            interval: interval,
+            dtype: params.dtype,
+        })
+        this.info_dir = params.info_dir
+        this.scale = params.scale
     }
 }
