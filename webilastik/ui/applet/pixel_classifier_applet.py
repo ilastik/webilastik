@@ -1,6 +1,6 @@
 # pyright: strict
 
-from concurrent.futures import Future
+from concurrent.futures import Future, Executor
 from dataclasses import dataclass
 from functools import partial
 import threading
@@ -8,7 +8,6 @@ from typing import Any, Callable, Literal, Optional, Sequence, Dict, Union
 import textwrap
 
 import numpy as np
-from webilastik.scheduling.hashing_executor import HashingExecutor
 
 from webilastik.ui.applet  import Applet, AppletOutput, PropagationOk, PropagationResult, UserPrompt, applet_output, user_interaction
 from webilastik.annotations.annotation import Annotation, Color
@@ -62,7 +61,7 @@ Description = Literal["disabled", "waiting for inputs", "training", "ready", "er
 @dataclass
 class _State:
     live_update: bool
-    classifier: Union[Future[Classifier], Classifier, None, Exception]
+    classifier: Union[Future[Classifier], Classifier, None, BaseException]
     generation: int
 
     @property
@@ -80,7 +79,7 @@ class _State:
     def updated_with(
         self,
         *,
-        classifier: Union[Future[Classifier], Classifier, None, Exception],
+        classifier: Union[Future[Classifier], Classifier, None, BaseException],
         live_update: Optional[bool] = None,
         generation: Optional[int] = None,
     ) -> "_State":
@@ -102,13 +101,13 @@ class PixelClassificationApplet(Applet):
         *,
         feature_extractors: AppletOutput[Sequence[IlpFilter]],
         annotations: AppletOutput[Sequence[Annotation]],
-        runner: HashingExecutor,
-        enqueue_interaction: Callable[[Interaction], Any],
+        executor: Executor,
+        on_async_change: Callable[[], Any],
     ):
         self._in_feature_extractors = feature_extractors
         self._in_annotations = annotations
-        self.runner = runner
-        self.enqueue_interaction = enqueue_interaction
+        self.executor = executor
+        self.on_async_change = on_async_change
 
         self._state: _State = _State(
             live_update=False,
@@ -146,25 +145,23 @@ class PixelClassificationApplet(Applet):
                 self._state = self._state.updated_with(classifier=None)
                 return PropagationOk()
 
-            classifier_future = self.runner.submit(
+            classifier_future = self.executor.submit(
                 partial(Classifier.train, feature_extractors), annotations
             )
             previous_state = self._state = self._state.updated_with(classifier=classifier_future)
 
-        def interaction() -> Optional[UsageError]:
-            try:
-                classifier = classifier_future.result()
-            except Exception as e:
-                print(f"===>> Exception while training classifier: {e}")
-                classifier = e
-            result = self._set_classifier(user_prompt, classifier, previous_state.generation)
-            return UsageError.check(result)
+        def on_training_ready(classifier_future: Future[VigraPixelClassifier[IlpFilter]]):
+            classifier_result = classifier_future.exception() or classifier_future.result()
+            propagation_result = self._set_classifier(user_prompt, classifier_result, previous_state.generation)
+            if not propagation_result.is_ok():
+                print(f"!!!!!! Training failed: {propagation_result}")
+            self.on_async_change()
+        classifier_future.add_done_callback(on_training_ready)
 
-        classifier_future.add_done_callback(lambda _: self.enqueue_interaction(interaction))
         return PropagationOk()
 
     @user_interaction(refresh_self=False)
-    def _set_classifier(self, user_prompt: UserPrompt, classifier: Union[Classifier, Exception], generation: int) -> PropagationResult:
+    def _set_classifier(self, user_prompt: UserPrompt, classifier: Union[Classifier, BaseException], generation: int) -> PropagationResult:
         with self.lock:
             if self._state.generation == generation:
                 self._state = self._state.updated_with(classifier=classifier)

@@ -1,20 +1,19 @@
 # pyright: reportUnusedCallResult=false
 
-from abc import ABC
 from asyncio.events import AbstractEventLoop
+from concurrent.futures.thread import ThreadPoolExecutor
 from dataclasses import dataclass
 from functools import partial
 import os
 import signal
 import asyncio
-from typing import Callable, Dict, List, Optional, Mapping, Sequence, Tuple
+from typing import Callable, List, Optional, Mapping, Tuple
 import json
 from base64 import b64decode
 import ssl
 import contextlib
 from pathlib import Path
 import traceback
-from base64 import b64encode
 import re
 
 
@@ -23,18 +22,17 @@ from aiohttp import web
 from aiohttp.client import ClientSession
 from aiohttp.http_websocket import WSCloseCode
 from aiohttp.web_app import Application
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonIntTripplet, ensureJsonObject, ensureJsonString
-from webilastik.datasource import DataSource, FsDataSource
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 
-from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource, PrecomputedChunksInfo
-from webilastik.ui.applet.export_applet import WsExportApplet
+from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
+from webilastik.scheduling.job import JobExecutor
 from webilastik.ui.applet.datasource_picker import WsDataSourcePicker
+from webilastik.ui.applet.pixel_predictions_export_applet import WsPixelClassificationExportApplet
 from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError
 from webilastik.utility.url import Protocol, Url
-from webilastik.scheduling.hashing_executor import HashingExecutor
 from webilastik.server.tunnel import ReverseSshTunnel
-from webilastik.ui.applet import Applet, InertApplet, applet_output, dummy_prompt
+from webilastik.ui.applet import dummy_prompt
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.applet.ws_feature_selection_applet import WsFeatureSelectionApplet
 from webilastik.ui.applet.ws_brushing_applet import WsBrushingApplet
@@ -126,18 +124,17 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         self._http_client_session: Optional[ClientSession] = None
         self._loop: Optional[AbstractEventLoop] = None
 
-        executor = HashingExecutor(name="Pixel Classification Executor")
+        executor = ThreadPoolExecutor(max_workers=4) #FIXME
 
         brushing_applet = WsBrushingApplet("brushing_applet")
         feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", datasources=brushing_applet.datasources)
-
 
         self.pixel_classifier_applet = WsPixelClassificationApplet(
             "pixel_classification_applet",
             feature_extractors=feature_selection_applet.feature_extractors,
             annotations=brushing_applet.annotations,
-            runner=executor,
-            enqueue_interaction=self.enqueue_user_interaction
+            executor=executor,
+            on_async_change=lambda : self.enqueue_user_interaction(lambda: None), #FIXME?
         )
 
         self.export_datasource_applet = WsDataSourcePicker(
@@ -146,14 +143,12 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             datasource_suggestions=brushing_applet.datasources,
         )
 
-        self.export_applet = WsExportApplet(
+        self.export_applet = WsPixelClassificationExportApplet(
             name="export_applet",
             executor=executor,
+            job_executor=JobExecutor(executor=executor, concurrent_job_steps=4), #FIXME: why 4?
             operator=self.pixel_classifier_applet.pixel_classifier,
-            datasource=self.export_datasource_applet.datasource,
-            on_job_step_completed=lambda job_id, step_index : self.enqueue_user_interaction(lambda: None),
-            on_job_completed=lambda job_id : self.enqueue_user_interaction(lambda: None),
-            enqueue_interaction=self.enqueue_user_interaction,
+            on_async_change=lambda : self.enqueue_user_interaction(lambda: None),
         )
 
         self.wsapplets : Mapping[str, WsApplet] = {

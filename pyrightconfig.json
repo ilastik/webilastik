@@ -8,7 +8,7 @@
   "reportMissingTypeArgument": true,
   "reportMissingTypeStubs": "warning",
   "useLibraryCodeForTypes": true,
-  "extraPaths": ["caching/redis_cache/"],
+  "extraPaths": ["caching/redis_cache/", "tests/"],
   "reportUnusedCallResult": "error",
   "reportUnusedVariable": "warning",
   "pythonVersion": "3.8",

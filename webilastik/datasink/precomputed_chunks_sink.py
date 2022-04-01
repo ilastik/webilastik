@@ -7,7 +7,7 @@ from ndstructs.point5D import Point5D, Shape5D
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonInt, ensureJsonObject, ensureJsonString
 from ndstructs.array5D import Array5D
 
-from webilastik.datasink import FsDataSink, DATASINK_FROM_JSON_CONSTRUCTORS
+from webilastik.datasink import FsDataSink
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.filesystem import JsonableFilesystem
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale
@@ -45,7 +45,8 @@ class PrecomputedChunksScaleSink(FsDataSink):
             hash_=f"resolution={self.scale.resolution[0]}_{self.scale.resolution[1]}_{self.scale.resolution[2]}"
         )
 
-    def create(self) -> "Exception | None":
+    def create(self) -> "Exception | PrecomputedChunksScaleSink": #FIXME: separate writing form the DataSink ?
+        print(f"Creating precomp chunks sink.....")
         info_path = self.info_dir.joinpath("info")
         scale_path = self.info_dir / self.scale.key
 
@@ -86,6 +87,7 @@ class PrecomputedChunksScaleSink(FsDataSink):
 
         with self.filesystem.openbin(info_path.as_posix(), "w") as info_file:
             _ = info_file.write(json.dumps(info.to_json_value(), indent=4).encode("utf8"))
+        return self #FIXME
 
     def to_datasource(self) -> PrecomputedChunksDataSource:
         return PrecomputedChunksDataSource(
@@ -135,5 +137,3 @@ class PrecomputedChunksScaleSink(FsDataSink):
         chunk_path = self.info_dir / self.scale.key / chunk_name
         with self.filesystem.openbin(chunk_path.as_posix(), "w") as f:
             _ = f.write(self.scale.encoding.encode(data))
-
-DATASINK_FROM_JSON_CONSTRUCTORS[PrecomputedChunksScaleSink.__name__] = PrecomputedChunksScaleSink.from_json_value

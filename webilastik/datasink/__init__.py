@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import json
 from pathlib import PurePosixPath
-from typing import Any, Callable, Dict
+from typing import Any, Protocol
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 
 import numpy as np
@@ -10,7 +10,9 @@ from ndstructs import Shape5D, Interval5D, Array5D
 from webilastik.filesystem import JsonableFilesystem
 from webilastik.utility.url import Url
 
-DATASINK_FROM_JSON_CONSTRUCTORS: Dict[str, Callable[[JsonValue], "DataSink"]] = {}
+class DataSinkWriter(Protocol):
+    def write(self, data: Array5D):
+        ...
 
 class DataSink(ABC):
     def __init__(
@@ -28,6 +30,10 @@ class DataSink(ABC):
         self.location = interval.start
 
     @abstractmethod
+    def create(self) -> "Exception | DataSinkWriter":
+        pass
+
+    @abstractmethod
     def write(self, data: Array5D) -> None:
         pass
 
@@ -43,9 +49,11 @@ class DataSink(ABC):
     def from_json_value(cls, value: JsonValue) -> "DataSink":
         value_obj = ensureJsonObject(value)
         class_name = ensureJsonString(value_obj.get("__class__"))
-        if class_name not in DATASINK_FROM_JSON_CONSTRUCTORS:
-            raise ValueError(f"Could not deserialize DataSink from {json.dumps(value)}")
-        return DATASINK_FROM_JSON_CONSTRUCTORS[class_name](value)
+
+        from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksScaleSink
+        if class_name == PrecomputedChunksScaleSink.__name__:
+            return PrecomputedChunksScaleSink.from_json_value(value)
+        raise ValueError(f"Could not deserialize DataSink from {json.dumps(value)}")
 
 class FsDataSink(DataSink):
     def __init__(

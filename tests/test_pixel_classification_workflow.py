@@ -1,38 +1,23 @@
-from pathlib import Path
 import time
-from typing import Tuple
+from concurrent.futures import ThreadPoolExecutor
 
-import numpy
-from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
-from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale, RawEncoder
-from webilastik.filesystem.osfs import OsFs
-from webilastik.libebrains.user_token import UserToken
-from webilastik.scheduling.hashing_executor import HashingExecutor
-# from webilastik.scheduling.multiprocess_runner import MultiprocessRunner
-from ndstructs.point5D import Shape5D
-import uuid
+import numpy as np
 
-from ndstructs.point5D import Point5D
+from tests import create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations, get_sample_feature_extractors
 from webilastik.datasource import DataRoi
-from webilastik.datasource.skimage_datasource import SkimageDataSource
-
-from webilastik.annotations import Annotation, Color
-from webilastik.features.channelwise_fastfilters import GaussianSmoothing, HessianOfGaussianEigenvalues
-from webilastik.ui.applet.datasource_picker import DataSourcePicker
-from webilastik.ui.applet.export_applet import ExportApplet
+from webilastik.scheduling.job import JobExecutor
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.ui.applet.brushing_applet import BrushingApplet
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
 from webilastik.ui.applet import dummy_prompt
-from webilastik.filesystem.bucket_fs import BucketFs
-from webilastik.utility.url import Protocol
+from webilastik.ui.applet.pixel_predictions_export_applet import PixelClassificationExportApplet
 
 
 
-def test_pixel_classification_workflow(
-    raw_data_source: SkimageDataSource, pixel_annotations: Tuple[Annotation, ...], bucket_fs: BucketFs
-):
-    executor = HashingExecutor(name="my_test_executor")
+if __name__ == "__main__":
+    executor = ThreadPoolExecutor(max_workers=4)
+    job_executor = JobExecutor(executor=executor, concurrent_job_steps=2)
+
 
     brushing_applet = BrushingApplet("brushing_applet")
     feature_selection_applet = FeatureSelectionApplet("feature_selection_applet", datasources=brushing_applet.datasources)
@@ -40,40 +25,33 @@ def test_pixel_classification_workflow(
         name="pixel_classifier_applet",
         feature_extractors=feature_selection_applet.feature_extractors,
         annotations=brushing_applet.annotations,
-        runner=executor,
-        enqueue_interaction=lambda interaction: interaction()
-    )
-    export_datasource_applet = DataSourcePicker(
-        name="export_datasource_applet",
-        allowed_protocols=tuple([Protocol.HTTPS, Protocol.HTTP, Protocol.FILE]),
-        ebrains_user_token=UserToken.from_environment(),
-    )
-    export_applet = ExportApplet(
-        name="export_applet",
-        ebrains_user_token=UserToken.from_environment(),
         executor=executor,
+        on_async_change=lambda : print(f"Pixel classifier training is prolly done")
+    )
+    export_applet = PixelClassificationExportApplet(
+        name="pixel_classification_export_applet",
+        on_async_change=lambda : print(f"Export changed something..."),
+        executor=executor,
+        job_executor=job_executor,
         operator=pixel_classifier_applet.pixel_classifier,
-        datasource=export_datasource_applet.datasource,
     )
 
+    # GUI turns on live update
     _ = pixel_classifier_applet.set_live_update(dummy_prompt, live_update=True)
 
     # GUI creates some feature extractors
-    # import pydevd; pydevd.settrace()
     _ = feature_selection_applet.add_feature_extractors(
-        dummy_prompt,
-        [
-            GaussianSmoothing.from_ilp_scale(scale=0.3, axis_2d="z"),
-            HessianOfGaussianEigenvalues.from_ilp_scale(scale=0.7, axis_2d="z"),
-        ],
+        user_prompt=dummy_prompt,
+        feature_extractors=get_sample_feature_extractors(),
     )
     assert len(feature_selection_applet.feature_extractors()) == 2
 
+    pixel_annotations = get_sample_c_cells_pixel_annotations()
 
     # GUI creates some annotations
     _ = brushing_applet.add_annotations(
-        dummy_prompt,
-        pixel_annotations,
+        user_prompt=dummy_prompt,
+        annotations=pixel_annotations,
     )
 
     time.sleep(3)
@@ -81,7 +59,8 @@ def test_pixel_classification_workflow(
     classifier = pixel_classifier_applet.pixel_classifier()
     assert classifier != None
 
-    # calculate predictions on the entire data source
+    # calculate predictions on an entire data source
+    raw_data_source = get_sample_c_cells_datasource()
     preds_future = executor.submit(classifier.compute, raw_data_source.roi)
     local_predictions = preds_future.result()
     local_predictions.as_uint8().show_channels()
@@ -91,42 +70,17 @@ def test_pixel_classification_workflow(
     exported_tile.result().show_channels()
 
     # try running an export job
-    # basic_pixel_classification_test_path = Path("basic_pixel_classification_test")
-    # sink = PrecomputedChunksSink.create(
-    #     base_path=basic_pixel_classification_test_path,
-    #     filesystem=bucket_fs,
-    #     info=PrecomputedChunksInfo(
-    #         data_type=numpy.dtype("float32"),
-    #         type_="image",
-    #         num_channels=classifier.num_classes,
-    #         scales=tuple([
-    #             PrecomputedChunksScale(
-    #                 key=Path("exported_data"),
-    #                 size=(raw_data_source.shape.x, raw_data_source.shape.y, raw_data_source.shape.z),
-    #                 chunk_sizes=tuple([
-    #                     (raw_data_source.tile_shape.x, raw_data_source.tile_shape.y, raw_data_source.tile_shape.z)
-    #                 ]),
-    #                 encoding=RawEncoder(),
-    #                 voxel_offset=(raw_data_source.location.x, raw_data_source.location.y, raw_data_source.location.z),
-    #                 resolution=raw_data_source.spatial_resolution
-    #             )
-    #         ]),
-    #     )
-    # ).scale_sinks[0]
-
-    # def on_progress(job_id: uuid.UUID, step_index: int):
-    #     print(f"===>>> Job {job_id} completed step {step_index}")
-
-    # def on_complete(job_id: uuid.UUID):
-    #     print(f"===>>> Job {job_id} is finished!")
-
-    # job = export_applet.start_export_job(
-    #     user_prompt=dummy_prompt,
-    #     source=raw_data_source,
-    #     sink=sink,
-    #     on_progress=on_progress,
-    #     on_complete=on_complete
-    # )
+    sink = create_precomputed_chunks_sink(
+        shape=raw_data_source.shape.updated(c=classifier.num_classes),
+        dtype=np.dtype("float32"),
+        chunk_size=raw_data_source.tile_shape
+    )
+    export_result = export_applet.start_export_job(
+        datasource=raw_data_source,
+        datasink=sink,
+    )
+    assert export_result is None
+    time.sleep(7)
 
     # while job.status in ("pending", "running"):
     #     time.sleep(1)
@@ -140,12 +94,11 @@ def test_pixel_classification_workflow(
     _ = brushing_applet.remove_annotations(dummy_prompt, pixel_annotations[0:1])
     assert tuple(brushing_applet.annotations()) == tuple(pixel_annotations[1:])
 
-
-
     # for png_bytes in preds.to_z_slice_pngs():
     #     path = f"/tmp/junk_test_image_{uuid.uuid4()}.png"
     #     with open(path, "wb") as outfile:
     #         outfile.write(png_bytes.getbuffer())
     #     os.system(f"gimp {path}")
 
+    job_executor.shutdown()
     executor.shutdown()
