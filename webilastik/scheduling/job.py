@@ -59,12 +59,14 @@ class Job(Generic[IN, OUT], Future[OUT]):
         def done_callback(future: Future[Any]): # FIXME
             with self.lock:
                 self.num_completed_steps += 1
-                if future.cancelled():
-                    _ = self.cancel()
-                elif future.exception():
-                    self.set_exception(future.exception())
-                elif not self.args.has_next() and self.num_dispatched_steps == self.num_completed_steps:
-                    self.set_result(future.result())
+                needs_result = not self.args.has_next() and self.num_dispatched_steps == self.num_completed_steps
+            if future.cancelled():
+                _ = self.cancel()
+            elif future.exception():
+                self.set_exception(future.exception())
+            elif needs_result:
+                print(f"===>>>>> JOB {self.name} is successfully done!")
+                self.set_result(future.result())
             if self.on_progress:
                 self.on_progress(self.uuid, step_index)
 
