@@ -212,7 +212,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
 
         datasources_result = try_get_datasources_from_url(url=url, allowed_protocols=(Protocol.HTTP, Protocol.HTTPS))
         if isinstance(datasources_result, UsageError):
-            return web.json_response({"error", str(datasources_result)}, status=400)
+            return web.json_response({"error": str(datasources_result)}, status=400)
 
         if selected_resolution:
             datasources = [ds for ds in datasources_result if ds.spatial_resolution == selected_resolution]
