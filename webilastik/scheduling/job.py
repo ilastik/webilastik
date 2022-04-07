@@ -5,8 +5,9 @@ import threading
 from concurrent.futures import Future, Executor
 import uuid
 
+
 from ndstructs.utils.json_serializable import JsonObject
-from webilastik.utility import PeekableIterator
+from webilastik.utility import DebugLock, PeekableIterator
 
 IN = TypeVar("IN", covariant=True)
 OUT = TypeVar("OUT")
@@ -34,67 +35,66 @@ class Job(Generic[IN, OUT], Future[OUT]):
         self.name = name
         self.target = target
         self.on_progress: "JobProgressCallback | None" = on_progress
-        if on_complete:
-            self.add_done_callback(lambda _: on_complete(self.uuid))
         self.num_args: "int | None" = num_args or (len(args) if isinstance(args, Sized) else None)
         self.args: PeekableIterator[IN] = PeekableIterator(args)
 
         self.uuid: uuid.UUID = uuid.uuid4()
         self.num_completed_steps = 0
         self.num_dispatched_steps = 0
-        self.lock: threading.Condition = self._condition #type: ignore # Uses Future's internal/private condition object
+        self.job_lock = threading.Lock()
 
     def _launch_next_step(self, executor: Executor) -> "Future[OUT] | None":
-        with self.lock:
+        with self.job_lock:
             if self.done() or not self.args.has_next():
                 return None
             if not self.running():
                 _ = self.set_running_or_notify_cancel()
-            future = executor.submit(self.target, self.args.get_next())
+            step = executor.submit(self.target, self.args.get_next())
             step_index = self.num_dispatched_steps
             self.num_dispatched_steps += 1
             if not self.args.has_next():
                 self.num_args = self.num_dispatched_steps #FIXME
 
-        def done_callback(future: Future[Any]): # FIXME
-            with self.lock:
+        def step_done_callback(future: Future[Any]): # FIXME
+            with self.job_lock:
                 self.num_completed_steps += 1
-                needs_result = not self.args.has_next() and self.num_dispatched_steps == self.num_completed_steps
-            if future.cancelled():
-                _ = self.cancel()
-            elif future.exception():
-                self.set_exception(future.exception())
-            elif needs_result:
-                print(f"===>>>>> JOB {self.name} is successfully done!")
-                self.set_result(future.result())
+                if future.cancelled():
+                    _ = self.cancel()
+                elif future.exception():
+                    self.set_exception(future.exception())
+                elif not self.args.has_next() and self.num_dispatched_steps == self.num_completed_steps:
+                    result = future.result()
+                    self.set_result(result)
             if self.on_progress:
                 self.on_progress(self.uuid, step_index)
 
-        future.add_done_callback(done_callback)
-        return future
-
-    def status(self) -> Literal["pending", "running", "cancelled", "failed", "success"]:
-        with self.lock:
-            if self.cancelled():
-                return "cancelled"
-            if self.exception():
-                return "failed"
-            if self.done():
-                return "success"
-            if self.running():
-                return "running"
-            return "pending"
+        step.add_done_callback(step_done_callback)
+        return step
 
     def to_json_value(self) -> JsonObject:
-        exception = self.exception()
-        with self.lock:
+        error_message: "str | None" = None
+        with self.job_lock:
+            if self.cancelled():
+                status = "cancelled"
+            elif self.done():
+                exception = self.exception() # only call exception() if done() so we don't block
+                if exception:
+                    status = "failed"
+                    error_message = str()
+                else:
+                    status = "success"
+            elif self.running():
+                status = "running"
+            else:
+                status = "pending"
+
             return {
                 "name": self.name,
                 "num_args": self.num_args,
                 "uuid": str(self.uuid),
-                "status": self.status(),
+                "status": status,
                 "num_completed_steps": self.num_completed_steps,
-                "error_message": exception and str(exception)
+                "error_message": error_message
             }
 
 # class JobExecutor:
