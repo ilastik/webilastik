@@ -65,6 +65,12 @@ export function createElement<K extends keyof HTMLElementTagNameMap>({tagName, p
     return element
 }
 
+export function createFieldset(params: {parentElement: HTMLElement, legend: string}): HTMLFieldSetElement{
+    let fieldset = createElement({tagName: "fieldset", parentElement: params.parentElement})
+    createElement({tagName: "legend", innerHTML: params.legend, parentElement: fieldset})
+    return fieldset
+}
+
 export function applyInlineCss(element: HTMLElement, inlineCss: InlineCss){
     for(let key in inlineCss){ //FIXME: remove any
         (element.style as any)[key] = inlineCss[key]

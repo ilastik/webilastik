@@ -35,4 +35,10 @@ export class Vec3Input{
         }
         return vec3.fromValues(x,y,z)
     }
+
+    public static createLabeledFieldset(params: {legend: string} & ConstructorParameters<typeof Vec3Input>[0]): Vec3Input{
+        let fieldset = createElement({tagName: "fieldset", parentElement: params.parentElement})
+        createElement({tagName: "legend", parentElement: fieldset, innerHTML: params.legend})
+        return new Vec3Input({...params, parentElement: fieldset})
+    }
 }

@@ -5,4 +5,5 @@ export enum CssClasses{
     ItkInputParagraph = "ItkInputParagraph",
     ItkGrayedOut = "ItkGrayedOut",
     ItkTable = "ItkTable",
+    ItkNumberInput = "ItkNumberInput"
 }

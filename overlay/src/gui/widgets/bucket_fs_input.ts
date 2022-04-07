@@ -1,16 +1,19 @@
 import { BucketFs, FileSystem } from "../../client/ilastik";
 import { createElement, createInputParagraph } from "../../util/misc";
+import { Path } from "../../util/parsed_url";
 import { PathInput } from "./path_input";
 
 export class BucketFsInput{
     private readonly bucketNameInput: HTMLInputElement;
     private readonly prefixInput: PathInput;
 
-    constructor(params: {parentElement: HTMLElement}){
-        this.bucketNameInput = createInputParagraph({inputType: "text", parentElement: params.parentElement, label_text: "Bucket Name: "})
+    constructor(params: {parentElement: HTMLElement, bucketName?: string, prefix?: Path}){
+        this.bucketNameInput = createInputParagraph({
+            inputType: "text", parentElement: params.parentElement, label_text: "Bucket Name: ", value: params.bucketName
+        })
 
         createElement({tagName: "label", parentElement: params.parentElement, innerHTML: "Prefix: "})
-        this.prefixInput = new PathInput({parentElement: params.parentElement})
+        this.prefixInput = new PathInput({parentElement: params.parentElement, value: params.prefix})
     }
 
     public tryGetFileSystem(): FileSystem | undefined{

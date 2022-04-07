@@ -1,6 +1,6 @@
 import { vec3 } from "gl-matrix";
 import { Shape5D, PrecomputedChunksScaleDataSink } from "../../client/ilastik";
-import { createElement, getNowString } from "../../util/misc";
+import { createElement, createFieldset, getNowString } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
 import { DataType, dataTypes, Scale } from "../../util/precomputed_chunks";
 import { DataTypeSelector } from "./data_type_selector";
@@ -13,7 +13,6 @@ import { BucketFsInput } from "./bucket_fs_input";
 
 
 export class PrecomputedChunksScaleDataSinkInput{
-    private element: HTMLDivElement;
     private infoDirectoryPathInput: PathInput;
     private scaleKeyInput: PathInput;
     private fileSystemSelector: BucketFsInput;
@@ -27,53 +26,61 @@ export class PrecomputedChunksScaleDataSinkInput{
     constructor(params: {
         parentElement: HTMLElement,
         tileShape?: Shape5D,
+        resolution?: vec3,
         voxelOffset?: vec3,
-        forceShape?: Shape5D,
-        forceResolution?: vec3,
+        disableShape?: boolean,
+        disableTileShape?: boolean,
     }){
-        this.element = createElement({tagName: "div", parentElement: params.parentElement})
+        let parentElement = params.parentElement
+        this.fileSystemSelector = BucketFsInput.createLabeledFieldset({
+            parentElement, legend: "Data Proxy Bucket:", bucketName: "hbp-image-service", prefix: Path.parse("ilastik_exports")
+        })
 
-        this.fileSystemSelector = BucketFsInput.createLabeledFieldset({parentElement: params.parentElement, legend: "Data Proxy Bucket:"})
+        this.infoDirectoryPathInput = new PathInput({
+            parentElement: createFieldset({parentElement, legend: "'info' Directory Path: "}), value: Path.parse(`/ilastik_export_${getNowString()}`)
+        })
 
-        let p = createElement({tagName: "p", parentElement: this.element})
-        createElement({tagName: "label", parentElement: p, innerHTML: "'info' Directory Path: "})
-        this.infoDirectoryPathInput = new PathInput({parentElement: p, value: Path.parse(`/ilastik_export_${getNowString()}`)})
+        this.scaleKeyInput = new PathInput({
+            parentElement: createFieldset({parentElement, legend: "Scale Key: "}), value: new Path({components: ["exported_data"]})
+        })
 
-        p = createElement({tagName: "p", parentElement: this.element})
-        createElement({tagName: "label", parentElement: p, innerHTML: "Scale Key: "})
-        this.scaleKeyInput = new PathInput({parentElement: p, value: new Path({components: ["exported_data"]})})
-
-        createElement({tagName: "label", parentElement: this.element, innerHTML: "Data Type: "})
+        let dataTypeFieldset = createFieldset({parentElement, legend: "Data Type: "})
         this.dataTypeSelector = new SelectorWidget<DataType>({
-            parentElement: this.element,
+            parentElement: dataTypeFieldset,
             options: dataTypes.slice(),
             optionRenderer: (dt) => dt,
         })
 
         this.sinkShapeInput = Shape5DInput.createLabeledFieldset({
-            parentElement: this.element,
+            parentElement,
             legend: "Output Shape:",
-            disabled: params.forceShape !== undefined,
-            value: params.forceShape,
+            disabled: params.disableShape,
         })
 
         this.tileShapeInput = Shape5DInput.createLabeledFieldset({
-            parentElement: this.element,
+            parentElement,
             legend: "Tile Shape:",
             value: params.tileShape,
+            disabled: params.disableTileShape
         })
 
-        this.resolutionInput = new Vec3Input({
-            parentElement: this.element, inlineFields: true, value: params.forceResolution
+        this.resolutionInput = Vec3Input.createLabeledFieldset({
+            legend: "Resolution (nm)",
+            parentElement,
+            inlineFields: true,
+            value: params.resolution,
         })
 
-        this.voxelOffsetInput = new Vec3Input({
-            parentElement: this.element, inlineFields: true, value: params.forceResolution || vec3.fromValues(0, 0, 0)
+        this.voxelOffsetInput = Vec3Input.createLabeledFieldset({
+            legend: "Voxel Offset:",
+            parentElement,
+            inlineFields: true,
+            value: params.voxelOffset || vec3.fromValues(0,0,0)
         })
 
-        createElement({tagName: "label", parentElement: this.element, innerHTML: "Encoding:"})
+        let encodingFieldset = createFieldset({parentElement, legend: "Encoding:"})
         this.encoderSelector = new SelectorWidget({
-            parentElement: this.element,
+            parentElement: encodingFieldset,
             options: precomputed_encodings.filter(e => e == "raw"), //FIXME?
             optionRenderer: (opt) => opt,
         })
@@ -107,6 +114,36 @@ export class PrecomputedChunksScaleDataSinkInput{
                 chunk_sizes: [[tileShape.x, tileShape.y, tileShape.z]],
                 encoding,
             })
+        })
+    }
+
+    public setParameters(params: {
+        shape?: Shape5D,
+        tileShape?: Shape5D,
+        resolution?: vec3,
+        voxelOffset?: vec3,
+    }){
+        if(params.shape){
+            this.sinkShapeInput.value = params.shape
+        }
+        if(params.tileShape){
+            this.tileShapeInput.value = params.tileShape
+        }
+        if(params.resolution){
+            this.resolutionInput.value = params.resolution
+        }
+        if(params.voxelOffset){
+            this.resolutionInput.value = params.voxelOffset
+        }
+    }
+
+    public static createLabeled(
+        params: {legend: string} & ConstructorParameters<typeof PrecomputedChunksScaleDataSinkInput>[0]
+    ): PrecomputedChunksScaleDataSinkInput{
+        let fieldset = createElement({tagName: "fieldset", parentElement: params.parentElement})
+        createElement({tagName: "legend", parentElement: fieldset, innerHTML: params.legend})
+        return new PrecomputedChunksScaleDataSinkInput({
+            ...params, parentElement: fieldset
         })
     }
 }
