@@ -6,7 +6,8 @@ from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonO
 
 import numpy as np
 
-from ndstructs import Shape5D, Interval5D, Array5D
+from ndstructs.point5D import Shape5D, Interval5D
+from ndstructs.array5D import Array5D
 from webilastik.filesystem import JsonableFilesystem
 from webilastik.utility.url import Url
 
@@ -42,6 +43,7 @@ class DataSink(ABC):
             "__class__": self.__class__.__name__,
             "tile_shape": self.tile_shape.to_json_value(),
             "interval": self.interval.to_json_value(),
+            "shape": self.shape.to_json_value(),
             "dtype": str(self.dtype.name), #type: ignore
         }
 

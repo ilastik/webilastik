@@ -266,6 +266,7 @@ class FsDataSource(DataSource):
             "tile_shape": self.tile_shape.to_json_value(),
             "dtype": str(self.dtype.name),
             "interval": self.interval.to_json_value(),
+            "shape": self.shape.to_json_value(),
             "spatial_resolution": self.spatial_resolution,
             "url": self.url.raw,
         }
