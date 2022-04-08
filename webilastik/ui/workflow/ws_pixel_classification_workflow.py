@@ -23,6 +23,7 @@ from aiohttp.client import ClientSession
 from aiohttp.http_websocket import WSCloseCode
 from aiohttp.web_app import Application
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
+from webilastik.datasource import FsDataSource
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
 from webilastik.scheduling.job import JobExecutor
@@ -146,8 +147,11 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         self.export_applet = WsPixelClassificationExportApplet(
             name="export_applet",
             executor=executor,
-            job_executor=JobExecutor(executor=executor, concurrent_job_steps=4), #FIXME: why 4?
+            job_executor=JobExecutor(executor=executor, concurrent_job_steps=1), #FIXME: why 4?
             operator=self.pixel_classifier_applet.pixel_classifier,
+            datasource_suggestions=brushing_applet.datasources.transformed_with(
+                lambda datasources: tuple(ds for ds in datasources if isinstance(ds, FsDataSource))
+            ),
             on_async_change=lambda : self.enqueue_user_interaction(lambda: None),
         )
 

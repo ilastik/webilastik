@@ -9,7 +9,7 @@ from ndstructs.utils.json_serializable import JsonObject, ensureJsonArray
 
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.datasink import DataSink, DataSinkWriter
-from webilastik.datasource import DataRoi, DataSource
+from webilastik.datasource import DataRoi, DataSource, FsDataSource
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.operator import IN, Operator
 from webilastik.scheduling.job import Job, JobExecutor, IN as JOB_IN, OUT as JOB_OUT
@@ -46,12 +46,14 @@ class PixelClassificationExportApplet(StatelesApplet):
         executor: Executor,
         job_executor: JobExecutor,
         operator: "AppletOutput[VigraPixelClassifier[IlpFilter] | None]",
+        datasource_suggestions: "AppletOutput[Sequence[FsDataSource] | None]"
     ):
         self.on_async_change = on_async_change
         self.executor = executor
         self.job_executor = job_executor
 
         self._in_operator = operator
+        self._in_datasource_suggestions = datasource_suggestions
 
         self._jobs: Dict[uuid.UUID, Job[Any, Any]] = {}
         self._lock = threading.Lock()
@@ -73,10 +75,10 @@ class PixelClassificationExportApplet(StatelesApplet):
             name=name,
             target=target,
             on_progress=lambda job_id, step_index: self.on_async_change(),
+            on_complete=lambda job_id: self.on_async_change(),
             args=args,
             num_args=num_args
         )
-        job.add_done_callback(lambda _: self.on_async_change())
         with self._lock:
             self._jobs[job.uuid] = job
         self.job_executor.submit(job)
@@ -112,7 +114,7 @@ class PixelClassificationExportApplet(StatelesApplet):
             )
         sink_creation_job.add_done_callback(launch_export_job)
 
-    def start_simple_segmentation_export_job(self, *, datasource: DataSource, datasinks: List[DataSink]) -> "UsageError | None":
+    def start_simple_segmentation_export_job(self, *, datasource: DataSource, datasinks: Sequence[DataSink]) -> "UsageError | None":
         classifier = self._in_operator()
         if classifier is None:
             return UsageError("Upstream not ready yet")
@@ -141,6 +143,7 @@ class PixelClassificationExportApplet(StatelesApplet):
 
         def launch_export_job(future_sink_writer: "Future[Exception | Sequence[DataSinkWriter]]"):
             result = future_sink_writer.result()
+
             if isinstance(result, Exception):
                 raise result
             _ = self._create_job(
@@ -167,7 +170,9 @@ class WsPixelClassificationExportApplet(WsApplet, PixelClassificationExportApple
     def _get_json_state(self) -> JsonObject:
         with self._lock:
             classifier = self._in_operator()
+            datasource_suggestions = self._in_datasource_suggestions()
             return {
                 "jobs": tuple(job.to_json_value() for job in self._jobs.values()),
                 "num_classes":  classifier and classifier.num_classes,
+                "datasource_suggestions": None if datasource_suggestions is None else tuple(ds.to_json_value() for ds in datasource_suggestions)
             }
