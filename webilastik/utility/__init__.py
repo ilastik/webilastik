@@ -1,5 +1,8 @@
 # pyright: reportUnusedImport=false
+from traceback import StackSummary
+import traceback
 from typing import Callable, Generic, Iterable, TypeVar
+import threading
 
 from ndstructs.utils.json_serializable import JsonObject, JsonValue
 from .flatten import flatten, unflatten, listify
@@ -56,3 +59,31 @@ class PeekableIterator(Generic[A]):
         except StopIteration:
             self.next_arg = _Empty()
         return out
+
+class DebugLock:
+    def __init__(self, timeout: int = 15) -> None:
+        self._lock = threading.Lock()
+        self.timeout = timeout
+        self.traceback: "StackSummary | None" = None
+
+    def __enter__(self, *args, **kwargs) -> "DebugLock":
+        got_it = self._lock.acquire(timeout=self.timeout)
+        if not got_it:
+            RED="\033[31m"
+            END="\033[0m"
+
+            assert self.traceback is not None
+            print(
+                f"{RED}!!!!!Could not acquire lock at{END}" + "\n" +
+                "".join(traceback.format_list(traceback.extract_stack())) +
+                f"{RED}because it's acquired by{END}" + "\n" +
+                "".join(traceback.format_list(self.traceback))
+            )
+            import pydevd; pydevd.settrace()
+            print("bla")
+        self.traceback = traceback.extract_stack()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.traceback = None
+        self._lock.release()
