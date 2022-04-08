@@ -133,15 +133,11 @@ class _StepToken:
 class JobExecutor:
     def __init__(self, executor: Executor, concurrent_job_steps: int) -> None:
         self.executor = executor
-        self.concurrent_job_steps = concurrent_job_steps
         self._is_shutting_down = False
         self._lock = threading.Lock()
 
-        self.job_queue: "queue.Queue[Job[Any, Any] | _Stop]" = queue.Queue()
-        self.step_token_queue: "queue.Queue[_StepToken | _Stop]" = queue.Queue(maxsize=concurrent_job_steps)
-        for _ in range(concurrent_job_steps):
-            self.step_token_queue.put(_StepToken())
-
+        self.job_queue: "queue.Queue[Job[Any, Any]]" = queue.Queue()
+        self.steps_semaphore = threading.Semaphore(value=concurrent_job_steps)
         self.step_submitter_thread = threading.Thread(
             group=None, target=self._submit_steps, name=f"JobExecutor_submitter_thread"
         )
@@ -149,19 +145,24 @@ class JobExecutor:
 
     def _submit_steps(self):
         while True:
-            job = self.job_queue.get()
-            if isinstance(job, _Stop):
-                return
-            while True:
-                token = self.step_token_queue.get()
-                if isinstance(token, _Stop):
-                    _ = job.cancel()
+            try:
+                job = self.job_queue.get(timeout=1)
+            except queue.Empty:
+                if self._is_shutting_down:
                     return
+                else:
+                    continue
+            while True:
+                token = self.steps_semaphore.acquire(timeout=1)
+                if self._is_shutting_down:
+                    return
+                if not token:
+                    continue
                 future = job._launch_next_step(executor=self.executor)
                 if isinstance(future, Future):
-                    future.add_done_callback(lambda _: self.step_token_queue.put(token))
+                    future.add_done_callback(lambda _: self.steps_semaphore.release())
                 else:
-                    self.step_token_queue.put(token)
+                    self.steps_semaphore.release()
                     break
 
     def shutdown(self):
@@ -169,24 +170,7 @@ class JobExecutor:
             if self._is_shutting_down:
                 return
             self._is_shutting_down = True
-
-            try:
-                while True:
-                    job = self.job_queue.get_nowait()
-                    if isinstance(job, Job):
-                        _ = job.cancel()
-            except queue.Empty:
-                pass
-            self.job_queue.put(_Stop())
-
-            try:
-                while self.step_token_queue.get_nowait():
-                    pass
-            except queue.Empty:
-                pass
-            self.step_token_queue.put(_Stop())
-
-            self.step_submitter_thread.join()
+        self.step_submitter_thread.join()
 
     def __del__(self):
         self.shutdown()
