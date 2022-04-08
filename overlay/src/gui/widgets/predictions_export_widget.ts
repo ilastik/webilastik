@@ -1,14 +1,14 @@
-import { ensureJsonArray, ensureJsonNumberTripplet, ensureOptional, toJsonValue } from '../../util/serialization';
+import { ensureJsonArray, ensureOptional } from '../../util/serialization';
 import { Applet } from '../../client/applets/applet';
 import { ensureJsonNumber, ensureJsonObject, ensureJsonString, JsonValue } from '../../util/serialization';
-import { createElement, createInput, createInputParagraph, createTable, setValueIfUnfocused } from '../../util/misc';
+import { createElement, createInputParagraph, createTable } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
-import { Session } from '../../client/ilastik';
-import { DataSourcePicker } from './datasource_picker';
+import { DataSource, Session } from '../../client/ilastik';
+import { DataSourceInput } from './datasource_input';
 import { CssClasses } from '../css_classes';
-import { Path } from '../../util/parsed_url';
-import { Encoding, ensureEncoding, encodings as precomputed_encodings } from '../../util/precomputed_chunks';
-import { SelectorWidget } from './selector_widget';
+import { PrecomputedChunksScaleDataSinkInput } from './precomputed_chunks_scale_datasink_input';
+import { ErrorPopupWidget, PopupWidget } from './popup';
+import { OneShotSelectorWidget } from './selector_widget';
 
 const sink_creation_stati = ["success", "failed", "running" ] as const;
 export type SinkCreationStatus = typeof sink_creation_stati[number];
@@ -19,7 +19,6 @@ export function ensureSinkCreationStatus(value: string): SinkCreationStatus{
     }
     return variant
 }
-
 
 export class Job{
     public readonly name: string
@@ -61,66 +60,27 @@ export class Job{
     }
 }
 
-export const export_modes = ["PREDICTIONS", "SIMPLE_SEGMENTATION"] as const;
-export type ExportMode = typeof export_modes[number];
-export function ensureExportMode(value: string): ExportMode{
-    const variant = export_modes.find(variant => variant === value)
-    if(variant === undefined){
-        throw Error(`Invalid encoding: ${value}`)
-    }
-    return variant
-}
-
-
-const status_descriptions = ["upstream not ready", "no datasource selected", "missing bucket name", "missing bucket prefix", "ready"] as const;
-type StatusDescription = typeof status_descriptions[number];
-export function ensureStatuDescription(value: string): StatusDescription{
-    const variant = status_descriptions.find(variant => variant === value)
-    if(variant === undefined){
-        throw Error(`Invalid status description description: ${value}`)
-    }
-    return variant
-}
-
 type State = {
     jobs: Array<Job>,
-    status_description: StatusDescription,
-    sink_bucket_name?: string,
-    sink_prefix?: Path,
-    sink_voxel_offset: [number, number, number],
-    sink_encoder: Encoding,
-    mode: ExportMode,
-    sink_creation_tasks: Array<{name: string, status: SinkCreationStatus}>,
+    num_classes: number | undefined,
+    datasource_suggestions: DataSource[],
 }
 
 function stateFromJsonValue(data: JsonValue): State{
     let data_obj = ensureJsonObject(data)
     return {
         jobs: Job.fromJsonArray(ensureJsonArray(data_obj["jobs"])),
-        status_description: ensureStatuDescription(ensureJsonString(data_obj["status_description"])),
-        sink_bucket_name: ensureOptional(ensureJsonString, data_obj["sink_bucket_name"]),
-        sink_prefix: ensureOptional((v) => Path.parse(ensureJsonString(v)), data_obj["sink_prefix"]),
-        sink_voxel_offset: ensureJsonNumberTripplet(data_obj["sink_voxel_offset"]),
-        sink_encoder: ensureEncoding(ensureJsonString(data_obj["sink_encoder"])),
-        mode: ensureExportMode(ensureJsonString(data_obj["mode"])),
-        sink_creation_tasks: ensureJsonArray(data_obj["sink_creation_tasks"]).map(v => {
-            const vobj = ensureJsonObject(v)
-            return {
-                name: ensureJsonString(vobj["name"]),
-                status: ensureSinkCreationStatus(ensureJsonString(vobj["status"]))
-            }
-        })
+        num_classes: ensureOptional(ensureJsonNumber, data_obj["num_classes"]),
+        datasource_suggestions: ensureJsonArray(data_obj["datasource_suggestions"]).map(raw => DataSource.fromJsonValue(raw))
     }
 }
 
 export class PredictionsExportWidget extends Applet<State>{
+    private state: State
     public readonly element: HTMLElement;
-    private readonly statusDescriptionContainer: HTMLParagraphElement;
-    private bucketNameInput: HTMLInputElement;
-    private prefixInput: HTMLInputElement;
-    private encoderSelector: SelectorWidget<Encoding>;
-    exportModeSelector: SelectorWidget<"PREDICTIONS" | "SIMPLE_SEGMENTATION">;
     jobsDisplay: HTMLDivElement;
+    private datasourceInput: DataSourceInput;
+    private datasinkInput: PrecomputedChunksScaleDataSinkInput;
 
     public constructor({name, parentElement, session, help}: {
         name: string, parentElement: HTMLElement, session: Session, help: string[]
@@ -131,97 +91,74 @@ export class PredictionsExportWidget extends Applet<State>{
             deserializer: stateFromJsonValue,
             onNewState: (new_state) => this.onNewState(new_state)
         })
+        this.state = {jobs: [], num_classes: undefined, datasource_suggestions: []}
         this.element = new CollapsableWidget({display_name: "Export Predictions", parentElement, help}).element
         this.element.classList.add("ItkPredictionsExportApplet")
 
-        let fieldset = createElement({tagName: "fieldset", parentElement: this.element})
-        let dataSourceLegend = createElement({tagName: "legend", parentElement: fieldset, innerHTML: "Input: "})
-        dataSourceLegend.title = `\
-            The URL for the dataset that should be batch-processed with the classifier you've just trained.
-            This could be the same URL of the dataset you've used during training
-        `.replace(/^ +/g, "")
-
-        new DataSourcePicker({name: "export_datasource_applet", parentElement: fieldset, session})
-
-        fieldset = createElement({tagName: "fieldset", parentElement: this.element})
-        createElement({tagName: "legend", parentElement: fieldset, innerHTML: "Output:"})
-
-        this.bucketNameInput = createInputParagraph({
-            inputType: "text", parentElement: fieldset, label_text: "Bucket name: "
+        this.datasourceInput = DataSourceInput.createLabeled({
+            legend: "Input:", parentElement: this.element, session, onChanged: (ds: DataSource | undefined) => {
+                if(ds  === undefined){
+                    return
+                }
+                if(this.state.num_classes !== undefined){
+                    this.datasinkInput.setParameters({
+                        shape: ds.shape.updated({c: this.state.num_classes}),
+                        tileShape: ds.tile_shape.updated({c: this.state.num_classes}),
+                        resolution: ds.spatial_resolution,
+                    })
+                }
+            }
         })
-        this.bucketNameInput.addEventListener("focusout", () => this.setSinkParams())
-
-        let p = createElement({tagName: "p", parentElement: fieldset, cssClasses: [CssClasses.ItkInputParagraph]})
-        let pathInputLabel = createElement({tagName: "label", innerHTML: "Path: ", parentElement: p})
-        pathInputLabel.title = "This is the path within the bucket, where the output should be saved"
-        this.prefixInput = createInput({inputType: "text", parentElement: p})
-        this.prefixInput.addEventListener("focusout", () => this.setSinkParams())
-
-        p = createElement({tagName: "p", parentElement: fieldset, cssClasses: [CssClasses.ItkInputParagraph]})
-        createElement({tagName: "label", parentElement: p, innerHTML: "Compression: "})
-        this.encoderSelector = new SelectorWidget({
-            parentElement: p,
-            options: precomputed_encodings.filter(e => e == "raw"), //FIXME?
-            optionRenderer: (opt) => opt,
-            onSelection: () => this.setSinkParams(),
+        createInputParagraph({inputType: "button", parentElement: this.element, label_text: "or ", value: "use training data...", onClick: () => {
+            if(this.state.datasource_suggestions.length == 0){
+                new ErrorPopupWidget({message: "No brush strokes to derive data input suggestions from."})
+                return
+            }
+            let popup = new PopupWidget("Input suggestions")
+            new OneShotSelectorWidget({
+                parentElement: popup.element,
+                options: this.state.datasource_suggestions,
+                optionRenderer: (ds) => ds.getDisplayString(),
+                onOk: (ds) => {
+                    this.datasourceInput.value = ds
+                    popup.destroy()
+                },
+                onCancel: () => {
+                    popup.destroy()
+                },
+            })
+        }})
+        this.datasinkInput = PrecomputedChunksScaleDataSinkInput.createLabeled({
+            legend: "Output:",
+            parentElement: this.element,
+            encoding: "raw",
+            dataType: "float32",
+            disableShape: true,
+            disableTileShape: true,
+            disableDataType: true,
+            disableEncoding: true,
         })
-        p.style.display = "none" //FIXME: add jpeg compression
-
-        p = createElement({tagName: "p", parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph]})
-        let exportSourceLabel = createElement({tagName: "label", parentElement: p, innerHTML: "Export Source: "})
-        exportSourceLabel.title = `\
-            PREDICTIONS: Outputs an image with one float32 channel for each class, with values between 0.0 and 1.0 representing the likelyhood of this pixel belonging to this class.
-            SIMPLE_SEGMENTATION: Outputs a 3-channel image for each class, where each pixel is either red (255,0,0) if it most likely belongs to that class or black (0,0,0) otherwise.
-        `.replace(/^ +/g, "")
-        this.exportModeSelector = new SelectorWidget({
-            parentElement: p,
-            options: export_modes.slice(), //FIXME?
-            optionRenderer: (opt) => opt,
-            onSelection: () => this.setSinkParams(),
-        })
-
         createInputParagraph({
-            inputType: "button", value: "Create Job", parentElement: this.element, onClick: () => this.doRPC("start_export_job", {})
+            inputType: "button", value: "Create Job", parentElement: this.element, onClick: () => {
+                let datasource = this.datasourceInput.value
+                let datasink = this.datasinkInput.value
+                if(!datasource || !datasink){
+                    new ErrorPopupWidget({message: "Missing export parameters"})
+                    return
+                }
+                this.doRPC(
+                    "start_export_job", //FIXME: what about simple segmentation?
+                    {datasource: datasource.toJsonValue(), datasink: datasink.toJsonValue()}
+                )
+            }
         })
-
-        this.statusDescriptionContainer = createElement({tagName: "p", parentElement: this.element})
 
         this.jobsDisplay = createElement({tagName: "div", parentElement: this.element});
     }
 
-    private setSinkParams(){
-        this.doRPC("set_sink_params", {
-            sink_bucket_name: this.bucketNameInput.value || null,
-            sink_prefix: this.prefixInput.value || null,
-            sink_encoder: toJsonValue(this.encoderSelector.getSelection() || null),
-            mode: toJsonValue(this.exportModeSelector.getSelection() || null),
-        })
-    }
-
     protected onNewState(new_state: State){
-        setValueIfUnfocused(this.bucketNameInput, new_state.sink_bucket_name || "")
-        setValueIfUnfocused(this.prefixInput, new_state.sink_prefix?.toString() || "")
-        this.encoderSelector.setSelection({selection: new_state.sink_encoder})
-        this.exportModeSelector.setSelection({selection: new_state.mode})
-
-        this.statusDescriptionContainer.innerHTML = ""
-        const statusDescriptionElement = createElement({
-            tagName: "span",
-            parentElement: this.statusDescriptionContainer,
-            innerHTML: new_state.status_description,
-        })
-        statusDescriptionElement.classList.add(new_state.status_description == "ready" ? CssClasses.InfoText : CssClasses.ErrorText)
-
+        this.state = new_state
         this.jobsDisplay.innerHTML = ""
-        if(new_state.sink_creation_tasks.length > 0){
-            createTable({
-                parentElement: this.jobsDisplay,
-                cssClasses: [CssClasses.ItkTable],
-                title: {header: "Sink Creation Tasks:"},
-                headers: {name: "Name", status: "Status"},
-                rows: new_state.sink_creation_tasks,
-            })
-        }
 
         if(new_state.jobs.length > 0){
             createTable({

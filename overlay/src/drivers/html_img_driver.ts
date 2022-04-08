@@ -4,6 +4,7 @@ import { createElement } from "../util/misc";
 import { Url } from "../util/parsed_url";
 import { INativeView, IViewportDriver, IViewportGeometry } from "./viewer_driver";
 import { PredictionsView, View } from "../viewer/view";
+import { Session } from "../client/ilastik";
 
 export class HtmlImgDriver implements IViewerDriver{
     public readonly img: HTMLImageElement;
@@ -11,9 +12,11 @@ export class HtmlImgDriver implements IViewerDriver{
     public readonly data_url: Url;
 
     private onViewportChangedHandlers = new Array<() => void>()
+    private readonly session: Session;
 
-    constructor({img}:{img: HTMLImageElement}){
+    constructor({img, session}:{img: HTMLImageElement, session: Session}){
         this.img = img
+        this.session = session
         this.container = img.parentElement || document.body
         try{
             this.data_url = Url.parse(this.img.src)
@@ -36,7 +39,7 @@ export class HtmlImgDriver implements IViewerDriver{
         const container = createElement({tagName: "div", parentElement: this.img.parentElement!, cssClasses: [output_css_class]});
 
         (async () => {
-            let view = View.tryFromNative(params.native_view)
+            let view = View.tryFromNative({native_view: params.native_view, session: this.session})
             if(view === undefined){
                 throw `Could not convert to view: ${JSON.stringify(params.native_view)}`
             }

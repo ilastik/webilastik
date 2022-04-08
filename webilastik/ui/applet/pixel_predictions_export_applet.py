@@ -25,6 +25,7 @@ class ExportTask(Generic[IN]):
 
     def __call__(self, step_arg: IN):
         tile = self.operator.compute(step_arg)
+        print(f"Writing tile {tile}")
         self.sink_writer.write(tile)
 
 class ExportAsSimpleSegmentationTask:
@@ -36,6 +37,10 @@ class ExportAsSimpleSegmentationTask:
         segmentations = self.operator.compute(step_arg)
         for segmentation, sink in zip(segmentations, self.sink_writers):
             sink.write(segmentation)
+
+# this needs to be top-level becase process pools can't handle local functions
+def _create_datasink(ds: DataSink) -> "DataSinkWriter | Exception":
+    return ds.create()
 
 class PixelClassificationExportApplet(StatelesApplet):
     def __init__(
@@ -97,8 +102,9 @@ class PixelClassificationExportApplet(StatelesApplet):
 
         sink_creation_job = self._create_job(
             name=f"Creating datasink",
-            target=lambda _: datasink.create(),
-            args=[None],
+            target=_create_datasink,
+            args=[datasink],
+            num_args=1,
         )
         sink_creation_job.add_done_callback(lambda _: self._remove_job(sink_creation_job.uuid))
 
@@ -111,6 +117,7 @@ class PixelClassificationExportApplet(StatelesApplet):
                 name=f"Export Job",
                 target=ExportTask(operator=classifier, sink_writer=result),
                 args=datasource.roi.get_datasource_tiles(), #FIXME: use sink tile_size
+                num_args=datasource.roi.get_num_tiles(tile_shape=datasource.tile_shape),
             )
         sink_creation_job.add_done_callback(launch_export_job)
 
@@ -138,6 +145,7 @@ class PixelClassificationExportApplet(StatelesApplet):
             name=f"Creating datasinks",
             target=lambda _: create_datasinks(),
             args=[None],
+            num_args=1, #FIXME: maybe one per datasink?
         )
         sink_creation_job.add_done_callback(lambda _: self._remove_job(sink_creation_job.uuid))
 
@@ -150,6 +158,7 @@ class PixelClassificationExportApplet(StatelesApplet):
                 name=f"Export Job",
                 target=ExportAsSimpleSegmentationTask(operator=classifier, sink_writers=result),
                 args=datasource.roi.get_datasource_tiles(), #FIXME: use sink tile_size
+                num_args=datasource.roi.get_num_tiles(tile_shape=datasource.tile_shape),
             )
         sink_creation_job.add_done_callback(launch_export_job)
 

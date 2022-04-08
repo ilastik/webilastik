@@ -41,10 +41,11 @@ export type InlineCss = Partial<Omit<
     "getPropertyPriority" | "getPropertyValue" | "item" | "removeProperty" | "setProperty"
 >>
 
-export function createElement<K extends keyof HTMLElementTagNameMap>({tagName, parentElement, innerHTML, cssClasses, inlineCss={}, onClick}:{
+export function createElement<K extends keyof HTMLElementTagNameMap>({tagName, parentElement, innerHTML, innerText, cssClasses, inlineCss={}, onClick}:{
     tagName: K,
     parentElement:HTMLElement,
     innerHTML?:string,
+    innerText?:string,
     cssClasses?:Array<string>,
     inlineCss?: InlineCss,
     onClick?(event: Event): void},
@@ -54,6 +55,9 @@ export function createElement<K extends keyof HTMLElementTagNameMap>({tagName, p
     parentElement.appendChild(element)
     if(innerHTML !== undefined){
         element.innerHTML = innerHTML
+    }
+    if(innerText !== undefined){
+        element.innerText = innerText
     }
     (cssClasses || []).forEach(klass => {
         element.classList.add(klass)

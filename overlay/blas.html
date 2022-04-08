@@ -1,0 +1,31 @@
+<html>
+    <head>
+        <meta charset="UTF-8">
+    </head>
+    <body>
+
+        <span>
+            <input type="text"/>
+        </span>
+
+        <select name="pets" id="pet-select">
+            <option value="dog">Dog</option>
+            <option value="cat">Cat</option>
+            <option value="hamster">Hamster</option>
+            <option value="parrot">Parrot</option>
+            <option value="spider">Spider</option>
+            <option value="goldfish">Goldfish</option>
+        </select>
+
+        <script>
+            let sel = document.querySelector("#pet-select")
+            sel.addEventListener("change", () => {
+                console.log(`changed!!! ${Date()}`)
+            })
+            document.body.addEventListener("dblclick", () => {
+                console.log(`changing select from ${sel.selectedIndex}...`)
+                sel.selectedIndex = 3
+            })
+        </script>
+    </body>
+</html>

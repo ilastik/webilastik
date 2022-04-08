@@ -66,7 +66,7 @@ export class Viewer{
             if(this.findViewFromNative(native_view) !== undefined){
                 continue
             }
-            let view = await View.tryFromNative(native_view);
+            let view = await View.tryFromNative({native_view, session: this.ilastik_session});
             if(view === undefined){
                 console.log(`Unsupported url: ${native_view.url}`)
                 continue

@@ -1,7 +1,7 @@
 import { vec3 } from "gl-matrix"
 import { sleep } from "../util/misc"
 import { Path, Url } from "../util/parsed_url"
-import { DataType, PrecomputedChunks, Scale } from "../util/precomputed_chunks"
+import { DataType, Scale } from "../util/precomputed_chunks"
 import { ensureJsonArray, ensureJsonNumber, ensureJsonNumberPair, ensureJsonNumberTripplet, ensureJsonObject, ensureJsonString, ensureOptional, IJsonable, IJsonableObject, JsonObject, JsonValue, toJsonValue } from "../util/serialization"
 
 export class Session{
@@ -350,6 +350,16 @@ export class Shape5D extends Point5D{
         super({x, y, z, t, c})
     }
 
+    public updated(params: {x?: number, y?: number, z?: number, t?: number, c?: number}): Shape5D{
+        return new Shape5D({
+            x: params.x !== undefined ? params.x : this.x,
+            y: params.y !== undefined ? params.y : this.y,
+            z: params.z !== undefined ? params.z : this.z,
+            t: params.t !== undefined ? params.t : this.t,
+            c: params.c !== undefined ? params.c : this.c,
+        })
+    }
+
     public static fromJsonData(data: JsonValue){
         let value_obj = ensureJsonObject(data)
         return new this({
@@ -373,9 +383,6 @@ export class Shape5D extends Point5D{
 }
 
 export class Interval5D{
-    to(): JsonValue {
-        throw new Error("Method not implemented.")
-    }
     public readonly x: [number, number];
     public readonly y: [number, number];
     public readonly z: [number, number];
@@ -413,6 +420,10 @@ export class Interval5D{
             t: ensureJsonNumberPair(value_obj.t),
             c: ensureJsonNumberPair(value_obj.c),
         })
+    }
+
+    public toJsonValue(): JsonObject{
+        return {"start": this.start.toJsonValue(), "stop": this.stop.toJsonValue()}
     }
 }
 
@@ -535,11 +546,17 @@ export abstract class DataSource implements IJsonable{
     public readonly filesystem: FileSystem
     public readonly path: Path
     public readonly spatial_resolution: vec3
+    public readonly shape: Shape5D
+    public readonly tile_shape: Shape5D
 
-    constructor({filesystem, path, spatial_resolution=vec3.fromValues(1,1,1)}: {filesystem: FileSystem, path: Path, spatial_resolution?: vec3}){
-        this.filesystem = filesystem
-        this.path = path
-        this.spatial_resolution = spatial_resolution
+    constructor(params: {
+        filesystem: FileSystem, path: Path, shape: Shape5D, spatial_resolution?: vec3, tile_shape: Shape5D
+    }){
+        this.filesystem = params.filesystem
+        this.path = params.path
+        this.spatial_resolution = params.spatial_resolution || vec3.fromValues(1,1,1)
+        this.shape = params.shape
+        this.tile_shape = params.tile_shape
     }
 
     public static fromJsonValue(data: JsonValue) : DataSource{
@@ -560,7 +577,9 @@ export abstract class DataSource implements IJsonable{
         return {
             filesystem: FileSystem.fromJsonValue(json_object["filesystem"]),
             path: Path.parse(ensureJsonString(json_object["path"])),
-            spatial_resolution: spatial_resolution === undefined ? vec3.fromValues(1,1,1) : ensureJsonNumberTripplet(spatial_resolution)
+            spatial_resolution: spatial_resolution === undefined ? vec3.fromValues(1,1,1) : ensureJsonNumberTripplet(spatial_resolution),
+            shape: Shape5D.fromJsonData(json_object["shape"]),
+            tile_shape: Shape5D.fromJsonData(json_object["tile_shape"]),
         }
     }
 
@@ -569,6 +588,8 @@ export abstract class DataSource implements IJsonable{
             filesystem: this.filesystem.toJsonValue(),
             path: this.path.raw,
             spatial_resolution: [this.spatial_resolution[0], this.spatial_resolution[1], this.spatial_resolution[2]],
+            shape: this.shape.toJsonValue(),
+            tile_shape: this.tile_shape.toJsonValue(),
             ...this.doToJsonValue()
         }
     }
@@ -591,7 +612,7 @@ export abstract class DataSource implements IJsonable{
 
     public abstract toTrainingUrl(_session: Session): Url;
 
-    public static async getDatasources(params: {datasource_url: Url, session: Session}): Promise<Array<DataSource> | Error>{
+    public static async getDatasourcesFromUrl(params: {datasource_url: Url, session: Session}): Promise<Array<DataSource> | Error>{
         let response = await fetch(params.session.sessionUrl.joinPath("get_datasources_from_url").raw, {
             method: "POST",
             body: JSON.stringify({url: params.datasource_url.raw})
@@ -600,7 +621,11 @@ export abstract class DataSource implements IJsonable{
             let error_message = (await response.json())["error"]
             return Error(error_message)
         }
-        return ensureJsonArray(await response.json()).map(rds => DataSource.fromJsonValue(rds))
+        let payload = ensureJsonObject(await response.json())
+        if("error" in payload){
+            return Error(ensureJsonString(payload.error))
+        }
+        return ensureJsonArray(payload["datasources"]).map(rds => DataSource.fromJsonValue(rds))
     }
 }
 
@@ -617,22 +642,6 @@ export class PrecomputedChunksDataSource extends DataSource{
         return { __class__: "PrecomputedChunksDataSource"}
     }
 
-    public static async tryGetTrainingRawData(url: Url): Promise<PrecomputedChunksDataSource | undefined>{
-        let training_regex = /stripped_precomputed\/url=(?<url>[^/]+)\/resolution=(?<resolution>\d+_\d+_\d+)/
-        let match = url.path.raw.match(training_regex)
-        if(!match){
-            return undefined
-        }
-        const original_url = Url.parse(Session.atob(match.groups!["url"]));
-        const raw_resolution = match.groups!["resolution"].split("_").map(axis => parseInt(axis));
-        const resolution = vec3.fromValues(raw_resolution[0], raw_resolution[1], raw_resolution[2]);
-        return new PrecomputedChunksDataSource({
-            filesystem: FileSystem.fromUrl(original_url),
-            path: Path.parse("/"),
-            spatial_resolution: resolution
-        })
-    }
-
     public toTrainingUrl(session: Session): Url{
         const original_url = this.filesystem.getUrl().joinPath(this.path.raw)
         const resolution_str = `${this.spatial_resolution[0]}_${this.spatial_resolution[1]}_${this.spatial_resolution[2]}`
@@ -640,23 +649,7 @@ export class PrecomputedChunksDataSource extends DataSource{
             .ensureDataScheme("precomputed")
             .joinPath(`stripped_precomputed/url=${Session.btoa(original_url.raw)}/resolution=${resolution_str}`)
     }
-
-    public static async tryArrayFromUrl(url: Url): Promise<Array<PrecomputedChunksDataSource> | undefined>{
-        let chunks = await PrecomputedChunks.tryFromUrl(url);
-        if(chunks === undefined){
-            return undefined
-        }
-        return chunks.scales.map(scale => {
-            return new PrecomputedChunksDataSource({
-                filesystem: new HttpFs({read_url: url.root}),
-                path: url.path,
-                spatial_resolution: vec3.clone(scale.resolution)
-            })
-        })
-    }
 }
-
-const image_content_types = ["image/png", "image/gif", "image/jpeg"]
 
 export class SkimageDataSource extends DataSource{
     public static fromJsonValue(data: JsonValue) : SkimageDataSource{
@@ -668,32 +661,6 @@ export class SkimageDataSource extends DataSource{
 
     protected doToJsonValue() : JsonObject & {__class__: string}{
         return { __class__: "SkimageDataSource"}
-    }
-
-    public static async tryFromUrl(url: Url): Promise<SkimageDataSource | undefined>{
-        if(url.datascheme !== undefined){
-            return undefined
-        }
-        if(url.protocol !== "http" && url.protocol !== "https"){
-            return undefined
-        }
-        const head = await fetch(url.toString(), {method: "HEAD"});
-        if(!head.ok || !image_content_types.includes(head.headers.get("Content-Type")!)){
-            return undefined
-        }
-        return new SkimageDataSource({
-            filesystem: new HttpFs({read_url: url.root}),
-            path: url.path,
-        })
-    }
-
-    public static async tryGetTrainingRawData(url: Url): Promise<SkimageDataSource | undefined>{
-        return await this.tryFromUrl(url)
-    }
-
-    public static async tryArrayFromUrl(url: Url): Promise<Array<SkimageDataSource> | undefined>{
-        let datasource = await this.tryFromUrl(url)
-        return datasource === undefined ? undefined : [datasource]
     }
 
     public toTrainingUrl(_session: Session): Url{
@@ -731,7 +698,7 @@ export class FsDataSink{
             filesystem: this.filesystem.toJsonValue(),
             path: this.path.toString(),
             tile_shape: this.tile_shape.toJsonValue(),
-            interval: this.interval.to(),
+            interval: this.interval.toJsonValue(),
             dtype: this.dtype.toString(),
         }
     }
@@ -771,5 +738,15 @@ export class PrecomputedChunksScaleDataSink extends FsDataSink{
         })
         this.info_dir = params.info_dir
         this.scale = params.scale
+    }
+
+    public toJsonValue(): JsonObject {
+        return {
+            ...super.toJsonValue(),
+            __class__: "PrecomputedChunksScaleSink",
+            info_dir: this.info_dir.raw,
+            scale: this.scale.toJsonValue(),
+            num_channels: this.shape.c,
+        }
     }
 }

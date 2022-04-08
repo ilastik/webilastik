@@ -1,5 +1,5 @@
 import { vec3 } from "gl-matrix";
-import { DataSource, PrecomputedChunksDataSource, Session, SkimageDataSource } from "../client/ilastik";
+import { DataSource, Session } from "../client/ilastik";
 import { INativeView } from "../drivers/viewer_driver";
 import { Url } from "../util/parsed_url";
 import { JsonValue } from "../util/serialization";
@@ -17,11 +17,11 @@ export abstract class View{
         return Url.parse(native_view.url).equals(this.url)
     }
 
-    public static async tryFromNative(native_view: INativeView): Promise<View | undefined>{
+    public static async tryFromNative(params: {native_view: INativeView, session: Session}): Promise<View | undefined>{
         return (
-            await PredictionsView.tryFromNative(native_view) ||
-            await TrainingView.tryFromNative(native_view) ||
-            await RawDataView.tryFromNative(native_view)
+            await PredictionsView.tryFromNative(params) ||
+            await TrainingView.tryFromNative(params) ||
+            await RawDataView.tryFromNative(params)
         )
     }
 }
@@ -47,17 +47,13 @@ export class RawDataView extends View{
         })
     }
 
-    public static async tryFromNative(native_view: INativeView): Promise<RawDataView | undefined>{
-        let url = Url.parse(native_view.url)
-        let datasources: Array<DataSource> | undefined = undefined
-        datasources = await SkimageDataSource.tryArrayFromUrl(url)
-        datasources = datasources || await PrecomputedChunksDataSource.tryArrayFromUrl(url)
-        if(datasources === undefined){
+    public static async tryFromNative(params: {native_view: INativeView, session: Session}): Promise<RawDataView | undefined>{
+        let url = Url.parse(params.native_view.url)
+        let datasources: Array<DataSource> | Error = await DataSource.getDatasourcesFromUrl({datasource_url: url, session: params.session})
+        if(datasources instanceof Error){
             return undefined
         }
-        return new RawDataView({
-            native_view, datasources
-        })
+        return new RawDataView({native_view: params.native_view, datasources})
     }
 }
 
@@ -69,17 +65,13 @@ export class TrainingView extends View{
         this.raw_data = params.raw_data
     }
 
-    public static async tryFromNative(native_view: INativeView): Promise<TrainingView | undefined>{
-        let url = Url.parse(native_view.url)
-        let raw_data : DataSource | undefined = undefined;
-        raw_data = raw_data || await SkimageDataSource.tryGetTrainingRawData(url);
-        raw_data = raw_data || await PrecomputedChunksDataSource.tryGetTrainingRawData(url);
-        if(raw_data){
-            return new TrainingView({
-                native_view, raw_data
-            })
+    public static async tryFromNative(params: {native_view: INativeView, session: Session}): Promise<TrainingView | undefined>{
+        let url = Url.parse(params.native_view.url)
+        let datasources: Array<DataSource> | Error = await DataSource.getDatasourcesFromUrl({datasource_url: url, session: params.session})
+        if(datasources instanceof Error || datasources.length > 1){
+            return undefined
         }
-        return undefined
+        return new TrainingView({native_view: params.native_view, raw_data: datasources[0]})
     }
 }
 
@@ -99,8 +91,8 @@ export class PredictionsView extends View{
         )
     }
 
-    public static async tryFromNative(native_view: INativeView): Promise<PredictionsView | undefined>{
-        let url = Url.parse(native_view.url)
+    public static async tryFromNative(params: {native_view: INativeView, session: Session}): Promise<PredictionsView | undefined>{
+        let url = Url.parse(params.native_view.url)
 
         let predictions_regex = /predictions\/raw_data=(?<raw_data>[^/]+)\/generation=(?<generation>[^/?]+)/
         let match = url.path.raw.match(predictions_regex)
@@ -110,7 +102,7 @@ export class PredictionsView extends View{
         const raw_data_json: JsonValue = JSON.parse(Session.atob(match.groups!["raw_data"]))
         const raw_data = DataSource.fromJsonValue(raw_data_json)
         return new PredictionsView({
-            native_view, raw_data, classifier_generation: parseInt(match.groups!["generation"])
+            native_view: params.native_view, raw_data, classifier_generation: parseInt(match.groups!["generation"])
         })
     }
 

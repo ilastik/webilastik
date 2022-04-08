@@ -46,7 +46,6 @@ class PrecomputedChunksScaleSink(FsDataSink):
         )
 
     def create(self) -> "Exception | PrecomputedChunksScaleSink": #FIXME: separate writing form the DataSink ?
-        print(f"Creating precomp chunks sink.....")
         info_path = self.info_dir.joinpath("info")
         scale_path = self.info_dir / self.scale.key
 

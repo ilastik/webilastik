@@ -1,7 +1,7 @@
 # pyright: reportUnusedCallResult=false
 
 from asyncio.events import AbstractEventLoop
-from concurrent.futures.thread import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from functools import partial
 import os
@@ -125,7 +125,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         self._http_client_session: Optional[ClientSession] = None
         self._loop: Optional[AbstractEventLoop] = None
 
-        executor = ThreadPoolExecutor(max_workers=4) #FIXME
+        executor = ProcessPoolExecutor() #FIXME
 
         brushing_applet = WsBrushingApplet("brushing_applet")
         feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", datasources=brushing_applet.datasources)
@@ -147,7 +147,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         self.export_applet = WsPixelClassificationExportApplet(
             name="export_applet",
             executor=executor,
-            job_executor=JobExecutor(executor=executor, concurrent_job_steps=1), #FIXME: why 4?
+            job_executor=JobExecutor(executor=executor, concurrent_job_steps=4), #FIXME: why 4?
             operator=self.pixel_classifier_applet.pixel_classifier,
             datasource_suggestions=brushing_applet.datasources.transformed_with(
                 lambda datasources: tuple(ds for ds in datasources if isinstance(ds, FsDataSource))

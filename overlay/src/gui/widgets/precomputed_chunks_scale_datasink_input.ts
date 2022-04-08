@@ -3,12 +3,10 @@ import { Shape5D, PrecomputedChunksScaleDataSink } from "../../client/ilastik";
 import { createElement, createFieldset, getNowString } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
 import { DataType, dataTypes, Scale } from "../../util/precomputed_chunks";
-import { DataTypeSelector } from "./data_type_selector";
 import { PathInput } from "./path_input";
-import { SelectorWidget } from "./selector_widget";
+import { DropdownSelect } from "./selector_widget";
 import { Shape5DInput } from "./shape5d_input";
 import { Vec3Input } from "./vec3_input";
-import { encodings as precomputed_encodings } from "../../util/precomputed_chunks";
 import { BucketFsInput } from "./bucket_fs_input";
 
 
@@ -16,8 +14,8 @@ export class PrecomputedChunksScaleDataSinkInput{
     private infoDirectoryPathInput: PathInput;
     private scaleKeyInput: PathInput;
     private fileSystemSelector: BucketFsInput;
-    private dataTypeSelector: DataTypeSelector;
-    private encoderSelector: SelectorWidget<"raw" | "jpeg" | "compressed_segmentation">;
+    private dataTypeSelector: DropdownSelect<DataType>;
+    private encoderSelector: DropdownSelect<"raw" | "jpeg" | "compressed_segmentation">;
     private tileShapeInput: Shape5DInput;
     private sinkShapeInput: Shape5DInput;
     private resolutionInput: Vec3Input;
@@ -25,11 +23,17 @@ export class PrecomputedChunksScaleDataSinkInput{
 
     constructor(params: {
         parentElement: HTMLElement,
+
+        dataType?: DataType,
         tileShape?: Shape5D,
         resolution?: vec3,
         voxelOffset?: vec3,
+        encoding?: "raw" | "jpeg",
+
         disableShape?: boolean,
         disableTileShape?: boolean,
+        disableEncoding?: boolean,
+        disableDataType?: boolean,
     }){
         let parentElement = params.parentElement
         this.fileSystemSelector = BucketFsInput.createLabeledFieldset({
@@ -44,12 +48,18 @@ export class PrecomputedChunksScaleDataSinkInput{
             parentElement: createFieldset({parentElement, legend: "Scale Key: "}), value: new Path({components: ["exported_data"]})
         })
 
-        let dataTypeFieldset = createFieldset({parentElement, legend: "Data Type: "})
-        this.dataTypeSelector = new SelectorWidget<DataType>({
-            parentElement: dataTypeFieldset,
-            options: dataTypes.slice(),
+        let p = createElement({tagName: "p", parentElement})
+        createElement({tagName: "label", parentElement: p, innerText: "Data Type: "})
+        this.dataTypeSelector = new DropdownSelect<DataType>({
+            parentElement: p,
+            firstOption: dataTypes[0],
+            otherOptions: dataTypes.slice(1),
             optionRenderer: (dt) => dt,
+            disabled: params.disableDataType,
         })
+        if(params.dataType){
+            this.dataTypeSelector.value = params.dataType
+        }
 
         this.sinkShapeInput = Shape5DInput.createLabeledFieldset({
             parentElement,
@@ -78,26 +88,32 @@ export class PrecomputedChunksScaleDataSinkInput{
             value: params.voxelOffset || vec3.fromValues(0,0,0)
         })
 
-        let encodingFieldset = createFieldset({parentElement, legend: "Encoding:"})
-        this.encoderSelector = new SelectorWidget({
-            parentElement: encodingFieldset,
-            options: precomputed_encodings.filter(e => e == "raw"), //FIXME?
+        p = createElement({tagName: "p", parentElement})
+        createElement({tagName: "label", parentElement: p, innerText: "Encoding: "})
+        this.encoderSelector = new DropdownSelect<"raw" | "jpeg" | "compressed_segmentation">({
+            parentElement: p,
+            firstOption: "raw",
+            otherOptions: ["jpeg"], //FIXME?
             optionRenderer: (opt) => opt,
+            disabled: params.disableEncoding,
         })
+        if(params.encoding){
+            this.encoderSelector.value = params.encoding
+        }
     }
 
     public get value(): PrecomputedChunksScaleDataSink | undefined{
         let filesystem = this.fileSystemSelector.tryGetFileSystem()
         let infoPath = this.infoDirectoryPathInput.value
-        let dtype = this.dataTypeSelector.getSelection()
+        let dtype = this.dataTypeSelector.value
         let scaleKey = this.scaleKeyInput.value
         let sinkShape = this.sinkShapeInput.value
         let tileShape = this.tileShapeInput.value
         let resolution = this.resolutionInput.value
         let voxelOffset = this.voxelOffsetInput.value
-        let encoding = this.encoderSelector.getSelection()
+        let encoding = this.encoderSelector.value
 
-        if(!filesystem || !infoPath || !scaleKey || !sinkShape || !tileShape || !dtype || !resolution || !voxelOffset || !encoding){
+        if(!filesystem || !infoPath || !scaleKey || !sinkShape || !tileShape || !resolution || !voxelOffset){
             return undefined
         }
 
