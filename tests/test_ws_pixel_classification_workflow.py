@@ -2,7 +2,7 @@
 
 import os
 from sys import prefix
-from tests import create_precomputed_chunks_sink
+from tests import create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations, get_sample_feature_extractors
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.features.channelwise_fastfilters import GaussianSmoothing, HessianOfGaussianEigenvalues
 from webilastik.filesystem.bucket_fs import BucketFs
@@ -55,7 +55,7 @@ async def read_server_status(websocket: ClientWebSocketResponse):
 async def main():
     ilastik_root_url = Url.parse("https://app.ilastik.org/")
     assert ilastik_root_url is not None
-    ds = SkimageDataSource(filesystem=HttpFs(read_url=ilastik_root_url), path=PurePosixPath("public/images/c_cells_1.png"))
+    ds = get_sample_c_cells_datasource()
     token = UserToken.from_environment()
     assert isinstance(token, UserToken)
 
@@ -91,46 +91,19 @@ async def main():
                     applet_name="feature_selection_applet",
                     method_name="add_feature_extractors",
                     arguments={
-                        "feature_extractors": tuple([
-                            GaussianSmoothing(sigma=0.3, axis_2d="z").to_json_data(),
-                            HessianOfGaussianEigenvalues(scale=0.7, axis_2d="z").to_json_data(),
-                        ])
+                        "feature_extractors": tuple(fe.to_json_data() for fe in get_sample_feature_extractors())
                     }
                 ).to_json_value()
             )
             print("done sending feature extractors<<<<<")
 
             print("sending some annotations=======")
-            green = Color(r=np.uint8(0), g=np.uint8(255), b=np.uint8(0))
-            red = Color(r=np.uint8(255), g=np.uint8(0), b=np.uint8(0))
-            brush_strokes = [
-                Annotation.interpolate_from_points(
-                    voxels=[Point5D.zero(x=140, y=150), Point5D.zero(x=145, y=155)],
-                    color=green,
-                    raw_data=ds
-                ),
-                Annotation.interpolate_from_points(
-                    voxels=[Point5D.zero(x=238, y=101), Point5D.zero(x=229, y=139)],
-                    color=green,
-                    raw_data=ds
-                ),
-                Annotation.interpolate_from_points(
-                    voxels=[Point5D.zero(x=283, y=87), Point5D.zero(x=288, y=92)],
-                    color=red,
-                    raw_data=ds
-                ),
-                Annotation.interpolate_from_points(
-                    voxels=[Point5D.zero(x=274, y=168), Point5D.zero(x=256, y=191)],
-                    color=red,
-                    raw_data=ds
-                ),
-            ]
             await ws.send_json(
                 RPCPayload(
                     applet_name="brushing_applet",
                     method_name="add_annotations",
                     arguments={
-                        "annotations": tuple(a.to_json_data() for a in brush_strokes)
+                        "annotations": tuple(a.to_json_data() for a in get_sample_c_cells_pixel_annotations())
                     }
                 ).to_json_value()
             )
@@ -174,17 +147,16 @@ async def main():
             #         Array5D(raw_data, axiskeys="cyx").show_channels()
 
             hbp_image_service_bucket_fs = BucketFs(
-                    bucket_name="hbp-image-service",
-                    ebrains_user_token=UserToken.get_global_token_or_raise(),
-                    prefix=PurePosixPath("/"),
-                )
-
+                bucket_name="hbp-image-service",
+                ebrains_user_token=UserToken.get_global_token_or_raise(),
+                prefix=PurePosixPath("/"),
+            )
 
             predictions_export_datasink = create_precomputed_chunks_sink(
                 shape=ds.shape.updated(c=2),
                 dtype=np.dtype("float32"),
-                chunk_size=ds.tile_shape,
-                bucket_fs=hbp_image_service_bucket_fs
+                chunk_size=ds.tile_shape.updated(c=2),
+                fs=hbp_image_service_bucket_fs,
             )
 
             print(f"Sending predictions job request??????")
@@ -205,13 +177,13 @@ async def main():
                     shape=ds.shape.updated(c=3),
                     dtype=np.dtype("uint8"),
                     chunk_size=ds.tile_shape.updated(c=3),
-                    bucket_fs=hbp_image_service_bucket_fs
+                    fs=hbp_image_service_bucket_fs
                 ),
                 create_precomputed_chunks_sink(
                     shape=ds.shape.updated(c=3),
                     dtype=np.dtype("uint8"),
                     chunk_size=ds.tile_shape.updated(c=3),
-                    bucket_fs=hbp_image_service_bucket_fs
+                    fs=hbp_image_service_bucket_fs
                 ),
             ]
 

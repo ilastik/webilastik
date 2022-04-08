@@ -1,5 +1,6 @@
 import os
 from pathlib import Path, PurePosixPath
+import time
 from typing import Any, Sequence, Tuple
 import uuid
 
@@ -15,27 +16,27 @@ from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale
 from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.features.channelwise_fastfilters import GaussianSmoothing, HessianOfGaussianEigenvalues
 from webilastik.features.ilp_filter import IlpFilter
+from webilastik.filesystem import JsonableFilesystem
 from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.filesystem.osfs import OsFs
+from webilastik.utility import get_now_string
 
 def get_project_root_dir() -> Path:
     return Path(__name__).parent
 
-def get_sample_c_cells_datasource() -> DataSource:
+def get_sample_c_cells_datasource() -> SkimageDataSource:
     return SkimageDataSource(
         filesystem=OsFs(get_project_root_dir().as_posix()), path=PurePosixPath("public/images/c_cells_1.png")
     )
 
-def create_precomputed_chunks_sink(*, shape: Shape5D, dtype: "np.dtype[Any]", chunk_size: Shape5D, bucket_fs: "BucketFs | None" = None) -> FsDataSink:
-    if bucket_fs:
-        fs = bucket_fs
-    else:
-        test_dir_path = Path(f"/tmp/webilastik-test-{uuid.uuid4()}")
-        os.makedirs(test_dir_path)
-        fs = OsFs(test_dir_path.as_posix())
+def get_test_output_osfs() -> OsFs:
+    test_dir_path = f"/tmp/webilastik-test-{time.monotonic()}/"
+    os.makedirs(test_dir_path, exist_ok=True)
+    return OsFs(test_dir_path)
 
+def create_precomputed_chunks_sink(*, shape: Shape5D, dtype: "np.dtype[Any]", chunk_size: Shape5D, fs: "JsonableFilesystem | None" = None) -> FsDataSink:
     return PrecomputedChunksScaleSink(
-        filesystem=fs,
+        filesystem=fs or get_test_output_osfs(),
         info_dir=PurePosixPath(f"{uuid.uuid4()}.precomputed"),
         dtype=dtype,
         num_channels=shape.c,
@@ -79,6 +80,12 @@ def get_sample_c_cells_pixel_annotations() -> Tuple[Annotation, ...]:
 def get_sample_feature_extractors() -> Sequence[IlpFilter]:
     return (
         GaussianSmoothing(sigma=0.3, axis_2d="z"),
+        GaussianSmoothing(sigma=0.7, axis_2d="z"),
+        GaussianSmoothing(sigma=1.0, axis_2d="z"),
+        GaussianSmoothing(sigma=1.6, axis_2d="z"),
+        GaussianSmoothing(sigma=3.5, axis_2d="z"),
+        GaussianSmoothing(sigma=5.0, axis_2d="z"),
+        GaussianSmoothing(sigma=10.0, axis_2d="z"),
         HessianOfGaussianEigenvalues(scale=0.7, axis_2d="z"),
     )
 
