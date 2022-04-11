@@ -79,8 +79,6 @@ class DebugLock:
                 f"{RED}because it's acquired by{END}" + "\n" +
                 "".join(traceback.format_list(self.traceback))
             )
-            import pydevd; pydevd.settrace()
-            print("bla")
         self.traceback = traceback.extract_stack()
         return self
 
