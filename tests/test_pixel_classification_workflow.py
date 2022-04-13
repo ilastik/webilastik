@@ -7,7 +7,7 @@ import numpy as np
 from tests import create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations, get_sample_feature_extractors, get_test_output_osfs
 from webilastik.datasource import DataRoi, FsDataSource
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
-from webilastik.scheduling.job import JobExecutor
+from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.ui.applet.brushing_applet import BrushingApplet
 from webilastik.ui.applet import dummy_prompt
@@ -19,7 +19,7 @@ from webilastik.ui.applet.ws_pixel_classification_applet import WsPixelClassific
 
 if __name__ == "__main__":
     executor = ThreadPoolExecutor(max_workers=4)
-    job_executor = JobExecutor(executor=executor, concurrent_job_steps=1)
+    priority_executor = PriorityExecutor(executor=executor, num_concurrent_tasks=2)
 
 
     brushing_applet = BrushingApplet("brushing_applet")
@@ -34,8 +34,7 @@ if __name__ == "__main__":
     export_applet = WsPixelClassificationExportApplet(
         name="pixel_classification_export_applet",
         on_async_change=lambda : print(json.dumps(export_applet._get_json_state(), indent=4)),
-        executor=executor,
-        job_executor=job_executor,
+        priority_executor=priority_executor,
         operator=pixel_classifier_applet.pixel_classifier,
         datasource_suggestions=brushing_applet.datasources.transformed_with(
             lambda datasources: tuple(ds for ds in datasources if isinstance(ds, FsDataSource))
@@ -91,14 +90,9 @@ if __name__ == "__main__":
     assert result is None
 
     print(f"---> Job successfully scheduled? Waiting for a while")
-    time.sleep(5)
+    time.sleep(10)
     print(f"Done waiting. Checking outputs")
 
-    for job in export_applet._jobs.values():
-        if not job.done():
-            job_status = job.to_json_value()
-            print(f"\033[31m [ERROR]JOB {json.dumps(job_status, indent=4)} is not done!!!!\033[0m")
-            exit(1)
 
     predictions_output = PrecomputedChunksDataSource(
         filesystem=output_fs,
@@ -106,7 +100,7 @@ if __name__ == "__main__":
         resolution=(1,1,1)
     )
     for tile in predictions_output.roi.get_datasource_tiles():
-        tile.retrieve().as_uint8(normalized=True).show_channels()
+        tile.retrieve().cut(c=1).as_uint8(normalized=True).show_channels()
 
 ##################################333
 
@@ -143,23 +137,8 @@ if __name__ == "__main__":
     for tile in segmentation_output_1.roi.get_datasource_tiles():
         tile.retrieve().show_images()
 
-    # while job.status in ("pending", "running"):
-    #     time.sleep(1)
-    # assert job.status == "succeeded"
 
-    # retrieved_predictions = sink.to_datasource().retrieve()
-    # assert local_predictions == retrieved_predictions
-    # retrieved_predictions.as_uint8().show_channels()
+##################################################3333
 
-    #try removing a brush stroke
-    # _ = brushing_applet.remove_annotations(dummy_prompt, pixel_annotations[0:1])
-    # assert tuple(brushing_applet.annotations()) == tuple(pixel_annotations[1:])
-
-    # for png_bytes in preds.to_z_slice_pngs():
-    #     path = f"/tmp/junk_test_image_{uuid.uuid4()}.png"
-    #     with open(path, "wb") as outfile:
-    #         outfile.write(png_bytes.getbuffer())
-    #     os.system(f"gimp {path}")
-
-    job_executor.shutdown()
+    priority_executor.shutdown()
     executor.shutdown()

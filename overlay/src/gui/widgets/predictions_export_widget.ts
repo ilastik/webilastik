@@ -10,7 +10,7 @@ import { PrecomputedChunksScaleDataSinkInput } from './precomputed_chunks_scale_
 import { ErrorPopupWidget, PopupWidget } from './popup';
 import { OneShotSelectorWidget } from './selector_widget';
 
-const sink_creation_stati = ["success", "failed", "running" ] as const;
+const sink_creation_stati = ["pending", "running", "cancelled", "failed", "succeeded"] as const;
 export type SinkCreationStatus = typeof sink_creation_stati[number];
 export function ensureSinkCreationStatus(value: string): SinkCreationStatus{
     const variant = sink_creation_stati.find(variant => variant === value)

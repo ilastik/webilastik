@@ -12,7 +12,7 @@ from webilastik.datasink import DataSink, DataSinkWriter
 from webilastik.datasource import DataRoi, DataSource, FsDataSource
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.operator import IN, Operator
-from webilastik.scheduling.job import Job, JobExecutor, IN as JOB_IN, OUT as JOB_OUT
+from webilastik.scheduling.job import Job, JobFailedCallback, JobSucceededCallback, PriorityExecutor, IN as JOB_IN, OUT as JOB_OUT
 from webilastik.simple_segmenter import SimpleSegmenter
 from webilastik.ui.applet import AppletOutput, StatelesApplet, UserPrompt
 from webilastik.ui.applet.ws_applet import WsApplet
@@ -48,14 +48,12 @@ class PixelClassificationExportApplet(StatelesApplet):
         *,
         name: str,
         on_async_change: Callable[[], Any],
-        executor: Executor,
-        job_executor: JobExecutor,
+        priority_executor: PriorityExecutor,
         operator: "AppletOutput[VigraPixelClassifier[IlpFilter] | None]",
         datasource_suggestions: "AppletOutput[Sequence[FsDataSource] | None]"
     ):
         self.on_async_change = on_async_change
-        self.executor = executor
-        self.job_executor = job_executor
+        self.priority_executor = priority_executor
 
         self._in_operator = operator
         self._in_datasource_suggestions = datasource_suggestions
@@ -74,19 +72,33 @@ class PixelClassificationExportApplet(StatelesApplet):
         name: str,
         target: Callable[[JOB_IN], JOB_OUT],
         args: Iterable[JOB_IN],
+        on_success: "JobSucceededCallback[JOB_OUT] | None" = None,
+        on_failure: "JobFailedCallback | None" = None,
         num_args: "int | None" = None,
     ) -> Job[JOB_IN, JOB_OUT]:
+        def wrapped_on_success(job_id: uuid.UUID, result: JOB_OUT):
+            if on_success:
+                on_success(job_id, result)
+            self.on_async_change()
+
+        def wrapped_on_failure(exception: BaseException):
+            if on_failure:
+                on_failure(exception)
+            self.on_async_change()
+
         job = Job(
             name=name,
             target=target,
             on_progress=lambda job_id, step_index: self.on_async_change(),
-            on_complete=lambda job_id: self.on_async_change(),
+            on_success=wrapped_on_success,
+            on_failure=wrapped_on_failure,
             args=args,
             num_args=num_args
         )
+
         with self._lock:
             self._jobs[job.uuid] = job
-        self.job_executor.submit(job)
+        self.priority_executor.submit_job(job)
         return job
 
     def start_export_job(self, *, datasource: DataSource, datasink: DataSink) -> "UsageError | None":
@@ -100,26 +112,25 @@ class PixelClassificationExportApplet(StatelesApplet):
             return UsageError("Data sink should have dtype of float32 for this kind of export")
 
 
-        sink_creation_job = self._create_job(
-            name=f"Creating datasink",
-            target=_create_datasink,
-            args=[datasink],
-            num_args=1,
-        )
-        sink_creation_job.add_done_callback(lambda _: self._remove_job(sink_creation_job.uuid))
-
-        def launch_export_job(future_sink_writer: "Future[Exception | DataSinkWriter]"):
-            result = future_sink_writer.result()
-            if isinstance(result, Exception):
+        def launch_export_job(job_id: uuid.UUID, result: "Exception | DataSinkWriter"):
+            if isinstance(result, BaseException):
                 raise result #FIXME?
-
+            self._remove_job(job_id)
             _ = self._create_job(
                 name=f"Export Job",
                 target=ExportTask(operator=classifier, sink_writer=result),
                 args=datasource.roi.get_datasource_tiles(), #FIXME: use sink tile_size
                 num_args=datasource.roi.get_num_tiles(tile_shape=datasource.tile_shape),
             )
-        sink_creation_job.add_done_callback(launch_export_job)
+
+        _ = self._create_job(
+            name=f"Creating datasink",
+            target=_create_datasink,
+            args=[datasink],
+            num_args=1,
+            on_success=launch_export_job,
+            # on_failure=lambda exception: self._remove_job(sink_creation_job.uuid)
+        )
 
     def start_simple_segmentation_export_job(self, *, datasource: DataSource, datasinks: Sequence[DataSink]) -> "UsageError | None":
         classifier = self._in_operator()
@@ -141,26 +152,25 @@ class PixelClassificationExportApplet(StatelesApplet):
                     raise result
                 out.append(result)
             return out
-        sink_creation_job = self._create_job(
-            name=f"Creating datasinks",
-            target=lambda _: create_datasinks(),
-            args=[None],
-            num_args=1, #FIXME: maybe one per datasink?
-        )
-        sink_creation_job.add_done_callback(lambda _: self._remove_job(sink_creation_job.uuid))
 
-        def launch_export_job(future_sink_writer: "Future[Exception | Sequence[DataSinkWriter]]"):
-            result = future_sink_writer.result()
-
+        def launch_export_job(job_id: uuid.UUID, result: "Exception | Sequence[DataSinkWriter]"):
             if isinstance(result, Exception):
                 raise result
+            self._remove_job(job_id)
             _ = self._create_job(
                 name=f"Export Job",
                 target=ExportAsSimpleSegmentationTask(operator=classifier, sink_writers=result),
                 args=datasource.roi.get_datasource_tiles(), #FIXME: use sink tile_size
                 num_args=datasource.roi.get_num_tiles(tile_shape=datasource.tile_shape),
             )
-        sink_creation_job.add_done_callback(launch_export_job)
+        _ = self._create_job(
+            name=f"Creating datasinks",
+            target=lambda _: create_datasinks(),
+            args=[None],
+            num_args=1, #FIXME: maybe one per datasink?
+            on_success=launch_export_job,
+        )
+
 
 class WsPixelClassificationExportApplet(WsApplet, PixelClassificationExportApplet):
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> "UsageError | None":

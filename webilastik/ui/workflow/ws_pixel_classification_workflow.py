@@ -15,6 +15,7 @@ import contextlib
 from pathlib import Path
 import traceback
 import re
+import multiprocessing
 
 
 import aiohttp
@@ -26,7 +27,7 @@ from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonO
 from webilastik.datasource import FsDataSource
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
-from webilastik.scheduling.job import JobExecutor
+from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet.datasource_picker import WsDataSourcePicker
 from webilastik.ui.applet.pixel_predictions_export_applet import WsPixelClassificationExportApplet
 from webilastik.ui.datasource import try_get_datasources_from_url
@@ -125,7 +126,8 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         self._http_client_session: Optional[ClientSession] = None
         self._loop: Optional[AbstractEventLoop] = None
 
-        executor = ProcessPoolExecutor() #FIXME
+        num_workers = multiprocessing.cpu_count()
+        executor = ProcessPoolExecutor(max_workers=num_workers) #FIXME
 
         brushing_applet = WsBrushingApplet("brushing_applet")
         feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", datasources=brushing_applet.datasources)
@@ -146,8 +148,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
 
         self.export_applet = WsPixelClassificationExportApplet(
             name="export_applet",
-            executor=executor,
-            job_executor=JobExecutor(executor=executor, concurrent_job_steps=4), #FIXME: why 4?
+            priority_executor=PriorityExecutor(executor=executor, num_concurrent_tasks=num_workers),
             operator=self.pixel_classifier_applet.pixel_classifier,
             datasource_suggestions=brushing_applet.datasources.transformed_with(
                 lambda datasources: tuple(ds for ds in datasources if isinstance(ds, FsDataSource))
