@@ -1,7 +1,7 @@
 import { DataSource, Session } from "../../client/ilastik";
 import { createElement, createInput } from "../../util/misc";
 import { CssClasses } from "../css_classes";
-import { ErrorPopupWidget } from "./popup";
+import { ErrorPopupWidget, PopupWidget } from "./popup";
 import { OneShotSelectorWidget } from "./selector_widget";
 import { UrlInput } from "./url_input";
 
@@ -10,14 +10,17 @@ export class DataSourceInput{
     public readonly element: HTMLDivElement;
     private readonly session: Session;
     private readonly urlInput: UrlInput;
-    private readonly suggestionsContainer: HTMLDivElement
+    private readonly suggestionsButtonContainer: HTMLDivElement
     public readonly checkButton: HTMLInputElement;
     private readonly onChanged: ((newValue: DataSource | undefined) => void) | undefined;
     private statusMessageContainer: HTMLParagraphElement;
     private _value: DataSource | undefined;
 
     constructor(params: {
-        parentElement: HTMLElement, session: Session, value?: DataSource, onChanged?: (newValue: DataSource | undefined) => void
+        parentElement: HTMLElement,
+        session: Session,
+        value?: DataSource,
+        onChanged?: (newValue: DataSource | undefined) => void,
     }){
         this.session = params.session
         this._value = params.value
@@ -35,13 +38,23 @@ export class DataSourceInput{
         this.checkButton = createInput({inputType: "button", value: "check", parentElement: p, onClick: () => this.checkUrl})
 
         this.statusMessageContainer = createElement({tagName: "p", parentElement: this.element, cssClasses: [CssClasses.InfoText]})
-        this.suggestionsContainer = createElement({tagName: "div", parentElement: this.element})
+        this.suggestionsButtonContainer = createElement({tagName: "div", parentElement: this.element})
+    }
+
+    public setSuggestions(suggestions: DataSource[] | undefined){
+        this.suggestionsButtonContainer.innerHTML = ""
+        if(!suggestions || suggestions.length == 0){
+            return
+        }
+        createInput({
+            inputType: "button", parentElement: this.suggestionsButtonContainer, value: "Suggestions...", onClick: () => {
+                this.popupSuggestions(suggestions)
+            }
+        })
     }
 
     private async checkUrl(){
         let previousValue = this.value
-
-        this.suggestionsContainer.innerHTML = ""
 
         let url = this.urlInput.value
         if(url == undefined){
@@ -55,11 +68,24 @@ export class DataSourceInput{
             new ErrorPopupWidget({message: `Error retrieving datasources: ${datasources_result}`})
             return
         }
+        if(datasources_result.length == 0){
+            new ErrorPopupWidget({message: `No datasources fond with given URL: ${url}`})
+            return
+        }
+        this.popupSuggestions(datasources_result)
+    }
+
+    protected popupSuggestions(suggestions: DataSource[]){
+        let popup = new PopupWidget("Select a Data Source")
         new OneShotSelectorWidget({
-            parentElement: this.suggestionsContainer,
-            options: datasources_result,
-            optionRenderer: (ds: DataSource) => ds.getDisplayString(),
-            onOk: (ds: DataSource) => {this.value = ds},
+            parentElement: popup.element,
+            options: suggestions,
+            optionRenderer: (ds) => ds.getDisplayString(),
+            onOk: (ds) => {
+                this.value = ds
+                popup.destroy()
+            },
+            onCancel: () => popup.destroy(),
         })
     }
 
@@ -72,10 +98,9 @@ export class DataSourceInput{
 
         this.urlInput.value = undefined
         this.statusMessageContainer.innerHTML = ""
-        this.suggestionsContainer.innerHTML = ""
 
         if(value !== undefined){
-            this.statusMessageContainer.innerText = `Current selection: ${value.getDisplayString()}`
+            this.statusMessageContainer.innerText = `✔️ Current selection: ${value.getDisplayString()}`
         }
         if(this.onChanged){
             this.onChanged(value)
