@@ -90,7 +90,7 @@ export class SimpleSegmentationExportParamsInput{
             legend: "Output:",
             parentElement: params.parentElement,
             encoding: "raw",
-            dataType: "float32",
+            dataType: "uint8",
             disableShape: true,
             disableTileShape: true,
             disableDataType: true,
@@ -102,7 +102,7 @@ export class SimpleSegmentationExportParamsInput{
         let ds = this.datasourceInput.value
         if(ds && this.numberOfPixelClasses){
             this.templateDatasinkInput.setParameters({
-                shape: ds.shape.updated({c: this.numberOfPixelClasses}),
+                shape: ds.shape.updated({c: 3}),
                 tileShape: ds.tile_shape.updated({c: 3}),
                 resolution: ds.spatial_resolution,
             })
