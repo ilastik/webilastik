@@ -671,7 +671,7 @@ export class SkimageDataSource extends DataSource{
 export class FsDataSink{
     public readonly tile_shape: Shape5D
     public readonly interval: Interval5D
-    public readonly dtype: string
+    public readonly dtype: DataType
     public readonly shape: any
     public readonly location: any
     public readonly filesystem: FileSystem
@@ -748,5 +748,15 @@ export class PrecomputedChunksScaleDataSink extends FsDataSink{
             scale: this.scale.toJsonValue(),
             num_channels: this.shape.c,
         }
+    }
+
+    public updatedWith(params: {filesystem?: FileSystem, info_dir?: Path}): PrecomputedChunksScaleDataSink{
+        return new PrecomputedChunksScaleDataSink({
+            filesystem: params.filesystem || this.filesystem,
+            info_dir: this.info_dir || params.info_dir,
+            scale: this.scale,
+            dtype: this.dtype,
+            num_channels: this.shape.c,
+        })
     }
 }
