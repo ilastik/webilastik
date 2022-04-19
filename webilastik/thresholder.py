@@ -17,7 +17,9 @@ class Thresholder(Operator[DataRoi, Array5D]):
     def __hash__(self) -> int:
         return hash((self.preprocessor, self.threshold))
 
-    def __eq__(self, other: "Thresholder"):
+    def __eq__(self, other: object):
+        if not isinstance(other, Thresholder):
+            return False
         return (self.preprocessor, self.threshold) == (other.preprocessor, other.threshold)
 
     def compute(self, roi: DataRoi) -> ScalarData:
@@ -26,4 +28,4 @@ class Thresholder(Operator[DataRoi, Array5D]):
 
         out.raw(Point5D.LABELS)[raw_data >= self.threshold] = True
         out.raw(Point5D.LABELS)[raw_data < self.threshold] = False
-        return out
+        return ScalarData(out.raw(out.axiskeys), axiskeys=out.axiskeys, location=out.location)
