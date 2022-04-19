@@ -753,7 +753,7 @@ export class PrecomputedChunksScaleDataSink extends FsDataSink{
     public updatedWith(params: {filesystem?: FileSystem, info_dir?: Path}): PrecomputedChunksScaleDataSink{
         return new PrecomputedChunksScaleDataSink({
             filesystem: params.filesystem || this.filesystem,
-            info_dir: this.info_dir || params.info_dir,
+            info_dir: params.info_dir || this.info_dir,
             scale: this.scale,
             dtype: this.dtype,
             num_channels: this.shape.c,
