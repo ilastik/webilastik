@@ -10,7 +10,7 @@ import { Vec3Input } from "./vec3_input";
 import { BucketFsInput } from "./bucket_fs_input";
 
 
-export class PrecomputedChunksScaleDataSinkInput{
+export class PrecomputedChunksScale_DataSink_Input{
     private infoDirectoryPathInput: PathInput;
     private scaleKeyInput: PathInput;
     private fileSystemSelector: BucketFsInput;
@@ -157,11 +157,11 @@ export class PrecomputedChunksScaleDataSinkInput{
     }
 
     public static createLabeled(
-        params: {legend: string} & ConstructorParameters<typeof PrecomputedChunksScaleDataSinkInput>[0]
-    ): PrecomputedChunksScaleDataSinkInput{
+        params: {legend: string} & ConstructorParameters<typeof PrecomputedChunksScale_DataSink_Input>[0]
+    ): PrecomputedChunksScale_DataSink_Input{
         let fieldset = createElement({tagName: "fieldset", parentElement: params.parentElement})
         createElement({tagName: "legend", parentElement: fieldset, innerHTML: params.legend})
-        return new PrecomputedChunksScaleDataSinkInput({
+        return new PrecomputedChunksScale_DataSink_Input({
             ...params, parentElement: fieldset
         })
     }

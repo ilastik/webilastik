@@ -4,11 +4,9 @@ import { ensureJsonNumber, ensureJsonObject, ensureJsonString, JsonValue } from 
 import { createElement, createInputParagraph, createTable } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
 import { DataSource, Session } from '../../client/ilastik';
-import { DataSourceInput } from './datasource_input';
 import { CssClasses } from '../css_classes';
-import { PrecomputedChunksScaleDataSinkInput } from './precomputed_chunks_scale_datasink_input';
-import { ErrorPopupWidget, PopupWidget } from './popup';
-import { OneShotSelectorWidget } from './selector_widget';
+import { ErrorPopupWidget } from './popup';
+import { PixelPredictionsExportParamsInput, SimpleSegmentationExportParamsInput } from './export_params_input';
 
 const sink_creation_stati = ["pending", "running", "cancelled", "failed", "succeeded"] as const;
 export type SinkCreationStatus = typeof sink_creation_stati[number];
@@ -76,11 +74,10 @@ function stateFromJsonValue(data: JsonValue): State{
 }
 
 export class PredictionsExportWidget extends Applet<State>{
-    private state: State
     public readonly element: HTMLElement;
     jobsDisplay: HTMLDivElement;
-    private datasourceInput: DataSourceInput;
-    private datasinkInput: PrecomputedChunksScaleDataSinkInput;
+    predictionsExportParamsInput: PixelPredictionsExportParamsInput;
+    simpleSegmentationExportParamsInput: SimpleSegmentationExportParamsInput;
 
     public constructor({name, parentElement, session, help}: {
         name: string, parentElement: HTMLElement, session: Session, help: string[]
@@ -91,65 +88,41 @@ export class PredictionsExportWidget extends Applet<State>{
             deserializer: stateFromJsonValue,
             onNewState: (new_state) => this.onNewState(new_state)
         })
-        this.state = {jobs: [], num_classes: undefined, datasource_suggestions: []}
         this.element = new CollapsableWidget({display_name: "Export Predictions", parentElement, help}).element
         this.element.classList.add("ItkPredictionsExportApplet")
 
-        this.datasourceInput = DataSourceInput.createLabeled({
-            legend: "Input:", parentElement: this.element, session, onChanged: (ds: DataSource | undefined) => {
-                if(ds  === undefined){
-                    return
-                }
-                if(this.state.num_classes !== undefined){
-                    this.datasinkInput.setParameters({
-                        shape: ds.shape.updated({c: this.state.num_classes}),
-                        tileShape: ds.tile_shape.updated({c: this.state.num_classes}),
-                        resolution: ds.spatial_resolution,
-                    })
-                }
-            }
-        })
-        createInputParagraph({inputType: "button", parentElement: this.element, label_text: "or ", value: "use training data...", onClick: () => {
-            if(this.state.datasource_suggestions.length == 0){
-                new ErrorPopupWidget({message: "No brush strokes to derive data input suggestions from."})
-                return
-            }
-            let popup = new PopupWidget("Input suggestions")
-            new OneShotSelectorWidget({
-                parentElement: popup.element,
-                options: this.state.datasource_suggestions,
-                optionRenderer: (ds) => ds.getDisplayString(),
-                onOk: (ds) => {
-                    this.datasourceInput.value = ds
-                    popup.destroy()
-                },
-                onCancel: () => {
-                    popup.destroy()
-                },
-            })
-        }})
-        this.datasinkInput = PrecomputedChunksScaleDataSinkInput.createLabeled({
-            legend: "Output:",
-            parentElement: this.element,
-            encoding: "raw",
-            dataType: "float32",
-            disableShape: true,
-            disableTileShape: true,
-            disableDataType: true,
-            disableEncoding: true,
+        let predictionsExportControls = createElement({tagName: "details", parentElement: this.element})
+        createElement({tagName: "summary", parentElement: predictionsExportControls, innerText: "Export Prediction Map"})
+        this.predictionsExportParamsInput = new PixelPredictionsExportParamsInput({
+            parentElement: predictionsExportControls,
+            session
         })
         createInputParagraph({
-            inputType: "button", value: "Create Job", parentElement: this.element, onClick: () => {
-                let datasource = this.datasourceInput.value
-                let datasink = this.datasinkInput.value
-                if(!datasource || !datasink){
+            inputType: "button", value: "Create Prediction Map Export Job", parentElement: predictionsExportControls, onClick: () => {
+                let payload = this.predictionsExportParamsInput.value
+                if(!payload){
                     new ErrorPopupWidget({message: "Missing export parameters"})
                     return
                 }
-                this.doRPC(
-                    "start_export_job", //FIXME: what about simple segmentation?
-                    {datasource: datasource.toJsonValue(), datasink: datasink.toJsonValue()}
-                )
+                this.doRPC("start_export_job", payload)
+            }
+        })
+
+
+        let simpleSegmentationExportControls = createElement({tagName: "details", parentElement: this.element})
+        createElement({tagName: "summary", parentElement: simpleSegmentationExportControls, innerText: "Export Simple Segmentation"})
+        this.simpleSegmentationExportParamsInput = new SimpleSegmentationExportParamsInput({
+            parentElement: simpleSegmentationExportControls,
+            session
+        })
+        createInputParagraph({
+            inputType: "button", value: "Create Simple Segmentation Export Job", parentElement: simpleSegmentationExportControls, onClick: () => {
+                let payload = this.simpleSegmentationExportParamsInput.value
+                if(!payload){
+                    new ErrorPopupWidget({message: "Missing export parameters"})
+                    return
+                }
+                this.doRPC("start_simple_segmentation_export_job", payload)
             }
         })
 
@@ -157,8 +130,16 @@ export class PredictionsExportWidget extends Applet<State>{
     }
 
     protected onNewState(new_state: State){
-        this.state = new_state
         this.jobsDisplay.innerHTML = ""
+
+        this.predictionsExportParamsInput.setParams({
+            datasourceSuggestions: new_state.datasource_suggestions,
+            numberOfPixelClasses: new_state.num_classes,
+        })
+        this.simpleSegmentationExportParamsInput.setParams({
+            datasourceSuggestions: new_state.datasource_suggestions,
+            numberOfPixelClasses: new_state.num_classes,
+        })
 
         if(new_state.jobs.length > 0){
             createTable({
