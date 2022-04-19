@@ -21,6 +21,6 @@ export class PathInput{
     public static createLabeled(params: {label: string} & ConstructorParameters<typeof PathInput>[0]): PathInput{
         let span = createElement({tagName: "span", parentElement: params.parentElement})
         createElement({tagName: "label", parentElement: span, innerHTML: params.label})
-        return new PathInput({parentElement: span, disabled: params.disabled})
+        return new PathInput({...params, parentElement: span})
     }
 }
