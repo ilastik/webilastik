@@ -6,7 +6,7 @@ import time
 from typing import Optional, Iterable, List, Dict, Any, Mapping, Tuple, Union
 from pathlib import Path
 from pkg_resources import parse_version
-from pkg_resources.extern.packaging.version import Version
+from pkg_resources.extern.packaging.version import Version # type: ignore
 from collections.abc import Mapping as BaseMapping
 import re
 import numpy as np
@@ -133,7 +133,7 @@ def convertVersion(vstring):
     #  is simply converted to the integer 5 for compatibility purposes.
     int_tuple = ()
     for i in vstring.split("."):
-        m = re.search("(\d+)", i)
+        m = re.search(r"(\d+)", i)
         assert bool(m), "Don't understand version component: {}".format(i)
         next_int = int(m.groups()[0])
         int_tuple = int_tuple + (next_int,)
