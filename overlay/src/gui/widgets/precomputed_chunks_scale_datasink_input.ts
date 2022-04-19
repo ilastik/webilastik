@@ -1,6 +1,6 @@
 import { vec3 } from "gl-matrix";
 import { Shape5D, PrecomputedChunksScaleDataSink } from "../../client/ilastik";
-import { createElement, createFieldset, getNowString } from "../../util/misc";
+import { createElement, getNowString } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
 import { DataType, dataTypes, Scale } from "../../util/precomputed_chunks";
 import { PathInput } from "./path_input";
@@ -40,12 +40,12 @@ export class PrecomputedChunksScaleDataSinkInput{
             parentElement, legend: "Data Proxy Bucket:", bucketName: "hbp-image-service", prefix: Path.parse("ilastik_exports")
         })
 
-        this.infoDirectoryPathInput = new PathInput({
-            parentElement: createFieldset({parentElement, legend: "'info' Directory Path: "}), value: Path.parse(`/ilastik_export_${getNowString()}`)
+        this.infoDirectoryPathInput = PathInput.createLabeled({
+            parentElement: createElement({tagName: "p", parentElement}), label: "'info' Directory Path: ", value: Path.parse(`/ilastik_export_${getNowString()}`)
         })
 
-        this.scaleKeyInput = new PathInput({
-            parentElement: createFieldset({parentElement, legend: "Scale Key: "}), value: new Path({components: ["exported_data"]})
+        this.scaleKeyInput = PathInput.createLabeled({
+            parentElement: createElement({tagName: "p", parentElement}), label: "Scale Key: ", value: new Path({components: ["exported_data"]})
         })
 
         let p = createElement({tagName: "p", parentElement})
@@ -79,13 +79,16 @@ export class PrecomputedChunksScaleDataSinkInput{
             parentElement,
             inlineFields: true,
             value: params.resolution,
+            min: {x: 1, y:1, z:1},
+            step: {x: 1, y:1, z:1},
         })
 
         this.voxelOffsetInput = Vec3Input.createLabeledFieldset({
             legend: "Voxel Offset:",
             parentElement,
             inlineFields: true,
-            value: params.voxelOffset || vec3.fromValues(0,0,0)
+            value: params.voxelOffset || vec3.fromValues(0,0,0),
+            step: {x: 1, y:1, z:1},
         })
 
         p = createElement({tagName: "p", parentElement})
