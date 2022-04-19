@@ -6,21 +6,19 @@ from . import base
 from .base import with_phil
 
 """
-    Implements support for HDF5 dimension scales.
-"""
+    Implements support for HDF5"""
 class DimensionProxy(base.CommonStateObject):
     """
-        Represents an HDF5 "dimension".
-    """
+        Represents an HDF5 "dim"""
     @property
     @with_phil
-    def label(self):
-        """ Get or set the dimension scale label """
+    def label(self): # -> Any | Literal['']:
+        """ Get or set the dimension scale """
         ...
     
     @label.setter
     @with_phil
-    def label(self, val):
+    def label(self, val): # -> None:
         ...
     
     @with_phil
@@ -36,7 +34,7 @@ class DimensionProxy(base.CommonStateObject):
         ...
     
     @with_phil
-    def __iter__(self):
+    def __iter__(self): # -> Generator[Unknown | None, None, None]:
         ...
     
     @with_phil
@@ -44,50 +42,38 @@ class DimensionProxy(base.CommonStateObject):
         ...
     
     @with_phil
-    def __getitem__(self, item):
+    def __getitem__(self, item): # -> Dataset:
         ...
     
-    def attach_scale(self, dset):
-        """ Attach a scale to this dimension.
-
-        Provide the Dataset of the scale you would like to attach.
-        """
+    def attach_scale(self, dset): # -> None:
+        """ Attach a scale to this dimensio"""
         ...
     
-    def detach_scale(self, dset):
-        """ Remove a scale from this dimension.
-
-        Provide the Dataset of the scale you would like to remove.
-        """
+    def detach_scale(self, dset): # -> None:
+        """ Remove a scale from this dimens"""
         ...
     
-    def items(self):
-        """ Get a list of (name, Dataset) pairs with all scales on this
-        dimension.
-        """
+    def items(self): # -> list[tuple[Unknown | None, Dataset]]:
+        """ Get a list of (name, Dataset) p"""
         ...
     
-    def keys(self):
-        """ Get a list of names for the scales on this dimension. """
+    def keys(self): # -> list[Unknown | None]:
+        """ Get a list of names for the sca"""
         ...
     
-    def values(self):
-        """ Get a list of Dataset for scales on this dimension. """
+    def values(self): # -> list[Dataset]:
+        """ Get a list of Dataset for scale"""
         ...
     
     @with_phil
-    def __repr__(self):
+    def __repr__(self): # -> str:
         ...
     
 
 
-class DimensionManager(base.MappingHDF5, base.CommonStateObject):
+class DimensionManager(base.CommonStateObject):
     """
-        Represents a collection of dimension associated with a dataset.
-
-        Like AttributeManager, an instance of this class is returned when
-        accessing the ".dims" property on a Dataset.
-    """
+        Represents a collection"""
     @with_phil
     def __init__(self, parent) -> None:
         """ Private constructor.
@@ -95,30 +81,27 @@ class DimensionManager(base.MappingHDF5, base.CommonStateObject):
         ...
     
     @with_phil
-    def __getitem__(self, index):
+    def __getitem__(self, index): # -> DimensionProxy:
         """ Return a Dimension object
-        """
+     """
         ...
     
     @with_phil
-    def __len__(self):
-        """ Number of dimensions associated with the dataset. """
+    def __len__(self): # -> int:
+        """ Number of dimensions associated"""
         ...
     
     @with_phil
-    def __iter__(self):
+    def __iter__(self): # -> Generator[DimensionProxy, None, None]:
         """ Iterate over the dimensions. """
         ...
     
     @with_phil
-    def __repr__(self):
+    def __repr__(self): # -> str:
         ...
     
-    def create_scale(self, dset, name=...):
-        """ Create a new dimension, from an initial scale.
-
-        Provide the dataset and a name for the scale.
-        """
+    def create_scale(self, dset, name=...): # -> None:
+        """ Create a new dimension, from an"""
         ...
     
 
