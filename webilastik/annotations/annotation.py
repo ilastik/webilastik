@@ -59,7 +59,7 @@ class Color:
         return sum(c * (16 ** (3 - idx)) for idx, c in enumerate(self.rgba))
 
     @property
-    def ilp_data(self) -> np.ndarray:
+    def ilp_data(self) -> "np.ndarray[Any, Any]":
         return np.asarray(self.rgba, dtype=np.int64)
 
     def __hash__(self):
@@ -87,10 +87,10 @@ class FeatureSamples(FeatureData, StaticLine):
         return cls.fromArray5D(samples)
 
     @property
-    def X(self) -> np.ndarray:
+    def X(self) -> "np.ndarray[Any, Any]":
         return self.linear_raw()
 
-    def get_y(self, label_class: np.uint8) -> np.ndarray:
+    def get_y(self, label_class: np.uint8) -> "np.ndarray[Any, Any]":
         return np.full((self.shape.volume, 1), label_class, dtype=np.uint32)
 
 
@@ -111,7 +111,7 @@ class Annotation(ScalarData):
         return self.color == other.color and bool(np.all(self._data == other._data))
 
     def __init__(
-        self, arr: np.ndarray, *, axiskeys: str, location: Point5D = Point5D.zero(), color: Color, raw_data: DataSource
+        self, arr: "np.ndarray[Any, Any]", *, axiskeys: str, location: Point5D = Point5D.zero(), color: Color, raw_data: DataSource
     ):
         super().__init__(arr.astype(bool), axiskeys=axiskeys, location=location)
         if not raw_data.interval.contains(self.interval):
@@ -119,7 +119,7 @@ class Annotation(ScalarData):
         self.color = color
         self.raw_data = raw_data
 
-    def rebuild(self, arr: np.ndarray, *, axiskeys: str, location: "Point5D | None" = None) -> "Annotation":
+    def rebuild(self, arr: "np.ndarray[Any, Any]", *, axiskeys: str, location: "Point5D | None" = None) -> "Annotation":
         location = self.location if location is None else location
         return self.__class__(arr, axiskeys=axiskeys, location=location, color=self.color, raw_data=self.raw_data)
 
