@@ -60,7 +60,7 @@ class PixelClassificationWorkflow:
         return {
             "Input Data": b"FIXME!!!!", #self.data_selection_applet.get_ilp_data(PixelClassificationLane),
             "FeatureSelections": self.feature_selection_applet.ilp_data,
-            "PixelClassification": self.pixel_classifier_applet.ilp_data,
+            "PixelClassification": b"FIXME!!!", #self.pixel_classifier_applet.ilp_data,
             "Prediction Export": {
                 "OutputFilenameFormat": "{dataset_dir}/{nickname}_{result_type}",
                 "OutputFormat": "hdf5",
@@ -77,9 +77,9 @@ class PixelClassificationWorkflow:
     def ilp_file(self) -> io.BufferedIOBase:
         project, backing_file = Project.from_ilp_data(self.ilp_data)
         project.close()
-        backing_file.seek(0)
+        _ = backing_file.seek(0)
         return backing_file
 
     def save_as(self, path: Path):
         with open(path, 'wb') as f:
-            f.write(self.ilp_file.read())
+            _ = f.write(self.ilp_file.read())
