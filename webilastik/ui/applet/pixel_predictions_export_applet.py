@@ -42,6 +42,16 @@ class ExportAsSimpleSegmentationTask:
 def _create_datasink(ds: DataSink) -> "DataSinkWriter | Exception":
     return ds.create()
 
+def _create_datasinks(datasinks: Sequence[DataSink]) -> "Exception | Sequence[DataSinkWriter]":
+    out: List[DataSinkWriter] = []
+    for sink in datasinks:
+        result = sink.create()
+        if isinstance(result, Exception):
+            raise result
+        out.append(result)
+    return out
+
+
 class PixelClassificationExportApplet(StatelesApplet):
     def __init__(
         self,
@@ -144,29 +154,22 @@ class PixelClassificationExportApplet(StatelesApplet):
         if any(sink.dtype != np.dtype("uint8") for sink in datasinks):
             return UsageError("All data sinks should have dtype of uint8 for this kind of export")
 
-        def create_datasinks() -> "Exception | Sequence[DataSinkWriter]":
-            out: List[DataSinkWriter] = []
-            for sink in datasinks:
-                result = sink.create()
-                if isinstance(result, Exception):
-                    raise result
-                out.append(result)
-            return out
+
 
         def launch_export_job(job_id: uuid.UUID, result: "Exception | Sequence[DataSinkWriter]"):
             if isinstance(result, Exception):
                 raise result
             self._remove_job(job_id)
             _ = self._create_job(
-                name=f"Export Job",
+                name=f"Simple Segmentation Export Job",
                 target=ExportAsSimpleSegmentationTask(operator=classifier, sink_writers=result),
                 args=datasource.roi.get_datasource_tiles(), #FIXME: use sink tile_size
                 num_args=datasource.roi.get_num_tiles(tile_shape=datasource.tile_shape),
             )
         _ = self._create_job(
             name=f"Creating datasinks",
-            target=lambda _: create_datasinks(),
-            args=[None],
+            target=_create_datasinks,
+            args=[datasinks],
             num_args=1, #FIXME: maybe one per datasink?
             on_success=launch_export_job,
         )
