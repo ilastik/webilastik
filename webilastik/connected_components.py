@@ -1,7 +1,7 @@
 import numpy as np
-from typing import Optional, Set
+from typing import Optional, Set, Any
 
-from skimage import measure as skmeasure
+from skimage import measure as skmeasure #type: ignore
 from ndstructs import Array5D, Interval5D, Shape5D, ScalarData, Point5D
 from ndstructs.array5D import ARR
 from webilastik.datasource import DataRoi
@@ -12,7 +12,7 @@ from webilastik.operator import Operator, OpRetriever
 class ConnectedComponents(ScalarData):
     """A "labeled" Array5D, where voxels of connected components have the same integer label, with 0 as background"""
     def __init__(
-        self, arr: np.ndarray, *, axiskeys: str, location: Point5D = Point5D.zero(), labels: Optional[Set[int]] = None
+        self, arr: "np.ndarray[Any, Any]", *, axiskeys: str, location: Point5D = Point5D.zero(), labels: Optional[Set[int]] = None
     ):
         super().__init__(arr, axiskeys=axiskeys, location=location)
         self._border_colors: Optional[Set[int]] = None
@@ -24,7 +24,7 @@ class ConnectedComponents(ScalarData):
             data.raw(Point5D.LABELS), axiskeys=Point5D.LABELS, location=data.location, labels=labels
         )
 
-    def rebuild(self: ARR, arr: np.ndarray, *, axiskeys: str, location: Point5D = None) -> ARR:
+    def rebuild(self: ARR, arr: "np.ndarray[Any, Any]", *, axiskeys: str, location: "Point5D  | None" = None) -> ARR:
         location = self.location if location is None else location
         return self.__class__(arr, axiskeys=axiskeys, location=location)  # FIXME
 
@@ -101,7 +101,9 @@ class ConnectedComponentsExtractor(Operator[DataRoi, ConnectedComponents]):
     def __hash__(self) -> int:
         return hash((self.preprocessor, self.object_channel_idx, self.expansion_step, self.maximum_tile_size))
 
-    def __eq__(self, other: "ConnectedComponentsExtractor") -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ConnectedComponentsExtractor):
+            return False
         return (self.preprocessor, self.object_channel_idx, self.expansion_step, self.maximum_tile_size) == \
             (other.preprocessor, other.object_channel_idx, other.expansion_step, other.maximum_tile_size)
 
