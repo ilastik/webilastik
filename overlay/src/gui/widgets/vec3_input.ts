@@ -8,14 +8,26 @@ export class Vec3Input{
     private zInput: NumberInput;
 
     constructor(params: {
-        parentElement: HTMLElement, inlineFields: boolean, disabled?: boolean, value?: vec3
+        parentElement: HTMLElement,
+        inlineFields: boolean,
+        disabled?: boolean,
+        value?: vec3,
+        min?: {x?: number, y?: number, z?: number},
+        max?: {x?: number, y?: number, z?: number},
+        step?: {x?: number, y?: number, z?: number},
     }){
         let parent = createElement({tagName: "div", parentElement: params.parentElement})
         let disabled = params.disabled === undefined ? false : params.disabled
 
-        this.xInput = NumberInput.createLabeled({parentElement: parent, label: " x: ", disabled})
-        this.yInput = NumberInput.createLabeled({parentElement: parent, label: " y: ", disabled})
-        this.zInput = NumberInput.createLabeled({parentElement: parent, label: " z: ", disabled})
+        this.xInput = NumberInput.createLabeled({
+            parentElement: parent, label: " x: ", disabled, min: params.min?.x, max: params.max?.x, step: params.step?.x
+        })
+        this.yInput = NumberInput.createLabeled({
+            parentElement: parent, label: " y: ", disabled, min: params.min?.y, max: params.max?.y, step: params.step?.y
+        })
+        this.zInput = NumberInput.createLabeled({
+            parentElement: parent, label: " z: ", disabled, min: params.min?.z, max: params.max?.z, step: params.step?.z
+        })
 
         this.value = params.value
     }
