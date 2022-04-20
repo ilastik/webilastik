@@ -41,7 +41,7 @@ def test_n5_attributes():
     assert attributes.to_json_data()["axes"] == ("x", "y")
 
 def test_n5_datasink(tmp_path: PurePosixPath, data: Array5D, datasource: DataSource):
-    sink = N5DatasetSink.create(
+    sink = N5DatasetSink(
         filesystem=OsFs(tmp_path.as_posix()),
         outer_path=PurePosixPath("test_n5_datasink.n5"),
         inner_path=PurePosixPath("/data"),
@@ -54,10 +54,12 @@ def test_n5_datasink(tmp_path: PurePosixPath, data: Array5D, datasource: DataSou
             location=Point5D.zero(x=7, y=13)
         )
     )
+    sink_writer = sink.create()
+    assert not isinstance(sink_writer, Exception)
     for tile in DataRoi(datasource).split(sink.tile_shape):
-        sink.write(tile.retrieve().translated(Point5D.zero(x=7, y=13)))
+        sink_writer.write(tile.retrieve().translated(Point5D.zero(x=7, y=13)))
 
-    n5ds = N5DataSource(filesystem=sink.filesystem, path=sink.path)
+    n5ds = N5DataSource(filesystem=sink.filesystem, path=sink.full_path)
     saved_data = n5ds.retrieve()
     assert saved_data.location == Point5D.zero(x=7, y=13)
     assert saved_data == data
@@ -74,15 +76,13 @@ def test_distributed_n5_datasink(tmp_path: PurePosixPath, data: Array5D, datasou
         dataType=datasource.dtype,
         compression=RawCompressor()
     )
-    sinks = [
-        N5DatasetSink.create(outer_path=outer_path, inner_path=inner_path, filesystem=filesystem, attributes=attributes),
-        N5DatasetSink.open(path=full_path, filesystem=filesystem),
-        N5DatasetSink.open(path=full_path, filesystem=filesystem),
-        N5DatasetSink.open(path=full_path, filesystem=filesystem),
-    ]
+    sink = N5DatasetSink(outer_path=outer_path, inner_path=inner_path, filesystem=filesystem, attributes=attributes)
+    sink_writer = sink.create()
+    assert not isinstance(sink_writer, Exception)
+    sink_writers = [sink_writer] * 4
 
     for idx, piece in enumerate(DataRoi(datasource).default_split()):
-        sink = sinks[idx % len(sinks)]
+        sink = sink_writers[idx % len(sink_writers)]
         sink.write(piece.retrieve())
 
     n5ds = N5DataSource(filesystem=filesystem, path=full_path)
