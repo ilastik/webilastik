@@ -1,9 +1,10 @@
 from abc import abstractmethod
-from typing import Optional, TypeVar, Type, List
+from typing import Any, Optional, TypeVar, Type, List
 import math
 import fastfilters #type: ignore
 
 import numpy
+from numpy import ndarray, float32, dtype
 from ndstructs.array5D import All, Array5D
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString, ensureJsonFloat
 from ndstructs.point5D import Point5D, Shape5D
@@ -46,7 +47,7 @@ class ChannelwiseFastFilter(IlpFilter):
         }
 
     @abstractmethod
-    def filter_fn(self, source_raw: numpy.ndarray) -> numpy.ndarray:
+    def filter_fn(self, source_raw: "ndarray[Any, dtype[float32]]") -> "ndarray[Any, dtype[float32]]":
         pass
 
     @classmethod
@@ -104,8 +105,8 @@ class ChannelwiseFastFilter(IlpFilter):
             if self.axis_2d:
                 source_axes = source_axes.replace(self.axis_2d, "")
 
-            raw_data: numpy.ndarray = source_data.raw(source_axes).astype(numpy.float32)
-            raw_feature_data: numpy.ndarray = self.filter_fn(raw_data)
+            raw_data: "ndarray[Any, dtype[float32]]" = source_data.raw(source_axes).astype(numpy.float32)
+            raw_feature_data: "ndarray[Any, dtype[float32]]" = self.filter_fn(raw_data)
             if len(raw_feature_data.shape) > len(source_axes):
                 output_axes = source_axes + "c"
                 channel_multiplier = raw_feature_data.shape[-1]
@@ -162,7 +163,7 @@ class StructureTensorEigenvalues(ChannelwiseFastFilter):
             "window_size": self.window_size,
         }
 
-    def filter_fn(self, source_raw: numpy.ndarray) -> numpy.ndarray:
+    def filter_fn(self, source_raw: "ndarray[Any, dtype[float32]]") -> "ndarray[Any, dtype[float32]]":
         return fastfilters.structureTensorEigenvalues(
             source_raw, innerScale=self.innerScale, outerScale=self.outerScale, window_size=self.window_size
         )
@@ -240,12 +241,12 @@ class SigmaWindowFilter(ChannelwiseFastFilter):
 
 
 class GaussianGradientMagnitude(SigmaWindowFilter):
-    def filter_fn(self, source_raw: numpy.ndarray) -> numpy.ndarray:
+    def filter_fn(self, source_raw: "ndarray[Any, dtype[float32]]") -> "ndarray[Any, dtype[float32]]":
         return fastfilters.gaussianGradientMagnitude(source_raw, sigma=self.sigma, window_size=self.window_size)
 
 
 class GaussianSmoothing(SigmaWindowFilter):
-    def filter_fn(self, source_raw: numpy.ndarray) -> numpy.ndarray:
+    def filter_fn(self, source_raw: "ndarray[Any, dtype[float32]]") -> "ndarray[Any, dtype[float32]]":
         return fastfilters.gaussianSmoothing(source_raw, sigma=self.sigma, window_size=self.window_size)
 
 
@@ -289,7 +290,7 @@ class DifferenceOfGaussians(ChannelwiseFastFilter):
     def __repr__(self):
         return f"<{self.__class__.__name__} sigma0:{self.sigma0} sigma1:{self.sigma1} window_size:{self.window_size} axis_2d:{self.axis_2d}>"
 
-    def filter_fn(self, source_raw: numpy.ndarray) -> numpy.ndarray:
+    def filter_fn(self, source_raw: "ndarray[Any, dtype[float32]]") -> "ndarray[Any, dtype[float32]]":
         a = fastfilters.gaussianSmoothing(source_raw, sigma=self.sigma0, window_size=self.window_size)
         b = fastfilters.gaussianSmoothing(source_raw, sigma=self.sigma1, window_size=self.window_size)
         return a - b
@@ -365,7 +366,7 @@ class ScaleWindowFilter(ChannelwiseFastFilter):
 
 
 class HessianOfGaussianEigenvalues(ScaleWindowFilter):
-    def filter_fn(self, source_raw: numpy.ndarray) -> numpy.ndarray:
+    def filter_fn(self, source_raw: "ndarray[Any, dtype[float32]]") -> "ndarray[Any, dtype[float32]]":
         return fastfilters.hessianOfGaussianEigenvalues(source_raw, scale=self.scale, window_size=self.window_size)
 
     @property
@@ -374,5 +375,5 @@ class HessianOfGaussianEigenvalues(ScaleWindowFilter):
 
 
 class LaplacianOfGaussian(ScaleWindowFilter):
-    def filter_fn(self, source_raw: numpy.ndarray) -> numpy.ndarray:
+    def filter_fn(self, source_raw: "ndarray[Any, dtype[float32]]") -> "ndarray[Any, dtype[float32]]":
         return fastfilters.laplacianOfGaussian(source_raw, scale=self.scale, window_size=self.window_size)
