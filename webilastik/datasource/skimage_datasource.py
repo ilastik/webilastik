@@ -1,5 +1,5 @@
 from pathlib import PurePosixPath
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Any
 
 import skimage.io #type: ignore
 import numpy as np
@@ -21,7 +21,7 @@ class SkimageDataSource(FsDataSource):
         tile_shape: Optional[Shape5D] = None,
         spatial_resolution: Optional[Tuple[int, int, int]] = None,
     ):
-        raw_data: np.ndarray = skimage.io.imread(filesystem.openbin(path.as_posix())) # type: ignore
+        raw_data: "np.ndarray[Any, Any]" = skimage.io.imread(filesystem.openbin(path.as_posix())) # type: ignore
         self._data = Array5D(raw_data, "yxc"[: len(raw_data.shape)], location=location)
 
         if tile_shape is None:
