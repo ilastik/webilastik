@@ -19,30 +19,30 @@ class N5Block(Array5D):
 
     @classmethod
     def from_bytes(cls, data: bytes, axiskeys: str, dtype: "np.dtype[Any]", compression: N5Compressor, location: Point5D) -> "N5Block":
-        data = np.frombuffer(data, dtype=np.uint8)
+        data = np.frombuffer(data, dtype=np.uint8) #pyright: ignore [reportUnknownMemberType]
 
         header_types = [
             ("mode", ">u2"),  # mode (uint16 big endian, default = 0x0000, varlength = 0x0001)
             ("num_dims", ">u2"),  # number of dimensions (uint16 big endian)
         ]
-        preamble = np.frombuffer(data, dtype=header_types, count=1)
+        preamble = np.frombuffer(data, dtype=header_types, count=1) #type: ignore
         header_types.append(
               # dimension 1[,...,n] (uint32 big endian)
             ("dimensions", str(preamble["num_dims"].item()) + ">u4") # type: ignore
         )
 
-        if preamble["mode"].item() == cls.Modes.VARLENGTH.value:
+        if preamble["mode"].item() == cls.Modes.VARLENGTH.value: #type: ignore
             # mode == varlength ? number of elements (uint32 big endian)
             header_types.append(("num_elements", ">u4")) # type: ignore
             raise RuntimeError("Don't know how to handle varlen N5 blocks")
 
         header_dtype = np.dtype(header_types)
-        header_data = np.frombuffer(data, dtype=header_dtype, count=1)
-        array_shape = header_data["dimensions"].squeeze()
+        header_data = np.frombuffer(data, dtype=header_dtype, count=1) #type: ignore
+        array_shape: Tuple[int, ...] = header_data["dimensions"].squeeze() #type: ignore
 
-        compressed_buffer = np.frombuffer(data, offset=header_dtype.itemsize, dtype=np.uint8)
+        compressed_buffer: "np.ndarray[Any, np.dtype[np.uint8]]" = np.frombuffer(data, offset=header_dtype.itemsize, dtype=np.uint8) #pyright: ignore [reportUnknownMemberType]
         decompressed_buffer = compression.decompress(compressed_buffer.tobytes())
-        raw_array = np.frombuffer(decompressed_buffer, dtype=dtype.newbyteorder(">")).reshape(array_shape, order="F") # type: ignore
+        raw_array: "np.ndarray[Any, np.dtype[Any]]" = np.frombuffer(decompressed_buffer, dtype=dtype.newbyteorder(">")).reshape(array_shape, order="F") # type: ignore
 
         return cls(raw_array, axiskeys=axiskeys[::-1], location=location)
 
@@ -55,7 +55,7 @@ class N5Block(Array5D):
             ("dimensions", f"{len(axiskeys)}>u4"),  # dimension 1[,...,n] (uint32 big endian)
             ("data", f"{len(data_buffer)}u1"),
         ]
-        tile = np.zeros(1, dtype=tile_types)
+        tile: "np.ndarray[Any, Any]" = np.zeros(1, dtype=tile_types) #pyright: ignore [reportUnknownMemberType]
         tile["mode"] = self.Modes.DEFAULT.value
         tile["num_dims"] = len(axiskeys)
         tile["dimensions"] = [self.shape[k] for k in axiskeys[::-1]]
