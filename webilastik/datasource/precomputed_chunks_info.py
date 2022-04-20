@@ -84,7 +84,7 @@ class JpegEncoder(PrecomputedChunksEncoder):
 
         # FIXME: check if this works with any sort of funny JPEG shapes
         # FIXME: Also, what to do if dtype is weird?
-        raw_jpg: np.ndarray = skimage.io.imread(io.BytesIO(raw_chunk)) # type: ignore
+        raw_jpg: "np.ndarray[Any, Any]" = skimage.io.imread(io.BytesIO(raw_chunk)) # type: ignore
         tile_5d = Array5D(raw_jpg.reshape(roi.shape.to_tuple("zyxc")), axiskeys="zyxc", location=roi.start)
         return tile_5d
 
