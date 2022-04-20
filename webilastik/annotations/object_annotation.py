@@ -1,12 +1,12 @@
-from typing import Tuple, Iterable
+#pyright: strict
+from typing import Tuple, Iterable, Any
 
-from abc import abstractmethod, ABC
-from ndstructs import Point5D, Shape5D, Interval5D, Point5D, Array5D, ScalarData
+from ndstructs import Point5D, Interval5D
 from webilastik.datasource import DataSource, DataRoi
 import numpy as np
-import vigra
+from numpy import ndarray, dtype, uint32, float32
 
-from webilastik.features.object_feature_extractor import array5d_to_vigra, ObjectFeatureExtractor
+from webilastik.features.object_feature_extractor import ObjectFeatureExtractor
 from webilastik.connected_components import ConnectedComponentsExtractor
 
 
@@ -22,7 +22,7 @@ class ObjectAnnotation:
         components_extractor: ConnectedComponentsExtractor,  # and also to the method used to extract the objects
     ):
         position_roi = DataRoi(datasource, **Interval5D.enclosing([position]).to_dict())
-        self.data_tile = position_roi.get_tiles(datasource.tile_shape, clamp=False).__next__().clamped(datasource.shape)
+        self.data_tile = position_roi.enlarge_to_tiles(tile_shape=datasource.tile_shape, tiles_origin=datasource.interval.start).clamped(datasource.interval)
         self.position = position
         self.klass = klass
         self.datasource = datasource
@@ -30,24 +30,24 @@ class ObjectAnnotation:
         # compute connected components in constructor to prevent creation of bad annotation
         self.label = components_extractor.compute(self.data_tile).label_at(position)
 
-    def get_feature_samples(self, feature_extractor: ObjectFeatureExtractor) -> np.ndarray: #1-d array with shape (num_feature_channels,)
+    def get_feature_samples(self, feature_extractor: ObjectFeatureExtractor) -> "np.ndarray[Any, Any]": #1-d array with shape (num_feature_channels,)
         return feature_extractor.compute((self.data_tile, self.components_extractor)).linear_raw()[self.label]
 
     @staticmethod
     def gather_samples(
         annotations: Iterable["ObjectAnnotation"], feature_extractor: ObjectFeatureExtractor
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> Tuple["ndarray[Any, dtype[float32]]", "ndarray[Any, dtype[uint32]]"]:
         classes = [a.klass for a in annotations]
-        y = np.asarray(classes, dtype=np.uint32).reshape((len(classes), 1))
-        X = np.asarray([a.get_feature_samples(feature_extractor) for a in annotations]).astype(np.float32)
+        y: "ndarray[Any, dtype[uint32]]" = np.asarray(classes, dtype=uint32).reshape((len(classes), 1)) #pyright: ignore[reportUnknownMemberType]
+        X: "ndarray[Any, dtype[float32]]" = np.asarray([a.get_feature_samples(feature_extractor) for a in annotations]).astype(float32) #pyright: ignore[reportUnknownMemberType]
         return (X, y)
 
-    def show(self):
-        data = self.data_tile.retrieve().cut(copy=True)
-        for axis in "xyz":
-            increment = Point5D.zero(**{axis: 1})
-            for pos in (self.position + increment, self.position - increment):
-                if data.interval.contains(Interval5D.enclosing([pos])):
-                    data.paint_point(pos, 0)
-        data.paint_point(self.position, 255)
-        data.show_images()
+    # def show(self):
+    #     data = self.data_tile.retrieve().cut(copy=True)
+    #     for axis in "xyz":
+    #         increment = Point5D.zero(**{axis: 1})
+    #         for pos in (self.position + increment, self.position - increment):
+    #             if data.interval.contains(Interval5D.enclosing([pos])):
+    #                 data.paint_point(pos, 0)
+    #     data.paint_point(self.position, 255)
+    #     data.show_images()
