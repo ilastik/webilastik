@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import List, Iterable
+from typing import Any, List, Iterable
 
 import numpy as np
 from ndstructs.point5D import Point5D
@@ -9,7 +9,7 @@ from webilastik.datasource import DataSource, DataRoi
 from webilastik.operator import Operator
 
 class FeatureData(Array5D):
-    def __init__(self, arr: np.ndarray, axiskeys: str, location: Point5D = Point5D.zero()):
+    def __init__(self, arr: "np.ndarray[Any, np.dtype[np.float32]]", axiskeys: str, location: Point5D = Point5D.zero()):
         super().__init__(arr, axiskeys=axiskeys, location=location)
         assert self.dtype == np.dtype('float32')
 
