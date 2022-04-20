@@ -240,7 +240,7 @@ class Dataset(HLObject):
         ...
 
     @with_phil
-    def __getitem__(self, args, new_dtype=...) -> "numpy.ndarray[Any, Any]": #FIXME: could this return something else?
+    def __getitem__(self, args, new_dtype=...) -> "numpy.ndarray[Any, Any] | bytes": #FIXME: could this return something else?
         """ Read a slice from the HDF5 data"""
         ...
 

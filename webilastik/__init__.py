@@ -58,7 +58,14 @@ class Project:
     def _getString(self, key: str) -> Optional[str]:
         if key not in self.file:
             return None
-        return self.file[key][()].decode("utf-8")
+        data = self.file[key]
+        if not isinstance(data, h5py.Dataset):
+            raise IOError("Expected string dataset at key {key}, but found {data}")
+        contents = data[()]
+        if isinstance(contents, str):
+            return contents
+        if isinstance(contents, bytes):
+            return contents.decode("utf-8")
 
     @property
     def ilastikVersion(self) -> Optional[Version]:
@@ -121,7 +128,9 @@ class Project:
     def from_ilp_data(cls, data: Mapping[str, Any], path: Optional[Path] = None) -> Tuple["Project", io.BufferedIOBase]:
         backing_file = open(path, "wb") if path else io.BytesIO()
         ilp = h5py.File(backing_file, "w")
-        cls.populate_h5_group(group=ilp["/"], data=data)
+        ilp_root = ilp["/"]
+        assert isinstance(ilp_root, h5py.Group)
+        cls.populate_h5_group(group=ilp_root, data=data)
         return cls(project_file=ilp), backing_file
 
 
