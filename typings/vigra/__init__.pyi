@@ -2,6 +2,7 @@ from vigra.arraytypes import *
 import vigra.arraytypes as arraytypes
 from .__version__ import version as version
 from .filters import convolve as convolve, gaussianSmoothing as gaussianSmoothing
+import .analysis
 from typing import Any, Optional
 from vigra.impex import readImage as readImage, readVolume as readVolume
 from vigra.vigranumpycore import ChunkedArrayCompressed as ChunkedArrayCompressed, ChunkedArrayFull as ChunkedArrayFull, ChunkedArrayHDF5 as ChunkedArrayHDF5, ChunkedArrayLazy as ChunkedArrayLazy, ChunkedArrayTmpFile as ChunkedArrayTmpFile, Compression as Compression, HDF5Mode as HDF5Mode
@@ -42,3 +43,5 @@ MetricType: Any
 
 def loadBSDGt(filename: Any): ...
 def pmapSeeds(pmap: Any) -> None: ...
+
+__all__ = ["analysis"]

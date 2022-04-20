@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Tuple, Sequence, Dict, Mapping
+from typing import Any, Tuple, Sequence, Dict, Mapping
 import enum
 
 import numpy as np
@@ -16,7 +16,7 @@ def array5d_to_vigra(arr: Array5D, axiskeys: str):
     return vigra.taggedView(arr.raw(axiskeys), axistags=axiskeys)
 
 
-def vigra_object_feature_to_array5d(raw_feature: np.ndarray) -> Array5D:
+def vigra_object_feature_to_array5d(raw_feature: "np.ndarray[Any, np.dtype[Any]]") -> Array5D:
     xc_shape : Tuple[int, int] = (raw_feature.shape[0], int(np.prod(raw_feature.shape[1:])))
     return Array5D(raw_feature.reshape(xc_shape), axiskeys="xc")
 
@@ -76,7 +76,9 @@ class VigraObjectFeatureExtractor(ObjectFeatureExtractor):
     def __hash__(self) -> int:
         return hash(self.feature_names)
 
-    def __eq__(self, other: "VigraObjectFeatureExtractor") -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, VigraObjectFeatureExtractor):
+            return False
         return self.feature_names == other.feature_names
 
     def get_halo(self) -> Point5D:
@@ -97,7 +99,7 @@ class VigraObjectFeatureExtractor(ObjectFeatureExtractor):
         label_frames = connected_comps.split(connected_comps.shape.updated(t=1))
         frame_axes = "xyzc"
         for data_frame, label_frame in zip(data_frames, label_frames):
-            raw_frame_features: Dict[str, np.ndarray] = vigra.analysis.extractRegionFeatures(
+            raw_frame_features: Dict[str, "np.ndarray[Any, np.dtype[Any]]"] = vigra.analysis.extractRegionFeatures(
                 array5d_to_vigra(data_frame, axiskeys=frame_axes).astype(np.float32),
                 array5d_to_vigra(label_frame, axiskeys=frame_axes).astype(np.uint32),
                 features=feature_names,
