@@ -60,37 +60,37 @@ class File(Group):
     def attrs(self): # -> AttributeManager:
         """ Attributes attached to this obj"""
         ...
-    
+
     @property
     @with_phil
     def filename(self): # -> str:
         """File name on disk"""
         ...
-    
+
     @property
     @with_phil
     def driver(self): # -> str:
         """Low-level HDF5 file driver used """
         ...
-    
+
     @property
     @with_phil
     def mode(self): # -> Literal['r+', 'r']:
         """ Python mode used to open file """
         ...
-    
+
     @property
     @with_phil
     def libver(self): # -> tuple[str, ...]:
         """File format version bounds (2-tu"""
         ...
-    
+
     @property
     @with_phil
     def userblock_size(self):
         """ User block size (in bytes) """
         ...
-    
+
     if mpi and hdf5_version >= (1, 8, 9):
         @property
         @with_phil
@@ -98,48 +98,48 @@ class File(Group):
             """ Set/get MPI-IO atomic mode
     """
             ...
-        
+
         @atomic.setter
         @with_phil
         def atomic(self, value): # -> None:
             ...
-        
+
     @property
     @with_phil
     def swmr_mode(self): # -> bool:
         """ Controls single-writer multiple"""
         ...
-    
+
     @swmr_mode.setter
     @with_phil
     def swmr_mode(self, value): # -> None:
         ...
-    
+
     def __init__(self, name, mode=..., driver=..., libver=..., userblock_size=..., swmr=..., rdcc_nslots=..., rdcc_nbytes=..., rdcc_w0=..., track_order=..., fs_strategy=..., fs_persist=..., fs_threshold=..., fs_page_size=..., page_buf_size=..., min_meta_keep=..., min_raw_keep=..., locking=..., **kwds) -> None:
         """Create a new file object.
 
      """
         ...
-    
-    def close(self): # -> None:
+
+    def close(self) -> None:
         """ Close the file.  All open objec"""
         ...
-    
+
     def flush(self): # -> None:
         """ Tell the HDF5 library to flush """
         ...
-    
+
     @with_phil
     def __enter__(self): # -> Self@File:
         ...
-    
+
     @with_phil
     def __exit__(self, *args): # -> None:
         ...
-    
+
     @with_phil
     def __repr__(self): # -> str:
         ...
-    
+
 
 
