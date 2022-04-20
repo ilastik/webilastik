@@ -10,6 +10,7 @@ import io
 
 
 import numpy as np
+from numpy import ndarray, dtype, float32
 from vigra.learning import RandomForest as VigraRandomForest
 from concurrent.futures import ProcessPoolExecutor
 
@@ -26,11 +27,11 @@ class Predictions(Array5D):
     """An array of floats from 0.0 to 1.0. The value in each channel represents
     how likely that pixel is to belong to the classification class associated with
     that channel"""
-    def __init__(self, arr: np.ndarray, axiskeys: str, channel_colors: Sequence[Color], location: Point5D = Point5D.zero()):
+    def __init__(self, arr: "ndarray[Any, dtype[float32]]", axiskeys: str, channel_colors: Sequence[Color], location: Point5D = Point5D.zero()):
         super().__init__(arr, axiskeys, location=location)
         self.channel_colors = tuple(channel_colors)
 
-    def rebuild(self: "Predictions", arr: np.ndarray, *, axiskeys: str, location: Optional[Point5D] = None) -> "Predictions":
+    def rebuild(self: "Predictions", arr: "ndarray[Any, dtype[float32]]", *, axiskeys: str, location: Optional[Point5D] = None) -> "Predictions":
         a5d = Array5D(arr=arr, axiskeys=axiskeys, location=location or self.location)
         channel_colors: Sequence[Color];
         if a5d.shape.c == self.shape.c:
@@ -61,7 +62,7 @@ class Predictions(Array5D):
             out_image = PIL.Image.fromarray(rendered_rgb.raw("yxc").astype(np.uint8)) # type: ignore
             out_file = io.BytesIO()
             out_image.save(out_file, "png")
-            out_file.seek(0)
+            _ = out_file.seek(0)
             yield out_file
 
 
@@ -73,8 +74,8 @@ class TrainingData(Generic[FE]):
     color_map: Dict[Color, np.uint8]
     classes: List[np.uint8]
     num_input_channels: int
-    X: np.ndarray  # shape is (num_samples, num_feature_channels)
-    y: np.ndarray  # shape is (num_samples, 1)
+    X: "ndarray[Any, Any]"  # shape is (num_samples, num_feature_channels) #FIXME: add dtype hint
+    y: "ndarray[Any, Any]"  # shape is (num_samples, 1) #FIXME: add dtype hint
 
     def __init__(
         self, *, feature_extractors: Sequence[FE], annotations: Sequence[Annotation]
@@ -168,7 +169,7 @@ class PickableVigraRandomForest:
         os.remove(tmp_file_path)
         self.__init__(forest=forest, forest_data=data)
 
-    def predict(self, feature_data: Array5D) -> np.ndarray:
+    def predict(self, feature_data: Array5D) -> "ndarray[Any, dtype[float32]]":
         return self._forest.predictProbabilities(feature_data.linear_raw()) * self._forest.treeCount()
 
     def treeCount(self) -> int:
@@ -196,7 +197,7 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         self.forests = forests
         self.num_trees = sum(f.treeCount() for f in forests)
 
-    def get_expected_dtype(self, input_dtype: np.dtype) -> np.dtype:
+    def get_expected_dtype(self, input_dtype: "dtype[Any]") -> "dtype[float32]":
         return np.dtype("float32")
 
     @classmethod
@@ -238,7 +239,7 @@ class VigraPixelClassifier(PixelClassifier[FE]):
             value=0,
         )
         assert predictions.interval == self.get_expected_roi(roi)
-        raw_linear_predictions: np.ndarray = predictions.linear_raw()
+        raw_linear_predictions: "ndarray[Any, dtype[float32]]" = predictions.linear_raw()
 
         for forest in self.forests:
             raw_linear_predictions += forest.predict(feature_data)
