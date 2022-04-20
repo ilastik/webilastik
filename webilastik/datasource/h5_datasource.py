@@ -33,7 +33,7 @@ class H5DataSource(FsDataSource):
             if not isinstance(dataset, h5py.Dataset):
                 raise ValueError(f"{inner_path} is not a Dataset")
             self.axiskeys = self.getAxisKeys(dataset)
-            self._dataset = cast(h5py.Dataset, dataset)
+            self._dataset = dataset
             tile_shape = Shape5D.create(raw_shape=self._dataset.chunks or self._dataset.shape, axiskeys=self.axiskeys)
             base_url = Url.parse(filesystem.geturl(outer_path.as_posix()))
             assert base_url is not None
@@ -77,7 +77,7 @@ class H5DataSource(FsDataSource):
 
     def _get_tile(self, tile: Interval5D) -> Array5D:
         slices = tile.translated(-self.location).to_slices(self.axiskeys)
-        raw: np.ndarray = self._dataset[slices]
+        raw = self._dataset[slices]
         return Array5D(raw, axiskeys=self.axiskeys, location=tile.start)
 
     def close(self) -> None:
