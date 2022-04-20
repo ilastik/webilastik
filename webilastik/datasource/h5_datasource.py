@@ -2,6 +2,8 @@ from pathlib import PurePosixPath
 from typing import Optional, Tuple, cast
 import json
 
+from numpy import ndarray
+
 from ndstructs.array5D import Array5D
 
 from webilastik.datasource import FsDataSource, guess_axiskeys
@@ -78,6 +80,8 @@ class H5DataSource(FsDataSource):
     def _get_tile(self, tile: Interval5D) -> Array5D:
         slices = tile.translated(-self.location).to_slices(self.axiskeys)
         raw = self._dataset[slices]
+        if not isinstance(raw, ndarray):
+            raise IOError("Expected ndarray at {slices}, found {raw}")
         return Array5D(raw, axiskeys=self.axiskeys, location=tile.start)
 
     def close(self) -> None:
