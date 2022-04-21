@@ -16,7 +16,6 @@ def try_filesystem_from_url(
 ) -> "JsonableFilesystem | UsageError":
     if url.protocol not in allowed_protocols:
         raise ValueError(f"Disallowed protocol '{url.protocol}' in url '{url}'")
-    filesystem: Optional[JsonableFilesystem] = None
     if url.protocol == Protocol.FILE:
         return OsFs(url.path.parent.as_posix())
     if url.raw.startswith(BucketFs.API_URL.raw):
