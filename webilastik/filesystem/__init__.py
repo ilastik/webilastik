@@ -27,5 +27,8 @@ class JsonableFilesystem(FS, IJsonable):
         if fs_class_name == BucketFs.__name__:
             return BucketFs.from_json_value(value)
 
-
         raise ValueError(f"Could not deserialize filesystem from:\n{json.dumps(value, indent=4)}")
+
+    @abstractmethod
+    def to_json_value(self) -> JsonValue:
+        pass
