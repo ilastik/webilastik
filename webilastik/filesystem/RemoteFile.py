@@ -1,3 +1,4 @@
+from _typeshed import ReadableBuffer
 import io
 from typing import Callable
 
@@ -8,10 +9,10 @@ class RemoteFile(io.BytesIO):
         self.close_callback = close_callback
         super().__init__(data)
 
-    def write(self, data: bytes) -> int:
+    def write(self, __buffer: ReadableBuffer) -> int:
         if self._mode == "r":
             raise RuntimeError("This is a readonly file!")
-        return super().write(data)
+        return super().write(__buffer)
 
     def close(self):
         self.close_callback(self)

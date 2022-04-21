@@ -212,7 +212,7 @@ class SwiftTempUrlFs(HttpFs):
                 return False
             raise
 
-    def makedir(self, path: str, permissions: Optional[Permissions], recreate: bool) -> SubFS[FS]:
+    def makedir(self, path: str, permissions: Optional[Permissions] = None, recreate: bool = False) -> SubFS[FS]:
         return self.opendir(path)
 
     def makedirs(self, path: str, permissions: Optional[Permissions]=None, recreate: bool = True) -> SubFS[FS]:
