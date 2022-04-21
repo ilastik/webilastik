@@ -19,8 +19,6 @@ def dummy_prompt(message: str, options: Dict[str, T]) -> Optional[T]:
         return value
     return None
 
-x: UserPrompt = dummy_prompt
-
 class PropagationResult(ABC):
     @abstractmethod
     def _abstract_sentinel(self):
