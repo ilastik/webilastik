@@ -5,8 +5,8 @@ from pathlib import PurePosixPath
 from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
-from webilastik.datasink import DataSink
-from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
+from webilastik.datasink import DataSink, DataSinkWriter
+from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksScaleSink
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale, RawEncoder
 
@@ -15,40 +15,38 @@ from webilastik.datasource import DataRoi
 from webilastik.datasource.skimage_datasource import SkimageDataSource
 
 
-def _write_data(tile: DataRoi, sink: DataSink):
+def _write_data(tile: DataRoi, sink_writer: DataSinkWriter):
     print(f"Writing {tile}")
-    sink.write(tile.retrieve())
+    sink_writer.write(tile.retrieve())
 
 def test_bucket_read_write(raw_data_source: SkimageDataSource, bucket_fs: BucketFs):
     precomp_path = PurePosixPath("c_cells_1.precomputed")
-    sink = PrecomputedChunksSink.create(
-        base_path=precomp_path,
+    sink = PrecomputedChunksScaleSink(
+        info_dir=precomp_path,
         filesystem=bucket_fs,
-        info=PrecomputedChunksInfo(
-            data_type=raw_data_source.dtype,
-            type_="image",
-            num_channels=raw_data_source.shape.c,
-            scales=tuple([
-                PrecomputedChunksScale(
-                    key=PurePosixPath("exported_data"),
-                    size=(raw_data_source.shape.x, raw_data_source.shape.y, raw_data_source.shape.z),
-                    chunk_sizes=tuple([
-                        (raw_data_source.tile_shape.x, raw_data_source.tile_shape.y, raw_data_source.tile_shape.z)
-                    ]),
-                    encoding=RawEncoder(),
-                    voxel_offset=(raw_data_source.location.x, raw_data_source.location.y, raw_data_source.location.z),
-                    resolution=raw_data_source.spatial_resolution
-                )
+        num_channels=raw_data_source.shape.c,
+        scale=PrecomputedChunksScale(
+            key=PurePosixPath("exported_data"),
+            size=(raw_data_source.shape.x, raw_data_source.shape.y, raw_data_source.shape.z),
+            chunk_sizes=tuple([
+                (raw_data_source.tile_shape.x, raw_data_source.tile_shape.y, raw_data_source.tile_shape.z)
             ]),
-        )
-    ).scale_sinks[0]
+            encoding=RawEncoder(),
+            voxel_offset=(raw_data_source.location.x, raw_data_source.location.y, raw_data_source.location.z),
+            resolution=raw_data_source.spatial_resolution
+        ),
+        dtype=raw_data_source.dtype,
+    )
+
+    sink_writer = sink.create()
+    assert not isinstance(sink_writer, Exception)
 
     assert bucket_fs.exists(precomp_path.joinpath("info").as_posix())
     assert not bucket_fs.exists(precomp_path.joinpath("i_dont_exist").as_posix())
 
     with ProcessPoolExecutor() as executor:
         _ = list(executor.map(
-            partial(_write_data, sink=sink),
+            partial(_write_data, sink_writer=sink_writer),
             raw_data_source.roi.get_datasource_tiles()
         ))
 
