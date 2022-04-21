@@ -1,5 +1,5 @@
 import pytest
-from typing import List, Optional, Iterator
+from typing import List, Optional, Iterator, Any
 import os
 import tempfile
 from pathlib import PurePosixPath
@@ -72,16 +72,23 @@ def create_n5(
     array: Array5D, *, axiskeys: Optional[str] = None, chunk_size: Shape5D, compression: N5Compressor = RawCompressor()
 ):
     path = PurePosixPath(tempfile.mkstemp()[1] + ".n5")
-    sink = N5DatasetSink.create(outer_path=path, inner_path=PurePosixPath("/data"), filesystem=OsFs("/"), attributes=N5DatasetAttributes(
-        dimensions=array.shape,
-        blockSize=chunk_size,
-        axiskeys=axiskeys or array.axiskeys,
-        dataType=array.dtype,
-        compression=compression,
-    ))
+    sink = N5DatasetSink(
+        outer_path=path,
+        inner_path=PurePosixPath("/data"),
+        filesystem=OsFs("/"),
+        attributes=N5DatasetAttributes(
+            dimensions=array.shape,
+            blockSize=chunk_size,
+            axiskeys=axiskeys or array.axiskeys,
+            dataType=array.dtype,
+            compression=compression,
+        )
+    )
+    sink_writer = sink.create()
+    assert not isinstance(sink_writer, Exception)
 
     for tile in array.split(chunk_size):
-        sink.write(tile)
+        sink_writer.write(tile)
     return path.as_posix()
 
 
@@ -111,7 +118,7 @@ def png_image() -> Iterator[PurePosixPath]:
     os.remove(png_path)
 
 
-def tile_equals(tile: DataSource, axiskeys: str, raw: np.ndarray) -> bool:
+def tile_equals(tile: DataSource, axiskeys: str, raw: "np.ndarray[Any, Any]") -> bool:
     return (tile.retrieve().raw(axiskeys) == raw).all() # type: ignore
 
 
@@ -166,18 +173,6 @@ def test_n5_datasource():
 
     ds2 = pickle.loads(pickle.dumps(ds))
     assert ds2.retrieve(x=(0, 3), y=(0, 2)) == expected_raw_piece
-
-
-try:
-    import SwiftTestConnection #type: ignore
-except ModuleNotFoundError:
-    SwiftTestConnection = None
-
-
-@pytest.mark.skipif(SwiftTestConnection is None, reason="No SwiftTestConnection class found")
-def test_n5_datasource_over_swift():
-    pass
-
 
 def test_h5_datasource():
     data_2d = Array5D(np.arange(100).reshape(10, 10), axiskeys="yx")
