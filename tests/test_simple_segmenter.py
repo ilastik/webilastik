@@ -1,6 +1,6 @@
 from ndstructs.array5D import Array5D
 import numpy as np
-from webilastik.datasource import ArrayDataSource
+from webilastik.datasource.array_datasource import ArrayDataSource
 
 from webilastik.simple_segmenter import SimpleSegmenter
 
@@ -8,8 +8,8 @@ from webilastik.simple_segmenter import SimpleSegmenter
 def test_simple_segmenter():
     segmenter = SimpleSegmenter()
 
-    input_data = ArrayDataSource.from_array5d(
-        Array5D(np.asarray([
+    input_data = ArrayDataSource(
+        data=Array5D(np.asarray([
            [[ 0.1,  0.1,   0.0,  1.0],
             [ 0.2,  0.2,   0.0,  0.0],
             [ 0.3,  0.3,   0.1,  0.2],
@@ -19,7 +19,7 @@ def test_simple_segmenter():
             [ 0.3,  0.3,   0.0,  0.0],
             [ 0.2,  0.2,   0.4,  0.0],
             [ 0.1,  0.1,   0.0,  0.0]]
-        ]), axiskeys="cyx")
+        ]), axiskeys="cyx"),
     )
 
     expected_segmentation = [
