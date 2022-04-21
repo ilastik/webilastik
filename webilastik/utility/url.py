@@ -105,6 +105,13 @@ class Url:
             hash_=match.group("hash_")
         );
 
+    @staticmethod
+    def parse_or_raise(url: str) -> "Url":
+        parsed = Url.parse(url)
+        if parsed is None:
+            raise ValueError("Could not parse {str} as an Url")
+        return parsed
+
     def __init__(
         self,
         *,

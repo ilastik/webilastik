@@ -22,22 +22,22 @@ def start_test_server(tmp_path: Path, port: int) -> HTTPServer:
     dir1 = tmp_path / "dir1"
     dir1.mkdir()
     with open(dir1 / "file1.txt", "wb") as f:
-        f.write("file1_contents".encode("ascii"))
+        _ = f.write("file1_contents".encode("ascii"))
 
     dir2 = tmp_path / "dir2"
     dir2.mkdir()
     with open(dir2 / "file2.txt", "wb") as f:
-        f.write("file2_contents".encode("ascii"))
+        _ = f.write("file2_contents".encode("ascii"))
 
     dir3 = tmp_path / "dir3"
     dir3.mkdir()
     with open(dir3 / "file3.txt", "wb") as f:
-        f.write("file3_contents".encode("ascii"))
+        _ = f.write("file3_contents".encode("ascii"))
 
     dir4 = dir3 / "dir4"
     dir4.mkdir()
     with open(dir4 / "file4.txt", "wb") as f:
-        f.write("file4_contents".encode("ascii"))
+        _ = f.write("file4_contents".encode("ascii"))
 
     server_address = ("", port)
     httpd = HTTPServer(server_address, functools.partial(SimpleHTTPRequestHandler, directory=tmp_path.as_posix()))
@@ -48,7 +48,7 @@ def start_test_server(tmp_path: Path, port: int) -> HTTPServer:
 def test_httpfs(tmp_path):
     httpd = start_test_server(tmp_path, port=8123)
     try:
-        fs = HttpFs(read_url=Url.parse("http://localhost:8123/"))
+        fs = HttpFs(read_url=Url.parse_or_raise("http://localhost:8123/"))
 
         eprint("  -->  Opening some file...")
         with fs.openbin("/dir1/file1.txt", "r") as f:
@@ -58,14 +58,14 @@ def test_httpfs(tmp_path):
         dir1 = fs.opendir("dir2")
         assert dir1.openbin("file2.txt", "r").read() == "file2_contents".encode("ascii")
 
-        fs2 = HttpFs(read_url=Url.parse("http://localhost:8123/dir1"))
+        fs2 = HttpFs(read_url=Url.parse_or_raise("http://localhost:8123/dir1"))
         assert fs2.desc("file2.txt") == "http://localhost:8123/dir1/file2.txt"
 
         # check that "/" maps to the base url that was used to create the filesystem
         assert fs2.desc("/file2.txt") == "http://localhost:8123/dir1/file2.txt"
 
         #check that .. works even when creating the fs
-        fs_updir = HttpFs(read_url=Url.parse("http://localhost:8123/dir1/.."))
+        fs_updir = HttpFs(read_url=Url.parse_or_raise("http://localhost:8123/dir1/.."))
         with fs_updir.openbin("dir1/file1.txt", "r") as f:
             assert f.read() == "file1_contents".encode("ascii")
 

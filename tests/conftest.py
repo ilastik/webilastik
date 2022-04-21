@@ -1,13 +1,16 @@
 import datetime
 from pathlib import PurePosixPath
-from typing import Tuple
+from typing import Sequence, Tuple
 
 import pytest
 import numpy as np
 from ndstructs.point5D import Point5D
 from webilastik.annotations.annotation import Annotation, Color
+from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 
 from webilastik.datasource.skimage_datasource import SkimageDataSource
+from webilastik.features.channelwise_fastfilters import GaussianSmoothing, HessianOfGaussianEigenvalues
+from webilastik.features.ilp_filter import IlpFilter
 from webilastik.filesystem.osfs import OsFs
 from webilastik.libebrains.user_token import UserToken
 from webilastik.filesystem.bucket_fs import BucketFs
@@ -15,7 +18,7 @@ from webilastik.filesystem.bucket_fs import BucketFs
 
 @pytest.fixture(scope="session")
 def ebrains_user_token() -> UserToken:
-    return UserToken.from_environment()
+    return UserToken.get_global_token_or_raise()
 
 @pytest.fixture(scope="session")
 def bucket_fs(ebrains_user_token: UserToken) -> BucketFs:
@@ -57,4 +60,21 @@ def pixel_annotations(raw_data_source: SkimageDataSource) -> Tuple[Annotation, .
             color=Color(r=np.uint8(255), g=np.uint8(0), b=np.uint8(0)),
             raw_data=raw_data_source
         ),
+    )
+
+@pytest.fixture
+def feature_extractors() -> Sequence[IlpFilter]:
+    return (
+        GaussianSmoothing(sigma=0.3, axis_2d="z"),
+        HessianOfGaussianEigenvalues(scale=0.7, axis_2d="z"),
+    )
+
+@pytest.fixture
+def c_cells_pixel_classifier(
+    pixel_annotations: Tuple[Annotation, ...],
+    feature_extractors: Sequence[IlpFilter],
+) -> VigraPixelClassifier[IlpFilter]:
+    return VigraPixelClassifier.train(
+        feature_extractors=feature_extractors,
+        annotations=pixel_annotations,
     )
