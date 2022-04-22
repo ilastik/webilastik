@@ -1,5 +1,5 @@
 from pathlib import Path, PurePosixPath
-from typing import Optional, Set, Tuple, Union, Iterable, List
+from typing import Optional, Sequence, Set, Tuple, Union, Iterable, List
 import json
 
 from aiohttp.client import ClientSession
@@ -48,6 +48,10 @@ class Scope(enum.Enum):
 
     def to_json_value(self) -> str:
         return self.value
+
+    @staticmethod
+    def iterable_to_json_value(scopes: Iterable["Scope"]) -> str:
+        return " ".join(s.to_json_value() for s in scopes)
 
 
 class OidcClient:
@@ -386,7 +390,7 @@ class OidcClient:
                 "login": "true",
                 "client_id": self.clientId,
                 "redirect_uri": redirect_uri.raw,
-                "scope": " ".join(scope.value for scope in scopes),
+                "scope": Scope.iterable_to_json_value(scopes),
                 "state": state if state is not None else str(uuid.uuid4()),
                 # 'response_mode': ['fragment'],
                 # 'nonce': ['b70e8d45-0b48-4688-9bd8-66bee41e5130'],
