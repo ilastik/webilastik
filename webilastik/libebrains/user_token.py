@@ -5,7 +5,7 @@ from aiohttp.client import ClientSession
 from aiohttp.client_exceptions import ClientResponseError
 
 import requests
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString, ensureOptional
 from webilastik.ui.usage_error import UsageError
 
 from webilastik.utility.url import Url
@@ -80,14 +80,9 @@ class UserToken:
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "UserToken":
         value_obj = ensureJsonObject(value)
-        raw_refresh_token = value_obj.get("access_token")
-        if raw_refresh_token is not None:
-            refresh_token = ensureJsonString(raw_refresh_token)
-        else:
-            refresh_token = None
         return UserToken(
             access_token=ensureJsonString(value_obj.get("access_token")),
-            refresh_token=refresh_token
+            refresh_token=ensureOptional(ensureJsonString, value_obj.get("refresh_token")),
         )
 
     def to_json_value(self) -> JsonObject:
