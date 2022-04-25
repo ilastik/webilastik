@@ -127,12 +127,10 @@ class OidcClient:
     def from_json_value(cls, value: JsonValue) -> "OidcClient":
         value_obj = ensureJsonObject(value)
         raw_rootUrl = ensureJsonString(value_obj.get("rootUrl"))
-        try:
-            rootUrl = Url.parse(raw_rootUrl)
-            assert rootUrl is not None
-        except ValueError:
+        rootUrl = Url.parse(raw_rootUrl)
+        if rootUrl is None:
             rootUrl = Url.parse(raw_rootUrl + "/") # it's possible to register a rootUrl without a path -.-
-            assert rootUrl is not None
+        assert rootUrl is not None
 
         redirectUris: List[Url] = []
         for raw_redirect_uri in ensureJsonStringArray(value_obj.get("redirectUris")):
