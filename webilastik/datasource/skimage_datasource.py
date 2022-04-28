@@ -1,3 +1,5 @@
+#pyright: strict
+
 from pathlib import PurePosixPath
 from typing import Optional, Tuple, Any
 
@@ -22,15 +24,17 @@ class SkimageDataSource(FsDataSource):
         spatial_resolution: Optional[Tuple[int, int, int]] = None,
     ):
         raw_data: "np.ndarray[Any, Any]" = skimage.io.imread(filesystem.openbin(path.as_posix())) # type: ignore
-        self._data = Array5D(raw_data, "yxc"[: len(raw_data.shape)], location=location)
+        c_axiskeys_on_disk = "yxc"[: len(raw_data.shape)]
+        self._data = Array5D(raw_data, axiskeys=c_axiskeys_on_disk, location=location)
 
         if tile_shape is None:
             tile_shape = Shape5D.hypercube(256).to_interval5d().clamped(self._data.shape).shape
 
         super().__init__(
+            c_axiskeys_on_disk=c_axiskeys_on_disk,
             filesystem=filesystem,
             path=path,
-            dtype=self._data.dtype, #type: ignore
+            dtype=self._data.dtype,
             interval=self._data.interval,
             tile_shape=tile_shape,
             spatial_resolution=spatial_resolution,

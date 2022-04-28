@@ -40,6 +40,7 @@ class H5DataSource(FsDataSource):
             base_url = Url.parse(filesystem.geturl(outer_path.as_posix()))
             assert base_url is not None
             super().__init__(
+                c_axiskeys_on_disk=self.axiskeys,
                 tile_shape=tile_shape,
                 interval=Shape5D.create(raw_shape=self._dataset.shape, axiskeys=self.axiskeys).to_interval5d(location),
                 dtype=self._dataset.dtype,

@@ -18,7 +18,7 @@ class N5Block(Array5D):
         VARLENGTH = 1
 
     @classmethod
-    def from_bytes(cls, data: bytes, axiskeys: str, dtype: "np.dtype[Any]", compression: N5Compressor, location: Point5D) -> "N5Block":
+    def from_bytes(cls, data: bytes, c_axiskeys: str, dtype: "np.dtype[Any]", compression: N5Compressor, location: Point5D) -> "N5Block":
         data = np.frombuffer(data, dtype=np.uint8) #pyright: ignore [reportUnknownMemberType]
 
         header_types = [
@@ -44,7 +44,7 @@ class N5Block(Array5D):
         decompressed_buffer = compression.decompress(compressed_buffer.tobytes())
         raw_array: "np.ndarray[Any, np.dtype[Any]]" = np.frombuffer(decompressed_buffer, dtype=dtype.newbyteorder(">")).reshape(array_shape, order="F") # type: ignore
 
-        return cls(raw_array, axiskeys=axiskeys[::-1], location=location)
+        return cls(raw_array, axiskeys=c_axiskeys[::-1], location=location)
 
     def to_n5_bytes(self, axiskeys: str, compression: N5Compressor):
         # because the axistags are written in reverse order to attributes.json, bytes must be written in C order.
@@ -77,9 +77,9 @@ class N5DataSource(FsDataSource):
         with filesystem.openbin(path.joinpath("attributes.json").as_posix(), "r") as f:
             attributes_json = f.read().decode("utf8")
         self.attributes = N5DatasetAttributes.from_json_data(json.loads(attributes_json), location_override=location)
-        self.axiskeys = self.attributes.axiskeys
 
         super().__init__(
+            c_axiskeys_on_disk=self.attributes.c_axiskeys,
             filesystem=filesystem,
             path=path,
             tile_shape=self.attributes.blockSize,
@@ -118,7 +118,7 @@ class N5DataSource(FsDataSource):
             with self.filesystem.openbin(slice_address.as_posix()) as f:
                 raw_tile = f.read()
             tile_5d = N5Block.from_bytes(
-                data=raw_tile, axiskeys=self.axiskeys, dtype=self.dtype, compression=self.attributes.compression, location=tile.start
+                data=raw_tile, c_axiskeys=self.c_axiskeys_on_disk, dtype=self.dtype, compression=self.attributes.compression, location=tile.start
             )
         except ResourceNotFound:
             tile_5d = self._allocate(interval=tile, fill_value=0)

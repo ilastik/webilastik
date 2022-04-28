@@ -42,6 +42,8 @@ class PrecomputedChunksDataSource(FsDataSource):
         base_url = Url.parse(filesystem.geturl(path.as_posix()))
         assert base_url is not None
         super().__init__(
+            # "The (...) data (...) chunk is stored directly in little-endian binary format in [x, y, z, channel] Fortran order"
+            c_axiskeys_on_disk="xyzc"[::-1],
             filesystem=filesystem,
             path=path,
             tile_shape=tile_shape,

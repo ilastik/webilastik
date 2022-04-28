@@ -228,6 +228,7 @@ class FsDataSource(DataSource):
     def __init__(
         self,
         *,
+        c_axiskeys_on_disk: str,
         filesystem: JsonableFilesystem,
         path: PurePosixPath,
         tile_shape: Shape5D,
@@ -236,6 +237,7 @@ class FsDataSource(DataSource):
         spatial_resolution: Optional[Tuple[int, int, int]] = None,
     ):
         super().__init__(tile_shape=tile_shape, dtype=dtype, interval=interval, spatial_resolution=spatial_resolution)
+        self.c_axiskeys_on_disk = c_axiskeys_on_disk
         self.filesystem = filesystem
         self.path = path
 

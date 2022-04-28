@@ -161,7 +161,7 @@ class N5DatasetAttributes:
         *,
         dimensions: Shape5D,
         blockSize: Shape5D,
-        axiskeys: str,
+        c_axiskeys: str,
         dataType: "np.dtype[Any]", #FIXME
         compression: N5Compressor,
         location: Point5D = Point5D.zero(),
@@ -169,7 +169,7 @@ class N5DatasetAttributes:
         """axiskeys follows ndstructs conventions (c-order), despite 'axes' in N5 datasets being F-order"""
         self.dimensions = dimensions
         self.blockSize = blockSize
-        self.axiskeys = axiskeys
+        self.c_axiskeys = c_axiskeys
         self.dataType = dataType
         self.compression = compression
         self.location = location
@@ -179,7 +179,7 @@ class N5DatasetAttributes:
         "Gets the relative path into the n5 dataset where 'tile' should be stored"
         if not tile.is_tile(tile_shape=self.blockSize, full_interval=self.interval, clamped=True):
             raise ValueError(f"{tile} is not a tile of {json.dumps(self.to_json_data())}")
-        slice_address_components = (tile.translated(-self.location).start // self.blockSize).to_tuple(self.axiskeys[::-1])
+        slice_address_components = (tile.translated(-self.location).start // self.blockSize).to_tuple(self.c_axiskeys[::-1])
         return Path("/".join(str(component) for component in slice_address_components))
 
     def __eq__(self, other: object) -> bool:
@@ -188,7 +188,7 @@ class N5DatasetAttributes:
         return (
             self.dimensions == other.dimensions and
             self.blockSize == other.blockSize and
-            self.axiskeys == other.axiskeys and
+            self.c_axiskeys == other.c_axiskeys and
             self.dataType == other.dataType and
             self.compression == other.compression
         )
@@ -208,30 +208,30 @@ class N5DatasetAttributes:
         blockSize = ensureJsonIntArray(raw_attributes.get("blockSize"))
         axes = raw_attributes.get("axes")
         if axes is None:
-            axiskeys = guess_axiskeys(dimensions)
+            c_axiskeys = guess_axiskeys(dimensions)
         else:
-            axiskeys = "".join(ensureJsonStringArray(axes)[::-1]).lower()
+            c_axiskeys = "".join(ensureJsonStringArray(axes)[::-1]).lower()
         location = raw_attributes.get("location")
         if location is None:
             location_5d = Point5D.zero()
         else:
-            location_5d = Point5D.zero(**dict(zip(axiskeys, ensureJsonIntArray(location)[::-1])))
+            location_5d = Point5D.zero(**dict(zip(c_axiskeys, ensureJsonIntArray(location)[::-1])))
 
         return N5DatasetAttributes(
-            blockSize=Shape5D.create(raw_shape=blockSize[::-1], axiskeys=axiskeys),
-            dimensions=Shape5D.create(raw_shape=dimensions[::-1], axiskeys=axiskeys),
+            blockSize=Shape5D.create(raw_shape=blockSize[::-1], axiskeys=c_axiskeys),
+            dimensions=Shape5D.create(raw_shape=dimensions[::-1], axiskeys=c_axiskeys),
             dataType=np.dtype(ensureJsonString(raw_attributes.get("dataType"))).newbyteorder(">"), # type: ignore
-            axiskeys=axiskeys,
+            c_axiskeys=c_axiskeys,
             compression=N5Compressor.from_json_data(raw_attributes["compression"]),
             location=location_override or location_5d,
         )
 
     def to_json_data(self) -> JsonObject:
         return {
-            "dimensions": self.dimensions.to_tuple(self.axiskeys[::-1]),
-            "blockSize": self.blockSize.to_tuple(self.axiskeys[::-1]),
-            "axes": tuple(self.axiskeys[::-1]),
+            "dimensions": self.dimensions.to_tuple(self.c_axiskeys[::-1]),
+            "blockSize": self.blockSize.to_tuple(self.c_axiskeys[::-1]),
+            "axes": tuple(self.c_axiskeys[::-1]),
             "dataType": str(self.dataType.name),
             "compression": self.compression.to_json_data(),
-            "location": self.location.to_tuple(self.axiskeys[::-1])
+            "location": self.location.to_tuple(self.c_axiskeys[::-1])
         }
