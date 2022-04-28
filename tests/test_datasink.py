@@ -31,7 +31,7 @@ def test_n5_attributes():
     attributes = N5DatasetAttributes(
         dimensions=Shape5D(x=100, y=200),
         blockSize=Shape5D(x=10, y=20),
-        axiskeys="yx",
+        c_axiskeys="yx",
         dataType=np.dtype("uint16").newbyteorder(">"), #type: ignore
         compression=GzipCompressor(level=3)
     )
@@ -48,7 +48,7 @@ def test_n5_datasink(tmp_path: PurePosixPath, data: Array5D, datasource: DataSou
         attributes=N5DatasetAttributes(
             dimensions=datasource.shape,
             blockSize=Shape5D(x=10, y=10),
-            axiskeys=data.axiskeys, #FIXME: double check this
+            c_axiskeys=data.axiskeys, #FIXME: double check this
             dataType=datasource.dtype,
             compression=RawCompressor(),
             location=Point5D.zero(x=7, y=13)
@@ -72,7 +72,7 @@ def test_distributed_n5_datasink(tmp_path: PurePosixPath, data: Array5D, datasou
     attributes = N5DatasetAttributes(
         dimensions=datasource.shape,
         blockSize=datasource.tile_shape,
-        axiskeys=data.axiskeys, #FIXME: double check this
+        c_axiskeys=data.axiskeys, #FIXME: double check this
         dataType=datasource.dtype,
         compression=RawCompressor()
     )

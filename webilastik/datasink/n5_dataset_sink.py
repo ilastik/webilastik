@@ -54,4 +54,4 @@ class N5DatasetSink(DataSink):
         tile = N5Block.fromArray5D(data)
         tile_path = self.full_path / self.attributes.get_tile_path(data.interval)
         with self.filesystem.openbin(tile_path.as_posix(), "w") as f:
-            _ = f.write(tile.to_n5_bytes(axiskeys=self.attributes.axiskeys, compression=self.attributes.compression))
+            _ = f.write(tile.to_n5_bytes(axiskeys=self.attributes.c_axiskeys, compression=self.attributes.compression))

@@ -79,7 +79,7 @@ def create_n5(
         attributes=N5DatasetAttributes(
             dimensions=array.shape,
             blockSize=chunk_size,
-            axiskeys=axiskeys or array.axiskeys,
+            c_axiskeys=axiskeys or array.axiskeys,
             dataType=array.dtype,
             compression=compression,
         )
