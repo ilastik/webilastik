@@ -19,7 +19,7 @@ from ndstructs.point5D import Interval5D, Point5D
 from webilastik.features.feature_extractor import FeatureExtractor
 from webilastik.features.feature_extractor import FeatureExtractorCollection
 from webilastik.annotations import Annotation, Color
-from webilastik import Project
+from webilastik.classic_ilastik.ilp import IlpGroup, populate_h5_group, read_h5_group
 from webilastik.operator import Operator
 from webilastik.datasource import DataRoi, DataSource
 
@@ -153,10 +153,10 @@ class PickableVigraRandomForest:
         os.close(tmp_file_handle)
         self._forest.writeHDF5(tmp_file_path, f"/Forest")
         with h5py.File(tmp_file_path, "r") as f:
-            self._forest_data = Project.h5_group_to_dict(f["/Forest"]) #type: ignore
+            self._forest_data = read_h5_group(f["/Forest"])
         os.remove(tmp_file_path)
 
-    def __getstate__(self) -> Dict[str, Any]:
+    def __getstate__(self) -> IlpGroup:
         return self._forest_data
 
     def __setstate__(self, data: Dict[str, Any]):
@@ -164,7 +164,7 @@ class PickableVigraRandomForest:
         os.close(tmp_file_handle)
         with h5py.File(tmp_file_path, "r+") as f:
             forest_group = f.create_group("Forest")
-            Project.populate_h5_group(forest_group, data)
+            populate_h5_group(forest_group, data)
             forest = VigraRandomForest(tmp_file_path, forest_group.name)
         os.remove(tmp_file_path)
         self.__init__(forest=forest, forest_data=data)
@@ -174,6 +174,9 @@ class PickableVigraRandomForest:
 
     def treeCount(self) -> int:
         return self._forest.treeCount()
+
+    def to_ilp_data(self) -> IlpGroup:
+        return self._forest_data
 
 def _train_forest(random_seed: int, num_trees: int, training_data: TrainingData[FE]) -> PickableVigraRandomForest:
     forest = VigraRandomForest(num_trees)
@@ -196,6 +199,11 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         )
         self.forests = forests
         self.num_trees = sum(f.treeCount() for f in forests)
+
+    def to_ilp_forests(self) -> IlpGroup:
+        return {
+            f"Forest{forest_index:04}": forest.to_ilp_data() for forest_index, forest in enumerate(self.forests)
+        }
 
     def get_expected_dtype(self, input_dtype: "dtype[Any]") -> "dtype[float32]":
         return np.dtype("float32")

@@ -36,12 +36,12 @@ class IlpFilter(FeatureExtractor):
     ) -> FE:
         pass
 
-    @property
-    def ilp_name(self) -> str:
+    def get_ilp_name(self, channel_index: int) -> str:
         name = re.sub(r"([a-z])([A-Z])", r"\1___\2", self.__class__.__name__).replace("___", " ").title()
         name = re.sub(r"\bOf\b", "of", name)
         name += f" (σ={self.ilp_scale})"
         name += " in 2D" if self.axis_2d is not None else " in 3D"
+        name += f" [{channel_index}]"
         return name
 
     @abstractmethod

@@ -182,7 +182,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
                 "/predictions/raw_data={encoded_raw_data}/generation={generation}/info",
                 self.pixel_classifier_applet.predictions_precomputed_chunks_info
             ),
-            web.post("/ilp_project", self.ilp_download),
+            # web.post("/ilp_project", self.ilp_download),
             web.delete("/close", self.close_session),
             web.get(
                 "/stripped_precomputed/url={encoded_original_url}/resolution={resolution_x}_{resolution_y}_{resolution_z}/info",
@@ -315,14 +315,14 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         for websocket in self.websockets[:]:
             loop.create_task(do_update(websocket))
 
-    async def ilp_download(self, request: web.Request):
-        return web.Response(
-            body=self.ilp_file.read(),
-            content_type="application/octet-stream",
-            headers={
-                "Content-disposition": 'attachment; filename="MyProject.ilp"'
-            }
-        )
+    # async def ilp_download(self, request: web.Request):
+    #     return web.Response(
+    #         body=self.ilp_file.read(),
+    #         content_type="application/octet-stream",
+    #         headers={
+    #             "Content-disposition": 'attachment; filename="MyProject.ilp"'
+    #         }
+    #     )
 
     async def stripped_precomputed_info(self, request: web.Request) -> web.Response:
         """Serves a precomp info stripped of all but one scales"""

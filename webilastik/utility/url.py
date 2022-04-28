@@ -74,6 +74,12 @@ class Url:
     def to_json_value(self) -> JsonValue:
         return self.raw
 
+    def to_ilp_filename(self) -> str:
+        if self.protocol == Protocol.FILE:
+            return f"{self.datascheme or ''}" + self.path.as_posix()
+        else:
+            return self.raw
+
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "Url":
         url = Url.parse(ensureJsonString(value))
