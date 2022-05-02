@@ -1,13 +1,12 @@
 # pyright: reportUnusedCallResult=false
 
 from asyncio.events import AbstractEventLoop
-from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from functools import partial
 import os
 import signal
 import asyncio
-from typing import Callable, List, Optional, Mapping, Tuple
+from typing import Callable, List, Optional, Tuple
 import json
 from base64 import b64decode
 import ssl
@@ -15,8 +14,6 @@ import contextlib
 from pathlib import Path
 import traceback
 import re
-import multiprocessing
-
 
 import aiohttp
 from aiohttp import web
@@ -24,22 +21,14 @@ from aiohttp.client import ClientSession
 from aiohttp.http_websocket import WSCloseCode
 from aiohttp.web_app import Application
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
-from webilastik.datasource import FsDataSource
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
-from webilastik.scheduling.job import PriorityExecutor
-from webilastik.ui.applet.datasource_picker import WsDataSourcePicker
-from webilastik.ui.applet.pixel_predictions_export_applet import WsPixelClassificationExportApplet
 from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError
+from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
 from webilastik.utility.url import Protocol, Url
 from webilastik.server.tunnel import ReverseSshTunnel
 from webilastik.ui.applet import dummy_prompt
-from webilastik.ui.applet.ws_applet import WsApplet
-from webilastik.ui.applet.ws_feature_selection_applet import WsFeatureSelectionApplet
-from webilastik.ui.applet.ws_brushing_applet import WsBrushingApplet
-from webilastik.ui.applet.ws_pixel_classification_applet import WsPixelClassificationApplet
-from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
 from webilastik.libebrains.user_token import UserToken
 
 
@@ -82,7 +71,7 @@ class RPCPayload:
         }
 
 
-class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
+class WebIlastik:
     @property
     def http_client_session(self) -> ClientSession:
         if self._http_client_session is None:
@@ -119,6 +108,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             )
 
     def __init__(self, ebrains_user_token: UserToken, ssl_context: Optional[ssl.SSLContext] = None):
+        super().__init__()
         UserToken.login_globally(ebrains_user_token)
 
         self.ssl_context = ssl_context
@@ -126,63 +116,23 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         self._http_client_session: Optional[ClientSession] = None
         self._loop: Optional[AbstractEventLoop] = None
 
-        num_workers = multiprocessing.cpu_count()
-        executor = ProcessPoolExecutor(max_workers=num_workers) #FIXME
-
-        brushing_applet = WsBrushingApplet("brushing_applet")
-        feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", datasources=brushing_applet.datasources)
-
-        self.pixel_classifier_applet = WsPixelClassificationApplet(
-            "pixel_classification_applet",
-            feature_extractors=feature_selection_applet.feature_extractors,
-            annotations=brushing_applet.annotations,
-            executor=executor,
+        self.workflow = PixelClassificationWorkflow(
+            ebrains_user_token=ebrains_user_token,
             on_async_change=lambda : self.enqueue_user_interaction(lambda: None), #FIXME?
         )
-
-        self.export_datasource_applet = WsDataSourcePicker(
-            name="export_datasource_applet",
-            allowed_protocols=tuple([Protocol.HTTPS, Protocol.HTTP]),
-            datasource_suggestions=brushing_applet.datasources,
-        )
-
-        self.export_applet = WsPixelClassificationExportApplet(
-            name="export_applet",
-            priority_executor=PriorityExecutor(executor=executor, num_concurrent_tasks=num_workers),
-            operator=self.pixel_classifier_applet.pixel_classifier,
-            datasource_suggestions=brushing_applet.datasources.transformed_with(
-                lambda datasources: tuple(ds for ds in datasources if isinstance(ds, FsDataSource))
-            ),
-            on_async_change=lambda : self.enqueue_user_interaction(lambda: None),
-        )
-
-        self.wsapplets : Mapping[str, WsApplet] = {
-            feature_selection_applet.name: feature_selection_applet,
-            brushing_applet.name: brushing_applet,
-            self.pixel_classifier_applet.name: self.pixel_classifier_applet,
-            self.export_datasource_applet.name: self.export_datasource_applet,
-            self.export_applet.name: self.export_applet,
-        }
-
-        super().__init__(
-            feature_selection_applet=feature_selection_applet,
-            brushing_applet=brushing_applet,
-            pixel_classifier_applet=self.pixel_classifier_applet,
-        )
-
         self.app = web.Application()
         self.app.add_routes([
             web.get('/status', self.get_status),
-            web.get('/ws', self.open_websocket), # type: ignore
+            web.get('/ws', self.open_websocket),
             web.get(
                 "/predictions/raw_data={encoded_raw_data}/generation={generation}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}",
-                self.pixel_classifier_applet.precomputed_chunks_compute
+                self.workflow.pixel_classifier_applet.precomputed_chunks_compute
             ),
             web.get(
                 "/predictions/raw_data={encoded_raw_data}/generation={generation}/info",
-                self.pixel_classifier_applet.predictions_precomputed_chunks_info
+                self.workflow.pixel_classifier_applet.predictions_precomputed_chunks_info
             ),
-            # web.post("/ilp_project", self.ilp_download),
+            web.post("/download_project_as_ilp", self.download_project_as_ilp),
             web.delete("/close", self.close_session),
             web.get(
                 "/stripped_precomputed/url={encoded_original_url}/resolution={resolution_x}_{resolution_y}_{resolution_z}/info",
@@ -278,8 +228,9 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
                     payload = RPCPayload.from_json_value(parsed_payload)
                     logger.debug("GOT PAYLOAD OK")
                     user_interaction = partial(
-                        self.wsapplets[payload.applet_name].run_rpc,
+                        self.workflow.run_rpc,
                         user_prompt=dummy_prompt,
+                        applet_name=payload.applet_name,
                         method_name=payload.method_name,
                         arguments=payload.arguments,
                     )
@@ -302,7 +253,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         if error_message is not None:
             payload = {"error": error_message}
         else:
-            payload = {name: applet._get_json_state() for name, applet in self.wsapplets.items()}
+            payload = self.workflow.get_json_state()
 
         async def do_update(ws: web.WebSocketResponse):
             try:
@@ -315,14 +266,17 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         for websocket in self.websockets[:]:
             loop.create_task(do_update(websocket))
 
-    # async def ilp_download(self, request: web.Request):
-    #     return web.Response(
-    #         body=self.ilp_file.read(),
-    #         content_type="application/octet-stream",
-    #         headers={
-    #             "Content-disposition": 'attachment; filename="MyProject.ilp"'
-    #         }
-    #     )
+    async def download_project_as_ilp(self, request: web.Request):
+        return web.Response(
+            body=self.workflow.get_ilp_contents(),
+            content_type="application/octet-stream",
+            headers={
+                "Content-disposition": 'attachment; filename="MyProject.ilp"'
+            }
+        )
+
+    async def save_project(self, request: web.Request):
+        pass
 
     async def stripped_precomputed_info(self, request: web.Request) -> web.Response:
         """Serves a precomp info stripped of all but one scales"""
@@ -436,7 +390,7 @@ if __name__ == '__main__':
         server_context = contextlib.nullcontext()
 
     with server_context:
-        WsPixelClassificationWorkflow(
+        WebIlastik(
             ebrains_user_token=UserToken(access_token=args.ebrains_user_access_token),
             ssl_context=ssl_context
         ).run(
