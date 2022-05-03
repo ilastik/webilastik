@@ -47,7 +47,7 @@ class UserToken:
     def from_environment(cls) -> "UserToken | UsageError":
         access_token = os.environ.get(cls.ENV_VAR_NAME)
         if access_token is None:
-            return UsageError("Environment variable '{cls.ENV_VAR_NAME}' is not set")
+            return UsageError(f"Environment variable '{cls.ENV_VAR_NAME}' is not set")
         return UserToken(access_token=access_token)
 
     @classmethod

@@ -1,10 +1,9 @@
 # pyright: reportUnusedCallResult=false
 # pyright: strict
 
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import Executor
 from pathlib import PurePosixPath
 from typing import Callable, Mapping
-import multiprocessing
 import io
 
 import h5py
@@ -33,12 +32,11 @@ class PixelClassificationWorkflow:
         *,
         ebrains_user_token: UserToken,
         on_async_change: Callable[[], None],
+        executor: Executor,
+        priority_executor: PriorityExecutor,
     ):
         super().__init__()
         UserToken.login_globally(ebrains_user_token)
-
-        num_workers = multiprocessing.cpu_count()
-        executor = ProcessPoolExecutor(max_workers=num_workers) #FIXME
 
         self.brushing_applet = WsBrushingApplet("brushing_applet")
         self.feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", datasources=self.brushing_applet.datasources)
@@ -53,7 +51,7 @@ class PixelClassificationWorkflow:
 
         self.export_applet = WsPixelClassificationExportApplet(
             name="export_applet",
-            priority_executor=PriorityExecutor(executor=executor, num_concurrent_tasks=num_workers),
+            priority_executor=priority_executor,
             operator=self.pixel_classifier_applet.pixel_classifier,
             datasource_suggestions=self.brushing_applet.datasources.transformed_with(
                 lambda datasources: tuple(ds for ds in datasources if isinstance(ds, FsDataSource))

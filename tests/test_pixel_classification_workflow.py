@@ -7,45 +7,34 @@ import numpy as np
 from tests import create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations, get_sample_feature_extractors, get_test_output_osfs
 from webilastik.datasource import DataRoi, FsDataSource
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
+from webilastik.libebrains.user_token import UserToken
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
 from webilastik.ui.applet.brushing_applet import BrushingApplet
 from webilastik.ui.applet import dummy_prompt
 from webilastik.ui.applet.pixel_predictions_export_applet import WsPixelClassificationExportApplet
 from webilastik.ui.applet.ws_pixel_classification_applet import WsPixelClassificationApplet
+from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
 
 
 
 
-if __name__ == "__main__":
-    executor = ThreadPoolExecutor(max_workers=4)
-    priority_executor = PriorityExecutor(executor=executor, num_concurrent_tasks=2)
+def test_pixel_classification_workflow():
+    executor = ThreadPoolExecutor()
+    priority_executor = PriorityExecutor(executor=executor, num_concurrent_tasks=3)
 
-
-    brushing_applet = BrushingApplet("brushing_applet")
-    feature_selection_applet = FeatureSelectionApplet("feature_selection_applet", datasources=brushing_applet.datasources)
-    pixel_classifier_applet = WsPixelClassificationApplet(
-        name="pixel_classifier_applet",
-        feature_extractors=feature_selection_applet.feature_extractors,
-        annotations=brushing_applet.annotations,
+    workflow = PixelClassificationWorkflow(
+        ebrains_user_token=UserToken.get_global_token_or_raise(),
+        on_async_change=lambda : print(json.dumps(workflow.export_applet._get_json_state(), indent=4)),
         executor=executor,
-        on_async_change=lambda : None,#print(f"Pixel classifier applet changed! {json.dumps(pixel_classifier_applet._get_json_state(), indent=4)}")
-    )
-    export_applet = WsPixelClassificationExportApplet(
-        name="pixel_classification_export_applet",
-        on_async_change=lambda : print(json.dumps(export_applet._get_json_state(), indent=4)),
         priority_executor=priority_executor,
-        operator=pixel_classifier_applet.pixel_classifier,
-        datasource_suggestions=brushing_applet.datasources.transformed_with(
-            lambda datasources: tuple(ds for ds in datasources if isinstance(ds, FsDataSource))
-        )
     )
 
     # GUI turns on live update
-    _ = pixel_classifier_applet.set_live_update(dummy_prompt, live_update=True)
+    _ = workflow.pixel_classifier_applet.set_live_update(dummy_prompt, live_update=True)
 
     # GUI creates some feature extractors
-    _ = feature_selection_applet.add_feature_extractors(
+    _ = workflow.feature_selection_applet.add_feature_extractors(
         user_prompt=dummy_prompt,
         feature_extractors=get_sample_feature_extractors(),
     )
@@ -53,14 +42,14 @@ if __name__ == "__main__":
     pixel_annotations = get_sample_c_cells_pixel_annotations()
 
     # GUI creates some annotations
-    _ = brushing_applet.add_annotations(
+    _ = workflow.brushing_applet.add_annotations(
         user_prompt=dummy_prompt,
         annotations=pixel_annotations,
     )
 
-    time.sleep(3)
+    time.sleep(5)
 
-    classifier = pixel_classifier_applet.pixel_classifier()
+    classifier = workflow.pixel_classifier_applet.pixel_classifier()
     assert classifier != None
 
     # # calculate predictions on an entire data source
@@ -83,7 +72,7 @@ if __name__ == "__main__":
     )
 
     print(f"Sending predictions job request??????")
-    result = export_applet.start_export_job(
+    result = workflow.export_applet.start_export_job(
         datasource=raw_data_source,
         datasink=predictions_export_datasink
     )
@@ -120,7 +109,7 @@ if __name__ == "__main__":
     ]
 
     print(f"Sending simple segmentation job request??????")
-    result = export_applet.start_simple_segmentation_export_job(
+    result = workflow.export_applet.start_simple_segmentation_export_job(
         datasource=raw_data_source,
         datasinks=simple_segmentation_datasinks,
     )
@@ -137,8 +126,9 @@ if __name__ == "__main__":
     for tile in segmentation_output_1.roi.get_datasource_tiles():
         tile.retrieve().show_images()
 
+    priority_executor.shutdown()
+
 
 ##################################################3333
-
-    priority_executor.shutdown()
-    executor.shutdown()
+if __name__ == "__main__":
+    test_pixel_classification_workflow()

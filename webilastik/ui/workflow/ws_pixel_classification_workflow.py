@@ -1,8 +1,10 @@
 # pyright: reportUnusedCallResult=false
 
 from asyncio.events import AbstractEventLoop
+from concurrent.futures.process import ProcessPoolExecutor
 from dataclasses import dataclass
 from functools import partial
+import multiprocessing
 import os
 import signal
 import asyncio
@@ -23,6 +25,7 @@ from aiohttp.web_app import Application
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
+from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError
 from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
@@ -116,9 +119,14 @@ class WebIlastik:
         self._http_client_session: Optional[ClientSession] = None
         self._loop: Optional[AbstractEventLoop] = None
 
+        self.executor = ProcessPoolExecutor(max_workers=multiprocessing.cpu_count())
+        self.priority_executor = PriorityExecutor(executor=self.executor, num_concurrent_tasks=multiprocessing.cpu_count())
+
         self.workflow = PixelClassificationWorkflow(
             ebrains_user_token=ebrains_user_token,
             on_async_change=lambda : self.enqueue_user_interaction(lambda: None), #FIXME?
+            executor=self.executor,
+            priority_executor=self.priority_executor
         )
         self.app = web.Application()
         self.app.add_routes([
@@ -196,7 +204,9 @@ class WebIlastik:
         return web.Response()
 
     async def _self_destruct(self, after_seconds: int = 5):
-        _ = await asyncio.sleep(5)
+        _ = await asyncio.sleep(after_seconds)
+        self.priority_executor.shutdown()
+        self.executor.shutdown()
         try:
             pid = os.getpid()
             pgid = os.getpgid(pid)
