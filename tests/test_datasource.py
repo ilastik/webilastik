@@ -64,7 +64,7 @@ raw_4_5x2_4y = np.asarray([
 
 def create_png(array: Array5D) -> PurePosixPath:
     png_path = tempfile.mkstemp()[1] + ".png"
-    skimage.io.imsave(png_path, array.raw("yxc")) # type: ignore
+    skimage.io.imsave(png_path, array.raw("yxc"))
     return PurePosixPath(png_path)
 
 
@@ -96,10 +96,10 @@ def create_h5(array: Array5D, axiskeys_style: str, chunk_shape: Optional[Shape5D
     raw_chunk_shape = (chunk_shape or Shape5D() * 2).clamped(maximum=array.shape).to_tuple(axiskeys)
 
     path = tempfile.mkstemp()[1] + ".h5"
-    f = h5py.File(path, "w") #type: ignore #FIXME
+    f = h5py.File(path, "w")
     ds = f.create_dataset("data", chunks=raw_chunk_shape, data=array.raw(axiskeys))
     if axiskeys_style == "dims":
-        for key, dim in zip(axiskeys, ds.dims): # type: ignore
+        for key, dim in zip(axiskeys, ds.dims):
             dim.label = key
     elif axiskeys_style == "vigra":
         type_flags = {"x": 2, "y": 2, "z": 2, "t": 2, "c": 1}
@@ -119,7 +119,7 @@ def png_image() -> Iterator[PurePosixPath]:
 
 
 def tile_equals(tile: DataSource, axiskeys: str, raw: "np.ndarray[Any, Any]") -> bool:
-    return (tile.retrieve().raw(axiskeys) == raw).all() # type: ignore
+    return (tile.retrieve().raw(axiskeys) == raw).all()
 
 
 def test_retrieve_roi_smaller_than_tile():
@@ -182,7 +182,7 @@ def test_h5_datasource():
     assert ds.tile_shape == Shape5D(x=3, y=3)
 
     slc = ds.interval.updated(x=(0, 3), y=(0, 2))
-    assert (ds.retrieve(slc).raw("yx") == data_2d.cut(slc).raw("yx")).all() #type: ignore
+    assert (ds.retrieve(slc).raw("yx") == data_2d.cut(slc).raw("yx")).all()
 
     data_3d = Array5D(np.arange(10 * 10 * 10).reshape(10, 10, 10), axiskeys="zyx")
     h5_path = create_h5(data_3d, axiskeys_style="vigra", chunk_shape=Shape5D(x=3, y=3))
@@ -191,7 +191,7 @@ def test_h5_datasource():
     assert ds.tile_shape == Shape5D(x=3, y=3)
 
     slc = ds.interval.updated(x=(0, 3), y=(0, 2), z=3)
-    assert (ds.retrieve(slc).raw("yxz") == data_3d.cut(slc).raw("yxz")).all() #type: ignore
+    assert (ds.retrieve(slc).raw("yxz") == data_3d.cut(slc).raw("yxz")).all()
 
 
 
@@ -280,12 +280,12 @@ def test_neighboring_tiles():
 
     # fmt: on
 
-    assert (fifties_slice.retrieve().raw("yx") == expected_fifties_slice.raw("yx")).all() # type: ignore
+    assert (fifties_slice.retrieve().raw("yx") == expected_fifties_slice.raw("yx")).all()
 
     for neighbor in fifties_slice.get_neighboring_tiles(tile_shape=Shape5D(x=3, y=3)):
         try:
             expected_slice = fifties_neighbor_data.pop(neighbor)
-            assert (expected_slice.raw("yx") == neighbor.retrieve().raw("yx")).all() # type: ignore
+            assert (expected_slice.raw("yx") == neighbor.retrieve().raw("yx")).all()
         except KeyError:
             print(f"\nWas searching for ", neighbor, "\n")
             for k in fifties_neighbor_data.keys():
@@ -399,11 +399,11 @@ def test_sequence_datasource():
     seq_ds = SequenceDataSource(datasources=stack_h5s("z"), stack_axis="z")
     assert seq_ds.shape == Shape5D(x=5, y=4, c=3, z=3)
     data = seq_ds.retrieve(**slice_x_2_4__y_1_3)
-    assert (expected_x_2_4__y_1_3.raw("xyzc") == data.raw("xyzc")).all() # type: ignore
+    assert (expected_x_2_4__y_1_3.raw("xyzc") == data.raw("xyzc")).all()
 
     seq_ds = SequenceDataSource(datasources=stack_h5s("z"), stack_axis="z")
     data = seq_ds.retrieve(**slice_x_2_4__y_1_3)
-    assert (expected_x_2_4__y_1_3.raw("xyzc") == data.raw("xyzc")).all() # type: ignore
+    assert (expected_x_2_4__y_1_3.raw("xyzc") == data.raw("xyzc")).all()
 
 
 # def test_relabeling_datasource():

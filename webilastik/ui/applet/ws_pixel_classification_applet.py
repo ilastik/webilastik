@@ -77,7 +77,7 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
         )
 
     async def precomputed_chunks_compute(self, request: web.Request) -> web.Response:
-        encoded_raw_data = str(request.match_info.get("encoded_raw_data")) # type: ignore
+        encoded_raw_data = str(request.match_info.get("encoded_raw_data"))
         generation = int(request.match_info.get("generation")) # type: ignore
         xBegin = int(request.match_info.get("xBegin")) # type: ignore
         xEnd = int(request.match_info.get("xEnd")) # type: ignore

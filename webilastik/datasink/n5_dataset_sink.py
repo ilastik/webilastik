@@ -19,8 +19,8 @@ class N5DatasetSink(DataSink):
         inner_path: PurePosixPath,
         attributes: N5DatasetAttributes
     ):
-        super().__init__( #type: ignore
-            dtype=attributes.dataType, #type: ignore
+        super().__init__(
+        dtype=attributes.dataType,
             tile_shape=attributes.blockSize,
             interval=attributes.dimensions.to_interval5d(),
         )

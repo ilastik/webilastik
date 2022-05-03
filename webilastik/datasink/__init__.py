@@ -25,7 +25,7 @@ class DataSink(ABC):
     ):
         self.tile_shape = tile_shape
         self.interval = interval
-        self.dtype = dtype # type: ignore
+        self.dtype = dtype
 
         self.shape = self.interval.shape
         self.location = interval.start
@@ -44,7 +44,7 @@ class DataSink(ABC):
             "tile_shape": self.tile_shape.to_json_value(),
             "interval": self.interval.to_json_value(),
             "shape": self.shape.to_json_value(),
-            "dtype": str(self.dtype.name), #type: ignore
+            "dtype": str(self.dtype.name),
         }
 
     @classmethod

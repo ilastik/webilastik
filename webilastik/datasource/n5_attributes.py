@@ -220,7 +220,7 @@ class N5DatasetAttributes:
         return N5DatasetAttributes(
             blockSize=Shape5D.create(raw_shape=blockSize[::-1], axiskeys=c_axiskeys),
             dimensions=Shape5D.create(raw_shape=dimensions[::-1], axiskeys=c_axiskeys),
-            dataType=np.dtype(ensureJsonString(raw_attributes.get("dataType"))).newbyteorder(">"), # type: ignore
+            dataType=np.dtype(ensureJsonString(raw_attributes.get("dataType"))).newbyteorder(">"),
             c_axiskeys=c_axiskeys,
             compression=N5Compressor.from_json_data(raw_attributes["compression"]),
             location=location_override or location_5d,

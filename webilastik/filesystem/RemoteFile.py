@@ -1,3 +1,4 @@
+import pickle
 import io
 from typing import Callable, Any
 from typing_extensions import TypeAlias
@@ -5,14 +6,14 @@ import array
 import ctypes
 import mmap
 
-#stolen from typeshed:
-
+# copied from typeshed:
 ReadOnlyBuffer: TypeAlias = bytes  # stable
 # Anything that implements the read-write buffer interface.
 # The buffer interface is defined purely on the C level, so we cannot define a normal Protocol
-# for it. Instead we have to list the most common stdlib buffer classes in a Union.
-WriteableBuffer: TypeAlias = "bytearray | memoryview | array.array[Any] | mmap.mmap | ctypes._CData"  # stable
-# Same as _WriteableBuffer, but also includes read-only buffer types (like bytes).
+# for it (until PEP 688 is implemented). Instead we have to list the most common stdlib buffer classes in a Union.
+WriteableBuffer: TypeAlias = "bytearray | memoryview | array.array[Any] | mmap.mmap | ctypes._CData | pickle.PickleBuffer"
+
+
 ReadableBuffer: TypeAlias = "ReadOnlyBuffer | WriteableBuffer"  # stable
 
 

@@ -91,10 +91,10 @@ class PrecomputedChunksDataSource(FsDataSource):
         try:
             with self.filesystem.openbin(tile_path.as_posix()) as f:
                 raw_tile_bytes = f.read()
-            tile_5d = self.scale.encoding.decode(roi=tile, dtype=self.dtype, raw_chunk=raw_tile_bytes) #type: ignore
+            tile_5d = self.scale.encoding.decode(roi=tile, dtype=self.dtype, raw_chunk=raw_tile_bytes)
         except ResourceNotFound:
             logger.warn(f"tile {tile} not found. Returning zeros")
-            tile_5d = Array5D.allocate(interval=tile, dtype=self.info.data_type, value=0) #type: ignore #FIXME
+            tile_5d = Array5D.allocate(interval=tile, dtype=self.info.data_type, value=0)
         return tile_5d
 
     def __getstate__(self) -> JsonObject:

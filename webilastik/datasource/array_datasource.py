@@ -19,7 +19,7 @@ class ArrayDataSource(DataSource):
         if tile_shape is None:
             tile_shape = Shape5D.hypercube(256).to_interval5d().clamped(self._data.shape).shape
         super().__init__(
-            dtype=self._data.dtype, #type: ignore
+            dtype=self._data.dtype,
             tile_shape=tile_shape,
             interval=self._data.interval,
             spatial_resolution=spatial_resolution,

@@ -94,7 +94,7 @@ class DataSource(ABC):
         pass
 
     def _allocate(self, interval: Union[Shape5D, Interval5D], fill_value: int) -> Array5D:
-        return Array5D.allocate(interval, dtype=self.dtype, value=fill_value) #type: ignore #FIXME
+        return Array5D.allocate(interval, dtype=self.dtype, value=fill_value)
 
     def retrieve(
         self,

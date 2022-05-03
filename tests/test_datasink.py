@@ -32,7 +32,7 @@ def test_n5_attributes():
         dimensions=Shape5D(x=100, y=200),
         blockSize=Shape5D(x=10, y=20),
         c_axiskeys="yx",
-        dataType=np.dtype("uint16").newbyteorder(">"), #type: ignore
+        dataType=np.dtype("uint16").newbyteorder(">"),
         compression=GzipCompressor(level=3)
     )
 
@@ -139,4 +139,4 @@ def test_writing_to_offset_precomputed_chunks(tmp_path: PurePosixPath, data: Arr
     precomp_datasource = PrecomputedChunksDataSource(path=sink_path, filesystem=filesystem, resolution=scale.resolution)
 
     reloaded_data = precomp_datasource.retrieve(interval=data_at_1000_1000.interval)
-    assert (reloaded_data.raw("xyz") == data.raw("xyz")).all() # type: ignore
+    assert (reloaded_data.raw("xyz") == data.raw("xyz")).all()

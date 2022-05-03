@@ -22,7 +22,7 @@ class PrecomputedChunksEncoder(ABC):
         self,
         *,
         roi: Interval5D,
-        dtype: np.dtype, #type: ignore
+        dtype: "np.dtype[Any]",
         raw_chunk: bytes
     ) -> Array5D:
         pass
@@ -58,13 +58,13 @@ class RawEncoder(PrecomputedChunksEncoder):
         # "The (...) data (...) chunk is stored directly in little-endian binary format in [x, y, z, channel] Fortran order"
         raw_tile: np.ndarray[Any, Any] = np.frombuffer( #type: ignore
             raw_chunk,
-            dtype=dtype.newbyteorder("<") # type: ignore
+            dtype=dtype.newbyteorder("<")
         ).reshape(roi.shape.to_tuple("xyzc"), order="F")
         tile_5d = Array5D(raw_tile, axiskeys="xyzc", location=roi.start)
         return tile_5d
 
     def encode(self, data: Array5D) -> bytes:
-        return data.raw("xyzc").tobytes("F") #type: ignore #FIXME
+        return data.raw("xyzc").tobytes("F")
 
 class JpegEncoder(PrecomputedChunksEncoder):
     def to_json_value(self) -> JsonValue:
@@ -264,7 +264,7 @@ class PrecomputedChunksInfo:
     def stripped(self, resolution: Tuple[int, int, int]) -> "PrecomputedChunksInfo":
         return PrecomputedChunksInfo(
             type_=self.type_,
-            data_type=self.data_type, #type: ignore
+            data_type=self.data_type,
             num_channels=self.num_channels,
             scales=tuple([self.get_scale_5d(resolution=resolution)])
         )
@@ -282,7 +282,7 @@ class PrecomputedChunksInfo:
         return (
             isinstance(other, PrecomputedChunksInfo) and
             self.type_ == other.type_ and
-            self.data_type == other.data_type and #type: ignore
+            self.data_type == other.data_type and
             self.num_channels == other.num_channels and
             self.scales == other.scales
         )
@@ -307,7 +307,7 @@ class PrecomputedChunksInfo:
             raise ValueError(f"Bad 'type' marker value: {type_}")
         return PrecomputedChunksInfo(
             type_=type_,
-            data_type=np.dtype(ensureJsonString(data_dict.get("data_type"))), #type: ignore
+            data_type=np.dtype(ensureJsonString(data_dict.get("data_type"))),
             num_channels=ensureJsonInt(data_dict.get("num_channels")),
             scales=tuple(
                 PrecomputedChunksScale.from_json_value(raw_scale)
@@ -319,7 +319,7 @@ class PrecomputedChunksInfo:
         return {
             "@type": "neuroglancer_multiscale_volume",
             "type": self.type_,
-            "data_type": str(self.data_type.name), #type: ignore
+            "data_type": str(self.data_type.name),
             "num_channels": self.num_channels,
             "scales": tuple(scale.to_json_value() for scale in self.scales),
         }

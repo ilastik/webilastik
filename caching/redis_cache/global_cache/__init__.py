@@ -10,7 +10,7 @@ T = TypeVar("T", bound=Callable[..., Any])
 
 redis_pool = redis.BlockingConnectionPool()
 
-def _redis_cache(func: T) -> T:
+def _redis_cache(func: T) -> T: #FIXME: use Callabe[P, OUT] ?
     @wraps(func)
     def wrapper(*args, **kwargs):
         r = redis.Redis(connection_pool=redis_pool)
@@ -20,9 +20,9 @@ def _redis_cache(func: T) -> T:
         if raw_value is not None:
             value = pickle.loads(raw_value)
         else:
-            value = func(*args, **kwargs) #type: ignore
+            value = func(*args, **kwargs)
             _ = r.set(key, pickle.dumps(value))
-        return value #type: ignore
+        return value
     return wrapper #type: ignore
 
 global_cache = _redis_cache

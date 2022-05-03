@@ -68,7 +68,7 @@ class ConnectedComponents(ScalarData):
         assert data.shape.t == 1  # FIXME: iterate over time frames?
 
         raw_axes = "xyz"
-        labeled_raw, num_labels = skmeasure.label(data.raw(raw_axes), background=background, return_num=True) #type: ignore
+        labeled_raw, num_labels = skmeasure.label(data.raw(raw_axes), background=background, return_num=True)
         all_labels = set(range(1, num_labels + 1))
         return ConnectedComponents(labeled_raw, axiskeys=raw_axes, location=data.location, labels=all_labels)
 
