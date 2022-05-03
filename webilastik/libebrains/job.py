@@ -30,6 +30,7 @@ class Memory:
     def __init__(self, amount: int, unit: Literal["G"]) -> None:
         self.amount = amount
         self.unit = unit
+        super().__init__()
 
     def to_json_value(self) -> str:
         return f"{self.amount}{self.unit}"
@@ -167,6 +168,7 @@ class JobProxyClient:
 
     def __init__(self, http_client_session: aiohttp.ClientSession) -> None:
         self.http_client_session = http_client_session
+        super().__init__()
 
     async def start_job(
         self, *, job_def: JobDescription, site: SiteName, service_account_token: UserToken,

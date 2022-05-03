@@ -39,6 +39,7 @@ class PropagationOk(PropagationResult):
 class PropagationError(PropagationResult):
     def __init__(self, message: str) -> None:
         self.message = message
+        super().__init__()
 
     def _abstract_sentinel(self):
         return
@@ -59,6 +60,7 @@ class Applet(ABC):
                     _ = field.subscribe(self) # type: ignore
                     self.upstream_applets.add(field.applet)
                     self.upstream_applets.update(field.applet.upstream_applets)
+        super().__init__()
 
     @abstractmethod
     def take_snapshot(self) -> Any:
@@ -128,6 +130,7 @@ class UserInteraction(Generic[P]):
         self._applet_method = applet_method
         self.__name__ = applet_method.__name__
         self.__self__ = applet
+        super().__init__()
 
     def __call__(self, user_prompt: UserPrompt, *args: P.args, **kwargs: P.kwargs) -> PropagationResult:
         applet_snapshot = self.applet.take_snapshot()
@@ -153,6 +156,7 @@ class _UserInteractionDescriptor(Generic[APPLET, P]):
         self.refresh_self = refresh_self
         self._applet_method = applet_method
         self.private_name: str = "__user_interaction_" + applet_method.__name__
+        super().__init__()
 
     def __get__(self, instance: APPLET, owner: Type[APPLET]) -> "UserInteraction[P]":
         if not hasattr(instance, self.private_name):
@@ -180,6 +184,7 @@ class AppletOutput(Generic[OUT]):
         self.applet = applet
         self.__name__ = name or method.__name__
         self.__self__ = applet
+        super().__init__()
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} {self.applet.name}.{self._method.__name__}>"
@@ -213,6 +218,7 @@ class applet_output(Generic[APPLET, OUT]):
     def __init__(self, method: Callable[[APPLET], OUT]):
         self._method = method
         self.private_name = "__output_slot_" + method.__name__
+        super().__init__()
 
     def __get__(self, instance: APPLET, owner: Type[APPLET]) -> "AppletOutput[OUT]":
         if not hasattr(instance, self.private_name):

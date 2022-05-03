@@ -22,6 +22,7 @@ class DeveloperToken:
         self.refresh_token = refresh_token
         self.scope = scope
         self.token_type = token_type
+        super().__init__()
 
     @classmethod
     def get(cls, username: str, password: str) -> "DeveloperToken":

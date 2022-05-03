@@ -42,6 +42,7 @@ class UserToken:
         # self.not_before_policy = not_before_policy
         # self.session_state = session_state
         # self.scope = scope
+        super().__init__()
 
     @classmethod
     def from_environment(cls) -> "UserToken | UsageError":

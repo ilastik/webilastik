@@ -23,6 +23,7 @@ class ReverseSshTunnel:
         self.local_unix_socket = ("" if local_unix_socket.anchor else "./") + str(local_unix_socket)
         self.tunnel_control_socket = self.local_unix_socket + ".control"
         self.tunnel_process: "Popen[bytes] | None" = None
+        super().__init__()
 
     def _delete_sockets(self):
         result = subprocess.run(

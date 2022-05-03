@@ -108,6 +108,7 @@ class PrecomputedChunksScale:
         self.voxel_offset = (0,0,0) if voxel_offset is None else voxel_offset
         self.chunk_sizes = chunk_sizes
         self.encoding = encoding
+        super().__init__()
 
     @classmethod
     def from_datasource(
@@ -239,6 +240,7 @@ class PrecomputedChunksInfo:
             raise ValueError("num_channels must be greater than 0", self.__dict__)
         if len(scales) == 0:
             raise ValueError("Must provide at least one scale", self.__dict__)
+        super().__init__()
 
     @classmethod
     def from_datasource(

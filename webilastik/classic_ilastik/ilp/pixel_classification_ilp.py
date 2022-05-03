@@ -73,6 +73,7 @@ class IlpPixelClassificationGroup:
         if not all(isinstance(a.raw_data, FsDataSource) for a in annotations):
             # FIXME: autocontext?
             raise ValueError(f"For now, all annotations must be on datasources present in the fylesystem in order to be saved")
+        super().__init__()
 
     def to_ilp_data(self) -> Dict[str, Any]:
         if self.classifier:

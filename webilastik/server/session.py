@@ -93,6 +93,7 @@ class LocalSession(Session):
         self.socket_at_master = socket_at_master
         self.master_username = master_username
         self.master_host = master_host
+        super().__init__()
 
     def get_id(self) -> UUID:
         return self.session_id

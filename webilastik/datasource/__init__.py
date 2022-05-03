@@ -52,6 +52,7 @@ class DataSource(ABC):
         self.location = interval.start
         self.spatial_resolution = spatial_resolution or (1,1,1)
         self.roi = DataRoi(self, **self.interval.to_dict())
+        super().__init__()
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} {self.interval}>"

@@ -13,6 +13,7 @@ class Thresholder(Operator[DataRoi, Array5D]):
     def __init__(self, *, threshold: float, preprocessor: Operator[DataRoi, Array5D] = OpRetriever()):
         self.preprocessor = preprocessor
         self.threshold = threshold
+        super().__init__()
 
     def __hash__(self) -> int:
         return hash((self.preprocessor, self.threshold))

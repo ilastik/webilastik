@@ -36,6 +36,7 @@ class BucketObject:
         self.bytes = bytes_
         self.name = name
         self.content_type = content_type
+        super().__init__()
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "BucketObject":
@@ -63,6 +64,7 @@ class BucketSubdir:
         # self.bytes = bytes
         # self.last_modified = last_modified
         # self.objects_count = objects_count
+        super().__init__()
 
     @property
     def name(self) -> str:

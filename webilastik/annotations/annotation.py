@@ -23,6 +23,7 @@ class Color:
         self.b = b
         self.a = a
         self.name = name or f"Label {self.rgba}"
+        super().__init__()
 
     @classmethod
     def from_json_data(cls, data: JsonValue) -> "Color":

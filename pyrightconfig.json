@@ -1,8 +1,11 @@
 {
-  "include": ["webilastik/", "test/", "caching/"],
+  "include": ["webilastik/", "tests/", "caching/"],
   "exclude": ["build/"],
   "strict": ["webilastik/datasource", "webilastik/datasink"],
   "typeCheckingMode": "basic",
+  "reportMissingSuperCall": "error",
+  "reportUnnecessaryTypeIgnoreComment":"error",
+  "reportUninitializedInstanceVariable": "error",
   "reportUnknownMemberType": false,
   "reportIncompatibleMethodOverride": true,
   "reportMissingTypeArgument": true,

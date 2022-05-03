@@ -29,6 +29,7 @@ class DataSink(ABC):
 
         self.shape = self.interval.shape
         self.location = interval.start
+        super().__init__()
 
     @abstractmethod
     def create(self) -> "Exception | DataSinkWriter":

@@ -45,6 +45,7 @@ class EbrainsSession:
 
     def __init__(self, user_token: UserToken):
         self.user_token = user_token
+        super().__init__()
 
     @classmethod
     async def from_cookie(cls, request: web.Request, http_client_session: ClientSession) -> Optional["EbrainsSession"]:
@@ -137,6 +138,7 @@ class SessionAllocator(Generic[SESSION_TYPE]):
                 follow_symlinks=True, show_index=True
             ),
         ])
+        super().__init__()
 
     @property
     def http_client_session(self) -> ClientSession:

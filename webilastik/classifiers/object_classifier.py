@@ -14,6 +14,7 @@ class ObjectClassifier:
     def __init__(self, *, feature_extractor: ObjectFeatureExtractor, forests: List[VigraRandomForest]):
         self.feature_extractor = feature_extractor
         self.forests = forests
+        super().__init__()
 
     @classmethod
     def train(

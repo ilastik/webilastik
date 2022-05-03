@@ -97,6 +97,7 @@ class ConnectedComponentsExtractor(Operator[DataRoi, ConnectedComponents]):
         self.object_channel_idx = object_channel_idx
         self.expansion_step = expansion_step
         self.maximum_tile_size = maximum_tile_size
+        super().__init__()
 
     def __hash__(self) -> int:
         return hash((self.preprocessor, self.object_channel_idx, self.expansion_step, self.maximum_tile_size))

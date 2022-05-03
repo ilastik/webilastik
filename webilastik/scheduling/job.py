@@ -141,6 +141,7 @@ class _Task(ABC,  Generic[_T]):
         self.priority = priority
         self.creation_time = time.time()
         self.uuid = uuid.uuid4()
+        super().__init__()
 
     def __lt__(self, other: object) -> bool:
         if not isinstance(other, _Task):
@@ -257,6 +258,7 @@ class PriorityExecutor(Executor):
 
         self._enqueueing_thread = threading.Thread(group=None, target=self._enqueueing_target)
         self._enqueueing_thread.start()
+        super().__init__()
 
     def shutdown(self, wait: bool = True) -> None:
         with self._lock:

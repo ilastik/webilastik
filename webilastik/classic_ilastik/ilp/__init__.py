@@ -39,6 +39,7 @@ class IlpAttrDataset:
     ) -> None:
         self.value = value
         self.attrs = attrs
+        super().__init__()
 
 IlpDatasetValue: TypeAlias = "IlpDatasetContents | IlpAttrDataset"
 IlpGroup: TypeAlias = Mapping[str, "IlpValue"]
@@ -98,6 +99,7 @@ class IlpProject(ABC):
         self.currentApplet = currentApplet or 0
         self.ilastikVersion = ilastikVersion or "1.3.2post1"
         self.time = time or datetime.now()
+        super().__init__()
 
     def to_ilp_data(self) -> IlpGroup:
         return {
@@ -156,6 +158,7 @@ class IlpDataSource:
         self.display_mode = display_mode
         self.normalizeDisplay = normalizeDisplay
         self.drange = drange
+        super().__init__()
 
 
     def to_ilp_data(self) -> IlpGroup:
@@ -178,6 +181,7 @@ class IlpDataSource:
 class IlpLane: #FIXME: generic over TypeVarTuple(..., bound=Literal["Raw Data", "Prediciton Mask", ...])
     def __init__(self, roles: Mapping[str, IlpDataSource]) -> None:
         self.roles = roles
+        super().__init__()
 
     @property
     def Role_Names(self) -> "ndarray[Any, Any]":
@@ -192,6 +196,7 @@ class IlpLane: #FIXME: generic over TypeVarTuple(..., bound=Literal["Raw Data", 
 class IlpInputDataGroup:
     def __init__(self, lanes: Sequence[IlpLane]) -> None:
         self.lanes = lanes
+        super().__init__()
 
     def to_ilp_data(self) -> IlpGroup:
         return {
@@ -215,6 +220,7 @@ class IlpFeatureSelectionsGroup:
 
     def __init__(self, feature_extractors: Sequence[IlpFilter]) -> None:
         self.feature_extractors = feature_extractors
+        super().__init__()
 
     def to_ilp_data(self) -> IlpGroup:
         if len(self.feature_extractors) == 0:

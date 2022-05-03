@@ -122,6 +122,7 @@ class OidcClient:
         self.standardFlowEnabled = standardFlowEnabled
         self.surrogateAuthRequired = surrogateAuthRequired
         self.webOrigins = webOrigins
+        super().__init__()
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "OidcClient":

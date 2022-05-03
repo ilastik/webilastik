@@ -59,6 +59,7 @@ class N5Compressor(ABC):
 class GzipCompressor(N5Compressor):
     def __init__(self, level: int = 1):
         self.level = level
+        super().__init__()
 
     @classmethod
     def get_label(cls) -> str:
@@ -86,6 +87,7 @@ class GzipCompressor(N5Compressor):
 class Bzip2Compressor(N5Compressor):
     def __init__(self, blockSize: int = 9):
         self.blockSize = blockSize
+        super().__init__()
 
     @classmethod
     def get_label(cls) -> str:
@@ -113,6 +115,7 @@ class Bzip2Compressor(N5Compressor):
 class XzCompressor(N5Compressor):
     def __init__(self, preset: int = 6):
         self.preset = preset
+        super().__init__()
 
     @classmethod
     def get_label(cls) -> str:
@@ -174,6 +177,7 @@ class N5DatasetAttributes:
         self.compression = compression
         self.location = location
         self.interval = self.dimensions.to_interval5d(self.location)
+        super().__init__()
 
     def get_tile_path(self, tile: Interval5D) -> Path:
         "Gets the relative path into the n5 dataset where 'tile' should be stored"

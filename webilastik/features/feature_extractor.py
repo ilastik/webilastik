@@ -41,6 +41,7 @@ class FeatureExtractorCollection(FeatureExtractor):
     def __init__(self, extractors: Iterable[FeatureExtractor]):
         self.extractors = tuple(extractors)
         assert len(self.extractors) > 0
+        super().__init__()
 
     def is_applicable_to(self, datasource: DataSource) -> bool:
         return all(fx.is_applicable_to(datasource) for fx in self.extractors)

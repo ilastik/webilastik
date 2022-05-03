@@ -45,6 +45,7 @@ class PeekableIterator(Generic[A]):
             self.next_arg = next(self.args)
         except StopIteration:
             pass
+        super().__init__()
 
     def has_next(self) -> bool:
         return not isinstance(self.next_arg, _Empty)
@@ -64,6 +65,7 @@ class DebugLock:
         self._lock = threading.Lock()
         self.timeout = timeout
         self.traceback: "StackSummary | None" = None
+        super().__init__()
 
     def __enter__(self, *args, **kwargs) -> "DebugLock":
         got_it = self._lock.acquire(timeout=self.timeout)

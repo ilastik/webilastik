@@ -1,6 +1,7 @@
 import threading
 from typing import Any, Callable, Dict, Generic, Iterable, List, Sequence
 from concurrent.futures import Executor, Future
+import typing
 import uuid
 
 import numpy as np
@@ -18,16 +19,19 @@ from webilastik.ui.applet import AppletOutput, StatelesApplet, UserPrompt
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.usage_error import UsageError
 
+@typing.final
 class ExportTask(Generic[IN]):
     def __init__(self, operator: Operator[IN, Array5D], sink_writer: DataSinkWriter):
         self.operator = operator
         self.sink_writer = sink_writer
+        super().__init__()
 
     def __call__(self, step_arg: IN):
         tile = self.operator.compute(step_arg)
         print(f"Writing tile {tile}")
         self.sink_writer.write(tile)
 
+@typing.final
 class ExportAsSimpleSegmentationTask:
     def __init__(self, operator: Operator[DataRoi, Array5D], sink_writers: Sequence[DataSinkWriter]):
         self.operator = SimpleSegmenter(preprocessor=operator)

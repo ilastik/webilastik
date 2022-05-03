@@ -4,6 +4,7 @@ import pickle
 from typing import Any, Iterator, List, Generic, Optional, Sequence, Dict, TypeVar
 import tempfile
 import os
+import typing
 import h5py
 import PIL
 import io
@@ -68,6 +69,7 @@ class Predictions(Array5D):
 
 FE = TypeVar("FE", bound=FeatureExtractor, covariant=True)
 
+@typing.final
 class TrainingData(Generic[FE]):
     feature_extractors: Sequence[FE]
     combined_extractor: FeatureExtractor
@@ -119,6 +121,7 @@ class PixelClassifier(Operator[DataRoi, Predictions], Generic[FE]):
         self.num_classes = len(classes)
         self.num_input_channels = num_input_channels
         self.color_map = color_map
+        super().__init__()
 
     @abstractmethod
     def _do_predict(self, roi: DataRoi) -> Predictions:
@@ -155,6 +158,7 @@ class PickableVigraRandomForest:
         with h5py.File(tmp_file_path, "r") as f:
             self._forest_data = read_h5_group(f["/Forest"])
         os.remove(tmp_file_path)
+        super().__init__()
 
     def __getstate__(self) -> IlpGroup:
         return self._forest_data

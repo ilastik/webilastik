@@ -170,6 +170,7 @@ class Url:
 
         if hostname == "" and protocol not in (Protocol.FILE, Protocol.MEMORY):
             raise ValueError(f"Missing hostname in {self.raw}")
+        super().__init__()
 
     def __hash__(self) -> int:
         return hash(self.raw)

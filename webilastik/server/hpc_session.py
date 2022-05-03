@@ -66,6 +66,7 @@ class HpcSession(Session):
     def __init__(self, session_id: UUID, job_id: UUID):
         self.session_id = session_id
         self.job_id = job_id
+        super().__init__()
 
     def get_id(self) -> UUID:
         return self.session_id
