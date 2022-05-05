@@ -19,6 +19,12 @@ vars:
   OVERLAY_BUNDLE_PATH: "{{.OVERLAY_DIR}}/build/inject_into_neuroglancer.js"
 
 tasks:
+  check:
+    env:
+      PYTHONPATH: "{{.PROJECT_ROOT}}"
+    cmds:
+      - pylint -j 0 --disable=all --enable=trailing-comma-tuple webilastik caching tests
+      - npx pyright
   create-build-dir:
     cmds:
       - mkdir -p {{.BUILD_DIR}}
