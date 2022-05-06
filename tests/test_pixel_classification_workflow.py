@@ -1,12 +1,15 @@
+from pathlib import PurePosixPath
 import time
 from concurrent.futures import ThreadPoolExecutor
 import json
 
 import numpy as np
+from ndstructs.utils.json_serializable import JsonObject, ensureJsonArray, ensureJsonInt, ensureJsonObject
 
 from tests import create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations, get_sample_feature_extractors, get_test_output_osfs
 from webilastik.datasource import DataRoi, FsDataSource
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
+from webilastik.filesystem.osfs import OsFs
 from webilastik.libebrains.user_token import UserToken
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
@@ -17,6 +20,22 @@ from webilastik.ui.applet.ws_pixel_classification_applet import WsPixelClassific
 from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
 
 
+def wait_until_jobs_completed(workflow: PixelClassificationWorkflow, timeout: float = 10):
+    wait_time = 0.2
+    while timeout > 0:
+        export_status: JsonObject = workflow.export_applet._get_json_state()
+        jobs = ensureJsonArray(export_status["jobs"])
+        for job in jobs:
+            job_obj = ensureJsonObject(job)
+            num_args = ensureJsonInt(job_obj["num_args"])
+            num_completed_steps = ensureJsonInt(job_obj["num_completed_steps"])
+            if num_completed_steps < num_args:
+                print(f"Jobs not done yet. Waiting...")
+                time.sleep(wait_time)
+                timeout -= wait_time
+                break
+        else:
+            return
 
 
 def test_pixel_classification_workflow():
@@ -47,7 +66,8 @@ def test_pixel_classification_workflow():
         annotations=pixel_annotations,
     )
 
-    time.sleep(5)
+    while workflow.pixel_classifier_applet.pixel_classifier() is None:
+        time.sleep(0.2)
 
     classifier = workflow.pixel_classifier_applet.pixel_classifier()
     assert classifier != None
@@ -79,9 +99,11 @@ def test_pixel_classification_workflow():
     assert result is None
 
     print(f"---> Job successfully scheduled? Waiting for a while")
-    time.sleep(10)
+    wait_until_jobs_completed(workflow=workflow)
     print(f"Done waiting. Checking outputs")
 
+    # _ = workflow.save_project(fs=OsFs("/tmp"), path=PurePosixPath("my_test.ilp"))
+    # exit(1)
 
     predictions_output = PrecomputedChunksDataSource(
         filesystem=output_fs,
@@ -115,7 +137,7 @@ def test_pixel_classification_workflow():
     )
 
     print(f"---> Job successfully scheduled? Waiting for a while")
-    time.sleep(5)
+    wait_until_jobs_completed(workflow=workflow)
     print(f"Done waiting. Checking outputs")
 
     segmentation_output_1 = PrecomputedChunksDataSource(
