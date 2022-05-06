@@ -1,7 +1,8 @@
 from abc import abstractmethod
 from functools import partial
+from pathlib import Path
 import pickle
-from typing import Any, Iterator, List, Generic, Optional, Sequence, Dict, TypeVar
+from typing import Any, Final, Iterator, List, Generic, NewType, Optional, Sequence, Dict, TypeVar
 import tempfile
 import os
 import typing
@@ -144,56 +145,42 @@ class PixelClassifier(Operator[DataRoi, Predictions], Generic[FE]):
             raise ValueError(f"Bad roi: {roi}. Expected roi to have shape.c={self.num_input_channels}")
         return self._do_predict(roi=roi)
 
+VigraForestH5Bytes = NewType("VigraForestH5Bytes", bytes)
 
-class PickableVigraRandomForest:
-    def __init__(self, forest: VigraRandomForest, forest_data: "Dict[str, Any] | None" = None) -> None:
-        self._forest: VigraRandomForest = forest
-        if forest_data:
-            self._forest_data = forest_data
-            return
+def dump_to_temp_file(contents: bytes) -> Path:
+    tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5") # FIXME
+    num_bytes_written = os.write(tmp_file_handle, contents)
+    assert num_bytes_written == len(contents)
+    os.close(tmp_file_handle)
+    return Path(tmp_file_path)
 
-        tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5") # FIXME
-        os.close(tmp_file_handle)
-        self._forest.writeHDF5(tmp_file_path, f"/Forest")
-        with h5py.File(tmp_file_path, "r") as f:
-            self._forest_data = read_h5_group(f["/Forest"])
-        os.remove(tmp_file_path)
-        super().__init__()
+def vigra_forest_to_h5_bytes(forest: VigraRandomForest) -> VigraForestH5Bytes:
+    tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5") # FIXME
+    os.close(tmp_file_handle)
+    forest.writeHDF5(tmp_file_path, f"/")
+    with open(tmp_file_path, "rb") as f:
+        out = VigraForestH5Bytes(f.read())
+    os.remove(tmp_file_path)
+    return out
 
-    def __getstate__(self) -> IlpGroup:
-        return self._forest_data
+def h5_bytes_to_vigra_forest(h5_bytes: VigraForestH5Bytes) -> VigraRandomForest:
+    tmp_file_path = dump_to_temp_file(h5_bytes)
+    out = VigraRandomForest(str(tmp_file_path), "/")
+    os.remove(tmp_file_path)
+    return out
 
-    def __setstate__(self, data: Dict[str, Any]):
-        tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5")
-        os.close(tmp_file_handle)
-        with h5py.File(tmp_file_path, "r+") as f:
-            forest_group = f.create_group("Forest")
-            populate_h5_group(forest_group, data)
-            forest = VigraRandomForest(tmp_file_path, forest_group.name)
-        os.remove(tmp_file_path)
-        self.__init__(forest=forest, forest_data=data)
-
-    def predict(self, feature_data: Array5D) -> "ndarray[Any, dtype[float32]]":
-        return self._forest.predictProbabilities(feature_data.linear_raw()) * self._forest.treeCount()
-
-    def treeCount(self) -> int:
-        return self._forest.treeCount()
-
-    def to_ilp_data(self) -> IlpGroup:
-        return self._forest_data
-
-def _train_forest(random_seed: int, num_trees: int, training_data: TrainingData[FE]) -> PickableVigraRandomForest:
+def _train_forest(random_seed: int, num_trees: int, training_data: TrainingData[FE]) -> VigraForestH5Bytes:
     forest = VigraRandomForest(num_trees)
     # forest.learnRF(training_data.X, training_data.y, random_seed)
-    forest.learnRF(training_data.X, training_data.y, 0)
-    return PickableVigraRandomForest(forest=forest)
+    _ = forest.learnRF(training_data.X, training_data.y, 0)
+    return vigra_forest_to_h5_bytes(forest)
 
 class VigraPixelClassifier(PixelClassifier[FE]):
     def __init__(
         self,
         *,
         feature_extractors: Sequence[FE],
-        forests: List[PickableVigraRandomForest],
+        forest_h5_bytes: "Sequence[VigraForestH5Bytes]",
         classes: List[np.uint8],
         num_input_channels: int,
         color_map: Dict[Color, np.uint8],
@@ -201,13 +188,9 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         super().__init__(
             classes=classes, feature_extractors=feature_extractors, num_input_channels=num_input_channels, color_map=color_map
         )
-        self.forests = forests
-        self.num_trees = sum(f.treeCount() for f in forests)
-
-    def to_ilp_forests(self) -> IlpGroup:
-        return {
-            f"Forest{forest_index:04}": forest.to_ilp_data() for forest_index, forest in enumerate(self.forests)
-        }
+        self.forest_h5_bytes: Final[Sequence[VigraForestH5Bytes]] = forest_h5_bytes
+        self.forests: Final[Sequence[VigraRandomForest]] = [h5_bytes_to_vigra_forest(forest_bytes) for forest_bytes in forest_h5_bytes]
+        self.num_trees: Final[int] = sum(f.treeCount() for f in self.forests)
 
     def get_expected_dtype(self, input_dtype: "dtype[Any]") -> "dtype[float32]":
         return np.dtype("float32")
@@ -227,7 +210,8 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         trees_per_forest = ((num_trees // num_forests) + (forest_index < num_trees % num_forests) for forest_index in range(num_forests))
 
         with ProcessPoolExecutor(max_workers=num_trees) as executor:
-            forests = list(executor.map(
+            # we're taking the bytes instead of the forest itself because vigra forests are not picklable
+            forests_bytes: Sequence[VigraForestH5Bytes] = list(executor.map(
                 partial(_train_forest, training_data=training_data),
                 random_seeds,
                 trees_per_forest
@@ -235,7 +219,7 @@ class VigraPixelClassifier(PixelClassifier[FE]):
 
         return cls(
             feature_extractors=feature_extractors,
-            forests=forests,
+            forest_h5_bytes=forests_bytes,
             num_input_channels=training_data.num_input_channels,
             classes=training_data.classes,
             color_map=training_data.color_map,
@@ -253,8 +237,9 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         assert predictions.interval == self.get_expected_roi(roi)
         raw_linear_predictions: "ndarray[Any, dtype[float32]]" = predictions.linear_raw()
 
+        #fixme: should this run in some sort of worker pool?
         for forest in self.forests:
-            raw_linear_predictions += forest.predict(feature_data)
+            raw_linear_predictions += forest.predictProbabilities(feature_data.linear_raw()) * forest.treeCount()
 
         raw_linear_predictions /= self.num_trees
         predictions.setflags(write=False)
@@ -272,13 +257,13 @@ class VigraPixelClassifier(PixelClassifier[FE]):
             "num_input_channels": self.num_input_channels,
             "classes": self.classes,
             "color_map": self.color_map,
-            "forests": self.forests
+            "forest_h5_bytes": self.forest_h5_bytes,
         }
 
     def __setstate__(self, data):
         self.__init__(
             feature_extractors=data["feature_extractors"],
-            forests=data["forests"],
+            forest_h5_bytes=data["forest_h5_bytes"],
             num_input_channels=data["num_input_channels"],
             classes=data["classes"],
             color_map=data["color_map"],
