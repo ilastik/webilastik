@@ -29,5 +29,5 @@ if version.hdf5_version_tuple != version.hdf5_built_version_tuple:
 if version.hdf5_version_tuple[: 3] >= get_config().vds_min_hdf5_version:
     ...
 
-__all__ = ["File", "Group", "Dataset"]
+__all__ = ["File", "Group", "Dataset", "AttributeManager"]
 
