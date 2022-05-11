@@ -3,6 +3,7 @@ from datetime import datetime
 import textwrap
 import pickle
 import time
+import h5py
 
 import numpy as np
 import vigra
@@ -11,11 +12,11 @@ from ndstructs.array5D import Array5D
 from ndstructs.point5D import Interval5D
 from webilastik.annotations.annotation import Color
 
-from webilastik.classic_ilastik.ilp import IlpAttrDataset, IlpDataSource, IlpFeatureSelectionsGroup, IlpGroup, IlpInputDataGroup, IlpLane, IlpProject, IlpValue
+from webilastik.classic_ilastik.ilp import IlpAttrDataset, IlpDatasetInfo, IlpFeatureSelectionsGroup, IlpGroup, IlpInputDataGroup, IlpLane, IlpProject, IlpValue
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.datasource import DataSource, FsDataSource
 from webilastik.annotations import Annotation
-from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
+from webilastik.classifiers.pixel_classifier import VigraPixelClassifier, dump_to_temp_file
 
 
 VIGRA_ILP_CLASSIFIER_FACTORY = textwrap.dedent(
@@ -57,7 +58,6 @@ VIGRA_ILP_CLASSIFIER_FACTORY = textwrap.dedent(
     ).encode("utf8")
 
 
-
 class IlpPixelClassificationGroup:
     def __init__(
         self,
@@ -75,7 +75,7 @@ class IlpPixelClassificationGroup:
             raise ValueError(f"For now, all annotations must be on datasources present in the fylesystem in order to be saved")
         super().__init__()
 
-    def to_ilp_data(self) -> Dict[str, Any]:
+    def populate_group(self, group: h5py.Group):
         if self.classifier:
             color_map = self.classifier.color_map
         else:
@@ -87,36 +87,17 @@ class IlpPixelClassificationGroup:
         LabelColors: "ndarray[Any, dtype[int64]]"  = np.asarray([color.rgba[:-1] for color in color_map.keys()], dtype=int64)
 
         # expected group keys to look like this:
-        # ['Bookmarks', 'ClassifierFactory', 'ClassifierForests', 'LabelColors', 'LabelNames', 'LabelSets', 'PmapColors', 'StorageVersion']>
-        out: Dict[str, IlpValue] = {
-            "Bookmarks": {
-                "0000": np.void(pickle.dumps([], 0)) # empty value is [], serialized with SerialPickleableSlot
-            },
-            "ClassifierFactory": VIGRA_ILP_CLASSIFIER_FACTORY,
-            # ClassifierForests set later
-            "LabelColors": LabelColors,
-            "LabelNames": np.asarray([color.name.encode("utf8") for color in color_map.keys()]),
-            # LabelSets set later
-            "PmapColors": LabelColors,
-            "StorageVersion": "0.1",
-        }
-
-        if self.classifier:
-            Forests: IlpGroup = self.classifier.to_ilp_forests() if self.classifier is not None else {}
-
-            feature_names: List[bytes] = []
-            get_feature_extractor_order = lambda ex: IlpFeatureSelectionsGroup.all_feature_names.index(ex.__class__.__name__)
-            for fe in sorted(self.feature_extractors, key=get_feature_extractor_order):
-                for c in range(self.classifier.num_input_channels * fe.channel_multiplier):
-                    feature_names.append(fe.get_ilp_name(c).encode("utf8"))
-
-            # ['Forest0000', ..., 'Forest000N', 'feature_names', 'known_labels', 'pickled_type']
-            out["ClassifierForests"] = {
-                **Forests,
-                "feature_names": np.asarray(feature_names),
-                "known_labels": np.asarray(self.classifier.classes).astype(np.uint32),
-                "pickled_type": b"clazyflow.classifiers.parallelVigraRfLazyflowClassifier\nParallelVigraRfLazyflowClassifier\np0\n.",
-            }
+        # ['Bookmarks', 'ClassifierFactory', 'LabelColors', 'LabelNames', 'PmapColors', 'StorageVersion', 'LabelSets', 'ClassifierForests']>
+        bookmark = group.create_group("Bookmarks").create_dataset("0000", data=np.void(pickle.dumps([], 0))) # empty value is [], serialized with SerialPickleableSlot
+        bookmark.attrs["version"] = 1
+        group["ClassifierFactory"] = VIGRA_ILP_CLASSIFIER_FACTORY
+        group["LabelColors"] = LabelColors
+        group["LabelColors"].attrs["isEmpty"] = False
+        group["LabelNames"] = np.asarray([color.name.encode("utf8") for color in color_map.keys()])
+        group["LabelNames"].attrs["isEmpty"] = False
+        group["PmapColors"] = LabelColors
+        group["PmapColors"].attrs["isEmpty"] = False
+        group["StorageVersion"] = "0.1".encode("utf8")
 
         merged_annotation_tiles: Dict[DataSource, Dict[Interval5D, Array5D]] = {}
         for annotation in self.annotations:
@@ -128,23 +109,38 @@ class IlpPixelClassificationGroup:
                 tile = merged_tiles.setdefault(interval, Array5D.allocate(interval=interval, value=0, dtype=np.dtype("uint8")))
                 tile.set(annotation_tile.colored(color_map[annotation.color]), mask_value=0)
 
-        LabelSets: Dict[str, Dict[str, IlpAttrDataset]] = {"labels000": {}}  # empty labels still produce this in classic ilastik
+        LabelSets = group.create_group("LabelSets")
         for lane_index, (lane_datasource, blocks) in enumerate(merged_annotation_tiles.items()):
-            assert isinstance(lane_datasource, FsDataSource)
+            assert isinstance(lane_datasource, FsDataSource) #FIXME? how do autocontext annotations work? They wouldn't be on FsDataSource
             axiskeys = lane_datasource.c_axiskeys_on_disk
-            LabelSets[f"labels{lane_index:03}"] = {
-                f"block{block_index:04d}": IlpAttrDataset(
-                    block.raw(axiskeys),
-                    attrs={
-                        "blockSlice": "[" + ",".join(f"{slc.start}:{slc.stop}" for slc in block.interval.updated(c=0).to_slices(axiskeys)) + "]",
-                        "axistags": vigra.defaultAxistags("xyz").toJSON()
-                    },
-                )
-                for block_index, block in enumerate(blocks.values())
-            }
-        out["LabelSets"] = LabelSets
+            label_set = LabelSets.create_group(f"labels{lane_index:03}")
+            for block_index, block in enumerate(blocks.values()):
+                labels_dataset = label_set.create_dataset(f"block{block_index:04d}", data=block.raw(axiskeys))
+                labels_dataset.attrs["blockSlice"] = "[" + ",".join(f"{slc.start}:{slc.stop}" for slc in block.interval.updated(c=0).to_slices(axiskeys)) + "]"
+                labels_dataset.attrs["axistags"] = vigra.defaultAxistags(axiskeys).toJSON()
+        if len(LabelSets.keys()) == 0:
+            _ = LabelSets.create_group("labels000")  # empty labels still produce this in classic ilastik
 
-        return out
+        if self.classifier:
+            # ['Forest0000', ..., 'Forest000N', 'feature_names', 'known_labels', 'pickled_type']
+            ClassifierForests = group.create_group("ClassifierForests")
+
+            feature_names: List[bytes] = []
+            get_feature_extractor_order = lambda ex: IlpFeatureSelectionsGroup.all_feature_names.index(ex.__class__.__name__)
+            for fe in sorted(self.classifier.feature_extractors, key=get_feature_extractor_order):
+                for c in range(self.classifier.num_input_channels * fe.channel_multiplier):
+                    feature_names.append(fe.get_ilp_name(c).encode("utf8"))
+
+            for forest_index, forest_bytes in enumerate(self.classifier.forest_h5_bytes):
+                forests_h5_path = dump_to_temp_file(forest_bytes)
+                with h5py.File(forests_h5_path, "r") as f:
+                    forest_group = f["/"]
+                    assert isinstance(forest_group, h5py.Group)
+                    ClassifierForests.copy(forest_group, f"Forest{forest_index:04}") # 'Forest0000', ..., 'Forest000N'
+
+            ClassifierForests["feature_names"] = np.asarray(feature_names)
+            ClassifierForests["known_labels"] = np.asarray(self.classifier.classes).astype(np.uint32)
+            ClassifierForests["pickled_type"] = b"clazyflow.classifiers.parallelVigraRfLazyflowClassifier\nParallelVigraRfLazyflowClassifier\np0\n."
 
 
 class IlpPixelClassificationWorkflowGroup(IlpProject):
@@ -179,7 +175,8 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
         return IlpPixelClassificationWorkflowGroup(
             Input_Data = IlpInputDataGroup(lanes=[
                 IlpLane(roles={
-                    "Raw Data": IlpDataSource(datasource=ds)
+                    "Raw Data": IlpDatasetInfo.from_datasource(datasource=ds),
+                    "Prediction Mask": None
                 })
                 for ds in datasources
                 if isinstance(ds, FsDataSource) #FIXME
@@ -190,25 +187,20 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
                 annotations=annotations,
                 classifier=classifier,
             ),
-            currentApplet=currentApplet,
+            currentApplet=2, #FIXME! !!!!!!!!!!!!!!!!
             ilastikVersion=ilastikVersion,
             time=time,
         )
 
 
-    def to_ilp_data(self) -> IlpGroup:
-        return {
-            "Input Data": self.Input_Data.to_ilp_data(),
-            "FeatureSelections": self.FeatureSelections.to_ilp_data(),
-            "PixelClassification": self.PixelClassification.to_ilp_data(),
-            "Prediction Export": {
-                "OutputFilenameFormat": "{dataset_dir}/{nickname}_{result_type}",
-                "OutputFormat": "hdf5",
-                "OutputInternalPath": "exported_data",
-                "StorageVersion": "0.1",
-            },
-            "currentApplet": 0,
-            "ilastikVersion": b"1.3.2post1",  # FIXME
-            "time": time.ctime().encode("utf-8"),  # FIXME
-            "workflowName": b"Pixel Classification",
-        }
+    def populate_group(self, group: h5py.Group):
+        super().populate_group(group)
+        self.Input_Data.populate_group(group.create_group("Input Data"))
+        self.FeatureSelections.populate_group(group.create_group("FeatureSelections"))
+        self.PixelClassification.populate_group(group.create_group("PixelClassification"))
+
+        Prediction_Export = group.create_group("Prediction Export")
+        Prediction_Export["OutputFilenameFormat"] = "{dataset_dir}/{nickname}_{result_type}".encode("utf8")
+        Prediction_Export["OutputFormat"] = "hdf5".encode("utf8")
+        Prediction_Export["OutputInternalPath"] = "exported_data".encode("utf8")
+        Prediction_Export["StorageVersion"] = "0.1".encode("utf8")

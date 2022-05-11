@@ -7,16 +7,11 @@ import numpy as np
 from ndstructs.utils.json_serializable import JsonObject, ensureJsonArray, ensureJsonInt, ensureJsonObject
 
 from tests import create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations, get_sample_feature_extractors, get_test_output_osfs
-from webilastik.datasource import DataRoi, FsDataSource
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.filesystem.osfs import OsFs
 from webilastik.libebrains.user_token import UserToken
 from webilastik.scheduling.job import PriorityExecutor
-from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
-from webilastik.ui.applet.brushing_applet import BrushingApplet
 from webilastik.ui.applet import dummy_prompt
-from webilastik.ui.applet.pixel_predictions_export_applet import WsPixelClassificationExportApplet
-from webilastik.ui.applet.ws_pixel_classification_applet import WsPixelClassificationApplet
 from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
 
 
@@ -72,6 +67,7 @@ def test_pixel_classification_workflow():
     classifier = workflow.pixel_classifier_applet.pixel_classifier()
     assert classifier != None
 
+
     # # calculate predictions on an entire data source
     raw_data_source = get_sample_c_cells_datasource()
     # preds_future = executor.submit(classifier.compute, raw_data_source.roi)
@@ -101,9 +97,6 @@ def test_pixel_classification_workflow():
     print(f"---> Job successfully scheduled? Waiting for a while")
     wait_until_jobs_completed(workflow=workflow)
     print(f"Done waiting. Checking outputs")
-
-    # _ = workflow.save_project(fs=OsFs("/tmp"), path=PurePosixPath("my_test.ilp"))
-    # exit(1)
 
     predictions_output = PrecomputedChunksDataSource(
         filesystem=output_fs,
@@ -148,8 +141,14 @@ def test_pixel_classification_workflow():
     for tile in segmentation_output_1.roi.get_datasource_tiles():
         tile.retrieve().show_images()
 
-    priority_executor.shutdown()
+###################################
 
+    _ = workflow.save_project(fs=OsFs("/tmp"), path=PurePosixPath("test_pixel_classification_workflow.ilp"))
+    # compare_projects(Path("/tmp/my_test.ilp"), Path("/home/builder/TrainedPixelClassMaster.ilp"))
+
+####################################3
+
+    priority_executor.shutdown()
 
 ##################################################3333
 if __name__ == "__main__":

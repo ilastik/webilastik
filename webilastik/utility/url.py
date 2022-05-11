@@ -4,7 +4,7 @@ from base64 import b64decode, b64encode
 import re
 from pathlib import PurePosixPath
 import enum
-from typing import Literal, Optional, List, Dict, Mapping, Union
+from typing import Optional, List, Dict, Mapping, Union
 from urllib.parse import parse_qs, urlencode, quote_plus, quote
 
 from ndstructs.utils.json_serializable import JsonValue, ensureJsonString
@@ -79,9 +79,6 @@ class Url:
             return f"{self.datascheme or ''}" + self.path.as_posix()
         else:
             return self.raw
-
-    def to_ilp_info_location(self) -> Literal["FileSystem"]:
-        return "FileSystem"
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "Url":

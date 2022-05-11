@@ -9,7 +9,6 @@ import io
 import h5py
 from ndstructs.utils.json_serializable import JsonObject
 
-from webilastik.classic_ilastik.ilp import populate_h5_group
 from webilastik.datasource import FsDataSource
 from webilastik.filesystem import JsonableFilesystem
 from webilastik.scheduling.job import PriorityExecutor
@@ -21,7 +20,6 @@ from webilastik.ui.applet.ws_feature_selection_applet import WsFeatureSelectionA
 from webilastik.ui.applet.ws_brushing_applet import WsBrushingApplet
 from webilastik.ui.applet.ws_pixel_classification_applet import WsPixelClassificationApplet
 from webilastik.libebrains.user_token import UserToken
-from webilastik.classic_ilastik.ilp import populate_h5_group
 from webilastik.classic_ilastik.ilp.pixel_classification_ilp import IlpPixelClassificationWorkflowGroup
 
 
@@ -78,7 +76,7 @@ class PixelClassificationWorkflow:
         f = h5py.File(backing_buffer, "w")
         root_group = f["/"]
         assert isinstance(root_group, h5py.Group)
-        populate_h5_group(root_group, self.to_ilp_workflow_group().to_ilp_data())
+        self.to_ilp_workflow_group().populate_group(root_group)
         f.close()
         _ = backing_buffer.seek(0)
         return backing_buffer.read()
