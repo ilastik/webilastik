@@ -79,14 +79,14 @@ def get_sample_c_cells_pixel_annotations() -> Tuple[Annotation, ...]:
 
 def get_sample_feature_extractors() -> Sequence[IlpFilter]:
     return (
-        GaussianSmoothing(sigma=0.3, axis_2d="z"),
-        GaussianSmoothing(sigma=0.7, axis_2d="z"),
-        GaussianSmoothing(sigma=1.0, axis_2d="z"),
-        GaussianSmoothing(sigma=1.6, axis_2d="z"),
-        GaussianSmoothing(sigma=3.5, axis_2d="z"),
-        GaussianSmoothing(sigma=5.0, axis_2d="z"),
-        GaussianSmoothing(sigma=10.0, axis_2d="z"),
-        HessianOfGaussianEigenvalues(scale=0.7, axis_2d="z"),
+        GaussianSmoothing.from_ilp_scale(scale=0.3, axis_2d="z"),
+        GaussianSmoothing.from_ilp_scale(scale=0.7, axis_2d="z"),
+        GaussianSmoothing.from_ilp_scale(scale=1.0, axis_2d="z"),
+        GaussianSmoothing.from_ilp_scale(scale=1.6, axis_2d="z"),
+        GaussianSmoothing.from_ilp_scale(scale=3.5, axis_2d="z"),
+        GaussianSmoothing.from_ilp_scale(scale=5.0, axis_2d="z"),
+        GaussianSmoothing.from_ilp_scale(scale=10.0, axis_2d="z"),
+        HessianOfGaussianEigenvalues.from_ilp_scale(scale=0.7, axis_2d="z"),
     )
 
 def get_sample_c_cells_pixel_classifier() -> VigraPixelClassifier[IlpFilter]:
