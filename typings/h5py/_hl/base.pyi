@@ -82,7 +82,7 @@ class HLObject(CommonStateObject):
 
     @property
     @with_phil
-    def name(self): # -> None:
+    def name(self) -> str:
         """ Return the full name of this ob"""
         ...
 
@@ -143,7 +143,7 @@ class HLObject(CommonStateObject):
 
 
 
-class KeysViewHDF5(KeysView):
+class KeysViewHDF5(KeysView[str]):
     def __str__(self) -> str:
         ...
 
@@ -153,7 +153,7 @@ class KeysViewHDF5(KeysView):
     __repr__ = ...
 
 
-class ValuesViewHDF5(ValuesView):
+class ValuesViewHDF5(ValuesView["Dataset | Group"]):
     """
         Wraps e.g. a Group or A"""
     def __contains__(self, value): # -> bool:
@@ -167,28 +167,28 @@ class ValuesViewHDF5(ValuesView):
 
 
 
-class ItemsViewHDF5(ItemsView):
+class ItemsViewHDF5(ItemsView[str, "Dataset | Group"]):
     """
         Wraps e.g. a Group or A"""
     def __contains__(self, item) -> bool:
         ...
 
-    def __iter__(self) -> Generator[Tuple[str, "Group | Dataset | Datatype"], None, None]:
+    def __iter__(self) -> Generator[Tuple[str, "Group | Dataset"], None, None]:
         ...
 
-    def __reversed__(self) -> Generator[Tuple[str, "Group | Dataset | Datatype"], None, None]:
+    def __reversed__(self) -> Generator[Tuple[str, "Group | Dataset"], None, None]:
         ...
 
 
 
-class MappingHDF5(Mapping):
+class MappingHDF5(Mapping[str, "Dataset | Group"]):
     """
         Wraps a Group, Attribut"""
     def keys(self) -> KeysViewHDF5:
         """ Get a view object on member nam"""
         ...
 
-    def values(self): # -> ValuesViewHDF5:
+    def values(self) -> ValuesViewHDF5:
         """ Get a view object on member obj"""
         ...
 
@@ -198,7 +198,7 @@ class MappingHDF5(Mapping):
 
 
 
-class MutableMappingHDF5(MappingHDF5, MutableMapping):
+class MutableMappingHDF5(MappingHDF5, MutableMapping[str, "Dataset | Group"]):
     """
         Wraps a Group or Attrib"""
     ...
