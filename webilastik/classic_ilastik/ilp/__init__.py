@@ -4,7 +4,7 @@
 from datetime import datetime
 from abc import ABC
 from pathlib import Path
-from typing import Callable, ClassVar, Any, Mapping, Sequence, Tuple, TypeVar
+from typing import Callable, ClassVar, Any, Dict, Mapping, Sequence, Tuple, TypeVar
 from collections.abc import Mapping as AbcMapping
 from typing_extensions import TypeAlias
 import enum
@@ -17,6 +17,7 @@ import numpy as np
 from numpy import ndarray
 import vigra
 import h5py
+from webilastik.annotations.annotation import Color
 from webilastik.datasource import FsDataSource
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.filesystem import JsonableFilesystem
@@ -63,6 +64,14 @@ class IlpAttrDataset:
 IlpDatasetValue: TypeAlias = "IlpDatasetContents | IlpAttrDataset"
 IlpGroup: TypeAlias = Mapping[str, "IlpValue"]
 IlpValue: TypeAlias = "IlpDatasetValue | IlpGroup"
+
+def ensure_group(group: h5py.Group, key: str) -> h5py.Group:
+    if key not in group:
+        raise IlpMissingKey(key)
+    inner_group = group[key]
+    if not isinstance(inner_group, h5py.Group):
+        raise IlpParsingError(f"Expected dataset at '{key}', found {inner_group.__class__.__name__}")
+    return inner_group
 
 def ensure_dataset(group: h5py.Group, key: str) -> h5py.Dataset:
     if key not in group:
@@ -117,6 +126,40 @@ def ensure_bytes(group: h5py.Group, key: str) -> bytes:
 
 def ensure_encoded_string(group: h5py.Group, key: str) -> str:
     return ensure_bytes(group, key).decode("utf8")
+
+def ensure_ndarray(group: h5py.Group, key: str) -> "np.ndarray[Any, np.dtype[Any]]":
+    dataset = ensure_dataset(group, key)
+    contents = dataset[()]
+    if not isinstance(contents, np.ndarray):
+        raise IlpParsingError(f"Expected ndarray at {key}, found {contents.__class__.__name__}")
+    return contents
+
+def ensure_encoded_string_list(group: h5py.Group, key: str) -> Sequence[str]:
+    dataset = ensure_dataset(group, key)
+    expected_dtype = np.dtype('object')
+    if len(dataset.shape) != 1 or dataset.dtype != expected_dtype:
+        raise IlpTypeMismatch(
+            key=key, expected_dtype=expected_dtype, expected_shape=(), dataset=dataset
+        )
+    contents = dataset[()]
+    if not isinstance(contents, np.ndarray):
+        raise IlpParsingError(f"Expected ndarray at {key}, found {contents.__class__.__name__}")
+    return [s.decode('utf8') for s in contents]
+
+def ensure_color_list(group: h5py.Group, key: str) -> Sequence[Color]:
+    dataset = ensure_dataset(group, key)
+    expected_dtype = np.dtype('int64') # classic ilastik saves color components as int64
+    if len(dataset.shape) != 2 or dataset.shape[1] != 3 or dataset.dtype != expected_dtype:
+        raise IlpTypeMismatch(
+            key=key, expected_dtype=expected_dtype, expected_shape=(), dataset=dataset
+        )
+    contents = dataset[()]
+    if not isinstance(contents, np.ndarray):
+        raise IlpParsingError(f"Expected ndarray at {key}, found {contents.__class__.__name__}")
+    return [
+        Color(r=np.uint8(c[0]), g=np.uint8(c[1]), b=np.uint8(c[2])) for c in contents
+    ]
+
 
 T = TypeVar("T")
 
@@ -325,7 +368,7 @@ class IlpDatasetInfo:
         group["fromstack"] = self.fromstack # FIXME?
 
     @classmethod
-    def from_ilp_data(cls, group: h5py.Group) -> "IlpDatasetInfo":
+    def parse(cls, group: h5py.Group) -> "IlpDatasetInfo":
         return IlpDatasetInfo(
             allowLabels=ensure_bool(group, "allowLabels"),
             axistags=vigra.AxisTags.fromJSON(ensure_encoded_string(group, "axistags")),
@@ -371,9 +414,20 @@ class IlpLane: #FIXME: generic over TypeVarTuple(..., bound=Literal["Raw Data", 
 
     def populate_group(self, group: h5py.Group):
         for role_name, role_datasouce in self.roles.items():
-            role_group = group.create_group(role_name)
+            role_group = group.create_group(role_name) # empty roles still show up in the .ilp
             if role_datasouce is not None:
                 role_datasouce.populate_group(role_group)
+
+    @classmethod
+    def parse(cls, group: h5py.Group, role_names: Sequence[str]) -> "IlpLane":
+        roles: Dict[str, "IlpDatasetInfo | None"] = {}
+        for role_name in role_names:
+            if role_name not in group:
+                roles[role_name] = None
+            else:
+                roles[role_name] = IlpDatasetInfo.parse(ensure_group(group, role_name))
+        return IlpLane(roles=roles)
+
 
 class IlpInputDataGroup:
     def __init__(self, lanes: Sequence[IlpLane]) -> None:
@@ -389,6 +443,25 @@ class IlpInputDataGroup:
             lane.populate_group(infos_group.create_group(f"lane{lane_index:04}"))
 
         _ = group.create_group("local_data")
+
+    @classmethod
+    def parse(cls, group: h5py.Group) -> "IlpInputDataGroup":
+        RoleNames = ensure_encoded_string_list(group, "Role Names")
+        expected_storage_version = "0.2"
+        found_storage_version = ensure_encoded_string(group, "StorageVersion")
+        if found_storage_version != expected_storage_version:
+            raise IlpParsingError(f"Expected {group.name}/StorageVersion to be {expected_storage_version}, found {found_storage_version}")
+        infos = ensure_group(group, "infos")
+        group.file
+        return IlpInputDataGroup(
+            lanes=[
+                IlpLane.parse(group=ensure_group(infos, lane_name), role_names=RoleNames) for lane_name in infos.keys()
+            ]
+        )
+
+    @classmethod
+    def find_and_parse(cls, h5_file: h5py.File) -> "IlpInputDataGroup":
+        return cls.parse(ensure_group(h5_file, "Input Data"))
 
 class IlpFeatureSelectionsGroup:
     all_feature_names: ClassVar[Sequence[str]] = [

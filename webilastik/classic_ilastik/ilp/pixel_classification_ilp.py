@@ -1,22 +1,23 @@
-from typing import Optional, Sequence, Any, Dict, List
+from typing import Mapping, Optional, Sequence, Any, Dict, List
 from datetime import datetime
 import textwrap
 import pickle
-import time
 import h5py
 
 import numpy as np
 import vigra
 from numpy import ndarray, dtype, int64
+from vigra.vigranumpycore import AxisTags
 from ndstructs.array5D import Array5D
-from ndstructs.point5D import Interval5D
-from webilastik.annotations.annotation import Color
+from ndstructs.point5D import Interval5D, Shape5D
+from vigra.learning import RandomForest as VigraRandomForest
 
-from webilastik.classic_ilastik.ilp import IlpAttrDataset, IlpDatasetInfo, IlpFeatureSelectionsGroup, IlpGroup, IlpInputDataGroup, IlpLane, IlpProject, IlpValue
+from webilastik.annotations.annotation import Color
+from webilastik.classic_ilastik.ilp import IlpAttrDataset, IlpDatasetInfo, IlpFeatureSelectionsGroup, IlpGroup, IlpInputDataGroup, IlpLane, IlpParsingError, IlpProject, IlpValue, ensure_bytes, ensure_color_list, ensure_dataset, ensure_encoded_string_list, ensure_group, ensure_ndarray
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.datasource import DataSource, FsDataSource
 from webilastik.annotations import Annotation
-from webilastik.classifiers.pixel_classifier import VigraPixelClassifier, dump_to_temp_file
+from webilastik.classifiers.pixel_classifier import VigraForestH5Bytes, VigraPixelClassifier, dump_to_temp_file, h5_bytes_to_vigra_forest, vigra_forest_to_h5_bytes
 
 
 VIGRA_ILP_CLASSIFIER_FACTORY = textwrap.dedent(
@@ -62,11 +63,9 @@ class IlpPixelClassificationGroup:
     def __init__(
         self,
         *,
-        feature_extractors: Sequence[IlpFilter],
         annotations: Sequence[Annotation],
         classifier: Optional[VigraPixelClassifier[IlpFilter]],
     ) -> None:
-        self.feature_extractors = feature_extractors
         self.annotations = annotations
         self.classifier = classifier
 
@@ -129,7 +128,7 @@ class IlpPixelClassificationGroup:
             get_feature_extractor_order = lambda ex: IlpFeatureSelectionsGroup.all_feature_names.index(ex.__class__.__name__)
             for fe in sorted(self.classifier.feature_extractors, key=get_feature_extractor_order):
                 for c in range(self.classifier.num_input_channels * fe.channel_multiplier):
-                    feature_names.append(fe.get_ilp_name(c).encode("utf8"))
+                    feature_names.append(fe.to_ilp_classifier_feature_entry(c).encode("utf8"))
 
             for forest_index, forest_bytes in enumerate(self.classifier.forest_h5_bytes):
                 forests_h5_path = dump_to_temp_file(forest_bytes)
@@ -141,6 +140,88 @@ class IlpPixelClassificationGroup:
             ClassifierForests["feature_names"] = np.asarray(feature_names)
             ClassifierForests["known_labels"] = np.asarray(self.classifier.classes).astype(np.uint32)
             ClassifierForests["pickled_type"] = b"clazyflow.classifiers.parallelVigraRfLazyflowClassifier\nParallelVigraRfLazyflowClassifier\np0\n."
+
+    @classmethod
+    def parse(cls, group: h5py.Group, raw_data_sources: Mapping[int, "FsDataSource | None"]) -> "IlpPixelClassificationGroup":
+        annotations: List[Annotation] = []
+        LabelSets = ensure_group(group, "LabelSets")
+        for lane_key in LabelSets.keys():
+            if not lane_key.startswith("labels"):
+                continue
+            lane_index = int(lane_key.replace("labels", ""))
+            lane_label_blocks = ensure_group(LabelSets, lane_key)
+            raw_data = raw_data_sources.get(lane_index)
+            if len(lane_label_blocks.keys()) == 0:
+                continue
+            if raw_data is None:
+                raise IlpParsingError(f"No datasource for lane {lane_index:03d}")
+            for block_name in lane_label_blocks.keys():
+                if not block_name.startswith("block"):
+                    continue
+                block = ensure_dataset(lane_label_blocks, block_name)
+                block_data = block[()]
+                if not isinstance(block_data, np.ndarray):
+                    raise IlpParsingError("Expected annotation block to contain a ndarray")
+
+                raw_axistags = block.attrs.get("axistags")
+                if not isinstance(raw_axistags, str):
+                    raise IlpParsingError(f"Expected axistags to be a str, found {raw_axistags}")
+                axistags = AxisTags.fromJSON(raw_axistags)
+                axiskeys = "".join(axistags.keys())
+
+                blockSlice = block.attrs.get("blockSlice")
+                if not isinstance(blockSlice, str):
+                    raise IlpParsingError(f"Expected 'blockSlice'' to be a str, found {blockSlice}")
+                blockSpans: Sequence[List[str]] = [span_str.split(":") for span_str in blockSlice.split(",")]
+                blockInterval = Interval5D.zero(**{
+                    key: (int(span[0]), int(span[1]))
+                    for key, span in zip(axiskeys, blockSpans)
+                })
+
+                block_5d = Array5D(block_data, axiskeys=axiskeys)
+                for color_5d in block_5d.unique_colors().split(shape=Shape5D(x=1, c=block_5d.shape.c)):
+                    raw_color = color_5d.raw("c")
+                    annotation = Annotation(
+                        block_5d.color_filtered(color=color_5d).raw(axiskeys),
+                        location=blockInterval.start,
+                        axiskeys=axiskeys, # FIXME: what if the user changed the axiskeys in the data source?
+                        raw_data=raw_data,
+                        color=Color(r=np.uint8(raw_color[0]), g=np.uint8(raw_color[1]), b=np.uint8(raw_color[2])),
+                    )
+                    annotations.append(annotation)
+
+        LabelColors = ensure_color_list(group, "LabelColors")
+        color_map = Color.create_color_map(LabelColors)
+
+        ClassifierFactory = ensure_bytes(group, "ClassifierFactory")
+        if ClassifierFactory != VIGRA_ILP_CLASSIFIER_FACTORY:
+            raise IlpParsingError(f"Expecting ClassifierFactory to be pickled ParallelVigraRfLazyflowClassifierFactory, found {ClassifierFactory}")
+        ClassifierForests = ensure_group(group, "ClassifierForests")
+        forests: List[VigraRandomForest] = []
+        for forest_key in sorted(ClassifierForests.keys()):
+            if not forest_key.startswith("Forest"):
+                continue
+            forest_bytes = ensure_bytes(ClassifierForests, forest_key)
+            forest = h5_bytes_to_vigra_forest(h5_bytes=VigraForestH5Bytes(forest_bytes))
+            forests.append(forest)
+
+        feature_names = ensure_encoded_string_list(ClassifierForests, "feature_names")
+        feature_extractors_result = IlpFilter.from_ilp_classifier_feature_entries(feature_names)
+        if isinstance(feature_extractors_result, Exception):
+            raise IlpParsingError(str(feature_extractors_result))
+
+        # FIXME: make feature extractors aware of which channel they handle
+        num_input_channels = max(int(fn.split()[-1][1:-1]) for fn in feature_names) + 1
+
+        classifier = VigraPixelClassifier(
+            feature_extractors=feature_extractors_result,
+            forest_h5_bytes=[vigra_forest_to_h5_bytes(forest) for forest in forests],
+            color_map=color_map,
+            classes=list(color_map.values()),
+            num_input_channels=num_input_channels,
+        )
+
+        return IlpPixelClassificationGroup(annotations=annotations, classifier=classifier)
 
 
 class IlpPixelClassificationWorkflowGroup(IlpProject):
@@ -183,11 +264,10 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
             ]),
             FeatureSelections=IlpFeatureSelectionsGroup(feature_extractors=feature_extractors),
             PixelClassification=IlpPixelClassificationGroup(
-                feature_extractors=feature_extractors,
                 annotations=annotations,
                 classifier=classifier,
             ),
-            currentApplet=2, #FIXME! !!!!!!!!!!!!!!!!
+            currentApplet=currentApplet,
             ilastikVersion=ilastikVersion,
             time=time,
         )
