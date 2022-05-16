@@ -1,10 +1,9 @@
-
 #pyright: strict
 
 from datetime import datetime
 from abc import ABC
 from pathlib import Path
-from typing import Callable, ClassVar, Any, Dict, Mapping, Sequence, Tuple, TypeVar
+from typing import Callable, ClassVar, Any, Dict, List, Mapping, Sequence, Tuple, Type, TypeVar, cast
 from collections.abc import Mapping as AbcMapping
 from typing_extensions import TypeAlias
 import enum
@@ -19,6 +18,7 @@ import vigra
 import h5py
 from webilastik.annotations.annotation import Color
 from webilastik.datasource import FsDataSource
+from webilastik.features.channelwise_fastfilters import DifferenceOfGaussians, GaussianGradientMagnitude, GaussianSmoothing, HessianOfGaussianEigenvalues, LaplacianOfGaussian, StructureTensorEigenvalues
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.filesystem import JsonableFilesystem
 from webilastik.ui.datasource import try_get_datasources_from_url
@@ -26,6 +26,7 @@ from webilastik.ui.usage_error import UsageError
 from webilastik.utility.url import Protocol, Url
 
 
+DT = TypeVar("DT", np.float64, np.int64, np.bool_, np.object_)
 
 IlpDatasetContents: TypeAlias = "int | bytes | str | bool | Tuple[int, ...] | Tuple[float, ...] | ndarray[Any, Any] | np.void"
 
@@ -127,12 +128,32 @@ def ensure_bytes(group: h5py.Group, key: str) -> bytes:
 def ensure_encoded_string(group: h5py.Group, key: str) -> str:
     return ensure_bytes(group, key).decode("utf8")
 
-def ensure_ndarray(group: h5py.Group, key: str) -> "np.ndarray[Any, np.dtype[Any]]":
+def ensure_ndarray(group: h5py.Group, key: str, expected_shape: Tuple[int, ...], expected_dtype: "np.dtype[DT]") -> "np.ndarray[Any, np.dtype[DT]]":
     dataset = ensure_dataset(group, key)
+    if dataset.dtype != expected_dtype or dataset.shape != expected_shape:
+        raise IlpTypeMismatch(key=key, expected_dtype=expected_dtype, expected_shape=expected_shape, dataset=dataset)
     contents = dataset[()]
     if not isinstance(contents, np.ndarray):
         raise IlpParsingError(f"Expected ndarray at {key}, found {contents.__class__.__name__}")
     return contents
+
+def ensure_scalar(group: h5py.Group, key: str, expected_dtype: "np.dtype[DT]") -> "DT":
+    dataset = ensure_dataset(group, key)
+    if dataset.dtype != expected_dtype or dataset.shape != ():
+        raise IlpTypeMismatch(key=key, expected_dtype=expected_dtype, expected_shape=(), dataset=dataset)
+    contents = dataset[()]
+    if not isinstance(contents, expected_dtype.type):
+        raise IlpParsingError(f"Expected a {expected_dtype} scalar at {key}, found {contents.__class__.__name__}")
+    return contents
+
+def ensure_list(group: h5py.Group, key: str, expected_dtype: "np.dtype[DT]") -> Sequence["DT"]:
+    dataset = ensure_dataset(group, key)
+    if dataset.dtype != expected_dtype or len(dataset.shape) != 1:
+        raise IlpParsingError(f"Expected {key} tp be list of {expected_dtype}, found {dataset}")
+    contents = dataset[()]
+    if not isinstance(contents, np.ndarray):
+        raise IlpParsingError(f"Expected ndarray at {key}, found {contents.__class__.__name__}")
+    return cast(Sequence["DT"], contents)
 
 def ensure_encoded_string_list(group: h5py.Group, key: str) -> Sequence[str]:
     dataset = ensure_dataset(group, key)
@@ -159,6 +180,14 @@ def ensure_color_list(group: h5py.Group, key: str) -> Sequence[Color]:
     return [
         Color(r=np.uint8(c[0]), g=np.uint8(c[1]), b=np.uint8(c[2])) for c in contents
     ]
+
+def ensure_float_list(group: h5py.Group, key: str) -> Sequence[float]:
+    dataset = ensure_dataset(group, key)
+    expected_dtype = np.dtype('float64')
+    if len(dataset.shape) != 1 or dataset.dtype != expected_dtype:
+        raise IlpParsingError(f"Expected {key} to be a  Sequence[int, ...] of float64, found {dataset.dtype} {dataset.shape}")
+    return [float(item) for item in tuple(dataset[()])]
+
 
 
 T = TypeVar("T")
@@ -332,7 +361,6 @@ class IlpDatasetInfo:
         display_mode: "IlpDatasetDisplayMode | None" = None,
         normalizeDisplay: "bool | None" = None,
         drange: "Tuple[int, int] | Tuple[float, float] | None" = None,
-
    ) -> "IlpDatasetInfo":
         return IlpDatasetInfo(
             allowLabels=allowLabels,
@@ -388,17 +416,20 @@ class IlpDatasetInfo:
         self,
         *,
         ilp_fs: JsonableFilesystem,
-        ilp_base_path: Path,
+        ilp_path: Path,
         allowed_protocols: Sequence[Protocol] = (Protocol.HTTP, Protocol.HTTPS)
-    ) -> "FsDataSource | UsageError":
+    ) -> "FsDataSource | ValueError":
         url = Url.parse(self.filePath)
         if url is None:
-            abs_path = ilp_base_path.joinpath(self.filePath)
-            url = Url.parse_or_raise(ilp_fs.geturl(abs_path.as_posix()))
+            abs_path = ilp_path.parent.joinpath(self.filePath)
+            url = Url.parse(ilp_fs.geturl(abs_path.as_posix()))
+        if url is None:
+            return ValueError(f"Could not parse {self.filePath} as URL")
         datasources_result = try_get_datasources_from_url(url=url, allowed_protocols=allowed_protocols)
         if isinstance(datasources_result, UsageError):
-            return datasources_result
-        assert len(datasources_result) == 1
+            return ValueError(f"Could not open {url} as a data source: {datasources_result}")
+        if len(datasources_result) != 1:
+            return ValueError(f"Expected a single datasource from {url}, found {len(datasources_result)}")
         return datasources_result[0]
 
 
@@ -463,15 +494,39 @@ class IlpInputDataGroup:
     def find_and_parse(cls, h5_file: h5py.File) -> "IlpInputDataGroup":
         return cls.parse(ensure_group(h5_file, "Input Data"))
 
+    def try_to_datasources(
+        self,
+        *,
+        role_name: str,
+        ilp_fs: JsonableFilesystem,
+        ilp_path: Path,
+        allowed_protocols: Sequence[Protocol] = (Protocol.HTTP, Protocol.HTTPS)
+    ) -> "Dict[int, 'FsDataSource | None'] | ValueError":
+        infos = [lane.roles[role_name] for lane in self.lanes]
+        raw_data_datasources: Dict[int, "FsDataSource | None"] = {}
+        for lane_index, info in enumerate(infos):
+            if info is None:
+                raw_data_datasources[lane_index] = None
+            else:
+                datasource_result = info.try_to_datasource(
+                    ilp_fs=ilp_fs, ilp_path=ilp_path, allowed_protocols=allowed_protocols
+                )
+                if isinstance(datasource_result, Exception):
+                    return datasource_result
+                raw_data_datasources[lane_index] = datasource_result
+        return raw_data_datasources
+
 class IlpFeatureSelectionsGroup:
-    all_feature_names: ClassVar[Sequence[str]] = [
-        "GaussianSmoothing",
-        "LaplacianOfGaussian",
-        "GaussianGradientMagnitude",
-        "DifferenceOfGaussians",
-        "StructureTensorEigenvalues",
-        "HessianOfGaussianEigenvalues",
-    ]
+    named_feature_classes: ClassVar[Mapping[str, Type[IlpFilter]]] = {
+        "GaussianSmoothing": GaussianSmoothing,
+        "LaplacianOfGaussian": LaplacianOfGaussian,
+        "GaussianGradientMagnitude": GaussianGradientMagnitude,
+        "DifferenceOfGaussians": DifferenceOfGaussians,
+        "StructureTensorEigenvalues": StructureTensorEigenvalues,
+        "HessianOfGaussianEigenvalues": HessianOfGaussianEigenvalues,
+    }
+    feature_names: ClassVar[Sequence[str]] = list(named_feature_classes.keys())
+    feature_classes: ClassVar[Sequence[Type[IlpFilter]]] = list(named_feature_classes.values())
 
     def __init__(self, feature_extractors: Sequence[IlpFilter]) -> None:
         self.feature_extractors = feature_extractors
@@ -482,7 +537,7 @@ class IlpFeatureSelectionsGroup:
             return
 
         group["FeatureIds"] = np.asarray([ # pyright: ignore [reportUnknownMemberType]
-            name.encode("utf8") for name in self.all_feature_names
+            name.encode("utf8") for name in self.feature_names
         ])
 
         default_scales = [0.3, 0.7, 1.0, 1.6, 3.5, 5.0, 10.0]
@@ -490,16 +545,44 @@ class IlpFeatureSelectionsGroup:
         scales = default_scales + sorted(extra_scales)
         group["Scales"] = np.asarray(scales) # pyright: ignore [reportUnknownMemberType]
 
-        SelectionMatrix: "ndarray[Any, Any]" = np.zeros((len(self.all_feature_names), len(scales)), dtype=bool) # pyright: ignore [reportUnknownMemberType]
+        SelectionMatrix: "ndarray[Any, Any]" = np.zeros((len(self.feature_classes), len(scales)), dtype=bool) # pyright: ignore [reportUnknownMemberType]
         for fe in self.feature_extractors:
-            name_idx = self.all_feature_names.index(fe.__class__.__name__)
+            name_idx = self.feature_classes.index(fe.__class__)
             scale_idx = scales.index(fe.ilp_scale)
             SelectionMatrix[name_idx, scale_idx] = True
 
         ComputeIn2d: "ndarray[Any, Any]" = np.full(len(scales), True, dtype=bool) # pyright: ignore [reportUnknownMemberType]
-        for idx, fname in enumerate(self.all_feature_names):
+        for idx, fname in enumerate(self.feature_classes):
             ComputeIn2d[idx] = all(fe.axis_2d for fe in self.feature_extractors if fe.__class__.__name__ == fname)
 
         group["SelectionMatrix"] = SelectionMatrix
         group["ComputeIn2d"] = ComputeIn2d  # [: len(scales)]  # weird .ilp quirk in featureTableWidget.py:524
         group["StorageVersion"] = "0.1"
+
+    @classmethod
+    def parse(cls, group: h5py.Group) -> "IlpFeatureSelectionsGroup":
+        FeatureIds = ensure_encoded_string_list(group, "FeatureIds")
+        Scales = ensure_list(group, key="Scales", expected_dtype=np.dtype("float64"))
+        SelectionMatrix = ensure_ndarray(
+            group, key="SelectionMatrix", expected_shape=(len(FeatureIds), len(Scales)), expected_dtype=np.dtype("bool")
+        )
+        ComputeIn2d = ensure_list(group, key="ComputeIn2d", expected_dtype=np.dtype("bool"))
+        if len(ComputeIn2d) != len(FeatureIds):
+            raise IlpParsingError(f"FeatureIds has different length from ComputeIn2D")
+        StorageVersion = ensure_encoded_string(group, key="StorageVersion")
+        if StorageVersion != "0.1":
+            raise IlpParsingError(f"Unexpected storage version on {group.name}: {StorageVersion}")
+
+        feature_extractors: List[IlpFilter] = []
+        for feature_name_index, feature_name in enumerate(FeatureIds):
+            for scale_index, scale in enumerate(Scales):
+                if not SelectionMatrix[feature_name_index][scale_index]:
+                    continue
+                feature_class = cls.named_feature_classes.get(feature_name)
+                if feature_class is None:
+                    raise IlpParsingError(f"Bad entry in {group.name}/FeatureIds: {feature_name}")
+                feature_extractors.append(feature_class.from_ilp_scale(
+                    scale=float(scale),
+                    axis_2d="z" if ComputeIn2d[feature_name_index] else None, #FIXME: always z?
+                ))
+        return IlpFeatureSelectionsGroup(feature_extractors=feature_extractors)

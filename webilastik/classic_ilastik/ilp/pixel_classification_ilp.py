@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Mapping, Optional, Sequence, Any, Dict, List
 from datetime import datetime
 import textwrap
@@ -13,11 +14,13 @@ from ndstructs.point5D import Interval5D, Shape5D
 from vigra.learning import RandomForest as VigraRandomForest
 
 from webilastik.annotations.annotation import Color
-from webilastik.classic_ilastik.ilp import IlpAttrDataset, IlpDatasetInfo, IlpFeatureSelectionsGroup, IlpGroup, IlpInputDataGroup, IlpLane, IlpParsingError, IlpProject, IlpValue, ensure_bytes, ensure_color_list, ensure_dataset, ensure_encoded_string_list, ensure_group, ensure_ndarray
+from webilastik.classic_ilastik.ilp import IlpAttrDataset, IlpDatasetInfo, IlpFeatureSelectionsGroup, IlpGroup, IlpInputDataGroup, IlpLane, IlpParsingError, IlpProject, IlpValue, ensure_bytes, ensure_color_list, ensure_dataset, ensure_encoded_string, ensure_encoded_string_list, ensure_group, ensure_int, ensure_ndarray
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.datasource import DataSource, FsDataSource
 from webilastik.annotations import Annotation
 from webilastik.classifiers.pixel_classifier import VigraForestH5Bytes, VigraPixelClassifier, dump_to_temp_file, h5_bytes_to_vigra_forest, vigra_forest_to_h5_bytes
+from webilastik.filesystem import JsonableFilesystem
+from webilastik.utility.url import Protocol
 
 
 VIGRA_ILP_CLASSIFIER_FACTORY = textwrap.dedent(
@@ -125,7 +128,7 @@ class IlpPixelClassificationGroup:
             ClassifierForests = group.create_group("ClassifierForests")
 
             feature_names: List[bytes] = []
-            get_feature_extractor_order = lambda ex: IlpFeatureSelectionsGroup.all_feature_names.index(ex.__class__.__name__)
+            get_feature_extractor_order = lambda ex: IlpFeatureSelectionsGroup.feature_classes.index(ex.__class__)
             for fe in sorted(self.classifier.feature_extractors, key=get_feature_extractor_order):
                 for c in range(self.classifier.num_input_channels * fe.channel_multiplier):
                     feature_names.append(fe.to_ilp_classifier_feature_entry(c).encode("utf8"))
@@ -150,9 +153,9 @@ class IlpPixelClassificationGroup:
                 continue
             lane_index = int(lane_key.replace("labels", ""))
             lane_label_blocks = ensure_group(LabelSets, lane_key)
-            raw_data = raw_data_sources.get(lane_index)
             if len(lane_label_blocks.keys()) == 0:
                 continue
+            raw_data = raw_data_sources.get(lane_index)
             if raw_data is None:
                 raise IlpParsingError(f"No datasource for lane {lane_index:03d}")
             for block_name in lane_label_blocks.keys():
@@ -272,7 +275,6 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
             time=time,
         )
 
-
     def populate_group(self, group: h5py.Group):
         super().populate_group(group)
         self.Input_Data.populate_group(group.create_group("Input Data"))
@@ -284,3 +286,36 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
         Prediction_Export["OutputFormat"] = "hdf5".encode("utf8")
         Prediction_Export["OutputInternalPath"] = "exported_data".encode("utf8")
         Prediction_Export["StorageVersion"] = "0.1".encode("utf8")
+
+    @classmethod
+    def parse(
+        cls,
+        group: h5py.Group,
+        ilp_fs: JsonableFilesystem,
+        ilp_path: Path,
+        allowed_protocols: Sequence[Protocol] = (Protocol.HTTP, Protocol.HTTPS)
+    ) -> "IlpPixelClassificationWorkflowGroup | ValueError":
+        workflowname = ensure_encoded_string(group, "workflowName")
+        if workflowname != "Pixel Classification":
+            raise IlpParsingError(f"Unexpected workflow name: {workflowname}")
+
+        Input_Data = IlpInputDataGroup.parse(ensure_group(group, "Input Data"))
+        raw_data_datasources_result = Input_Data.try_to_datasources(
+            role_name="Raw Data", ilp_fs=ilp_fs, ilp_path=ilp_path, allowed_protocols=allowed_protocols
+        )
+        if isinstance(raw_data_datasources_result, Exception):
+            return raw_data_datasources_result
+
+        PixelClassification = IlpPixelClassificationGroup.parse(
+            group=ensure_group(group, "PixelClassification"),
+            raw_data_sources=raw_data_datasources_result,
+        )
+
+        return IlpPixelClassificationWorkflowGroup(
+            Input_Data=Input_Data,
+            FeatureSelections=IlpFeatureSelectionsGroup.parse(ensure_group(group, "FeatureSelections")),
+            PixelClassification=PixelClassification,
+            currentApplet=ensure_int(group, "currentApplet"),
+            ilastikVersion=ensure_encoded_string(group, "ilastikVersion"),
+            time=datetime.strptime(ensure_encoded_string(group, "time"), "%a %b %d %H:%M:%S %Y"),
+        )
