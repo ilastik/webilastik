@@ -255,8 +255,9 @@ class IlpPixelClassificationGroup:
                     color = reverse_color_map.get(color_index)
                     if color is None:
                         raise IlpParsingError(f"Could not find a label color for index {color_index}")
+                    annotation_data: "np.ndarray[Any, np.dtype[np.uint8]]" = block_5d.color_filtered(color=color_5d).raw(axiskeys)
                     annotation = Annotation(
-                        block_5d.color_filtered(color=color_5d).raw(axiskeys),
+                        annotation_data,
                         location=blockInterval.start,
                         axiskeys=axiskeys, # FIXME: what if the user changed the axiskeys in the data source?
                         raw_data=raw_data,
@@ -269,29 +270,32 @@ class IlpPixelClassificationGroup:
         ClassifierFactory = ensure_bytes(group, "ClassifierFactory")
         if ClassifierFactory != VIGRA_ILP_CLASSIFIER_FACTORY:
             raise IlpParsingError(f"Expecting ClassifierFactory to be pickled ParallelVigraRfLazyflowClassifierFactory, found {ClassifierFactory}")
-        ClassifierForests = ensure_group(group, "ClassifierForests")
-        forests: List[VigraRandomForest] = []
-        for forest_key in sorted(ClassifierForests.keys()):
-            if not forest_key.startswith("Forest"):
-                continue
-            forest = VigraRandomForest(group.file.filename, f"{ClassifierForests.name}/{forest_key}")
-            # forest_bytes = ensure_bytes(ClassifierForests, forest_key)
-            # forest = h5_bytes_to_vigra_forest(h5_bytes=VigraForestH5Bytes(forest_bytes))
-            forests.append(forest)
+        if "ClassifierForests" in group:
+            ClassifierForests = ensure_group(group, "ClassifierForests")
+            forests: List[VigraRandomForest] = []
+            for forest_key in sorted(ClassifierForests.keys()):
+                if not forest_key.startswith("Forest"):
+                    continue
+                forest = VigraRandomForest(group.file.filename, f"{ClassifierForests.name}/{forest_key}")
+                # forest_bytes = ensure_bytes(ClassifierForests, forest_key)
+                # forest = h5_bytes_to_vigra_forest(h5_bytes=VigraForestH5Bytes(forest_bytes))
+                forests.append(forest)
 
-        feature_names = ensure_encoded_string_list(ClassifierForests, "feature_names")
-        feature_extractors = cls.ilp_filters_from_names(feature_names)
+            feature_names = ensure_encoded_string_list(ClassifierForests, "feature_names")
+            feature_extractors = cls.ilp_filters_from_names(feature_names)
 
-        # FIXME: make feature extractors aware of which channel they handle
-        num_input_channels = max(int(fn.split()[-1][1:-1]) for fn in feature_names) + 1
+            # FIXME: make feature extractors aware of which channel they handle
+            num_input_channels = max(int(fn.split()[-1][1:-1]) for fn in feature_names) + 1
 
-        classifier = VigraPixelClassifier(
-            feature_extractors=feature_extractors,
-            forest_h5_bytes=[vigra_forest_to_h5_bytes(forest) for forest in forests],
-            color_map=color_map,
-            classes=list(color_map.values()),
-            num_input_channels=num_input_channels,
-        )
+            classifier = VigraPixelClassifier(
+                feature_extractors=feature_extractors,
+                forest_h5_bytes=[vigra_forest_to_h5_bytes(forest) for forest in forests],
+                color_map=color_map,
+                classes=list(color_map.values()),
+                num_input_channels=num_input_channels,
+            )
+        else:
+            classifier = None
 
         return IlpPixelClassificationGroup(annotations=annotations, classifier=classifier)
 
@@ -361,7 +365,6 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
         cls,
         group: h5py.Group,
         ilp_fs: JsonableFilesystem,
-        ilp_path: PurePosixPath,
         allowed_protocols: Sequence[Protocol] = (Protocol.HTTP, Protocol.HTTPS)
     ) -> "IlpPixelClassificationWorkflowGroup | ValueError":
         workflowname = ensure_encoded_string(group, "workflowName")
@@ -370,7 +373,7 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
 
         Input_Data = IlpInputDataGroup.parse(ensure_group(group, "Input Data"))
         raw_data_datasources_result = Input_Data.try_to_datasources(
-            role_name="Raw Data", ilp_fs=ilp_fs, ilp_path=ilp_path, allowed_protocols=allowed_protocols
+            role_name="Raw Data", ilp_fs=ilp_fs, ilp_path=PurePosixPath(group.file.filename), allowed_protocols=allowed_protocols
         )
         if isinstance(raw_data_datasources_result, Exception):
             return raw_data_datasources_result
