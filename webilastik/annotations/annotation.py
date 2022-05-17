@@ -215,40 +215,5 @@ class Annotation(ScalarData):
             out.set(annot.colored(color_map[annot.color]), mask_value=0)
         return out
 
-    # @staticmethod
-    # def dump_as_ilp_data(
-    #     annotations: Sequence["Annotation"],
-    #     color_map: Optional[Dict[Color, np.uint8]] = None,
-    #     block_size: Optional[Shape5D] = None,
-    # ) -> Dict[str, Any]:
-    #     if len(annotations) == 0:
-    #         return {}
-    #     if len(set(annot.raw_data for annot in annotations)) > 1:
-    #         raise ValueError(f"All Annotations must come from the same datasource!")
-    #     axiskeys = annotations[0].raw_data.axiskeys
-    #     merged_annotations = Annotation.merge(annotations, color_map=color_map)
-
-    #     out = {}
-    #     for block_index, block in enumerate(merged_annotations.split(block_size or merged_annotations.shape)):
-    #         out[f"block{block_index:04d}"] = {
-    #             "__data__": block.raw(axiskeys),
-    #             "__attrs__": {
-    #                 "blockSlice": "["
-    #                 + ",".join(f"{slc.start}:{slc.stop}" for slc in block.interval.to_slices(axiskeys))
-    #                 + "]"
-    #             },
-    #         }
-    #     return out
-
-    # @property
-    # def ilp_data(self) -> Mapping[str, Any]:
-    #     axiskeys = self.raw_data.axiskeys
-    #     return {
-    #         "__data__": self.raw(axiskeys),
-    #         "__attrs__": {
-    #             "blockSlice": "[" + ",".join(f"{slc.start}:{slc.stop}" for slc in self.interval.to_slices(axiskeys)) + "]"
-    #         },
-    #     }
-
     def __repr__(self):
         return f"<Annotation {self.shape} for raw_data: {self.raw_data}>"
