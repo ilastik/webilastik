@@ -77,6 +77,8 @@ class Color:
     def create_color_map(cls, colors: Iterable["Color"]) -> Dict["Color", np.uint8]:
         return {color: np.uint8(idx + 1) for idx, color in enumerate(cls.sort(set(colors)))}
 
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} r={self.r} g={self.g} b={self.b}>"
 
 class FeatureSamples(FeatureData, StaticLine):
     """A multi-channel array with a single spacial dimension, with each channel representing a feature calculated on
@@ -216,4 +218,5 @@ class Annotation(ScalarData):
         return out
 
     def __repr__(self):
-        return f"<Annotation {self.shape} for raw_data: {self.raw_data}>"
+        return f"<Annotation {self.interval} {self.color} onto {self.raw_data}>"
+
