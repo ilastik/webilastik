@@ -17,7 +17,7 @@ def try_filesystem_from_url(
     if url.protocol not in allowed_protocols:
         raise ValueError(f"Disallowed protocol '{url.protocol}' in url '{url}'")
     if url.protocol == Protocol.FILE:
-        return OsFs(url.path.parent.as_posix())
+        return OsFs(url.path.as_posix())
     if url.raw.startswith(BucketFs.API_URL.raw):
         return BucketFs.try_from_url(url=url, ebrains_user_token=ebrains_user_token)
     return HttpFs.try_from_url(url)
