@@ -106,7 +106,7 @@ class Group(HLObject, MutableMappingHDF5):
         """ Test if a member name exists """
         ...
 
-    def copy(self, source, dest, name=..., shallow=..., expand_soft=..., expand_external=..., expand_refs=..., without_attrs=...):
+    def copy(self, source: "str | Group | Dataset", dest: "str | Group", name=..., shallow=..., expand_soft=..., expand_external=..., expand_refs=..., without_attrs=...) -> None:
         """Copy an object or group.
 
       """

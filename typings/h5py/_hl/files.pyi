@@ -63,7 +63,7 @@ class File(Group):
 
     @property
     @with_phil
-    def filename(self): # -> str:
+    def filename(self) -> str:
         """File name on disk"""
         ...
 
@@ -130,7 +130,7 @@ class File(Group):
         ...
 
     @with_phil
-    def __enter__(self): # -> Self@File:
+    def __enter__(self) -> "File":
         ...
 
     @with_phil
