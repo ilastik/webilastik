@@ -1,5 +1,7 @@
-from pathlib import Path
-from typing import Mapping, Optional, Sequence, Any, Dict, List
+# pyright: strict
+
+from pathlib import PurePosixPath
+from typing import Callable, ClassVar, Mapping, Optional, Sequence, Any, Dict, List, Type
 from datetime import datetime
 import textwrap
 import pickle
@@ -14,11 +16,27 @@ from ndstructs.point5D import Interval5D, Shape5D
 from vigra.learning import RandomForest as VigraRandomForest
 
 from webilastik.annotations.annotation import Color
-from webilastik.classic_ilastik.ilp import IlpAttrDataset, IlpDatasetInfo, IlpFeatureSelectionsGroup, IlpGroup, IlpInputDataGroup, IlpLane, IlpParsingError, IlpProject, IlpValue, ensure_bytes, ensure_color_list, ensure_dataset, ensure_encoded_string, ensure_encoded_string_list, ensure_group, ensure_int, ensure_ndarray
+from webilastik.classic_ilastik.ilp import (
+    IlpDatasetInfo,
+    IlpFeatureSelectionsGroup,
+    IlpInputDataGroup,
+    IlpLane,
+    IlpParsingError,
+    IlpProject,
+    ensure_bytes,
+    ensure_color_list,
+    ensure_dataset,
+    ensure_encoded_string,
+    ensure_encoded_string_list,
+    ensure_group, ensure_int
+)
+from webilastik.features.channelwise_fastfilters import (
+    DifferenceOfGaussians, GaussianGradientMagnitude, GaussianSmoothing, HessianOfGaussianEigenvalues, LaplacianOfGaussian, StructureTensorEigenvalues
+)
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.datasource import DataSource, FsDataSource
 from webilastik.annotations import Annotation
-from webilastik.classifiers.pixel_classifier import VigraForestH5Bytes, VigraPixelClassifier, dump_to_temp_file, h5_bytes_to_vigra_forest, vigra_forest_to_h5_bytes
+from webilastik.classifiers.pixel_classifier import VigraPixelClassifier, dump_to_temp_file, vigra_forest_to_h5_bytes
 from webilastik.filesystem import JsonableFilesystem
 from webilastik.utility.url import Protocol
 
@@ -63,6 +81,46 @@ VIGRA_ILP_CLASSIFIER_FACTORY = textwrap.dedent(
 
 
 class IlpPixelClassificationGroup:
+    feature_name_to_class: ClassVar[Mapping[str, Type[IlpFilter]]] = {
+        "Gaussian Smoothing": GaussianSmoothing,
+        "Laplacian of Gaussian": LaplacianOfGaussian,
+        "Gaussian Gradient Magnitude": GaussianGradientMagnitude,
+        "Difference of Gaussians": DifferenceOfGaussians,
+        "Structure Tensor Eigenvalues": StructureTensorEigenvalues,
+        "Hessian of Gaussian Eigenvalues": HessianOfGaussianEigenvalues,
+    }
+    class_to_feature_name: ClassVar[Mapping[Type[IlpFilter], str]] = {v: k for k, v in feature_name_to_class.items()}
+    feature_names: ClassVar[Sequence[str]] = list(feature_name_to_class.keys())
+    feature_classes: ClassVar[Sequence[Type[IlpFilter]]] = list(feature_name_to_class.values())
+
+    @classmethod
+    def make_feature_ilp_name(cls, feature_extractor: IlpFilter, channel_index: int) -> str:
+        name = f"{cls.class_to_feature_name[feature_extractor.__class__]} (σ={feature_extractor.ilp_scale})"
+        name += " in 2D" if feature_extractor.axis_2d is not None else " in 3D"
+        name += f" [{channel_index}]"
+        return name
+
+    @classmethod
+    def ilp_filters_from_names(cls, feature_names: Sequence[str]) -> Sequence[IlpFilter]:
+        out: List[IlpFilter] = []
+        for name in feature_names:
+            parts = name.split()
+            # channel_index = int(parts[-1][1:-1]) # strip square brackets off of something like '[3]'
+            in_2D = parts[-2] == "2D"
+            ilp_scale = float(parts[-4][3:-1]) # read number from something like '(σ=0.3)'
+            ilp_classifier_feature_name = " ".join(parts[:-4]) # drops the 4 last items, that look like '(σ=0.3) in 2D [0]'
+
+            filter_class = cls.feature_name_to_class.get(ilp_classifier_feature_name)
+            if filter_class is None:
+                raise IlpParsingError(f"Bad ilp filter name: {ilp_classifier_feature_name}")
+            ilp_filter = filter_class.from_ilp_scale(
+                scale=ilp_scale, axis_2d= "z" if in_2D else None # FIXME: is axis_2d always 'z'?
+            )
+            if len(out) == 0 or out[-1] != ilp_filter:
+                out.append(ilp_filter)
+        return out
+
+
     def __init__(
         self,
         *,
@@ -86,7 +144,7 @@ class IlpPixelClassificationGroup:
                 Color(r=np.uint8(0), g=np.uint8(130), b=np.uint8(200))
             ])
 
-        LabelColors: "ndarray[Any, dtype[int64]]"  = np.asarray([color.rgba[:-1] for color in color_map.keys()], dtype=int64)
+        LabelColors: "ndarray[Any, dtype[int64]]"  = np.asarray([color.rgba[:-1] for color in color_map.keys()], dtype=int64) # pyright: ignore [reportUnknownMemberType]
 
         # expected group keys to look like this:
         # ['Bookmarks', 'ClassifierFactory', 'LabelColors', 'LabelNames', 'PmapColors', 'StorageVersion', 'LabelSets', 'ClassifierForests']>
@@ -95,7 +153,7 @@ class IlpPixelClassificationGroup:
         group["ClassifierFactory"] = VIGRA_ILP_CLASSIFIER_FACTORY
         group["LabelColors"] = LabelColors
         group["LabelColors"].attrs["isEmpty"] = False
-        group["LabelNames"] = np.asarray([color.name.encode("utf8") for color in color_map.keys()])
+        group["LabelNames"] = np.asarray([color.name.encode("utf8") for color in color_map.keys()]) # pyright: ignore [reportUnknownMemberType]
         group["LabelNames"].attrs["isEmpty"] = False
         group["PmapColors"] = LabelColors
         group["PmapColors"].attrs["isEmpty"] = False
@@ -128,10 +186,10 @@ class IlpPixelClassificationGroup:
             ClassifierForests = group.create_group("ClassifierForests")
 
             feature_names: List[bytes] = []
-            get_feature_extractor_order = lambda ex: IlpFeatureSelectionsGroup.feature_classes.index(ex.__class__)
+            get_feature_extractor_order: Callable[[IlpFilter], int] = lambda ex: self.feature_classes.index(ex.__class__)
             for fe in sorted(self.classifier.feature_extractors, key=get_feature_extractor_order):
                 for c in range(self.classifier.num_input_channels * fe.channel_multiplier):
-                    feature_names.append(fe.to_ilp_classifier_feature_entry(c).encode("utf8"))
+                    feature_names.append(self.make_feature_ilp_name(fe, channel_index=c).encode("utf8"))
 
             for forest_index, forest_bytes in enumerate(self.classifier.forest_h5_bytes):
                 forests_h5_path = dump_to_temp_file(forest_bytes)
@@ -140,13 +198,18 @@ class IlpPixelClassificationGroup:
                     assert isinstance(forest_group, h5py.Group)
                     ClassifierForests.copy(forest_group, f"Forest{forest_index:04}") # 'Forest0000', ..., 'Forest000N'
 
-            ClassifierForests["feature_names"] = np.asarray(feature_names)
-            ClassifierForests["known_labels"] = np.asarray(self.classifier.classes).astype(np.uint32)
+            ClassifierForests["feature_names"] = np.asarray(feature_names) # pyright: ignore [reportUnknownMemberType]
+            ClassifierForests["known_labels"] = np.asarray(self.classifier.classes).astype(np.uint32) # pyright: ignore [reportUnknownMemberType]
             ClassifierForests["pickled_type"] = b"clazyflow.classifiers.parallelVigraRfLazyflowClassifier\nParallelVigraRfLazyflowClassifier\np0\n."
 
     @classmethod
     def parse(cls, group: h5py.Group, raw_data_sources: Mapping[int, "FsDataSource | None"]) -> "IlpPixelClassificationGroup":
         annotations: List[Annotation] = []
+
+        LabelColors = ensure_color_list(group, "LabelColors")
+        color_map = Color.create_color_map(LabelColors)
+        reverse_color_map = {v: k for k, v in color_map.items()}
+
         LabelSets = ensure_group(group, "LabelSets")
         for lane_key in LabelSets.keys():
             if not lane_key.startswith("labels"):
@@ -172,10 +235,13 @@ class IlpPixelClassificationGroup:
                 axistags = AxisTags.fromJSON(raw_axistags)
                 axiskeys = "".join(axistags.keys())
 
-                blockSlice = block.attrs.get("blockSlice")
+                if "blockSlice" not in block.attrs:
+                    raise IlpParsingError(f"Expected 'blockSlice' in attrs from {block.name}")
+                blockSlice = block.attrs["blockSlice"]
                 if not isinstance(blockSlice, str):
                     raise IlpParsingError(f"Expected 'blockSlice'' to be a str, found {blockSlice}")
-                blockSpans: Sequence[List[str]] = [span_str.split(":") for span_str in blockSlice.split(",")]
+                # import pydevd; pydevd.settrace()
+                blockSpans: Sequence[List[str]] = [span_str.split(":") for span_str in blockSlice[1:-1].split(",")]
                 blockInterval = Interval5D.zero(**{
                     key: (int(span[0]), int(span[1]))
                     for key, span in zip(axiskeys, blockSpans)
@@ -183,18 +249,22 @@ class IlpPixelClassificationGroup:
 
                 block_5d = Array5D(block_data, axiskeys=axiskeys)
                 for color_5d in block_5d.unique_colors().split(shape=Shape5D(x=1, c=block_5d.shape.c)):
-                    raw_color = color_5d.raw("c")
+                    color_index = np.uint8(color_5d.raw("c")[0])
+                    if color_index == np.uint8(0): # background
+                        continue
+                    color = reverse_color_map.get(color_index)
+                    if color is None:
+                        raise IlpParsingError(f"Could not find a label color for index {color_index}")
                     annotation = Annotation(
                         block_5d.color_filtered(color=color_5d).raw(axiskeys),
                         location=blockInterval.start,
                         axiskeys=axiskeys, # FIXME: what if the user changed the axiskeys in the data source?
                         raw_data=raw_data,
-                        color=Color(r=np.uint8(raw_color[0]), g=np.uint8(raw_color[1]), b=np.uint8(raw_color[2])),
+                        color=color,
                     )
                     annotations.append(annotation)
 
-        LabelColors = ensure_color_list(group, "LabelColors")
-        color_map = Color.create_color_map(LabelColors)
+
 
         ClassifierFactory = ensure_bytes(group, "ClassifierFactory")
         if ClassifierFactory != VIGRA_ILP_CLASSIFIER_FACTORY:
@@ -204,20 +274,19 @@ class IlpPixelClassificationGroup:
         for forest_key in sorted(ClassifierForests.keys()):
             if not forest_key.startswith("Forest"):
                 continue
-            forest_bytes = ensure_bytes(ClassifierForests, forest_key)
-            forest = h5_bytes_to_vigra_forest(h5_bytes=VigraForestH5Bytes(forest_bytes))
+            forest = VigraRandomForest(group.file.filename, f"{ClassifierForests.name}/{forest_key}")
+            # forest_bytes = ensure_bytes(ClassifierForests, forest_key)
+            # forest = h5_bytes_to_vigra_forest(h5_bytes=VigraForestH5Bytes(forest_bytes))
             forests.append(forest)
 
         feature_names = ensure_encoded_string_list(ClassifierForests, "feature_names")
-        feature_extractors_result = IlpFilter.from_ilp_classifier_feature_entries(feature_names)
-        if isinstance(feature_extractors_result, Exception):
-            raise IlpParsingError(str(feature_extractors_result))
+        feature_extractors = cls.ilp_filters_from_names(feature_names)
 
         # FIXME: make feature extractors aware of which channel they handle
         num_input_channels = max(int(fn.split()[-1][1:-1]) for fn in feature_names) + 1
 
         classifier = VigraPixelClassifier(
-            feature_extractors=feature_extractors_result,
+            feature_extractors=feature_extractors,
             forest_h5_bytes=[vigra_forest_to_h5_bytes(forest) for forest in forests],
             color_map=color_map,
             classes=list(color_map.values()),
@@ -292,7 +361,7 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
         cls,
         group: h5py.Group,
         ilp_fs: JsonableFilesystem,
-        ilp_path: Path,
+        ilp_path: PurePosixPath,
         allowed_protocols: Sequence[Protocol] = (Protocol.HTTP, Protocol.HTTPS)
     ) -> "IlpPixelClassificationWorkflowGroup | ValueError":
         workflowname = ensure_encoded_string(group, "workflowName")

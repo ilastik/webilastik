@@ -145,11 +145,6 @@ class StructureTensorEigenvalues(ChannelwiseFastFilter):
         self.window_size = window_size
 
     @classmethod
-    @property
-    def ilp_classifier_feature_name(cls) -> str:
-        return "Structure Tensor Eigenvalues"
-
-    @classmethod
     def from_json_data(cls, data: JsonValue) -> "StructureTensorEigenvalues":
         data_dict = ensureJsonObject(data)
         return cls(
@@ -246,31 +241,16 @@ class SigmaWindowFilter(ChannelwiseFastFilter):
 
 
 class GaussianGradientMagnitude(SigmaWindowFilter):
-    @classmethod
-    @property
-    def ilp_classifier_feature_name(cls) -> str:
-        return "Gaussian Gradient Magnitude"
-
     def filter_fn(self, source_raw: "ndarray[Any, dtype[float32]]") -> "ndarray[Any, dtype[float32]]":
         return fastfilters.gaussianGradientMagnitude(source_raw, sigma=self.sigma, window_size=self.window_size)
 
 
 class GaussianSmoothing(SigmaWindowFilter):
-    @classmethod
-    @property
-    def ilp_classifier_feature_name(cls) -> str:
-        return "GaussianSmoothing"
-
     def filter_fn(self, source_raw: "ndarray[Any, dtype[float32]]") -> "ndarray[Any, dtype[float32]]":
         return fastfilters.gaussianSmoothing(source_raw, sigma=self.sigma, window_size=self.window_size)
 
 
 class DifferenceOfGaussians(ChannelwiseFastFilter):
-    @classmethod
-    @property
-    def ilp_classifier_feature_name(cls) -> str:
-        return "Difference of Gaussians"
-
     def __init__(
         self,
         *,
@@ -386,11 +366,6 @@ class ScaleWindowFilter(ChannelwiseFastFilter):
 
 
 class HessianOfGaussianEigenvalues(ScaleWindowFilter):
-    @classmethod
-    @property
-    def ilp_classifier_feature_name(cls) -> str:
-        return "Hessian of Gaussian Eigenvalues"
-
     def filter_fn(self, source_raw: "ndarray[Any, dtype[float32]]") -> "ndarray[Any, dtype[float32]]":
         return fastfilters.hessianOfGaussianEigenvalues(source_raw, scale=self.scale, window_size=self.window_size)
 

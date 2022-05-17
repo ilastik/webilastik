@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from abc import ABC
-from pathlib import Path
+from pathlib import PurePosixPath
 from typing import Callable, ClassVar, Any, Dict, List, Mapping, Sequence, Tuple, Type, TypeVar, cast
 from collections.abc import Mapping as AbcMapping
 from typing_extensions import TypeAlias
@@ -79,7 +79,7 @@ def ensure_dataset(group: h5py.Group, key: str) -> h5py.Dataset:
         raise IlpMissingKey(key)
     dataset = group[key]
     if not isinstance(dataset, h5py.Dataset):
-        raise IlpParsingError(f"Expected dataset at '{key}', found {dataset.__class__.__name__}")
+        raise IlpParsingError(f"Expected dataset at '{group.name}/{key}', found {dataset.__class__.__name__}")
     return dataset
 
 def ensure_int(group: h5py.Group, key: str) -> int:
@@ -327,7 +327,6 @@ class IlpDatasetInfo:
         datasetId: "None | uuid.UUID",
         filePath: str,
         nickname: str,
-        fromstack: "bool | None",
         location: IlpDatasetInfoLocation,
         klass: IlpInfoClassName,
         shape: Tuple[int, ...],
@@ -338,7 +337,6 @@ class IlpDatasetInfo:
         self.allowLabels: bool = True if allowLabels is None else allowLabels
         self.axistags: AxisTags = axistags
         self.nickname: str = nickname
-        self.fromstack: bool = True if fromstack is None else fromstack
         self.location = location
         self.klass = klass
         self.datasetId: uuid.UUID = datasetId or uuid.uuid1()
@@ -368,7 +366,6 @@ class IlpDatasetInfo:
             datasetId=datasetId,
             filePath=datasource.url.to_ilp_info_filePath(),
             nickname=nickname or datasource.url.path.name,
-            fromstack=fromstack,
             location=IlpDatasetInfoLocation.FILE_SYSTEM,
             klass=IlpInfoClassName.from_url(datasource.url),
             shape=datasource.shape.to_tuple(datasource.c_axiskeys_on_disk),
@@ -393,7 +390,6 @@ class IlpDatasetInfo:
         group["datasetId"] = str(self.datasetId).encode("utf8")
 
         group["axisorder"] = "".join(self.axistags.keys()).encode("utf8")
-        group["fromstack"] = self.fromstack # FIXME?
 
     @classmethod
     def parse(cls, group: h5py.Group) -> "IlpDatasetInfo":
@@ -402,7 +398,6 @@ class IlpDatasetInfo:
             axistags=vigra.AxisTags.fromJSON(ensure_encoded_string(group, "axistags")),
             datasetId=uuid.UUID(ensure_encoded_string(group, "datasetId")),
             filePath=ensure_encoded_string(group, "filePath"),
-            fromstack=ensure_bool(group, "fromstack"),
             location=IlpDatasetInfoLocation.from_ilp_data(ensure_bytes(group, "location")),
             klass=IlpInfoClassName.from_ilp_data(ensure_bytes(group, "__class__")), # FIXME: optional?
             nickname=ensure_encoded_string(group, "nickname"),
@@ -416,13 +411,13 @@ class IlpDatasetInfo:
         self,
         *,
         ilp_fs: JsonableFilesystem,
-        ilp_path: Path,
+        ilp_path: PurePosixPath,
         allowed_protocols: Sequence[Protocol] = (Protocol.HTTP, Protocol.HTTPS)
     ) -> "FsDataSource | ValueError":
         url = Url.parse(self.filePath)
-        if url is None:
-            abs_path = ilp_path.parent.joinpath(self.filePath)
-            url = Url.parse(ilp_fs.geturl(abs_path.as_posix()))
+        if url is None: # filePath was probably a path, not an URL
+            path = ilp_path.parent.joinpath(self.filePath)
+            url = Url.parse(ilp_fs.geturl(path.as_posix()))
         if url is None:
             return ValueError(f"Could not parse {self.filePath} as URL")
         datasources_result = try_get_datasources_from_url(url=url, allowed_protocols=allowed_protocols)
@@ -455,8 +450,12 @@ class IlpLane: #FIXME: generic over TypeVarTuple(..., bound=Literal["Raw Data", 
         for role_name in role_names:
             if role_name not in group:
                 roles[role_name] = None
-            else:
-                roles[role_name] = IlpDatasetInfo.parse(ensure_group(group, role_name))
+                continue
+            info_group = ensure_group(group, role_name)
+            if len(info_group.keys()) == 0:
+                roles[role_name] = None
+                continue
+            roles[role_name] = IlpDatasetInfo.parse(info_group)
         return IlpLane(roles=roles)
 
 
@@ -499,7 +498,7 @@ class IlpInputDataGroup:
         *,
         role_name: str,
         ilp_fs: JsonableFilesystem,
-        ilp_path: Path,
+        ilp_path: PurePosixPath,
         allowed_protocols: Sequence[Protocol] = (Protocol.HTTP, Protocol.HTTPS)
     ) -> "Dict[int, 'FsDataSource | None'] | ValueError":
         infos = [lane.roles[role_name] for lane in self.lanes]
@@ -536,9 +535,7 @@ class IlpFeatureSelectionsGroup:
         if len(self.feature_extractors) == 0:
             return
 
-        group["FeatureIds"] = np.asarray([ # pyright: ignore [reportUnknownMemberType]
-            name.encode("utf8") for name in self.feature_names
-        ])
+        group["FeatureIds"] = [name.encode("utf8") for name in self.feature_names]
 
         default_scales = [0.3, 0.7, 1.0, 1.6, 3.5, 5.0, 10.0]
         extra_scales = set(fe.ilp_scale for fe in self.feature_extractors if fe.ilp_scale not in default_scales)
@@ -567,8 +564,8 @@ class IlpFeatureSelectionsGroup:
             group, key="SelectionMatrix", expected_shape=(len(FeatureIds), len(Scales)), expected_dtype=np.dtype("bool")
         )
         ComputeIn2d = ensure_list(group, key="ComputeIn2d", expected_dtype=np.dtype("bool"))
-        if len(ComputeIn2d) != len(FeatureIds):
-            raise IlpParsingError(f"FeatureIds has different length from ComputeIn2D")
+        # if len(ComputeIn2d) != len(FeatureIds):
+            # raise IlpParsingError(f"FeatureIds has different length from ComputeIn2D")
         StorageVersion = ensure_encoded_string(group, key="StorageVersion")
         if StorageVersion != "0.1":
             raise IlpParsingError(f"Unexpected storage version on {group.name}: {StorageVersion}")
