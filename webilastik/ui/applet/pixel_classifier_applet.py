@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from functools import partial
 import threading
 from typing import Any, Callable, Literal, Optional, Sequence, Dict, Union
-import textwrap
 
 import numpy as np
 
@@ -15,44 +14,6 @@ from webilastik.features.ilp_filter import IlpFilter
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.ui.usage_error import UsageError
 
-
-DEFAULT_ILP_CLASSIFIER_FACTORY = textwrap.dedent(
-        """
-        ccopy_reg
-        _reconstructor
-        p0
-        (clazyflow.classifiers.parallelVigraRfLazyflowClassifier
-        ParallelVigraRfLazyflowClassifierFactory
-        p1
-        c__builtin__
-        object
-        p2
-        Ntp3
-        Rp4
-        (dp5
-        VVERSION
-        p6
-        I2
-        sV_num_trees
-        p7
-        I100
-        sV_label_proportion
-        p8
-        NsV_variable_importance_path
-        p9
-        NsV_variable_importance_enabled
-        p10
-        I00
-        sV_kwargs
-        p11
-        (dp12
-        sV_num_forests
-        p13
-        I8
-        sb."""[
-            1:
-        ]
-    ).encode("utf8")
 
 Classifier = VigraPixelClassifier[IlpFilter]
 ColorMap = Dict[Color, np.uint8]
