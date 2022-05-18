@@ -4,9 +4,7 @@
 from concurrent.futures import Executor
 from pathlib import PurePosixPath
 from typing import Callable, Mapping
-import io
 
-import h5py
 from ndstructs.utils.json_serializable import JsonObject
 
 from webilastik.datasource import FsDataSource
@@ -72,14 +70,7 @@ class PixelClassificationWorkflow:
         )
 
     def get_ilp_contents(self) -> bytes:
-        backing_buffer = io.BytesIO()
-        f = h5py.File(backing_buffer, "w")
-        root_group = f["/"]
-        assert isinstance(root_group, h5py.Group)
-        self.to_ilp_workflow_group().populate_group(root_group)
-        f.close()
-        _ = backing_buffer.seek(0)
-        return backing_buffer.read()
+        return self.to_ilp_workflow_group().to_h5_file_bytes()
 
     def save_project(self, fs: JsonableFilesystem, path: PurePosixPath) -> int:
         with fs.openbin(path.as_posix(), "w") as f:

@@ -5,8 +5,9 @@ from typing import Callable, ClassVar, Mapping, Optional, Sequence, Any, Dict, L
 from datetime import datetime
 import textwrap
 import pickle
-import h5py
+import io
 
+import h5py
 import numpy as np
 import vigra
 from numpy import ndarray, dtype, int64
@@ -391,3 +392,13 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
             ilastikVersion=ensure_encoded_string(group, "ilastikVersion"),
             time=datetime.strptime(ensure_encoded_string(group, "time"), "%a %b %d %H:%M:%S %Y"),
         )
+
+    def to_h5_file_bytes(self) -> bytes:
+        backing_buffer = io.BytesIO()
+        f = h5py.File(backing_buffer, "w")
+        root_group = f["/"]
+        assert isinstance(root_group, h5py.Group)
+        self.populate_group(root_group)
+        f.close()
+        _ = backing_buffer.seek(0)
+        return backing_buffer.read()
