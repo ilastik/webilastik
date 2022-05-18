@@ -389,7 +389,7 @@ class IlpDatasetInfo:
         group["filePath"] = self.filePath.encode("utf8")
         group["datasetId"] = str(self.datasetId).encode("utf8")
 
-        group["axisorder"] = "".join(self.axistags.keys()).encode("utf8")
+        # group["axisorder"] = "".join(self.axistags.keys()).encode("utf8")
 
     @classmethod
     def parse(cls, group: h5py.Group) -> "IlpDatasetInfo":
