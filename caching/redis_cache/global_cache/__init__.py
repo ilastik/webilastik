@@ -14,7 +14,7 @@ def _redis_cache(func: T) -> T: #FIXME: use Callabe[P, OUT] ?
     @wraps(func)
     def wrapper(*args, **kwargs):
         r = redis.Redis(connection_pool=redis_pool)
-        key_tuple = (func.__qualname__, tuple(args), sorted(kwargs.items(), key=lambda x: x[0])),
+        key_tuple = (func.__qualname__, tuple(args), sorted(kwargs.items(), key=lambda x: x[0]))
         key  = pickle.dumps(key_tuple)
         raw_value = r.get(key)
         if raw_value is not None:
