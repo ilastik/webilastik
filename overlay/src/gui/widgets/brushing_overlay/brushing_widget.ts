@@ -34,7 +34,7 @@ export class BrushingWidget extends Applet<State>{
     public staging_brush_stroke: BrushStroke | undefined = undefined
     public readonly gl: WebGL2RenderingContext
     public readonly canvas: HTMLCanvasElement
-    private brushStrokeContainers = new HashMap<DataSource, BrushStrokesContainer>({
+    private brushStrokeContainers = new HashMap<DataSource, BrushStrokesContainer, string>({
         hash_function: (ds => ds.getDisplayString()) //FIXME
     });
 

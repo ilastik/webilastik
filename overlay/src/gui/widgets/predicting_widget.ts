@@ -108,7 +108,7 @@ export class PredictingWidget extends Applet<State>{
             return
         }
 
-        let viewsToOpen = new HashMap<DataSource, PredictionsView>({hash_function: ds => JSON.stringify(ds.toJsonValue())})
+        let viewsToOpen = new HashMap<DataSource, PredictionsView, string>({hash_function: ds => JSON.stringify(ds.toJsonValue())})
 
         for(let view of this.viewer.getViews()){
             // All training views need a prediction view...
