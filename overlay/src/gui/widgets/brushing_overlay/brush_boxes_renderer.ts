@@ -224,7 +224,7 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
         let a_offset_vx_location = this.getAttribLocation("a_offset_vx");
         for(let brush_stroke of brush_strokes){
             if(!this.debugColors){
-                this.uniform3fv("color", brush_stroke.color)
+                this.uniform3fv("color", brush_stroke.color.vec3f)
             }
             this.uniform3fv("u_brush_resolution", brush_stroke.resolution)
             brush_stroke.positions_buffer.useAsInstacedAttribute({vao: this.vao, location: a_offset_vx_location, attributeDivisor: 1})

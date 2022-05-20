@@ -289,12 +289,46 @@ export class Color{
     public readonly r: number;
     public readonly g: number;
     public readonly b: number;
-    public readonly a: number;
-    public constructor({r=0, g=0, b=0, a=255}: {r: number, g: number, b: number, a: number}){
-        this.r = r; this.g = g; this.b = b; this.a = a;
+    public readonly vec3f: vec3;
+    public readonly vec3i: vec3;
+    public readonly hashValue: number
+    public readonly hexCode: string
+
+    public constructor({r=0, g=0, b=0}: {r: number, g: number, b: number}){
+        this.r = r; this.g = g; this.b = b;
+        this.vec3f = vec3.fromValues(r/255, g/255, b/255) // FIXME: rounding errors?
+        this.vec3i = vec3.fromValues(r, g, b) // FIXME: rounding errors?
+        this.hashValue = r * 256 * 256 + g * 256 + b
+        this.hexCode = "#" + [r,g,b].map((val) => {
+            const val_str = val.toString(16)
+            return val_str.length < 2 ? "0" + val_str : val_str
+        }).join("")
     }
-    public static fromJsonData(data: any): Color{
-        return new Color(data)
+
+    public static fromHexCode(hexCode: string): Color{
+        let channels = hexCode.slice(1).match(/../g)!.map(c => parseInt(c, 16))
+        return new Color({r: channels[0], g: channels[1], b: channels[2]})
+    }
+
+    public static fromJsonValue(value: JsonValue){
+        let color_object = ensureJsonObject(value)
+        return new Color({
+            r: ensureJsonNumber(color_object["r"]),
+            g: ensureJsonNumber(color_object["g"]),
+            b: ensureJsonNumber(color_object["b"]),
+        })
+    }
+
+    public toJsonValue(): JsonObject{
+        return {
+            r: this.r,
+            g: this.g,
+            b: this.b,
+        }
+    }
+
+    public equals(other: Color): boolean{
+        return this.hashValue == other.hashValue
     }
 }
 
@@ -308,7 +342,7 @@ export class Annotation{
     public static fromJsonData(data: any): Annotation{
         return new Annotation(
             data["voxels"],
-            Color.fromJsonData(data["color"]),
+            Color.fromJsonValue(data["color"]),
             DataSource.fromJsonValue(data["raw_data"])
         )
     }

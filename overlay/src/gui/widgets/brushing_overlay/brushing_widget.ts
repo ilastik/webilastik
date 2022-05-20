@@ -1,10 +1,9 @@
 import { quat, vec3 } from "gl-matrix"
 import { BrushStroke } from "../../.."
-import { DataSource, Session } from "../../../client/ilastik"
+import { Color, DataSource, Session } from "../../../client/ilastik"
 import { createElement, createInputParagraph, removeElement } from "../../../util/misc"
 import { CollapsableWidget } from "../collapsable_applet_gui"
 import { OneShotSelectorWidget } from "../selector_widget"
-import { Vec3ColorPicker } from "../vec3_color_picker"
 import { BrushingOverlay } from "./brushing_overlay"
 import { BrushelBoxRenderer } from "./brush_boxes_renderer"
 import { BrushStrokesContainer } from "./brush_strokes_container"
@@ -14,6 +13,7 @@ import { Applet } from "../../../client/applets/applet"
 import { ensureJsonArray, ensureJsonBoolean, ensureJsonObject, JsonValue } from "../../../util/serialization"
 import { HashMap } from "../../../util/hashmap"
 import { PredictingWidget } from "../predicting_widget";
+import { ColorPicker } from "../color_picker"
 
 
 type State = {brushing_enabled: boolean, annotations: Array<BrushStroke>}
@@ -24,7 +24,7 @@ export class BrushingWidget extends Applet<State>{
     private readonly status_display: HTMLElement
     private readonly resolutionSelectionContainer: HTMLElement
     private readonly trainingWidget: HTMLDivElement
-    private readonly colorPicker: Vec3ColorPicker
+    private readonly colorPicker: ColorPicker
     private readonly brushingEnabledCheckbox: HTMLInputElement
     private readonly brushDisplayContainer: HTMLParagraphElement
 
@@ -91,7 +91,7 @@ export class BrushingWidget extends Applet<State>{
 
             let p = createElement({tagName: "p", parentElement: this.trainingWidget})
                 createElement({tagName: "label", innerHTML: "Brush Color: ", parentElement: p})
-                this.colorPicker = new Vec3ColorPicker({parentElement: p})
+                this.colorPicker = new ColorPicker({parentElement: p})
 
             this.brushDisplayContainer = createElement({tagName: "p", parentElement: this.trainingWidget})
 
@@ -211,7 +211,7 @@ export class BrushingWidget extends Applet<State>{
             container = new BrushStrokesContainer({
                 parentElement: this.brushDisplayContainer,
                 datasource: brushStroke.annotated_data_source,
-                onBrushColorClicked: (color: vec3) => this.colorPicker.setColor(color),
+                onBrushColorClicked: (color: Color) => this.colorPicker.setColor(color),
                 onBrushRemoved: (brushStroke: BrushStroke) => {
                     //mask loading time by updating local state
                     let container = this.brushStrokeContainers.get(brushStroke.annotated_data_source)

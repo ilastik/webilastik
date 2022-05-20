@@ -62,7 +62,7 @@ export class BrushelLinesRenderer extends ShaderProgram implements BrushRenderer
 
         let a_offset_vx_location = this.getAttribLocation("a_offset_vx");
         for(let brush_stroke of brush_strokes){
-            this.uniform3fv("color", brush_stroke.color)
+            this.uniform3fv("color", brush_stroke.color.vec3f)
             brush_stroke.positions_buffer.useWithAttribute({vao: this.vao, location: a_offset_vx_location})
             this.gl.drawArrays(brush_stroke.num_points == 1 ? DrawingMode.POINTS : DrawingMode.LINE_STRIP, 0, brush_stroke.num_points)
         }

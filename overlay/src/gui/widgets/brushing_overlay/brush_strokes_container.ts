@@ -1,6 +1,6 @@
 import { vec3 } from "gl-matrix";
-import { DataSource } from "../../../client/ilastik";
-import { createElement, createInput, removeElement, vec3ToHexColor, vec3ToRgb, vecToString } from "../../../util/misc";
+import { Color, DataSource } from "../../../client/ilastik";
+import { createElement, createInput, removeElement, vecToString } from "../../../util/misc";
 import { BrushStroke } from "./brush_stroke";
 
 export type resolution = vec3;
@@ -12,13 +12,13 @@ export class BrushStrokesContainer{
 
     public readonly datasource: DataSource
     private brushStrokeWidgets: BrushStrokeWidget[] = [];
-    private onBrushColorClicked: (color: vec3) => void;
+    private onBrushColorClicked: (color: Color) => void;
     private onBrushRemoved: (stroke: BrushStroke) => void;
 
     constructor({datasource, parentElement, onBrushColorClicked, onBrushRemoved}: {
         datasource: DataSource,
         parentElement: HTMLElement,
-        onBrushColorClicked: (color: vec3) => void,
+        onBrushColorClicked: (color: Color) => void,
         onBrushRemoved: (stroke: BrushStroke) => void,
     }){
         this.element = createElement({tagName: "div", parentElement, cssClasses: ["ItkBrushStrokesContainer"]});
@@ -70,7 +70,7 @@ class BrushStrokeWidget{
         brushStroke: BrushStroke,
         parentElement: HTMLTableElement,
         onLabelClicked : (stroke: BrushStroke) => void,
-        onColorClicked : (color: vec3) => void,
+        onColorClicked : (color: Color) => void,
         onDeleteClicked : (stroke: BrushStroke) => void,
     }){
         this.brushStroke = brushStroke
@@ -82,10 +82,10 @@ class BrushStrokeWidget{
         createInput({
             inputType: "button",
             value: "🖌",
-            title: `Pick this color (${vec3ToHexColor(brushStroke.color)})`,
+            title: `Pick this color (${brushStroke.color.hexCode})`,
             parentElement: color_container,
             inlineCss: {
-                backgroundColor: vec3ToRgb(brushStroke.color),
+                backgroundColor: brushStroke.color.hexCode,
             },
             onClick: () => onColorClicked(brushStroke.color),
         })

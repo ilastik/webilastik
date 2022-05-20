@@ -211,12 +211,6 @@ export function coverContents({target, overlay, offsetLeft=0, offsetBottom=0, wi
     overlay.style.left =   (targetContentRect.left + offsetLeft)   + "px"
 }
 
-
-
-export function vec3ToRgb(value: vec3): string{
-    return "rgb(" + value.map((c: number) => Math.floor(c * 255)).join(", ") + ")"
-}
-
 export function vecToString(value: Float32Array | Array<number>, decimals: number = 3): string{
     let axisNames = "xyzw";
     return Array.from(value).map((value, idx) => {
@@ -250,18 +244,6 @@ export function m4_to_s(m: mat4) : string{
     }
     let comma_sep_lines = lines.map((line) => line.join(", "))
     return comma_sep_lines.join("\n")
-}
-
-export function hexColorToVec3(color: string): vec3{
-    let channels = color.slice(1).match(/../g)!.map(c => parseInt(c, 16) / 255)
-    return vec3.fromValues(channels[0], channels[1], channels[2])
-}
-
-export function vec3ToHexColor(color: vec3): string{
-    return "#" + Array.from(color).map((val) => {
-        const val_str = Math.round(val * 255).toString(16)
-        return val_str.length < 2 ? "0" + val_str : val_str
-    }).join("")
 }
 
 export function vec3to4(v: vec3, w: number): vec4{
