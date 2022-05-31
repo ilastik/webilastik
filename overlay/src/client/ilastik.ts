@@ -330,6 +330,10 @@ export class Color{
     public equals(other: Color): boolean{
         return this.hashValue == other.hashValue
     }
+
+    public inverse(): Color{
+        return new Color({r: 255 - this.r, g: 255 - this.g, b: 255 - this.b})
+    }
 }
 
 export class Annotation{
