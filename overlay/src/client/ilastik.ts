@@ -597,6 +597,10 @@ export abstract class DataSource implements IJsonable{
         this.tile_shape = params.tile_shape
     }
 
+    public get hashValue(): string{
+        return JSON.stringify(this.toJsonValue())
+    }
+
     public static fromJsonValue(data: JsonValue) : DataSource{
         const data_obj = ensureJsonObject(data)
         const class_name = ensureJsonString(data_obj["__class__"])

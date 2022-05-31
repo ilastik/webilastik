@@ -5,6 +5,7 @@ import { VertexArrayObject } from "../../../gl/buffer"
 import { DrawingMode, RenderParams } from "../../../gl/gl"
 import { FragmentShader, ShaderProgram, VertexShader } from "../../../gl/shader"
 import { BrushStroke } from "./brush_stroke"
+import { Color } from "../../../client/ilastik"
 
 
 export class BrushelLinesRenderer extends ShaderProgram implements BrushRenderer{
@@ -48,7 +49,7 @@ export class BrushelLinesRenderer extends ShaderProgram implements BrushRenderer
         voxelToWorld,
         renderParams=new RenderParams({})
     }: {
-        brush_strokes: Array<BrushStroke>,
+        brush_strokes: Array<[Color, BrushStroke[]]>,
         camera: Camera,
         voxelToWorld: mat4,
         renderParams?: RenderParams
@@ -61,10 +62,12 @@ export class BrushelLinesRenderer extends ShaderProgram implements BrushRenderer
         this.uniformMatrix4fv("u_voxel_to_clip", u_voxel_to_clip);
 
         let a_offset_vx_location = this.getAttribLocation("a_offset_vx");
-        for(let brush_stroke of brush_strokes){
-            this.uniform3fv("color", brush_stroke.color.vec3f)
-            brush_stroke.positions_buffer.useWithAttribute({vao: this.vao, location: a_offset_vx_location})
-            this.gl.drawArrays(brush_stroke.num_points == 1 ? DrawingMode.POINTS : DrawingMode.LINE_STRIP, 0, brush_stroke.num_points)
+        for(let [color, annotations] of brush_strokes){
+            for(let brush_stroke of annotations){
+                this.uniform3fv("color", color.vec3f)
+                brush_stroke.positions_buffer.useWithAttribute({vao: this.vao, location: a_offset_vx_location})
+                this.gl.drawArrays(brush_stroke.num_points == 1 ? DrawingMode.POINTS : DrawingMode.LINE_STRIP, 0, brush_stroke.num_points)
+            }
         }
     }
 }

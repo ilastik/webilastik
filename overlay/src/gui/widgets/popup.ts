@@ -1,4 +1,4 @@
-import { createElement, createInputParagraph, removeElement } from "../../util/misc";
+import { createElement, createInput, createInputParagraph, removeElement } from "../../util/misc";
 
 export class PopupWidget{
     public readonly background: HTMLElement
@@ -48,6 +48,29 @@ export class ErrorPopupWidget extends PopupWidget{
         createElement({tagName: "span", parentElement: this.element, innerHTML: params.message})
         createInputParagraph({inputType: "button", parentElement:  this.element, value: "Ok", onClick: () => {
             this.destroy()
+        }})
+    }
+}
+
+export class InputPopupWidget<V> extends PopupWidget{
+    constructor(params: {
+        title: string,
+        inputWidgetFactory: (parentElement: HTMLElement) => {value: V},
+        onConfirm: (value: V) => void,
+        onCancel?: () => void
+    }){
+        super(params.title)
+        let inputWidget = params.inputWidgetFactory(this.element)
+        let p = createElement({tagName: "p", parentElement: this.element})
+        createInput({inputType: "button", parentElement: p, value: "Ok", onClick: () => {
+            this.destroy()
+            params.onConfirm(inputWidget.value)
+        }})
+        createInput({inputType: "button", parentElement: p, value: "Cancel", onClick: () => {
+            this.destroy()
+            if(params.onCancel){
+                params.onCancel()
+            }
         }})
     }
 }

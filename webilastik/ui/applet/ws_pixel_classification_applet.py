@@ -21,17 +21,13 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
     def _get_json_state(self) -> JsonValue:
         with self.lock:
             state = self._state
-
-        if isinstance(state.classifier, PixelClassifier):
-            channel_colors = tuple(color.to_json_data() for color in state.classifier.color_map.keys())
-        else:
-            channel_colors = tuple()
+            label_classes = self._in_label_classes()
 
         return {
             "generation": state.generation,
             "description": state.description,
             "live_update": state.live_update,
-            "channel_colors": channel_colors,
+            "channel_colors": tuple(color.to_json_data() for color in label_classes.keys()),
         }
 
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
@@ -87,7 +83,9 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
         zEnd = int(request.match_info.get("zEnd")) # type: ignore
 
         datasource = _decode_datasource(encoded_raw_data)
-        classifier = self.pixel_classifier()
+        with self.lock:
+            classifier = self.pixel_classifier()
+            label_classes = self._in_label_classes()
         if classifier is None:
             return web.json_response({"error": "Classifier is not ready yet"}, status=412)
 
@@ -106,7 +104,8 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
             if predictions.shape.z > 1:
                 return web.Response(status=400, text="Server-side rendering only available for 2d images")
 
-            prediction_png_bytes = list(predictions.to_z_slice_pngs())[0]
+            class_colors = tuple(label_classes.keys())
+            prediction_png_bytes = list(predictions.to_z_slice_pngs(class_colors))[0] #FIXME assumes shape.t=1 and shape.z=1
             return web.Response(
                 body=prediction_png_bytes.getbuffer(),
                 headers={

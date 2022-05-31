@@ -9,6 +9,7 @@ import typing
 import h5py
 import PIL
 import io
+from dataclasses import dataclass
 
 
 import numpy as np
@@ -29,34 +30,18 @@ class Predictions(Array5D):
     """An array of floats from 0.0 to 1.0. The value in each channel represents
     how likely that pixel is to belong to the classification class associated with
     that channel"""
-    def __init__(self, arr: "ndarray[Any, dtype[float32]]", axiskeys: str, channel_colors: Sequence[Color], location: Point5D = Point5D.zero()):
-        super().__init__(arr, axiskeys, location=location)
-        self.channel_colors = tuple(channel_colors)
 
-    def rebuild(self: "Predictions", arr: "ndarray[Any, dtype[float32]]", *, axiskeys: str, location: Optional[Point5D] = None) -> "Predictions":
-        a5d = Array5D(arr=arr, axiskeys=axiskeys, location=location or self.location)
-        channel_colors: Sequence[Color];
-        if a5d.shape.c == self.shape.c:
-            channel_colors = self.channel_colors
-        elif self.interval.contains(a5d.interval):
-            channel_colors = [self.channel_colors[c] for c in range(*a5d.interval.c)]
-        else:
-            raise RuntimeError(
-                f"Don't know how to propagate prediction channel colors {self.channel_colors} when rebuilding as {a5d}"
-            )
-        return Predictions(arr=arr, axiskeys=axiskeys, location=location or self.location, channel_colors=channel_colors)
-
-    def to_z_slice_pngs(self) -> Iterator[io.BytesIO]:
+    def to_z_slice_pngs(self, class_colors: Sequence[Color]) -> Iterator[io.BytesIO]:
         for z_slice in self.split(self.shape.updated(z=1)):
             print(f"\nz_slice: {z_slice}")
             rendered_rgb = Array5D.allocate(z_slice.shape.updated(c=3), dtype=np.dtype("float32"), value=0)
             rendered_rgb_yxc = rendered_rgb.raw("yxc")
 
-            for prediction_channel, color in zip(z_slice.split(z_slice.shape.updated(c=1)), self.channel_colors):
+            for prediction_channel, color in zip(z_slice.split(z_slice.shape.updated(c=1)), class_colors):
                 print(f"\nprediction_channel: {prediction_channel}")
 
                 class_rgb = Array5D(np.ones(prediction_channel.shape.updated(c=3).to_tuple("yxc")), axiskeys="yxc")
-                class_rgb.raw("yxc")[...] *= np.asarray([color.r, color.g, color.b]) * (color.a / 255)
+                class_rgb.raw("yxc")[...] *= np.asarray([color.r, color.g, color.b])
                 class_rgb.raw("cyx")[...] *= prediction_channel.raw("yx")
 
                 rendered_rgb_yxc += class_rgb.raw("yxc")
@@ -71,57 +56,73 @@ class Predictions(Array5D):
 FE = TypeVar("FE", bound=FeatureExtractor, covariant=True)
 
 @typing.final
-class TrainingData(Generic[FE]):
-    feature_extractors: Sequence[FE]
+@dataclass
+class TrainingData:
+    feature_extractors: Sequence[FeatureExtractor]
     combined_extractor: FeatureExtractor
-    color_map: Dict[Color, np.uint8]
-    classes: List[np.uint8]
     num_input_channels: int
+    num_classes: int
     X: "ndarray[Any, Any]"  # shape is (num_samples, num_feature_channels) #FIXME: add dtype hint
     y: "ndarray[Any, Any]"  # shape is (num_samples, 1) #FIXME: add dtype hint
 
-    def __init__(
-        self, *, feature_extractors: Sequence[FE], annotations: Sequence[Annotation]
-    ):
-        assert len(annotations) > 0, "Cannot train classifier with 0 annotations"
-        assert len(feature_extractors) > 0
+    @classmethod
+    def create(
+        cls, *, feature_extractors: Sequence[FeatureExtractor], label_classes: Sequence[Sequence[Annotation]]
+    ) -> "TrainingData | ValueError":
+        if sum(len(labels) for labels in label_classes) == 0:
+            return ValueError("Cannot train classifier with 0 annotations")
+        if len(feature_extractors) == 0:
+            return ValueError("Empty feature extractor sequence")
+
+        annotated_datasources = {annotation.raw_data for labels in label_classes for annotation in labels}
         for fx in feature_extractors:
-            for annot in annotations:
-                fx.ensure_applicable(annot.raw_data)
+            for ds in annotated_datasources:
+                if not fx.is_applicable_to(ds):
+                    return ValueError(f"feature {fx} is not compatible with {ds}")
+        channel_counts = {ds.shape.c for ds in annotated_datasources}
+        if len(channel_counts) > 1:
+            return ValueError(f"All annotations should be on images of same number of channels")
 
-        channels = {a.raw_data.shape.c for a in annotations}
-        if len(channels) != 1:
-            raise ValueError(f"All annotations should be on images of same number of channels: {annotations}")
-        annotations = Annotation.sort(annotations)  # sort so the meaning of the channels is always predictable
         combined_extractor = FeatureExtractorCollection(feature_extractors)
-        feature_samples = [a.get_feature_samples(combined_extractor) for a in annotations]
 
-        self.num_input_channels = channels.pop()
-        self.feature_extractors = feature_extractors
-        self.combined_extractor = combined_extractor
-        self.color_map = Color.create_color_map(annot.color for annot in annotations)
-        self.classes = list(self.color_map.values())
-        self.X = np.concatenate([fs.X for fs in feature_samples])
-        self.y = np.concatenate(
-            [fs.get_y(self.color_map[annot.color]) for fs, annot in zip(feature_samples, annotations)]
+        X_parts: List["np.ndarray[Any, np.dtype[Any]]"] = []
+        y_parts: List["np.ndarray[Any, np.dtype[np.uint32]]"] = []
+        for label_index, labels in enumerate(label_classes, start=1):
+            for annotation in labels:
+                feature_sample = annotation.get_feature_samples(combined_extractor)
+                X_parts.append(feature_sample.X)
+                y_parts.append(
+                    feature_sample.get_y(label_class=np.uint8(label_index))
+                )
+
+        feature_extractors = feature_extractors
+        combined_extractor = combined_extractor
+        X = np.concatenate(X_parts)
+        y = np.concatenate(y_parts)
+        assert X.shape[0] == y.shape[0]
+
+        return TrainingData(
+            feature_extractors=feature_extractors,
+            combined_extractor=combined_extractor,
+            num_input_channels=channel_counts.pop(),
+            num_classes=len(label_classes),
+            X=X,
+            y=y,
         )
-        assert self.X.shape[0] == self.y.shape[0]
 
 class PixelClassifier(Operator[DataRoi, Predictions], Generic[FE]):
     def __init__(
         self,
         *,
         feature_extractors: Sequence[FE],
-        classes: List[np.uint8],
+        num_classes: int,
         num_input_channels: int,
-        color_map: Dict[Color, np.uint8],
     ):
         self.feature_extractors = feature_extractors
         self.feature_extractor = FeatureExtractorCollection(feature_extractors)
-        self.classes = classes
-        self.num_classes = len(classes)
+        self.num_classes = num_classes
+        self.classes: Sequence[np.uint8] = [np.uint8(class_index + 1) for class_index in range(num_classes)]
         self.num_input_channels = num_input_channels
-        self.color_map = color_map
         super().__init__()
 
     @abstractmethod
@@ -169,7 +170,7 @@ def h5_bytes_to_vigra_forest(h5_bytes: VigraForestH5Bytes) -> VigraRandomForest:
     os.remove(tmp_file_path)
     return out
 
-def _train_forest(random_seed: int, num_trees: int, training_data: TrainingData[FE]) -> VigraForestH5Bytes:
+def _train_forest(random_seed: int, num_trees: int, training_data: TrainingData) -> VigraForestH5Bytes:
     forest = VigraRandomForest(num_trees)
     # forest.learnRF(training_data.X, training_data.y, random_seed)
     _ = forest.learnRF(training_data.X, training_data.y, 0)
@@ -181,12 +182,11 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         *,
         feature_extractors: Sequence[FE],
         forest_h5_bytes: "Sequence[VigraForestH5Bytes]",
-        classes: List[np.uint8],
         num_input_channels: int,
-        color_map: Dict[Color, np.uint8],
+        num_classes: int,
     ):
         super().__init__(
-            classes=classes, feature_extractors=feature_extractors, num_input_channels=num_input_channels, color_map=color_map
+            num_classes=num_classes, feature_extractors=feature_extractors, num_input_channels=num_input_channels
         )
         self.forest_h5_bytes: Final[Sequence[VigraForestH5Bytes]] = forest_h5_bytes
         self.forests: Final[Sequence[VigraRandomForest]] = [h5_bytes_to_vigra_forest(forest_bytes) for forest_bytes in forest_h5_bytes]
@@ -199,20 +199,22 @@ class VigraPixelClassifier(PixelClassifier[FE]):
     def train(
         cls,
         feature_extractors: Sequence[FE],
-        annotations: Sequence[Annotation],
+        label_classes: Sequence[Sequence[Annotation]],
         *,
         num_trees: int = 100,
         num_forests: int = 8,
         random_seed: int = 0,
-    ) -> "VigraPixelClassifier[FE]":
-        training_data = TrainingData[FE](feature_extractors=feature_extractors, annotations=annotations)
+    ) -> "VigraPixelClassifier[FE] | ValueError":
+        training_data_result = TrainingData.create(feature_extractors=feature_extractors, label_classes=label_classes)
+        if isinstance(training_data_result, Exception):
+            return training_data_result
         random_seeds = range(random_seed, random_seed + num_forests)
         trees_per_forest = ((num_trees // num_forests) + (forest_index < num_trees % num_forests) for forest_index in range(num_forests))
 
         with ProcessPoolExecutor(max_workers=num_trees) as executor:
             # we're taking the bytes instead of the forest itself because vigra forests are not picklable
             forests_bytes: Sequence[VigraForestH5Bytes] = list(executor.map(
-                partial(_train_forest, training_data=training_data),
+                partial(_train_forest, training_data=training_data_result),
                 random_seeds,
                 trees_per_forest
             ))
@@ -220,9 +222,8 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         return cls(
             feature_extractors=feature_extractors,
             forest_h5_bytes=forests_bytes,
-            num_input_channels=training_data.num_input_channels,
-            classes=training_data.classes,
-            color_map=training_data.color_map,
+            num_input_channels=training_data_result.num_input_channels,
+            num_classes=training_data_result.num_classes,
         )
 
 
@@ -248,15 +249,13 @@ class VigraPixelClassifier(PixelClassifier[FE]):
             arr=predictions.raw(predictions.axiskeys),
             axiskeys=predictions.axiskeys,
             location=predictions.location,
-            channel_colors=Color.sort(self.color_map.keys()),
         )
 
     def __getstate__(self):
         return {
             "feature_extractors": self.feature_extractors,
             "num_input_channels": self.num_input_channels,
-            "classes": self.classes,
-            "color_map": self.color_map,
+            "num_classes": self.num_classes,
             "forest_h5_bytes": self.forest_h5_bytes,
         }
 
@@ -265,6 +264,5 @@ class VigraPixelClassifier(PixelClassifier[FE]):
             feature_extractors=data["feature_extractors"],
             forest_h5_bytes=data["forest_h5_bytes"],
             num_input_channels=data["num_input_channels"],
-            classes=data["classes"],
-            color_map=data["color_map"],
+            num_classes=data["num_classes"],
         )

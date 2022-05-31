@@ -1,5 +1,6 @@
 import { mat3, mat4 } from "gl-matrix"
 import { BrushStroke } from "../../..";
+import { Color } from "../../../client/ilastik";
 import { VertexArrayObject, BufferUsageHint } from "../../../gl/buffer";
 import { RenderParams } from "../../../gl/gl";
 import { ShaderProgram, VertexShader, FragmentShader } from "../../../gl/shader";
@@ -199,7 +200,7 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
         voxelToWorld,
         renderParams=new RenderParams({})
     }: {
-        brush_strokes: Array<BrushStroke>,
+        brush_strokes: Array<[Color, BrushStroke[]]>,
         camera: Camera,
         voxelToWorld: mat4,
         renderParams?: RenderParams
@@ -222,18 +223,20 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
         this.uniformMatrix3fv("u_clip_to_world", u_clip_to_world)
 
         let a_offset_vx_location = this.getAttribLocation("a_offset_vx");
-        for(let brush_stroke of brush_strokes){
-            if(!this.debugColors){
-                this.uniform3fv("color", brush_stroke.color.vec3f)
-            }
-            this.uniform3fv("u_brush_resolution", brush_stroke.resolution)
-            brush_stroke.positions_buffer.useAsInstacedAttribute({vao: this.vao, location: a_offset_vx_location, attributeDivisor: 1})
-            this.gl.drawArraysInstanced( //instance-draw a bunch of cubes, one cube for each voxel in the brush stroke
+        for(let [color, annotations] of brush_strokes){
+            for(let brush_stroke of annotations){
+                if(!this.debugColors){
+                    this.uniform3fv("color", color.vec3f)
+                }
+                this.uniform3fv("u_brush_resolution", brush_stroke.resolution)
+                brush_stroke.positions_buffer.useAsInstacedAttribute({vao: this.vao, location: a_offset_vx_location, attributeDivisor: 1})
+                this.gl.drawArraysInstanced( //instance-draw a bunch of cubes, one cube for each voxel in the brush stroke
                 /*mode=*/this.box.getDrawingMode(),
                 /*first=*/0,
                 /*count=*/this.box.vertCapacity,
                 /*instanceCount=*/brush_stroke.num_points
-            );
+                );
+            }
         }
     }
 }

@@ -6,38 +6,27 @@ import { CollapsableWidget } from "../collapsable_applet_gui"
 import { OneShotSelectorWidget } from "../selector_widget"
 import { BrushingOverlay } from "./brushing_overlay"
 import { BrushelBoxRenderer } from "./brush_boxes_renderer"
-import { BrushStrokesContainer } from "./brush_strokes_container"
+import { BrushingApplet } from "./brush_strokes_container"
 import { Viewer } from "../../../viewer/viewer"
 import { PredictionsView, RawDataView, TrainingView } from "../../../viewer/view"
-import { Applet } from "../../../client/applets/applet"
-import { ensureJsonArray, ensureJsonBoolean, ensureJsonObject, JsonValue } from "../../../util/serialization"
-import { HashMap } from "../../../util/hashmap"
 import { PredictingWidget } from "../predicting_widget";
-import { ColorPicker } from "../color_picker"
 
 
-type State = {brushing_enabled: boolean, annotations: Array<BrushStroke>}
-
-export class BrushingWidget extends Applet<State>{
+export class BrushingWidget{
     public readonly viewer: Viewer
     public readonly element: HTMLElement
     private readonly status_display: HTMLElement
     private readonly resolutionSelectionContainer: HTMLElement
     private readonly trainingWidget: HTMLDivElement
-    private readonly colorPicker: ColorPicker
     private readonly brushingEnabledCheckbox: HTMLInputElement
-    private readonly brushDisplayContainer: HTMLParagraphElement
 
     private animationRequestId: number = 0
     session: Session
     public overlay?: BrushingOverlay
-    public staging_brush_stroke: BrushStroke | undefined = undefined
+    public stagingStroke: BrushStroke | undefined = undefined
     public readonly gl: WebGL2RenderingContext
     public readonly canvas: HTMLCanvasElement
-    private brushStrokeContainers = new HashMap<DataSource, BrushStrokesContainer, string>({
-        hash_function: (ds => ds.getDisplayString()) //FIXME
-    });
-
+    private brushingApplet: BrushingApplet
 
     constructor({
         applet_name,
@@ -52,19 +41,6 @@ export class BrushingWidget extends Applet<State>{
         viewer: Viewer,
         help: string[],
     }){
-        super({
-            name: applet_name,
-            deserializer: (value: JsonValue) => {
-                let data_obj = ensureJsonObject(value)
-                let raw_annotations = ensureJsonArray(data_obj["annotations"]);
-                return {
-                    brushing_enabled: ensureJsonBoolean(data_obj["brushing_enabled"]),
-                    annotations: raw_annotations.map(a => BrushStroke.fromJsonValue(this.gl, a))
-                }
-            },
-            session,
-            onNewState: (new_state) => this.onNewState(new_state)
-        })
         this.session = session
         this.canvas = createElement({tagName: "canvas", parentElement: document.body, inlineCss: {display: "none"}})
         this.gl = this.canvas.getContext("webgl2", {depth: true, stencil: true})!
@@ -89,11 +65,13 @@ export class BrushingWidget extends Applet<State>{
                 onClick: () => this.overlay?.setBrushingEnabled(this.brushingEnabledCheckbox.checked)
             })
 
-            let p = createElement({tagName: "p", parentElement: this.trainingWidget})
-                createElement({tagName: "label", innerHTML: "Brush Color: ", parentElement: p})
-                this.colorPicker = new ColorPicker({parentElement: p})
-
-            this.brushDisplayContainer = createElement({tagName: "p", parentElement: this.trainingWidget})
+            createElement({tagName: "label", innerHTML: "Brush Strokes:", parentElement: this.trainingWidget})
+            this.brushingApplet = new BrushingApplet({
+                parentElement: this.trainingWidget,
+                session,
+                applet_name,
+                gl: this.gl,
+            })
 
         viewer.onViewportsChanged(() => this.handleViewerDataDisplayChange())
         this.handleViewerDataDisplayChange()
@@ -107,7 +85,7 @@ export class BrushingWidget extends Applet<State>{
         this.overlay = undefined
     }
 
-    public showTrainingUi({trainingDatasource, brushStrokesGetter}: {trainingDatasource: DataSource, brushStrokesGetter: () => Array<BrushStroke>}){
+    public showTrainingUi({trainingDatasource, brushStrokesGetter}: {trainingDatasource: DataSource, brushStrokesGetter: () => Array<[Color, BrushStroke[]]>}){
         this.trainingWidget.style.display = "block"
         this.canvas.style.display = "block"
         let overlay = this.overlay = new BrushingOverlay({
@@ -116,18 +94,17 @@ export class BrushingWidget extends Applet<State>{
             viewport_drivers: this.viewer.getViewportDrivers(),
             brush_stroke_handler: {
                 handleNewBrushStroke: (params: {start_position_uvw: vec3, camera_orientation_uvw: quat}) => {
-                    this.staging_brush_stroke = BrushStroke.create({
+                    this.stagingStroke = BrushStroke.create({
                         gl: this.gl,
                         start_postition_uvw: params.start_position_uvw, //FIXME put scale somewhere
-                        color: this.colorPicker.getColor(),
                         annotated_data_source: trainingDatasource,
                         camera_orientation: params.camera_orientation_uvw, //FIXME: realy data space? rename param in BrushStroke?
                     })
-                    return this.staging_brush_stroke
+                    return this.stagingStroke
                 },
-                handleFinishedBrushStroke: (stroke) => {
-                    this.staging_brush_stroke = undefined
-                    this.addBrushStroke(stroke)
+                handleFinishedBrushStroke: (stagingStroke: BrushStroke) => {
+                    this.stagingStroke = undefined
+                    this.brushingApplet.addBrushStroke(stagingStroke)
                 }
             },
         })
@@ -136,8 +113,12 @@ export class BrushingWidget extends Applet<State>{
         window.cancelAnimationFrame(this.animationRequestId)
         const render = () => {
             let strokes = brushStrokesGetter();
-            if(this.staging_brush_stroke){
-                strokes.push(this.staging_brush_stroke)
+            if(this.stagingStroke){
+                if(!this.brushingApplet.currentColor){
+                    console.error("FIXME: no color selected but still brushing")
+                }else{
+                    strokes.push([this.brushingApplet.currentColor, [this.stagingStroke]])
+                }
             }
             overlay.render(strokes, new BrushelBoxRenderer({gl: this.gl, highlightCrossSection: false, onlyCrossSection: true})) //FIXME? remove this optional override?
             this.animationRequestId = window.requestAnimationFrame(render)
@@ -200,79 +181,11 @@ export class BrushingWidget extends Applet<State>{
         })
     }
 
-    public addBrushStroke(brushStroke: BrushStroke){
-        this.doAddBrushStroke(brushStroke)
-        this.doRPC("add_annotations", {annotations: [brushStroke]})
-    }
-
-    private doAddBrushStroke(brushStroke: BrushStroke){
-        let container = this.brushStrokeContainers.get(brushStroke.annotated_data_source)
-        if(container === undefined){
-            container = new BrushStrokesContainer({
-                parentElement: this.brushDisplayContainer,
-                datasource: brushStroke.annotated_data_source,
-                onBrushColorClicked: (color: Color) => this.colorPicker.setColor(color),
-                onBrushRemoved: (brushStroke: BrushStroke) => {
-                    //mask loading time by updating local state
-                    let container = this.brushStrokeContainers.get(brushStroke.annotated_data_source)
-                    if(!container){
-                        return
-                    }
-                    if(container.getBrushStrokes().length == 0){
-                        this.brushStrokeContainers.delete(brushStroke.annotated_data_source)
-                        container.destroy()
-                    }
-                    this.doRPC("remove_annotations", {annotations: [brushStroke]})
-                }
-            })
-            this.brushStrokeContainers.set(brushStroke.annotated_data_source, container)
-        }
-        container.addBrushStroke(brushStroke) //mask loading time by updating local state
-    }
-
-    public removeBrushStroke(brushStroke: BrushStroke){
-        //mask loading time by updating local state
-        let container = this.brushStrokeContainers.get(brushStroke.annotated_data_source)
-        if(!container){
-            return
-        }
-        console.log(`Brush strokes before removing: ${container.getBrushStrokes().length}`)
-        container.removeBrushStroke(brushStroke)
-        console.log(`Brush strokes AFTER removing: ${container.getBrushStrokes().length}`)
-
-        if(container.getBrushStrokes().length == 0){
-            console.log(`REACHED 0 ANNOTAIONS!!!!!!!!!!!!!!!`)
-            this.brushStrokeContainers.delete(brushStroke.annotated_data_source)
-            container.destroy()
-        }
-        this.doRPC("remove_annotations", {annotations: [brushStroke]})
-    }
-
-    protected onNewState(newState: State){
-        this.brushDisplayContainer.innerHTML = ""
-        createElement({tagName: "label", innerHTML: "Brush Strokes:", parentElement: this.brushDisplayContainer})
-
-        this.brushStrokeContainers.values().forEach(bsc => bsc.destroy())
-        this.brushStrokeContainers = new HashMap({
-            hash_function: (ds) => ds.getDisplayString()
-        })
-
-        for(let brushStroke of newState.annotations){
-            this.doAddBrushStroke(brushStroke)
-        }
-    }
-
     private startTraining(datasource: DataSource){
         this.resetWidgets()
         this.showTrainingUi({
             trainingDatasource: datasource,
-            brushStrokesGetter: () => {
-                let container = this.brushStrokeContainers.get(datasource)
-                if(container){
-                    return container.getBrushStrokes()
-                }
-                return []
-            }
+            brushStrokesGetter: () => this.brushingApplet.getBrushStrokes(datasource)
         })
         this.showStatus(`Now training on ${datasource.getDisplayString()}`)
     }
@@ -283,7 +196,7 @@ export class BrushingWidget extends Applet<State>{
         removeElement(this.gl.canvas)
         removeElement(this.element)
 
-        this.brushStrokeContainers.values().forEach(bsc => bsc.destroy())
+        this.brushingApplet.destroy()
         removeElement(this.element)
         //FIXME: remove event from viewer
     }

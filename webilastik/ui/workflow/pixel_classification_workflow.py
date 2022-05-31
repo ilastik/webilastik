@@ -10,12 +10,12 @@ from ndstructs.utils.json_serializable import JsonObject
 from webilastik.datasource import FsDataSource
 from webilastik.filesystem import JsonableFilesystem
 from webilastik.scheduling.job import PriorityExecutor
+from webilastik.ui.applet.brushing_applet import WsBrushingApplet
 from webilastik.ui.applet.pixel_predictions_export_applet import WsPixelClassificationExportApplet
 from webilastik.ui.usage_error import UsageError
 from webilastik.ui.applet import UserPrompt
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.applet.ws_feature_selection_applet import WsFeatureSelectionApplet
-from webilastik.ui.applet.ws_brushing_applet import WsBrushingApplet
 from webilastik.ui.applet.ws_pixel_classification_applet import WsPixelClassificationApplet
 from webilastik.libebrains.user_token import UserToken
 from webilastik.classic_ilastik.ilp.pixel_classification_ilp import IlpPixelClassificationWorkflowGroup
@@ -34,13 +34,13 @@ class PixelClassificationWorkflow:
         super().__init__()
         UserToken.login_globally(ebrains_user_token)
 
-        self.brushing_applet = WsBrushingApplet("brushing_applet")
+        self.brushing_applet = WsBrushingApplet.initial(name="brushing_applet")
         self.feature_selection_applet = WsFeatureSelectionApplet("feature_selection_applet", datasources=self.brushing_applet.datasources)
 
         self.pixel_classifier_applet = WsPixelClassificationApplet(
             "pixel_classification_applet",
             feature_extractors=self.feature_selection_applet.feature_extractors,
-            annotations=self.brushing_applet.annotations,
+            label_classes=self.brushing_applet.label_classes,
             executor=executor,
             on_async_change=on_async_change,
         )
@@ -55,7 +55,7 @@ class PixelClassificationWorkflow:
             on_async_change=on_async_change,
         )
 
-        self.wsapplets : Mapping[str, WsApplet] = {
+        self.wsapplets: Mapping[str, WsApplet] = {
             self.feature_selection_applet.name: self.feature_selection_applet,
             self.brushing_applet.name: self.brushing_applet,
             self.pixel_classifier_applet.name: self.pixel_classifier_applet,
@@ -64,8 +64,8 @@ class PixelClassificationWorkflow:
 
     def to_ilp_workflow_group(self) -> IlpPixelClassificationWorkflowGroup:
         return IlpPixelClassificationWorkflowGroup.create(
-            feature_extractors=self.feature_selection_applet.feature_extractors() or [],
-            annotations=self.brushing_applet.annotations() or [],
+            feature_extractors=self.feature_selection_applet.feature_extractors(),
+            label_classes=self.brushing_applet.label_classes(),
             classifier=self.pixel_classifier_applet.pixel_classifier(),
         )
 

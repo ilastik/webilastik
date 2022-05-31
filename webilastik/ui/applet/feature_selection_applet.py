@@ -6,7 +6,7 @@ from webilastik.ui.applet import Applet, AppletOutput, PropagationOk, Propagatio
 from webilastik.features.ilp_filter import IlpFilter
 
 class FeatureSelectionApplet(Applet):
-    def __init__(self, name: str, *, datasources: AppletOutput[Sequence[DataSource]]):
+    def __init__(self, name: str, *, datasources: AppletOutput[Set[DataSource]]):
         self._in_datasources = datasources
         self._feature_extractors: Set[IlpFilter] = set()
         super().__init__(name=name)

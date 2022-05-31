@@ -1,7 +1,7 @@
 # pyright: strict
 
 from pathlib import PurePosixPath
-from typing import Callable, ClassVar, Mapping, Optional, Sequence, Any, Dict, List, Type
+from typing import Callable, ClassVar, Mapping, Optional, Dict, Sequence, Any, List, Tuple, Type
 from datetime import datetime
 import textwrap
 import pickle
@@ -125,27 +125,21 @@ class IlpPixelClassificationGroup:
     def __init__(
         self,
         *,
-        annotations: Sequence[Annotation],
         classifier: Optional[VigraPixelClassifier[IlpFilter]],
+        label_classes: Dict[Color, Tuple[Annotation, ...]],
     ) -> None:
-        self.annotations = annotations
         self.classifier = classifier
+        self.label_classes = label_classes
+        if classifier and len(label_classes) != classifier.num_classes:
+            raise ValueError(f"Wrong number of colors {len(label_classes)} for classifier with {classifier.num_classes} classes")
 
-        if not all(isinstance(a.raw_data, FsDataSource) for a in annotations):
+        if not all(isinstance(annotation.raw_data, FsDataSource) for labels in label_classes.values() for annotation in labels):
             # FIXME: autocontext?
             raise ValueError(f"For now, all annotations must be on datasources present in the fylesystem in order to be saved")
         super().__init__()
 
     def populate_group(self, group: h5py.Group):
-        if self.classifier:
-            color_map = self.classifier.color_map
-        else:
-            color_map = Color.create_color_map([ # default ilastik labels: yellow and blue
-                Color(r=np.uint8(255), g=np.uint8(255), b=np.uint8(25)),
-                Color(r=np.uint8(0), g=np.uint8(130), b=np.uint8(200))
-            ])
-
-        LabelColors: "ndarray[Any, dtype[int64]]"  = np.asarray([color.rgba[:-1] for color in color_map.keys()], dtype=int64) # pyright: ignore [reportUnknownMemberType]
+        LabelColors: "ndarray[Any, dtype[int64]]"  = np.asarray([color.rgba[:-1] for color in self.label_classes.keys()], dtype=int64) # pyright: ignore [reportUnknownMemberType]
 
         # expected group keys to look like this:
         # ['Bookmarks', 'ClassifierFactory', 'LabelColors', 'LabelNames', 'PmapColors', 'StorageVersion', 'LabelSets', 'ClassifierForests']>
@@ -154,21 +148,22 @@ class IlpPixelClassificationGroup:
         group["ClassifierFactory"] = VIGRA_ILP_CLASSIFIER_FACTORY
         group["LabelColors"] = LabelColors
         group["LabelColors"].attrs["isEmpty"] = False
-        group["LabelNames"] = np.asarray([color.name.encode("utf8") for color in color_map.keys()]) # pyright: ignore [reportUnknownMemberType]
+        group["LabelNames"] = np.asarray([color.name.encode("utf8") for color in self.label_classes.keys()]) # pyright: ignore [reportUnknownMemberType]
         group["LabelNames"].attrs["isEmpty"] = False
         group["PmapColors"] = LabelColors
         group["PmapColors"].attrs["isEmpty"] = False
         group["StorageVersion"] = "0.1".encode("utf8")
 
         merged_annotation_tiles: Dict[DataSource, Dict[Interval5D, Array5D]] = {}
-        for annotation in self.annotations:
-            datasource = annotation.raw_data
-            merged_tiles = merged_annotation_tiles.setdefault(datasource, {})
+        for label_class, labels in enumerate(self.label_classes.values(), start=1):
+            for annotation in labels:
+                datasource = annotation.raw_data
+                merged_tiles = merged_annotation_tiles.setdefault(datasource, {})
 
-            for interval in annotation.interval.get_tiles(tile_shape=datasource.tile_shape, tiles_origin=datasource.interval.start):
-                annotation_tile = annotation.cut(interval.clamped(annotation.interval))
-                tile = merged_tiles.setdefault(interval, Array5D.allocate(interval=interval, value=0, dtype=np.dtype("uint8")))
-                tile.set(annotation_tile.colored(color_map[annotation.color]), mask_value=0)
+                for interval in annotation.interval.get_tiles(tile_shape=datasource.tile_shape, tiles_origin=datasource.interval.start):
+                    annotation_tile = annotation.cut(interval.clamped(annotation.interval))
+                    tile = merged_tiles.setdefault(interval, Array5D.allocate(interval=interval, value=0, dtype=np.dtype("uint8")))
+                    tile.set(annotation_tile.colored(np.uint8(label_class)), mask_value=0)
 
         LabelSets = group.create_group("LabelSets")
         for lane_index, (lane_datasource, blocks) in enumerate(merged_annotation_tiles.items()):
@@ -205,12 +200,10 @@ class IlpPixelClassificationGroup:
 
     @classmethod
     def parse(cls, group: h5py.Group, raw_data_sources: Mapping[int, "FsDataSource | None"]) -> "IlpPixelClassificationGroup":
-        annotations: List[Annotation] = []
-
         LabelColors = ensure_color_list(group, "LabelColors")
-        color_map = Color.create_color_map(LabelColors)
-        reverse_color_map = {v: k for k, v in color_map.items()}
+        class_to_color: Mapping[np.uint8, Color] = {np.uint8(i): color for i, color in enumerate(LabelColors, start=1)}
 
+        label_classes: Dict[Color, List[Annotation]] = {color: [] for color in LabelColors}
         LabelSets = ensure_group(group, "LabelSets")
         for lane_key in LabelSets.keys():
             if not lane_key.startswith("labels"):
@@ -253,7 +246,7 @@ class IlpPixelClassificationGroup:
                     color_index = np.uint8(color_5d.raw("c")[0])
                     if color_index == np.uint8(0): # background
                         continue
-                    color = reverse_color_map.get(color_index)
+                    color = class_to_color.get(color_index)
                     if color is None:
                         raise IlpParsingError(f"Could not find a label color for index {color_index}")
                     annotation_data: "np.ndarray[Any, np.dtype[np.uint8]]" = block_5d.color_filtered(color=color_5d).raw(axiskeys)
@@ -262,9 +255,8 @@ class IlpPixelClassificationGroup:
                         location=blockInterval.start,
                         axiskeys=axiskeys, # FIXME: what if the user changed the axiskeys in the data source?
                         raw_data=raw_data,
-                        color=color,
                     )
-                    annotations.append(annotation)
+                    label_classes[color].append(annotation)
 
 
 
@@ -291,14 +283,18 @@ class IlpPixelClassificationGroup:
             classifier = VigraPixelClassifier(
                 feature_extractors=feature_extractors,
                 forest_h5_bytes=[vigra_forest_to_h5_bytes(forest) for forest in forests],
-                color_map=color_map,
-                classes=list(color_map.values()),
+                num_classes=sum(len(labels) and 1 for labels in label_classes.values()),
                 num_input_channels=num_input_channels,
             )
         else:
             classifier = None
 
-        return IlpPixelClassificationGroup(annotations=annotations, classifier=classifier)
+        return IlpPixelClassificationGroup(
+            classifier=classifier,
+            label_classes={
+                color: tuple(labels) for color, labels in label_classes.items()
+            },
+        )
 
 
 class IlpPixelClassificationWorkflowGroup(IlpProject):
@@ -323,13 +319,13 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
     def create(
         *,
         feature_extractors: Sequence[IlpFilter],
-        annotations: Sequence[Annotation],
+        label_classes: Dict[Color, Tuple[Annotation, ...]],
         classifier: "VigraPixelClassifier[IlpFilter] | None",
         currentApplet: "int | None" = None,
         ilastikVersion: "str | None" = None,
         time: "datetime | None" = None,
     ):
-        datasources = {a.raw_data for a in annotations} #FIXME
+        datasources = {annotation.raw_data for labels in label_classes.values() for annotation in labels}
         return IlpPixelClassificationWorkflowGroup(
             Input_Data = IlpInputDataGroup(lanes=[
                 IlpLane(roles={
@@ -341,7 +337,7 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
             ]),
             FeatureSelections=IlpFeatureSelectionsGroup(feature_extractors=feature_extractors),
             PixelClassification=IlpPixelClassificationGroup(
-                annotations=annotations,
+                label_classes=label_classes,
                 classifier=classifier,
             ),
             currentApplet=currentApplet,

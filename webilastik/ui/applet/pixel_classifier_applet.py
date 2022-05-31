@@ -4,7 +4,7 @@ from concurrent.futures import Future, Executor
 from dataclasses import dataclass
 from functools import partial
 import threading
-from typing import Any, Callable, Literal, Optional, Sequence, Dict, Union
+from typing import Any, Callable, Literal, Optional, Sequence, Dict, Union, Mapping
 
 import numpy as np
 
@@ -22,7 +22,7 @@ Description = Literal["disabled", "waiting for inputs", "training", "ready", "er
 @dataclass
 class _State:
     live_update: bool
-    classifier: Union[Future[Classifier], Classifier, None, BaseException]
+    classifier: "Future[Classifier | ValueError] | Classifier | None | BaseException"
     generation: int
 
     @property
@@ -40,7 +40,7 @@ class _State:
     def updated_with(
         self,
         *,
-        classifier: Union[Future[Classifier], Classifier, None, BaseException],
+        classifier: "Future[Classifier | ValueError] | Classifier | None | BaseException",
         live_update: Optional[bool] = None,
         generation: Optional[int] = None,
     ) -> "_State":
@@ -61,12 +61,12 @@ class PixelClassificationApplet(Applet):
         name: str,
         *,
         feature_extractors: AppletOutput[Sequence[IlpFilter]],
-        annotations: AppletOutput[Sequence[Annotation]],
+        label_classes: AppletOutput[Mapping[Color, Sequence[Annotation]]],
         executor: Executor,
         on_async_change: Callable[[], Any],
     ):
         self._in_feature_extractors = feature_extractors
-        self._in_annotations = annotations
+        self._in_label_classes = label_classes
         self.executor = executor
         self.on_async_change = on_async_change
 
@@ -99,19 +99,19 @@ class PixelClassificationApplet(Applet):
                 self._state = self._state.updated_with(classifier=None)
                 return PropagationOk()
 
-            annotations = self._in_annotations()
+            label_classes = self._in_label_classes()
             feature_extractors = self._in_feature_extractors()
-            if not annotations or not feature_extractors:
+            if sum(len(labels) for labels in label_classes.values()) == 0 or not feature_extractors:
                 # annotations or features changed, so classifier is stale
                 self._state = self._state.updated_with(classifier=None)
                 return PropagationOk()
 
             classifier_future = self.executor.submit(
-                partial(Classifier.train, feature_extractors), annotations
+                partial(Classifier.train, feature_extractors), tuple(label_classes.values())
             )
             previous_state = self._state = self._state.updated_with(classifier=classifier_future)
 
-        def on_training_ready(classifier_future: Future[VigraPixelClassifier[IlpFilter]]):
+        def on_training_ready(classifier_future: Future["VigraPixelClassifier[IlpFilter] | ValueError"]):
             classifier_result = classifier_future.exception() or classifier_future.result()
             propagation_result = self._set_classifier(user_prompt, classifier_result, previous_state.generation)
             if not propagation_result.is_ok():

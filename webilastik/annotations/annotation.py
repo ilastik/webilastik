@@ -1,4 +1,5 @@
 from typing import List, Sequence, Mapping, Tuple, Dict, Iterable, Sequence, Any, Optional
+import itertools
 
 import numpy as np
 from ndstructs.point5D import Interval5D, Point5D, Shape5D
@@ -15,14 +16,13 @@ class Color:
         r: np.uint8 = np.uint8(0),
         g: np.uint8 = np.uint8(0),
         b: np.uint8 = np.uint8(0),
-        a: np.uint8 = np.uint8(255),
         name: str = "",
     ):
         self.r = r
         self.g = g
         self.b = b
-        self.a = a
         self.name = name or f"Label {self.rgba}"
+        self.hex_code = f"#{r:02X}{g:02X}{b:02X}"
         super().__init__()
 
     @classmethod
@@ -32,7 +32,6 @@ class Color:
             r=np.uint8(ensureJsonInt(data_dict.get("r", 0))),
             g=np.uint8(ensureJsonInt(data_dict.get("g", 0))),
             b=np.uint8(ensureJsonInt(data_dict.get("b", 0))),
-            a=np.uint8(ensureJsonInt(data_dict.get("a", 255))),
         )
 
     def to_json_data(self) -> JsonObject:
@@ -40,20 +39,19 @@ class Color:
             "r": int(self.r),
             "g": int(self.g),
             "b": int(self.b),
-            "a": int(self.a),
         }
 
     @classmethod
     def from_channels(cls, channels: List[np.uint8], name: str = "") -> "Color":
-        if len(channels) == 0 or len(channels) > 4:
+        if len(channels) == 0 or len(channels) > 3:
             raise ValueError(f"Cannnot create color from {channels}")
         if len(channels) == 1:
-            channels = [channels[0], channels[0], channels[0], np.uint8(255)]
-        return cls(r=channels[0], g=channels[1], b=channels[2], a=channels[3], name=name)
+            channels = [channels[0], channels[0], channels[0]]
+        return cls(r=channels[0], g=channels[1], b=channels[2], name=name)
 
     @property
-    def rgba(self) -> Tuple[np.uint8, np.uint8, np.uint8, np.uint8]:
-        return (self.r, self.g, self.b, self.a)
+    def rgba(self) -> Tuple[np.uint8, np.uint8, np.uint8]:
+        return (self.r, self.g, self.b)
 
     @property
     def q_rgba(self) -> int:
@@ -93,7 +91,7 @@ class FeatureSamples(FeatureData, StaticLine):
     def X(self) -> "np.ndarray[Any, Any]":
         return self.linear_raw()
 
-    def get_y(self, label_class: np.uint8) -> "np.ndarray[Any, Any]":
+    def get_y(self, label_class: np.uint8) -> "np.ndarray[Any, np.dtype[np.uint32]]":
         return np.full((self.shape.volume, 1), label_class, dtype=np.uint32)
 
 
@@ -106,28 +104,27 @@ class Annotation(ScalarData):
     """User annotation attached to the raw data onto which they were drawn"""
 
     def __hash__(self):
-        return hash((self._data.tobytes(), self.color))
+        return hash(self._data.tobytes())
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Annotation):
             return False
-        return self.color == other.color and bool(np.all(self._data == other._data))
+        return self.interval == other.interval and bool(np.all(self._data == other._data))
 
     def __init__(
-        self, arr: "np.ndarray[Any, Any]", *, axiskeys: str, location: Point5D = Point5D.zero(), color: Color, raw_data: DataSource
+        self, arr: "np.ndarray[Any, Any]", *, axiskeys: str, location: Point5D = Point5D.zero(), raw_data: DataSource
     ):
         super().__init__(arr.astype(bool), axiskeys=axiskeys, location=location)
         if not raw_data.interval.contains(self.interval):
             raise AnnotationOutOfBounds(annotation_roi=self.interval, raw_data=raw_data)
-        self.color = color
         self.raw_data = raw_data
 
     def rebuild(self, arr: "np.ndarray[Any, Any]", *, axiskeys: str, location: "Point5D | None" = None) -> "Annotation":
         location = self.location if location is None else location
-        return self.__class__(arr, axiskeys=axiskeys, location=location, color=self.color, raw_data=self.raw_data)
+        return self.__class__(arr, axiskeys=axiskeys, location=location, raw_data=self.raw_data)
 
     @classmethod
-    def interpolate_from_points(cls, color: Color, voxels: Sequence[Point5D], raw_data: DataSource):
+    def interpolate_from_points(cls, voxels: Sequence[Point5D], raw_data: DataSource):
         start = Point5D.min_coords(voxels)
         stop = Point5D.max_coords(voxels) + 1  # +1 because slice.stop is exclusive, but max_point isinclusive
         scribbling_roi = Interval5D.create_from_start_stop(start=start, stop=stop)
@@ -141,7 +138,7 @@ class Annotation(ScalarData):
                 scribblings.paint_point(point=interp_voxel, value=True)
             anchor = voxel
 
-        return cls(scribblings._data, axiskeys=scribblings.axiskeys, color=color, raw_data=raw_data, location=start)
+        return cls(scribblings._data, axiskeys=scribblings.axiskeys, raw_data=raw_data, location=start)
 
     @classmethod
     def from_json_value(cls, data: JsonValue) -> "Annotation":
@@ -149,13 +146,12 @@ class Annotation(ScalarData):
         raw_voxels = ensureJsonArray(data_dict.get("voxels"))
         voxels : Sequence[Point5D] = [Point5D.from_json_value(raw_voxel) for raw_voxel in raw_voxels]
 
-        color = Color.from_json_data(data_dict.get("color"))
         raw_data = DataSource.from_json_value(data_dict.get("raw_data"))
 
-        return cls.from_voxels(voxels=voxels, color=color, raw_data=raw_data)
+        return cls.from_voxels(voxels=voxels, raw_data=raw_data)
 
     @classmethod
-    def from_voxels(cls, voxels: Sequence[Point5D], color: Color, raw_data: DataSource) -> "Annotation":
+    def from_voxels(cls, voxels: Sequence[Point5D], raw_data: DataSource) -> "Annotation":
         start = Point5D.min_coords(voxels)
         stop = Point5D.max_coords(voxels) + 1  # +1 because slice.stop is exclusive, but max_point isinclusive
         scribbling_roi = Interval5D.create_from_start_stop(start=start, stop=stop)
@@ -166,7 +162,7 @@ class Annotation(ScalarData):
         for voxel in voxels:
             scribblings.paint_point(point=voxel, value=True)
 
-        return cls(scribblings._data, axiskeys=scribblings.axiskeys, color=color, raw_data=raw_data, location=start)
+        return cls(scribblings._data, axiskeys=scribblings.axiskeys, raw_data=raw_data, location=start)
 
     def to_json_data(self) -> JsonObject:
         if not isinstance(self.raw_data, FsDataSource):
@@ -180,7 +176,6 @@ class Annotation(ScalarData):
             voxels.append(Point5D(x=x, y=y, z=z) + self.location)
 
         return {
-            "color": self.color.to_json_data(),
             "raw_data": self.raw_data.to_json_value(),
             "voxels": tuple(vx.to_json_value() for vx in voxels),
         }
@@ -201,22 +196,8 @@ class Annotation(ScalarData):
 
         return all_feature_samples[0].concatenate(*all_feature_samples[1:])
 
-    @classmethod
-    def sort(cls, annotations: Sequence["Annotation"]) -> List["Annotation"]:
-        return sorted(annotations, key=lambda a: a.color.q_rgba)
-
     def colored(self, value: np.uint8) -> Array5D:
         return Array5D(self._data * value, axiskeys=self.axiskeys, location=self.location)
 
-    @staticmethod
-    def merge(annotations: Sequence["Annotation"], color_map: Optional[Dict[Color, np.uint8]] = None) -> Array5D:
-        out_roi = Interval5D.enclosing(annot.interval for annot in annotations)
-        out = Array5D.allocate(interval=out_roi, value=0, dtype=np.dtype('uint8'))
-        color_map = color_map or Color.create_color_map(annot.color for annot in annotations)
-        for annot in annotations:
-            out.set(annot.colored(color_map[annot.color]), mask_value=0)
-        return out
-
     def __repr__(self):
-        return f"<Annotation {self.interval} {self.color} onto {self.raw_data}>"
-
+        return f"<Annotation {self.interval} onto {self.raw_data}>"

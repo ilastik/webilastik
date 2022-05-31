@@ -7,6 +7,7 @@ import { ClearConfig, RenderParams, ScissorConfig } from '../../../gl/gl'
 import { changeOrientationBase, coverContents, insertAfter, removeElement } from '../../../util/misc'
 import { IViewportDriver } from '../../../drivers/viewer_driver'
 import { IBrushStrokeHandler, BrushStroke } from './brush_stroke'
+import { Color } from '../../../client/ilastik'
 
 
 export class OverlayViewport{
@@ -130,7 +131,7 @@ export class OverlayViewport{
         return position_uvw
     }
 
-    public render = (brushStrokes: Array<BrushStroke>, renderer: BrushRenderer) => {
+    public render = (brushStrokes: Array<[Color, BrushStroke[]]>, renderer: BrushRenderer) => {
         const viewport_geometry = this.viewport_driver.getGeometry()
         coverContents({
             target: this.canvas,
@@ -206,7 +207,7 @@ export class BrushingOverlay{
         this.viewports.forEach(viewport => viewport.setBrushingEnabled(enabled))
     }
 
-    public render = (brushStrokes: Array<BrushStroke>, renderer: BrushRenderer) => {
+    public render = (brushStrokes: Array<[Color, BrushStroke[]]>, renderer: BrushRenderer) => {
         coverContents({target: this.trackedElement, overlay: this.element})
         this.element.width = this.element.scrollWidth
         this.element.height = this.element.scrollHeight

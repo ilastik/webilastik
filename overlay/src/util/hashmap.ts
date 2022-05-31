@@ -1,25 +1,30 @@
-export class HashMap<K, V, HK extends string | number>{
+export class HashMap<K extends {hashValue: HK}, V, HK extends string | number>{
     private registry = new Map<HK, [K, V]>();
-    public readonly hash_function: (key: K) => HK;
-    constructor({entries=[], hash_function}: {entries?: Array<[K, V]>, hash_function: (key: K) => HK}){
-        this.hash_function = hash_function
-        entries.forEach(entry => this.registry.set(hash_function(entry[0]), entry))
+    constructor(){
     }
 
     public set(key: K, value: V){
-        return this.registry.set(this.hash_function(key), [key, value])
+        return this.registry.set(key.hashValue, [key, value])
     }
 
     public get(key: K): V | undefined{
-        let value =  this.registry.get(this.hash_function(key))
+        let value =  this.registry.get(key.hashValue)
         if(value === undefined){
             return value
         }
         return value[1]
     }
 
+    public getOrCreate(key: K, default_value: V): V{
+        if(!this.has(key)){
+            this.set(key, default_value)
+            return default_value
+        }
+        return this.get(key)!
+    }
+
     public has(key: K): boolean{
-        return this.registry.has(this.hash_function(key))
+        return this.registry.has(key.hashValue)
     }
 
     public clear(){
@@ -27,7 +32,7 @@ export class HashMap<K, V, HK extends string | number>{
     }
 
     public delete(key: K): boolean{
-        return this.registry.delete(this.hash_function(key))
+        return this.registry.delete(key.hashValue)
     }
 
     public keys(): Array<K>{

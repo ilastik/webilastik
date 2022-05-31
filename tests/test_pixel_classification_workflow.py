@@ -2,17 +2,22 @@ from pathlib import PurePosixPath
 import time
 from concurrent.futures import ThreadPoolExecutor
 import json
+import h5py
 
 import numpy as np
 from ndstructs.utils.json_serializable import JsonObject, ensureJsonArray, ensureJsonInt, ensureJsonObject
 
 from tests import create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations, get_sample_feature_extractors, get_test_output_osfs
+from webilastik.classic_ilastik.ilp import IlpFeatureSelectionsGroup, ensure_group
+from webilastik.classic_ilastik.ilp.pixel_classification_ilp import IlpPixelClassificationGroup, IlpPixelClassificationWorkflowGroup
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
+from webilastik.features.channelwise_fastfilters import DifferenceOfGaussians, GaussianGradientMagnitude, GaussianSmoothing, HessianOfGaussianEigenvalues, LaplacianOfGaussian, StructureTensorEigenvalues
 from webilastik.filesystem.osfs import OsFs
 from webilastik.libebrains.user_token import UserToken
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet import dummy_prompt
 from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
+from webilastik.utility.url import Protocol
 
 
 def wait_until_jobs_completed(workflow: PixelClassificationWorkflow, timeout: float = 10):
@@ -54,12 +59,14 @@ def test_pixel_classification_workflow():
     )
 
     pixel_annotations = get_sample_c_cells_pixel_annotations()
-
-    # GUI creates some annotations
-    _ = workflow.brushing_applet.add_annotations(
-        user_prompt=dummy_prompt,
-        annotations=pixel_annotations,
-    )
+    for color, annotations in zip(workflow.brushing_applet.label_classes().keys(), pixel_annotations.values()):
+        for a in annotations:
+            result = workflow.brushing_applet.add_annotation(
+                user_prompt=dummy_prompt,
+                color=color,
+                annotation=a,
+            )
+            assert result.is_ok()
 
     while workflow.pixel_classifier_applet.pixel_classifier() is None:
         time.sleep(0.2)
@@ -77,6 +84,59 @@ def test_pixel_classification_workflow():
     # # calculate predictions on just a piece of arbitrary data
     # exported_tile = executor.submit(classifier.compute, DataRoi(datasource=raw_data_source, x=(100, 200), y=(100, 200)))
     # exported_tile.result().show_channels()
+
+###################################
+
+    ilp_path = PurePosixPath("/tmp/test_pixel_classification_workflow.ilp")
+    _ = workflow.save_project(fs=OsFs("/"), path=ilp_path)
+
+    with h5py.File(ilp_path, "r") as f:
+        FeatureSelections = IlpFeatureSelectionsGroup.parse(ensure_group(f, "FeatureSelections"))
+        expected_feature_extractors = get_sample_feature_extractors()
+        for i, fe in enumerate(FeatureSelections.feature_extractors):
+            if fe != expected_feature_extractors[i]:
+                print(f"Deserialized: {fe}")
+                print(f"Expected:     {expected_feature_extractors[i]}")
+                exit(1)
+        # assert FeatureSelections.feature_extractors == get_sample_feature_extractors()
+
+    # with h5py.File("/home/builder/MyProject.ilp", "r") as f:
+        # FeatureSelections = IlpFeatureSelectionsGroup.parse(ensure_group(f, "FeatureSelections"))
+        # expected_feature_extractors = [
+        #     GaussianSmoothing.from_ilp_scale(scale=0.3, axis_2d="z"),
+        #     LaplacianOfGaussian.from_ilp_scale(scale=0.7, axis_2d="z"),
+        #     GaussianGradientMagnitude.from_ilp_scale(scale=1.0, axis_2d="z"),
+        #     DifferenceOfGaussians.from_ilp_scale(scale=1.6, axis_2d="z"),
+        #     StructureTensorEigenvalues.from_ilp_scale(scale=3.5, axis_2d="z"),
+        #     HessianOfGaussianEigenvalues.from_ilp_scale(scale=5.0, axis_2d="z"),
+        # ]
+        # for i, fe in enumerate(FeatureSelections.feature_extractors):
+        #     if fe != expected_feature_extractors[i]:
+        #         print(f"Deserialized: {fe}")
+        #         print(f"Expected:     {expected_feature_extractors[i]}")
+        #         exit(1)
+
+    with h5py.File("/home/builder/SampleProjects/SampleTrainedPixelClassifier.ilp", "r") as f:
+        sample_trained_workflow_data = IlpPixelClassificationWorkflowGroup.parse(
+            group=f,
+            ilp_fs=OsFs("/"),
+            allowed_protocols=[Protocol.FILE],
+        )
+        assert not isinstance(sample_trained_workflow_data, Exception)
+        with open("/tmp/rewritten.ilp", "wb") as rewritten:
+            _ = rewritten.write(sample_trained_workflow_data.to_h5_file_bytes())
+
+
+    from tests import compare_projects
+    from pathlib import Path
+    compare_projects(Path("/tmp/rewritten.ilp"), Path("/home/builder/SampleProjects/SampleTrainedPixelClassifier.ilp"))
+
+
+
+    # priority_executor.shutdown()
+    # exit(1)
+
+#######################################33
 
     # run an export job
     output_fs = get_test_output_osfs()
@@ -140,11 +200,6 @@ def test_pixel_classification_workflow():
     )
     for tile in segmentation_output_1.roi.get_datasource_tiles():
         tile.retrieve().show_images()
-
-###################################
-
-    _ = workflow.save_project(fs=OsFs("/tmp"), path=PurePosixPath("test_pixel_classification_workflow.ilp"))
-    # compare_projects(Path("/tmp/my_test.ilp"), Path("/home/builder/TrainedPixelClassMaster.ilp"))
 
 ####################################3
 

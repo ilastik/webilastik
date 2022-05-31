@@ -1,7 +1,7 @@
 import os
 from pathlib import Path, PurePosixPath
 import time
-from typing import Any, Dict, Literal, Mapping, Sequence, Tuple
+from typing import Any, Dict, Literal, Mapping, Dict, Sequence, Tuple
 import uuid
 import json
 from collections.abc import Mapping as MappingAbc
@@ -23,6 +23,7 @@ from webilastik.features.channelwise_fastfilters import GaussianSmoothing, Hessi
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.filesystem import JsonableFilesystem
 from webilastik.filesystem.osfs import OsFs
+from webilastik.ui.applet.pixel_classifier_applet import Classifier
 
 def get_project_root_dir() -> Path:
     return Path(__name__).parent
@@ -55,30 +56,30 @@ def create_precomputed_chunks_sink(*, shape: Shape5D, dtype: "np.dtype[Any]", ch
         )
     )
 
-def get_sample_c_cells_pixel_annotations() -> Tuple[Annotation, ...]:
+def get_sample_c_cells_pixel_annotations() -> Dict[Color, Tuple[Annotation, ...]]:
     raw_data_source = get_sample_c_cells_datasource()
-    return (
-        Annotation.interpolate_from_points(
-            voxels=[Point5D.zero(x=140, y=150), Point5D.zero(x=145, y=155)],
-            color=Color(r=np.uint8(0), g=np.uint8(0), b=np.uint8(255)),
-            raw_data=raw_data_source
+    return {
+        Color(r=np.uint8(0), g=np.uint8(0), b=np.uint8(255)): (
+            Annotation.interpolate_from_points(
+                voxels=[Point5D.zero(x=140, y=150), Point5D.zero(x=145, y=155)],
+                raw_data=raw_data_source
+            ),
+            Annotation.interpolate_from_points(
+                voxels=[Point5D.zero(x=238, y=101), Point5D.zero(x=229, y=139)],
+                raw_data=raw_data_source
+            ),
         ),
-        Annotation.interpolate_from_points(
-            voxels=[Point5D.zero(x=238, y=101), Point5D.zero(x=229, y=139)],
-            color=Color(r=np.uint8(0), g=np.uint8(0), b=np.uint8(255)),
-            raw_data=raw_data_source
+        Color(r=np.uint8(255), g=np.uint8(0), b=np.uint8(0)): (
+            Annotation.interpolate_from_points(
+                voxels=[Point5D.zero(x=283, y=87), Point5D.zero(x=288, y=92)],
+                raw_data=raw_data_source
+            ),
+            Annotation.interpolate_from_points(
+                voxels=[Point5D.zero(x=274, y=168), Point5D.zero(x=256, y=191)],
+                raw_data=raw_data_source
+            ),
         ),
-        Annotation.interpolate_from_points(
-            voxels=[Point5D.zero(x=283, y=87), Point5D.zero(x=288, y=92)],
-            color=Color(r=np.uint8(255), g=np.uint8(0), b=np.uint8(0)),
-            raw_data=raw_data_source
-        ),
-        Annotation.interpolate_from_points(
-            voxels=[Point5D.zero(x=274, y=168), Point5D.zero(x=256, y=191)],
-            color=Color(r=np.uint8(255), g=np.uint8(0), b=np.uint8(0)),
-            raw_data=raw_data_source
-        ),
-    )
+    }
 
 def get_sample_feature_extractors() -> Sequence[IlpFilter]:
     return (
@@ -93,10 +94,13 @@ def get_sample_feature_extractors() -> Sequence[IlpFilter]:
     )
 
 def get_sample_c_cells_pixel_classifier() -> VigraPixelClassifier[IlpFilter]:
-    return VigraPixelClassifier.train(
+    classifier_result = VigraPixelClassifier.train(
         feature_extractors=get_sample_feature_extractors(),
-        annotations=get_sample_c_cells_pixel_annotations(),
+        label_classes=tuple(get_sample_c_cells_pixel_annotations().values()),
     )
+    if isinstance(classifier_result, Exception):
+        raise classifier_result
+    return classifier_result
 
 
 

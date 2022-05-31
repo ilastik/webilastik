@@ -1,4 +1,4 @@
-import { createElement, createInput, createInputParagraph, removeElement, uuidv4 } from "../../util/misc";
+import { applyInlineCss, createElement, createInput, createInputParagraph, InlineCss, removeElement, uuidv4 } from "../../util/misc";
 
 export class WidgetSelector<T extends {element: HTMLElement}>{
     public readonly element: HTMLElement;
@@ -92,13 +92,13 @@ export class DropdownSelect<T>{
     private allOptions: T[]
     private readonly element: HTMLSelectElement
     private optionComparator: (a: T, b: T) => boolean
-    private optionRenderer: (opt: T) => string;
+    private optionRenderer: (opt: T) => string | {text: string, inlineCss: InlineCss};
 
     constructor(params: {
         parentElement: HTMLElement,
         firstOption: T,
         otherOptions: T[],
-        optionRenderer: (opt: T) => string,
+        optionRenderer: (opt: T) => string | {text: string, inlineCss: InlineCss},
         optionComparator?: (a: T, b: T) => boolean,
         disabled?: boolean,
     }){
@@ -109,10 +109,23 @@ export class DropdownSelect<T>{
         this._value = params.firstOption
         this.allOptions = [params.firstOption].concat(params.otherOptions)
         for(let optionValue of this.allOptions){
-            createElement({tagName: "option", parentElement: this.element, innerText: params.optionRenderer(optionValue)})
+            let contents = params.optionRenderer(optionValue)
+            if(typeof contents === "string"){
+                createElement({tagName: "option", parentElement: this.element, innerText: contents})
+            }else{
+                let option = createElement({tagName: "option", parentElement: this.element, innerText: contents.text})
+                applyInlineCss(option, contents.inlineCss)
+            }
         }
         this.element.addEventListener("change", () => {
+            this._value = this.allOptions[this.element.selectedIndex]
+            console.log("Selecting this value in dropdown sleect:")
+            console.log(this._value)
         })
+    }
+
+    public get selectedIndex(): number{
+        return this.element.selectedIndex
     }
 
     public get value(): T{
@@ -126,6 +139,14 @@ export class DropdownSelect<T>{
         }
         this._value = val
         this.element.selectedIndex = index
+    }
+
+    public get values(): T[]{
+        return this.allOptions
+    }
+
+    public destroy(){
+        removeElement(this.element)
     }
 }
 
