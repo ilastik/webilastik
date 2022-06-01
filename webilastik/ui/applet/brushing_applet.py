@@ -76,6 +76,11 @@ class BrushingApplet(Applet):
         return PropagationOk()
 
     @user_interaction(refresh_self=False)
+    def remove_label(self, user_prompt: UserPrompt, label_name: str) -> PropagationResult:
+        self._labels = [label for label in self._labels if label.name != label_name]
+        return PropagationOk()
+
+    @user_interaction(refresh_self=False)
     def add_annotation(self, user_prompt: UserPrompt, label_name: str, annotation: Annotation) -> PropagationResult:
         label = self.get_label(label_name)
         if label is None:
@@ -154,6 +159,12 @@ class WsBrushingApplet(WsApplet, BrushingApplet):
                 user_prompt=user_prompt,
                 label_name=ensureJsonString(arguments.get("label_name")),
                 color=Color.from_json_data(arguments.get("color")),
+            ))
+
+        if method_name == "remove_label":
+            return UsageError.check(self.remove_label(
+                user_prompt=user_prompt,
+                label_name=ensureJsonString(arguments.get("label_name")),
             ))
 
         if method_name == "add_annotation":

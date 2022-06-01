@@ -117,6 +117,7 @@ export class BrushingApplet extends Applet<State>{
                 name,
                 parentElement: this.element,
                 color,
+                onLabelDeleteClicked: (labelName: string) => this.doRPC("remove_label", {label_name: labelName}),
                 onBrushStrokeDeleteClicked: (_color, brushStroke) => this.doRPC(
                     "remove_annotation", {label_name: name, annotation: brushStroke}
                 ),
@@ -178,10 +179,11 @@ class LabelWidget{
     private colorPicker: ColorPicker;
     private nameInput: HTMLInputElement;
 
-    constructor({name, color, parentElement, onBrushStrokeDeleteClicked, onColorChange, onNameChange}: {
+    constructor({name, color, parentElement, onLabelDeleteClicked, onBrushStrokeDeleteClicked, onColorChange, onNameChange}: {
         name: string,
         color: Color,
         parentElement: HTMLElement,
+        onLabelDeleteClicked: (labelName: string) => void,
         onBrushStrokeDeleteClicked: (color: Color, stroke: BrushStroke) => void,
         onColorChange: (newColor: Color) => void,
         onNameChange: (newName: string) => void,
@@ -194,6 +196,8 @@ class LabelWidget{
         this.colorPicker = new ColorPicker({
             parentElement: this.element, color, label: "Label Color: ", onChange: colors => onColorChange(colors.newColor)
         })
+
+        createInputParagraph({inputType: "button", parentElement: this.element, value: "Delete Label", onClick: () => onLabelDeleteClicked(this.name)})
 
         this.table = createElement({
             tagName: "table", parentElement: this.element, cssClasses: ["ItkBrushStrokesContainer"], inlineCss: {
