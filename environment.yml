@@ -1,8 +1,8 @@
-name: webilastik
+name: webilastikbla
 channels:
-  - defaults
   - conda-forge
-  - ilastik-forge/label/freepy
+  - ilastik-forge
+  - nodefaults
 dependencies:
   - python>=3.8
   - numpy

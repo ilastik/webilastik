@@ -37,7 +37,7 @@ def raw_data_source() -> SkimageDataSource:
 
 @pytest.fixture(scope="session")
 def pixel_annotations(raw_data_source: SkimageDataSource) -> Dict[Color, Tuple[Annotation, ...]]:
-    return tests.get_sample_c_cells_pixel_annotations()
+    return {label.color: tuple(label.annotations) for label in tests.get_sample_c_cells_pixel_annotations()}
 
 @pytest.fixture
 def feature_extractors() -> Sequence[IlpFilter]:

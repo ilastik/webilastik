@@ -98,18 +98,15 @@ async def main():
             print("done sending feature extractors<<<<<")
 
             print("sending some annotations=======")
-            default_label_colors = [
-                Color(r=np.uint8(255), g=np.uint8(0), b=np.uint8(0)),
-                Color(r=np.uint8(0), g=np.uint8(255), b=np.uint8(0))
-            ]
-            for color, annotations in zip(default_label_colors, get_sample_c_cells_pixel_annotations().values()):
-                for a in annotations:
+            default_label_names = ["Foreground", "Background"]
+            for label_name, label in zip(default_label_names, get_sample_c_cells_pixel_annotations()):
+                for a in label.annotations:
                     await ws.send_json(
                         RPCPayload(
                             applet_name="brushing_applet",
                             method_name="add_annotations",
                             arguments={
-                                "color": color.to_json_data(),
+                                "label_name": label_name,
                                 "annotation": a.to_json_data(),
                             }
                         ).to_json_value()

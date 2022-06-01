@@ -27,7 +27,8 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
             "generation": state.generation,
             "description": state.description,
             "live_update": state.live_update,
-            "channel_colors": tuple(color.to_json_data() for color in label_classes.keys()),
+            # vigra will output only as many channels as number of values in the samples, so empty labels are a problems
+            "channel_colors": tuple(color.to_json_data() for color, annotations in label_classes.items() if len(annotations) > 0),
         }
 
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:

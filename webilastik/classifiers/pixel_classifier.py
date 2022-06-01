@@ -19,6 +19,7 @@ from concurrent.futures import ProcessPoolExecutor
 
 from ndstructs.array5D import Array5D
 from ndstructs.point5D import Interval5D, Point5D
+from webilastik import annotations
 from webilastik.features.feature_extractor import FeatureExtractor
 from webilastik.features.feature_extractor import FeatureExtractorCollection
 from webilastik.annotations import Annotation, Color
@@ -105,7 +106,8 @@ class TrainingData:
             feature_extractors=feature_extractors,
             combined_extractor=combined_extractor,
             num_input_channels=channel_counts.pop(),
-            num_classes=len(label_classes),
+            # vigra will output only as many channels as number of values in the samples, so empty labels are a problems
+            num_classes=len([annotations for annotations in label_classes if len(annotations) > 0]),
             X=X,
             y=y,
         )

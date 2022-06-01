@@ -59,11 +59,11 @@ def test_pixel_classification_workflow():
     )
 
     pixel_annotations = get_sample_c_cells_pixel_annotations()
-    for color, annotations in zip(workflow.brushing_applet.label_classes().keys(), pixel_annotations.values()):
-        for a in annotations:
+    for label_name, label in zip(workflow.brushing_applet.label_names(), pixel_annotations):
+        for a in label.annotations:
             result = workflow.brushing_applet.add_annotation(
                 user_prompt=dummy_prompt,
-                color=color,
+                label_name=label_name,
                 annotation=a,
             )
             assert result.is_ok()

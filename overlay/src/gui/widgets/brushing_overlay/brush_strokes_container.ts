@@ -1,9 +1,8 @@
 import { vec3 } from "gl-matrix";
 import { Applet } from "../../../client/applets/applet";
 import { Color, DataSource, Session } from "../../../client/ilastik";
-import { HashMap } from "../../../util/hashmap";
-import { createElement, createInput, removeElement, vecToString } from "../../../util/misc";
-import { ensureJsonArray, ensureJsonObject, JsonValue } from "../../../util/serialization";
+import { createElement, createInput, createInputParagraph, removeElement, vecToString } from "../../../util/misc";
+import { ensureJsonArray, ensureJsonObject, ensureJsonString, JsonValue } from "../../../util/serialization";
 import { ColorPicker } from "../color_picker";
 import { ErrorPopupWidget, PopupWidget } from "../popup";
 import { DropdownSelect } from "../selector_widget";
@@ -11,14 +10,14 @@ import { BrushStroke } from "./brush_stroke";
 
 export type resolution = vec3;
 
-type State = {labels: Array<{color: Color, annotations: BrushStroke[]}>}
+type State = {labels: Array<{name: string, color: Color, annotations: BrushStroke[]}>}
 
 
 export class BrushingApplet extends Applet<State>{
     public readonly element: HTMLDivElement;
-    private labelWidgets = new HashMap<Color, LabelWidget, number>()
-    private labelSelectorContainer: HTMLDivElement;
-    private colorSelector: DropdownSelect<Color> | undefined
+    private labelWidgets = new Map<string, LabelWidget>()
+    private labelSelectorContainer: HTMLSpanElement;
+    private labelSelector: DropdownSelect<string> | undefined
 
     constructor(params: {
         session: Session,
@@ -34,6 +33,7 @@ export class BrushingApplet extends Applet<State>{
                     labels: ensureJsonArray(data_obj["labels"]).map(raw_label_class => {
                         let label_class = ensureJsonObject(raw_label_class)
                         return {
+                            name: ensureJsonString(label_class["name"]),
                             color: Color.fromJsonValue(label_class["color"]),
                             annotations: ensureJsonArray(label_class["annotations"]).map(raw_annot => BrushStroke.fromJsonValue(params.gl, raw_annot))
                         }
@@ -46,102 +46,125 @@ export class BrushingApplet extends Applet<State>{
 
         this.element = createElement({tagName: "div", parentElement: params.parentElement, cssClasses: ["ItkBrushStrokesContainer"]});
 
+        this.labelSelectorContainer = createElement({tagName: "span", parentElement: this.element})
+
         createInput({inputType: "button", value: "Create Label", parentElement: this.element, onClick: () => {
             let popup = new PopupWidget("Create Label")
-
-            let colorPicker = new ColorPicker({
-                parentElement: popup.element,
-                label: "Label Color: ",
-            })
+            let labelForm = createElement({tagName: "form", parentElement: popup.element})
+            let labelNameInput = createInputParagraph({inputType: "text", parentElement: labelForm, label_text: "Input Name: ", required: true})
+            let colorPicker = new ColorPicker({label: "Label Color: ", parentElement: labelForm})
 
             let p = createElement({tagName: "p", parentElement: popup.element})
-            createInput({inputType: "button", parentElement: p, value: "Ok", onClick: () => {
-                if(this.labelWidgets.has(colorPicker.value)){
-                    new ErrorPopupWidget({message: `There is already a label with color ${colorPicker.value.hexCode}`})
-                    return
-                }
-                this.doRPC("create_label",  {color: colorPicker.value})
-                popup.destroy()
-            }})
+            createInputParagraph({inputType: "submit", value: "Ok", parentElement: labelForm})
             createInput({inputType: "button", parentElement: p, value: "Cancel", onClick: () => {
                 popup.destroy()
             }})
-        }})
 
-        this.labelSelectorContainer = createElement({tagName: "div", parentElement: this.element})
+            labelForm.addEventListener("submit", (ev) => { //use submit to leverage native form validation
+                if(!labelNameInput.value){
+                    new ErrorPopupWidget({message: `Missing input name`})
+                }else if(this.labelWidgets.has(labelNameInput.value)){
+                    new ErrorPopupWidget({message: `There is already a label with color ${colorPicker.value.hexCode}`})
+                }else {
+                    this.doRPC("create_label",  {label_name: labelNameInput.value, color: colorPicker.value})
+                    popup.destroy()
+                }
+                //don't submit synchronously
+                ev.preventDefault()
+                return false
+            })
+        }})
+    }
+
+    public get currentLabelWidget(): LabelWidget | undefined{
+        let name = this.labelSelector?.value;
+        if(name === undefined){
+            return undefined
+        }
+        return this.labelWidgets.get(name)
     }
 
     public get currentColor(): Color | undefined{
-        return this.colorSelector?.value
+        return this.currentLabelWidget?.color
     }
 
     public getBrushStrokes(datasource: DataSource | undefined): Array<[Color, BrushStroke[]]>{
-        return this.labelWidgets.values().map(widget => [widget.color, widget.getBrushStrokes(datasource)])
+        let out: Array<[Color, BrushStroke[]]> = []
+        for(let widget of this.labelWidgets.values()){
+            out.push([widget.color, widget.getBrushStrokes(datasource)])
+        }
+        return out
     }
 
     public addBrushStroke(brushStroke: BrushStroke){
-        if(!this.colorSelector){
+        let labelWidget = this.currentLabelWidget
+        if(!labelWidget){
             new ErrorPopupWidget({message: `No label selected`}) //FIXME?
             return
         }
-        this.labelWidgets.get(this.colorSelector.value)?.addBrushStroke(brushStroke)
-        this.doRPC("add_annotation", {color: this.colorSelector.value, annotation: brushStroke})
+        labelWidget.addBrushStroke(brushStroke) // mask load time by modifying client state
+        this.doRPC("add_annotation", {label_name: labelWidget.name, color: labelWidget.color, annotation: brushStroke})
     }
 
     private onNewState(newState: State){
-        this.labelWidgets.values().forEach(bsw => bsw.destroy())
-        this.labelWidgets = new HashMap()
+        for(let labelWidget of this.labelWidgets.values()){
+            labelWidget.destroy()
+        }
+        this.labelWidgets = new Map()
 
-        for(let {color, annotations} of newState.labels){
+        for(let {name, color, annotations} of newState.labels){
             let colorGroupWidget = new LabelWidget({
+                name,
                 parentElement: this.element,
                 color,
-                onBrushStrokeDeleteClicked: (color, brushStroke) => this.doRPC(
-                    "remove_annotation", {color, annotation: brushStroke}
+                onBrushStrokeDeleteClicked: (_color, brushStroke) => this.doRPC(
+                    "remove_annotation", {label_name: name, annotation: brushStroke}
                 ),
-                onColorChange: (colors: {oldColor: Color, newColor: Color}) => {
-                    if(this.labelWidgets.has(colors.newColor)){
-                        new ErrorPopupWidget({message: `The color ${colors.newColor.hexCode} is already in use`})
-                        return false
-                    }
-                    this.doRPC("recolor_label", {old_color: colors.oldColor, new_color: colors.newColor})
+                onColorChange: (newColor: Color) => {
+                    this.doRPC("recolor_label", {label_name: name, new_color: newColor})
                     return true
+                },
+                onNameChange: (newName: string) => {
+                    this.doRPC("rename_label", {old_name: name, new_name: newName})
                 }
             })
             for(let brushStroke of annotations){
                 colorGroupWidget.addBrushStroke(brushStroke)
             }
-            this.labelWidgets.set(color, colorGroupWidget)
+            this.labelWidgets.set(name, colorGroupWidget)
         }
 
 
-        let currentColor = this.colorSelector?.value;
-        let currentColorIndex = this.colorSelector?.selectedIndex
+        let currentLabelName = this.labelSelector?.value;
+        let currentLabelIndex = this.labelSelector?.selectedIndex
 
         this.labelSelectorContainer.innerHTML = ""
-        let colors = newState.labels.map(label => label.color)
-        if(colors.length == 0){
-            this.colorSelector = undefined
+        let labelNames = newState.labels.map(label => label.name)
+        if(labelNames.length == 0){
+            this.labelSelector = undefined
             return
         }
-        this.colorSelector = new DropdownSelect({
+        createElement({tagName: "label", parentElement: this.labelSelectorContainer, innerText: "Current Label: "})
+        this.labelSelector = new DropdownSelect({
             parentElement: this.labelSelectorContainer,
-            firstOption: colors[0],
-            otherOptions: colors.slice(1),
-            optionRenderer: (color) => ({text: color.hexCode, inlineCss: {color: color.hexCode}}),
-            optionComparator: (color1, color2) => color1.equals(color2),
+            firstOption: labelNames[0],
+            otherOptions: labelNames.slice(1),
+            optionRenderer: (name) => name,
+            optionComparator: (name1, name2) => name1 == name2,
         })
-        if(currentColor){
-            if(this.labelWidgets.has(currentColor)){
-                this.colorSelector.value = currentColor
-            }else if (currentColorIndex != undefined && currentColorIndex < this.colorSelector.values.length){
-                this.colorSelector.value = this.colorSelector.values[currentColorIndex]
+        if(currentLabelName){
+            if(this.labelWidgets.has(currentLabelName)){
+                this.labelSelector.value = currentLabelName
+            }else if (currentLabelIndex != undefined && currentLabelIndex < this.labelSelector.values.length){
+                this.labelSelector.value = this.labelSelector.values[currentLabelIndex]
             }
         }
     }
 
     public destroy(){
-        this.labelWidgets.values().forEach(bsw => bsw.destroy())
+        for(let labelWidget of this.labelWidgets.values()){
+            labelWidget.destroy()
+        }
         removeElement(this.element)
     }
 }
@@ -153,20 +176,23 @@ class LabelWidget{
     private onBrushStrokeDeleteClicked: (color: Color, stroke: BrushStroke) => void;
     public readonly element: HTMLDivElement;
     private colorPicker: ColorPicker;
+    private nameInput: HTMLInputElement;
 
-    constructor({color, parentElement, onBrushStrokeDeleteClicked, onColorChange}: {
+    constructor({name, color, parentElement, onBrushStrokeDeleteClicked, onColorChange, onNameChange}: {
+        name: string,
         color: Color,
         parentElement: HTMLElement,
         onBrushStrokeDeleteClicked: (color: Color, stroke: BrushStroke) => void,
-        onColorChange: (colors: {oldColor: Color, newColor: Color}) => boolean,
+        onColorChange: (newColor: Color) => void,
+        onNameChange: (newName: string) => void,
     }){
         this.element = createElement({tagName: "div", parentElement, cssClasses: ["ItkBrushStrokesContainer"]});
+
+        this.nameInput = createInputParagraph({label_text: "Label Name:", inputType: "text", parentElement: this.element, value: name})
+        this.nameInput.addEventListener("focusout", () => onNameChange(this.nameInput.value))
+
         this.colorPicker = new ColorPicker({
-            parentElement: this.element, color, label: "Label Color: ", onChange: colors => {
-                if(!onColorChange(colors)){
-                    this.colorPicker.setColor(colors.oldColor)
-                }
-            }
+            parentElement: this.element, color, label: "Label Color: ", onChange: colors => onColorChange(colors.newColor)
         })
 
         this.table = createElement({
@@ -175,6 +201,10 @@ class LabelWidget{
             }
         });
         this.onBrushStrokeDeleteClicked = onBrushStrokeDeleteClicked
+    }
+
+    public get name(): string{
+        return this.nameInput.value
     }
 
     public get color(): Color{
