@@ -46,37 +46,40 @@ def try_get_datasources_from_url(
         return filesystem_result
     filesystem = filesystem_result
 
-    # FIXME: At least for now, these normal formats must have their formats in the url, just like a file extension
-    if ds_path.suffix in (".png", ".jpg", ".jpeg", ".bmp", ".gif"):
-        return [SkimageDataSource(
-            path=ds_path,
-            filesystem=filesystem,
-        )]
+    try:
+        # FIXME: At least for now, these normal formats must have their formats in the url, just like a file extension
+        if ds_path.suffix in (".png", ".jpg", ".jpeg", ".bmp", ".gif"):
+            return [SkimageDataSource(
+                path=ds_path,
+                filesystem=filesystem,
+            )]
 
-    # Precomputed chunks URL should point to the top level folder and have a resolution=x_y_z hash (not query!) parameter
-    precomp_info_result = PrecomputedChunksInfo.tryLoad(filesystem=filesystem, path=ds_path.joinpath("info"))
-    if isinstance(precomp_info_result, Exception):
-        return UsageError(str(precomp_info_result))
-    else:
-        precomp_info = precomp_info_result
-        try:
-            resolution = ensureJsonIntTripplet(tuple(int(axis) for axis in hash_params["resolution"].split("_")))
-        except KeyError:
-            # No 'resolution' hash param in url
-            return [
-                PrecomputedChunksDataSource(
-                    filesystem=filesystem,
-                    path=ds_path,
-                    resolution=scale.resolution,
-                )
-                for scale in precomp_info.scales
-            ]
-        except ValueError:
-            resolution_options = ["_".join(map(str, scale.resolution)) for scale in precomp_info.scales]
-            return UsageError(f"Bad 'resolution' tripplet in url: {url}. Options are {resolution_options}")
-        return [PrecomputedChunksDataSource(
-            filesystem=filesystem,
-            path=ds_path,
-            resolution=resolution,
-        )]
-    return UsageError(f"Could not open {url}")
+        # Precomputed chunks URL should point to the top level folder and have a resolution=x_y_z hash (not query!) parameter
+        precomp_info_result = PrecomputedChunksInfo.tryLoad(filesystem=filesystem, path=ds_path.joinpath("info"))
+        if isinstance(precomp_info_result, Exception):
+            return UsageError(str(precomp_info_result))
+        else:
+            precomp_info = precomp_info_result
+            try:
+                resolution = ensureJsonIntTripplet(tuple(int(axis) for axis in hash_params["resolution"].split("_")))
+            except KeyError:
+                # No 'resolution' hash param in url
+                return [
+                    PrecomputedChunksDataSource(
+                        filesystem=filesystem,
+                        path=ds_path,
+                        resolution=scale.resolution,
+                    )
+                    for scale in precomp_info.scales
+                ]
+            except ValueError:
+                resolution_options = ["_".join(map(str, scale.resolution)) for scale in precomp_info.scales]
+                return UsageError(f"Bad 'resolution' tripplet in url: {url}. Options are {resolution_options}")
+            return [PrecomputedChunksDataSource(
+                filesystem=filesystem,
+                path=ds_path,
+                resolution=resolution,
+            )]
+        return UsageError(f"Could not open {url}")
+    except Exception as e:
+        return UsageError(f"Could not open {url}: {e}")
