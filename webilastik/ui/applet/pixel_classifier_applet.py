@@ -64,6 +64,7 @@ class PixelClassificationApplet(Applet):
         label_classes: AppletOutput[Mapping[Color, Sequence[Annotation]]],
         executor: Executor,
         on_async_change: Callable[[], Any],
+        pixel_classifier: "VigraPixelClassifier[IlpFilter] | None",
     ):
         self._in_feature_extractors = feature_extractors
         self._in_label_classes = label_classes
@@ -72,7 +73,7 @@ class PixelClassificationApplet(Applet):
 
         self._state: _State = _State(
             live_update=False,
-            classifier=None,
+            classifier=pixel_classifier,
             generation=0,
         )
 
