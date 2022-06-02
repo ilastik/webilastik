@@ -28,6 +28,9 @@ class Label:
     def clone(self) -> "Label":
         return Label(name=self.name, color=self.color, annotations=list(self.annotations))
 
+    def is_empty(self) -> bool:
+        return len(self.annotations) == 0
+
 class BrushingApplet(Applet):
     def __init__(self, name: str, labels: Sequence[Label]):
         if len(labels) < 2:
@@ -47,6 +50,10 @@ class BrushingApplet(Applet):
     @applet_output
     def label_classes(self) -> Dict[Color, Tuple[Annotation, ...]]:
         return {label.color: tuple(label.annotations) for label in self._labels}
+
+    @applet_output
+    def labels(self) -> Sequence[Label]:
+        return [label.clone() for label in self._labels]
 
     @applet_output
     def datasources(self) -> Set[DataSource]:
