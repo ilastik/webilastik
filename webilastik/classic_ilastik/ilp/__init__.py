@@ -434,9 +434,8 @@ class IlpLane: #FIXME: generic over TypeVarTuple(..., bound=Literal["Raw Data", 
         super().__init__()
 
     @property
-    def Role_Names(self) -> "ndarray[Any, Any]":
-        role_names: "ndarray[Any, Any]" = np.asarray([name.encode("utf8") for name in self.roles.keys()]) # pyright: ignore [reportUnknownMemberType]
-        return role_names
+    def Role_Names(self) -> "List[bytes]":
+        return [name.encode("utf8") for name in self.roles.keys()]
 
     def populate_group(self, group: h5py.Group):
         for role_name, role_datasouce in self.roles.items():
