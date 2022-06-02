@@ -164,20 +164,19 @@ class Annotation(ScalarData):
 
         return cls(scribblings._data, axiskeys=scribblings.axiskeys, raw_data=raw_data, location=start)
 
+    def to_points(self) -> Iterable[Point5D]:
+        # FIXME: annotation should probably not be an Array6D
+        for x, y, z in zip(*self.raw("xyz").nonzero()): # type: ignore
+            yield Point5D(x=x, y=y, z=z) + self.location
+
     def to_json_data(self) -> JsonObject:
         if not isinstance(self.raw_data, FsDataSource):
             #FIXME: maybe create a FsDatasourceAnnotation so we don't have to raise here?
             raise ValueError(f"Can't serialize annotation over {self.raw_data}")
 
-        voxels : List[Point5D] = []
-
-        # FIXME: annotation should probably not be an Array6D
-        for x, y, z in zip(*self.raw("xyz").nonzero()): # type: ignore
-            voxels.append(Point5D(x=x, y=y, z=z) + self.location)
-
         return {
             "raw_data": self.raw_data.to_json_value(),
-            "voxels": tuple(vx.to_json_value() for vx in voxels),
+            "voxels": tuple(vx.to_json_value() for vx in self.to_points()),
         }
 
     def get_feature_samples(self, feature_extractor: FeatureExtractor) -> FeatureSamples:
