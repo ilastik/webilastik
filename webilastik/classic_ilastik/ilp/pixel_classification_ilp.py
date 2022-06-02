@@ -39,6 +39,7 @@ from webilastik.datasource import DataSource, FsDataSource
 from webilastik.annotations import Annotation
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier, dump_to_temp_file, vigra_forest_to_h5_bytes
 from webilastik.filesystem import JsonableFilesystem
+from webilastik.ui.applet.brushing_applet import Label
 from webilastik.utility.url import Protocol
 
 
@@ -102,11 +103,13 @@ class IlpPixelClassificationGroup:
         return name
 
     @classmethod
-    def ilp_filters_from_names(cls, feature_names: Sequence[str]) -> Sequence[IlpFilter]:
+    def ilp_filters_and_expected_num_channels_from_names(cls, feature_names: Sequence[str]) -> Tuple[Sequence[IlpFilter], int]:
         out: List[IlpFilter] = []
+
+        expected_num_channels = 0
         for name in feature_names:
             parts = name.split()
-            # channel_index = int(parts[-1][1:-1]) # strip square brackets off of something like '[3]'
+            channel_index = int(parts[-1][1:-1]) # strip square brackets off of something like '[3]'
             in_2D = parts[-2] == "2D"
             ilp_scale = float(parts[-4][3:-1]) # read number from something like '(σ=0.3)'
             ilp_classifier_feature_name = " ".join(parts[:-4]) # drops the 4 last items, that look like '(σ=0.3) in 2D [0]'
@@ -117,29 +120,28 @@ class IlpPixelClassificationGroup:
             ilp_filter = filter_class.from_ilp_scale(
                 scale=ilp_scale, axis_2d= "z" if in_2D else None # FIXME: is axis_2d always 'z'?
             )
+            expected_num_channels = max(expected_num_channels, channel_index // ilp_filter.channel_multiplier)
             if len(out) == 0 or out[-1] != ilp_filter:
                 out.append(ilp_filter)
-        return out
+        return (out, expected_num_channels)
 
 
     def __init__(
         self,
         *,
         classifier: Optional[VigraPixelClassifier[IlpFilter]],
-        label_classes: Dict[Color, Tuple[Annotation, ...]],
+        labels: Sequence[Label],
     ) -> None:
         self.classifier = classifier
-        self.label_classes = label_classes
-        if classifier and len(label_classes) != classifier.num_classes:
-            raise ValueError(f"Wrong number of colors {len(label_classes)} for classifier with {classifier.num_classes} classes")
+        self.labels = labels
 
-        if not all(isinstance(annotation.raw_data, FsDataSource) for labels in label_classes.values() for annotation in labels):
+        if not all(isinstance(annotation.raw_data, FsDataSource) for label in labels for annotation in label.annotations):
             # FIXME: autocontext?
             raise ValueError(f"For now, all annotations must be on datasources present in the fylesystem in order to be saved")
         super().__init__()
 
     def populate_group(self, group: h5py.Group):
-        LabelColors: "ndarray[Any, dtype[int64]]"  = np.asarray([color.rgba[:-1] for color in self.label_classes.keys()], dtype=int64) # pyright: ignore [reportUnknownMemberType]
+        LabelColors: "ndarray[Any, dtype[int64]]"  = np.asarray([label.color.rgba for label in self.labels], dtype=int64) # pyright: ignore [reportUnknownMemberType]
 
         # expected group keys to look like this:
         # ['Bookmarks', 'ClassifierFactory', 'LabelColors', 'LabelNames', 'PmapColors', 'StorageVersion', 'LabelSets', 'ClassifierForests']>
@@ -148,19 +150,21 @@ class IlpPixelClassificationGroup:
         group["ClassifierFactory"] = VIGRA_ILP_CLASSIFIER_FACTORY
         group["LabelColors"] = LabelColors
         group["LabelColors"].attrs["isEmpty"] = False
-        group["LabelNames"] = np.asarray([color.name.encode("utf8") for color in self.label_classes.keys()]) # pyright: ignore [reportUnknownMemberType]
+        group["LabelNames"] = [label.name.encode("utf8") for label in self.labels]
         group["LabelNames"].attrs["isEmpty"] = False
         group["PmapColors"] = LabelColors
         group["PmapColors"].attrs["isEmpty"] = False
         group["StorageVersion"] = "0.1".encode("utf8")
 
         merged_annotation_tiles: Dict[DataSource, Dict[Interval5D, Array5D]] = {}
-        for label_class, labels in enumerate(self.label_classes.values(), start=1):
-            for annotation in labels:
+        for label_class, label in enumerate(self.labels, start=1):
+            for annotation in label.annotations:
                 datasource = annotation.raw_data
                 merged_tiles = merged_annotation_tiles.setdefault(datasource, {})
 
-                for interval in annotation.interval.get_tiles(tile_shape=datasource.tile_shape, tiles_origin=datasource.interval.start):
+                for interval in annotation.interval.get_tiles(
+                    tile_shape=datasource.tile_shape.updated(c=1), tiles_origin=datasource.interval.start.updated(c=0)
+                ):
                     annotation_tile = annotation.cut(interval.clamped(annotation.interval))
                     tile = merged_tiles.setdefault(interval, Array5D.allocate(interval=interval, value=0, dtype=np.dtype("uint8")))
                     tile.set(annotation_tile.colored(np.uint8(label_class)), mask_value=0)
@@ -194,16 +198,17 @@ class IlpPixelClassificationGroup:
                     assert isinstance(forest_group, h5py.Group)
                     ClassifierForests.copy(forest_group, f"Forest{forest_index:04}") # 'Forest0000', ..., 'Forest000N'
 
-            ClassifierForests["feature_names"] = np.asarray(feature_names) # pyright: ignore [reportUnknownMemberType]
+            ClassifierForests["feature_names"] = feature_names
             ClassifierForests["known_labels"] = np.asarray(self.classifier.classes).astype(np.uint32) # pyright: ignore [reportUnknownMemberType]
             ClassifierForests["pickled_type"] = b"clazyflow.classifiers.parallelVigraRfLazyflowClassifier\nParallelVigraRfLazyflowClassifier\np0\n."
 
     @classmethod
     def parse(cls, group: h5py.Group, raw_data_sources: Mapping[int, "FsDataSource | None"]) -> "IlpPixelClassificationGroup":
         LabelColors = ensure_color_list(group, "LabelColors")
+        LabelNames = ensure_encoded_string_list(group, "LabelNames")
         class_to_color: Mapping[np.uint8, Color] = {np.uint8(i): color for i, color in enumerate(LabelColors, start=1)}
 
-        label_classes: Dict[Color, List[Annotation]] = {color: [] for color in LabelColors}
+        label_classes: Dict[Color, Label] = {color: Label(name=name, color=color, annotations=[]) for name, color in zip(LabelNames, LabelColors)}
         LabelSets = ensure_group(group, "LabelSets")
         for lane_key in LabelSets.keys():
             if not lane_key.startswith("labels"):
@@ -250,13 +255,14 @@ class IlpPixelClassificationGroup:
                     if color is None:
                         raise IlpParsingError(f"Could not find a label color for index {color_index}")
                     annotation_data: "np.ndarray[Any, np.dtype[np.uint8]]" = block_5d.color_filtered(color=color_5d).raw(axiskeys)
+                    print(f"+++++++++++ {annotation_data.shape=}")
                     annotation = Annotation(
                         annotation_data,
                         location=blockInterval.start,
                         axiskeys=axiskeys, # FIXME: what if the user changed the axiskeys in the data source?
                         raw_data=raw_data,
                     )
-                    label_classes[color].append(annotation)
+                    label_classes[color].annotations.append(annotation)
 
 
 
@@ -275,25 +281,20 @@ class IlpPixelClassificationGroup:
                 forests.append(forest)
 
             feature_names = ensure_encoded_string_list(ClassifierForests, "feature_names")
-            feature_extractors = cls.ilp_filters_from_names(feature_names)
-
-            # FIXME: make feature extractors aware of which channel they handle
-            num_input_channels = max(int(fn.split()[-1][1:-1]) for fn in feature_names) + 1
+            feature_extractors, expected_num_channels = cls.ilp_filters_and_expected_num_channels_from_names(feature_names)
 
             classifier = VigraPixelClassifier(
                 feature_extractors=feature_extractors,
                 forest_h5_bytes=[vigra_forest_to_h5_bytes(forest) for forest in forests],
-                num_classes=sum(len(labels) and 1 for labels in label_classes.values()),
-                num_input_channels=num_input_channels,
+                num_classes=len([label for label in label_classes.values() if not label.is_empty()]),
+                num_input_channels=expected_num_channels,
             )
         else:
             classifier = None
 
         return IlpPixelClassificationGroup(
             classifier=classifier,
-            label_classes={
-                color: tuple(labels) for color, labels in label_classes.items()
-            },
+            labels=list(label_classes.values()),
         )
 
 
@@ -319,13 +320,13 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
     def create(
         *,
         feature_extractors: Sequence[IlpFilter],
-        label_classes: Dict[Color, Tuple[Annotation, ...]],
+        labels: Sequence[Label],
         classifier: "VigraPixelClassifier[IlpFilter] | None",
         currentApplet: "int | None" = None,
         ilastikVersion: "str | None" = None,
         time: "datetime | None" = None,
     ):
-        datasources = {annotation.raw_data for labels in label_classes.values() for annotation in labels}
+        datasources = {annotation.raw_data for label in labels for annotation in label.annotations}
         return IlpPixelClassificationWorkflowGroup(
             Input_Data = IlpInputDataGroup(lanes=[
                 IlpLane(roles={
@@ -337,7 +338,7 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
             ]),
             FeatureSelections=IlpFeatureSelectionsGroup(feature_extractors=feature_extractors),
             PixelClassification=IlpPixelClassificationGroup(
-                label_classes=label_classes,
+                labels=labels,
                 classifier=classifier,
             ),
             currentApplet=currentApplet,

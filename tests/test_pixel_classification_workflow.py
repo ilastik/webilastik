@@ -1,13 +1,17 @@
-from pathlib import PurePosixPath
+from pathlib import Path
 import time
 from concurrent.futures import ThreadPoolExecutor
 import json
+from typing import Set
 import h5py
+import shutil
 
 import numpy as np
+from ndstructs.point5D import Point5D
 from ndstructs.utils.json_serializable import JsonObject, ensureJsonArray, ensureJsonInt, ensureJsonObject
 
 from tests import create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations, get_sample_feature_extractors, get_test_output_osfs
+from webilastik.annotations.annotation import Color
 from webilastik.classic_ilastik.ilp import IlpFeatureSelectionsGroup, ensure_group
 from webilastik.classic_ilastik.ilp.pixel_classification_ilp import IlpPixelClassificationGroup, IlpPixelClassificationWorkflowGroup
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
@@ -87,54 +91,52 @@ def test_pixel_classification_workflow():
 
 ###################################
 
-    ilp_path = PurePosixPath("/tmp/test_pixel_classification_workflow.ilp")
-    _ = workflow.save_project(fs=OsFs("/"), path=ilp_path)
+    sample_trained_ilp_path = Path("tests/projects/TrainedPixelClassification.ilp")
+    output_ilp_path = Path("/tmp/rewritten.ilp")
 
-    with h5py.File(ilp_path, "r") as f:
-        FeatureSelections = IlpFeatureSelectionsGroup.parse(ensure_group(f, "FeatureSelections"))
-        expected_feature_extractors = get_sample_feature_extractors()
-        for i, fe in enumerate(FeatureSelections.feature_extractors):
-            if fe != expected_feature_extractors[i]:
-                print(f"Deserialized: {fe}")
-                print(f"Expected:     {expected_feature_extractors[i]}")
-                exit(1)
-        # assert FeatureSelections.feature_extractors == get_sample_feature_extractors()
-
-    # with h5py.File("/home/builder/MyProject.ilp", "r") as f:
-        # FeatureSelections = IlpFeatureSelectionsGroup.parse(ensure_group(f, "FeatureSelections"))
-        # expected_feature_extractors = [
-        #     GaussianSmoothing.from_ilp_scale(scale=0.3, axis_2d="z"),
-        #     LaplacianOfGaussian.from_ilp_scale(scale=0.7, axis_2d="z"),
-        #     GaussianGradientMagnitude.from_ilp_scale(scale=1.0, axis_2d="z"),
-        #     DifferenceOfGaussians.from_ilp_scale(scale=1.6, axis_2d="z"),
-        #     StructureTensorEigenvalues.from_ilp_scale(scale=3.5, axis_2d="z"),
-        #     HessianOfGaussianEigenvalues.from_ilp_scale(scale=5.0, axis_2d="z"),
-        # ]
-        # for i, fe in enumerate(FeatureSelections.feature_extractors):
-        #     if fe != expected_feature_extractors[i]:
-        #         print(f"Deserialized: {fe}")
-        #         print(f"Expected:     {expected_feature_extractors[i]}")
-        #         exit(1)
-
-    with h5py.File("/home/builder/SampleProjects/SampleTrainedPixelClassifier.ilp", "r") as f:
-        sample_trained_workflow_data = IlpPixelClassificationWorkflowGroup.parse(
+    with h5py.File(sample_trained_ilp_path, "r") as f:
+        sample_workflow_data = IlpPixelClassificationWorkflowGroup.parse(
             group=f,
+            ilp_fs=OsFs("."),
+            allowed_protocols=[Protocol.FILE],
+        )
+        assert not isinstance(sample_workflow_data, Exception)
+        with open(output_ilp_path, "wb") as rewritten:
+            _ = rewritten.write(sample_workflow_data.to_h5_file_bytes())
+        shutil.copy("tests/projects/c_cells_1.png", output_ilp_path.parent.joinpath("c_cells_1.png"))
+
+    with h5py.File(output_ilp_path, "r") as rewritten:
+        reloaded_data = IlpPixelClassificationWorkflowGroup.parse(
+            group=rewritten,
             ilp_fs=OsFs("/"),
             allowed_protocols=[Protocol.FILE],
         )
-        assert not isinstance(sample_trained_workflow_data, Exception)
-        with open("/tmp/rewritten.ilp", "wb") as rewritten:
-            _ = rewritten.write(sample_trained_workflow_data.to_h5_file_bytes())
+        assert not isinstance(reloaded_data, Exception)
 
+        loaded_feature_extractors = reloaded_data.FeatureSelections.feature_extractors
+        assert GaussianSmoothing.from_ilp_scale(scale=0.3, axis_2d="z") in loaded_feature_extractors
+        assert LaplacianOfGaussian.from_ilp_scale(scale=0.7, axis_2d="z") in loaded_feature_extractors
+        assert GaussianGradientMagnitude.from_ilp_scale(scale=1.0, axis_2d="z") in loaded_feature_extractors
+        assert DifferenceOfGaussians.from_ilp_scale(scale=1.6, axis_2d="z") in loaded_feature_extractors
+        assert StructureTensorEigenvalues.from_ilp_scale(scale=3.5, axis_2d="z") in loaded_feature_extractors
+        assert HessianOfGaussianEigenvalues.from_ilp_scale(scale=5.0, axis_2d="z") in loaded_feature_extractors
+        assert len(loaded_feature_extractors) == 6
+
+        loaded_labels = reloaded_data.PixelClassification.labels
+        for label in loaded_labels:
+            loaded_points: Set[Point5D] = set()
+            for a in label.annotations:
+                loaded_points.update(a.to_points())
+            if label.color == Color(r=np.uint8(255), g=np.uint8(225),  b=np.uint8(25)):
+                assert loaded_points == set([Point5D(x=200, y=200), Point5D(x=201, y=201), Point5D(x=202, y=202)])
+            elif label.color == Color(r=np.uint8(0), g=np.uint8(130),  b=np.uint8(200)):
+                assert loaded_points == set([Point5D(x=400, y=400), Point5D(x=401, y=401), Point5D(x=402, y=402)])
+            else:
+                assert False, f"Unexpected label color: {label.color}"
 
     from tests import compare_projects
-    from pathlib import Path
-    compare_projects(Path("/tmp/rewritten.ilp"), Path("/home/builder/SampleProjects/SampleTrainedPixelClassifier.ilp"))
+    compare_projects(output_ilp_path, sample_trained_ilp_path)
 
-
-
-    # priority_executor.shutdown()
-    # exit(1)
 
 #######################################33
 
