@@ -43,11 +43,14 @@ export class PopupWidget{
 }
 
 export class ErrorPopupWidget extends PopupWidget{
-    constructor(params: {message: string}){
+    constructor(params: {message: string, onClose?: () => void}){
         super("Error")
         createElement({tagName: "span", parentElement: this.element, innerHTML: params.message})
         createInputParagraph({inputType: "button", parentElement:  this.element, value: "Ok", onClick: () => {
             this.destroy()
+            if(params.onClose){
+                params.onClose()
+            }
         }})
     }
 }
