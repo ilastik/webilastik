@@ -464,7 +464,7 @@ class IlpInputDataGroup:
         super().__init__()
 
     def populate_group(self, group: h5py.Group):
-        group["Role Names"] = self.lanes[0].Role_Names
+        group["Role Names"] = ["Raw Data".encode("utf8"), "Prediciton Mask".encode("utf8")] # FIXME! what about other workflows?
         group["StorageVersion"] = "0.2"
 
         infos_group = group.create_group("infos")
