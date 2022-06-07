@@ -13,7 +13,7 @@ import json
 from base64 import b64decode
 import ssl
 import contextlib
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import traceback
 import re
 
@@ -23,8 +23,11 @@ from aiohttp.client import ClientSession
 from aiohttp.http_websocket import WSCloseCode
 from aiohttp.web_app import Application
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
+from webilastik import filesystem
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
+from webilastik.filesystem import JsonableFilesystem
+from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError
@@ -72,6 +75,10 @@ class RPCPayload:
             "method_name": self.method_name,
             "arguments": self.arguments,
         }
+
+def do_save_project(filesystem: BucketFs, file_name: str, workflow_contents: bytes):
+    with filesystem.openbin(file_name, "w") as f:
+        f.write(workflow_contents)
 
 
 class WebIlastik:
@@ -154,6 +161,11 @@ class WebIlastik:
                 "/get_datasources_from_url",
                 self.get_datasources_from_url
             ),
+            web.post(
+                "/save_project",
+                self.save_project
+            ),
+
         ])
         self.app.on_shutdown.append(self.close_websockets)
 
@@ -285,8 +297,22 @@ class WebIlastik:
             }
         )
 
-    async def save_project(self, request: web.Request):
-        pass
+    async def save_project(self, request: web.Request) -> web.Response:
+        payload = await request.json()
+        filesystem = BucketFs.from_json_value(payload.get("fs"))
+        file_path = PurePosixPath(ensureJsonString(payload.get("project_file_name")))
+        if len(file_path.parts) > 1 or ".." in file_path.parts or "." in file_path.parts:
+            return web.Response(status=400, text=f"Bad project file name: {file_path}")
+
+        await asyncio.wrap_future(self.executor.submit(
+            do_save_project,
+            filesystem=filesystem,
+            file_name=file_path.as_posix(),
+            workflow_contents=self.workflow.get_ilp_contents()
+        ))
+
+        return web.Response(status=200, text=f"Project saved to {filesystem.geturl(file_path.as_posix())}")
+
 
     async def stripped_precomputed_info(self, request: web.Request) -> web.Response:
         """Serves a precomp info stripped of all but one scales"""

@@ -200,3 +200,12 @@ class Annotation(ScalarData):
 
     def __repr__(self):
         return f"<Annotation {self.interval} onto {self.raw_data}>"
+
+    def show(self, color: Color):
+        background = self.raw_data.retrieve(self.interval.updated(c=self.raw_data.interval.c)).cut(copy=True)
+
+        raw_background = background.raw("tzyxc")
+        raw_annotation = self.raw("tzyx")
+        raw_background[raw_annotation > 0] = [color.r, color.g, color.b]
+
+        background.show_images()
