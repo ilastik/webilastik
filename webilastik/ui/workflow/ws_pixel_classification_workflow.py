@@ -80,6 +80,9 @@ def do_save_project(filesystem: BucketFs, file_name: str, workflow_contents: byt
     with filesystem.openbin(file_name, "w") as f:
         f.write(workflow_contents)
 
+def do_load_project_bytes(filesystem: BucketFs, file_name: str) -> bytes:
+    with filesystem.openbin(file_name, "r") as f:
+        return f.read()
 
 class WebIlastik:
     @property
@@ -165,7 +168,10 @@ class WebIlastik:
                 "/save_project",
                 self.save_project
             ),
-
+            web.post(
+                "/load_project",
+                self.load_project
+            ),
         ])
         self.app.on_shutdown.append(self.close_websockets)
 
@@ -314,6 +320,31 @@ class WebIlastik:
 
         return web.Response(status=200, text=f"Project saved to {filesystem.geturl(file_path.as_posix())}")
 
+    async def load_project(self, request: web.Request) -> web.Response:
+        payload = await request.json()
+        filesystem = BucketFs.from_json_value(payload.get("fs"))
+        file_path = PurePosixPath(ensureJsonString(payload.get("project_file_name")))
+        if len(file_path.parts) > 1 or ".." in file_path.parts or "." in file_path.parts:
+            return web.Response(status=400, text=f"Bad project file name: {file_path}")
+
+        ilp_bytes = await asyncio.wrap_future(self.executor.submit(
+            do_load_project_bytes,
+            filesystem=filesystem,
+            file_name=file_path.as_posix(),
+        ))
+        new_workflow_result = PixelClassificationWorkflow.from_ilp_bytes(
+            ilp_bytes=ilp_bytes,
+            ebrains_user_token=UserToken.get_global_token_or_raise(),
+            on_async_change=lambda : self.enqueue_user_interaction(lambda: None), #FIXME?
+            executor=self.executor,
+            priority_executor=self.priority_executor,
+            allowed_protocols=(Protocol.HTTP, Protocol.HTTPS),
+        )
+        if isinstance(new_workflow_result, Exception):
+            return web.Response(status=400, text=f"Could not load project: {new_workflow_result}")
+        self.workflow = new_workflow_result
+        self._update_clients()
+        return web.Response(status=200, text=f"Project saved to {filesystem.geturl(file_path.as_posix())}")
 
     async def stripped_precomputed_info(self, request: web.Request) -> web.Response:
         """Serves a precomp info stripped of all but one scales"""

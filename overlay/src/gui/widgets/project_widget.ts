@@ -24,10 +24,13 @@ export class ProjectWidget{
         })
 
         p = createElement({tagName: "p", parentElement: form})
-        let submitButtonText = "Save Project"
-        let submitButton = createInput({inputType: "submit", parentElement: p, value: submitButtonText})
-        form.addEventListener("submit", (ev): false => {
+        let saveButtonText = "Save Project"
+        let loadButtonText = "Load Project"
+        let saveButton = createInput({inputType: "submit", parentElement: p, value: saveButtonText})
+        let loadButton = createInput({inputType: "submit", parentElement: p, value: loadButtonText})
+        form.addEventListener("submit", (ev: SubmitEvent): false => {
             ev.preventDefault()
+
             let fs = bucketInput.tryGetFileSystem()
             let project_file_name = projectFileNameInput.value
             if(!fs || !project_file_name){
@@ -35,16 +38,27 @@ export class ProjectWidget{
                 return false
             }
 
-            submitButton.disabled = true
-            submitButton.value = "Saving project..."
-            params.session.saveProject({fs,  project_file_name}).then(result => {
-                if(result instanceof Error){
-                    new ErrorPopupWidget({message: result.message})
-                }
-                submitButton.disabled = false
-                submitButton.value = submitButtonText
-            })
+            saveButton.disabled = loadButton.disabled = true
 
+            if(ev.submitter == loadButton){
+                loadButton.value = "Loading project..."
+                params.session.loadProject({fs,  project_file_name}).then(result => {
+                    if(result instanceof Error){
+                        new ErrorPopupWidget({message: result.message})
+                    }
+                    loadButton.value = loadButtonText
+                    saveButton.disabled = loadButton.disabled = false
+                })
+            }else if(ev.submitter == saveButton){
+                saveButton.value = "Saving project..."
+                params.session.saveProject({fs,  project_file_name}).then(result => {
+                    if(result instanceof Error){
+                        new ErrorPopupWidget({message: result.message})
+                    }
+                    saveButton.value = saveButtonText
+                    saveButton.disabled = loadButton.disabled = false
+                })
+            }
             return false
         })
     }

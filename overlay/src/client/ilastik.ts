@@ -84,6 +84,19 @@ export class Session{
         return Error(`Could not save project: ${await response.text()}`)
     }
 
+    public async loadProject(params: {fs: FileSystem, project_file_name: string}): Promise<Error | undefined>{
+        let response = await fetch(
+            this.sessionUrl.joinPath("load_project").schemeless_raw,
+            {
+                method: "POST",
+                body: JSON.stringify(toJsonValue(params)),
+            })
+        if(response.ok){
+            return undefined
+        }
+        return Error(`Could not load project: ${await response.text()}`)
+    }
+
     public doRPC(params: {applet_name: string, method_name: string, method_arguments: IJsonableObject}){
         return this.websocket.send(JSON.stringify({
             applet_name: params.applet_name,
