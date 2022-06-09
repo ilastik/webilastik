@@ -105,7 +105,7 @@ class WebIlastik:
                 traceback_messages = traceback.format_exc()
                 error_message = f"Unhandled Exception: {e}\n\n{traceback_messages}"
                 logger.error(error_message)
-            await self._update_clients(error_message=error_message)
+            self._update_clients(error_message=error_message)
         self.loop.call_soon_threadsafe(lambda: self.loop.create_task(do_rpc()))
 
     async def close_websockets(self, app: Application):
@@ -238,7 +238,7 @@ class WebIlastik:
         _ = await websocket.prepare(request)
         self.websockets.append(websocket)
         logger.debug(f"JUST STABILISHED A NEW CONNECTION!!!! {len(self.websockets)}")
-        await self._update_clients() # when a new client connects, send it the current state
+        self._update_clients() # when a new client connects, send it the current state
         async for msg in websocket:
             if msg.type == aiohttp.WSMsgType.TEXT:
                 if msg.data == 'close':
@@ -260,7 +260,7 @@ class WebIlastik:
                 except Exception:
                     import traceback
                     traceback.print_exc()
-                    await self._update_clients() # restore last known good state of offending client
+                    self._update_clients() # restore last known good state of offending client
             elif msg.type == aiohttp.WSMsgType.BINARY:
                 logger.error(f'Unexpected binary message')
             elif msg.type == aiohttp.WSMsgType.ERROR:
@@ -271,22 +271,23 @@ class WebIlastik:
         logger.info('websocket connection closed')
         return websocket
 
-    async def _update_clients(self, error_message: Optional[str] = None):
-        if error_message is not None:
-            payload = {"error": error_message}
-        else:
-            payload = self.workflow.get_json_state()
-
-        async def do_update(ws: web.WebSocketResponse):
+    async def do_update(self, payload: JsonValue):
+        stringified_payload = json.dumps(payload)
+        for websocket in self.websockets[:]:
             try:
-                await websocket.send_str(json.dumps(payload))
+                # FIXME: do all sockets at once
+                await websocket.send_str(stringified_payload)
             except ConnectionResetError as e:
                 logger.error(f"Got an exception while updating remote:\n{e}\n\nRemoving websocket...")
                 self.websockets.remove(websocket)
 
+    def _update_clients(self, error_message: Optional[str] = None):
+        if error_message is not None:
+            payload = {"error": error_message}
+        else:
+            payload = self.workflow.get_json_state()
         loop = self.app.loop # FIXME?
-        for websocket in self.websockets[:]:
-            loop.create_task(do_update(websocket))
+        loop.create_task(self.do_update(payload))
 
     async def download_project_as_ilp(self, request: web.Request):
         return web.Response(
