@@ -395,5 +395,11 @@ export function setValueIfUnfocused(input: HTMLInputElement, value: string){
 
 export function getNowString(): string{
     let now = new Date()
-    return `${now.getFullYear()}y_${now.getMonth()}m_${now.getDay()}d__${now.getHours()}h_${now.getMinutes()}min_${now.getSeconds()}s`
+    let month = now.getMonth().toString().padStart(2, '0')
+    let day = now.getDay().toString().padStart(2, '0')
+    let hours = now.getHours().toString().padStart(2, '0')
+    let minutes = now.getMinutes().toString().padStart(2, '0')
+    let seconds = now.getSeconds().toString().padStart(2, '0')
+
+    return `${now.getFullYear()}y_${month}m_${day}d__${hours}h_${minutes}min_${seconds}s`
 }
