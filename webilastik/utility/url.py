@@ -43,6 +43,13 @@ class SearchQuotingMethod(enum.Enum):
     QUOTE = 0
     QUOTE_PLUS = 1
 
+def parse_params(params: "str | None") -> Dict[str, str]:
+    if params is None:
+        return {}
+    else:
+        parsed_params: Dict[str, List[str]] = parse_qs(params, keep_blank_values=True, strict_parsing=True, encoding='utf-8')
+        return {k: v[-1] if v else "" for k,v in parsed_params.items()}
+
 class Url:
     hostname_pattern = r"[0-9a-z\-\.]*"
 
@@ -95,11 +102,7 @@ class Url:
         raw_datascheme = match.group("datascheme")
         raw_port = match.group("port")
         raw_search = match.group("search")
-        if raw_search is None:
-            search: Dict[str, str] = {}
-        else:
-            parsed_qs: Dict[str, List[str]] = parse_qs(raw_search, keep_blank_values=True, strict_parsing=True, encoding='utf-8')
-            search: Dict[str, str] = {k: v[-1] if v else "" for k,v in parsed_qs.items()}
+        search = parse_params(raw_search)
 
         return Url(
             datascheme=None if raw_datascheme is None else DataScheme.from_str(raw_datascheme),
@@ -215,6 +218,22 @@ class Url:
             search={**self.search},
             hash_=self.hash_,
         )
+
+    def hashless(self) -> "Url":
+        return Url(
+            path=self.path,
+            datascheme=self.datascheme,
+            protocol=self.protocol,
+            hostname=self.hostname,
+            port=self.port,
+            search={**self.search},
+            hash_=None,
+        )
+
+    def get_hash_params(self) -> "Dict[str, str]":
+        if self.hash_ is None:
+            return {}
+        return parse_params(self.hash_)
 
     @property
     def parent(self) -> "Url":

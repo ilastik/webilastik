@@ -1,8 +1,12 @@
 from abc import abstractmethod
 import json
+from typing import Sequence
 
 from ndstructs.utils.json_serializable import IJsonable, JsonValue, ensureJsonObject, ensureJsonString
 from fs.base import FS
+from webilastik.ui.usage_error import UsageError
+
+from webilastik.utility.url import Protocol, Url
 
 
 
@@ -32,3 +36,15 @@ class JsonableFilesystem(FS, IJsonable):
     @abstractmethod
     def to_json_value(self) -> JsonValue:
         pass
+
+    @staticmethod
+    def from_url(url: Url) -> "JsonableFilesystem | Exception":
+        from webilastik.filesystem.osfs import OsFs
+        from webilastik.filesystem.bucket_fs import BucketFs
+        from webilastik.filesystem.http_fs import HttpFs
+
+        if url.protocol == Protocol.FILE:
+            return OsFs(url.path.as_posix())
+        if url.raw.startswith(BucketFs.API_URL.raw):
+            return BucketFs.try_from_url(url=url)
+        return HttpFs.try_from_url(url)

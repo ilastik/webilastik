@@ -22,7 +22,6 @@ from webilastik.features.channelwise_fastfilters import DifferenceOfGaussians, G
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.filesystem import JsonableFilesystem
 from webilastik.ui.datasource import try_get_datasources_from_url
-from webilastik.ui.usage_error import UsageError
 from webilastik.utility.url import Protocol, Url
 
 
@@ -413,18 +412,18 @@ class IlpDatasetInfo:
         ilp_fs: JsonableFilesystem,
         ilp_path: PurePosixPath,
         allowed_protocols: Sequence[Protocol] = (Protocol.HTTP, Protocol.HTTPS)
-    ) -> "FsDataSource | ValueError":
+    ) -> "FsDataSource | Exception":
         url = Url.parse(self.filePath)
         if url is None: # filePath was probably a path, not an URL
             path = ilp_path.parent.joinpath(self.filePath)
             url = Url.parse(ilp_fs.geturl(path.as_posix()))
         if url is None:
-            return ValueError(f"Could not parse {self.filePath} as URL")
+            return Exception(f"Could not parse {self.filePath} as URL")
         datasources_result = try_get_datasources_from_url(url=url, allowed_protocols=allowed_protocols)
-        if isinstance(datasources_result, UsageError):
-            return ValueError(f"Could not open {url} as a data source: {datasources_result}")
+        if isinstance(datasources_result, Exception):
+            return Exception(f"Could not open {url} as a data source: {datasources_result}")
         if len(datasources_result) != 1:
-            return ValueError(f"Expected a single datasource from {url}, found {len(datasources_result)}")
+            return Exception(f"Expected a single datasource from {url}, found {len(datasources_result)}")
         return datasources_result[0]
 
 
@@ -499,7 +498,7 @@ class IlpInputDataGroup:
         ilp_fs: JsonableFilesystem,
         ilp_path: PurePosixPath,
         allowed_protocols: Sequence[Protocol] = (Protocol.HTTP, Protocol.HTTPS)
-    ) -> "Dict[int, 'FsDataSource | None'] | ValueError":
+    ) -> "Dict[int, 'FsDataSource | None'] | Exception":
         infos = [lane.roles[role_name] for lane in self.lanes]
         raw_data_datasources: Dict[int, "FsDataSource | None"] = {}
         for lane_index, info in enumerate(infos):

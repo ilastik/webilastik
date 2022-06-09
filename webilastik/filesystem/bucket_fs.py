@@ -102,12 +102,12 @@ class BucketFs(JsonableFilesystem):
         return BucketFs(bucket_name=bucket_name, prefix=prefix, ebrains_user_token=token_result)
 
     @classmethod
-    def try_from_url(cls, url: Url, ebrains_user_token: "UserToken | None") -> "BucketFs | UsageError":
+    def try_from_url(cls, url: Url, ebrains_user_token: "UserToken | None" = None) -> "BucketFs | Exception":
         if not url.raw.startswith(cls.API_URL.raw):
-            return UsageError(f"Url must be inside the data-proxy ({cls.API_URL}. Got {url}")
+            return Exception(f"Url must be inside the data-proxy ({cls.API_URL}. Got {url}")
         bucket_name_part_index = len(cls.API_URL.path.parts)
         if len(url.path.parts) <= bucket_name_part_index:
-            return UsageError(f"Bad bucket url: {url}")
+            return Exception(f"Bad bucket url: {url}")
         token_result = ebrains_user_token or UserToken.get_global_login_token()
         if isinstance(token_result, UsageError):
             return token_result

@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional, Sequence, Tuple
 from pathlib import PurePosixPath
 import json
 import logging
@@ -11,7 +11,7 @@ from fs.errors import ResourceNotFound
 from webilastik.datasource import FsDataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo
 from webilastik.filesystem import JsonableFilesystem
-from webilastik.utility.url import Url
+from webilastik.utility.url import DataScheme, Url
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,42 @@ class PrecomputedChunksDataSource(FsDataSource):
     @property
     def url(self) -> Url:
         resolution_str = f"{self.spatial_resolution[0]}_{self.spatial_resolution[1]}_{self.spatial_resolution[2]}"
-        return super().url.updated_with(hash_=f"resolution={resolution_str}")
+        return super().url.updated_with(datascheme=DataScheme.PRECOMPUTED, hash_=f"resolution={resolution_str}")
+
+    @classmethod
+    def supports_url(cls, url: Url) -> bool:
+        return url.datascheme == DataScheme.PRECOMPUTED
+
+    @classmethod
+    def from_url(cls, url: Url) -> "Sequence[PrecomputedChunksDataSource] | Exception":
+        if not cls.supports_url(url):
+            return Exception(f"Unsupported url: {url}")
+        fs_url = url.parent.schemeless().hashless()
+        fs_result = JsonableFilesystem.from_url(url=fs_url)
+        if isinstance(fs_result, Exception):
+            return fs_result
+        fs = fs_result
+        path = PurePosixPath(url.path.name)
+
+        precomp_info_result = PrecomputedChunksInfo.tryLoad(filesystem=fs, path=path / "info")
+        if isinstance(precomp_info_result, Exception):
+            return precomp_info_result
+        info = precomp_info_result
+
+        resolution_str = url.get_hash_params().get("resolution")
+        if resolution_str is None:
+            return [
+                PrecomputedChunksDataSource(filesystem=fs_result, path=path, resolution=scale.resolution)
+                for scale in info.scales
+            ]
+        try:
+            resolution_tripplet = ensureJsonIntTripplet(tuple(int(axis) for axis in resolution_str.split("_")))
+        except Exception:
+            return Exception(f"Bad resolution fragment parameter: {resolution_str}")
+        resolution_options = [scale.resolution for scale in info.scales]
+        if resolution_tripplet not in resolution_options:
+            return Exception(f"Bad 'resolution' tripplet in url: {url}. Options are {resolution_options}")
+        return [PrecomputedChunksDataSource(filesystem=fs, path=path, resolution=resolution_tripplet)]
 
     def to_json_value(self) -> JsonObject:
         return super().to_json_value()

@@ -1,7 +1,7 @@
 #pyright: strict
 
 from pathlib import PurePosixPath
-from typing import Optional, Tuple, Any
+from typing import Optional, Sequence, Tuple, Any
 
 import skimage.io #type: ignore
 import numpy as np
@@ -11,6 +11,7 @@ from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonI
 
 from webilastik.datasource import FsDataSource
 from webilastik.filesystem import JsonableFilesystem
+from webilastik.utility.url import Url
 
 class SkimageDataSource(FsDataSource):
     """A naive implementation of DataSource that can read images using skimage"""
@@ -51,6 +52,24 @@ class SkimageDataSource(FsDataSource):
 
     def to_json_value(self) -> JsonObject:
         return super().to_json_value()
+
+    @classmethod
+    def supports_url(cls, url: Url) -> bool:
+        return url.datascheme == None and url.path.suffix in (".png", ".jpg", ".jpeg", ".bmp", ".gif")
+
+    @classmethod
+    def from_url(cls, url: Url) -> "Sequence[SkimageDataSource] | Exception":
+        if not cls.supports_url(url):
+            return Exception(f"Unsupported url: {url}")
+        fs_url = url.parent.schemeless().hashless()
+        fs_result = JsonableFilesystem.from_url(url=fs_url)
+        if isinstance(fs_result, Exception):
+            return fs_result
+        path = PurePosixPath(url.path.name)
+        try:
+            return [SkimageDataSource(path=path, filesystem=fs_result)]
+        except Exception as e:
+            return e
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "SkimageDataSource":
