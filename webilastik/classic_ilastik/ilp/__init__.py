@@ -557,6 +557,8 @@ class IlpFeatureSelectionsGroup:
 
     @classmethod
     def parse(cls, group: h5py.Group) -> "IlpFeatureSelectionsGroup":
+        if len(group.keys()) == 0:
+            return IlpFeatureSelectionsGroup(feature_extractors=[])
         FeatureIds = ensure_encoded_string_list(group, "FeatureIds")
         Scales = ensure_list(group, key="Scales", expected_dtype=np.dtype("float64"))
         SelectionMatrix = ensure_ndarray(
