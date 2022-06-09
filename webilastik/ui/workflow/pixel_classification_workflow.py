@@ -1,8 +1,10 @@
 # pyright: strict
 
 from concurrent.futures import Executor
+import os
 from pathlib import Path, PurePosixPath
 from typing import Callable, Mapping, Sequence, Set
+import tempfile
 
 import h5py
 import numpy as np
@@ -100,12 +102,14 @@ class PixelClassificationWorkflow:
         on_async_change: Callable[[], None],
         executor: Executor,
         priority_executor: PriorityExecutor,
+        allowed_protocols: "Sequence[Protocol] | None" = None,
     ) -> "PixelClassificationWorkflow | Exception":
+        allowed_protocols = allowed_protocols or (Protocol.HTTP, Protocol.HTTPS)
         with h5py.File(ilp_path, "r") as f:
             parsing_result = IlpPixelClassificationWorkflowGroup.parse(
                 group=f,
                 ilp_fs=OsFs("/"),
-                allowed_protocols=[Protocol.FILE],
+                allowed_protocols=allowed_protocols,
             )
             if isinstance(parsing_result, Exception):
                 return parsing_result
@@ -120,6 +124,32 @@ class PixelClassificationWorkflow:
                 labels=parsing_result.PixelClassification.labels,
                 pixel_classifier=parsing_result.PixelClassification.classifier,
             )
+
+    @classmethod
+    def from_ilp_bytes(
+        cls,
+        *,
+        ilp_bytes: bytes,
+        ebrains_user_token: UserToken,
+        on_async_change: Callable[[], None],
+        executor: Executor,
+        priority_executor: PriorityExecutor,
+        allowed_protocols: "Sequence[Protocol] | None" = None,
+    ) -> "PixelClassificationWorkflow | Exception":
+        tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5") # FIXME
+        num_bytes_written = os.write(tmp_file_handle, ilp_bytes)
+        assert num_bytes_written == len(ilp_bytes)
+        os.close(tmp_file_handle)
+        workflow =  PixelClassificationWorkflow.from_ilp(
+            ilp_path=Path(tmp_file_path),
+            ebrains_user_token=ebrains_user_token,
+            on_async_change=on_async_change,
+            executor=executor,
+            priority_executor=priority_executor,
+            allowed_protocols=allowed_protocols,
+        )
+        os.remove(tmp_file_path)
+        return workflow
 
     def to_ilp_workflow_group(self) -> IlpPixelClassificationWorkflowGroup:
         return IlpPixelClassificationWorkflowGroup.create(
