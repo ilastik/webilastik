@@ -79,7 +79,7 @@ class BucketSubdir:
 
 
 class BucketFs(JsonableFilesystem):
-    API_URL = Url(protocol=Protocol.HTTPS, hostname="data-proxy.ebrains.eu", path=PurePosixPath("/api/buckets"))
+    API_URL = Url(protocol=Protocol.HTTPS, hostname="data-proxy.ebrains.eu", path=PurePosixPath("/api/v1/buckets"))
 
     def __init__(self, bucket_name: str, prefix: PurePosixPath, ebrains_user_token: UserToken):
         self.bucket_name = bucket_name
@@ -142,7 +142,7 @@ class BucketFs(JsonableFilesystem):
         return items
 
     def _get_tmp_url(self, path: str) -> Url:
-        object_url = self.url.concatpath(path)
+        object_url = self.url.concatpath(path).updated_with(search={**self.url.search, "redirect": "false"})
         response = self.session.get(object_url.raw)
         response.raise_for_status()
 

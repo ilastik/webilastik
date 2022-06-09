@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 from pathlib import Path, PurePosixPath
 import time
@@ -22,7 +23,9 @@ from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.features.channelwise_fastfilters import GaussianSmoothing, HessianOfGaussianEigenvalues
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.filesystem import JsonableFilesystem
+from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.filesystem.osfs import OsFs
+from webilastik.libebrains.user_token import UserToken
 from webilastik.ui.applet.brushing_applet import Label
 from webilastik.ui.applet.pixel_classifier_applet import Classifier
 
@@ -38,6 +41,15 @@ def get_test_output_osfs() -> OsFs:
     test_dir_path = f"/tmp/webilastik-test-{time.monotonic()}/"
     os.makedirs(test_dir_path, exist_ok=True)
     return OsFs(test_dir_path)
+
+def get_test_output_bucket_fs() -> BucketFs:
+    now = datetime.now()
+    now_str = f"{now.year:02}y{now.month:02}m{now.day:02}d__{now.hour:02}h{now.minute:02}m{now.second:02}s"
+    return BucketFs(
+        bucket_name="hbp-image-service",
+        prefix=PurePosixPath(f"/test-{now_str}"),
+        ebrains_user_token=UserToken.get_global_token_or_raise(),
+    )
 
 def create_precomputed_chunks_sink(*, shape: Shape5D, dtype: "np.dtype[Any]", chunk_size: Shape5D, fs: "JsonableFilesystem | None" = None) -> FsDataSink:
     return PrecomputedChunksScaleSink(

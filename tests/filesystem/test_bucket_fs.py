@@ -1,25 +1,25 @@
-# pyright:
-
 from functools import partial
 from pathlib import PurePosixPath
 from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
-from webilastik.datasink import DataSink, DataSinkWriter
+
+from tests import get_sample_c_cells_datasource, get_test_output_bucket_fs
+from webilastik.datasink import DataSinkWriter
 from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksScaleSink
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
-from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale, RawEncoder
-
-from webilastik.filesystem.bucket_fs import BucketFs
+from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale, RawEncoder
 from webilastik.datasource import DataRoi
-from webilastik.datasource.skimage_datasource import SkimageDataSource
 
 
 def _write_data(tile: DataRoi, sink_writer: DataSinkWriter):
     print(f"Writing {tile}")
     sink_writer.write(tile.retrieve())
 
-def test_bucket_read_write(raw_data_source: SkimageDataSource, bucket_fs: BucketFs):
+def test_bucket_read_write():
+    raw_data_source = get_sample_c_cells_datasource()
+    bucket_fs = get_test_output_bucket_fs()
+
     precomp_path = PurePosixPath("c_cells_1.precomputed")
     sink = PrecomputedChunksScaleSink(
         info_dir=precomp_path,
@@ -58,3 +58,6 @@ def test_bucket_read_write(raw_data_source: SkimageDataSource, bucket_fs: Bucket
 
     retrieved_data = data_proxy_source.retrieve()
     assert np.all(retrieved_data.raw("yxc") == raw_data_source.retrieve().raw("yxc"))
+
+if __name__ == "__main__":
+    test_bucket_read_write()
