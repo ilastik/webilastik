@@ -23,7 +23,7 @@ tasks:
     env:
       PYTHONPATH: "{{.PROJECT_ROOT}}"
     cmds:
-      - pylint -j 0 --disable=all --enable=trailing-comma-tuple webilastik caching tests
+      - pylint -j 0 --disable=all --enable=trailing-comma-tuple,expression-not-assigned webilastik caching tests
       - npx pyright
   create-build-dir:
     cmds:
