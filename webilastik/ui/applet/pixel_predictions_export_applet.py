@@ -27,7 +27,7 @@ class ExportTask(Generic[IN]):
         super().__init__()
 
     def __call__(self, step_arg: IN):
-        tile = self.operator.compute(step_arg)
+        tile = self.operator(step_arg)
         print(f"Writing tile {tile}")
         self.sink_writer.write(tile)
 
@@ -38,7 +38,7 @@ class ExportAsSimpleSegmentationTask:
         self.sink_writers = sink_writers
 
     def __call__(self, step_arg: DataRoi):
-        segmentations = self.operator.compute(step_arg)
+        segmentations = self.operator(step_arg)
         for segmentation, sink in zip(segmentations, self.sink_writers):
             sink.write(segmentation)
 

@@ -94,7 +94,7 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
             return web.json_response({"error": "This classifier is stale"}, status=410)
 
         predictions = await asyncio.wrap_future(self.executor.submit(
-            classifier.compute,
+            classifier,
             DataRoi(datasource, x=(xBegin, xEnd), y=(yBegin, yEnd), z=(zBegin, zEnd))
         ))
 

@@ -142,7 +142,7 @@ class PixelClassifier(Operator[DataRoi, Predictions], Generic[FE]):
             datasource.roi.c == self.num_input_channels
         )
 
-    def compute(self, roi: DataRoi) -> Predictions:
+    def __call__(self, /, roi: DataRoi) -> Predictions:
         self.feature_extractor.ensure_applicable(roi.datasource)
         if roi.shape.c != self.num_input_channels:
             raise ValueError(f"Bad roi: {roi}. Expected roi to have shape.c={self.num_input_channels}")
@@ -230,7 +230,7 @@ class VigraPixelClassifier(PixelClassifier[FE]):
 
 
     def _do_predict(self, roi: DataRoi) -> Predictions:
-        feature_data = self.feature_extractor.compute(roi)
+        feature_data = self.feature_extractor(roi)
 
         predictions = Array5D.allocate(
             interval=self.get_expected_roi(roi),

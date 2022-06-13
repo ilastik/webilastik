@@ -184,7 +184,7 @@ class Annotation(ScalarData):
 
         def make_samples(data_tile: DataRoi) -> FeatureSamples:
             annotation_tile = self.clamped(data_tile)
-            feature_tile = feature_extractor.compute(data_tile).cut(annotation_tile.interval, c=All())
+            feature_tile = feature_extractor(data_tile).cut(annotation_tile.interval, c=All())
             return FeatureSamples.create(annotation_tile, feature_tile)
 
         tile_shape = self.raw_data.tile_shape.updated(c=self.raw_data.shape.c)

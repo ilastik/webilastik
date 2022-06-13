@@ -23,7 +23,7 @@ class Thresholder(Operator[DataRoi, Array5D]):
             return False
         return (self.preprocessor, self.threshold) == (other.preprocessor, other.threshold)
 
-    def compute(self, roi: DataRoi) -> ScalarData:
+    def __call__(self, /, roi: DataRoi) -> ScalarData:
         raw_data = roi.retrieve().raw(Point5D.LABELS)
         out = ScalarData.allocate(interval=roi, dtype=np.dtype("bool"))
 

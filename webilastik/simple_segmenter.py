@@ -16,8 +16,8 @@ class SimpleSegmenter(Operator[DataRoi, List[Array5D]]):
         super().__init__()
         self.preprocessor = preprocessor
 
-    def compute(self, roi: DataRoi) -> List[Array5D]:
-        data = self.preprocessor.compute(roi)
+    def __call__(self, /,  roi: DataRoi) -> List[Array5D]:
+        data = self.preprocessor(roi)
         winning_channel_indices = Array5D(
             arr=np.argmax(data.raw(data.axiskeys), axis=data.axiskeys.index("c")),
             axiskeys=data.axiskeys.replace("c", ""),

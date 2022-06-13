@@ -84,7 +84,7 @@ class ChannelwiseFastFilter(IlpFilter):
         return datasource.shape >= self.halo * 2
 
     @global_cache
-    def compute(self, roi: DataRoi) -> FeatureData:
+    def __call__(self, /, roi: DataRoi) -> FeatureData:
         roi_step: Shape5D = roi.shape.updated(c=1, t=1)  # compute features independently for each c and each t
         if self.axis_2d:
             roi_step = roi_step.updated(**{self.axis_2d: 1})  # also compute in 2D slices
@@ -97,9 +97,9 @@ class ChannelwiseFastFilter(IlpFilter):
                 gaussian_filter = GaussianSmoothing(
                     preprocessor=self.preprocessor, sigma=self.presmooth_sigma, axis_2d=self.axis_2d, window_size=3.5
                 )
-                source_data = gaussian_filter.compute(haloed_roi)
+                source_data = gaussian_filter(haloed_roi)
             else:
-                source_data = self.preprocessor.compute(haloed_roi)
+                source_data = self.preprocessor(haloed_roi)
 
             source_axes = "zyx"
             if self.axis_2d:

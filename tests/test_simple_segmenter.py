@@ -58,6 +58,6 @@ def test_simple_segmenter():
         ]), axiskeys="cyx")
     ]
 
-    segmentations = segmenter.compute(input_data.roi)
+    segmentations = segmenter(input_data.roi)
     for seg, expected_seg in zip(segmentations, expected_segmentation):
         assert np.all(seg.raw("cyx") == expected_seg.raw("cyx"))

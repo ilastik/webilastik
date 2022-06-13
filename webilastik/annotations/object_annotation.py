@@ -28,11 +28,11 @@ class ObjectAnnotation:
         self.datasource = datasource
         self.components_extractor = components_extractor
         # compute connected components in constructor to prevent creation of bad annotation
-        self.label = components_extractor.compute(self.data_tile).label_at(position)
+        self.label = components_extractor(self.data_tile).label_at(position)
         super().__init__()
 
     def get_feature_samples(self, feature_extractor: ObjectFeatureExtractor) -> "np.ndarray[Any, Any]": #1-d array with shape (num_feature_channels,)
-        return feature_extractor.compute((self.data_tile, self.components_extractor)).linear_raw()[self.label]
+        return feature_extractor((self.data_tile, self.components_extractor)).linear_raw()[self.label]
 
     @staticmethod
     def gather_samples(

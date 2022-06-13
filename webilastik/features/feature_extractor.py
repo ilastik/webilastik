@@ -1,4 +1,4 @@
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from typing import Any, List, Iterable
 
 import numpy as np
@@ -19,8 +19,12 @@ class FeatureDataMismatchException(Exception):
         super().__init__(f"Feature {feature_extractor} can't be cleanly applied to {data_source}")
 
 
-class FeatureExtractor(Operator[DataRoi, FeatureData]):
+class FeatureExtractor(ABC, Operator[DataRoi, FeatureData]):
     """A specification of how feature data is to be (reproducibly) computed"""
+
+    @abstractmethod
+    def __call__(self, /, roi: DataRoi) -> FeatureData:
+        pass
 
     @abstractmethod
     def is_applicable_to(self, datasource: DataSource) -> bool:
@@ -46,11 +50,11 @@ class FeatureExtractorCollection(FeatureExtractor):
     def is_applicable_to(self, datasource: DataSource) -> bool:
         return all(fx.is_applicable_to(datasource) for fx in self.extractors)
 
-    def compute(self, roi: DataRoi) -> FeatureData:
+    def __call__(self, /, roi: DataRoi) -> FeatureData:
         features: List[FeatureData] = []
         channel_offset: int = 0
         for fx in self.extractors:
-            result = fx.compute(roi).translated(Point5D.zero(c=channel_offset))
+            result = fx(roi).translated(Point5D.zero(c=channel_offset))
             features.append(result)
             channel_offset += result.shape.c
         out = Array5D.combine(features)

@@ -109,13 +109,13 @@ class ConnectedComponentsExtractor(Operator[DataRoi, ConnectedComponents]):
             (other.preprocessor, other.object_channel_idx, other.expansion_step, other.maximum_tile_size)
 
     #@lru_cache()
-    def compute(self, roi: DataRoi) -> ConnectedComponents:
+    def __call__(self, /, roi: DataRoi) -> ConnectedComponents:
         roi = roi.updated(c=self.object_channel_idx)
         expansion_step: Shape5D = (self.expansion_step or roi.tile_shape).updated(c=0)
 
         current_roi = roi
         while True:
-            thresholded_data: ScalarData = ScalarData.fromArray5D(self.preprocessor.compute(current_roi))
+            thresholded_data: ScalarData = ScalarData.fromArray5D(self.preprocessor(current_roi))
             connected_comps = ConnectedComponents.label(thresholded_data)
             if connected_comps.fully_contains_objects_in(roi):
                 break
