@@ -29,7 +29,8 @@ class H5DataSource(FsDataSource):
         self.inner_path = inner_path
         self.filesystem = filesystem
         binfile = filesystem.openbin(outer_path.as_posix())
-        f = h5py.File(binfile, "r")
+        # FIXME: h5py might not like this if the filesystem isn't OSFS
+        f = h5py.File(binfile, "r") #type: ignore
         try:
             dataset = f[inner_path.as_posix()]
             if not isinstance(dataset, h5py.Dataset):
