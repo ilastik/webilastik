@@ -27,6 +27,7 @@ export class BrushingWidget{
     public readonly gl: WebGL2RenderingContext
     public readonly canvas: HTMLCanvasElement
     private brushingApplet: BrushingApplet
+    private predictingWidget: PredictingWidget
 
     constructor({
         applet_name,
@@ -55,7 +56,7 @@ export class BrushingWidget{
         this.resolutionSelectionContainer = createElement({tagName: "p", parentElement: this.element})
 
         this.trainingWidget = createElement({tagName: "div", parentElement: this.element})
-            new PredictingWidget({session, viewer: this.viewer, parentElement: this.trainingWidget})
+            this.predictingWidget = new PredictingWidget({session, viewer: this.viewer, parentElement: this.trainingWidget})
 
             this.brushingEnabledCheckbox = createInputParagraph({
                 parentElement: this.trainingWidget,
@@ -196,6 +197,7 @@ export class BrushingWidget{
         removeElement(this.gl.canvas)
         removeElement(this.element)
 
+        this.predictingWidget.destroy()
         this.brushingApplet.destroy()
         removeElement(this.element)
         //FIXME: remove event from viewer

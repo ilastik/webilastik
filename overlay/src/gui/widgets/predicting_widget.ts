@@ -2,7 +2,7 @@ import { vec3 } from "gl-matrix";
 import { Applet } from "../../client/applets/applet";
 import { DataSource, Session } from "../../client/ilastik";
 import { HashMap } from "../../util/hashmap";
-import { createElement, createImage, createInputParagraph } from "../../util/misc";
+import { createElement, createImage, createInputParagraph, removeElement } from "../../util/misc";
 import { ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonObject, ensureJsonString, JsonValue } from "../../util/serialization";
 import { PredictionsView, TrainingView } from "../../viewer/view";
 import { Viewer } from "../../viewer/viewer";
@@ -104,6 +104,7 @@ export class PredictingWidget extends Applet<State>{
 
     private async onNewState(new_state: State){
         this.showInfo(new_state.description)
+        this.liveUpdateCheckbox.checked = new_state.live_update
         if(new_state.description != "ready"){
             return
         }
@@ -139,5 +140,10 @@ export class PredictingWidget extends Applet<State>{
             view,
             channel_colors: new_state.channel_colors.map(color => vec3.fromValues(color.r, color.g, color.b))
         }))
+    }
+
+    public destroy(){
+        this.closePredictionViews()
+        removeElement(this.element)
     }
 }
