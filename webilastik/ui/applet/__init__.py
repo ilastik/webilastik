@@ -45,7 +45,7 @@ class PropagationError(PropagationResult):
         return
 
 
-_propagation_lock = threading.RLock()
+_propagation_lock = threading.Lock()
 
 class Applet(ABC):
     def __init__(self, name: str) -> None:
@@ -73,28 +73,6 @@ class Applet(ABC):
     @abstractmethod
     def on_dependencies_changed(self, user_prompt: UserPrompt) -> PropagationResult:
         raise NotImplementedError
-
-    @final
-    def propagate_downstream(self, user_prompt: UserPrompt) -> PropagationResult:
-        applet_snapshots : Dict["Applet", Any] = {}
-
-        def restore_snapshots():
-            for applet, snap in applet_snapshots.items():
-                applet.restore_snaphot(snap)
-
-        try:
-            with _propagation_lock:
-                propagation_result = PropagationOk()
-                for applet in self.get_downstream_applets():
-                    applet_snapshots[applet] = applet.take_snapshot()
-                    propagation_result = applet.on_dependencies_changed(user_prompt=user_prompt)
-                    if not propagation_result.is_ok():
-                        restore_snapshots()
-                        return propagation_result
-                return propagation_result
-        except:
-            restore_snapshots()
-            raise
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} name={self.name}>"
@@ -133,23 +111,35 @@ class UserInteraction(Generic[P]):
         super().__init__()
 
     def __call__(self, user_prompt: UserPrompt, *args: P.args, **kwargs: P.kwargs) -> PropagationResult:
-        applet_snapshot = self.applet.take_snapshot()
+        applet_snapshots : Dict["Applet", Any] = {}
+
+        def restore_snapshots():
+            for applet, snap in applet_snapshots.items():
+                applet.restore_snaphot(snap)
+
         try:
             with _propagation_lock:
+                applet_snapshots[self.applet] = self.applet.take_snapshot()
                 action_result = self._applet_method(self.applet, user_prompt, *args, **kwargs)
                 if not action_result.is_ok():
-                    self.applet.restore_snaphot(applet_snapshot)
+                    restore_snapshots()
                     return action_result
-                if self.refresh_self:
-                    on_change_result = self.applet.on_dependencies_changed(user_prompt)
-                    if not on_change_result.is_ok():
-                        self.applet.restore_snaphot(applet_snapshot)
-                        return on_change_result
-                propagation_result = self.applet.propagate_downstream(user_prompt)
-                return action_result if propagation_result.is_ok() else propagation_result
-        except:
-            self.applet.restore_snaphot(applet_snapshot)
-            raise
+
+                applets_to_refresh: List[Applet] = [self.applet] if self.refresh_self else []
+                applets_to_refresh += self.applet.get_downstream_applets()
+
+                for applet in applets_to_refresh:
+                    if applet not in applet_snapshots:
+                        applet_snapshots[applet] = applet.take_snapshot()
+                    propagation_result = applet.on_dependencies_changed(user_prompt=user_prompt)
+                    if not propagation_result.is_ok():
+                        restore_snapshots()
+                        return propagation_result
+
+                return action_result
+        except Exception as e:
+            restore_snapshots()
+            return PropagationError(str(e))
 
 class _UserInteractionDescriptor(Generic[APPLET, P]):
     def __init__(self, refresh_self: bool, applet_method: Callable[Concatenate[APPLET, UserPrompt, P], PropagationResult]):
