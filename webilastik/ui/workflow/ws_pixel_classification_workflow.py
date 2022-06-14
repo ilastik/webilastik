@@ -144,11 +144,11 @@ class WebIlastik:
             web.get('/ws', self.open_websocket),
             web.get(
                 "/predictions/raw_data={encoded_raw_data}/generation={generation}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}",
-                self.workflow.pixel_classifier_applet.precomputed_chunks_compute
+                lambda request: self.workflow.pixel_classifier_applet.precomputed_chunks_compute(request)
             ),
             web.get(
                 "/predictions/raw_data={encoded_raw_data}/generation={generation}/info",
-                self.workflow.pixel_classifier_applet.predictions_precomputed_chunks_info
+                lambda request: self.workflow.pixel_classifier_applet.predictions_precomputed_chunks_info(request)
             ),
             web.post("/download_project_as_ilp", self.download_project_as_ilp),
             web.delete("/close", self.close_session),
