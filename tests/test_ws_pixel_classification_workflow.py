@@ -1,14 +1,11 @@
 # pyright: reportUnusedCallResult=false
 
 import os
-from sys import prefix
 from tests import create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations, get_sample_feature_extractors
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
-from webilastik.features.channelwise_fastfilters import GaussianSmoothing, HessianOfGaussianEigenvalues
 from webilastik.filesystem.bucket_fs import BucketFs
 
 from webilastik.ui.workflow.ws_pixel_classification_workflow import RPCPayload
-from webilastik.utility import get_now_string
 # ensure requests will use the mkcert cert. Requests uses certifi by default, i think
 os.environ["REQUESTS_CA_BUNDLE"] = "/etc/ssl/certs/ca-certificates.crt"
 # ensure aiohttp will use the mkcert certts. I don't really know where it otherwise gets its certs from
@@ -22,12 +19,7 @@ from typing import Dict, Any
 
 import numpy as np
 from aiohttp.client_ws import ClientWebSocketResponse
-from ndstructs.point5D import Shape5D, Point5D
-from ndstructs.array5D import Array5D
 
-from webilastik.annotations import Annotation, Color
-from webilastik.filesystem.http_fs import HttpFs
-from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.utility.url import Url
 from webilastik.libebrains.user_token import UserToken
 from webilastik.server.session_allocator import EbrainsSession
@@ -91,7 +83,7 @@ async def main():
                     applet_name="feature_selection_applet",
                     method_name="add_feature_extractors",
                     arguments={
-                        "feature_extractors": tuple(fe.to_json_data() for fe in get_sample_feature_extractors())
+                        "feature_extractors": tuple(fe.to_json_value() for fe in get_sample_feature_extractors())
                     }
                 ).to_json_value()
             )

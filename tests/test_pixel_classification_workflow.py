@@ -1,32 +1,26 @@
-from pathlib import Path
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 import json
-from typing import List, Set
-import h5py
-import shutil
+from typing import List
 
 import numpy as np
-from ndstructs.point5D import Point5D
 from ndstructs.utils.json_serializable import JsonObject, ensureJsonArray, ensureJsonInt, ensureJsonObject
 
-from tests import create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations, get_sample_feature_extractors, get_test_output_osfs
-from webilastik.annotations.annotation import Color
-from webilastik.classic_ilastik.ilp import IlpFeatureSelectionsGroup, ensure_group
-from webilastik.classic_ilastik.ilp.pixel_classification_ilp import IlpPixelClassificationGroup, IlpPixelClassificationWorkflowGroup
+from tests import create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations, get_test_output_osfs
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
-from webilastik.features.channelwise_fastfilters import DifferenceOfGaussians, GaussianGradientMagnitude, GaussianSmoothing, HessianOfGaussianEigenvalues, LaplacianOfGaussian, StructureTensorEigenvalues
+from webilastik.features.ilp_filter import (
+    IlpDifferenceOfGaussians, IlpGaussianGradientMagnitude, IlpGaussianSmoothing,
+    IlpHessianOfGaussianEigenvalues, IlpLaplacianOfGaussian, IlpStructureTensorEigenvalues,
+)
 from webilastik.features.ilp_filter import IlpFilter
-from webilastik.filesystem.osfs import OsFs
 from webilastik.libebrains.user_token import UserToken
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet import dummy_prompt
 from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
-from webilastik.utility.url import Protocol
 
 
 def wait_until_jobs_completed(workflow: PixelClassificationWorkflow, timeout: float = 10):
-    wait_time = 0.2
+    wait_time = 0.5
     while timeout > 0:
         export_status: JsonObject = workflow.export_applet._get_json_state()
         jobs = ensureJsonArray(export_status["jobs"])
@@ -44,8 +38,8 @@ def wait_until_jobs_completed(workflow: PixelClassificationWorkflow, timeout: fl
 
 
 def test_pixel_classification_workflow():
-    executor = ThreadPoolExecutor()
-    priority_executor = PriorityExecutor(executor=executor, num_concurrent_tasks=3)
+    executor = ProcessPoolExecutor()
+    priority_executor = PriorityExecutor(executor=executor, num_concurrent_tasks=8)
 
     workflow = PixelClassificationWorkflow(
         ebrains_user_token=UserToken.get_global_token_or_raise(),
@@ -61,12 +55,12 @@ def test_pixel_classification_workflow():
 
     all_feature_extractors: List[IlpFilter] = []
     for scale in [0.3, 0.7, 1.0, 1.6, 3.5, 5.0, 10.0][0:3]:
-        all_feature_extractors.append(GaussianSmoothing(sigma=scale, axis_2d="z"))
-        all_feature_extractors.append(LaplacianOfGaussian(scale=scale, axis_2d="z"))
-        all_feature_extractors.append(GaussianGradientMagnitude(sigma=scale, axis_2d="z"))
-        all_feature_extractors.append(DifferenceOfGaussians(sigma0=scale, sigma1=scale * 0.66, axis_2d="z"))
-        all_feature_extractors.append(StructureTensorEigenvalues(innerScale=scale, outerScale=0.5 * scale, axis_2d="z"))
-        all_feature_extractors.append(HessianOfGaussianEigenvalues(scale=scale, axis_2d="z"))
+        all_feature_extractors.append(IlpGaussianSmoothing(ilp_scale=scale, axis_2d="z"))
+        all_feature_extractors.append(IlpLaplacianOfGaussian(ilp_scale=scale, axis_2d="z"))
+        all_feature_extractors.append(IlpGaussianGradientMagnitude(ilp_scale=scale, axis_2d="z"))
+        all_feature_extractors.append(IlpDifferenceOfGaussians(ilp_scale=scale, axis_2d="z"))
+        all_feature_extractors.append(IlpStructureTensorEigenvalues(ilp_scale=scale, axis_2d="z"))
+        all_feature_extractors.append(IlpHessianOfGaussianEigenvalues(ilp_scale=scale, axis_2d="z"))
 
 
 

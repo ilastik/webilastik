@@ -29,7 +29,7 @@ class FeatureSelectionApplet(Applet):
 
     @applet_output
     def feature_extractors(self) -> Sequence[IlpFilter]:
-        return sorted(self._feature_extractors, key=lambda fe: json.dumps(fe.to_json_data())) #FIXME
+        return sorted(self._feature_extractors, key=lambda fe: json.dumps(fe.to_json_value())) #FIXME
 
     def _set_feature_extractors(self, user_prompt: UserPrompt, feature_extractors: Iterable[IlpFilter]) -> PropagationResult:
         candidate_extractors = set(feature_extractors)
@@ -70,29 +70,12 @@ class FeatureSelectionApplet(Applet):
         return self._set_feature_extractors(user_prompt=user_prompt, feature_extractors=self._feature_extractors)
 
 class WsFeatureSelectionApplet(WsApplet, FeatureSelectionApplet):
-    def _item_from_json_data(self, data: JsonValue) -> IlpFilter:
-        data_dict = ensureJsonObject(data)
-        class_name = ensureJsonString(data_dict.get("__class__"))
-        if class_name == StructureTensorEigenvalues.__name__:
-            return StructureTensorEigenvalues.from_json_data(data)
-        if class_name == GaussianGradientMagnitude.__name__:
-            return GaussianGradientMagnitude.from_json_data(data)
-        if class_name == GaussianSmoothing.__name__:
-            return GaussianSmoothing.from_json_data(data)
-        if class_name == DifferenceOfGaussians.__name__:
-            return DifferenceOfGaussians.from_json_data(data)
-        if class_name == HessianOfGaussianEigenvalues.__name__:
-            return HessianOfGaussianEigenvalues.from_json_data(data)
-        if class_name == LaplacianOfGaussian.__name__:
-            return LaplacianOfGaussian.from_json_data(data)
-        raise ValueError(f"Could not convert {data} into a Feature Extractor")
-
     def _get_json_state(self) -> JsonValue:
-        return {"feature_extractors": tuple(extractor.to_json_data() for extractor in self.feature_extractors())}
+        return {"feature_extractors": tuple(extractor.to_json_value() for extractor in self.feature_extractors())}
 
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
         raw_feature_array = ensureJsonArray(arguments.get("feature_extractors"))
-        feature_extractors = [self._item_from_json_data(raw_feature) for raw_feature in raw_feature_array]
+        feature_extractors = [IlpFilter.from_json_value(raw_feature) for raw_feature in raw_feature_array]
 
         if method_name == "add_feature_extractors":
             return UsageError.check(self.add_feature_extractors(user_prompt=user_prompt, feature_extractors=feature_extractors))

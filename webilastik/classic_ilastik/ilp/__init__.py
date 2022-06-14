@@ -18,7 +18,10 @@ import vigra
 import h5py
 from webilastik.annotations.annotation import Color
 from webilastik.datasource import FsDataSource
-from webilastik.features.channelwise_fastfilters import DifferenceOfGaussians, GaussianGradientMagnitude, GaussianSmoothing, HessianOfGaussianEigenvalues, LaplacianOfGaussian, StructureTensorEigenvalues
+from webilastik.features.ilp_filter import (
+    IlpDifferenceOfGaussians, IlpGaussianGradientMagnitude, IlpGaussianSmoothing, IlpHessianOfGaussianEigenvalues,
+    IlpLaplacianOfGaussian, IlpStructureTensorEigenvalues
+)
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.filesystem import JsonableFilesystem
 from webilastik.ui.datasource import try_get_datasources_from_url
@@ -515,12 +518,12 @@ class IlpInputDataGroup:
 
 class IlpFeatureSelectionsGroup:
     named_feature_classes: ClassVar[Mapping[str, Type[IlpFilter]]] = {
-        "GaussianSmoothing": GaussianSmoothing,
-        "LaplacianOfGaussian": LaplacianOfGaussian,
-        "GaussianGradientMagnitude": GaussianGradientMagnitude,
-        "DifferenceOfGaussians": DifferenceOfGaussians,
-        "StructureTensorEigenvalues": StructureTensorEigenvalues,
-        "HessianOfGaussianEigenvalues": HessianOfGaussianEigenvalues,
+        "GaussianSmoothing": IlpGaussianSmoothing,
+        "LaplacianOfGaussian": IlpLaplacianOfGaussian,
+        "GaussianGradientMagnitude": IlpGaussianGradientMagnitude,
+        "DifferenceOfGaussians": IlpDifferenceOfGaussians,
+        "StructureTensorEigenvalues": IlpStructureTensorEigenvalues,
+        "HessianOfGaussianEigenvalues": IlpHessianOfGaussianEigenvalues,
     }
     feature_names: ClassVar[Sequence[str]] = list(named_feature_classes.keys())
     feature_classes: ClassVar[Sequence[Type[IlpFilter]]] = list(named_feature_classes.values())
@@ -578,8 +581,8 @@ class IlpFeatureSelectionsGroup:
                 feature_class = cls.named_feature_classes.get(feature_name)
                 if feature_class is None:
                     raise IlpParsingError(f"Bad entry in {group.name}/FeatureIds: {feature_name}")
-                feature_extractors.append(feature_class.from_ilp_scale(
-                    scale=float(scale),
+                feature_extractors.append(feature_class(
+                    ilp_scale=float(scale),
                     axis_2d="z" if ComputeIn2d[feature_name_index] else None, #FIXME: always z?
                 ))
         return IlpFeatureSelectionsGroup(feature_extractors=feature_extractors)

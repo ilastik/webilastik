@@ -182,132 +182,53 @@ export class Session{
     }
 }
 
-export abstract class FeatureExtractor implements IJsonable{
-    public static fromJsonValue(data: any): FeatureExtractor{
-        let feature_class_name = data["__class__"]
-        if(feature_class_name == "GaussianSmoothing"){
-            return new GaussianSmoothing(data)
-        }
-        if(feature_class_name == "GaussianGradientMagnitude"){
-            return new GaussianGradientMagnitude(data)
-        }
-        if(feature_class_name == "HessianOfGaussianEigenvalues"){
-            return new HessianOfGaussianEigenvalues(data)
-        }
-        if(feature_class_name == "LaplacianOfGaussian"){
-            return new LaplacianOfGaussian(data)
-        }
-        if(feature_class_name == "DifferenceOfGaussians"){
-            return new DifferenceOfGaussians(data)
-        }
-        if(feature_class_name == "StructureTensorEigenvalues"){
-            return new StructureTensorEigenvalues(data)
-        }
-        throw Error(`Bad feature extractor class name in ${JSON.stringify(data)}`)
+const FeatureClassNames = [
+    "IlpGaussianSmoothing", "IlpGaussianGradientMagnitude", "IlpHessianOfGaussianEigenvalues", "IlpLaplacianOfGaussian", "IlpDifferenceOfGaussians", "IlpStructureTensorEigenvalues"
+] as const;
+export type FeatureClassName = (typeof FeatureClassNames)[number]
+
+export function ensureFeatureClassName(value: string): FeatureClassName{
+    const variant = FeatureClassNames.find(variant => variant === value)
+    if(variant === undefined){
+        throw Error(`Invalid feature class name: ${value}`)
+    }
+    return variant
+}
+
+export class IlpFeatureExtractor implements IJsonable{
+    public readonly ilp_scale: number
+    public readonly axis_2d: string
+    public readonly __class__: FeatureClassName
+
+    constructor(params: {ilp_scale: number, axis_2d: string, __class__: FeatureClassName}){
+        this.ilp_scale = params.ilp_scale
+        this.axis_2d = params.axis_2d
+        this.__class__ = params.__class__
     }
 
-    public static fromJsonArray(data: JsonValue): FeatureExtractor[]{
-        const array = ensureJsonArray(data)
-        return array.map((v: JsonValue) => FeatureExtractor.fromJsonValue(v))
-    }
-
-    public equals(other: FeatureExtractor) : boolean{
-        if(this.constructor !== other.constructor){
-            return false
-        }
-        //FIXME: maybe impelment a faster comparison here?
-        return JSON.stringify(this.toJsonValue()) == JSON.stringify(other.toJsonValue())
+    public static fromJsonValue(value: JsonValue): IlpFeatureExtractor{
+        let value_obj = ensureJsonObject(value)
+        let feature_class_name = ensureFeatureClassName(ensureJsonString(value_obj["__class__"]))
+        let ilp_scale = ensureJsonNumber(value_obj["ilp_scale"])
+        let axis_2d = ensureJsonString(value_obj["axis_2d"])
+        return new IlpFeatureExtractor({ilp_scale, axis_2d, __class__: feature_class_name})
     }
 
     public toJsonValue(): JsonValue{
-        let out = JSON.parse(JSON.stringify(this))
-        //FIXME: Class name
-        out["__class__"] = this.constructor.name
-        return out
+        return {
+            "ilp_scale": this.ilp_scale,
+            "axis_2d": this.axis_2d,
+            "__class__": this.__class__,
+        }
     }
-}
 
-export class GaussianSmoothing extends FeatureExtractor{
-    public readonly sigma: number;
-    public readonly axis_2d: string;
-    public constructor({sigma, axis_2d="z"}:{
-        sigma: number,
-        axis_2d?: string
-    }){
-        super()
-        this.sigma=sigma
-        this.axis_2d=axis_2d
+    public static fromJsonArray(data: JsonValue): IlpFeatureExtractor[]{
+        const array = ensureJsonArray(data)
+        return array.map((v: JsonValue) => IlpFeatureExtractor.fromJsonValue(v))
     }
-}
 
-export class GaussianGradientMagnitude extends FeatureExtractor{
-    public readonly sigma: number;
-    public readonly axis_2d: string;
-    public constructor({sigma, axis_2d="z"}: {
-        sigma: number,
-        axis_2d?: string
-    }){
-        super()
-        this.sigma=sigma
-        this.axis_2d=axis_2d
-    }
-}
-
-export class HessianOfGaussianEigenvalues extends FeatureExtractor{
-    public readonly scale: number;
-    public readonly axis_2d: string;
-    public constructor({scale, axis_2d='z'}: {
-        scale: number,
-        axis_2d?: string
-    }){
-        super()
-        this.scale=scale
-        this.axis_2d=axis_2d
-    }
-}
-
-export class LaplacianOfGaussian extends FeatureExtractor{
-    public readonly scale: number;
-    public readonly axis_2d: string;
-    public constructor({scale, axis_2d='z'}: {
-        scale: number,
-        axis_2d?: string
-    }){
-        super()
-        this.scale=scale
-        this.axis_2d=axis_2d
-    }
-}
-
-export class DifferenceOfGaussians extends FeatureExtractor{
-    public readonly sigma0: number;
-    public readonly sigma1: number;
-    public readonly axis_2d: string;
-    public constructor({sigma0, sigma1, axis_2d="z"}: {
-        sigma0: number,
-        sigma1: number,
-        axis_2d?: string
-    }){
-        super()
-        this.sigma0=sigma0
-        this.sigma1=sigma1
-        this.axis_2d=axis_2d
-    }
-}
-
-export class StructureTensorEigenvalues extends FeatureExtractor{
-    public readonly innerScale: number;
-    public readonly outerScale: number;
-    public readonly axis_2d: string;
-    public constructor({innerScale, outerScale, axis_2d="z"}: {
-        innerScale: number,
-        outerScale: number,
-        axis_2d?: string
-    }){
-        super()
-        this.innerScale=innerScale
-        this.outerScale=outerScale
-        this.axis_2d=axis_2d
+    public equals(other: IlpFeatureExtractor) : boolean{
+        return this.ilp_scale == other.ilp_scale && this.axis_2d == other.axis_2d && this.__class__ == other.__class__
     }
 }
 

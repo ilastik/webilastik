@@ -31,8 +31,9 @@ from webilastik.classic_ilastik.ilp import (
     ensure_encoded_string_list,
     ensure_group, ensure_int
 )
-from webilastik.features.channelwise_fastfilters import (
-    DifferenceOfGaussians, GaussianGradientMagnitude, GaussianSmoothing, HessianOfGaussianEigenvalues, LaplacianOfGaussian, StructureTensorEigenvalues
+from webilastik.features.ilp_filter import (
+    IlpDifferenceOfGaussians, IlpGaussianGradientMagnitude, IlpGaussianSmoothing,
+    IlpHessianOfGaussianEigenvalues, IlpLaplacianOfGaussian, IlpStructureTensorEigenvalues,
 )
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.datasource import DataSource, FsDataSource
@@ -84,12 +85,12 @@ VIGRA_ILP_CLASSIFIER_FACTORY = textwrap.dedent(
 
 class IlpPixelClassificationGroup:
     feature_name_to_class: ClassVar[Mapping[str, Type[IlpFilter]]] = {
-        "Gaussian Smoothing": GaussianSmoothing,
-        "Laplacian of Gaussian": LaplacianOfGaussian,
-        "Gaussian Gradient Magnitude": GaussianGradientMagnitude,
-        "Difference of Gaussians": DifferenceOfGaussians,
-        "Structure Tensor Eigenvalues": StructureTensorEigenvalues,
-        "Hessian of Gaussian Eigenvalues": HessianOfGaussianEigenvalues,
+        "Gaussian Smoothing": IlpGaussianSmoothing,
+        "Laplacian of Gaussian": IlpLaplacianOfGaussian,
+        "Gaussian Gradient Magnitude": IlpGaussianGradientMagnitude,
+        "Difference of Gaussians": IlpDifferenceOfGaussians,
+        "Structure Tensor Eigenvalues": IlpStructureTensorEigenvalues,
+        "Hessian of Gaussian Eigenvalues": IlpHessianOfGaussianEigenvalues,
     }
     class_to_feature_name: ClassVar[Mapping[Type[IlpFilter], str]] = {v: k for k, v in feature_name_to_class.items()}
     feature_names: ClassVar[Sequence[str]] = list(feature_name_to_class.keys())
@@ -117,8 +118,8 @@ class IlpPixelClassificationGroup:
             filter_class = cls.feature_name_to_class.get(ilp_classifier_feature_name)
             if filter_class is None:
                 raise IlpParsingError(f"Bad ilp filter name: {ilp_classifier_feature_name}")
-            ilp_filter = filter_class.from_ilp_scale(
-                scale=ilp_scale, axis_2d= "z" if in_2D else None # FIXME: is axis_2d always 'z'?
+            ilp_filter = filter_class(
+                ilp_scale=ilp_scale, axis_2d= "z" if in_2D else None # FIXME: is axis_2d always 'z'?
             )
             expected_num_channels = max(expected_num_channels, channel_index // ilp_filter.channel_multiplier)
             if len(out) == 0 or out[-1] != ilp_filter:

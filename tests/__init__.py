@@ -2,7 +2,7 @@ from datetime import datetime
 import os
 from pathlib import Path, PurePosixPath
 import time
-from typing import Any, Dict, Literal, Mapping, Dict, Sequence, Tuple
+from typing import Any, Dict, Literal, Mapping, Dict, Sequence
 import uuid
 import json
 from collections.abc import Mapping as MappingAbc
@@ -20,14 +20,13 @@ from webilastik.datasink import FsDataSink
 from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksScaleSink
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale, RawEncoder
 from webilastik.datasource.skimage_datasource import SkimageDataSource
-from webilastik.features.channelwise_fastfilters import GaussianSmoothing, HessianOfGaussianEigenvalues
+from webilastik.features.ilp_filter import IlpGaussianSmoothing, IlpHessianOfGaussianEigenvalues
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.filesystem import JsonableFilesystem
 from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.filesystem.osfs import OsFs
 from webilastik.libebrains.user_token import UserToken
 from webilastik.ui.applet.brushing_applet import Label
-from webilastik.ui.applet.pixel_classifier_applet import Classifier
 
 def get_project_root_dir() -> Path:
     return Path(__name__).parent
@@ -104,14 +103,14 @@ def get_sample_c_cells_pixel_annotations() -> Sequence[Label]:
 
 def get_sample_feature_extractors() -> Sequence[IlpFilter]:
     return (
-        GaussianSmoothing.from_ilp_scale(scale=0.3, axis_2d="z"),
-        GaussianSmoothing.from_ilp_scale(scale=0.7, axis_2d="z"),
-        GaussianSmoothing.from_ilp_scale(scale=1.0, axis_2d="z"),
-        GaussianSmoothing.from_ilp_scale(scale=1.6, axis_2d="z"),
-        GaussianSmoothing.from_ilp_scale(scale=3.5, axis_2d="z"),
-        GaussianSmoothing.from_ilp_scale(scale=5.0, axis_2d="z"),
-        GaussianSmoothing.from_ilp_scale(scale=10.0, axis_2d="z"),
-        HessianOfGaussianEigenvalues.from_ilp_scale(scale=0.7, axis_2d="z"),
+        IlpGaussianSmoothing(ilp_scale=0.3, axis_2d="z"),
+        IlpGaussianSmoothing(ilp_scale=0.7, axis_2d="z"),
+        IlpGaussianSmoothing(ilp_scale=1.0, axis_2d="z"),
+        IlpGaussianSmoothing(ilp_scale=1.6, axis_2d="z"),
+        IlpGaussianSmoothing(ilp_scale=3.5, axis_2d="z"),
+        IlpGaussianSmoothing(ilp_scale=5.0, axis_2d="z"),
+        IlpGaussianSmoothing(ilp_scale=10.0, axis_2d="z"),
+        IlpHessianOfGaussianEigenvalues(ilp_scale=0.7, axis_2d="z"),
     )
 
 def get_sample_c_cells_pixel_classifier() -> VigraPixelClassifier[IlpFilter]:

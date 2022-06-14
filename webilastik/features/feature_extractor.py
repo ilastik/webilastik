@@ -1,9 +1,10 @@
 from abc import abstractmethod, ABC
-from typing import Any, List, Iterable
+from typing import Any, List, Iterable, Protocol
 
 import numpy as np
 from ndstructs.point5D import Point5D
 from ndstructs.array5D import Array5D
+from ndstructs.utils.json_serializable import IJsonable
 
 from webilastik.datasource import DataSource, DataRoi
 from webilastik.operator import Operator
@@ -19,7 +20,7 @@ class FeatureDataMismatchException(Exception):
         super().__init__(f"Feature {feature_extractor} can't be cleanly applied to {data_source}")
 
 
-class FeatureExtractor(ABC, Operator[DataRoi, FeatureData]):
+class FeatureExtractor(Operator[DataRoi, FeatureData], Protocol):
     """A specification of how feature data is to be (reproducibly) computed"""
 
     @abstractmethod
@@ -63,3 +64,6 @@ class FeatureExtractorCollection(FeatureExtractor):
             axiskeys=out.axiskeys,
             location=out.location
         )
+
+class JsonableFeatureExtractor(IJsonable, FeatureExtractor, Protocol):
+    pass

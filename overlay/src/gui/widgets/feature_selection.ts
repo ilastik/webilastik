@@ -1,7 +1,7 @@
 import { createElement, createInput } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
 import { Applet } from '../../client/applets/applet';
-import { DifferenceOfGaussians, FeatureExtractor, GaussianGradientMagnitude, GaussianSmoothing, HessianOfGaussianEigenvalues, LaplacianOfGaussian, Session, StructureTensorEigenvalues } from '../../client/ilastik';
+import { Session, IlpFeatureExtractor, FeatureClassName } from '../../client/ilastik';
 import { ensureJsonObject } from '../../util/serialization';
 
 // class FeatureCheckbox<FE extends FeatureExtractor>{
@@ -12,11 +12,11 @@ type Scale = number;
 
 class FeatureSelectionCheckbox{
     public readonly element: HTMLInputElement;
-    public readonly featureExtractor: FeatureExtractor;
+    public readonly featureExtractor: IlpFeatureExtractor;
     public lastUpstreamState: boolean
     constructor({parentElement, featureExtractor, lastUpstreamState, onClick}: {
         parentElement: HTMLElement,
-        featureExtractor: FeatureExtractor,
+        featureExtractor: IlpFeatureExtractor,
         lastUpstreamState: boolean,
         onClick?: (feature_checkbox: FeatureSelectionCheckbox) => void,
     }){
@@ -41,7 +41,7 @@ class FeatureSelectionCheckbox{
         this.updateHighlight()
     }
 
-    public getStagedChanges(): {action: "add" | "remove" | "nothing", featureExtractor: FeatureExtractor}{
+    public getStagedChanges(): {action: "add" | "remove" | "nothing", featureExtractor: IlpFeatureExtractor}{
         let action: "add" | "remove" | "nothing" = "nothing"
         if(this.element.checked != this.lastUpstreamState){
             action = this.element.checked ? 'add' : 'remove'
@@ -58,7 +58,7 @@ class FeatureSelectionCheckbox{
     }
 }
 
-export class FeatureSelectionWidget extends Applet<{feature_extractors: FeatureExtractor[]}>{
+export class FeatureSelectionWidget extends Applet<{feature_extractors: IlpFeatureExtractor[]}>{
     public readonly element: HTMLElement;
     private checkboxes = new Array<FeatureSelectionCheckbox>();
 
@@ -71,7 +71,7 @@ export class FeatureSelectionWidget extends Applet<{feature_extractors: FeatureE
             deserializer: (data) => {
                 let value_obj = ensureJsonObject(data)
                 return {
-                    feature_extractors: FeatureExtractor.fromJsonArray(value_obj["feature_extractors"])
+                    feature_extractors: IlpFeatureExtractor.fromJsonArray(value_obj["feature_extractors"])
                 }
             },
             onNewState: (new_state) => this.onNewState(new_state)
@@ -80,13 +80,13 @@ export class FeatureSelectionWidget extends Applet<{feature_extractors: FeatureE
         this.element.classList.add("ItkFeatureSelectionWidget")
 
         const scales: Array<Scale> = [0.3, 0.7, 1.0, 1.6, 3.5, 5.0, 10.0]
-        const feature_extractor_creators = new Map<string, (scale: Scale) => FeatureExtractor>([
-            ["Gaussian Smoothing", (scale) => new GaussianSmoothing({sigma: scale})],
-            ["Laplacian Of Gaussian", (scale) => new LaplacianOfGaussian({scale: scale})],
-            ["Gaussian Gradient Magnitude", (scale) => new GaussianGradientMagnitude({sigma: scale})],
-            ["Difference Of Gaussians", (scale) => new DifferenceOfGaussians({sigma0: scale, sigma1: scale * 0.66})],
-            ["Structure Tensor Eigenvalues", (scale) => new StructureTensorEigenvalues({innerScale: scale, outerScale: 0.5 * scale})],
-            ["Hessian Of Gaussian Eigenvalues", (scale) => new HessianOfGaussianEigenvalues({scale: scale})]
+        const feature_extractor_creators = new Map<string, FeatureClassName>([
+            ["Gaussian Smoothing", 'IlpGaussianSmoothing'],
+            ["Laplacian Of Gaussian", "IlpLaplacianOfGaussian"],
+            ["Gaussian Gradient Magnitude", "IlpGaussianGradientMagnitude"],
+            ["Difference Of Gaussians", "IlpDifferenceOfGaussians"],
+            ["Structure Tensor Eigenvalues", "IlpStructureTensorEigenvalues"],
+            ["Hessian Of Gaussian Eigenvalues", "IlpHessianOfGaussianEigenvalues"]
         ])
 
         const table = createElement({tagName: 'table', parentElement: this.element})
@@ -95,13 +95,13 @@ export class FeatureSelectionWidget extends Applet<{feature_extractors: FeatureE
         createElement({tagName: 'th', innerHTML: 'Feature / sigma', parentElement: header_row})
         scales.forEach(scale => createElement({tagName: "th", parentElement: header_row, innerHTML: scale.toFixed(1)}))
 
-        feature_extractor_creators.forEach((creator, label) => {
+        feature_extractor_creators.forEach((class_name, label) => {
             let tr = createElement({tagName: "tr", parentElement: table})
             createElement({tagName: "td", parentElement: tr, innerHTML: label})
             scales.forEach(scale => {
                 this.checkboxes.push(new FeatureSelectionCheckbox({
                     parentElement: createElement({tagName: "td", parentElement: tr}),
-                    featureExtractor: creator(scale),
+                    featureExtractor: new IlpFeatureExtractor({ilp_scale: scale, axis_2d: "z", __class__: class_name}),
                     lastUpstreamState: false, // FIXME? Maybe initialize straight with the upstream state?
                 }))
             })
@@ -114,8 +114,8 @@ export class FeatureSelectionWidget extends Applet<{feature_extractors: FeatureE
             this.checkboxes.filter(cb => cb.element.checked).forEach(cb => cb.element.click())
         }})
         createInput({inputType: 'button', parentElement: this.element, value: 'Ok', onClick: async () => {
-            let extractors_to_add = new Array<FeatureExtractor>();
-            let extractors_to_remove = new Array<FeatureExtractor>();
+            let extractors_to_add = new Array<IlpFeatureExtractor>();
+            let extractors_to_remove = new Array<IlpFeatureExtractor>();
             for(let cb of this.checkboxes){
                 let changes = cb.getStagedChanges()
                 if(changes.action == "add"){
@@ -133,7 +133,7 @@ export class FeatureSelectionWidget extends Applet<{feature_extractors: FeatureE
         }})
     }
 
-    protected onNewState(state: {feature_extractors: Array<FeatureExtractor>}){
+    protected onNewState(state: {feature_extractors: Array<IlpFeatureExtractor>}){
         for(let cb of this.checkboxes){
             cb.setLastUpstreamState(false)
             cb.setChecked(false)
