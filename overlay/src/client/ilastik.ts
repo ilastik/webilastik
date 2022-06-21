@@ -1,19 +1,108 @@
 import { vec3 } from "gl-matrix"
 import { sleep } from "../util/misc"
-import { Url } from "../util/parsed_url"
-import { PrecomputedChunks } from "../util/precomputed_chunks"
-import { ensureJsonArray, ensureJsonNumberTripplet, ensureJsonObject, ensureJsonString, IJsonable, JsonObject, JsonValue } from "../util/serialization"
+import { Path, Url } from "../util/parsed_url"
+import { DataType, Scale } from "../util/precomputed_chunks"
+import { ensureJsonArray, ensureJsonNumber, ensureJsonNumberPair, ensureJsonNumberTripplet, ensureJsonObject, ensureJsonString, ensureOptional, IJsonable, IJsonableObject, JsonObject, JsonValue, toJsonValue } from "../util/serialization"
 
 export class Session{
-    public readonly ilastik_url: string
-    public readonly session_url: string
+    public readonly ilastikUrl: Url
+    public readonly sessionUrl: Url
+    private websocket: WebSocket
+    private messageHandlers = new Array<(ev: MessageEvent) => void>();
+    private readonly onUsageError: (message: string) => void
 
-    protected constructor({ilastik_url, session_url}: {
-        ilastik_url: URL,
-        session_url: URL,
+    protected constructor(params: {
+        ilastikUrl: Url,
+        sessionUrl: Url,
+        onUsageError: (message: string) => void,
     }){
-        this.ilastik_url = ilastik_url.toString().replace(/\/$/, "")
-        this.session_url = session_url.toString().replace(/\/$/, "")
+        this.ilastikUrl = params.ilastikUrl
+        this.sessionUrl = params.sessionUrl
+        this.onUsageError = params.onUsageError
+        this.websocket = this.openWebsocket()
+    }
+
+    private openWebsocket(): WebSocket{
+        const wsUrl = this.sessionUrl.updatedWith({
+            protocol: this.sessionUrl.protocol == "http" ? "ws" : "wss"
+        }).joinPath("ws")
+        let websocket = new WebSocket(wsUrl.schemeless_raw)
+        websocket.addEventListener("close", this.refreshWebsocket)
+        websocket.addEventListener("error", this.refreshWebsocket)
+        websocket.addEventListener("message", (ev: MessageEvent) => {
+            let payload = JSON.parse(ev.data)
+            let payload_obj = ensureJsonObject(payload)
+            if("error" in payload_obj){
+                this.onUsageError(ensureJsonString(payload_obj.error))
+            }
+        })
+        for(let handler of this.messageHandlers){
+            websocket.addEventListener("message", handler)
+        }
+        return websocket
+    }
+
+    private closeWebsocket(){
+        this.websocket.removeEventListener("close", this.refreshWebsocket)
+        this.websocket.removeEventListener("error", this.refreshWebsocket)
+        for(let handler of this.messageHandlers){
+            this.websocket.removeEventListener("message", handler)
+        }
+        this.websocket.close()
+    }
+
+    private refreshWebsocket = (ev: Event) => {
+        console.warn("Refreshing socket because of this:", ev)
+        this.closeWebsocket()
+        this.websocket = this.openWebsocket()
+    }
+
+    public addMessageListener(handler: (ev: MessageEvent) => void){
+        this.messageHandlers.push(handler)
+        this.websocket.addEventListener("message", handler)
+    }
+
+    public async close(): Promise<true | undefined>{
+        this.closeWebsocket()
+        let closeSession_response = await fetch(this.sessionUrl.joinPath("close").schemeless_raw, {method: "DELETE"})
+        if(closeSession_response.ok){
+            return undefined
+        }
+        return true
+    }
+
+    public async saveProject(params: {fs: FileSystem, project_file_name: string}): Promise<Error | undefined>{
+        let response = await fetch(
+            this.sessionUrl.joinPath("save_project").schemeless_raw,
+            {
+                method: "POST",
+                body: JSON.stringify(toJsonValue(params)),
+            })
+        if(response.ok){
+            return undefined
+        }
+        return Error(`Could not save project: ${await response.text()}`)
+    }
+
+    public async loadProject(params: {fs: FileSystem, project_file_name: string}): Promise<Error | undefined>{
+        let response = await fetch(
+            this.sessionUrl.joinPath("load_project").schemeless_raw,
+            {
+                method: "POST",
+                body: JSON.stringify(toJsonValue(params)),
+            })
+        if(response.ok){
+            return undefined
+        }
+        return Error(`Could not load project: ${await response.text()}`)
+    }
+
+    public doRPC(params: {applet_name: string, method_name: string, method_arguments: IJsonableObject}){
+        return this.websocket.send(JSON.stringify({
+            applet_name: params.applet_name,
+            method_name: params.method_name,
+            arguments: toJsonValue(params.method_arguments),
+        }))
     }
 
     public static btoa(url: String): string{
@@ -24,8 +113,8 @@ export class Session{
         return atob(encoded.replace("-", "+").replace("_", "/"))
     }
 
-    public static async check_login({ilastik_api_url}: {ilastik_api_url: Url}): Promise<boolean>{
-        let response = await fetch(ilastik_api_url.joinPath("check_login").raw, {
+    public static async check_login({ilastikUrl}: {ilastikUrl: Url}): Promise<boolean>{
+        let response = await fetch(ilastikUrl.joinPath("/api/check_login").raw, {
             credentials: "include"
         });
         if(response.ok){
@@ -38,16 +127,22 @@ export class Session{
         throw new Error(`Checking loging faield with ${response.status}:\n${contents}`)
     }
 
-    public static async create({ilastik_url, session_duration_seconds, timeout_s, onProgress=(_) => {}}: {
-        ilastik_url: URL,
+    public static getEbrainsToken(): string | undefined{
+        return document.cookie.split('; ')
+            .find(row => row.startsWith('ebrains_user_access_token='))?.split('=')[1];
+    }
+
+    public static async create({ilastikUrl, session_duration_seconds, timeout_s, onProgress=(_) => {}, onUsageError}: {
+        ilastikUrl: Url,
         session_duration_seconds: number,
         timeout_s: number,
         onProgress?: (message: string) => void,
+        onUsageError: (message: string) => void
+
     }): Promise<Session>{
-        const clean_ilastik_url = ilastik_url.toString().replace(/\/$/, "")
-        const new_session_url = clean_ilastik_url + "/session"
+        const newSessionUrl = ilastikUrl.joinPath("/api/session")
         while(timeout_s > 0){
-            let session_creation_response = await fetch(new_session_url, {
+            let session_creation_response = await fetch(newSessionUrl.schemeless_raw, {
                 method: "POST",
                 body: JSON.stringify({session_duration: session_duration_seconds})
             })
@@ -60,9 +155,9 @@ export class Session{
                 continue
             }
             onProgress(`Successfully requested a session!`)
-            let raw_session_data: {url: string, id: string, token: string} = await session_creation_response.json()
+            let rawSession_data: {url: string, id: string, token: string} = await session_creation_response.json()
             while(timeout_s){
-                let session_status_response = await fetch(clean_ilastik_url + `/session/${raw_session_data.id}`)
+                let session_status_response = await fetch(ilastikUrl.joinPath(`/api/session/${rawSession_data.id}`).schemeless_raw)
                 if(session_status_response.ok  && (await session_status_response.json())["status"] == "ready"){
                     onProgress(`Session has become ready!`)
                     break
@@ -71,171 +166,69 @@ export class Session{
                 timeout_s -= 2
                 await sleep(2000)
             }
-            return new Session({
-                ilastik_url: new URL(clean_ilastik_url),
-                session_url: new URL(raw_session_data.url),
-            })
+            return new Session({ilastikUrl, sessionUrl: Url.parse(rawSession_data.url), onUsageError})
         }
         throw `Could not create a session`
     }
 
-    public static async load({ilastik_url, session_url}: {
-        ilastik_url: URL, session_url:URL
+    public static async load({ilastikUrl, sessionUrl, onUsageError}: {
+        ilastikUrl: Url, sessionUrl:Url, onUsageError: (message: string) => void
     }): Promise<Session>{
-        const status_endpoint = session_url.toString().replace(/\/?$/, "/status")
-        let session_status_resp = await fetch(status_endpoint)
+        let session_status_resp = await fetch(sessionUrl.joinPath("status").schemeless_raw)
         if(!session_status_resp.ok){
             throw Error(`Bad response from session: ${session_status_resp.status}`)
         }
-        return new Session({
-            ilastik_url: ilastik_url,
-            session_url: session_url,
-        })
-    }
-
-    public createSocket(): WebSocket{
-        //FIXME  is there a point to handling socket errors?:
-        let ws_url = new URL(this.session_url)
-        ws_url.protocol = ws_url.protocol == "http:" ? "ws:" : "wss:";
-        ws_url.pathname = ws_url.pathname + '/ws'
-        return new WebSocket(ws_url.toString())
-    }
-
-    public async close(): Promise<true | undefined>{
-        let close_session_response = await fetch(this.session_url + `/close`, {method: "DELETE"})
-        if(close_session_response.ok){
-            return undefined
-        }
-        return true
+        return new Session({ilastikUrl, sessionUrl, onUsageError})
     }
 }
 
-export abstract class FeatureExtractor implements IJsonable{
-    public static fromJsonValue(data: any): FeatureExtractor{
-        let feature_class_name = data["__class__"]
-        if(feature_class_name == "GaussianSmoothing"){
-            return new GaussianSmoothing(data)
-        }
-        if(feature_class_name == "GaussianGradientMagnitude"){
-            return new GaussianGradientMagnitude(data)
-        }
-        if(feature_class_name == "HessianOfGaussianEigenvalues"){
-            return new HessianOfGaussianEigenvalues(data)
-        }
-        if(feature_class_name == "LaplacianOfGaussian"){
-            return new LaplacianOfGaussian(data)
-        }
-        if(feature_class_name == "DifferenceOfGaussians"){
-            return new DifferenceOfGaussians(data)
-        }
-        if(feature_class_name == "StructureTensorEigenvalues"){
-            return new StructureTensorEigenvalues(data)
-        }
-        throw Error(`Bad feature extractor class name in ${JSON.stringify(data)}`)
+const FeatureClassNames = [
+    "IlpGaussianSmoothing", "IlpGaussianGradientMagnitude", "IlpHessianOfGaussianEigenvalues", "IlpLaplacianOfGaussian", "IlpDifferenceOfGaussians", "IlpStructureTensorEigenvalues"
+] as const;
+export type FeatureClassName = (typeof FeatureClassNames)[number]
+
+export function ensureFeatureClassName(value: string): FeatureClassName{
+    const variant = FeatureClassNames.find(variant => variant === value)
+    if(variant === undefined){
+        throw Error(`Invalid feature class name: ${value}`)
+    }
+    return variant
+}
+
+export class IlpFeatureExtractor implements IJsonable{
+    public readonly ilp_scale: number
+    public readonly axis_2d: string
+    public readonly __class__: FeatureClassName
+
+    constructor(params: {ilp_scale: number, axis_2d: string, __class__: FeatureClassName}){
+        this.ilp_scale = params.ilp_scale
+        this.axis_2d = params.axis_2d
+        this.__class__ = params.__class__
     }
 
-    public static fromJsonArray(data: JsonValue): FeatureExtractor[]{
-        const array = ensureJsonArray(data)
-        return array.map((v: JsonValue) => FeatureExtractor.fromJsonValue(v))
-    }
-
-    public equals(other: FeatureExtractor) : boolean{
-        if(this.constructor !== other.constructor){
-            return false
-        }
-        //FIXME: maybe impelment a faster comparison here?
-        return JSON.stringify(this.toJsonValue()) == JSON.stringify(other.toJsonValue())
+    public static fromJsonValue(value: JsonValue): IlpFeatureExtractor{
+        let value_obj = ensureJsonObject(value)
+        let feature_class_name = ensureFeatureClassName(ensureJsonString(value_obj["__class__"]))
+        let ilp_scale = ensureJsonNumber(value_obj["ilp_scale"])
+        let axis_2d = ensureJsonString(value_obj["axis_2d"])
+        return new IlpFeatureExtractor({ilp_scale, axis_2d, __class__: feature_class_name})
     }
 
     public toJsonValue(): JsonValue{
-        let out = JSON.parse(JSON.stringify(this))
-        //FIXME: Class name
-        out["__class__"] = this.constructor.name
-        return out
+        return {
+            "ilp_scale": this.ilp_scale,
+            "axis_2d": this.axis_2d,
+            "__class__": this.__class__,
+        }
     }
-}
 
-export class GaussianSmoothing extends FeatureExtractor{
-    public readonly sigma: number;
-    public readonly axis_2d: string;
-    public constructor({sigma, axis_2d="z"}:{
-        sigma: number,
-        axis_2d?: string
-    }){
-        super()
-        this.sigma=sigma
-        this.axis_2d=axis_2d
+    public static fromJsonArray(data: JsonValue): IlpFeatureExtractor[]{
+        const array = ensureJsonArray(data)
+        return array.map((v: JsonValue) => IlpFeatureExtractor.fromJsonValue(v))
     }
-}
 
-export class GaussianGradientMagnitude extends FeatureExtractor{
-    public readonly sigma: number;
-    public readonly axis_2d: string;
-    public constructor({sigma, axis_2d="z"}: {
-        sigma: number,
-        axis_2d?: string
-    }){
-        super()
-        this.sigma=sigma
-        this.axis_2d=axis_2d
-    }
-}
-
-export class HessianOfGaussianEigenvalues extends FeatureExtractor{
-    public readonly scale: number;
-    public readonly axis_2d: string;
-    public constructor({scale, axis_2d='z'}: {
-        scale: number,
-        axis_2d?: string
-    }){
-        super()
-        this.scale=scale
-        this.axis_2d=axis_2d
-    }
-}
-
-export class LaplacianOfGaussian extends FeatureExtractor{
-    public readonly scale: number;
-    public readonly axis_2d: string;
-    public constructor({scale, axis_2d='z'}: {
-        scale: number,
-        axis_2d?: string
-    }){
-        super()
-        this.scale=scale
-        this.axis_2d=axis_2d
-    }
-}
-
-export class DifferenceOfGaussians extends FeatureExtractor{
-    public readonly sigma0: number;
-    public readonly sigma1: number;
-    public readonly axis_2d: string;
-    public constructor({sigma0, sigma1, axis_2d="z"}: {
-        sigma0: number,
-        sigma1: number,
-        axis_2d?: string
-    }){
-        super()
-        this.sigma0=sigma0
-        this.sigma1=sigma1
-        this.axis_2d=axis_2d
-    }
-}
-
-export class StructureTensorEigenvalues extends FeatureExtractor{
-    public readonly innerScale: number;
-    public readonly outerScale: number;
-    public readonly axis_2d: string;
-    public constructor({innerScale, outerScale, axis_2d="z"}: {
-        innerScale: number,
-        outerScale: number,
-        axis_2d?: string
-    }){
-        super()
-        this.innerScale=innerScale
-        this.outerScale=outerScale
-        this.axis_2d=axis_2d
+    public equals(other: IlpFeatureExtractor) : boolean{
+        return this.ilp_scale == other.ilp_scale && this.axis_2d == other.axis_2d && this.__class__ == other.__class__
     }
 }
 
@@ -243,12 +236,50 @@ export class Color{
     public readonly r: number;
     public readonly g: number;
     public readonly b: number;
-    public readonly a: number;
-    public constructor({r=0, g=0, b=0, a=255}: {r: number, g: number, b: number, a: number}){
-        this.r = r; this.g = g; this.b = b; this.a = a;
+    public readonly vec3f: vec3;
+    public readonly vec3i: vec3;
+    public readonly hashValue: number
+    public readonly hexCode: string
+
+    public constructor({r=0, g=0, b=0}: {r: number, g: number, b: number}){
+        this.r = r; this.g = g; this.b = b;
+        this.vec3f = vec3.fromValues(r/255, g/255, b/255) // FIXME: rounding errors?
+        this.vec3i = vec3.fromValues(r, g, b) // FIXME: rounding errors?
+        this.hashValue = r * 256 * 256 + g * 256 + b
+        this.hexCode = "#" + [r,g,b].map((val) => {
+            const val_str = val.toString(16)
+            return val_str.length < 2 ? "0" + val_str : val_str
+        }).join("")
     }
-    public static fromJsonData(data: any): Color{
-        return new Color(data)
+
+    public static fromHexCode(hexCode: string): Color{
+        let channels = hexCode.slice(1).match(/../g)!.map(c => parseInt(c, 16))
+        return new Color({r: channels[0], g: channels[1], b: channels[2]})
+    }
+
+    public static fromJsonValue(value: JsonValue){
+        let color_object = ensureJsonObject(value)
+        return new Color({
+            r: ensureJsonNumber(color_object["r"]),
+            g: ensureJsonNumber(color_object["g"]),
+            b: ensureJsonNumber(color_object["b"]),
+        })
+    }
+
+    public toJsonValue(): JsonObject{
+        return {
+            r: this.r,
+            g: this.g,
+            b: this.b,
+        }
+    }
+
+    public equals(other: Color): boolean{
+        return this.hashValue == other.hashValue
+    }
+
+    public inverse(): Color{
+        return new Color({r: 255 - this.r, g: 255 - this.g, b: 255 - this.b})
     }
 }
 
@@ -262,23 +293,122 @@ export class Annotation{
     public static fromJsonData(data: any): Annotation{
         return new Annotation(
             data["voxels"],
-            Color.fromJsonData(data["color"]),
+            Color.fromJsonValue(data["color"]),
             DataSource.fromJsonValue(data["raw_data"])
         )
     }
 }
 
-export class Shape5D{
+export class Point5D{
     public readonly x: number;
     public readonly y: number;
     public readonly z: number;
     public readonly t: number;
     public readonly c: number;
-    constructor({x, y, z, t, c}: {x: number, y: number, z: number, t: number, c: number}){
+
+    constructor({x=0, y=0, z=0, t=0, c=0}: {
+        x?: number, y?: number, z?: number,t?: number, c?: number
+    }){
         this.x = x; this.y = y; this.z = z; this.t = t; this.c = c;
     }
+
+    public static fromJsonData(data: JsonValue){
+        let value_obj = ensureJsonObject(data)
+        return new this({
+            x: ensureOptional(ensureJsonNumber, value_obj.x) || 0,
+            y: ensureOptional(ensureJsonNumber, value_obj.y) || 0,
+            z: ensureOptional(ensureJsonNumber, value_obj.z) || 0,
+            t: ensureOptional(ensureJsonNumber, value_obj.t) || 0,
+            c: ensureOptional(ensureJsonNumber, value_obj.c) || 0,
+        })
+    }
+
+    public toJsonValue(): JsonValue {
+        return {x: this.x, y: this.y, z: this.z, t: this.t, c: this.c}
+    }
+}
+
+export class Shape5D extends Point5D{
+    constructor({x=1, y=1, z=1, t=1, c=1}: {
+        x?: number, y?: number, z?: number, t?: number, c?: number
+    }){
+        super({x, y, z, t, c})
+    }
+
+    public updated(params: {x?: number, y?: number, z?: number, t?: number, c?: number}): Shape5D{
+        return new Shape5D({
+            x: params.x !== undefined ? params.x : this.x,
+            y: params.y !== undefined ? params.y : this.y,
+            z: params.z !== undefined ? params.z : this.z,
+            t: params.t !== undefined ? params.t : this.t,
+            c: params.c !== undefined ? params.c : this.c,
+        })
+    }
+
+    public static fromJsonData(data: JsonValue){
+        let value_obj = ensureJsonObject(data)
+        return new this({
+            x: ensureOptional(ensureJsonNumber, value_obj.x) || 1,
+            y: ensureOptional(ensureJsonNumber, value_obj.y) || 1,
+            z: ensureOptional(ensureJsonNumber, value_obj.z) || 1,
+            t: ensureOptional(ensureJsonNumber, value_obj.t) || 1,
+            c: ensureOptional(ensureJsonNumber, value_obj.c) || 1,
+        })
+    }
+
+    public toInterval5D({offset=new Point5D({})}: {offset?: Point5D}): Interval5D{
+        return new Interval5D({
+            x: [offset.x, offset.x + this.x],
+            y: [offset.y, offset.y + this.y],
+            z: [offset.z, offset.z + this.z],
+            t: [offset.t, offset.t + this.t],
+            c: [offset.c, offset.c + this.c],
+        })
+    }
+}
+
+export class Interval5D{
+    public readonly x: [number, number];
+    public readonly y: [number, number];
+    public readonly z: [number, number];
+    public readonly t: [number, number];
+    public readonly c: [number, number];
+    public readonly shape: Shape5D
+    public readonly start: Point5D
+    public readonly stop: Point5D
+
+    constructor({x, y, z, t, c}: {
+        x: [number, number],
+        y: [number, number],
+        z: [number, number],
+        t: [number, number],
+        c: [number, number],
+    }){
+        this.x = x; this.y = y; this.z = z; this.t = t; this.c = c;
+        this.shape = new Shape5D({
+            x: x[1] - x[0],
+            y: y[1] - y[0],
+            z: z[1] - z[0],
+            t: t[1] - t[0],
+            c: c[1] - c[0],
+        })
+        this.start = new Point5D({x: x[0], y: y[0], z: z[0], t: t[0], c: c[0]})
+        this.stop = new Point5D({x: x[1], y: y[1], z: z[1], t: t[1], c: c[1]})
+    }
+
     public static fromJsonData(data: any){
-        return new this(data)
+        let value_obj = ensureJsonObject(data)
+        return new this({
+            x: ensureJsonNumberPair(value_obj.x),
+            y: ensureJsonNumberPair(value_obj.y),
+            z: ensureJsonNumberPair(value_obj.z),
+            t: ensureJsonNumberPair(value_obj.t),
+            c: ensureJsonNumberPair(value_obj.c),
+        })
+    }
+
+    public toJsonValue(): JsonObject{
+        return {"start": this.start.toJsonValue(), "stop": this.stop.toJsonValue()}
     }
 }
 
@@ -291,17 +421,28 @@ export abstract class FileSystem implements IJsonable{
         if(class_name == "HttpFs"){
             return HttpFs.fromJsonValue(value)
         }
+        if(class_name == "BucketFs"){
+            return BucketFs.fromJsonValue(value)
+        }
         throw Error(`Could not deserialize FileSystem from ${JSON.stringify(value)}`)
     }
     public abstract equals(other: FileSystem): boolean;
     public abstract getUrl(): Url;
+
+    public static fromUrl(url: Url): FileSystem{
+        if(url.hostname == "data-proxy.ebrains.eu"){
+            return BucketFs.fromDataProxyUrl(url)
+        }else{
+            return new HttpFs({read_url: url})
+        }
+    }
 }
 
 export class HttpFs extends FileSystem{
     public readonly read_url: Url
     public constructor({read_url}: {read_url: Url}){
         super()
-        this.read_url = read_url
+        this.read_url = read_url.updatedWith({datascheme: undefined})
     }
 
     public getDisplayString(): string{
@@ -331,15 +472,80 @@ export class HttpFs extends FileSystem{
     }
 }
 
+export class BucketFs extends FileSystem{
+    public static readonly API_URL = Url.parse("https://data-proxy.ebrains.eu/api/buckets")
+    public readonly bucket_name: string
+    public readonly prefix: Path
+
+    constructor(params: {bucket_name: string, prefix: Path}){
+        super()
+        this.bucket_name = params.bucket_name
+        this.prefix = params.prefix
+    }
+
+    public equals(other: FileSystem): boolean {
+        return (
+            other instanceof BucketFs &&
+            other.bucket_name == this.bucket_name &&
+            other.prefix.equals(this.prefix)
+        )
+    }
+
+    public getUrl(): Url {
+        return BucketFs.API_URL.joinPath(`${this.bucket_name}/${this.prefix}`)
+    }
+
+    public getDisplayString(): string {
+        return this.getUrl().toString()
+    }
+
+    public static fromJsonValue(value: JsonValue): BucketFs {
+        const valueObj = ensureJsonObject(value)
+        return new this({
+            bucket_name: ensureJsonString(valueObj.bucket_name),
+            prefix: Path.parse(ensureJsonString(valueObj.prefix)),
+        })
+    }
+
+    public toJsonValue(): JsonObject {
+        return {
+            bucket_name: this.bucket_name,
+            prefix: this.prefix.toString(),
+            __class__: "BucketFs"
+        }
+    }
+
+    public static fromDataProxyUrl(url: Url): BucketFs{
+        if(!url.schemeless_raw.startsWith(BucketFs.API_URL.schemeless_raw)){
+            throw `Expected data-proxy url, got this: ${url.toString()}`
+        }
+
+        return new BucketFs({
+            bucket_name: url.path.components[2],
+            prefix: new Path({components: url.path.components.slice(3)}),
+        })
+    }
+}
+
 export abstract class DataSource implements IJsonable{
     public readonly filesystem: FileSystem
-    public readonly path: string
+    public readonly path: Path
     public readonly spatial_resolution: vec3
+    public readonly shape: Shape5D
+    public readonly tile_shape: Shape5D
 
-    constructor({filesystem, path, spatial_resolution=vec3.fromValues(1,1,1)}: {filesystem: FileSystem, path: string, spatial_resolution?: vec3}){
-        this.filesystem = filesystem
-        this.path = path
-        this.spatial_resolution = spatial_resolution
+    constructor(params: {
+        filesystem: FileSystem, path: Path, shape: Shape5D, spatial_resolution?: vec3, tile_shape: Shape5D
+    }){
+        this.filesystem = params.filesystem
+        this.path = params.path
+        this.spatial_resolution = params.spatial_resolution || vec3.fromValues(1,1,1)
+        this.shape = params.shape
+        this.tile_shape = params.tile_shape
+    }
+
+    public get hashValue(): string{
+        return JSON.stringify(this.toJsonValue())
     }
 
     public static fromJsonValue(data: JsonValue) : DataSource{
@@ -359,23 +565,27 @@ export abstract class DataSource implements IJsonable{
         const spatial_resolution = json_object["spatial_resolution"]
         return {
             filesystem: FileSystem.fromJsonValue(json_object["filesystem"]),
-            path: ensureJsonString(json_object["path"]),
-            spatial_resolution: spatial_resolution === undefined ? vec3.fromValues(1,1,1) : ensureJsonNumberTripplet(spatial_resolution)
+            path: Path.parse(ensureJsonString(json_object["path"])),
+            spatial_resolution: spatial_resolution === undefined ? vec3.fromValues(1,1,1) : ensureJsonNumberTripplet(spatial_resolution),
+            shape: Shape5D.fromJsonData(json_object["shape"]),
+            tile_shape: Shape5D.fromJsonData(json_object["tile_shape"]),
         }
     }
 
     public toJsonValue(): JsonObject{
         return {
             filesystem: this.filesystem.toJsonValue(),
-            path: this.path,
+            path: this.path.raw,
             spatial_resolution: [this.spatial_resolution[0], this.spatial_resolution[1], this.spatial_resolution[2]],
+            shape: this.shape.toJsonValue(),
+            tile_shape: this.tile_shape.toJsonValue(),
             ...this.doToJsonValue()
         }
     }
 
     public getDisplayString() : string{
         const resolution_str = `${this.spatial_resolution[0]} x ${this.spatial_resolution[1]} x ${this.spatial_resolution[2]}`
-        return `${this.filesystem.getDisplayString()} ${this.path} (${resolution_str})`
+        return `${this.filesystem.getUrl().joinPath(this.path.raw)} (${resolution_str})`
     }
 
     protected abstract doToJsonValue() : JsonObject & {__class__: string}
@@ -384,12 +594,28 @@ export abstract class DataSource implements IJsonable{
         return (
             this.constructor.name == other.constructor.name &&
             this.filesystem.equals(other.filesystem) &&
-            this.path == other.path &&
+            this.path.equals(other.path) &&
             vec3.equals(this.spatial_resolution, other.spatial_resolution)
         )
     }
 
     public abstract toTrainingUrl(_session: Session): Url;
+
+    public static async getDatasourcesFromUrl(params: {datasource_url: Url, session: Session}): Promise<Array<DataSource> | Error>{
+        let response = await fetch(params.session.sessionUrl.joinPath("get_datasources_from_url").raw, {
+            method: "POST",
+            body: JSON.stringify({url: params.datasource_url.raw})
+        })
+        if(!response.ok){
+            let error_message = (await response.json())["error"]
+            return Error(error_message)
+        }
+        let payload = ensureJsonObject(await response.json())
+        if("error" in payload){
+            return Error(ensureJsonString(payload.error))
+        }
+        return ensureJsonArray(payload["datasources"]).map(rds => DataSource.fromJsonValue(rds))
+    }
 }
 
 // Represents a single scale from precomputed chunks
@@ -405,42 +631,12 @@ export class PrecomputedChunksDataSource extends DataSource{
         return { __class__: "PrecomputedChunksDataSource"}
     }
 
-    public static async tryGetTrainingRawData(url: Url): Promise<PrecomputedChunksDataSource | undefined>{
-        let training_regex = /stripped_precomputed\/url=(?<url>[^/]+)\/resolution=(?<resolution>\d+_\d+_\d+)/
-        let match = url.path.match(training_regex)
-        if(!match){
-            return undefined
-        }
-        const original_url = Url.parse(Session.atob(match.groups!["url"]));
-        const raw_resolution = match.groups!["resolution"].split("_").map(axis => parseInt(axis));
-        const resolution = vec3.fromValues(raw_resolution[0], raw_resolution[1], raw_resolution[2]);
-        return new PrecomputedChunksDataSource({
-            filesystem: new HttpFs({read_url: original_url.updatedWith({path: "/"})}),
-            path: url.path,
-            spatial_resolution: resolution
-        })
-    }
-
     public toTrainingUrl(session: Session): Url{
-        const original_url = this.filesystem.getUrl().joinPath(this.path)
+        const original_url = this.filesystem.getUrl().joinPath(this.path.raw)
         const resolution_str = `${this.spatial_resolution[0]}_${this.spatial_resolution[1]}_${this.spatial_resolution[2]}`
-        return Url.parse(session.session_url)
+        return session.sessionUrl
             .ensureDataScheme("precomputed")
             .joinPath(`stripped_precomputed/url=${Session.btoa(original_url.raw)}/resolution=${resolution_str}`)
-    }
-
-    public static async tryArrayFromUrl(url: Url): Promise<Array<PrecomputedChunksDataSource> | undefined>{
-        let chunks = await PrecomputedChunks.tryFromUrl(url);
-        if(chunks === undefined){
-            return undefined
-        }
-        return chunks.scales.map(scale => {
-            return new PrecomputedChunksDataSource({
-                filesystem: new HttpFs({read_url: url.root}),
-                path: url.path,
-                spatial_resolution: vec3.clone(scale.resolution)
-            })
-        })
     }
 }
 
@@ -456,45 +652,100 @@ export class SkimageDataSource extends DataSource{
         return { __class__: "SkimageDataSource"}
     }
 
-    public static async tryFromUrl(url: Url): Promise<SkimageDataSource | undefined>{
-        if(url.datascheme !== undefined){
-            return undefined
-        }
-        if(url.protocol !== "http" && url.protocol !== "https"){
-            return undefined
-        }
-        //FIXME: maybe do a HEAD and check mime type?
-        return new SkimageDataSource({
-            filesystem: new HttpFs({read_url: url.updatedWith({path: "/"})}),
-            path: url.path,
-        })
-    }
-
-    public static async tryGetTrainingRawData(url: Url): Promise<SkimageDataSource | undefined>{
-        return await this.tryFromUrl(url)
-    }
-
-    public static async tryArrayFromUrl(url: Url): Promise<Array<SkimageDataSource> | undefined>{
-        let datasource = await this.tryFromUrl(url)
-        return datasource === undefined ? undefined : [datasource]
-    }
-
     public toTrainingUrl(_session: Session): Url{
-        return this.filesystem.getUrl().joinPath(this.path)
+        return this.filesystem.getUrl().joinPath(this.path.raw)
     }
 }
 
-export class Lane implements IJsonable{
-    public constructor(public readonly raw_data: DataSource){
+export class FsDataSink{
+    public readonly tile_shape: Shape5D
+    public readonly interval: Interval5D
+    public readonly dtype: DataType
+    public readonly shape: any
+    public readonly location: any
+    public readonly filesystem: FileSystem
+    public readonly path: Path
+
+    constructor (params: {
+        filesystem: FileSystem,
+        path: Path,
+        tile_shape: Shape5D,
+        interval: Interval5D,
+        dtype: DataType,
+    }){
+        this.filesystem = params.filesystem
+        this.path = params.path
+        this.tile_shape = params.tile_shape
+        this.interval = params.interval
+        this.dtype = params.dtype
+        this.shape = this.interval.shape
+        this.location = params.interval.start
     }
-    public static fromJsonValue(data: any): Lane{
-        return new Lane(DataSource.fromJsonValue(data["raw_data"]))
-    }
+
     public toJsonValue(): JsonObject{
-        return {raw_data: this.raw_data.toJsonValue()}
+        return {
+            filesystem: this.filesystem.toJsonValue(),
+            path: this.path.toString(),
+            tile_shape: this.tile_shape.toJsonValue(),
+            interval: this.interval.toJsonValue(),
+            dtype: this.dtype.toString(),
+        }
     }
-    public static fromJsonArray(data: JsonValue): Lane[]{
-        const array = ensureJsonArray(data)
-        return array.map((v: JsonValue) => Lane.fromJsonValue(v))
+
+    public static fromJsonValue(value: JsonValue): "DataSink"{
+        let valueObj = ensureJsonObject(value)
+        let className = valueObj.__class__
+        if(className == "PrecomputedChunksScaleDataSink"){
+            return PrecomputedChunksScaleDataSink.fromJsonValue(value)
+        }
+        throw Error(`Unrecognized DataSink class name: ${className}`)
+    }
+}
+
+export class PrecomputedChunksScaleDataSink extends FsDataSink{
+    public readonly info_dir: Path
+    public readonly scale: Scale
+
+    constructor(params: {
+        filesystem: FileSystem,
+        info_dir: Path,
+        scale: Scale,
+        dtype: DataType,
+        num_channels: number,
+    }){
+        let shape = new Shape5D({x: params.scale.size[0], y: params.scale.size[1], z: params.scale.size[2], c: params.num_channels})
+        let location = new Point5D({x: params.scale.voxel_offset[0], y: params.scale.voxel_offset[1], z: params.scale.voxel_offset[2]})
+        let interval = shape.toInterval5D({offset: location})
+        let chunk_sizes_5d = params.scale.chunk_sizes.map(cs => new Shape5D({x: cs[0], y: cs[1], z: cs[2], c: params.num_channels}))
+
+        super({
+            filesystem: params.filesystem,
+            path: params.info_dir,
+            tile_shape: chunk_sizes_5d[0], //FIXME?
+            interval: interval,
+            dtype: params.dtype,
+        })
+        this.info_dir = params.info_dir
+        this.scale = params.scale
+    }
+
+    public toJsonValue(): JsonObject {
+        return {
+            ...super.toJsonValue(),
+            __class__: "PrecomputedChunksScaleSink",
+            info_dir: this.info_dir.raw,
+            scale: this.scale.toJsonValue(),
+            num_channels: this.shape.c,
+        }
+    }
+
+    public updatedWith(params: {filesystem?: FileSystem, info_dir?: Path}): PrecomputedChunksScaleDataSink{
+        return new PrecomputedChunksScaleDataSink({
+            filesystem: params.filesystem || this.filesystem,
+            info_dir: params.info_dir || this.info_dir,
+            scale: this.scale,
+            dtype: this.dtype,
+            num_channels: this.shape.c,
+        })
     }
 }

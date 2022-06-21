@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Tuple, Sequence, Dict, Mapping
+from typing import Any, Tuple, Sequence, Dict, Mapping
 import enum
 
 import numpy as np
@@ -16,13 +16,15 @@ def array5d_to_vigra(arr: Array5D, axiskeys: str):
     return vigra.taggedView(arr.raw(axiskeys), axistags=axiskeys)
 
 
-def vigra_object_feature_to_array5d(raw_feature: np.ndarray) -> Array5D:
+def vigra_object_feature_to_array5d(raw_feature: "np.ndarray[Any, np.dtype[Any]]") -> Array5D:
     xc_shape : Tuple[int, int] = (raw_feature.shape[0], int(np.prod(raw_feature.shape[1:])))
     return Array5D(raw_feature.reshape(xc_shape), axiskeys="xc")
 
 
-class ObjectFeatureExtractor(Operator[Tuple[DataRoi, ConnectedComponentsExtractor], Array5D]):
-    pass
+class ObjectFeatureExtractor(ABC, Operator[Tuple[DataRoi, ConnectedComponentsExtractor], Array5D]):
+    @abstractmethod
+    def __call__(self, /, roi: Tuple[DataRoi, ConnectedComponentsExtractor]) -> Array5D:
+        pass
 
 
 class VigraFeatureName(enum.Enum):
@@ -76,7 +78,9 @@ class VigraObjectFeatureExtractor(ObjectFeatureExtractor):
     def __hash__(self) -> int:
         return hash(self.feature_names)
 
-    def __eq__(self, other: "VigraObjectFeatureExtractor") -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, VigraObjectFeatureExtractor):
+            return False
         return self.feature_names == other.feature_names
 
     def get_halo(self) -> Point5D:
@@ -86,7 +90,7 @@ class VigraObjectFeatureExtractor(ObjectFeatureExtractor):
     def get_timewise_feature_map(self, spec: Tuple[DataRoi, ConnectedComponentsExtractor]) -> Mapping[Interval5D, Mapping[str, Array5D]]:
         data_roi, components_extractor = spec
         # some object features might need more context around the object mask, which is why it gets enlarged here
-        connected_comps = components_extractor.compute(data_roi).enlarged(radius=self.get_halo(), limits=data_roi.full())
+        connected_comps = components_extractor(data_roi).enlarged(radius=self.get_halo(), limits=data_roi.full())
         data = data_roi.datasource.retrieve(connected_comps.interval.updated(c=data_roi.c))
         feature_names = [fn.value for fn in self.feature_names]
 
@@ -97,7 +101,7 @@ class VigraObjectFeatureExtractor(ObjectFeatureExtractor):
         label_frames = connected_comps.split(connected_comps.shape.updated(t=1))
         frame_axes = "xyzc"
         for data_frame, label_frame in zip(data_frames, label_frames):
-            raw_frame_features: Dict[str, np.ndarray] = vigra.analysis.extractRegionFeatures(
+            raw_frame_features: Dict[str, "np.ndarray[Any, np.dtype[Any]]"] = vigra.analysis.extractRegionFeatures(
                 array5d_to_vigra(data_frame, axiskeys=frame_axes).astype(np.float32),
                 array5d_to_vigra(label_frame, axiskeys=frame_axes).astype(np.uint32),
                 features=feature_names,
@@ -117,7 +121,7 @@ class VigraObjectFeatureExtractor(ObjectFeatureExtractor):
         return timewise_features
 
     #@lru_cache()
-    def compute(self, roi: Tuple[DataRoi, ConnectedComponentsExtractor]) -> Array5D:
+    def __call__(self, /, roi: Tuple[DataRoi, ConnectedComponentsExtractor]) -> Array5D:
         """Outputs a Array5D where shape.x is the highest label extracted from the provided DataRoi. Channels are the stacked
         channels of the features in self.feature_names"""
         feature_map = self.get_timewise_feature_map(roi)

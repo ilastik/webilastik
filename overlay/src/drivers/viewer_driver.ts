@@ -36,6 +36,12 @@ export interface IViewerDriver{
      */
     refreshView: (params: {native_view: INativeView, similar_url_hint?: string, channel_colors?: vec3[]}) => void;
 
+
+    /**
+     * Closes the view
+     */
+    closeView: (params: {native_view: INativeView}) => void;
+
     /**
      * Registers a calback that should be called every time the viewer:
      *  -> opens or closes a data source;

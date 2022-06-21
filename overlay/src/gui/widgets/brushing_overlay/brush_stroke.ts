@@ -1,5 +1,5 @@
 import { quat, vec3 } from "gl-matrix";
-import { DataSource } from "../../../client/ilastik";
+import { Color, DataSource } from "../../../client/ilastik";
 import { Vec3AttributeBuffer, BufferUsageHint } from "../../../gl/buffer";
 import { VertexArray } from "../../../gl/vertex_primitives";
 import { ensureJsonObject, IJsonable, JsonObject, JsonValue} from "../../../util/serialization";
@@ -8,14 +8,12 @@ import { ensureJsonObject, IJsonable, JsonObject, JsonValue} from "../../../util
 export class BrushStroke extends VertexArray implements IJsonable{
     public readonly camera_orientation: quat
     public num_points : number
-    public readonly color : vec3
     public readonly positions_buffer: Vec3AttributeBuffer
     public readonly annotated_data_source: DataSource;
 
-    private constructor({gl, points_vx, color, camera_orientation, annotated_data_source}: {
+    private constructor({gl, points_vx, camera_orientation, annotated_data_source}: {
         gl: WebGL2RenderingContext,
-        points_vx: vec3[],
-        color: vec3,
+        points_vx: vec3[], // points in "voxel-space" (i.e. cooridnates are pixel indices into the image array)
         camera_orientation: quat,
         annotated_data_source: DataSource,
     }){
@@ -24,19 +22,17 @@ export class BrushStroke extends VertexArray implements IJsonable{
         this.camera_orientation = quat.create(); quat.copy(this.camera_orientation, camera_orientation)
         this.annotated_data_source = annotated_data_source
         this.num_points = 0
-        this.color = vec3.create(); vec3.copy(this.color, color)
         this.positions_buffer = new Vec3AttributeBuffer(gl, data, BufferUsageHint.DYNAMIC_DRAW)
         points_vx.forEach(pt_vx => this.try_add_point_vx(pt_vx))
     }
 
-    public static create({gl, start_postition_uvw, color, camera_orientation, annotated_data_source}: {
+    public static create({gl, start_postition_uvw, camera_orientation, annotated_data_source}: {
         gl: WebGL2RenderingContext,
         start_postition_uvw: vec3,
-        color: vec3,
         camera_orientation: quat,
         annotated_data_source: DataSource,
     }): BrushStroke{
-        const stroke = new BrushStroke({gl, points_vx: [], color, camera_orientation, annotated_data_source})
+        const stroke = new BrushStroke({gl, points_vx: [], camera_orientation, annotated_data_source})
         stroke.try_add_point_uvw(start_postition_uvw)
         return stroke
     }
@@ -80,11 +76,6 @@ export class BrushStroke extends VertexArray implements IJsonable{
 
         return {
             "voxels": raw_voxels,
-            "color": {
-                "r": Math.floor(this.color[0] * 255), //FIXME: rounding issues?
-                "g": Math.floor(this.color[1] * 255),
-                "b": Math.floor(this.color[2] * 255),
-            },
             "raw_data": this.annotated_data_source.toJsonValue(),
             "camera_orientation": [
                 this.camera_orientation[0], this.camera_orientation[1], this.camera_orientation[2], this.camera_orientation[3],
@@ -96,12 +87,6 @@ export class BrushStroke extends VertexArray implements IJsonable{
         let raw = ensureJsonObject(value)
         //FIXME: better error checking
         let voxels = (raw["voxels"] as Array<any>).map(v => vec3.fromValues(v["x"], v["y"], v["z"]));
-        let raw_color = ensureJsonObject(raw["color"])
-        let color = vec3.fromValues(
-            raw_color["r"] as number / 255,  //FIXME: rounding issues?
-            raw_color["g"]  as number / 255,
-            raw_color["b"]  as number / 255,
-        )
         let camera_orientation: quat;
         if("camera_orientation" in raw){
             let raw_camera_orientation = raw["camera_orientation"] as Array<number>;
@@ -113,12 +98,14 @@ export class BrushStroke extends VertexArray implements IJsonable{
         }
         let annotated_data_source = DataSource.fromJsonValue(raw["raw_data"])
         return new BrushStroke({
-            gl, points_vx: voxels, camera_orientation, color, annotated_data_source
+            gl, points_vx: voxels, camera_orientation, annotated_data_source
         })
     }
 }
 
+export type IStagingBrushStroke = {stroke: BrushStroke, color: Color}
+
 export interface IBrushStrokeHandler{
     handleNewBrushStroke: (params: {start_position_uvw: vec3, camera_orientation_uvw: quat}) => BrushStroke,
-    handleFinishedBrushStroke: (stroke: BrushStroke) => any,
+    handleFinishedBrushStroke: (stagingStroke: BrushStroke) => any,
 }

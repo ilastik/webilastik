@@ -1,71 +1,130 @@
 import { quat, vec3 } from "gl-matrix"
 import { BrushStroke } from "../../.."
-import { DataSource, Session } from "../../../client/ilastik"
-import { createElement, createInput, removeElement } from "../../../util/misc"
+import { Color, DataSource, Session } from "../../../client/ilastik"
+import { createElement, createInputParagraph, removeElement } from "../../../util/misc"
 import { CollapsableWidget } from "../collapsable_applet_gui"
-import { OneShotSelectorWidget, SelectorWidget } from "../selector_widget"
-import { Vec3ColorPicker } from "../vec3_color_picker"
+import { OneShotSelectorWidget } from "../selector_widget"
 import { BrushingOverlay } from "./brushing_overlay"
 import { BrushelBoxRenderer } from "./brush_boxes_renderer"
-import { BrushelLinesRenderer } from "./brush_lines_renderer"
-import { BrushRenderer } from "./brush_renderer"
-import { BrushStrokesContainer } from "./brush_strokes_container"
+import { BrushingApplet } from "./brush_strokes_container"
 import { Viewer } from "../../../viewer/viewer"
 import { PredictionsView, RawDataView, TrainingView } from "../../../viewer/view"
+import { PredictingWidget } from "../predicting_widget";
+
 
 export class BrushingWidget{
-    public static training_view_name_prefix = "ilastik training: "
-
-    public readonly gl: WebGL2RenderingContext
     public readonly viewer: Viewer
     public readonly element: HTMLElement
-    public readonly canvas: HTMLCanvasElement
-    public readonly status_display: HTMLElement
+    private readonly status_display: HTMLElement
+    private readonly resolutionSelectionContainer: HTMLElement
+    private readonly trainingWidget: HTMLDivElement
+    private readonly brushingEnabledCheckbox: HTMLInputElement
 
-    public readonly brushStrokeContainer: BrushStrokesContainer
-    private readonly controlsContainer: HTMLElement
     private animationRequestId: number = 0
-    private trainingWidget: TrainingWidget | undefined = undefined
     session: Session
+    public overlay?: BrushingOverlay
+    public stagingStroke: BrushStroke | undefined = undefined
+    public readonly gl: WebGL2RenderingContext
+    public readonly canvas: HTMLCanvasElement
+    private brushingApplet: BrushingApplet
+    private predictingWidget: PredictingWidget
 
     constructor({
+        applet_name,
         session,
-        socket,
         parentElement,
         viewer,
+        help,
     }: {
+        applet_name: string,
         session: Session,
-        socket: WebSocket,
         parentElement: HTMLElement,
         viewer: Viewer,
+        help: string[],
     }){
         this.session = session
-        this.element = new CollapsableWidget({display_name: "Training", parentElement}).element
-        this.element.classList.add("ItkBrushingWidget")
-        this.canvas =  createElement({tagName: "canvas", parentElement: document.body}) as HTMLCanvasElement;
+        this.canvas = createElement({tagName: "canvas", parentElement: document.body, inlineCss: {display: "none"}})
         this.gl = this.canvas.getContext("webgl2", {depth: true, stencil: true})!
+
+        this.element = new CollapsableWidget({display_name: "Training", parentElement, help}).element
+        this.element.classList.add("ItkBrushingWidget")
         this.viewer = viewer
 
+
         this.status_display = createElement({tagName:"p", parentElement: this.element, cssClasses: ["ItkBrushingWidget_status_display"]})
-        this.controlsContainer = createElement({tagName: "p", parentElement: this.element})
 
-        let p = createElement({tagName: "p", parentElement: this.element})
-        createElement({tagName: "label", innerHTML: "Brush Strokes:", parentElement: p})
-        this.brushStrokeContainer = new BrushStrokesContainer({
-            socket,
-            parentElement: this.element,
-            applet_name: "brushing_applet",
-            gl: this.gl,
-            onBrushColorClicked: (color: vec3) => this.trainingWidget?.colorPicker.setColor(color)
-        })
+        this.resolutionSelectionContainer = createElement({tagName: "p", parentElement: this.element})
 
-        this.showCanvas(false)
+        this.trainingWidget = createElement({tagName: "div", parentElement: this.element})
+            this.predictingWidget = new PredictingWidget({session, viewer: this.viewer, parentElement: this.trainingWidget})
+
+            this.brushingEnabledCheckbox = createInputParagraph({
+                parentElement: this.trainingWidget,
+                label_text: "Enable Brushing: ",
+                inputType: "checkbox",
+                title: "Enable to draw annotations by clicking and dragging. Disable to use the viewer's controls to navigate over the data.",
+                onClick: () => this.overlay?.setBrushingEnabled(this.brushingEnabledCheckbox.checked)
+            })
+
+            createElement({tagName: "label", innerHTML: "Brush Strokes:", parentElement: this.trainingWidget})
+            this.brushingApplet = new BrushingApplet({
+                parentElement: this.trainingWidget,
+                session,
+                applet_name,
+                gl: this.gl,
+            })
+
         viewer.onViewportsChanged(() => this.handleViewerDataDisplayChange())
         this.handleViewerDataDisplayChange()
     }
 
-    private showCanvas(show: boolean){
-        this.canvas.style.display = show ? "block" : "none"
+    public hideTrainingUi(){
+        window.cancelAnimationFrame(this.animationRequestId)
+        this.trainingWidget.style.display = "none"
+        this.canvas.style.display = "none"
+        this.overlay?.destroy()
+        this.overlay = undefined
+    }
+
+    public showTrainingUi({trainingDatasource, brushStrokesGetter}: {trainingDatasource: DataSource, brushStrokesGetter: () => Array<[Color, BrushStroke[]]>}){
+        this.trainingWidget.style.display = "block"
+        this.canvas.style.display = "block"
+        let overlay = this.overlay = new BrushingOverlay({
+            gl: this.gl,
+            trackedElement: this.viewer.getTrackedElement(),
+            viewport_drivers: this.viewer.getViewportDrivers(),
+            brush_stroke_handler: {
+                handleNewBrushStroke: (params: {start_position_uvw: vec3, camera_orientation_uvw: quat}) => {
+                    this.stagingStroke = BrushStroke.create({
+                        gl: this.gl,
+                        start_postition_uvw: params.start_position_uvw, //FIXME put scale somewhere
+                        annotated_data_source: trainingDatasource,
+                        camera_orientation: params.camera_orientation_uvw, //FIXME: realy data space? rename param in BrushStroke?
+                    })
+                    return this.stagingStroke
+                },
+                handleFinishedBrushStroke: (stagingStroke: BrushStroke) => {
+                    this.stagingStroke = undefined
+                    this.brushingApplet.addBrushStroke(stagingStroke)
+                }
+            },
+        })
+        overlay.setBrushingEnabled(this.brushingEnabledCheckbox.checked)
+
+        window.cancelAnimationFrame(this.animationRequestId)
+        const render = () => {
+            let strokes = brushStrokesGetter();
+            if(this.stagingStroke){
+                if(!this.brushingApplet.currentColor){
+                    console.error("FIXME: no color selected but still brushing")
+                }else{
+                    strokes.push([this.brushingApplet.currentColor, [this.stagingStroke]])
+                }
+            }
+            overlay.render(strokes, new BrushelBoxRenderer({gl: this.gl, highlightCrossSection: false, onlyCrossSection: true})) //FIXME? remove this optional override?
+            this.animationRequestId = window.requestAnimationFrame(render)
+        }
+        render()
     }
 
     public showStatus(message: string){
@@ -77,9 +136,9 @@ export class BrushingWidget{
     }
 
     private resetWidgets(){
-        this.trainingWidget?.destroy()
-        this.controlsContainer.innerHTML = ""
-        this.showCanvas(false)
+        window.cancelAnimationFrame(this.animationRequestId)
+        this.hideTrainingUi()
+        this.resolutionSelectionContainer.innerHTML = ""
         this.clearStatus()
     }
 
@@ -94,7 +153,7 @@ export class BrushingWidget{
 
         const view = this.viewer.getActiveView()
         if(view === undefined){
-            return
+            return this.showStatus("No data")
         }
         if(view instanceof Error){ //FIXME: remove this? or return error from viewer?
             return this.showStatus(`${view}`)
@@ -109,16 +168,11 @@ export class BrushingWidget{
         if(!(view instanceof RawDataView)){
             throw `Unexpected view type (${view.constructor.name}): ${JSON.stringify(view)}`
         }
-        if(view.datasources.length == 1){
-            const datasource = view.datasources[0]
-            const training_view = view.toTrainingView({resolution: datasource.spatial_resolution, session: this.session})
-            this.openTrainingView(training_view)
-            return this.startTraining(training_view.raw_data)
-        }
+        this.showStatus(`Viewing multi-resolution datasource`)
 
-        createElement({tagName: "label", innerHTML: "Select a voxel size to annotate on:", parentElement: this.controlsContainer});
+        createElement({tagName: "label", innerHTML: "Select a voxel size to annotate on:", parentElement: this.resolutionSelectionContainer});
         new OneShotSelectorWidget<DataSource>({
-            parentElement: this.controlsContainer,
+            parentElement: this.resolutionSelectionContainer,
             options: view.datasources,
             optionRenderer: (datasource) => `${datasource.spatial_resolution[0]} x ${datasource.spatial_resolution[1]} x ${datasource.spatial_resolution[2]} nm`,
             onOk: async (datasource) => {
@@ -130,109 +184,22 @@ export class BrushingWidget{
 
     private startTraining(datasource: DataSource){
         this.resetWidgets()
-        this.showCanvas(true)
-
-        this.trainingWidget = new TrainingWidget({
-            gl: this.gl,
-            parentElement: this.controlsContainer,
-            onNewBrushStroke: stroke => this.brushStrokeContainer.addBrushStroke(stroke),
-            datasource,
-            viewer: this.viewer
+        this.showTrainingUi({
+            trainingDatasource: datasource,
+            brushStrokesGetter: () => this.brushingApplet.getBrushStrokes(datasource)
         })
         this.showStatus(`Now training on ${datasource.getDisplayString()}`)
-        window.cancelAnimationFrame(this.animationRequestId)
-        const render = () => {
-            this.trainingWidget?.render(this.brushStrokeContainer.getBrushStrokes())
-            this.animationRequestId = window.requestAnimationFrame(render)
-        }
-        this.animationRequestId = window.requestAnimationFrame(render)
     }
 
     public destroy(){
         window.cancelAnimationFrame(this.animationRequestId)
-        this.trainingWidget?.destroy()
-        this.brushStrokeContainer.destroy()
+        this.overlay?.destroy()
+        removeElement(this.gl.canvas)
         removeElement(this.element)
-        removeElement(this.canvas)
-    }
-}
 
-
-export class TrainingWidget{
-    public readonly element: HTMLElement
-    public readonly overlay: BrushingOverlay
-    public staging_brush_stroke: BrushStroke | undefined = undefined
-    public readonly rendererSelector: SelectorWidget<BrushRenderer>
-    public readonly colorPicker: Vec3ColorPicker
-    public readonly datasource: DataSource
-
-    constructor({gl, parentElement, datasource, viewer, onNewBrushStroke}: {
-        gl: WebGL2RenderingContext,
-        parentElement: HTMLElement,
-        datasource: DataSource,
-        viewer: Viewer,
-        onNewBrushStroke: (stroke: BrushStroke) => void,
-    }){
-        this.element = createElement({tagName: "div", parentElement})
-        this.datasource = datasource
-
-        let p: HTMLElement;
-
-        p = createElement({tagName:"p", parentElement: this.element})
-        const brushing_enabled_checkbox = createInput({inputType: "checkbox", parentElement: p, onClick: () => {
-            this.overlay.setBrushingEnabled(brushing_enabled_checkbox.checked)
-        }})
-        const enable_brushing_label = createElement({tagName: "label", innerHTML: "Enable Brushing", parentElement: p});
-        (enable_brushing_label as HTMLLabelElement).htmlFor = brushing_enabled_checkbox.id = "brushing_enabled_checkbox"
-
-        p = createElement({tagName: "p", parentElement: this.element})
-        createElement({tagName: "label", innerHTML: "Brush Color: ", parentElement: p})
-        this.colorPicker = new Vec3ColorPicker({parentElement: p})
-
-        p = createElement({tagName: "p", parentElement: this.element, inlineCss: {display: (window as any).ilastik_debug ? "block" : "none"}})
-        createElement({tagName: "label", innerHTML: "Rendering style: ", parentElement: p})
-        this.rendererSelector = new SelectorWidget<BrushRenderer>({
-            parentElement: p,
-            options: [
-                new BrushelBoxRenderer({gl, highlightCrossSection: false, onlyCrossSection: true}),
-                new BrushelLinesRenderer(gl),
-                new BrushelBoxRenderer({gl, debugColors: false, highlightCrossSection: false, onlyCrossSection: false}),
-                new BrushelBoxRenderer({gl, debugColors: true, highlightCrossSection: true, onlyCrossSection: false}),
-            ],
-            optionRenderer: (_, index) => ["Boxes - Cross Section", "Lines", "Boxes", "Boxes (debug colors)"][index],
-            onSelection: (_) => {},
-        })
-
-        this.overlay = new BrushingOverlay({
-            gl,
-            trackedElement: viewer.getTrackedElement(),
-            viewport_drivers: viewer.getViewportDrivers(),
-            brush_stroke_handler: {
-                handleNewBrushStroke: (params: {start_position_uvw: vec3, camera_orientation_uvw: quat}) => {
-                    this.staging_brush_stroke = BrushStroke.create({
-                        gl,
-                        start_postition_uvw: params.start_position_uvw, //FIXME put scale somewhere
-                        color: this.colorPicker.getColor(),
-                        annotated_data_source: datasource,
-                        camera_orientation: params.camera_orientation_uvw, //FIXME: realy data space? rename param in BrushStroke?
-                    })
-                    return this.staging_brush_stroke
-                },
-                handleFinishedBrushStroke: onNewBrushStroke
-            },
-        })
-    }
-
-    public render(brushStrokes: Array<BrushStroke>){
-        let strokes = brushStrokes.filter(stroke => stroke.annotated_data_source.equals(this.datasource))
-        if(this.staging_brush_stroke){
-            strokes.push(this.staging_brush_stroke)
-        }
-        this.overlay.render(strokes, this.rendererSelector.getSelection())
-    }
-
-    public destroy(){
-        this.overlay.destroy()
+        this.predictingWidget.destroy()
+        this.brushingApplet.destroy()
         removeElement(this.element)
+        //FIXME: remove event from viewer
     }
 }

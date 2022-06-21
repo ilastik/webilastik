@@ -5,6 +5,7 @@
   "main": "build/cjs/index.js",
   "types": "build/cjs/index.d.ts",
   "scripts": {
+    "build-service-worker": "npx tsc -p service_worker_tsconfig.json --noEmit && npx esbuild src/service_worker.ts --bundle --loader:.ts=ts --sourcemap --outfile=build/service_worker.js",
     "build-cjs": "rm -rf build/cjs && npx tsc --outDir build/cjs --module CommonJS",
     "build": "npm run build-cjs",
     "package": "npm run build && npm pack",
@@ -16,11 +17,11 @@
   ],
   "author": "Tomaz Vieira",
   "license": "ISC",
-  "devDependencies": {
-    "esbuild": "^0.11.15",
-    "typescript": "^4.3.4"
-  },
   "dependencies": {
     "gl-matrix": "^3.3.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.14.11",
+    "typescript": "^4.5.4"
   }
 }

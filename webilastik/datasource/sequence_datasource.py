@@ -1,8 +1,8 @@
-from typing import Dict, Iterable
+from typing import Iterable
 import bisect
 
 from ndstructs import Interval5D, Point5D, Array5D
-from ndstructs.utils.json_serializable import JsonObject, JsonValue
+from ndstructs.utils.json_serializable import JsonValue
 
 from webilastik.datasource import DataSource
 
@@ -22,18 +22,13 @@ class SequenceDataSource(DataSource):
         if any(ds.shape[stack_axis] % tile_shape[stack_axis] != 0 for ds in self.datasources):
             raise ValueError(f"Stacking over axis that are not multiple of the tile size is not supported")
         self.stack_levels = [ds.location[stack_axis] for ds in self.datasources]
+        self.axiskeys = stack_axis + Point5D.LABELS.replace(stack_axis, "")
         interval = Interval5D.enclosing(ds.interval for ds in self.datasources)
         super().__init__(
             dtype=self.datasources[0].dtype,
             interval=interval,
-            axiskeys=stack_axis + Point5D.LABELS.replace(stack_axis, ""),
             tile_shape=tile_shape
         )
-
-    def to_json_value(self) -> JsonObject:
-        out : Dict[str, JsonValue] = {**super().to_json_value()}
-        out["datasources"] = tuple([ds.to_json_value() for ds in self.datasources])
-        return out
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "SequenceDataSource":

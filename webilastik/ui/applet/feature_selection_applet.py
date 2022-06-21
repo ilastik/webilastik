@@ -1,65 +1,84 @@
-from typing import List, TypeVar, Sequence, Optional, Dict, Any
+import json
+from typing import Iterable, Optional, Tuple, Sequence, Set
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonArray, ensureJsonObject, ensureJsonString
 from webilastik.datasource import DataSource
+from webilastik.features.channelwise_fastfilters import DifferenceOfGaussians, GaussianGradientMagnitude, GaussianSmoothing, HessianOfGaussianEigenvalues, LaplacianOfGaussian, StructureTensorEigenvalues
 
-import numpy as np
-
-from webilastik.ui.applet import Applet, CONFIRMER, Slot, SequenceValueSlot, CancelledException
+from webilastik.ui.applet import Applet, AppletOutput, CascadeOk, CascadeResult, UserCancelled, UserPrompt, applet_output, cascade
 from webilastik.features.ilp_filter import IlpFilter
+from webilastik.ui.applet.ws_applet import WsApplet
+from webilastik.ui.usage_error import UsageError
 
 class FeatureSelectionApplet(Applet):
-    ilp_feature_names = [
-        "GaussianSmoothing",
-        "LaplacianOfGaussian",
-        "GaussianGradientMagnitude",
-        "DifferenceOfGaussians",
-        "StructureTensorEigenvalues",
-        "HessianOfGaussianEigenvalues",
-    ]
-
-    def __init__(self, name: str, *, datasources: Slot[Sequence[DataSource]]):
+    def __init__(
+        self,
+        name: str,
+        *,
+        feature_extractors: "Set[IlpFilter] | None" = None,
+        datasources: AppletOutput[Set[DataSource]]
+    ):
         self._in_datasources = datasources
-        self.feature_extractors = SequenceValueSlot[IlpFilter](owner=self, refresher=self._refresh_extractors)
+        self._feature_extractors: Set[IlpFilter] = feature_extractors or set()
         super().__init__(name=name)
 
-    def _refresh_extractors(self, confirmer: CONFIRMER) -> Optional[Sequence[IlpFilter]]:
-        current_extractors = list(self.feature_extractors.get() or ())
-        new_extractors : List[IlpFilter] = []
-        current_datasources = self._in_datasources.get() or []
-        for ex in current_extractors:
-            for ds in current_datasources:
-                if not ex.is_applicable_to(ds):
-                    if confirmer(f"Feature {ex} is not compatible with {ds}. Drop feature extractor?"):
-                        break
-                    else:
-                        raise CancelledException("User did not drop feature extractor")
-            else:
-                new_extractors.append(ex)
-        return tuple(new_extractors) or None
+    def take_snapshot(self) -> Tuple[IlpFilter, ...]:
+        return tuple(self._feature_extractors)
 
-    @property
-    def ilp_data(self) -> Dict[str, Any]:
-        feature_extractors = self.feature_extractors.get()
-        if not feature_extractors:
-            return {}
+    def restore_snaphot(self, snapshot: Tuple[IlpFilter, ...]) -> None:
+        self._feature_extractors = set(snapshot)
 
-        out = {"FeatureIds": np.asarray([name.encode("utf8") for name in self.ilp_feature_names])}
+    @applet_output
+    def feature_extractors(self) -> Sequence[IlpFilter]:
+        return sorted(self._feature_extractors, key=lambda fe: json.dumps(fe.to_json_value())) #FIXME
 
-        default_scales = [0.3, 0.7, 1.0, 1.6, 3.5, 6.0, 10.0] #FIXME allow arbitrary scales
-        extra_scales = set(fe.ilp_scale for fe in feature_extractors if fe.ilp_scale not in default_scales)
-        scales = default_scales + sorted(extra_scales)
-        out["Scales"] = np.asarray(scales)
+    def _set_feature_extractors(self, user_prompt: UserPrompt, feature_extractors: Iterable[IlpFilter]) -> CascadeResult:
+        candidate_extractors = set(feature_extractors)
+        incompatible_extractors : Set[IlpFilter] = set()
 
-        SelectionMatrix = np.zeros((len(self.ilp_feature_names), len(scales)), dtype=bool)
-        for fe in feature_extractors:
-            name_idx = self.ilp_feature_names.index(fe.__class__.__name__)
-            scale_idx = scales.index(fe.ilp_scale)
-            SelectionMatrix[name_idx, scale_idx] = True
+        for extractor in candidate_extractors:
+            for ds in self._in_datasources():
+                if not extractor.is_applicable_to(ds):
+                    incompatible_extractors.add(extractor)
+                    break
 
-        ComputeIn2d = np.full(len(scales), True, dtype=bool)
-        for idx, fname in enumerate(self.ilp_feature_names):
-            ComputeIn2d[idx] = all(fe.axis_2d for fe in feature_extractors if fe.__class__.__name__ == fname)
+        if incompatible_extractors and not user_prompt(
+            message=(
+                "The following feature extractors are incompatible with your datasources:\n"
+                "\n".join(str(extractor) for extractor in incompatible_extractors)
+            ),
+            options={"Drop features": True, "Abort change": False}
+        ):
+            return UserCancelled()
+        self._feature_extractors = candidate_extractors.difference(incompatible_extractors)
+        return CascadeOk()
 
-        out["SelectionMatrix"] = SelectionMatrix
-        out["ComputeIn2d"] = ComputeIn2d  # [: len(scales)]  # weird .ilp quirk in featureTableWidget.py:524
-        out["StorageVersion"] = "0.1"
-        return out
+    @cascade(refresh_self=True)
+    def add_feature_extractors(self, user_prompt: UserPrompt, feature_extractors: Iterable[IlpFilter]) -> CascadeResult:
+        return self._set_feature_extractors(
+            user_prompt=user_prompt,
+            feature_extractors=self._feature_extractors.union(feature_extractors)
+        )
+
+    @cascade(refresh_self=True)
+    def remove_feature_extractors(self, user_prompt: UserPrompt, feature_extractors: Iterable[IlpFilter]) -> CascadeResult:
+        return self._set_feature_extractors(
+            user_prompt=user_prompt,
+            feature_extractors=self._feature_extractors.difference(feature_extractors)
+        )
+
+    def refresh(self, user_prompt: UserPrompt) -> CascadeResult:
+        return self._set_feature_extractors(user_prompt=user_prompt, feature_extractors=self._feature_extractors)
+
+class WsFeatureSelectionApplet(WsApplet, FeatureSelectionApplet):
+    def _get_json_state(self) -> JsonValue:
+        return {"feature_extractors": tuple(extractor.to_json_value() for extractor in self.feature_extractors())}
+
+    def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
+        raw_feature_array = ensureJsonArray(arguments.get("feature_extractors"))
+        feature_extractors = [IlpFilter.from_json_value(raw_feature) for raw_feature in raw_feature_array]
+
+        if method_name == "add_feature_extractors":
+            return UsageError.check(self.add_feature_extractors(user_prompt=user_prompt, feature_extractors=feature_extractors))
+        if method_name == "remove_feature_extractors":
+            return UsageError.check(self.remove_feature_extractors(user_prompt, feature_extractors))
+        raise ValueError(f"Invalid method name: '{method_name}'")

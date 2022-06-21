@@ -14,6 +14,7 @@ class ObjectClassifier:
     def __init__(self, *, feature_extractor: ObjectFeatureExtractor, forests: List[VigraRandomForest]):
         self.feature_extractor = feature_extractor
         self.forests = forests
+        super().__init__()
 
     @classmethod
     def train(
@@ -31,7 +32,7 @@ class ObjectClassifier:
         def train_forest(forest_index: int) -> VigraRandomForest:
             ntrees = (num_trees // num_forests) + (forest_index < num_trees % num_forests)
             forest = VigraRandomForest(ntrees)
-            forest.learnRF(X, y, random_seed)
+            _ = forest.learnRF(X, y, random_seed)
             return forest
 
         with ThreadPoolExecutor() as executor:

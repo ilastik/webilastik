@@ -19,6 +19,8 @@
     resize: both;
     overflow: scroll;
     filter: drop-shadow(10px 10px 4px rgba(0,0,0, 0.3));
+    max-width: 30em;
+    max-height: 80vh;
 }
 
 .ItkOverlayControls_header{
@@ -48,7 +50,7 @@
     margin-bottom: 2px;
 }
 
-.ItkFeatureSelectionWidget td, .ItkFeatureSelectionWidget th{
+.ItkFeatureSelectionWidget td, .ItkFeatureSelectionWidget th, .ItkTable td, .ItkTable th{
     border: solid 1px grey;
     padding: 0.3em;
 }
@@ -57,6 +59,8 @@
     border: dashed 1px grey;
     background-color: rgba(0,0,0, 0.1);
     padding: 0.2em;
+    max-width: 30em;
+    overflow: scroll;
 }
 
 .ItkBrushStrokesContainer{
@@ -74,4 +78,62 @@
 
 .ItkSelector{
     background-color: rgba(0,0,0, 0.1);
+}
+
+/*https://stackoverflow.com/a/21457838*/
+.ItkGrayedOut {
+    position: relative;
+}
+
+.ItkGrayedOut::after {
+    content: " ";
+    z-index: 10;
+    display: block;
+    position: absolute;
+    height: 100%;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.ItkInputParagraph{
+    display: flex;
+}
+
+.ItkInputParagraph label{
+    margin-left: 5px;
+    margin-right: 5px;
+}
+
+.ItkInputParagraph input[type=text], .ItkInputParagraph input[type=url]{
+    flex-grow: 1; /*make input stretch to occupy all remaining space*/
+}
+
+.ItkInputParagraph input[type=number]{
+    width: 4em;
+}
+
+.ItkErrorText{
+    font-style: italic;
+    color: red;
+}
+
+.ItkSuccessText{
+    font-style: italic;
+    color: green;
+}
+
+.ItkInfoText{
+    font-style: italic;
+    color: grey;
+}
+
+.ItkInfoText img, .ItkErrorText img{
+    height: 1em;
+    width: 1em;
+}
+
+.ItkNumberInput{
+    width: 3em;
 }

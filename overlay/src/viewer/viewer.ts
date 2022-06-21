@@ -56,13 +56,17 @@ export class Viewer{
         })
     }
 
+    public closeView(view: View){
+        this.driver.closeView({native_view: view.native_view})
+    }
+
     private createMissingViews = async (): Promise<Array<View>> => { //FIXME: detect old prediction/training views that are still open?
         let out = new Array<View>();
         for(let native_view of this.driver.getOpenDataViews()){
             if(this.findViewFromNative(native_view) !== undefined){
                 continue
             }
-            let view = await View.tryFromNative(native_view);
+            let view = await View.tryFromNative({native_view, session: this.ilastik_session});
             if(view === undefined){
                 console.log(`Unsupported url: ${native_view.url}`)
                 continue
@@ -97,5 +101,9 @@ export class Viewer{
             return this.findViewFromNative(native_view)
         }
         return undefined
+    }
+
+    public destroy(){
+        //FIXME: unregister events from native viewer using the driver
     }
 }

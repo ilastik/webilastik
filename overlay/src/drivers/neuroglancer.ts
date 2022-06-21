@@ -1,6 +1,6 @@
 import { vec3, mat4, quat } from "gl-matrix"
 import { IViewportDriver, IViewerDriver } from "..";
-import { getElementContentRect, uuidv4} from "../util/misc";
+import { getElementContentRect } from "../util/misc";
 import { Url } from "../util/parsed_url";
 import { INativeView } from "./viewer_driver";
 
@@ -51,16 +51,65 @@ export class NeuroglancerViewportDriver implements IViewportDriver{
     })
 }
 
-interface INeuroglancerLayer{
-    name: string,
-    source: string,
-    visible: boolean,
-    shader: string | undefined
-    type?: string
+class Layer{
+    constructor(private readonly managedLayer: any){
+        if(managedLayer.layer === undefined){
+            throw `UNDEFINED LAYER!`
+        }
+    }
+
+    public get name(): string{
+        return this.managedLayer.name
+    }
+
+    public get visible(): boolean{
+        return this.managedLayer.visible
+    }
+
+    public get fragmentShader(): string{
+        return this.managedLayer.layer.fragmentMain.value
+    }
+
+    public set fragmentShader(shader: string){
+        this.managedLayer.layer.fragmentMain.value = shader
+    }
+
+    public get sourceUrl(): string{
+        return this.managedLayer.sourceUrl.replace(/\bgs:\/\//, "https://storage.googleapis.com/")
+    }
+
+    public async getNumChannels(): Promise<number>{
+        return this.managedLayer.layer.multiscaleSource.then((mss: any) => mss.numChannels)
+    }
 }
 
+const defaultShader = 'void main() {\n  emitGrayscale(toNormalized(getDataValue()));\n}\n'
+
 export class NeuroglancerDriver implements IViewerDriver{
-    constructor(public readonly viewer: any){}
+    private layerUrlsWithFixedShaders = new Set<string>()
+    private generation = 0
+    constructor(public readonly viewer: any){
+        const guessShader = async () => {
+            const generation = this.generation += 1
+            for(let layer of this.getImageLayers()){
+                if(layer.fragmentShader != defaultShader || this.layerUrlsWithFixedShaders.has(layer.sourceUrl)){
+                    continue
+                }
+                let numChannels = await layer.getNumChannels()
+                if(generation != this.generation){
+                    return
+                }
+                if(numChannels == 3){
+                    layer.fragmentShader = this.makePredictionsShader([
+                        vec3.fromValues(255, 0, 0), vec3.fromValues(0, 255, 0), vec3.fromValues(0, 0, 255)
+                    ])
+                }
+                this.layerUrlsWithFixedShaders.add(layer.sourceUrl)
+            }
+        }
+        guessShader()
+        this.viewer.layerManager.layersChanged.add(guessShader);
+    }
     getTrackedElement() : HTMLElement{
         return document.querySelector("canvas")! //FIXME: double-check selector
     }
@@ -87,9 +136,6 @@ export class NeuroglancerDriver implements IViewerDriver{
     }
     onViewportsChanged(handler: () => void){
         this.viewer.layerManager.layersChanged.add(() => {
-            if(this.viewer.state.toJSON().layers.find((layer: INeuroglancerLayer) => layer.type === undefined)){
-                return // if any layer has no type, then the viwer hasn't settled yet
-            }
             handler()
         })
         // this.viewer.layerManager.layersChanged.add(() => handler())
@@ -97,27 +143,25 @@ export class NeuroglancerDriver implements IViewerDriver{
     }
     refreshView(params: {native_view: INativeView, similar_url_hint?: string, channel_colors?: vec3[]}){
         let shader: string | undefined = undefined;
+        let similar_url_hint = params.similar_url_hint && Url.parse(params.similar_url_hint).double_protocol_raw
         if(params.channel_colors !== undefined){
             shader = this.makePredictionsShader(params.channel_colors)
-        }else if(params.similar_url_hint !== undefined){
-            const similar_layers = this.getImageLayers().filter(layer => layer.source == params.similar_url_hint)
+        }else if(similar_url_hint !== undefined){
+            const similar_layers = this.getImageLayers().filter(layer => layer.sourceUrl == similar_url_hint)
             if(similar_layers.length > 0){
-                shader = similar_layers[0].shader
+                shader = similar_layers[0].fragmentShader
             }
         }
         this.refreshLayer({name: params.native_view.name, url: params.native_view.url, shader})
     }
 
+    closeView(params: { native_view: INativeView; }){
+        this.dropLayer(params.native_view.name)
+    }
+
     private refreshLayer({name, url, shader}: {name: string, url: string, shader?: string}){
         this.dropLayer(name)
-        const cache_busting_url = Url.parse(url)
-            // .updatedWith({ //FIXME: this needs patching NG to handle query params
-            //     extra_search: new Map<string, string>([["cache_busting_random", uuidv4()]])
-            // })
-            .double_protocol_raw
-            .replace(/run_id=[^/?]+/, `run_id=${uuidv4()}`) // FIXME
-        console.log(`Refreshing layer '${name}' with url ${cache_busting_url}`)
-        this.openNewDataSource({name, url: cache_busting_url, shader})
+        this.openNewDataSource({name, url: Url.parse(url).double_protocol_raw, shader})
     }
 
     private getLayerManager(): any {
@@ -138,7 +182,7 @@ export class NeuroglancerDriver implements IViewerDriver{
     private openNewDataSource(params: {name: string, url: string, shader?: string}){
         const newPredictionsLayer = this.viewer.layerSpecification.getLayer(
             params.name,
-            {source: params.url, shader: params.shader}
+            {source: Url.parse(params.url).double_protocol_raw, shader: params.shader}
         );
         this.viewer.layerSpecification.add(newPredictionsLayer);
     }
@@ -159,19 +203,16 @@ export class NeuroglancerDriver implements IViewerDriver{
             ].join("\n")
     }
 
-    public getImageLayers() : Array<INeuroglancerLayer>{
-        return (this.viewer.state.toJSON().layers || [])
-        .filter((l: any) => l.type == "image")
-        .map((l: any) : INeuroglancerLayer => ({
-                name: l.name,
-                source: l.source.replace(/\bgs:\/\//, "https://storage.googleapis.com/"),
-                visible: l.visible  === undefined ? true : l.visible,
-                shader: l.shader
-        }));
+    public getImageLayers() : Array<Layer>{
+        return Array.from(this.viewer.layerManager.layerSet)
+        .filter((managedLayer: any) => {
+            return managedLayer.layer && managedLayer.layer.constructor.name == "ImageUserLayer" && managedLayer.sourceUrl //FIXME?
+        })
+        .map((managedLayer: any) : Layer => new Layer(managedLayer));
     }
 
     public getOpenDataViews(): Array<INativeView>{
-        return this.getImageLayers().map(layer => ({name: layer.name, url: layer.source}))
+        return this.getImageLayers().map(layer => ({name: layer.name, url: layer.sourceUrl}))
     }
 
     public getDataViewOnDisplay(): INativeView | undefined{
@@ -179,7 +220,7 @@ export class NeuroglancerDriver implements IViewerDriver{
             .filter(layer => layer.visible)
             .map(layer => ({
                 name: layer.name,
-                url: layer.source,
+                url: layer.sourceUrl,
             }))[0];
     }
 }

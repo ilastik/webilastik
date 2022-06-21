@@ -1,14 +1,22 @@
+import os
 from pathlib import PurePosixPath
-from typing import Optional, Mapping, Union
+from typing import ClassVar, Dict, Optional, Mapping
+from aiohttp.client import ClientSession
+from aiohttp.client_exceptions import ClientResponseError
 
 import requests
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, JsonableValue, ensureJsonObject
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString, ensureOptional
+from webilastik.ui.usage_error import UsageError
 
 from webilastik.utility.url import Url
 
 
 
 class UserToken:
+    ENV_VAR_NAME = "EBRAINS_USER_ACCESS_TOKEN"
+
+    _global_login_token: "ClassVar[UserToken | None]" = None
+
     def __init__(
         self,
         *,
@@ -22,7 +30,9 @@ class UserToken:
         # session_state: str,
         # scope: str
     ):
-        self._api_url = Url.parse("https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect")
+        api_url = Url.parse("https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect")
+        assert api_url is not None
+        self._api_url = api_url
         self.access_token = access_token
         self.refresh_token = refresh_token
         # self.expires_in = expires_in
@@ -32,35 +42,90 @@ class UserToken:
         # self.not_before_policy = not_before_policy
         # self.session_state = session_state
         # self.scope = scope
+        super().__init__()
 
-    def _get(
+    @classmethod
+    def from_environment(cls) -> "UserToken | UsageError":
+        access_token = os.environ.get(cls.ENV_VAR_NAME)
+        if access_token is None:
+            return UsageError(f"Environment variable '{cls.ENV_VAR_NAME}' is not set")
+        return UserToken(access_token=access_token)
+
+    @classmethod
+    def login_globally(cls, token: "UserToken"):
+        cls._global_login_token = token
+
+    @classmethod
+    def login_globally_from_environment(cls):
+        token_result = cls.from_environment()
+        if isinstance(token_result, UsageError):
+            raise token_result
+        cls.login_globally(token_result)
+
+    @classmethod
+    def get_global_login_token(cls) -> "UserToken | UsageError":
+        if cls._global_login_token is None:
+            token_result = cls.from_environment()
+            if isinstance(token_result, UsageError):
+                return token_result
+            cls._global_login_token = token_result
+        return cls._global_login_token
+
+    @classmethod
+    def get_global_token_or_raise(cls) -> "UserToken":
+        token = cls.get_global_login_token()
+        if isinstance(token, UsageError):
+            raise token
+        return token
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "UserToken":
+        value_obj = ensureJsonObject(value)
+        return UserToken(
+            access_token=ensureJsonString(value_obj.get("access_token")),
+            refresh_token=ensureOptional(ensureJsonString, value_obj.get("refresh_token")),
+        )
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "access_token": self.access_token,
+            "refresh_token": self.refresh_token,
+        }
+
+    def as_auth_header(self) -> Dict[str, str]:
+        return {"Authorization": f"Bearer {self.access_token}"}
+
+    async def _get(
         self,
         path: PurePosixPath,
         *,
         params: Optional[Mapping[str, str]] = None,
         headers: Optional[Mapping[str, str]] = None,
-        https_verify: bool = True,
+        http_client_session: ClientSession,
     ) -> JsonValue:
-        url = self._api_url.joinpath(path).updated_with(search={})
-        resp = requests.get(
-            url.raw,
+        url = self._api_url.concatpath(path).updated_with(search={})
+        resp = await http_client_session.request(
+            method="GET",
+            url=url.raw,
             params={**url.search, **(params or {})},
             headers={
                 **(headers or {}),
-                "Authorization": f"Bearer {self.access_token}",
+                **self.as_auth_header(),
             },
-            verify=https_verify,
+            raise_for_status=True,
         )
-        resp.raise_for_status()
-        return resp.json()
+        resp.raise_for_status
+        return await resp.json()
 
-    def is_valid(self) -> bool:
+    async def is_valid(self, http_client_session: ClientSession) -> bool:
         #FIXME: maybe just validate signature + time ?
         try:
-            self.get_userinfo()
+            _ = await self.get_userinfo(http_client_session)
             return True
-        except requests.exceptions.HTTPError:
+        except ClientResponseError:
             return False
 
-    def get_userinfo(self) -> JsonObject:
-        return ensureJsonObject(self._get(PurePosixPath("userinfo")))
+    async def get_userinfo(self, http_client_session: ClientSession) -> JsonObject:
+        return ensureJsonObject(await self._get(
+            path=PurePosixPath("userinfo"), http_client_session=http_client_session
+        ))

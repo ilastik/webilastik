@@ -1,20 +1,14 @@
-from abc import ABC, abstractmethod
-from typing import Callable, Generic, Optional, Type, TypeVar
+from typing import Protocol, TypeVar
 
-import numpy as np
-
-from webilastik.datasource import DataRoi, DataSource
-from ndstructs import Array5D, Shape5D
+from webilastik.datasource import DataRoi
+from ndstructs.array5D import Array5D
 
 IN = TypeVar("IN", contravariant=True)
 OUT = TypeVar("OUT", covariant=True)
 
-class Operator(ABC, Generic[IN, OUT]):
-    @abstractmethod
-    def compute(self, roi: IN) -> OUT:
-        """Perform this operator's computaion and returns its result"""
-        pass
+class Operator(Protocol[IN, OUT]):
+    def __call__(self, /, input: IN) -> OUT: ...
 
 class OpRetriever(Operator[DataRoi, Array5D]):
-    def compute(self, roi: DataRoi) -> Array5D:
+    def __call__(self, /, roi: DataRoi) -> Array5D:
         return roi.retrieve()

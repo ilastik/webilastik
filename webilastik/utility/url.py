@@ -1,13 +1,12 @@
 # pyright: strict
 
+from base64 import b64decode, b64encode
 import re
 from pathlib import PurePosixPath
 import enum
 from typing import Optional, List, Dict, Mapping, Union
-from urllib.parse import parse_qs, urlencode
+from urllib.parse import parse_qs, urlencode, quote_plus, quote
 
-from fs.base import FS as FileSystem
-from fs.osfs import OSFS
 from ndstructs.utils.json_serializable import JsonValue, ensureJsonString
 
 
@@ -40,12 +39,16 @@ class Protocol(enum.Enum):
                 return protocol
         raise ValueError(f"Bad protocol: {value}")
 
-    @classmethod
-    def from_filesystem(cls, filesystem: FileSystem) -> "Protocol":
-        if isinstance(filesystem, OSFS):
-            return Protocol.FILE
-        return Url.parse(filesystem.geturl("")).protocol #FIXME: is this reliable ?
+class SearchQuotingMethod(enum.Enum):
+    QUOTE = 0
+    QUOTE_PLUS = 1
 
+def parse_params(params: "str | None") -> Dict[str, str]:
+    if params is None:
+        return {}
+    else:
+        parsed_params: Dict[str, List[str]] = parse_qs(params, keep_blank_values=True, strict_parsing=True, encoding='utf-8')
+        return {k: v[-1] if v else "" for k,v in parsed_params.items()}
 
 class Url:
     hostname_pattern = r"[0-9a-z\-\.]*"
@@ -63,7 +66,7 @@ class Url:
             r"(?P<port>\d+)"
         ")?"
 
-        r"(?P<path>/[^?]*)"
+        r"(?P<path>/[^?#]*)"
 
         r"(\?"
             r"(?P<search>[^#]*)"
@@ -78,23 +81,28 @@ class Url:
     def to_json_value(self) -> JsonValue:
         return self.raw
 
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "Url":
-        return Url.parse(ensureJsonString(value))
+    def to_ilp_info_filePath(self) -> str:
+        if self.protocol == Protocol.FILE:
+            return f"{self.datascheme or ''}" + self.path.as_posix()
+        else:
+            return self.raw
 
     @classmethod
-    def parse(cls, url: str) -> "Url":
+    def from_json_value(cls, value: JsonValue) -> "Url":
+        url = Url.parse(ensureJsonString(value))
+        if url is not None:
+            return url
+        raise ValueError(f"Bad url: {value}")
+
+    @staticmethod
+    def parse(url: str) -> Optional["Url"]:
         match = Url.url_pattern.fullmatch(url)
         if match is None:
-            raise ValueError(f"Invalid URL: {url}");
+            return None
         raw_datascheme = match.group("datascheme")
         raw_port = match.group("port")
         raw_search = match.group("search")
-        if raw_search is None:
-            search: Dict[str, str] = {}
-        else:
-            parsed_qs: Dict[str, List[str]] = parse_qs(raw_search, keep_blank_values=True, strict_parsing=True, encoding='utf-8')
-            search: Dict[str, str] = {k: v[-1] if v else "" for k,v in parsed_qs.items()}
+        search = parse_params(raw_search)
 
         return Url(
             datascheme=None if raw_datascheme is None else DataScheme.from_str(raw_datascheme),
@@ -106,6 +114,13 @@ class Url:
             hash_=match.group("hash_")
         );
 
+    @staticmethod
+    def parse_or_raise(url: str) -> "Url":
+        parsed = Url.parse(url)
+        if parsed is None:
+            raise ValueError("Could not parse {str} as an Url")
+        return parsed
+
     def __init__(
         self,
         *,
@@ -116,6 +131,7 @@ class Url:
         path: PurePosixPath,
         search: Optional[Mapping[str, str]] = None,
         hash_: Optional[str] = None,
+        search_quoting_method: SearchQuotingMethod = SearchQuotingMethod.QUOTE_PLUS,
     ):
         if not path.is_absolute():
             raise ValueError("Path '{path}' is not absolute")
@@ -125,7 +141,7 @@ class Url:
                 continue;
             if part == "..":
                 if len(path_parts) > 0:
-                    path_parts.pop()
+                    _ = path_parts.pop()
             else:
                 path_parts.append(part)
 
@@ -137,9 +153,14 @@ class Url:
         self.path = PurePosixPath("/") / "/".join(path_parts)
         self.search = search or {}
         self.hash_ = hash_
-        self.schemeless_raw = f"{protocol}://{self.host}{path}"
+        self.schemeless_raw = f"{protocol}://{self.host}"
+        self.schemeless_raw += str(path)
         if self.search:
-            self.schemeless_raw += "?" + urlencode(self.search, doseq=True)
+            if search_quoting_method == SearchQuotingMethod.QUOTE_PLUS:
+                quote_via = quote_plus
+            else:
+                quote_via = quote
+            self.schemeless_raw += "?" + urlencode(self.search, doseq=True, quote_via=quote_via)
         if self.hash_:
             self.schemeless_raw += "#" + self.hash_
 
@@ -152,6 +173,7 @@ class Url:
 
         if hostname == "" and protocol not in (Protocol.FILE, Protocol.MEMORY):
             raise ValueError(f"Missing hostname in {self.raw}")
+        super().__init__()
 
     def __hash__(self) -> int:
         return hash(self.raw)
@@ -186,6 +208,33 @@ class Url:
             hash_=hash_ if hash_ is not None else self.hash_,
         )
 
+    def schemeless(self) -> "Url":
+        return Url(
+            path=self.path,
+            datascheme=None,
+            protocol=self.protocol,
+            hostname=self.hostname,
+            port=self.port,
+            search={**self.search},
+            hash_=self.hash_,
+        )
+
+    def hashless(self) -> "Url":
+        return Url(
+            path=self.path,
+            datascheme=self.datascheme,
+            protocol=self.protocol,
+            hostname=self.hostname,
+            port=self.port,
+            search={**self.search},
+            hash_=None,
+        )
+
+    def get_hash_params(self) -> "Dict[str, str]":
+        if self.hash_ is None:
+            return {}
+        return parse_params(self.hash_)
+
     @property
     def parent(self) -> "Url":
         return self.updated_with(path=self.path.parent)
@@ -195,10 +244,21 @@ class Url:
         return self.updated_with(path=self.path / subpath)
 
     def concatpath(self, subpath: Union[str, PurePosixPath]) -> "Url":
-        """Always concatenates path, even if subpath starts with a /"""
-        return self.joinpath(str(subpath).lstrip("/"))
+        """Always concatenates path, event if starting with '/'. Disallows going up the path with .."""
+        fixed_subpath = PurePosixPath("/").joinpath(subpath).as_posix().lstrip("/")
+        return self.joinpath(fixed_subpath)
 
     def ensure_datascheme(self, datascheme: DataScheme) -> "Url":
         if self.datascheme != datascheme:
             raise ValueError(f"Url {self.raw} had unexpected datascheme: {self.datascheme}. Expected {datascheme}")
         return self
+
+    def to_base64(self) -> str:
+        return b64encode(self.raw.encode("utf8"), altchars=b'-_').decode("utf8")
+
+    @staticmethod
+    def from_base64(encoded_url: str) -> "Url":
+        decoded_raw_url = b64decode(encoded_url, altchars=b'-_').decode('utf8')
+        url = Url.parse(decoded_raw_url)
+        assert url is not None
+        return url

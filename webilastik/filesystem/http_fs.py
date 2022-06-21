@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 import io
@@ -14,6 +15,7 @@ from fs.permissions import Permissions
 from fs.enums import ResourceType
 from requests.models import CaseInsensitiveDict
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
+from webilastik.ui.usage_error import UsageError
 
 from .RemoteFile import RemoteFile
 from webilastik.filesystem import JsonableFilesystem
@@ -36,8 +38,15 @@ class HttpFs(JsonableFilesystem):
         if isinstance(self.requests_verify, str) and not Path(self.requests_verify).exists():
             raise ValueError(f"CA_CERT_PATH '{self.requests_verify}' not found")
 
+        self.headers = headers or {}
         self.session = requests.Session()
-        self.session.headers.update(headers or {})
+        self.session.headers.update(self.headers)
+
+    @classmethod
+    def try_from_url(cls, url: Url) -> "HttpFs | UsageError":
+        if url.protocol not in (Protocol.HTTP, Protocol.HTTPS):
+            return UsageError(f"Bad url for HttpFs: {url}")
+        return HttpFs(read_url=url)
 
     def to_json_value(self) -> JsonObject:
         return {
@@ -47,18 +56,31 @@ class HttpFs(JsonableFilesystem):
         }
 
     @classmethod
-    def from_json_value(cls, value: JsonValue) -> "JsonableFilesystem":
+    def from_json_value(cls, value: JsonValue) -> "HttpFs":
         value_obj = ensureJsonObject(value)
-        raw_write_url = value_obj.get("write_url")
+
         raw_headers = value_obj.get("headers")
         if raw_headers is None:
             headers = {}
         else:
             headers_obj = ensureJsonObject(raw_headers)
             headers = {ensureJsonString(k): ensureJsonString(v) for k,v in headers_obj.items()}
+
+        read_url = Url.parse(ensureJsonString(value_obj.get("read_url")))
+        if read_url is None:
+            raise ValueError(f"Bad 'read_url' in json payload: {json.dumps(value, indent=4)}")
+
+        raw_write_url = value_obj.get("write_url")
+        if raw_write_url is None:
+            write_url = None
+        else:
+            write_url = Url.parse(ensureJsonString(raw_write_url))
+            if write_url is None:
+                raise ValueError(f"Bad write_url in HttpFs payload: {json.dumps(value, indent=4)}")
+
         return cls(
-            read_url=Url.parse(ensureJsonString(value_obj.get("read_url"))),
-            write_url=None if raw_write_url is None else Url.parse(ensureJsonString(raw_write_url)),
+            read_url=read_url,
+            write_url=write_url,
             headers=headers,
         )
 
@@ -66,10 +88,11 @@ class HttpFs(JsonableFilesystem):
         return self.to_json_value()
 
     def __setstate__(self, data: Dict[str, Any]):
+        url = HttpFs.from_json_value(data)
         self.__init__(
-            read_url=Url.parse(data["read_url"]),
-            write_url=Url.parse(data["write_url"]),
-            headers=data["headers"],
+            read_url=url.read_url,
+            write_url=url.write_url,
+            headers=url.headers,
         )
 
     def desc(self, path: str) -> str:
@@ -84,7 +107,7 @@ class HttpFs(JsonableFilesystem):
         resp = self.session.delete(full_path.raw, verify=self.requests_verify)
         resp.raise_for_status()
 
-    def _put_object(self, subpath: str, contents: bytes):
+    def _put_object(self, subpath: str, contents: bytes) -> requests.Response:
         full_path = self.write_url.concatpath(subpath)
         assert full_path.raw != "/"
 
@@ -102,6 +125,7 @@ class HttpFs(JsonableFilesystem):
             full_path.raw, data=contents, headers={"Content-Type": "application/octet-stream"}, verify=self.requests_verify
         )
         response.raise_for_status()
+        return response
 
     def _get_object(self, subpath: str) -> Tuple["CaseInsensitiveDict[str]", bytes]:
         full_path = self.read_url.concatpath(subpath)
@@ -141,19 +165,19 @@ class HttpFs(JsonableFilesystem):
         def close_callback(f: RemoteFile):
             if mode == "r":
                 return
-            f.seek(0)
-            self._put_object(path, f.read())
+            _ = f.seek(0)
+            self._put_object(path, f.read()).raise_for_status()
 
         contents = bytes()
         if mode in ("r", "r+", "w+", "a", "a+"):
             try:
-                _meta, contents = self._get_object(path)
+                _, contents = self._get_object(path)
             except HTTPError as e:
                 if e.response.status_code == 404 and "r" in mode:
                     raise ResourceNotFound(path) from e
         remote_file = RemoteFile(close_callback=close_callback, mode=mode, data=contents)
         if "a" in mode:
-            remote_file.seek(0, io.SEEK_END)
+            _ = remote_file.seek(0, io.SEEK_END)
         return remote_file
 
     def opendir(self, path: str, factory=None) -> SubFS[FS]:
@@ -181,14 +205,14 @@ class SwiftTempUrlFs(HttpFs):
     def exists(self, path: str) -> bool:
         # FIXME: folders with never exist
         try:
-            self._get_object(path)
+            _ = self._get_object(path)
             return True
         except HTTPError as e:
             if e.response.status_code == 404:
                 return False
             raise
 
-    def makedir(self, path: str, permissions: Optional[Permissions], recreate: bool) -> SubFS[FS]:
+    def makedir(self, path: str, permissions: Optional[Permissions] = None, recreate: bool = False) -> SubFS[FS]:
         return self.opendir(path)
 
     def makedirs(self, path: str, permissions: Optional[Permissions]=None, recreate: bool = True) -> SubFS[FS]:

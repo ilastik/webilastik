@@ -1,6 +1,8 @@
 from pathlib import Path, PurePosixPath
-from typing import Optional, Set, Tuple, Union, Iterable, List
+from typing import Optional, Sequence, Set, Tuple, Union, Iterable, List
 import json
+
+from aiohttp.client import ClientSession
 from webilastik.libebrains.developer_token import DeveloperToken
 from webilastik.libebrains.user_token import UserToken
 import requests
@@ -46,6 +48,10 @@ class Scope(enum.Enum):
 
     def to_json_value(self) -> str:
         return self.value
+
+    @staticmethod
+    def iterable_to_json_value(scopes: Iterable["Scope"]) -> str:
+        return " ".join(s.to_json_value() for s in scopes)
 
 
 class OidcClient:
@@ -116,27 +122,32 @@ class OidcClient:
         self.standardFlowEnabled = standardFlowEnabled
         self.surrogateAuthRequired = surrogateAuthRequired
         self.webOrigins = webOrigins
+        super().__init__()
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "OidcClient":
         value_obj = ensureJsonObject(value)
         raw_rootUrl = ensureJsonString(value_obj.get("rootUrl"))
-        try:
-            rootUrl = Url.parse(raw_rootUrl)
-        except ValueError:
+        rootUrl = Url.parse(raw_rootUrl)
+        if rootUrl is None:
             rootUrl = Url.parse(raw_rootUrl + "/") # it's possible to register a rootUrl without a path -.-
+        assert rootUrl is not None
 
         redirectUris: List[Url] = []
         for raw_redirect_uri in ensureJsonStringArray(value_obj.get("redirectUris")):
             try:
-                redirectUris.append(Url.parse(raw_redirect_uri))
+                redirect_uri = Url.parse(raw_redirect_uri)
+                assert redirect_uri is not None
+                redirectUris.append(redirect_uri)
             except ValueError:
                 uri = rootUrl.joinpath(PurePosixPath(raw_redirect_uri)) # FIXME: do leading slashes mean root here too?
                 redirectUris.append(uri)
 
+        baseUrl = Url.parse(ensureJsonString(value_obj.get("baseUrl")))
+        assert baseUrl is not None
         return OidcClient(
             alwaysDisplayInConsole=ensureJsonBoolean(value_obj.get("alwaysDisplayInConsole")),
-            baseUrl=Url.parse(ensureJsonString(value_obj.get("baseUrl"))),
+            baseUrl=baseUrl,
             bearerOnly=ensureJsonBoolean(value_obj.get("bearerOnly")),
             clientAuthenticatorType=ensureJsonString(value_obj.get("clientAuthenticatorType")),
             clientId=ensureJsonString(value_obj.get("clientId")),
@@ -271,7 +282,6 @@ class OidcClient:
             },
             json=payload
         )
-        print(f"Update client respose: \n\n{resp.text}")
         resp.raise_for_status()
 
     @classmethod
@@ -316,7 +326,7 @@ class OidcClient:
 
         filename = f"/tmp/oidc_client_{clientId}.json"
         with open(filename, "w") as f:
-            f.write(json.dumps(payload, indent=4))
+            _ = f.write(json.dumps(payload, indent=4))
         print(f"Dumped {clientId} info to {filename}")
         return OidcClient.from_json_value(payload)
 
@@ -331,7 +341,7 @@ class OidcClient:
                 return True
         return False
 
-    def get_user_token(self, *, code: str, redirect_uri: Url) -> "UserToken":
+    async def get_user_token(self, *, code: str, redirect_uri: Url, http_client_session: ClientSession) -> "UserToken":
         if not self.can_redirect_to(redirect_uri):
             raise ValueError(f"Can't redirect to {redirect_uri.raw}")
         data = {
@@ -341,34 +351,22 @@ class OidcClient:
             "client_id": self.clientId,
             "client_secret": self.secret,
         }
-        print(f"postin this: \n{json.dumps(data)}")
-        resp = requests.post(
-            "https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect/token",
+        resp = await http_client_session.request(
+            method="post",
+            url="https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect/token",
             allow_redirects=False,
             data=data
         )
-        print(f"Got this response: \n\n{resp.text}")
         resp.raise_for_status()
 
-        data = ensureJsonObject(resp.json())
-        return UserToken(
-            access_token=ensureJsonString(data.get("access_token")),
-            refresh_token=ensureJsonString(data.get("refresh_token")),
-            # expires_in=data["expires_in"],
-            # refresh_expires_in=data["refresh_expires_in"],
-            # token_type=data["token_type"],
-            # id_token=data["id_token"],
-            # not_before_policy=data["not-before-policy"],
-            # session_state=data["session_state"],
-            # scope=data["scope"],
-        )
+        data = ensureJsonObject(await resp.json())
+        return UserToken.from_json_value(data)
 
     def create_user_login_url(self, *, redirect_uri: Url, scopes: Optional[Set["Scope"]] = None, state: Optional[str] = None) -> Url:
         if not self.can_redirect_to(redirect_uri):
             raise ValueError(f"Can't redirect to {redirect_uri}")
 
-        scopes = scopes.copy() if scopes else set()
-        scopes.add(Scope.OPENID)
+        scopes = scopes or set()
 
         return Url(
             protocol=Protocol.HTTPS,
@@ -379,7 +377,7 @@ class OidcClient:
                 "login": "true",
                 "client_id": self.clientId,
                 "redirect_uri": redirect_uri.raw,
-                "scope": "+".join(scope.value for scope in scopes),
+                "scope": Scope.iterable_to_json_value(scopes.union([Scope.OPENID])),
                 "state": state if state is not None else str(uuid.uuid4()),
                 # 'response_mode': ['fragment'],
                 # 'nonce': ['b70e8d45-0b48-4688-9bd8-66bee41e5130'],
@@ -396,6 +394,5 @@ class OidcClient:
                 "Authorization": f"Bearer {dev_token.access_token}"
             },
         )
-        print(f"Retrieving Oidc Client response: \n{resp.json()}\n\n")
         resp.raise_for_status()
         return OidcClient.from_json_value(resp.json())

@@ -1,14 +1,19 @@
 {
+  "include": ["webilastik/", "tests/", "caching/"],
   "exclude": ["build/"],
   "strict": ["webilastik/datasource", "webilastik/datasink"],
   "typeCheckingMode": "basic",
+  "reportMissingSuperCall": "error",
+  "reportUnnecessaryTypeIgnoreComment":"error",
+  "reportUninitializedInstanceVariable": "error",
   "reportUnknownMemberType": false,
   "reportIncompatibleMethodOverride": true,
   "reportMissingTypeArgument": true,
   "reportMissingTypeStubs": "warning",
   "useLibraryCodeForTypes": true,
-
-
-  "pythonVersion": "3.7",
+  "extraPaths": ["caching/redis_cache/", "tests/"],
+  "reportUnusedCallResult": "error",
+  "reportUnusedVariable": "warning",
+  "pythonVersion": "3.8",
   "pythonPlatform": "Linux"
 }

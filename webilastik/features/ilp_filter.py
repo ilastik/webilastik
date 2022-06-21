@@ -1,89 +1,143 @@
-from abc import abstractmethod, ABC
-from typing import Type, TypeVar, List, TypeVar, ClassVar, Mapping, Iterator, Sequence, Dict, Any, Optional
-import re
+from abc import abstractmethod
+from typing import Optional
 
 
 from ndstructs.array5D import Array5D
-from ndstructs.utils.json_serializable import JsonValue
-import numpy as np
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonFloat, ensureJsonObject, ensureJsonString
 
-from webilastik.datasource import DataRoi
-from .feature_extractor import FeatureExtractor
+from webilastik.datasource import DataRoi, DataSource
+from webilastik.features.channelwise_fastfilters import (
+    Axis2D, ChannelwiseFastFilter, DifferenceOfGaussians, GaussianGradientMagnitude, GaussianSmoothing, HessianOfGaussianEigenvalues,
+    LaplacianOfGaussian, PresmoothedFilter, StructureTensorEigenvalues, get_axis_2d
+)
+from .feature_extractor import FeatureData, JsonableFeatureExtractor
 from webilastik.operator import Operator, OpRetriever
 
 
-FE = TypeVar("FE", bound="IlpFilter")
+class IlpFilter(PresmoothedFilter, JsonableFeatureExtractor):
+    def to_json_value(self) -> JsonObject:
+        return {
+            "ilp_scale": self.ilp_scale,
+            "axis_2d": self.axis_2d,
+            "__class__": self.__class__.__name__,
+        }
 
-
-class IlpFilter(FeatureExtractor):
-    def __init__(self, axis_2d: Optional[str]):
-        self.axis_2d = axis_2d
-        super().__init__()
+    def is_applicable_to(self, datasource: DataSource) -> bool:
+        return self.op.is_applicable_to(datasource)
 
     @property
     def channel_multiplier(self) -> int:
-        return 1
-
-    @property
-    @abstractmethod
-    def ilp_scale(self) -> float:
-        pass
+        return self.op.channel_multiplier
 
     @classmethod
-    @abstractmethod
-    def from_ilp_scale(
-        cls: Type[FE], *, preprocessor: Operator[DataRoi, Array5D] = OpRetriever(), scale: float, axis_2d: Optional[str] = None
-    ) -> FE:
-        pass
+    def from_json_value(cls, value: JsonValue) -> "IlpFilter":
+        value_obj = ensureJsonObject(value)
+        class_name = ensureJsonString(value_obj.get("__class__"))
+        ilp_scale = ensureJsonFloat(value_obj.get("ilp_scale"))
+        axis_2d = get_axis_2d(value_obj.get("axis_2d"))
+
+        if class_name == IlpGaussianSmoothing.__name__:
+            return IlpGaussianSmoothing(ilp_scale=ilp_scale, axis_2d=axis_2d)
+        if class_name == IlpLaplacianOfGaussian.__name__:
+            return IlpLaplacianOfGaussian(ilp_scale=ilp_scale, axis_2d=axis_2d)
+        if class_name == IlpGaussianGradientMagnitude.__name__:
+            return IlpGaussianGradientMagnitude(ilp_scale=ilp_scale, axis_2d=axis_2d)
+        if class_name == IlpDifferenceOfGaussians.__name__:
+            return IlpDifferenceOfGaussians(ilp_scale=ilp_scale, axis_2d=axis_2d)
+        if class_name == IlpStructureTensorEigenvalues.__name__:
+            return IlpStructureTensorEigenvalues(ilp_scale=ilp_scale, axis_2d=axis_2d)
+        if class_name == IlpHessianOfGaussianEigenvalues.__name__:
+            return IlpHessianOfGaussianEigenvalues(ilp_scale=ilp_scale, axis_2d=axis_2d)
+        raise Exception(f"Bad __class__ name: {class_name}")
 
     @property
-    def ilp_name(self) -> str:
-        name = re.sub(r"([a-z])([A-Z])", r"\1___\2", self.__class__.__name__).replace("___", " ").title()
-        name = re.sub(r"\bOf\b", "of", name)
-        name += f" (σ={self.ilp_scale})"
-        name += " in 2D" if self.axis_2d is not None else " in 3D"
-        return name
-
-    def to_json_data(self) -> JsonValue:
+    @abstractmethod
+    def op(self) -> ChannelwiseFastFilter:
         pass
 
-    # @classmethod
-    # def from_ilp_classifier_feature_name(cls, feature_name: bytes) -> "ChannelwiseFilter":
-    #     description = feature_name.decode("utf8")
-    #     name = re.search(r"^(?P<name>[a-zA-Z \-]+)", description).group("name").strip()
-    #     klass = cls.REGISTRY[name.title().replace(" ", "")]
-    #     scale = float(re.search(r"σ=(?P<sigma>[0-9.]+)", description).group("sigma"))
-    #     return klass.from_ilp_scale(scale=scale, axis_2d="z" if "in 2D" in description else None)
+    def __call__(self, /, roi: DataRoi) -> FeatureData:
+        return self.op(roi)
 
-    # @classmethod
-    # def from_ilp_classifier_feature_names(cls, feature_names: List[bytes]) -> List["IlpFilter"]:
-    #     feature_extractors: List[IlpFilter] = []
-    #     for feature_description in feature_names:
-    #         extractor = cls.from_ilp_feature_name(feature_description)
-    #         if len(feature_extractors) == 0 or feature_extractors[-1] != extractor:
-    #             feature_extractors.append(extractor)
-    #     return feature_extractors
+class IlpGaussianSmoothing(IlpFilter):
+    def __init__(self, ilp_scale: float, axis_2d: Optional[Axis2D], preprocessor: Operator[DataRoi, Array5D] = OpRetriever()):
+        super().__init__(ilp_scale=ilp_scale, axis_2d=axis_2d, preprocessor=preprocessor)
+        self._op = GaussianSmoothing(
+            preprocessor=self.presmoother,
+            sigma=min(ilp_scale, 1.0),
+            axis_2d=axis_2d,
+        )
 
-    # @classmethod
-    # def from_ilp_data(cls, data: Mapping[str, Any]) -> List["IlpFilter"]:
-    #     feature_names: List[str] = [feature_name.decode("utf-8") for feature_name in data["FeatureIds"][()]]
-    #     compute_in_2d: List[bool] = list(data["ComputeIn2d"][()])
-    #     scales: List[float] = list(data["Scales"][()])
-    #     selection_matrix = data["SelectionMatrix"][()]  # feature name x scales
+    @property
+    def op(self) -> GaussianSmoothing:
+        return self._op
 
-    #     feature_extractors = []
-    #     for feature_idx, feature_name in enumerate(feature_names):
-    #         feature_class = IlpFilter.REGISTRY[feature_name]
-    #         for scale_idx, (scale, in_2d) in enumerate(zip(scales, compute_in_2d)):
-    #             if selection_matrix[feature_idx][scale_idx]:
-    #                 axis_2d = "z" if in_2d else None
-    #                 extractor = feature_class.from_ilp_scale(
-    #                     scale=scale, axis_2d=axis_2d
-    #                 )
-    #                 feature_extractors.append(extractor)
-    #     return feature_extractors
+class IlpLaplacianOfGaussian(IlpFilter):
+    def __init__(self, ilp_scale: float, axis_2d: Optional[Axis2D], preprocessor: Operator[DataRoi, Array5D] = OpRetriever()):
+        super().__init__(ilp_scale=ilp_scale, axis_2d=axis_2d, preprocessor=preprocessor)
+        self._op = LaplacianOfGaussian(
+            preprocessor=self.presmoother,
+            scale=min(ilp_scale, 1.0),
+            axis_2d=axis_2d,
+        )
 
-    # def to_ilp_feature_names(self) -> Iterator[bytes]:
-    #     for c in range(self.num_input_channels * self.channel_multiplier):
-    #         name_and_channel = self.ilp_name + f" [{c}]"
-    #         yield name_and_channel.encode("utf8")
+    @property
+    def op(self) -> LaplacianOfGaussian:
+        return self._op
+
+class IlpGaussianGradientMagnitude(IlpFilter):
+    def __init__(self, ilp_scale: float, axis_2d: Optional[Axis2D], preprocessor: Operator[DataRoi, Array5D] = OpRetriever()):
+        super().__init__(ilp_scale=ilp_scale, axis_2d=axis_2d, preprocessor=preprocessor)
+        self._op = GaussianGradientMagnitude(
+            preprocessor=self.presmoother,
+            sigma=min(ilp_scale, 1.0),
+            axis_2d=axis_2d,
+        )
+
+    @property
+    def op(self) -> GaussianGradientMagnitude:
+        return self._op
+
+class IlpDifferenceOfGaussians(IlpFilter):
+    def __init__(self, ilp_scale: float, axis_2d: Optional[Axis2D], preprocessor: Operator[DataRoi, Array5D] = OpRetriever()):
+        super().__init__(ilp_scale=ilp_scale, axis_2d=axis_2d, preprocessor=preprocessor)
+        capped_scale = min(ilp_scale, 1.0)
+        self._op = DifferenceOfGaussians(
+            preprocessor=self.presmoother,
+            sigma0=capped_scale,
+            sigma1=capped_scale * 0.66,
+            axis_2d=axis_2d,
+        )
+
+    @property
+    def op(self) -> DifferenceOfGaussians:
+        return self._op
+
+class IlpStructureTensorEigenvalues(IlpFilter):
+    def __init__(
+        self, *, ilp_scale: float, axis_2d: Optional[Axis2D], preprocessor: Operator[DataRoi, Array5D] = OpRetriever()
+    ):
+        super().__init__(ilp_scale=ilp_scale, preprocessor=preprocessor, axis_2d=axis_2d)
+        capped_scale = min(ilp_scale, 1.0)
+        self._op = StructureTensorEigenvalues(
+            innerScale=capped_scale,
+            outerScale=0.5 * capped_scale,
+            axis_2d=axis_2d,
+            preprocessor=self.presmoother,
+        )
+
+    @property
+    def op(self) -> StructureTensorEigenvalues:
+        return self._op
+
+class IlpHessianOfGaussianEigenvalues(IlpFilter):
+    def __init__(self, ilp_scale: float, axis_2d: Optional[Axis2D]):
+        super().__init__(ilp_scale=ilp_scale, axis_2d=axis_2d)
+        self._op = HessianOfGaussianEigenvalues(
+            preprocessor=self.presmoother,
+            scale=min(ilp_scale, 1.0),
+            axis_2d=axis_2d,
+        )
+
+    @property
+    def op(self) -> HessianOfGaussianEigenvalues:
+        return self._op

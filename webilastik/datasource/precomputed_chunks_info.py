@@ -1,19 +1,20 @@
 from abc import ABC, abstractmethod
-from typing import Tuple
-from pathlib import Path
+import json
+from typing import Any, Literal, Optional, Tuple
+from pathlib import PurePosixPath
 import io
-from dataclasses import dataclass
 
 import numpy as np
 import skimage.io #type: ignore
 
 from ndstructs.utils.json_serializable import (
-    JsonValue, JsonObject, ensureJsonObject, ensureJsonString, ensureJsonIntTripplet, ensureJsonArray, ensureJsonInt
+    JsonValue, JsonObject, ensureJsonObject, ensureJsonString, ensureJsonIntTripplet, ensureJsonArray, ensureJsonInt, ensureOptional
 )
 from ndstructs.point5D import Point5D, Shape5D, Interval5D
 from ndstructs.array5D import Array5D
 
 from webilastik.datasource import DataSource
+from webilastik.filesystem import JsonableFilesystem
 
 class PrecomputedChunksEncoder(ABC):
     @abstractmethod
@@ -21,7 +22,7 @@ class PrecomputedChunksEncoder(ABC):
         self,
         *,
         roi: Interval5D,
-        dtype: np.dtype, #type: ignore
+        dtype: "np.dtype[Any]",
         raw_chunk: bytes
     ) -> Array5D:
         pass
@@ -51,13 +52,13 @@ class RawEncoder(PrecomputedChunksEncoder):
         self,
         *,
         roi: Interval5D,
-        dtype: np.dtype, #type: ignore
+        dtype: "np.dtype[Any]", #FIXME
         raw_chunk: bytes
     ) -> Array5D:
         # "The (...) data (...) chunk is stored directly in little-endian binary format in [x, y, z, channel] Fortran order"
-        raw_tile = np.frombuffer(
+        raw_tile: np.ndarray[Any, Any] = np.frombuffer( #type: ignore
             raw_chunk,
-            dtype=dtype.newbyteorder("<") # type: ignore
+            dtype=dtype.newbyteorder("<")
         ).reshape(roi.shape.to_tuple("xyzc"), order="F")
         tile_5d = Array5D(raw_tile, axiskeys="xyzc", location=roi.start)
         return tile_5d
@@ -83,25 +84,35 @@ class JpegEncoder(PrecomputedChunksEncoder):
 
         # FIXME: check if this works with any sort of funny JPEG shapes
         # FIXME: Also, what to do if dtype is weird?
-        raw_jpg: np.ndarray = skimage.io.imread(io.BytesIO(raw_chunk)) # type: ignore
-        tile_5d = Array5D(raw_jpg.reshape(roi.shape.to_tuple("zyxc")), axiskeys="zyxc")
+        raw_jpg: "np.ndarray[Any, Any]" = skimage.io.imread(io.BytesIO(raw_chunk)) # type: ignore
+        tile_5d = Array5D(raw_jpg.reshape(roi.shape.to_tuple("zyxc")), axiskeys="zyxc", location=roi.start)
         return tile_5d
 
     def encode(self, data: Array5D) -> bytes:
         raise NotImplementedError
 
-@dataclass
+
 class PrecomputedChunksScale:
-    key: Path
-    size: Tuple[int, int, int]
-    resolution: Tuple[int, int, int]
-    voxel_offset: Tuple[int, int, int]
-    chunk_sizes: Tuple[Tuple[int, int, int], ...]
-    encoding: PrecomputedChunksEncoder
+    def __init__(
+        self,
+        key: PurePosixPath,
+        size: Tuple[int, int, int],
+        resolution: Tuple[int, int, int],
+        voxel_offset: Optional[Tuple[int, int, int]],
+        chunk_sizes: Tuple[Tuple[int, int, int], ...],
+        encoding: PrecomputedChunksEncoder,
+    ) -> None:
+        self.key = PurePosixPath(key.as_posix().lstrip("/"))
+        self.size = size
+        self.resolution = resolution
+        self.voxel_offset = (0,0,0) if voxel_offset is None else voxel_offset
+        self.chunk_sizes = chunk_sizes
+        self.encoding = encoding
+        super().__init__()
 
     @classmethod
     def from_datasource(
-        cls, *, datasource: DataSource, key: Path, encoding: PrecomputedChunksEncoder
+        cls, *, datasource: DataSource, key: PurePosixPath, encoding: PrecomputedChunksEncoder
     ) -> "PrecomputedChunksScale":
         return PrecomputedChunksScale(
             key=key,
@@ -128,10 +139,10 @@ class PrecomputedChunksScale:
     def from_json_value(cls, value: JsonValue) -> "PrecomputedChunksScale":
         value_obj = ensureJsonObject(value)
         return PrecomputedChunksScale(
-            key=Path(ensureJsonString(value_obj.get("key"))),
+            key=PurePosixPath(ensureJsonString(value_obj.get("key"))),
             size=ensureJsonIntTripplet(value_obj.get("size")),
             resolution=ensureJsonIntTripplet(value_obj.get("resolution")),
-            voxel_offset=ensureJsonIntTripplet(value_obj.get("voxel_offset")),
+            voxel_offset=ensureOptional(ensureJsonIntTripplet, value_obj.get("voxel_offset")),
             chunk_sizes=tuple([
                 ensureJsonIntTripplet(v)
                 for v in ensureJsonArray(value_obj.get("chunk_sizes"))
@@ -155,7 +166,7 @@ class PrecomputedChunksScale5D(PrecomputedChunksScale):
     def __init__(
         self,
         *,
-        key: Path,
+        key: PurePosixPath,
         size: Tuple[int, int, int],
         resolution: Tuple[int, int, int],
         voxel_offset: Tuple[int, int, int],
@@ -201,7 +212,7 @@ class PrecomputedChunksScale5D(PrecomputedChunksScale):
         raw_scale = PrecomputedChunksScale.from_json_value(value)
         return PrecomputedChunksScale5D.from_raw_scale(raw_scale, num_channels=ensureJsonInt(value_obj.get("num_channels")))
 
-    def get_tile_path(self, tile: Interval5D) -> Path:
+    def get_tile_path(self, tile: Interval5D) -> PurePosixPath:
         assert any(tile.is_tile(tile_shape=cs, full_interval=self.interval, clamped=True) for cs in self.chunk_sizes_5d), f"Bad tile: {tile}"
         return self.key / f"{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_{tile.z[0]}-{tile.z[1]}"
 
@@ -210,13 +221,13 @@ class PrecomputedChunksInfo:
     def __init__(
         self,
         *,
-        type_: str,
-        data_type: np.dtype, #type: ignore
+        type_: Literal["image"],
+        data_type: "np.dtype[Any]", #FIXME
         num_channels: int,
         scales: Tuple[PrecomputedChunksScale, ...],
     ):
-        self.type_ = type_
-        self.data_type = data_type #type: ignore
+        self.type_: Literal["image"] = type_
+        self.data_type = data_type
         self.num_channels = num_channels
         self.scales = scales
         self.scales_5d = [
@@ -229,14 +240,22 @@ class PrecomputedChunksInfo:
             raise ValueError("num_channels must be greater than 0", self.__dict__)
         if len(scales) == 0:
             raise ValueError("Must provide at least one scale", self.__dict__)
+        super().__init__()
 
     @classmethod
     def from_datasource(
-        cls, *, datasource: DataSource, scale_key: Path, encoding: PrecomputedChunksEncoder) -> "PrecomputedChunksInfo":
+        cls,
+        *,
+        datasource: DataSource,
+        scale_key: PurePosixPath,
+        encoding: PrecomputedChunksEncoder = RawEncoder(),
+        num_channels: Optional[int] = None,
+        data_type: "np.dtype[Any] | None" = None, #FIXME: remove Any?
+    ) -> "PrecomputedChunksInfo":
         return PrecomputedChunksInfo(
             type_="image",
-            data_type=datasource.dtype, #type: ignore
-            num_channels=datasource.shape.c,
+            data_type=data_type or datasource.dtype,
+            num_channels=num_channels or datasource.shape.c,
             scales=tuple([
                 PrecomputedChunksScale.from_datasource(
                     datasource=datasource, key=scale_key, encoding=encoding
@@ -247,7 +266,7 @@ class PrecomputedChunksInfo:
     def stripped(self, resolution: Tuple[int, int, int]) -> "PrecomputedChunksInfo":
         return PrecomputedChunksInfo(
             type_=self.type_,
-            data_type=self.data_type, #type: ignore
+            data_type=self.data_type,
             num_channels=self.num_channels,
             scales=tuple([self.get_scale_5d(resolution=resolution)])
         )
@@ -265,17 +284,32 @@ class PrecomputedChunksInfo:
         return (
             isinstance(other, PrecomputedChunksInfo) and
             self.type_ == other.type_ and
-            self.data_type == other.data_type and #type: ignore
+            self.data_type == other.data_type and
             self.num_channels == other.num_channels and
             self.scales == other.scales
         )
 
     @classmethod
+    def tryLoad(cls, filesystem: JsonableFilesystem, path: PurePosixPath) ->"PrecomputedChunksInfo | Exception":
+        url = filesystem.geturl(path.as_posix())
+        if not filesystem.exists(path.as_posix()):
+            return FileNotFoundError(f"Could not find info file at {url}")
+        with filesystem.openbin(path.as_posix(), "r") as f:
+            try:
+                info_json = f.read().decode("utf8")
+                return PrecomputedChunksInfo.from_json_value(json.loads(info_json))
+            except Exception:
+                return ValueError(f"Could not interpret json info file at {url}")
+
+    @classmethod
     def from_json_value(cls, data: JsonValue):
         data_dict = ensureJsonObject(data)
+        type_ = ensureJsonString(data_dict.get("type"))
+        if type_ != "image":
+            raise ValueError(f"Bad 'type' marker value: {type_}")
         return PrecomputedChunksInfo(
-            type_=ensureJsonString(data_dict.get("type")),
-            data_type=np.dtype(ensureJsonString(data_dict.get("data_type"))), #type: ignore
+            type_=type_,
+            data_type=np.dtype(ensureJsonString(data_dict.get("data_type"))),
             num_channels=ensureJsonInt(data_dict.get("num_channels")),
             scales=tuple(
                 PrecomputedChunksScale.from_json_value(raw_scale)
@@ -287,7 +321,7 @@ class PrecomputedChunksInfo:
         return {
             "@type": "neuroglancer_multiscale_volume",
             "type": self.type_,
-            "data_type": str(self.data_type.name), #type: ignore
+            "data_type": str(self.data_type.name),
             "num_channels": self.num_channels,
             "scales": tuple(scale.to_json_value() for scale in self.scales),
         }

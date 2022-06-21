@@ -1,4 +1,4 @@
-import { createElement, removeElement } from "../../util/misc";
+import { createElement, createInput, createInputParagraph, removeElement } from "../../util/misc";
 
 export class PopupWidget{
     public readonly background: HTMLElement
@@ -28,5 +28,52 @@ export class PopupWidget{
     public destroy(){
         removeElement(this.background)
         removeElement(this.element)
+    }
+
+    public static OkPopup(params: {title: string, paragraphs: string[]}): PopupWidget{
+        let popup = new PopupWidget(params.title);
+        for(let paragraph of params.paragraphs){
+            createElement({tagName: "p", parentElement: popup.element, innerHTML: `<p>${paragraph}</p>`})
+        }
+        createInputParagraph({inputType: "button", parentElement:  popup.element, value: "Ok", onClick: () => {
+            popup.destroy()
+        }})
+        return popup
+    }
+}
+
+export class ErrorPopupWidget extends PopupWidget{
+    constructor(params: {message: string, onClose?: () => void}){
+        super("Error")
+        createElement({tagName: "span", parentElement: this.element, innerHTML: params.message})
+        createInputParagraph({inputType: "button", parentElement:  this.element, value: "Ok", onClick: () => {
+            this.destroy()
+            if(params.onClose){
+                params.onClose()
+            }
+        }})
+    }
+}
+
+export class InputPopupWidget<V> extends PopupWidget{
+    constructor(params: {
+        title: string,
+        inputWidgetFactory: (parentElement: HTMLElement) => {value: V},
+        onConfirm: (value: V) => void,
+        onCancel?: () => void
+    }){
+        super(params.title)
+        let inputWidget = params.inputWidgetFactory(this.element)
+        let p = createElement({tagName: "p", parentElement: this.element})
+        createInput({inputType: "button", parentElement: p, value: "Ok", onClick: () => {
+            this.destroy()
+            params.onConfirm(inputWidget.value)
+        }})
+        createInput({inputType: "button", parentElement: p, value: "Cancel", onClick: () => {
+            this.destroy()
+            if(params.onCancel){
+                params.onCancel()
+            }
+        }})
     }
 }

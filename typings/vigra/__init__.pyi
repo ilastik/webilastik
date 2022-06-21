@@ -2,6 +2,7 @@ from vigra.arraytypes import *
 import vigra.arraytypes as arraytypes
 from .__version__ import version as version
 from .filters import convolve as convolve, gaussianSmoothing as gaussianSmoothing
+import .analysis
 from typing import Any, Optional
 from vigra.impex import readImage as readImage, readVolume as readVolume
 from vigra.vigranumpycore import ChunkedArrayCompressed as ChunkedArrayCompressed, ChunkedArrayFull as ChunkedArrayFull, ChunkedArrayHDF5 as ChunkedArrayHDF5, ChunkedArrayLazy as ChunkedArrayLazy, ChunkedArrayTmpFile as ChunkedArrayTmpFile, Compression as Compression, HDF5Mode as HDF5Mode
@@ -18,7 +19,8 @@ class Timer:
     interval: Any = ...
     def __exit__(self, *args: Any) -> None: ...
 standardArrayType = arraytypes.VigraArray
-defaultAxistags: Any
+def defaultAxistags(tagSpec: "int | str", order: "str | None" = None, noChannels: bool = False) -> AxisTags: ...
+
 
 def readHDF5(filenameOrGroup: Any, pathInFile: Any, order: Optional[Any] = ...): ...
 def writeHDF5(data: Any, filenameOrGroup: Any, pathInFile: Any, compression: Optional[Any] = ..., chunks: Optional[Any] = ...) -> None: ...
@@ -42,3 +44,5 @@ MetricType: Any
 
 def loadBSDGt(filename: Any): ...
 def pmapSeeds(pmap: Any) -> None: ...
+
+__all__ = ["analysis"]

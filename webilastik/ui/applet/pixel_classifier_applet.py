@@ -1,131 +1,136 @@
-from typing import Generic, Mapping, Optional, Sequence, Dict, Any, Iterator, TypeVar
-import textwrap
+# pyright: strict
 
-from webilastik.datasource import DataRoi
+from concurrent.futures import Future, Executor
+from dataclasses import dataclass
+from functools import partial
+import threading
+from typing import Any, Callable, Literal, Optional, Sequence, Dict, Union, Mapping
+
 import numpy as np
 
-from webilastik.ui.applet  import Applet, DerivedSlot, NotReadyException, Slot, CONFIRMER
-from webilastik.ui.applet.feature_selection_applet import FeatureSelectionApplet
+from webilastik.ui.applet  import Applet, AppletOutput, CascadeOk, CascadeResult, UserPrompt, applet_output, cascade
 from webilastik.annotations.annotation import Annotation, Color
 from webilastik.features.ilp_filter import IlpFilter
-from webilastik.classifiers.pixel_classifier import Predictions, VigraPixelClassifier
+from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
+from webilastik.ui.usage_error import UsageError
 
 
-DEFAULT_ILP_CLASSIFIER_FACTORY = textwrap.dedent(
-        """
-        ccopy_reg
-        _reconstructor
-        p0
-        (clazyflow.classifiers.parallelVigraRfLazyflowClassifier
-        ParallelVigraRfLazyflowClassifierFactory
-        p1
-        c__builtin__
-        object
-        p2
-        Ntp3
-        Rp4
-        (dp5
-        VVERSION
-        p6
-        I2
-        sV_num_trees
-        p7
-        I100
-        sV_label_proportion
-        p8
-        NsV_variable_importance_path
-        p9
-        NsV_variable_importance_enabled
-        p10
-        I00
-        sV_kwargs
-        p11
-        (dp12
-        sV_num_forests
-        p13
-        I8
-        sb."""[
-            1:
-        ]
-    ).encode("utf8")
+Classifier = VigraPixelClassifier[IlpFilter]
+ColorMap = Dict[Color, np.uint8]
+Description = Literal["disabled", "waiting for inputs", "training", "ready", "error"]
 
+@dataclass
+class _State:
+    live_update: bool
+    classifier: "Future[Classifier | ValueError] | Classifier | None | BaseException"
+    generation: int
+
+    @property
+    def description(self) -> Description:
+        if not self.live_update:
+            return "disabled"
+        if self.classifier is None:
+            return "waiting for inputs"
+        if isinstance(self.classifier, Future):
+            return "training"
+        if isinstance(self.classifier, Exception):
+            return "error"
+        return "ready"
+
+    def updated_with(
+        self,
+        *,
+        classifier: "Future[Classifier | ValueError] | Classifier | None | BaseException",
+        live_update: Optional[bool] = None,
+        generation: Optional[int] = None,
+    ) -> "_State":
+        if self.classifier != classifier and isinstance(self.classifier, Future):
+            _ = self.classifier.cancel()
+
+        return _State(
+            classifier=classifier,
+            live_update=live_update if live_update is not None else self.live_update,
+            generation=generation if generation is not None else self.generation + 1,
+        )
+
+Interaction = Callable[[], Optional[UsageError]]
 
 class PixelClassificationApplet(Applet):
-    pixel_classifier: Slot[VigraPixelClassifier[IlpFilter]]
-
     def __init__(
         self,
         name: str,
         *,
-        feature_extractors: Slot[Sequence[IlpFilter]],
-        annotations: Slot[Sequence[Annotation]],
+        feature_extractors: AppletOutput[Sequence[IlpFilter]],
+        label_classes: AppletOutput[Mapping[Color, Sequence[Annotation]]],
+        executor: Executor,
+        on_async_change: Callable[[], Any],
+        pixel_classifier: "VigraPixelClassifier[IlpFilter] | None",
     ):
         self._in_feature_extractors = feature_extractors
-        self._in_annotations = annotations
-        self.pixel_classifier = DerivedSlot[VigraPixelClassifier[IlpFilter]](
-            owner=self,
-            refresher=self._create_pixel_classifier
+        self._in_label_classes = label_classes
+        self.executor = executor
+        self.on_async_change = on_async_change
+
+        self._state: _State = _State(
+            live_update=False,
+            classifier=pixel_classifier,
+            generation=0,
         )
-        self.color_map = DerivedSlot[Dict[Color, np.uint8]](
-            owner=self,
-            refresher=self._create_color_map
-        )
+
+        self.lock = threading.Lock()
         super().__init__(name=name)
 
-    def _create_pixel_classifier(self, confirmer: CONFIRMER) -> Optional[VigraPixelClassifier[IlpFilter]]:
-        classifier = VigraPixelClassifier[IlpFilter].train(
-            annotations=self._in_annotations(),
-            feature_extractors=self._in_feature_extractors()
-        )
-        classifier.__getstate__() #warm up pickle cache?
-        return classifier
+    def take_snapshot(self) -> _State:
+        with self.lock:
+            return self._state
 
-    def _create_color_map(self, confirmer: CONFIRMER) -> Optional[Dict[Color, np.uint8]]:
-        annotations = self._in_annotations.get() or []
-        return Color.create_color_map([a.color for a in annotations])
+    def restore_snaphot(self, snapshot: _State) -> None:
+        with self.lock:
+            self._state = snapshot
 
-    def predict(self, roi: DataRoi) -> Predictions:
-        classifier = self.pixel_classifier()
-        return classifier.compute(roi)
+    @applet_output
+    def pixel_classifier(self) -> Optional[VigraPixelClassifier[IlpFilter]]:
+        classifier = self._state.classifier
+        return classifier if isinstance(classifier, VigraPixelClassifier) else None #FIXME?
 
-    def get_ilp_classifier_feature_names(self) -> Iterator[bytes]:
-        num_input_channels = self._in_annotations()[0].raw_data.shape.c #FIXME: all lanes always have same c?
-        for fe in sorted(self._in_feature_extractors(), key=lambda ex: FeatureSelectionApplet.ilp_feature_names.index(ex.__class__.__name__)):
-            for c in range(num_input_channels * fe.channel_multiplier):
-                name_and_channel = fe.ilp_name + f" [{c}]"
-                yield name_and_channel.encode("utf8")
+    def refresh(self, user_prompt: UserPrompt) -> CascadeResult:
+        with self.lock:
+            if not self._state.live_update:
+                # annotations or features changed, so classifier is stale
+                self._state = self._state.updated_with(classifier=None)
+                return CascadeOk()
 
-    def get_classifier_ilp_data(self) -> Mapping[str, Any]:
-        classifier = self.pixel_classifier()
-        out = classifier.get_forest_data()
-        feature_names: Iterator[bytes] = self.get_ilp_classifier_feature_names()
-        out["feature_names"] = np.asarray(list(feature_names))
-        out[
-            "pickled_type"
-        ] = b"clazyflow.classifiers.parallelVigraRfLazyflowClassifier\nParallelVigraRfLazyflowClassifier\np0\n."
-        out["known_labels"] = np.asarray(classifier.classes).astype(np.uint32)
-        return out
+            label_classes = self._in_label_classes()
+            feature_extractors = self._in_feature_extractors()
+            if sum(len(labels) for labels in label_classes.values()) == 0 or not feature_extractors:
+                # annotations or features changed, so classifier is stale
+                self._state = self._state.updated_with(classifier=None)
+                return CascadeOk()
 
-    @property
-    def ilp_data(self) -> Dict[str, Any]:
-        out = {
-            "Bookmarks": {"0000": []},
-            "StorageVersion": "0.1",
-            "ClassifierFactory": DEFAULT_ILP_CLASSIFIER_FACTORY,
-        }
-        try:
-            out["ClassifierForests"] = self.get_classifier_ilp_data()
-        except NotReadyException:
-            pass
+            classifier_future = self.executor.submit(
+                partial(Classifier.train, feature_extractors), tuple(label_classes.values())
+            )
+            previous_state = self._state = self._state.updated_with(classifier=classifier_future)
 
-        out["LabelSets"] = labelSets = {"labels000": {}}  # empty labels still produce this in classic ilastik
-        color_map = self.color_map()
-        datasources = {a.raw_data for a in self._in_annotations.get() or []} # FIXME: is order important?
-        for lane_idx, datasource in enumerate(datasources):
-            lane_annotations = [annot for annot in self._in_annotations() or [] if annot.raw_data == datasource]
-            label_data = Annotation.dump_as_ilp_data(lane_annotations, color_map=color_map)
-            labelSets[f"labels{lane_idx:03d}"] = label_data
-        out["LabelColors"] = np.asarray([color.rgba[:-1] for color in color_map.keys()], dtype=np.int64)
-        out["PmapColors"] = out["LabelColors"]
-        out["LabelNames"] = np.asarray([color.name.encode("utf8") for color in color_map.keys()])
-        return out
+        def on_training_ready(classifier_future: Future["VigraPixelClassifier[IlpFilter] | ValueError"]):
+            classifier_result = classifier_future.exception() or classifier_future.result()
+            propagation_result = self._set_classifier(user_prompt, classifier_result, previous_state.generation)
+            if not propagation_result.is_ok():
+                print(f"!!!!!! Training failed: {propagation_result}")
+            self.on_async_change()
+        classifier_future.add_done_callback(on_training_ready)
+
+        return CascadeOk()
+
+    @cascade(refresh_self=False)
+    def _set_classifier(self, user_prompt: UserPrompt, classifier: Union[Classifier, BaseException], generation: int) -> CascadeResult:
+        with self.lock:
+            if self._state.generation == generation:
+                self._state = self._state.updated_with(classifier=classifier)
+        return CascadeOk()
+
+    @cascade(refresh_self=True)
+    def set_live_update(self, user_prompt: UserPrompt, live_update: bool) -> CascadeResult:
+        with self.lock:
+            self._state = self._state.updated_with(classifier=self._state.classifier, live_update=live_update)
+        return CascadeOk()

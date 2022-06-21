@@ -1,4 +1,5 @@
 import { vec3, mat4, vec4, quat } from "gl-matrix";
+import { Url } from "./parsed_url";
 
 export function project(out: vec3, v: vec3, onto: vec3){
     // a . b = |a| * |b| * cos(alpha)
@@ -40,30 +41,23 @@ export type InlineCss = Partial<Omit<
     "getPropertyPriority" | "getPropertyValue" | "item" | "removeProperty" | "setProperty"
 >>
 
-export interface CreateElementParams{
-    tagName:string,
+export function createElement<K extends keyof HTMLElementTagNameMap>({tagName, parentElement, innerHTML, innerText, cssClasses, inlineCss={}, onClick}:{
+    tagName: K,
     parentElement:HTMLElement,
     innerHTML?:string,
+    innerText?:string,
     cssClasses?:Array<string>,
     inlineCss?: InlineCss,
-    onClick?: (event: MouseEvent) => void,
-}
+    onClick?(event: Event): void},
+): HTMLElementTagNameMap[K]{
 
-
-export interface CreateInputParams extends Omit<CreateElementParams, "tagName">{
-    inputType: string,
-    parentElement:HTMLElement,
-    value?:string,
-    name?:string,
-    disabled?:boolean,
-    required?:boolean,
-}
-
-export function createElement({tagName, parentElement, innerHTML, cssClasses, inlineCss={}, onClick}: CreateElementParams): HTMLElement{
     const element = document.createElement(tagName);
     parentElement.appendChild(element)
     if(innerHTML !== undefined){
         element.innerHTML = innerHTML
+    }
+    if(innerText !== undefined){
+        element.innerText = innerText
     }
     (cssClasses || []).forEach(klass => {
         element.classList.add(klass)
@@ -73,6 +67,12 @@ export function createElement({tagName, parentElement, innerHTML, cssClasses, in
     }
     applyInlineCss(element, inlineCss)
     return element
+}
+
+export function createFieldset(params: {parentElement: HTMLElement, legend: string}): HTMLFieldSetElement{
+    let fieldset = createElement({tagName: "fieldset", parentElement: params.parentElement})
+    createElement({tagName: "legend", innerHTML: params.legend, parentElement: fieldset})
+    return fieldset
 }
 
 export function applyInlineCss(element: HTMLElement, inlineCss: InlineCss){
@@ -96,8 +96,18 @@ export function createImage({src, parentElement, cssClasses, onClick}:
     return image
 }
 
+export type InputType = "button" | "text" | "checkbox" | "submit" | "url" | "radio" | "number" | "color"
 
-export function createInput(params : CreateInputParams): HTMLInputElement{
+export function createInput(params: {
+        inputType: InputType,
+        value?: string,
+        name?: string,
+        title?: string,
+        disabled?:boolean,
+        required?: boolean,
+        id?: string,
+    } & Omit<Parameters<typeof createElement>[0], "tagName">
+): HTMLInputElement{
     const input = <HTMLInputElement>createElement({tagName:'input', ...params})
     input.type = params.inputType;
     if(params.value !== undefined){
@@ -106,21 +116,45 @@ export function createInput(params : CreateInputParams): HTMLInputElement{
     if(params.name !== undefined){
         input.name = params.name
     }
+    if(params.title !== undefined){
+        input.title = params.title
+    }
     if(params.required !== undefined){
         input.required = params.required
+    }
+    if(params.id !== undefined){
+        input.id = params.id
     }
     input.disabled = params.disabled ? true : false
     return input
 }
 
-export function createSelect({parentElement, values, name, onClick}:
-    {parentElement:HTMLElement, values?: Map<string, string>, name?:string, onClick?: (event: MouseEvent) => void}
-): HTMLSelectElement{
+export function createInputParagraph(params: Parameters<typeof createInput>[0] & {label_text?: string}): ReturnType<typeof createInput>{
+    let p = createElement({tagName: "p", parentElement: params.parentElement, cssClasses: ["ItkInputParagraph"]})
+    const id = params.id === undefined ? uuidv4() : params.id
+    if(params.label_text !== undefined){
+        const label = createElement({tagName: "label", parentElement: p, innerHTML: params.label_text})
+        label.htmlFor = id
+    }
+    return createInput({...params, parentElement: p, id : id})
+}
+
+export function createSelect<T extends {toString: () => string}>({
+    parentElement,
+    values,
+    name,
+    onClick
+}:{
+    parentElement:HTMLElement,
+    values?: Map<string, T>,
+    name?:string,
+    onClick?: (event: MouseEvent) => void
+}): HTMLSelectElement{
     const select = <HTMLSelectElement>createElement({tagName: 'select', parentElement, onClick})
     if(values !== undefined){
-        values.forEach((value:string, displayValue:string) => {
-            let option = <HTMLInputElement>createElement({tagName: 'option', innerHTML: displayValue, parentElement: select, onClick})
-            option.value = value
+        values.forEach((value: T, displayValue: string) => {
+            let option = createElement({tagName: 'option', innerHTML: displayValue, parentElement: select, onClick})
+            option.value = value.toString()
         })
     }
     if(name !== undefined){
@@ -177,12 +211,6 @@ export function coverContents({target, overlay, offsetLeft=0, offsetBottom=0, wi
     overlay.style.left =   (targetContentRect.left + offsetLeft)   + "px"
 }
 
-
-
-export function vec3ToRgb(value: vec3): string{
-    return "rgb(" + value.map((c: number) => Math.floor(c * 255)).join(", ") + ")"
-}
-
 export function vecToString(value: Float32Array | Array<number>, decimals: number = 3): string{
     let axisNames = "xyzw";
     return Array.from(value).map((value, idx) => {
@@ -216,18 +244,6 @@ export function m4_to_s(m: mat4) : string{
     }
     let comma_sep_lines = lines.map((line) => line.join(", "))
     return comma_sep_lines.join("\n")
-}
-
-export function hexColorToVec3(color: string): vec3{
-    let channels = color.slice(1).match(/../g)!.map(c => parseInt(c, 16) / 255)
-    return vec3.fromValues(channels[0], channels[1], channels[2])
-}
-
-export function vec3ToHexColor(color: vec3): string{
-    return "#" + Array.from(color).map((val) => {
-        const val_str = Math.round(val * 255).toString(16)
-        return val_str.length < 2 ? "0" + val_str : val_str
-    }).join("")
 }
 
 export function vec3to4(v: vec3, w: number): vec4{
@@ -299,10 +315,10 @@ export function sleep(ms: number){
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-export function injectCss(url: URL){
+export function injectCss(url: Url){
     let link_element = createElement({tagName: "link", parentElement: document.head}) as HTMLLinkElement
     link_element.rel = "stylesheet"
-    link_element.href = url.toString()
+    link_element.href = url.schemeless_raw
 }
 
 export function removeElement(element: HTMLElement){
@@ -331,4 +347,59 @@ export async function awaitStalable<T>(params: {referenceKey: string, callable: 
         return new StaleResult(result)
     }
     return result
+}
+
+export function createTable<T extends {[key: string]: string}>(
+    params: {
+        parentElement: HTMLElement,
+        title?: {label: string} | {header: string},
+        headers: T,
+        rows: Array<{[Property in keyof T]: string}>,
+        cssClasses?: Array<string>,
+    }
+): HTMLTableElement{
+    if(params.title){
+        if("label" in params.title){
+            createElement({tagName: "label", parentElement: params.parentElement, innerHTML: params.title.label})
+        }else{
+            createElement({tagName: "h3", parentElement: params.parentElement, innerHTML: params.title.header})
+        }
+    }
+    const table = createElement({tagName: "table", parentElement: params.parentElement, cssClasses: params.cssClasses})
+
+    const header = createElement({tagName: "thead", parentElement: table})
+    for(let key in params.headers){
+        createElement({tagName: "th", parentElement: header, innerHTML: params.headers[key]})
+    }
+
+    const body = createElement({tagName: "tbody", parentElement: table})
+    for(let row of params.rows){
+        let tr = createElement({tagName: "tr", parentElement: body})
+        for(let key in row){
+            createElement({tagName: "td", parentElement: tr, innerHTML: row[key]})
+        }
+    }
+
+    return table
+}
+
+export function hasFocus(element: HTMLElement): boolean{
+    return document.activeElement === element
+}
+
+export function setValueIfUnfocused(input: HTMLInputElement, value: string){
+    if(!hasFocus(input)){
+        input.value = value
+    }
+}
+
+export function getNowString(): string{
+    let now = new Date()
+    let month = now.getMonth().toString().padStart(2, '0')
+    let day = now.getDay().toString().padStart(2, '0')
+    let hours = now.getHours().toString().padStart(2, '0')
+    let minutes = now.getMinutes().toString().padStart(2, '0')
+    let seconds = now.getSeconds().toString().padStart(2, '0')
+
+    return `${now.getFullYear()}y_${month}m_${day}d__${hours}h_${minutes}min_${seconds}s`
 }

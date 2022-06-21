@@ -50,7 +50,7 @@ export interface IDeserializer<T>{
 ///////////////////////////////////////////
 
 export function isJsonLeafValue(value: JsonableValue): value is JsonLeafValue{
-    return typeof value == "number" || typeof value == "string" || value === null
+    return typeof value == "number" || typeof value == "string" || typeof value == "boolean" || value === null
 }
 
 export function isJsonableArray(value: JsonableValue): value is JsonableArray{
@@ -81,7 +81,7 @@ export function ensureJsonNumber(value: JsonValue): number{
 
 export function ensureJsonString(value: JsonValue): string{
     if(typeof(value) !== "string"){
-        throw `Expected number, found ${JSON.stringify(value)}`
+        throw `Expected string, found ${JSON.stringify(value)}`
     }
     return value
 }
@@ -95,7 +95,7 @@ export function ensureJsonObject(value: JsonValue): JsonObject{
 
 export function ensureJsonArray(value: JsonValue): JsonArray{
     if(!isJsonableArray(value)){
-        throw `Expected JSON object, found this: ${JSON.stringify(value)}`
+        throw `Expected JSON array, found this: ${JSON.stringify(value)}`
     }
     return value
 }
@@ -106,4 +106,19 @@ export function ensureJsonNumberTripplet(value: JsonValue): [number, number, num
         throw Error(`Expected number tripplet, found this: ${JSON.stringify(value)}`)
     }
     return [number_array[0], number_array[1], number_array[2]]
+}
+
+export function ensureJsonNumberPair(value: JsonValue): [number, number]{
+    let number_array = ensureJsonArray(value).map(element => ensureJsonNumber(element))
+    if(number_array.length != 2){
+        throw Error(`Expected number pair, found this: ${JSON.stringify(value)}`)
+    }
+    return [number_array[0], number_array[1]]
+}
+
+export function ensureOptional<T>(f: (value: JsonValue) => T, value: JsonValue): T | undefined{
+    if(value === null || value === undefined){
+        return undefined
+    }
+    return f(value)
 }
