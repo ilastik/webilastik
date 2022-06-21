@@ -354,7 +354,7 @@ class WebIlastik:
         if resolution_x is None or resolution_y is None or resolution_z is None:
             return web.Response(status=400, text=f"Bad resolution: {resolution_x}_{resolution_y}_{resolution_z}")
         try:
-            resolution = (int(resolution_x), int(resolution_x), int(resolution_x))
+            resolution = (int(resolution_x), int(resolution_y), int(resolution_z))
         except Exception:
             return web.Response(status=400, text=f"Bad resolution: {resolution_x}_{resolution_y}_{resolution_z}")
 
