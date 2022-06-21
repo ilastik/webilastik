@@ -194,6 +194,8 @@ tasks:
     generates:
       - "{{.DEB_PKG_PATH}}"
     cmds:
+      - echo "Ensuring no changes in the working tree before packing to .deb"
+      - test $(git status --porcelain | wc -l) -eq 0
       - dpkg-deb --build -z2 {{.PKG_TREE_PATH}} {{.DEB_PKG_PATH}}
 
   start-local-server:
