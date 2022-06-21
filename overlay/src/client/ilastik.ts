@@ -632,7 +632,7 @@ export class PrecomputedChunksDataSource extends DataSource{
     }
 
     public toTrainingUrl(session: Session): Url{
-        const original_url = this.filesystem.getUrl().joinPath(this.path.raw)
+        const original_url = this.filesystem.getUrl().joinPath(this.path.raw).updatedWith({datascheme: "precomputed"})
         const resolution_str = `${this.spatial_resolution[0]}_${this.spatial_resolution[1]}_${this.spatial_resolution[2]}`
         return session.sessionUrl
             .ensureDataScheme("precomputed")
