@@ -131,11 +131,44 @@ tasks:
       - echo 2>&1 '[INFO] Generating basic package tree'
       - rm -rf {{.PKG_TREE_PATH}}
       - cp -r {{.PROJECT_ROOT}}/package_tree {{.PKG_TREE_PATH}}
-
       - echo 2>&1 '[INFO] Generating DEBIAN/control file'
       - echo '{{.CONTROL_FILE_CONTENTS}}' > {{.PKG_TREE_PATH}}/DEBIAN/control
 
       - mkdir -p {{.PKG_TREE_PATH}}/etc/webilastik
+      - |
+        python3 - {{.CLI_ARGS}} <<COPY_OIDC_CLIENT_FILE
+
+        import argparse
+        from pathlib import Path
+        import sys
+        import json
+        import shutil
+
+        parser = argparse.ArgumentParser()
+        _ = parser.add_argument(
+            "--oidc-client-json-path",
+            required=True,
+            help="The path to the ebrains OIDC client json (containing things like 'clientId' and 'secret')",
+        )
+        args = parser.parse_args()
+
+        try:
+            oidc_client_json_path = Path(args.oidc_client_json_path)
+        except Exception:
+            print(f"Could not interpret {args.oidc_client_json_path} as a file path")
+            exit(1)
+        if not oidc_client_json_path.exists():
+            print(f"File {oidc_client_json_path} does not exist", file=sys.stderr)
+            exit(1)
+        try:
+            _ = json.load(open(oidc_client_json_path))
+        except Exception:
+            print(f"Could not interpret {oidc_client_json_path} as JSON")
+            exit(1)
+        print(f"Copying {oidc_client_json_path} to {{.PKG_TREE_PATH}}/etc/webilastik/oidc_client.json")
+        shutil.copyfile(oidc_client_json_path, "{{.PKG_TREE_PATH}}/etc/webilastik/oidc_client.json")
+
+        COPY_OIDC_CLIENT_FILE
 
       - echo 2>&1 '[INFO] Unpacking conda environment'
       - mkdir -p {{.PKG_TREE_PATH}}/opt/webilastik_conda_env
