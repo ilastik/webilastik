@@ -21,3 +21,6 @@ def test_url_basics():
     url3 = Url.parse("http://some.host.com/some/path?a=123&b=%5B1%2C+2%2C+3%5D#myhash")
     assert url3 is not None
     assert url3.search["b"]== '[1, 2, 3]'
+
+if __name__ == "__main__":
+    test_url_basics()
