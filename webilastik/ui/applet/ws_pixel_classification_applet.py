@@ -8,7 +8,7 @@ from aiohttp import web
 from webilastik.classifiers.pixel_classifier import PixelClassifier
 
 from webilastik.datasource import DataRoi, DataSource
-from webilastik.ui.applet import PropagationError, UserPrompt
+from webilastik.ui.applet import CascadeError, UserPrompt
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.usage_error import UsageError
@@ -35,7 +35,7 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
         if(method_name == "set_live_update"):
             live_update = ensureJsonBoolean(arguments.get("live_update"))
             result = self.set_live_update(user_prompt=user_prompt, live_update=live_update)
-            if isinstance(result, PropagationError):
+            if isinstance(result, CascadeError):
                 return UsageError(result.message)
             return None
 

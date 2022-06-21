@@ -8,7 +8,7 @@ from typing import Any, Callable, Literal, Optional, Sequence, Dict, Union, Mapp
 
 import numpy as np
 
-from webilastik.ui.applet  import Applet, AppletOutput, PropagationOk, PropagationResult, UserPrompt, applet_output, user_interaction
+from webilastik.ui.applet  import Applet, AppletOutput, CascadeOk, CascadeResult, UserPrompt, applet_output, cascade
 from webilastik.annotations.annotation import Annotation, Color
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
@@ -93,19 +93,19 @@ class PixelClassificationApplet(Applet):
         classifier = self._state.classifier
         return classifier if isinstance(classifier, VigraPixelClassifier) else None #FIXME?
 
-    def on_dependencies_changed(self, user_prompt: UserPrompt) -> PropagationResult:
+    def refresh(self, user_prompt: UserPrompt) -> CascadeResult:
         with self.lock:
             if not self._state.live_update:
                 # annotations or features changed, so classifier is stale
                 self._state = self._state.updated_with(classifier=None)
-                return PropagationOk()
+                return CascadeOk()
 
             label_classes = self._in_label_classes()
             feature_extractors = self._in_feature_extractors()
             if sum(len(labels) for labels in label_classes.values()) == 0 or not feature_extractors:
                 # annotations or features changed, so classifier is stale
                 self._state = self._state.updated_with(classifier=None)
-                return PropagationOk()
+                return CascadeOk()
 
             classifier_future = self.executor.submit(
                 partial(Classifier.train, feature_extractors), tuple(label_classes.values())
@@ -120,17 +120,17 @@ class PixelClassificationApplet(Applet):
             self.on_async_change()
         classifier_future.add_done_callback(on_training_ready)
 
-        return PropagationOk()
+        return CascadeOk()
 
-    @user_interaction(refresh_self=False)
-    def _set_classifier(self, user_prompt: UserPrompt, classifier: Union[Classifier, BaseException], generation: int) -> PropagationResult:
+    @cascade(refresh_self=False)
+    def _set_classifier(self, user_prompt: UserPrompt, classifier: Union[Classifier, BaseException], generation: int) -> CascadeResult:
         with self.lock:
             if self._state.generation == generation:
                 self._state = self._state.updated_with(classifier=classifier)
-        return PropagationOk()
+        return CascadeOk()
 
-    @user_interaction(refresh_self=True)
-    def set_live_update(self, user_prompt: UserPrompt, live_update: bool) -> PropagationResult:
+    @cascade(refresh_self=True)
+    def set_live_update(self, user_prompt: UserPrompt, live_update: bool) -> CascadeResult:
         with self.lock:
             self._state = self._state.updated_with(classifier=self._state.classifier, live_update=live_update)
-        return PropagationOk()
+        return CascadeOk()

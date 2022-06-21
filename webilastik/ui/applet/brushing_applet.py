@@ -7,7 +7,7 @@ import numpy as np
 
 from webilastik.datasource import DataSource
 from webilastik.annotations.annotation import Annotation, Color
-from webilastik.ui.applet import Applet, PropagationError, PropagationOk, PropagationResult, UserPrompt, applet_output, user_interaction
+from webilastik.ui.applet import Applet, CascadeError, CascadeOk, CascadeResult, UserPrompt, applet_output, cascade
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.usage_error import UsageError
 
@@ -44,8 +44,8 @@ class BrushingApplet(Applet):
     def restore_snaphot(self, snapshot: List[Label]) -> None:
         self._labels = snapshot
 
-    def on_dependencies_changed(self, user_prompt: UserPrompt) -> PropagationResult:
-        return PropagationOk()
+    def refresh(self, user_prompt: UserPrompt) -> CascadeResult:
+        return CascadeOk()
 
     @applet_output
     def label_classes(self) -> Dict[Color, Tuple[Annotation, ...]]:
@@ -72,57 +72,57 @@ class BrushingApplet(Applet):
             if label.name == label_name:
                 return label
 
-    @user_interaction(refresh_self=False)
-    def create_label(self, user_prompt: UserPrompt, label_name: str, color: Color) -> PropagationResult:
+    @cascade(refresh_self=False)
+    def create_label(self, user_prompt: UserPrompt, label_name: str, color: Color) -> CascadeResult:
         for label in self._labels:
             if label.name == label_name:
-                return PropagationError(f"A label with name {label_name} already exists")
+                return CascadeError(f"A label with name {label_name} already exists")
             if label.color == color:
-                return PropagationError(f"A label with color {color.hex_code} already exists: {label.name}")
+                return CascadeError(f"A label with color {color.hex_code} already exists: {label.name}")
         self._labels.append(Label(name=label_name, color=color, annotations=[]))
-        return PropagationOk()
+        return CascadeOk()
 
-    @user_interaction(refresh_self=False)
-    def remove_label(self, user_prompt: UserPrompt, label_name: str) -> PropagationResult:
+    @cascade(refresh_self=False)
+    def remove_label(self, user_prompt: UserPrompt, label_name: str) -> CascadeResult:
         self._labels = [label for label in self._labels if label.name != label_name]
-        return PropagationOk()
+        return CascadeOk()
 
-    @user_interaction(refresh_self=False)
-    def add_annotation(self, user_prompt: UserPrompt, label_name: str, annotation: Annotation) -> PropagationResult:
+    @cascade(refresh_self=False)
+    def add_annotation(self, user_prompt: UserPrompt, label_name: str, annotation: Annotation) -> CascadeResult:
         label = self.get_label(label_name)
         if label is None:
-            return PropagationError(f"No label with name {label_name}")
+            return CascadeError(f"No label with name {label_name}")
         label.annotations.append(annotation)
-        return PropagationOk()
+        return CascadeOk()
 
-    @user_interaction(refresh_self=False)
-    def remove_annotation(self, user_prompt: UserPrompt, label_name: str, annotation: Annotation) -> PropagationResult:
+    @cascade(refresh_self=False)
+    def remove_annotation(self, user_prompt: UserPrompt, label_name: str, annotation: Annotation) -> CascadeResult:
         label = self.get_label(label_name)
         if label is None:
-            return PropagationError(f"No label with name {label_name}")
+            return CascadeError(f"No label with name {label_name}")
         label.annotations = [a for a in label.annotations if a != annotation]
-        return PropagationOk()
+        return CascadeOk()
 
-    @user_interaction(refresh_self=False)
-    def recolor_label(self, user_prompt: UserPrompt, label_name: str, new_color: Color) -> PropagationResult:
+    @cascade(refresh_self=False)
+    def recolor_label(self, user_prompt: UserPrompt, label_name: str, new_color: Color) -> CascadeResult:
         label = self.get_label(label_name)
         if label is None:
-            return PropagationError(f"No label named {label_name}")
+            return CascadeError(f"No label named {label_name}")
         if new_color in self.label_colors():
-            return PropagationError(f"Label with color {new_color.hex_code} already exists")
+            return CascadeError(f"Label with color {new_color.hex_code} already exists")
         label.color = new_color
-        return PropagationOk()
+        return CascadeOk()
 
-    @user_interaction(refresh_self=False)
-    def rename_label(self, user_prompt: UserPrompt, old_name: str, new_name: str) -> PropagationResult:
+    @cascade(refresh_self=False)
+    def rename_label(self, user_prompt: UserPrompt, old_name: str, new_name: str) -> CascadeResult:
         target_label = self.get_label(old_name)
         if target_label is None:
-            return PropagationError(f"No label named {old_name}")
+            return CascadeError(f"No label named {old_name}")
         homonym_label = self.get_label(new_name)
         if homonym_label is not None and homonym_label is not target_label:
-            return PropagationError(f"There is already a label named '{new_name}'")
+            return CascadeError(f"There is already a label named '{new_name}'")
         target_label.name = new_name
-        return PropagationOk()
+        return CascadeOk()
 
 
 class WsBrushingApplet(WsApplet, BrushingApplet):

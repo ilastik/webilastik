@@ -19,24 +19,24 @@ def dummy_prompt(message: str, options: Dict[str, T]) -> Optional[T]:
         return value
     return None
 
-class PropagationResult(ABC):
+class CascadeResult(ABC):
     @abstractmethod
     def _abstract_sentinel(self):
         """Prevents this class from being instantiated"""
         pass
 
     def is_ok(self) -> bool:
-        return isinstance(self, PropagationOk)
+        return isinstance(self, CascadeOk)
 
-class UserCancelled(PropagationResult):
+class UserCancelled(CascadeResult):
     def _abstract_sentinel(self):
         return
 
-class PropagationOk(PropagationResult):
+class CascadeOk(CascadeResult):
     def _abstract_sentinel(self):
         return
 
-class PropagationError(PropagationResult):
+class CascadeError(CascadeResult):
     def __init__(self, message: str) -> None:
         self.message = message
         super().__init__()
@@ -53,7 +53,7 @@ class Applet(ABC):
         self.upstream_applets: Set[Applet] = set()
         # FIXME: maybe no __dict__ magic and explicit subscribe?
         for field in self.__dict__.values():
-            if isinstance(field, UserInteraction):
+            if isinstance(field, Cascade):
                 assert field.applet == self, "Borrowing UserInputs messes up dirty propagation"
             elif isinstance(field, AppletOutput):
                 if field.applet is not self:
@@ -71,7 +71,7 @@ class Applet(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def on_dependencies_changed(self, user_prompt: UserPrompt) -> PropagationResult:
+    def refresh(self, user_prompt: UserPrompt) -> CascadeResult:
         raise NotImplementedError
 
     def __repr__(self) -> str:
@@ -94,15 +94,15 @@ APPLET = TypeVar("APPLET", bound="Applet")
 P = ParamSpec("P")
 
 
-def user_interaction(*, refresh_self: bool):
-    def wrapper(applet_method: Callable[Concatenate[APPLET, UserPrompt, P], PropagationResult]) -> _UserInteractionDescriptor[APPLET, P]:
-        return _UserInteractionDescriptor[APPLET, P](refresh_self=refresh_self, applet_method=applet_method)
+def cascade(*, refresh_self: bool):
+    def wrapper(applet_method: Callable[Concatenate[APPLET, UserPrompt, P], CascadeResult]) -> _CascadeDescriptor[APPLET, P]:
+        return _CascadeDescriptor[APPLET, P](refresh_self=refresh_self, applet_method=applet_method)
     return wrapper
 
 
-class UserInteraction(Generic[P]):
+class Cascade(Generic[P]):
     # @private
-    def __init__(self, *, refresh_self: bool, applet: APPLET, applet_method: Callable[Concatenate[APPLET, UserPrompt, P], PropagationResult]):
+    def __init__(self, *, refresh_self: bool, applet: APPLET, applet_method: Callable[Concatenate[APPLET, UserPrompt, P], CascadeResult]):
         self.refresh_self = refresh_self
         self.applet = applet
         self._applet_method = applet_method
@@ -110,7 +110,7 @@ class UserInteraction(Generic[P]):
         self.__self__ = applet
         super().__init__()
 
-    def __call__(self, user_prompt: UserPrompt, *args: P.args, **kwargs: P.kwargs) -> PropagationResult:
+    def __call__(self, user_prompt: UserPrompt, *args: P.args, **kwargs: P.kwargs) -> CascadeResult:
         applet_snapshots : Dict["Applet", Any] = {}
 
         def restore_snapshots():
@@ -131,7 +131,7 @@ class UserInteraction(Generic[P]):
                 for applet in applets_to_refresh:
                     if applet not in applet_snapshots:
                         applet_snapshots[applet] = applet.take_snapshot()
-                    propagation_result = applet.on_dependencies_changed(user_prompt=user_prompt)
+                    propagation_result = applet.refresh(user_prompt=user_prompt)
                     if not propagation_result.is_ok():
                         restore_snapshots()
                         return propagation_result
@@ -139,18 +139,18 @@ class UserInteraction(Generic[P]):
                 return action_result
         except Exception as e:
             restore_snapshots()
-            return PropagationError(str(e))
+            return CascadeError(str(e))
 
-class _UserInteractionDescriptor(Generic[APPLET, P]):
-    def __init__(self, refresh_self: bool, applet_method: Callable[Concatenate[APPLET, UserPrompt, P], PropagationResult]):
+class _CascadeDescriptor(Generic[APPLET, P]):
+    def __init__(self, refresh_self: bool, applet_method: Callable[Concatenate[APPLET, UserPrompt, P], CascadeResult]):
         self.refresh_self = refresh_self
         self._applet_method = applet_method
         self.private_name: str = "__user_interaction_" + applet_method.__name__
         super().__init__()
 
-    def __get__(self, instance: APPLET, owner: Type[APPLET]) -> "UserInteraction[P]":
+    def __get__(self, instance: APPLET, owner: Type[APPLET]) -> "Cascade[P]":
         if not hasattr(instance, self.private_name):
-            user_input = UserInteraction[P](refresh_self=self.refresh_self, applet=instance, applet_method=self._applet_method)
+            user_input = Cascade[P](refresh_self=self.refresh_self, applet=instance, applet_method=self._applet_method)
             setattr(instance, self.private_name, user_input)
         return getattr(instance, self.private_name)
 
@@ -219,8 +219,8 @@ class applet_output(Generic[APPLET, OUT]):
 
 class InertApplet(Applet):
     @final
-    def on_dependencies_changed(self, user_prompt: UserPrompt) -> PropagationResult:
-        return PropagationOk()
+    def refresh(self, user_prompt: UserPrompt) -> CascadeResult:
+        return CascadeOk()
 
 
 class NoSnapshotApplet(Applet):

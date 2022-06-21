@@ -1,14 +1,14 @@
 from typing import Optional
 from ndstructs.utils.json_serializable import JsonObject
-from webilastik.ui.applet import PropagationError, PropagationResult
+from webilastik.ui.applet import CascadeError, CascadeResult
 
 
 class UsageError(Exception):
     pass
 
     @classmethod
-    def check(cls, result: PropagationResult) -> Optional["UsageError"]:
-        if isinstance(result, PropagationError):
+    def check(cls, result: CascadeResult) -> Optional["UsageError"]:
+        if isinstance(result, CascadeError):
             return UsageError(result.message)
         return None
 

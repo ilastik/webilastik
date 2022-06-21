@@ -1,7 +1,7 @@
 # pyright: strict
 
 from typing import Any, Optional
-from webilastik.ui.applet import InertApplet, UserCancelled, PropagationOk, PropagationResult, AppletOutput, applet_output, Applet, NoSnapshotApplet, StatelesApplet, user_interaction, dummy_prompt, UserPrompt
+from webilastik.ui.applet import InertApplet, UserCancelled, CascadeOk, CascadeResult, AppletOutput, applet_output, Applet, NoSnapshotApplet, StatelesApplet, cascade, dummy_prompt, UserPrompt
 
 
 class InputIdentityApplet(NoSnapshotApplet, InertApplet):
@@ -9,10 +9,10 @@ class InputIdentityApplet(NoSnapshotApplet, InertApplet):
         self._value: Optional[int] = None
         super().__init__(name)
 
-    @user_interaction(refresh_self=False)
-    def set_value(self, user_prompt: UserPrompt, value: Optional[int]) -> PropagationResult:
+    @cascade(refresh_self=False)
+    def set_value(self, user_prompt: UserPrompt, value: Optional[int]) -> CascadeResult:
         self._value = value
-        return PropagationOk()
+        return CascadeOk()
 
     @applet_output
     def value(self) -> Optional[int]:
@@ -43,15 +43,15 @@ class AdderApplet(StatelesApplet):
             return None
         return val1 + val2
 
-class PropagationCounterApplet(NoSnapshotApplet):
+class CascadeCounterApplet(NoSnapshotApplet):
     def __init__(self, name: str, source: AppletOutput[Optional[int]]) -> None:
         self._source = source
         self.refresh_count = 0
         super().__init__(name)
 
-    def on_dependencies_changed(self, user_prompt: UserPrompt) -> PropagationResult:
+    def refresh(self, user_prompt: UserPrompt) -> CascadeResult:
         self.refresh_count += 1
-        return PropagationOk()
+        return CascadeOk()
 
 class CachingTripplerApplet(Applet):
     def __init__(self, name: str, source: AppletOutput[Optional[int]]) -> None:
@@ -65,10 +65,10 @@ class CachingTripplerApplet(Applet):
     def restore_snaphot(self, snapshot: Any):
         self._trippled_cache = snapshot
 
-    def on_dependencies_changed(self, user_prompt: UserPrompt) -> PropagationResult:
+    def refresh(self, user_prompt: UserPrompt) -> CascadeResult:
         in_value = self._source()
         self._trippled_cache = in_value if in_value is None else in_value * 3
-        return PropagationOk()
+        return CascadeOk()
 
     @applet_output
     def out_trippled(self) -> Optional[int]:
@@ -81,11 +81,11 @@ class FailingPropagationApplet(NoSnapshotApplet):
         self._num_refreshes = 0
         super().__init__(name)
 
-    def on_dependencies_changed(self, user_prompt: UserPrompt) -> PropagationResult:
+    def refresh(self, user_prompt: UserPrompt) -> CascadeResult:
         if self._num_refreshes >= self._fail_after:
             result = UserCancelled()
         else:
-            result = PropagationOk()
+            result = CascadeOk()
         self._num_refreshes += 1
         return result
 
@@ -121,7 +121,7 @@ def test_topographic_sorting_of_applets():
 
     adder_3 = AdderApplet(name="adder_3", source1=forwarder_4.out, source2=forwarder_3.out)
 
-    refresh_counter = PropagationCounterApplet(name="refresh_counter", source = adder_3.out)
+    refresh_counter = CascadeCounterApplet(name="refresh_counter", source = adder_3.out)
 
     assert len(adder_3.upstream_applets) == 7
     assert adder_3.upstream_applets == set([
@@ -195,7 +195,7 @@ def test_snapshotting_on_cancelled_refresh():
     )
 
     result = input_applet.set_value(dummy_prompt, 10)
-    assert isinstance(result, PropagationOk)
+    assert isinstance(result, CascadeOk)
     assert caching_trippler_applet.out_trippled() == 30
 
     result = input_applet.set_value(dummy_prompt, 20)
@@ -240,13 +240,13 @@ def test_auto_update_on_user_interaction():
         def restore_snaphot(self, snapshot: int) -> None:
             self._num_changes = snapshot
 
-        def on_dependencies_changed(self, user_prompt: UserPrompt) -> PropagationResult:
+        def refresh(self, user_prompt: UserPrompt) -> CascadeResult:
             self._num_changes += 1
-            return PropagationOk()
+            return CascadeOk()
 
-        @user_interaction(refresh_self=True)
-        def do_something(self, user_prompt: UserPrompt) -> PropagationResult:
-            return PropagationOk()
+        @cascade(refresh_self=True)
+        def do_something(self, user_prompt: UserPrompt) -> CascadeResult:
+            return CascadeOk()
 
         @applet_output
         def num_changes(self) -> int:

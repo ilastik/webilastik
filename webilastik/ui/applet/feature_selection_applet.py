@@ -4,7 +4,7 @@ from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonA
 from webilastik.datasource import DataSource
 from webilastik.features.channelwise_fastfilters import DifferenceOfGaussians, GaussianGradientMagnitude, GaussianSmoothing, HessianOfGaussianEigenvalues, LaplacianOfGaussian, StructureTensorEigenvalues
 
-from webilastik.ui.applet import Applet, AppletOutput, PropagationOk, PropagationResult, UserCancelled, UserPrompt, applet_output, user_interaction
+from webilastik.ui.applet import Applet, AppletOutput, CascadeOk, CascadeResult, UserCancelled, UserPrompt, applet_output, cascade
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.usage_error import UsageError
@@ -31,7 +31,7 @@ class FeatureSelectionApplet(Applet):
     def feature_extractors(self) -> Sequence[IlpFilter]:
         return sorted(self._feature_extractors, key=lambda fe: json.dumps(fe.to_json_value())) #FIXME
 
-    def _set_feature_extractors(self, user_prompt: UserPrompt, feature_extractors: Iterable[IlpFilter]) -> PropagationResult:
+    def _set_feature_extractors(self, user_prompt: UserPrompt, feature_extractors: Iterable[IlpFilter]) -> CascadeResult:
         candidate_extractors = set(feature_extractors)
         incompatible_extractors : Set[IlpFilter] = set()
 
@@ -50,23 +50,23 @@ class FeatureSelectionApplet(Applet):
         ):
             return UserCancelled()
         self._feature_extractors = candidate_extractors.difference(incompatible_extractors)
-        return PropagationOk()
+        return CascadeOk()
 
-    @user_interaction(refresh_self=True)
-    def add_feature_extractors(self, user_prompt: UserPrompt, feature_extractors: Iterable[IlpFilter]) -> PropagationResult:
+    @cascade(refresh_self=True)
+    def add_feature_extractors(self, user_prompt: UserPrompt, feature_extractors: Iterable[IlpFilter]) -> CascadeResult:
         return self._set_feature_extractors(
             user_prompt=user_prompt,
             feature_extractors=self._feature_extractors.union(feature_extractors)
         )
 
-    @user_interaction(refresh_self=True)
-    def remove_feature_extractors(self, user_prompt: UserPrompt, feature_extractors: Iterable[IlpFilter]) -> PropagationResult:
+    @cascade(refresh_self=True)
+    def remove_feature_extractors(self, user_prompt: UserPrompt, feature_extractors: Iterable[IlpFilter]) -> CascadeResult:
         return self._set_feature_extractors(
             user_prompt=user_prompt,
             feature_extractors=self._feature_extractors.difference(feature_extractors)
         )
 
-    def on_dependencies_changed(self, user_prompt: UserPrompt) -> PropagationResult:
+    def refresh(self, user_prompt: UserPrompt) -> CascadeResult:
         return self._set_feature_extractors(user_prompt=user_prompt, feature_extractors=self._feature_extractors)
 
 class WsFeatureSelectionApplet(WsApplet, FeatureSelectionApplet):
