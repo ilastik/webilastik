@@ -119,8 +119,6 @@ export class DropdownSelect<T>{
         }
         this.element.addEventListener("change", () => {
             this._value = this.allOptions[this.element.selectedIndex]
-            console.log("Selecting this value in dropdown sleect:")
-            console.log(this._value)
         })
     }
 
