@@ -124,7 +124,7 @@ export class NeuroglancerDriver implements IViewerDriver{
             ["xz", quat.setAxisAngle(quat.create(), vec3.fromValues(1, 0, 0), Math.PI / 2)], // FIXME
             ["yz", quat.setAxisAngle(quat.create(), vec3.fromValues(0, 1, 0), Math.PI / 2)],//FIXME
         ])
-        if(layout == "4panel"){
+        if(layout == "4panel" && panels.length == 4){ //the layout switches name to '4panel' even without the panels being created
             console.log("Detected 4panel layout!s!")
             return [
                 new NeuroglancerViewportDriver(this, panels[0], orientation_offsets.get("xy")!),
@@ -135,11 +135,9 @@ export class NeuroglancerDriver implements IViewerDriver{
         return [new NeuroglancerViewportDriver(this, panels[0], orientation_offsets.get(layout.replace("-3d", ""))!)]
     }
     onViewportsChanged(handler: () => void){
-        this.viewer.layerManager.layersChanged.add(() => {
+        this.viewer.display.changed.add(() => {
             handler()
         })
-        // this.viewer.layerManager.layersChanged.add(() => handler())
-        // this.viewer.layout.changed.add(() => handler())
     }
     refreshView(params: {native_view: INativeView, similar_url_hint?: string, channel_colors?: vec3[]}){
         let shader: string | undefined = undefined;
