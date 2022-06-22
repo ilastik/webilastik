@@ -26,7 +26,9 @@ export class VertexArrayObject{
 }
 
 export enum BindTarget {
+    //Buffer containing vertex attributes, such as vertex coordinates, texture coordinate data, or vertex color data
     ARRAY_BUFFER = WebGL2RenderingContext.ARRAY_BUFFER,
+    //Buffer used for element indices
     ELEMENT_ARRAY_BUFFER = WebGL2RenderingContext.ELEMENT_ARRAY_BUFFER,
 }
 
