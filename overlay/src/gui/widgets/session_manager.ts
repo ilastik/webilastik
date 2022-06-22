@@ -65,6 +65,8 @@ export class SessionManagerWidget{
         this.session_loader = new SessionLoaderWidget({parentElement: this.element, ilastikUrl, onNewSession, onUsageError})
 
         const onLeaveSession = () => {
+            this.session?.closeWebsocket()
+            this.session = undefined
             this.workflow?.destroy()
             close_session_btn.disabled = true
             leave_session_btn.disabled = true
@@ -78,7 +80,8 @@ export class SessionManagerWidget{
             value: "Close Session",
             parentElement: this.element,
             onClick: async () => {
-                this.session?.close()
+                this.session?.terminate()
+                this.session = undefined
                 onLeaveSession()
                 this.session_loader.setFields({
                     ilastikUrl,
