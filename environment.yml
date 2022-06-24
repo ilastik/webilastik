@@ -1,4 +1,4 @@
-name: webilastikbla
+name: webilastik
 channels:
   - ilastik-forge
   - conda-forge
