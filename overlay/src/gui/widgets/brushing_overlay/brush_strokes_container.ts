@@ -5,7 +5,7 @@ import { createElement, createInput, createInputParagraph, removeElement, vecToS
 import { ensureJsonArray, ensureJsonObject, ensureJsonString, JsonValue } from "../../../util/serialization";
 import { ColorPicker } from "../color_picker";
 import { ErrorPopupWidget, PopupWidget } from "../popup";
-import { DropdownSelect } from "../selector_widget";
+import { PopupSelect } from "../selector_widget";
 import { BrushStroke } from "./brush_stroke";
 
 export type resolution = vec3;
@@ -17,7 +17,7 @@ export class BrushingApplet extends Applet<State>{
     public readonly element: HTMLDivElement;
     private labelWidgets = new Map<string, LabelWidget>()
     private labelSelectorContainer: HTMLSpanElement;
-    private labelSelector: DropdownSelect<string> | undefined
+    private labelSelector: PopupSelect<{name: string, color: Color}> | undefined
 
     constructor(params: {
         session: Session,
@@ -77,11 +77,11 @@ export class BrushingApplet extends Applet<State>{
     }
 
     public get currentLabelWidget(): LabelWidget | undefined{
-        let name = this.labelSelector?.value;
-        if(name === undefined){
+        let label = this.labelSelector?.value;
+        if(label === undefined){
             return undefined
         }
-        return this.labelWidgets.get(name)
+        return this.labelWidgets.get(label.name)
     }
 
     public get currentColor(): Color | undefined{
@@ -112,7 +112,9 @@ export class BrushingApplet extends Applet<State>{
         }
         this.labelWidgets = new Map()
 
+        let labelOptions = new Array<{name: string, color: Color}>();
         for(let {name, color, annotations} of newState.labels){
+            labelOptions.push({name, color})
             let colorGroupWidget = new LabelWidget({
                 name,
                 parentElement: this.element,
@@ -135,30 +137,39 @@ export class BrushingApplet extends Applet<State>{
             this.labelWidgets.set(name, colorGroupWidget)
         }
 
-
-        let currentLabelName = this.labelSelector?.value;
-        let currentLabelIndex = this.labelSelector?.selectedIndex
-
+        let currentLabel = this.labelSelector?.value;
         this.labelSelectorContainer.innerHTML = ""
-        let labelNames = newState.labels.map(label => label.name)
-        if(labelNames.length == 0){
+        if(labelOptions.length == 0){
             this.labelSelector = undefined
             return
         }
-        createElement({tagName: "label", parentElement: this.labelSelectorContainer, innerText: "Current Label: "})
-        this.labelSelector = new DropdownSelect({
+
+        createElement({tagName: "label", parentElement: this.labelSelectorContainer, innerText: "Current label: "})
+        this.labelSelector = new PopupSelect<{name: string, color: Color}>({
+            popupTitle: "Select a label",
             parentElement: this.labelSelectorContainer,
-            firstOption: labelNames[0],
-            otherOptions: labelNames.slice(1),
-            optionRenderer: (name) => name,
-            optionComparator: (name1, name2) => name1 == name2,
+            options: labelOptions,
+            comparator: (label1, label2) => label1.name == label2.name,
+            optionRenderer: (args) => {
+                createElement({tagName: "span", parentElement: args.parentElement, innerText: args.option.name + " "})
+                createElement({tagName: "span", parentElement: args.parentElement, innerText: "🖌️", inlineCss: {
+                    backgroundColor: args.option.color.hexCode,
+                    padding: "2px",
+                    border: "solid 1px black"
+                }})
+            },
         })
-        if(currentLabelName){
-            if(this.labelWidgets.has(currentLabelName)){
-                this.labelSelector.value = currentLabelName
-            }else if (currentLabelIndex != undefined && currentLabelIndex < this.labelSelector.values.length){
-                this.labelSelector.value = this.labelSelector.values[currentLabelIndex]
+        if(currentLabel){
+            if(this.labelWidgets.has(currentLabel.name)){
+                this.labelSelector.value = currentLabel
+                return
             }
+            for(let labelWidget of this.labelWidgets.values()){
+                if(labelWidget.color.equals(currentLabel.color)){
+                    this.labelSelector.value = {name: labelWidget.name, color: labelWidget.color}
+                    return
+                }
+            };
         }
     }
 
