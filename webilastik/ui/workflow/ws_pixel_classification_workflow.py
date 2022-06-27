@@ -130,7 +130,7 @@ class WebIlastik:
         self._loop: Optional[AbstractEventLoop] = None
 
         self.executor = ProcessPoolExecutor(max_workers=multiprocessing.cpu_count())
-        self.priority_executor = PriorityExecutor(executor=self.executor, num_concurrent_tasks=multiprocessing.cpu_count())
+        self.priority_executor = PriorityExecutor(executor=self.executor, max_active_job_steps=2 * multiprocessing.cpu_count())
 
         self.workflow = PixelClassificationWorkflow(
             on_async_change=lambda : self.enqueue_user_interaction(lambda: None), #FIXME?

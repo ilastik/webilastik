@@ -42,8 +42,8 @@ def wait_until_jobs_completed(workflow: PixelClassificationWorkflow, timeout: fl
 
 
 def test_pixel_classification_workflow():
-    executor = ProcessPoolExecutor()
-    priority_executor = PriorityExecutor(executor=executor, num_concurrent_tasks=8)
+    executor = ProcessPoolExecutor(max_workers=8)
+    priority_executor = PriorityExecutor(executor=executor, max_active_job_steps=8)
 
     workflow = PixelClassificationWorkflow(
         on_async_change=lambda : print(json.dumps(workflow.export_applet._get_json_state(), indent=4)),
@@ -154,7 +154,7 @@ def test_pixel_classification_workflow():
         resolution=(1,1,1)
     )
     for tile in predictions_output.roi.get_datasource_tiles():
-        _ = tile.retrieve().cut(c=1).as_uint8(normalized=True)#.show_channels()
+        _ = tile.retrieve().cut(c=1).as_uint8(normalized=True).show_channels()
 
 ##################################333
 
@@ -189,7 +189,7 @@ def test_pixel_classification_workflow():
         resolution=(1,1,1)
     )
     for tile in segmentation_output_1.roi.get_datasource_tiles():
-        _ = tile.retrieve()#.show_images()
+        _ = tile.retrieve().show_images()
 
 ####################################3
 

@@ -10,7 +10,7 @@ def sleeping_target(t: int):
 
 def test_job():
     executor = ThreadPoolExecutor(max_workers=2)
-    priority_executor = PriorityExecutor(executor=executor, num_concurrent_tasks=1)
+    priority_executor = PriorityExecutor(executor=executor, max_active_job_steps=1)
     job = Job(
         name="my_test_job",
         target=sleeping_target,
