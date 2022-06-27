@@ -68,14 +68,16 @@ class Job(Generic[IN, OUT]):
 
     def _get_next_task(self) -> "_JobStepTask[OUT] | None":
         with self.job_lock:
-            if self._done() or not self.args.has_next():
+            if self._done():
                 return None
+            if not self.args.has_next():
+                self.num_args = self.num_dispatched_steps #FIXME
+                return None
+            step_arg = self.args.get_next()
             if self._status == "pending":
                 self._status = "running"
             step_index = self.num_dispatched_steps
             self.num_dispatched_steps += 1
-            if not self.args.has_next():
-                self.num_args = self.num_dispatched_steps #FIXME
 
         def step_done_callback(future: Future[Any]): # FIXME
             with self.job_lock:
@@ -100,7 +102,7 @@ class Job(Generic[IN, OUT]):
 
         return _JobStepTask(
             job=self,
-            fn=functools.partial(self.target, self.args.get_next()),
+            fn=functools.partial(self.target, step_arg),
             inner_future_done_callback=step_done_callback,
         )
 
