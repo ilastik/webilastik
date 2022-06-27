@@ -113,6 +113,9 @@ class PixelClassificationApplet(Applet):
             previous_state = self._state = self._state.updated_with(classifier=classifier_future)
 
         def on_training_ready(classifier_future: Future["VigraPixelClassifier[IlpFilter] | ValueError"]):
+            if classifier_future.cancelled():
+                print(f"{self.__class__.__name__} ({self.name}) Training was cancelled....")
+                return
             classifier_result = classifier_future.exception() or classifier_future.result()
             propagation_result = self._set_classifier(user_prompt, classifier_result, previous_state.generation)
             if not propagation_result.is_ok():
