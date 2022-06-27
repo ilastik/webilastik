@@ -68,7 +68,7 @@ class PixelClassificationWorkflow:
             "pixel_classification_applet",
             feature_extractors=self.feature_selection_applet.feature_extractors,
             label_classes=self.brushing_applet.label_classes,
-            executor=executor,
+            executor=priority_executor,
             on_async_change=on_async_change,
             pixel_classifier=pixel_classifier,
         )
