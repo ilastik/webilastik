@@ -133,7 +133,6 @@ class WebIlastik:
         self.priority_executor = PriorityExecutor(executor=self.executor, num_concurrent_tasks=multiprocessing.cpu_count())
 
         self.workflow = PixelClassificationWorkflow(
-            ebrains_user_token=ebrains_user_token,
             on_async_change=lambda : self.enqueue_user_interaction(lambda: None), #FIXME?
             executor=self.executor,
             priority_executor=self.priority_executor
@@ -334,7 +333,6 @@ class WebIlastik:
         ))
         new_workflow_result = PixelClassificationWorkflow.from_ilp_bytes(
             ilp_bytes=ilp_bytes,
-            ebrains_user_token=UserToken.get_global_token_or_raise(),
             on_async_change=lambda : self.enqueue_user_interaction(lambda: None), #FIXME?
             executor=self.executor,
             priority_executor=self.priority_executor,

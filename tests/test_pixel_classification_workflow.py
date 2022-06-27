@@ -46,7 +46,6 @@ def test_pixel_classification_workflow():
     priority_executor = PriorityExecutor(executor=executor, num_concurrent_tasks=8)
 
     workflow = PixelClassificationWorkflow(
-        ebrains_user_token=UserToken.get_global_token_or_raise(),
         on_async_change=lambda : print(json.dumps(workflow.export_applet._get_json_state(), indent=4)),
         executor=executor,
         priority_executor=priority_executor,
@@ -100,7 +99,6 @@ def test_pixel_classification_workflow():
 
     loaded_workflow = PixelClassificationWorkflow.from_ilp(
         ilp_path=Path(url.path),
-        ebrains_user_token=UserToken.get_global_token_or_raise(),
         on_async_change=lambda : print(json.dumps(workflow.export_applet._get_json_state(), indent=4)),
         executor=executor,
         priority_executor=priority_executor,
