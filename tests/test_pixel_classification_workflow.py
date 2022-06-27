@@ -23,7 +23,7 @@ from webilastik.utility.url import Protocol, Url
 
 test_output_osfs = get_test_output_osfs()
 
-def wait_until_jobs_completed(workflow: PixelClassificationWorkflow, timeout: float = 10):
+def wait_until_jobs_completed(workflow: PixelClassificationWorkflow, timeout: float = 50):
     wait_time = 0.5
     while timeout > 0:
         export_status: JsonObject = workflow.export_applet._get_json_state()
@@ -39,6 +39,7 @@ def wait_until_jobs_completed(workflow: PixelClassificationWorkflow, timeout: fl
                 break
         else:
             return
+    raise TimeoutError("Waiting on jobs timed out!")
 
 
 def test_pixel_classification_workflow():
