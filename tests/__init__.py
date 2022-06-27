@@ -29,10 +29,13 @@ from webilastik.libebrains.user_token import UserToken
 from webilastik.ui.applet.brushing_applet import Label
 
 def get_project_root_dir() -> Path:
-    return Path(__name__).parent
+    return Path(__file__).parent.parent
+
+def get_project_test_dir() -> Path:
+    return get_project_root_dir() / "tests"
 
 def get_tmp_dir() -> Path:
-    return Path(__name__) / "tmp"
+    return get_project_test_dir() / "tmp"
 
 def get_sample_c_cells_datasource() -> SkimageDataSource:
     return SkimageDataSource(
