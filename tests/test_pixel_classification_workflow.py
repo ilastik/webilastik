@@ -154,7 +154,7 @@ def test_pixel_classification_workflow():
         resolution=(1,1,1)
     )
     for tile in predictions_output.roi.get_datasource_tiles():
-        _ = tile.retrieve().cut(c=1).as_uint8(normalized=True).show_channels()
+        _ = tile.retrieve().cut(c=1).as_uint8(normalized=True)#.show_channels()
 
 ##################################333
 
@@ -189,7 +189,7 @@ def test_pixel_classification_workflow():
         resolution=(1,1,1)
     )
     for tile in segmentation_output_1.roi.get_datasource_tiles():
-        _ = tile.retrieve().show_images()
+        _ = tile.retrieve()#.show_images()
 
 ####################################3
 
