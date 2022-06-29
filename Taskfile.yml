@@ -202,6 +202,9 @@ tasks:
     deps: [create-deb-tree]
     env:
       PYTHONPATH: "{{.PKG_TREE_PATH}}/opt/webilastik/:{{.PKG_TREE_PATH}}/opt/webilastik/caching/redis_cache/"
+      # PYTHONPATH: "{{.PKG_TREE_PATH}}/opt/webilastik/:{{.PKG_TREE_PATH}}/opt/webilastik/caching/lru_cache/"
+      LRU_CACHE_MAX_SIZE: "128"
+      REDIS_UNIX_SOCKET_PATH: /tmp/conda_redis.sock
       REQUESTS_CA_BUNDLE: "/etc/ssl/certs/ca-certificates.crt" # so python requests uses local certificate
       SSL_CERT_DIR: "/etc/ssl/certs/" # aiohttp needs help finding certs when running from packed conda env
     cmds: #this assumes an nginx like the one in webilastik.conf running already
@@ -223,10 +226,11 @@ tasks:
 
       - echo "Clearing redis cache"
       - echo -e "FLUSHDB\nQUIT\n" | redis-cli
+      - echo -e "FLUSHDB\nQUIT\n" | redis-cli -s $REDIS_UNIX_SOCKET_PATH
 
       - echo "Running local server as www-data (because that's nginx's user)"
       - >
-        sudo -u www-data -g www-data --preserve-env=PYTHONPATH,REQUESTS_CA_BUNDLE,SSL_CERT_DIR
+        sudo -u www-data -g www-data --preserve-env=PYTHONPATH,REQUESTS_CA_BUNDLE,SSL_CERT_DIR,LRU_CACHE_MAX_SIZE,REDIS_UNIX_SOCKET_PATH
         {{.PKG_TREE_PATH}}/opt/webilastik_conda_env/bin/python3 -B {{.PKG_TREE_PATH}}/opt/webilastik/webilastik/server/session_allocator.py
         --session-type=Local
         --master-host=localhost

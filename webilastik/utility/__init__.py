@@ -3,6 +3,8 @@ from traceback import StackSummary
 import traceback
 from typing import Callable, Generic, Iterable, TypeVar
 import threading
+import os
+import sys
 
 from ndstructs.utils.json_serializable import JsonObject, JsonValue
 import datetime
@@ -86,3 +88,34 @@ class DebugLock:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.traceback = None
         self._lock.release()
+
+def get_env_var(
+    *,
+    var_name: str,
+    parser: Callable[[str], "T | Exception"],
+    default: "T | None" = None,
+) -> "T | Exception":
+    raw_value = os.environ.get(var_name)
+    if raw_value is None:
+        if default is not None:
+            print(f"Environment variable {var_name} not set. Defaulting to {default}", file=sys.stderr)
+            return default
+        else:
+            return Exception(f"Environment variable {var_name} was not set")
+
+    try:
+        return parser(raw_value)
+    except Exception as e:
+        return e
+
+def get_env_var_or_exit(
+    *,
+    var_name: str,
+    parser: Callable[[str], "T | Exception"],
+    default: "T | None" = None,
+) -> "T":
+    value = get_env_var(var_name=var_name, parser=parser, default=default)
+    if isinstance(value, Exception):
+        print(f"Environment variable {var_name} not set", file=sys.stderr)
+        exit(1)
+    return value
