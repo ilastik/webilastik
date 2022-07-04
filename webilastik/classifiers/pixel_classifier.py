@@ -26,6 +26,7 @@ from webilastik.annotations import Annotation, Color
 from webilastik.classic_ilastik.ilp import IlpGroup, populate_h5_group, read_h5_group
 from webilastik.operator import Operator
 from webilastik.datasource import DataRoi, DataSource
+from executor_getter import get_executor
 
 class Predictions(Array5D):
     """An array of floats from 0.0 to 1.0. The value in each channel represents
@@ -213,7 +214,7 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         random_seeds = range(random_seed, random_seed + num_forests)
         trees_per_forest = ((num_trees // num_forests) + (forest_index < num_trees % num_forests) for forest_index in range(num_forests))
 
-        with ProcessPoolExecutor(max_workers=num_forests) as executor:
+        with get_executor(hint="training", max_workers=num_forests) as executor:
             # we're taking the bytes instead of the forest itself because vigra forests are not picklable
             forests_bytes: Sequence[VigraForestH5Bytes] = list(executor.map(
                 partial(_train_forest, training_data=training_data_result),

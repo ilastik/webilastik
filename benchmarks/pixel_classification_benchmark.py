@@ -1,6 +1,6 @@
 # pyright: strict
 
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, wait as wait_futures
+from concurrent.futures import Executor, ThreadPoolExecutor, ProcessPoolExecutor, wait as wait_futures
 from pathlib import Path, PurePosixPath
 from typing import List, Sequence
 import time
@@ -55,9 +55,24 @@ def feature_extractor_from_arg(arg: str) -> FeatureExtractor:
     axis_2d = get_axis_2d(match.group("axis_2d") or "z")
     return feature_extractors_classes[class_name](ilp_scale=float(scale), axis_2d=axis_2d)
 
+def executor_from_arg(arg: str) -> Executor:
+    if arg == "ProcessPoolExecutor":
+        return ProcessPoolExecutor(max_workers=os.cpu_count())
+    if arg == "ThreadPoolExecutor":
+        return ThreadPoolExecutor(max_workers=os.cpu_count())
+    if arg == "SerialExecutor":
+        return SerialExecutor()
+    raise Exception(f"bad executor name: {arg}")
+
 default_scales = [0.3, 0.7, 1.0, 1.6, 3.5, 5.0, 10.0]
 
 argparser = argparse.ArgumentParser()
+_ = argparser.add_argument(
+    "--executor",
+    choices=["ProcessPoolExecutor", "ThreadPoolExecutor", "SerialExecutor"],
+    default=executor_from_arg("ProcessPoolExecutor"),
+    type=executor_from_arg,
+)
 _ = argparser.add_argument(
     "--extractors",
     nargs="+",
@@ -74,7 +89,10 @@ _ = argparser.add_argument(
 )
 args = argparser.parse_args()
 
+executor: Executor = args.executor
 selected_feature_extractors: Sequence[JsonableFeatureExtractor] = args.extractors
+
+print(f"Executor: {executor.__class__.__name__}")
 print(f"Extractors:")
 for ex in selected_feature_extractors:
     print(ex.to_json_value())
@@ -192,17 +210,8 @@ print(f"Trained classifier in {time.time() - t} seconds")
 
 ds = mouse_datasources[0]
 
-executor_creators = [
-    lambda: ProcessPoolExecutor(max_workers=os.cpu_count()),
-    lambda: ThreadPoolExecutor(max_workers=os.cpu_count()),
-    lambda: SerialExecutor()
-]
-for executor_creator in executor_creators:
+with executor as ex:
     t = time.time()
-    with executor_creator() as executor:
-        print(f"Executor {executor.__class__.__name__} created in {time.time() - t}s")
-        t = time.time()
-        futs = [executor.submit(classifier, tile) for tile in ds.roi.default_split()]
-        _ = wait_futures(futs)
-        print(f"Predicted image sized {ds.shape} with {executor.__class__.__name__} in {time.time() - t}s")
-        t = time.time()
+    futs = [ex.submit(classifier, tile) for tile in ds.roi.default_split()]
+    _ = wait_futures(futs)
+    print(f"Predicted image sized {ds.shape} ({ds.interval.get_num_tiles(tile_shape=ds.tile_shape)} tiles) in {time.time() - t}s")
