@@ -10,6 +10,7 @@ import h5py
 import PIL
 import io
 from dataclasses import dataclass
+# import time
 
 
 import numpy as np
@@ -174,10 +175,14 @@ def h5_bytes_to_vigra_forest(h5_bytes: VigraForestH5Bytes) -> VigraRandomForest:
     return out
 
 def _train_forest(random_seed: int, num_trees: int, training_data: TrainingData) -> VigraForestH5Bytes:
+    # t = time.time()
     forest = VigraRandomForest(num_trees)
-    # forest.learnRF(training_data.X, training_data.y, random_seed)
     _ = forest.learnRF(training_data.X, training_data.y, 0)
-    return vigra_forest_to_h5_bytes(forest)
+    # t_trained = time.time()
+    serialized = vigra_forest_to_h5_bytes(forest)
+    # t_serialized = time.time()
+    # print(f"Trained in {t_trained - t}s, serialized in {t_serialized - t_trained}")
+    return serialized
 
 class VigraPixelClassifier(PixelClassifier[FE]):
     def __init__(
