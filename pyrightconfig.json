@@ -11,7 +11,7 @@
   "reportMissingTypeArgument": true,
   "reportMissingTypeStubs": "warning",
   "useLibraryCodeForTypes": true,
-  "extraPaths": ["executors/default/", "caching/redis_cache/", "tests/"],
+  "extraPaths": ["executor_getters/default/", "caching/redis_cache/", "tests/"],
   "reportUnusedCallResult": "error",
   "reportUnusedVariable": "warning",
   "pythonVersion": "3.8",
