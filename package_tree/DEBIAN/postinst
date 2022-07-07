@@ -4,5 +4,5 @@ set -u
 set -e
 
 systemctl daemon-reload
-systemctl restart webilastik.service
+systemctl restart webilastik@.service
 systemctl restart nginx.service

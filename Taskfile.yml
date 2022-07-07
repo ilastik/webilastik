@@ -23,7 +23,7 @@ tasks:
     env:
       PYTHONPATH: "{{.PROJECT_ROOT}}"
     cmds:
-      - pylint -j 0 --disable=all --enable=trailing-comma-tuple,expression-not-assigned webilastik caching tests
+      - pylint -j 0 --disable=all --enable=trailing-comma-tuple,expression-not-assigned webilastik caching executor_getters tests
       - npx pyright
   create-build-dir:
     cmds:
@@ -111,6 +111,7 @@ tasks:
       - "{{.PACKED_ENV_PATH}}"
       - "{{.PROJECT_ROOT}}/webilastik/**/*.py"
       - "{{.PROJECT_ROOT}}/caching/**/*.py"
+      - "{{.PROJECT_ROOT}}/executor_getters/**/*.py"
       - "{{.OVERLAY_BUNDLE_PATH}}"
       - "{{.OVERLAY_DIR}}/build/service_worker.js*"
       - "{{.NEUROGLANCER_BUNDLE_PATH}}"
@@ -176,7 +177,7 @@ tasks:
 
       - echo 2>&1 '[INFO] Copying webilastik files'
       - mkdir -p {{.PKG_TREE_PATH}}/opt/webilastik
-      - cp -r {{.PROJECT_ROOT}}/webilastik {{.PROJECT_ROOT}}/caching {{.PROJECT_ROOT}}/public {{.PKG_TREE_PATH}}/opt/webilastik
+      - cp -r {{.PROJECT_ROOT}}/webilastik {{.PROJECT_ROOT}}/caching {{.PROJECT_ROOT}}/executor_getters {{.PROJECT_ROOT}}/public {{.PKG_TREE_PATH}}/opt/webilastik
       - find {{.PKG_TREE_PATH}}/opt/webilastik -name __pycache__ | xargs --no-run-if-empty rm -rf
 
       - echo 2>&1 '[INFO] Copying overlay bundle to public dir'
@@ -201,10 +202,10 @@ tasks:
   start-local-server:
     deps: [create-deb-tree]
     env:
-      PYTHONPATH: "{{.PKG_TREE_PATH}}/opt/webilastik/:{{.PKG_TREE_PATH}}/opt/webilastik/caching/redis_cache/"
+      PYTHONPATH: "{{.PKG_TREE_PATH}}/opt/webilastik/:{{.PKG_TREE_PATH}}/opt/webilastik/caching/redis_cache/:{{.PKG_TREE_PATH}}/opt/webilastik/executor_getters/default/"
       # PYTHONPATH: "{{.PKG_TREE_PATH}}/opt/webilastik/:{{.PKG_TREE_PATH}}/opt/webilastik/caching/lru_cache/"
       LRU_CACHE_MAX_SIZE: "128"
-      REDIS_UNIX_SOCKET_PATH: /tmp/conda_redis.sock
+      REDIS_UNIX_SOCKET_PATH: "/var/run/redis/redis-server.sock"
       REQUESTS_CA_BUNDLE: "/etc/ssl/certs/ca-certificates.crt" # so python requests uses local certificate
       SSL_CERT_DIR: "/etc/ssl/certs/" # aiohttp needs help finding certs when running from packed conda env
     cmds: #this assumes an nginx like the one in webilastik.conf running already
