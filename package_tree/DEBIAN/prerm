@@ -3,5 +3,5 @@
 set -u
 set -e
 
-systemctl stop webilastik.service
-systemctl disable webilastik.service
+systemctl stop webilastik@.service
+systemctl disable webilastik@.service
