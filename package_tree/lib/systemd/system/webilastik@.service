@@ -29,7 +29,7 @@ WorkingDirectory=%I
 
 Environment=REDIS_UNIX_SOCKET_PATH=/var/run/redis/redis-server.sock
 Environment=PYTHONPATH=./:caching/redis_cache/:executor_getters/default/
-ExecStart=bash -c "../webilastik_conda_env/bin/python3 -B webilastik/server/session_allocator.py \
+ExecStart=bash -c "conda_env/bin/python3 -B webilastik/server/session_allocator.py \
     --session-type=Local \
     --master-host=localhost \
     --master-username=www-data \

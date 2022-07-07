@@ -10,7 +10,7 @@ vars:
   ENV_PATH: "{{.BUILD_DIR}}/webilastik_conda_env"
   ENV_CHECKSUM_PATH: "{{.BUILD_DIR}}/environment.yml.sha256"
   PACKED_ENV_PATH: "{{.ENV_PATH}}.tar.gz"
-  PKG_TREE_PATH: "{{.BUILD_DIR}}/{{.PKG_NAME}}"
+  DEB_TREE_PATH: "{{.BUILD_DIR}}/deb_tree"
   DEB_PKG_PATH: "{{.BUILD_DIR}}/{{.PKG_NAME}}.deb"
   NEUROGLANCER_GIT_DIR: "{{.BUILD_DIR}}/neuroglancer"
   NEUROGLANCER_BUILD_PATH: "{{.NEUROGLANCER_GIT_DIR}}/dist/dev"
@@ -116,7 +116,7 @@ tasks:
       - "{{.OVERLAY_DIR}}/build/service_worker.js*"
       - "{{.NEUROGLANCER_BUNDLE_PATH}}"
     generates:
-      - "{{.PKG_TREE_PATH}}/**/*"
+      - "{{.DEB_TREE_PATH}}/**/*"
     vars:
       CONTROL_FILE_CONTENTS: |-
           Package: webilastik
@@ -130,12 +130,12 @@ tasks:
            Server and frontend for the web version of ilastik
     cmds:
       - echo 2>&1 '[INFO] Generating basic package tree'
-      - rm -rf {{.PKG_TREE_PATH}}
-      - cp -r {{.PROJECT_ROOT}}/package_tree {{.PKG_TREE_PATH}}
+      - rm -rf {{.DEB_TREE_PATH}}
+      - cp -r {{.PROJECT_ROOT}}/package_tree {{.DEB_TREE_PATH}}
       - echo 2>&1 '[INFO] Generating DEBIAN/control file'
-      - echo '{{.CONTROL_FILE_CONTENTS}}' > {{.PKG_TREE_PATH}}/DEBIAN/control
+      - echo '{{.CONTROL_FILE_CONTENTS}}' > {{.DEB_TREE_PATH}}/DEBIAN/control
 
-      - mkdir -p {{.PKG_TREE_PATH}}/etc/webilastik
+      - mkdir -p {{.DEB_TREE_PATH}}/etc/webilastik
       - |
         python3 - {{.CLI_ARGS}} <<COPY_OIDC_CLIENT_FILE
 
@@ -166,44 +166,44 @@ tasks:
         except Exception:
             print(f"Could not interpret {oidc_client_json_path} as JSON")
             exit(1)
-        print(f"Copying {oidc_client_json_path} to {{.PKG_TREE_PATH}}/etc/webilastik/oidc_client.json")
-        shutil.copyfile(oidc_client_json_path, "{{.PKG_TREE_PATH}}/etc/webilastik/oidc_client.json")
+        print(f"Copying {oidc_client_json_path} to {{.DEB_TREE_PATH}}/etc/webilastik/oidc_client.json")
+        shutil.copyfile(oidc_client_json_path, "{{.DEB_TREE_PATH}}/etc/webilastik/oidc_client.json")
 
         COPY_OIDC_CLIENT_FILE
 
       - echo 2>&1 '[INFO] Unpacking conda environment'
-      - mkdir -p {{.PKG_TREE_PATH}}/opt/webilastik_conda_env
-      - tar -xzf {{.PACKED_ENV_PATH}} -C {{.PKG_TREE_PATH}}/opt/webilastik_conda_env
+      - mkdir -p {{.DEB_TREE_PATH}}/opt/webilastik/conda_env
+      - tar -xzf {{.PACKED_ENV_PATH}} -C {{.DEB_TREE_PATH}}/opt/webilastik/conda_env
 
       - echo 2>&1 '[INFO] Copying webilastik files'
-      - mkdir -p {{.PKG_TREE_PATH}}/opt/webilastik
-      - cp -r {{.PROJECT_ROOT}}/webilastik {{.PROJECT_ROOT}}/caching {{.PROJECT_ROOT}}/executor_getters {{.PROJECT_ROOT}}/public {{.PKG_TREE_PATH}}/opt/webilastik
-      - find {{.PKG_TREE_PATH}}/opt/webilastik -name __pycache__ | xargs --no-run-if-empty rm -rf
+      - mkdir -p {{.DEB_TREE_PATH}}/opt/webilastik
+      - cp -r {{.PROJECT_ROOT}}/webilastik {{.PROJECT_ROOT}}/caching {{.PROJECT_ROOT}}/executor_getters {{.PROJECT_ROOT}}/public {{.DEB_TREE_PATH}}/opt/webilastik
+      - find {{.DEB_TREE_PATH}}/opt/webilastik -name __pycache__ | xargs --no-run-if-empty rm -rf
 
       - echo 2>&1 '[INFO] Copying overlay bundle to public dir'
-      - mkdir -p {{.PKG_TREE_PATH}}/opt/webilastik/public/js/
-      - cp {{.OVERLAY_BUNDLE_PATH}} {{.PKG_TREE_PATH}}/opt/webilastik/public/js/
-      - cp {{.OVERLAY_DIR}}/build/service_worker.js* {{.PKG_TREE_PATH}}/opt/webilastik/public/js
+      - mkdir -p {{.DEB_TREE_PATH}}/opt/webilastik/public/js/
+      - cp {{.OVERLAY_BUNDLE_PATH}} {{.DEB_TREE_PATH}}/opt/webilastik/public/js/
+      - cp {{.OVERLAY_DIR}}/build/service_worker.js* {{.DEB_TREE_PATH}}/opt/webilastik/public/js
 
       - echo 2>&1 '[INFO] Copying nehuba to public dir'
-      - cp -r {{.NEUROGLANCER_BUILD_PATH}} {{.PKG_TREE_PATH}}/opt/webilastik/public/nehuba
+      - cp -r {{.NEUROGLANCER_BUILD_PATH}} {{.DEB_TREE_PATH}}/opt/webilastik/public/nehuba
 
   create-deb-package:
     deps: [create-deb-tree]
     sources:
-      - "{{.PKG_TREE_PATH}}/**/*"
+      - "{{.DEB_TREE_PATH}}/**/*"
     generates:
       - "{{.DEB_PKG_PATH}}"
     cmds:
       - echo "Ensuring no changes in the working tree before packing to .deb"
       - test $(git status --porcelain | wc -l) -eq 0
-      - dpkg-deb --build -z2 {{.PKG_TREE_PATH}} {{.DEB_PKG_PATH}}
+      - dpkg-deb --build -z2 {{.DEB_TREE_PATH}} {{.DEB_PKG_PATH}}
 
   start-local-server:
     deps: [create-deb-tree]
     env:
-      PYTHONPATH: "{{.PKG_TREE_PATH}}/opt/webilastik/:{{.PKG_TREE_PATH}}/opt/webilastik/caching/redis_cache/:{{.PKG_TREE_PATH}}/opt/webilastik/executor_getters/default/"
-      # PYTHONPATH: "{{.PKG_TREE_PATH}}/opt/webilastik/:{{.PKG_TREE_PATH}}/opt/webilastik/caching/lru_cache/"
+      PYTHONPATH: "{{.DEB_TREE_PATH}}/opt/webilastik/:{{.DEB_TREE_PATH}}/opt/webilastik/caching/redis_cache/:{{.DEB_TREE_PATH}}/opt/webilastik/executor_getters/default/"
+      # PYTHONPATH: "{{.DEB_TREE_PATH}}/opt/webilastik/:{{.DEB_TREE_PATH}}/opt/webilastik/caching/lru_cache/"
       LRU_CACHE_MAX_SIZE: "128"
       REDIS_UNIX_SOCKET_PATH: "/var/run/redis/redis-server.sock"
       REQUESTS_CA_BUNDLE: "/etc/ssl/certs/ca-certificates.crt" # so python requests uses local certificate
@@ -232,7 +232,7 @@ tasks:
       - echo "Running local server as www-data (because that's nginx's user)"
       - >
         sudo -u www-data -g www-data --preserve-env=PYTHONPATH,REQUESTS_CA_BUNDLE,SSL_CERT_DIR,LRU_CACHE_MAX_SIZE,REDIS_UNIX_SOCKET_PATH
-        {{.PKG_TREE_PATH}}/opt/webilastik_conda_env/bin/python3 -B {{.PKG_TREE_PATH}}/opt/webilastik/webilastik/server/session_allocator.py
+        {{.DEB_TREE_PATH}}/opt/webilastik_conda_env/bin/python3 -B {{.DEB_TREE_PATH}}/opt/webilastik/webilastik/server/session_allocator.py
         --session-type=Local
         --master-host=localhost
         --master-username=www-data
