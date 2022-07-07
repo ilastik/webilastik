@@ -16,12 +16,12 @@ from dataclasses import dataclass
 import numpy as np
 from numpy import ndarray, dtype, float32
 from vigra.learning import RandomForest as VigraRandomForest
-from concurrent.futures import ProcessPoolExecutor
+import concurrent.futures
 
 from ndstructs.array5D import Array5D
 from ndstructs.point5D import Interval5D, Point5D
 from webilastik import annotations
-from webilastik.features.feature_extractor import FeatureExtractor
+from webilastik.features.feature_extractor import FeatureData, FeatureExtractor
 from webilastik.features.feature_extractor import FeatureExtractorCollection
 from webilastik.annotations import Annotation, Color
 from webilastik.classic_ilastik.ilp import IlpGroup, populate_h5_group, read_h5_group
@@ -184,6 +184,9 @@ def _train_forest(random_seed: int, num_trees: int, training_data: TrainingData)
     # print(f"Trained in {t_trained - t}s, serialized in {t_serialized - t_trained}")
     return serialized
 
+def _compute_partial_predictions(feature_data: FeatureData, forest: VigraRandomForest) -> "np.ndarray[Any, np.dtype[np.float32]]":
+    return forest.predictProbabilities(feature_data.linear_raw()) * forest.treeCount()
+
 class VigraPixelClassifier(PixelClassifier[FE]):
     def __init__(
         self,
@@ -246,9 +249,11 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         assert predictions.interval == self.get_expected_roi(roi)
         raw_linear_predictions: "ndarray[Any, dtype[float32]]" = predictions.linear_raw()
 
-        #fixme: should this run in some sort of worker pool?
-        for forest in self.forests:
-            raw_linear_predictions += forest.predictProbabilities(feature_data.linear_raw()) * forest.treeCount()
+        with get_executor(hint="predicting") as executor:
+            f = partial(_compute_partial_predictions, feature_data)
+            futures = [executor.submit(f, forest) for forest in self.forests]
+            for partial_predictions_future in concurrent.futures.as_completed(futures):
+                raw_linear_predictions += partial_predictions_future.result()
 
         raw_linear_predictions /= self.num_trees
         predictions.setflags(write=False)
