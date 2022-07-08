@@ -247,8 +247,8 @@ tasks:
 
   stop-local-server:
     cmds:
-      - sudo systemctl stop "{{.WEBILASTIK_DEV_UNIT_NAME}}"
-      - sudo systemctl reset-failed {{.WEBILASTIK_DEV_UNIT_NAME}}
+      - sudo systemctl stop "{{.WEBILASTIK_DEV_UNIT_NAME}}" || true
+      - sudo systemctl reset-failed {{.WEBILASTIK_DEV_UNIT_NAME}} || true
       - sudo rm -f {{.WEBILASTIK_DEV_UNIT_CONFIG_DIR}}/output_to_tty.conf
       - sudo rm -f {{.WEBILASTIK_UNIT_INSTALL_PATH}}
       - >
@@ -258,7 +258,7 @@ tasks:
   clean:
     deps: [stop-local-server]
     cmds:
-      - rm -rf {{.BUILD_DIR}}/*
+      - rm -rf {{.PROJECT_ROOT}}/.task {{.BUILD_DIR}}/*
 
   default:
     deps: [create-deb-package]
