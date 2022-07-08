@@ -183,8 +183,8 @@ tasks:
       - echo 2>&1 '[INFO] Copying webilastik files'
       - mkdir -p {{.DEB_TREE_PATH}}/opt/webilastik
       - >
-        for source_dir_name in {{.SOURCES_DIR_NAMES}}; do
-           cp -r "{{.PROJECT_ROOT}}/$dir_name" {{.DEB_TREE_PATH}}/opt/webilastik
+        for source_dir_name in {{.SOURCES_DIR_NAMES}} public; do
+           cp -r "{{.PROJECT_ROOT}}/$source_dir_name" {{.DEB_TREE_PATH}}/opt/webilastik
         done
       - find {{.DEB_TREE_PATH}}/opt/webilastik -name __pycache__ | xargs --no-run-if-empty rm -rf
 
