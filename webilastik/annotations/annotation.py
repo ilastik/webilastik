@@ -113,9 +113,10 @@ class Annotation(ScalarData):
         return hash(self._data.tobytes())
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Annotation):
+        if not isinstance(other, Annotation) or self.interval != other.interval:
             return False
-        return self.interval == other.interval and bool(np.all(self._data == other._data))
+        equal = np.all(self.raw(Point5D.LABELS) == other.raw(Point5D.LABELS))
+        return bool(equal)
 
     def __init__(
         self, arr: "np.ndarray[Any, Any]", *, axiskeys: str, location: Point5D = Point5D.zero(), raw_data: DataSource
