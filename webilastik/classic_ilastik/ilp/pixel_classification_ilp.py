@@ -256,13 +256,13 @@ class IlpPixelClassificationGroup:
                     if color is None:
                         raise IlpParsingError(f"Could not find a label color for index {color_index}")
                     annotation_data: "np.ndarray[Any, np.dtype[np.uint8]]" = block_5d.color_filtered(color=color_5d).raw(axiskeys)
-                    print(f"+++++++++++ {annotation_data.shape=}")
                     annotation = Annotation(
                         annotation_data,
                         location=blockInterval.start,
                         axiskeys=axiskeys, # FIXME: what if the user changed the axiskeys in the data source?
                         raw_data=raw_data,
                     )
+
                     label_classes[color].annotations.append(annotation)
 
 

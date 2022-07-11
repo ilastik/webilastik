@@ -121,7 +121,8 @@ class Annotation(ScalarData):
     def __init__(
         self, arr: "np.ndarray[Any, Any]", *, axiskeys: str, location: Point5D = Point5D.zero(), raw_data: DataSource
     ):
-        super().__init__(arr.astype(bool), axiskeys=axiskeys, location=location)
+        data5d = Array5D(arr.astype(bool), axiskeys=axiskeys, location=location).contracted_to_non_zero()
+        super().__init__(data5d._data, axiskeys=data5d.axiskeys, location=data5d.location)
         if not raw_data.interval.contains(self.interval):
             raise AnnotationOutOfBounds(annotation_roi=self.interval, raw_data=raw_data)
         self.raw_data = raw_data
