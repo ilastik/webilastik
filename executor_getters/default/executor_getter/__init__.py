@@ -32,29 +32,42 @@ class ExecutorManager:
     def __del__(self):
         self.shutdown()
 
-def _create_process_pool(max_workers: Optional[int]) -> ProcessPoolExecutor:
-    return ProcessPoolExecutor(max_workers=max_workers, mp_context=mp.get_context("spawn"))
 
+def _create_process_pool(max_workers: Optional[int]) -> ProcessPoolExecutor:
+    return ProcessPoolExecutor(max_workers=8, mp_context=mp.get_context("spawn"))
 _server_executor_manager = ExecutorManager(executor_factory=_create_process_pool)
-_training_executor_manager = ExecutorManager(executor_factory=ThreadPoolExecutor)
-# _sampling_executor_manager = ExecutorManager(executor_factory=ThreadPoolExecutor)
+
+_worker_thread_prefix = "worker_pool_thread_"
+def _create_worker_thread_pool(max_workers: Optional[int]) -> ThreadPoolExecutor:
+    return ThreadPoolExecutor(max_workers=8, thread_name_prefix=_worker_thread_prefix)
+_worker_thread_pool_manager = ExecutorManager(executor_factory=_create_worker_thread_pool)
 
 
 def _get_executor(*, hint: ExecutorHint, max_workers: Optional[int] = None) -> Executor:
+    if threading.current_thread().name.startswith(_worker_thread_prefix):
+        print(f"!!!!!!!!!!!! {hint} needs an executor but already inside one !!!!!!!!!!!!!!!!")
+        return SerialExecutor()
     if hint == "server_tile_handler":
+        print(f"Is something requesting a pool already???????????????????")
         return _server_executor_manager.get_executor(max_workers=max_workers)
     if hint == "training":
-        return _training_executor_manager.get_executor(max_workers=max_workers)
+        return SerialExecutor()
+        # return _worker_thread_pool_manager.get_executor(max_workers=max_workers)
     elif hint == "sampling":
-        return _training_executor_manager.get_executor(max_workers=max_workers)
+        return SerialExecutor()
+    elif hint == "feature_extraction":
+        return SerialExecutor()
+        # return _worker_thread_pool_manager.get_executor(max_workers=max_workers)
     elif hint == "predicting":
         return SerialExecutor()
+        # return _worker_thread_pool_manager.get_executor(max_workers=max_workers)
     elif hint == "any":
         return SerialExecutor()
 
 def _shutdown_executors():
     print(f"Shutting down global executors....")
-    _training_executor_manager.shutdown()
+    _server_executor_manager.shutdown()
+    _worker_thread_pool_manager.shutdown()
 
 _ = atexit.register(_shutdown_executors)
 
