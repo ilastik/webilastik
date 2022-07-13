@@ -7,4 +7,4 @@ PROJECT_DIR="$(realpath $SCRIPT_DIR/../..)"
 
 export PYTHONPATH="$PROJECT_DIR"
 
-mpiexec -n 4 python $SCRIPT_DIR/test_hashing_mpi_executor.py
+mpiexec --use-hwthread-cpus -n 8 python $SCRIPT_DIR/test_hashing_mpi_executor.py

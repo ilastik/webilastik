@@ -21,5 +21,5 @@ fi
 
 export PYTHONPATH="${PROJECT_DIR}:${PROJECT_DIR}/ndstructs/:${CACHE_IMPL_DIR}:${EXECUTOR_GETTER_IMPL}${PYTHONPATH+:$PYTHONPATH}"
 
-python "${PROJECT_DIR}/benchmarks/pixel_classification_benchmark.py" --datasource brain
+mpiexec --use-hwthread-cpus python "${PROJECT_DIR}/benchmarks/pixel_classification_benchmark.py" --executor HashingMpiExecutor  --datasource brain
 

@@ -29,6 +29,7 @@ from webilastik.features.feature_extractor import FeatureExtractor, JsonableFeat
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.filesystem.osfs import OsFs
 from webilastik.scheduling import SerialExecutor
+from webilastik.scheduling.hashing_mpi_executor import HashingMpiExecutor, Worker
 
 
 feature_extractors_classes = {
@@ -66,6 +67,15 @@ def executor_from_arg(arg: str) -> Executor:
         return ThreadPoolExecutor(max_workers=os.cpu_count())
     if arg == "SerialExecutor":
         return SerialExecutor()
+    if arg == "HashingMpiExecutor":
+        from mpi4py import MPI
+        rank = MPI.COMM_WORLD.Get_rank()
+        if rank == 0:
+            return HashingMpiExecutor()
+        else:
+            Worker().start()
+            exit(0)
+
     raise Exception(f"bad executor name: {arg}")
 
 def compute_tile(classifier: PixelClassifier[Any], roi: DataRoi):
@@ -77,9 +87,8 @@ if __name__ == "__main__":
     argparser = argparse.ArgumentParser()
     _ = argparser.add_argument(
         "--executor",
-        choices=["ProcessPoolExecutor", "ThreadPoolExecutor", "SerialExecutor"],
-        default=executor_from_arg("ProcessPoolExecutor"),
-        type=executor_from_arg,
+        choices=["ProcessPoolExecutor", "ThreadPoolExecutor", "SerialExecutor", "HashingMpiExecutor"],
+        default="ProcessPoolExecutor",
     )
     _ = argparser.add_argument(
         "--extractors",
@@ -102,7 +111,7 @@ if __name__ == "__main__":
     )
     args = argparser.parse_args()
 
-    executor: Executor = args.executor
+    executor: Executor = executor_from_arg(args.executor)
     selected_feature_extractors: Sequence[JsonableFeatureExtractor] = args.extractors
 
     print(f"Executor: {executor.__class__.__name__}")

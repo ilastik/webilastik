@@ -6,7 +6,7 @@ import threading
 import enum
 from typing import Any, Dict, Sequence, TypeVar, Generic, Callable
 from typing_extensions import ParamSpec
-from concurrent.futures import Future
+from concurrent.futures import Executor, Future
 import functools
 
 from mpi4py import MPI
@@ -31,7 +31,7 @@ class _Task(Generic[_T]):
         self.future_id = future_id
         super().__init__()
 
-    def __call__(self, worker: "_Worker") -> "_TaskResult[_T]":
+    def __call__(self, worker: "Worker") -> "_TaskResult[_T]":
         try:
             result_value = self.target()
         except Exception as e:
@@ -40,20 +40,18 @@ class _Task(Generic[_T]):
 
 
 class _TaskResult(Generic[_T]):
-    def __init__(self, worker: "_Worker", future_id: int, value: "_T | Exception") -> None:
+    def __init__(self, worker: "Worker", future_id: int, value: "_T | Exception") -> None:
         self.future_id = future_id
         self.value = value
         super().__init__()
 
 
-class _WorkerBase:
-    def __init__(self, rank: int) -> None:
-        self.rank = rank
+class Worker:
+    def __init__(self) -> None:
+        self.rank = MPI.COMM_WORLD.Get_rank()
         self.stopped = False
         super().__init__()
 
-
-class _Worker(_WorkerBase):
     def start(self):
         print(f"WORKER {self.rank}: Started", file=sys.stderr)
         while True:
@@ -68,7 +66,12 @@ class _Worker(_WorkerBase):
         print(f"WORKER {self.rank}: Terminated", file=sys.stderr)
 
 
-class _WorkerHandle(_WorkerBase):
+class _WorkerHandle:
+    def __init__(self, rank: int) -> None:
+        self.rank = rank
+        self.stopped = False
+        super().__init__()
+
     def submit(self, task: _Task[Any]):
         print(f"Sending task to remote worker {self.rank}...", file=sys.stderr)
         MPI.COMM_WORLD.send(task, dest=self.rank, tag=Tags.NEW_TASK)
@@ -79,7 +82,7 @@ class _WorkerHandle(_WorkerBase):
 
 
 
-class HashingMpiExecutor:
+class HashingMpiExecutor(Executor):
     """Coordinates work amongst MPI processes.
 
     In order to use this class, applications must be launched with mpirun: e.g.: mpirun -N <num_workers> ilastik.py
@@ -124,7 +127,7 @@ class HashingMpiExecutor:
             _ = future.set_running_or_notify_cancel()
             return future
 
-    def shutdown(self):
+    def shutdown(self, wait: bool = True):
         with self._lock:
             if self._shutting_down:
                 return
@@ -133,8 +136,3 @@ class HashingMpiExecutor:
             worker_handle.stop()
         MPI.COMM_WORLD.send(_Stop(), dest=self.rank, tag=Tags.TASK_DONE)
         self._results_collector_thread.join()
-
-
-if MPI.COMM_WORLD.Get_rank() != 0:
-    # FIXME? is there a more elegant way to handle this?
-    _Worker(rank=MPI.COMM_WORLD.Get_rank()).start()
