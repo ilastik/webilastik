@@ -19,7 +19,7 @@ if echo "$CACHE_IMPL_DIR" | grep "redis_cache"; then
     echo -e "FLUSHDB\nQUIT\n" | redis-cli
 fi
 
-export PYTHONPATH="${PROJECT_DIR}:${CACHE_IMPL_DIR}:${EXECUTOR_GETTER_IMPL}${PYTHONPATH+:$PYTHONPATH}"
+export PYTHONPATH="${PROJECT_DIR}:${PROJECT_DIR}/ndstructs/:${CACHE_IMPL_DIR}:${EXECUTOR_GETTER_IMPL}${PYTHONPATH+:$PYTHONPATH}"
 
-python "${PROJECT_DIR}/benchmarks/pixel_classification_benchmark.py" --datasource c_cells
+python "${PROJECT_DIR}/benchmarks/pixel_classification_benchmark.py" --datasource brain
 
