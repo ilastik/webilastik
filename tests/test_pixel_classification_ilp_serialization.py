@@ -1,4 +1,5 @@
-from pathlib import Path
+from concurrent.futures import ProcessPoolExecutor
+from pathlib import Path, PurePosixPath
 import shutil
 import tempfile
 from typing import List, Set
@@ -7,9 +8,10 @@ import h5py
 import numpy as np
 from ndstructs.point5D import Point5D
 
-from webilastik.annotations.annotation import Color
+from webilastik.annotations.annotation import Annotation, Color
 from webilastik.classic_ilastik.ilp import IlpFeatureSelectionsGroup
 from webilastik.classic_ilastik.ilp.pixel_classification_ilp import IlpPixelClassificationWorkflowGroup
+from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.features.ilp_filter import (
     IlpDifferenceOfGaussians,
     IlpGaussianGradientMagnitude,
@@ -20,7 +22,10 @@ from webilastik.features.ilp_filter import (
 )
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.filesystem.osfs import OsFs
+from webilastik.scheduling.job import PriorityExecutor
+from webilastik.ui.applet import dummy_prompt
 from webilastik.utility.url import Protocol
+from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
 
 
 def test_feature_extractor_serialization():
@@ -85,8 +90,44 @@ def test_pixel_classification_ilp_serialization():
             else:
                 assert False, f"Unexpected label color: {label.color}"
 
-    from tests import compare_projects
-    compare_projects(output_ilp_path, sample_trained_ilp_path)
+    some_executor = ProcessPoolExecutor(max_workers=2)
+    priority_executor = PriorityExecutor(executor=some_executor, max_active_job_steps=2)
+    workflow = PixelClassificationWorkflow.from_ilp(
+        allowed_protocols=[Protocol.FILE],
+        executor=some_executor,
+        priority_executor=priority_executor,
+        ilp_path=output_ilp_path,
+        on_async_change=lambda: None,
+    )
+    assert not isinstance(workflow, Exception)
+    print(f"These are the deserialized brush strokes:")
+
+    from pprint import pprint
+    pprint(workflow.brushing_applet.label_classes())
+
+    annotation_raw_data = workflow.brushing_applet.labels()[0].annotations[0].raw_data
+    expected_annotation1 = Annotation.from_voxels(
+        voxels=[Point5D(x=200, y=200), Point5D(x=201, y=201), Point5D(x=202, y=202)],
+        raw_data=annotation_raw_data,
+    )
+    expected_annotation2 = Annotation.from_voxels(
+        voxels=[Point5D(x=400, y=400), Point5D(x=401, y=401), Point5D(x=402, y=402)],
+        raw_data=annotation_raw_data,
+    )
+
+    assert set(a for annotations in workflow.brushing_applet.label_classes().values() for a in annotations) == set([expected_annotation1, expected_annotation2])
+
+    res = workflow.brushing_applet.remove_annotation(user_prompt=dummy_prompt, label_name="Label 1", annotation=expected_annotation1)
+    print(res)
+    pprint(workflow.brushing_applet.label_classes())
+
+
+
+    priority_executor.shutdown()
+    some_executor.shutdown()
+
+    # from tests import compare_projects
+    # compare_projects(output_ilp_path, sample_trained_ilp_path)
 
 if __name__ == "__main__":
     test_feature_extractor_serialization()
