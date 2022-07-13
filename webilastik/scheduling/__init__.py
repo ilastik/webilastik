@@ -2,7 +2,7 @@ from typing import Literal, Optional, Protocol, TypeVar, Callable
 from typing_extensions import ParamSpec
 from concurrent.futures import Executor, Future
 
-ExecutorHint = Literal["training", "predicting", "sampling", "any"]
+ExecutorHint = Literal["server_tile_handler", "training", "predicting", "sampling", "any"]
 
 class ExecutorGetter(Protocol):
     def __call__(self, *, hint: ExecutorHint, max_workers: Optional[int] = None) -> Executor:

@@ -36,6 +36,7 @@ from webilastik.utility.url import Protocol, Url
 from webilastik.server.tunnel import ReverseSshTunnel
 from webilastik.ui.applet import dummy_prompt
 from webilastik.libebrains.user_token import UserToken
+from executor_getter import get_executor
 
 
 class MyLogger:
@@ -129,7 +130,7 @@ class WebIlastik:
         self._http_client_session: Optional[ClientSession] = None
         self._loop: Optional[AbstractEventLoop] = None
 
-        self.executor = ProcessPoolExecutor(max_workers=multiprocessing.cpu_count())
+        self.executor = get_executor(hint="server_tile_handler", max_workers=multiprocessing.cpu_count())
         self.priority_executor = PriorityExecutor(executor=self.executor, max_active_job_steps=2 * multiprocessing.cpu_count())
 
         self.workflow = PixelClassificationWorkflow(
