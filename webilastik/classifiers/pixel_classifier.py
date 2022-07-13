@@ -222,13 +222,13 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         random_seeds = range(random_seed, random_seed + num_forests)
         trees_per_forest = ((num_trees // num_forests) + (forest_index < num_trees % num_forests) for forest_index in range(num_forests))
 
-        with get_executor(hint="training", max_workers=num_forests) as executor:
-            # we're taking the bytes instead of the forest itself because vigra forests are not picklable
-            forests_bytes: Sequence[VigraForestH5Bytes] = list(executor.map(
-                partial(_train_forest, training_data=training_data_result),
-                random_seeds,
-                trees_per_forest
-            ))
+        executor = get_executor(hint="training", max_workers=num_forests)
+        # we're taking the bytes instead of the forest itself because vigra forests are not picklable
+        forests_bytes: Sequence[VigraForestH5Bytes] = list(executor.map(
+            partial(_train_forest, training_data=training_data_result),
+            random_seeds,
+            trees_per_forest
+        ))
 
         return cls(
             feature_extractors=feature_extractors,
@@ -249,11 +249,11 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         assert predictions.interval == self.get_expected_roi(roi)
         raw_linear_predictions: "ndarray[Any, dtype[float32]]" = predictions.linear_raw()
 
-        with get_executor(hint="predicting") as executor:
-            f = partial(_compute_partial_predictions, feature_data)
-            futures = [executor.submit(f, forest) for forest in self.forests]
-            for partial_predictions_future in concurrent.futures.as_completed(futures):
-                raw_linear_predictions += partial_predictions_future.result()
+        executor = get_executor(hint="predicting")
+        f = partial(_compute_partial_predictions, feature_data)
+        futures = [executor.submit(f, forest) for forest in self.forests]
+        for partial_predictions_future in concurrent.futures.as_completed(futures):
+            raw_linear_predictions += partial_predictions_future.result()
 
         raw_linear_predictions /= self.num_trees
         predictions.setflags(write=False)

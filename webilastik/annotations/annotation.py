@@ -193,11 +193,11 @@ class Annotation(ScalarData):
         tile_shape = self.raw_data.tile_shape.updated(c=self.raw_data.shape.c)
         make_samples_on_tile = partial(_make_samples, annotation=self, feature_extractor=feature_extractor)
         num_tiles = interval_under_annotation.get_num_tiles(tile_shape=tile_shape)
-        with get_executor(hint="sampling", max_workers=num_tiles) as executor:
-            all_feature_samples = list(executor.map(
-                make_samples_on_tile,
-                self.raw_data.roi.clamped(interval_under_annotation).get_tiles(tile_shape=tile_shape, tiles_origin=self.raw_data.location)
-            ))
+        executor = get_executor(hint="sampling", max_workers=num_tiles)
+        all_feature_samples = list(executor.map(
+            make_samples_on_tile,
+            self.raw_data.roi.clamped(interval_under_annotation).get_tiles(tile_shape=tile_shape, tiles_origin=self.raw_data.location)
+        ))
 
         return all_feature_samples[0].concatenate(*all_feature_samples[1:])
 
