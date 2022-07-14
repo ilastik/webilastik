@@ -1,16 +1,18 @@
 # pyright: strict
 
-from concurrent.futures import Executor, ThreadPoolExecutor, ProcessPoolExecutor, wait as wait_futures
+from concurrent.futures import Executor, ThreadPoolExecutor, ProcessPoolExecutor, Future, wait as wait_futures
 from functools import partial
 import multiprocessing
 from pathlib import Path, PurePosixPath
-from typing import Any, List, Sequence
+from typing import Any, List, Sequence, cast
 import time
 import argparse
 import re
-import os
+import sys
 
 from ndstructs.point5D import Point5D
+from mpi4py import MPI
+from mpi4py.futures import MPICommExecutor
 
 from webilastik.annotations.annotation import Annotation
 from webilastik.classifiers.pixel_classifier import PixelClassifier, VigraPixelClassifier
@@ -60,15 +62,20 @@ def feature_extractor_from_arg(arg: str) -> FeatureExtractor:
     axis_2d = get_axis_2d(match.group("axis_2d") or "z")
     return feature_extractors_classes[class_name](ilp_scale=float(scale), axis_2d=axis_2d)
 
-def executor_from_arg(arg: str) -> Executor:
+def executor_from_arg(arg: str, num_workers: int) -> Executor:
     if arg == "ProcessPoolExecutor":
-        return ProcessPoolExecutor(max_workers=os.cpu_count(), mp_context=multiprocessing.get_context("spawn"))
+        return ProcessPoolExecutor(max_workers=num_workers, mp_context=multiprocessing.get_context("spawn"))
     if arg == "ThreadPoolExecutor":
-        return ThreadPoolExecutor(max_workers=os.cpu_count())
+        return ThreadPoolExecutor(max_workers=num_workers)
     if arg == "SerialExecutor":
         return SerialExecutor()
+
+    if num_workers != MPI.COMM_WORLD.size - 1:
+            print(f"Number of workers is inconsistent with the mpi Comm size")
+            exit(1)
+    if arg == "MpiCommExecutor":
+        return cast(Executor, MPICommExecutor(MPI.COMM_WORLD, root=0))
     if arg == "HashingMpiExecutor":
-        from mpi4py import MPI
         rank = MPI.COMM_WORLD.Get_rank()
         if rank == 0:
             return HashingMpiExecutor()
@@ -76,10 +83,11 @@ def executor_from_arg(arg: str) -> Executor:
             Worker().start()
             exit(0)
 
+
     raise Exception(f"bad executor name: {arg}")
 
 def compute_tile(classifier: PixelClassifier[Any], roi: DataRoi):
-    print(f"Predicting on {roi}")
+    # print(f"Predicting on {roi}")
     _ = classifier(roi)#.as_uint8(normalized=True).show_channels()
 
 if __name__ == "__main__":
@@ -87,7 +95,7 @@ if __name__ == "__main__":
     argparser = argparse.ArgumentParser()
     _ = argparser.add_argument(
         "--executor",
-        choices=["ProcessPoolExecutor", "ThreadPoolExecutor", "SerialExecutor", "HashingMpiExecutor"],
+        choices=["ProcessPoolExecutor", "ThreadPoolExecutor", "SerialExecutor", "HashingMpiExecutor", "MpiCommExecutor"],
         default="ProcessPoolExecutor",
     )
     _ = argparser.add_argument(
@@ -96,12 +104,9 @@ if __name__ == "__main__":
         required=False,
         type=feature_extractor_from_arg,
         default=[
-            *[IlpGaussianSmoothing(ilp_scale=s, axis_2d="z") for s in default_scales],
-            *[IlpLaplacianOfGaussian(ilp_scale=s, axis_2d="z") for s in default_scales],
-            *[IlpGaussianGradientMagnitude(ilp_scale=s, axis_2d="z") for s in default_scales],
-            *[IlpDifferenceOfGaussians(ilp_scale=s, axis_2d="z") for s in default_scales],
-            *[IlpStructureTensorEigenvalues(ilp_scale=s, axis_2d="z") for s in default_scales],
-            *[IlpHessianOfGaussianEigenvalues(ilp_scale=s, axis_2d="z") for s in default_scales],
+            extractor_class(ilp_scale=scale, axis_2d="z")
+            for extractor_class in feature_extractors_classes.values()
+            for scale in default_scales
         ]
     )
     _ = argparser.add_argument(
@@ -109,15 +114,23 @@ if __name__ == "__main__":
         choices=["brain", "c_cells"],
         default="brain"
     )
+    _ = argparser.add_argument(
+        "--num-tiles"
+    )
+    _ = argparser.add_argument(
+        "--num-workers",
+        default=multiprocessing.cpu_count() - 1,
+        type=int
+    )
+
     args = argparser.parse_args()
 
-    executor: Executor = executor_from_arg(args.executor)
-    selected_feature_extractors: Sequence[JsonableFeatureExtractor] = args.extractors
+    executor: Executor = executor_from_arg(args.executor, num_workers=args.num_workers)
+    if executor is None:
+        exit(0)
 
-    print(f"Executor: {executor.__class__.__name__}")
-    print(f"Extractors:")
-    for ex in selected_feature_extractors:
-        print(ex.to_json_value())
+    selected_feature_extractors: Sequence[JsonableFeatureExtractor] = args.extractors
+    num_tiles = None if args.num_tiles is None else int(args.num_tiles)
 
     mouse_datasources: List[DataSource] = [
         PrecomputedChunksDataSource(
@@ -252,27 +265,43 @@ if __name__ == "__main__":
     #         a.show(color)
 
 
-    t = time.time()
-    classifier = VigraPixelClassifier.train(
-        feature_extractors=selected_feature_extractors,
-        label_classes=[
-            class1_annotations,
-            class_2_annotations
-        ],
-        random_seed=7919,
-    )
-    print(f"Trained classifier in {time.time() - t} seconds")
-    if isinstance(classifier, Exception):
-        raise classifier
-
-
     # roi = DataRoi(datasource=datasource, x=(100,200), y=(100,200), c=datasource.interval.c)
     # classifier(roi).as_uint8(normalized=True).show_channels()
     # exit(1)
 
-    f = partial(compute_tile, classifier)
     with executor as ex:
+        if ex is None:
+            exit(0)
+
+        print(f"Extractors:")
+        for fe in selected_feature_extractors:
+            print(fe.to_json_value())
+
         t = time.time()
-        futs = [ex.submit(f, tile) for tile in datasource.roi.get_datasource_tiles()]
+        classifier = VigraPixelClassifier.train(
+            feature_extractors=selected_feature_extractors,
+            label_classes=[
+                class1_annotations,
+                class_2_annotations
+            ],
+            random_seed=7919,
+        )
+        print(f"Trained classifier in {time.time() - t} seconds")
+        if isinstance(classifier, Exception):
+            raise classifier
+        f = partial(compute_tile, classifier)
+
+        t = time.time()
+        futs: "List[Future[Any]]" = []
+
+        requested_num_tiles = num_tiles or datasource.roi.get_num_tiles(tile_shape=datasource.tile_shape)
+        # for tile in datasource.roi.get_datasource_tiles():
+        #     _ = tile.retrieve() #prefetch
+        for tile in datasource.roi.get_datasource_tiles():
+            if len(futs) >= requested_num_tiles:
+                break
+            futs.append(ex.submit(f, tile))
+            print(".", end="")
         _ = wait_futures(futs)
-        print(f"Predicted image sized {datasource.shape} ({datasource.interval.get_num_tiles(tile_shape=datasource.tile_shape)} tiles) in {time.time() - t}s")
+        print(f"ARGV: {sys.argv}")
+        print(f"[{ex.__class__.__name__}] Predicted {len(futs)} tiles sized {datasource.tile_shape} in {time.time() - t}s")
