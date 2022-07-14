@@ -59,27 +59,27 @@ class FeatureExtractorCollection(FeatureExtractor):
         features: List[FeatureData] = []
 
         channel_offset: int = 0
-        t0 = time.time()
+        # t0 = time.time()
         executor = get_executor(hint="feature_extraction", max_workers=len(self.extractors))
         for fut in [executor.submit(fx, roi) for fx in self.extractors]:
             result = fut.result().translated(Point5D.zero(c=channel_offset))
             features.append(result)
             channel_offset += result.shape.c
-        t1 = time.time()
-        print(f"computed features in {t1 - t0}s")
+        # t1 = time.time()
+        # print(f"computed features in {t1 - t0}s")
 
         out = Array5D.allocate(
             dtype=np.dtype("float32"),
             interval=roi.shape.updated(c=sum(feat.shape.c for feat in features)),
             axiskeys="ctzyx",
         ).translated(roi.start)
-        print(f"Allocated {out} for storing features of {roi.interval}")
+        # print(f"Allocated {out} for storing features of {roi.interval}")
 
-        t0 = time.time()
+        # t0 = time.time()
         for feature in features:
             out.set(feature)
-        t1 = time.time()
-        print(f"Copied features in {t1 - t0}s")
+        # t1 = time.time()
+        # print(f"Copied features in {t1 - t0}s")
 
         return FeatureData(
             arr=out.raw(out.axiskeys),
