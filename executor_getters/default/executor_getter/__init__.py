@@ -5,6 +5,7 @@ import threading
 from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
 from typing import Optional, Protocol
 import multiprocessing as mp
+import sys
 
 from webilastik.scheduling import ExecutorGetter, ExecutorHint, SerialExecutor
 
@@ -45,7 +46,7 @@ _worker_thread_pool_manager = ExecutorManager(executor_factory=_create_worker_th
 
 def _get_executor(*, hint: ExecutorHint, max_workers: Optional[int] = None) -> Executor:
     if threading.current_thread().name.startswith(_worker_thread_prefix):
-        print(f"!!!!!!!!!!!! {hint} needs an executor but already inside one !!!!!!!!!!!!!!!!")
+        print(f"[WARNING]{hint} needs an executor but already inside one", file=sys.stderr)
         return SerialExecutor()
     if hint == "server_tile_handler":
         print(f"Is something requesting a pool already???????????????????")
