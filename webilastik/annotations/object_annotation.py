@@ -39,8 +39,8 @@ class ObjectAnnotation:
         annotations: Iterable["ObjectAnnotation"], feature_extractor: ObjectFeatureExtractor
     ) -> Tuple["ndarray[Any, dtype[float32]]", "ndarray[Any, dtype[uint32]]"]:
         classes = [a.klass for a in annotations]
-        y: "ndarray[Any, dtype[uint32]]" = np.asarray(classes, dtype=uint32).reshape((len(classes), 1)) #pyright: ignore[reportUnknownMemberType]
-        X: "ndarray[Any, dtype[float32]]" = np.asarray([a.get_feature_samples(feature_extractor) for a in annotations]).astype(float32) #pyright: ignore[reportUnknownMemberType]
+        y: "ndarray[Any, dtype[uint32]]" = np.asarray(classes, dtype=uint32).reshape((len(classes), 1))
+        X: "ndarray[Any, dtype[float32]]" = np.asarray([a.get_feature_samples(feature_extractor) for a in annotations]).astype(float32)
         return (X, y)
 
     # def show(self):

@@ -56,7 +56,7 @@ class RawEncoder(PrecomputedChunksEncoder):
         raw_chunk: bytes
     ) -> Array5D:
         # "The (...) data (...) chunk is stored directly in little-endian binary format in [x, y, z, channel] Fortran order"
-        raw_tile: np.ndarray[Any, Any] = np.frombuffer( #type: ignore
+        raw_tile: np.ndarray[Any, Any] = np.frombuffer(
             raw_chunk,
             dtype=dtype.newbyteorder("<")
         ).reshape(roi.shape.to_tuple("xyzc"), order="F")

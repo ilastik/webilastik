@@ -142,7 +142,7 @@ class IlpPixelClassificationGroup:
         super().__init__()
 
     def populate_group(self, group: h5py.Group):
-        LabelColors: "ndarray[Any, dtype[int64]]"  = np.asarray([label.color.rgba for label in self.labels], dtype=int64) # pyright: ignore [reportUnknownMemberType]
+        LabelColors: "ndarray[Any, dtype[int64]]"  = np.asarray([label.color.rgba for label in self.labels], dtype=int64)
 
         # expected group keys to look like this:
         # ['Bookmarks', 'ClassifierFactory', 'LabelColors', 'LabelNames', 'PmapColors', 'StorageVersion', 'LabelSets', 'ClassifierForests']>
@@ -200,7 +200,7 @@ class IlpPixelClassificationGroup:
                     ClassifierForests.copy(forest_group, f"Forest{forest_index:04}") # 'Forest0000', ..., 'Forest000N'
 
             ClassifierForests["feature_names"] = feature_names
-            ClassifierForests["known_labels"] = np.asarray(self.classifier.classes).astype(np.uint32) # pyright: ignore [reportUnknownMemberType]
+            ClassifierForests["known_labels"] = np.asarray(self.classifier.classes).astype(np.uint32)
             ClassifierForests["pickled_type"] = b"clazyflow.classifiers.parallelVigraRfLazyflowClassifier\nParallelVigraRfLazyflowClassifier\np0\n."
 
     @classmethod
