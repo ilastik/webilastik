@@ -20,6 +20,7 @@ from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet import dummy_prompt
 from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
 from webilastik.utility.url import Protocol, Url
+from executor_getter import get_executor
 
 test_output_osfs = get_test_output_osfs()
 
@@ -43,7 +44,7 @@ def wait_until_jobs_completed(workflow: PixelClassificationWorkflow, timeout: fl
 
 
 def test_pixel_classification_workflow():
-    executor = ProcessPoolExecutor(max_workers=8)
+    executor = get_executor(hint="server_tile_handler")
     priority_executor = PriorityExecutor(executor=executor, max_active_job_steps=8)
 
     workflow = PixelClassificationWorkflow(
