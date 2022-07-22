@@ -31,7 +31,7 @@ class PresmoothedFilter(FeatureExtractor):
         *,
         ilp_scale: float,
         axis_2d: Optional[Axis2D],
-        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(),
+        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx"),
     ):
         self.ilp_scale = ilp_scale
         self.presmoother = GaussianSmoothing(
@@ -48,7 +48,7 @@ class ChannelwiseFastFilter(JsonableFeatureExtractor):
     def __init__(
         self,
         *,
-        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(),
+        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx"),
         axis_2d: Optional[Axis2D],
     ):
         super().__init__()
@@ -132,7 +132,7 @@ class StructureTensorEigenvalues(ChannelwiseFastFilter):
     def __init__(
         self,
         *,
-        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(),
+        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx"),
         innerScale: float,
         outerScale: float,
         window_size: float = 0,
@@ -172,7 +172,7 @@ class StructureTensorEigenvalues(ChannelwiseFastFilter):
 
     @classmethod
     def from_ilp_scale(
-        cls, *, preprocessor: Operator[DataRoi, Array5D] = OpRetriever(), scale: float, axis_2d: Optional[Axis2D]
+        cls, *, preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx"), scale: float, axis_2d: Optional[Axis2D]
     ) -> "StructureTensorEigenvalues":
         capped_scale = min(scale, 1.0)
         return cls(
@@ -190,7 +190,7 @@ class SigmaWindowFilter(ChannelwiseFastFilter):
     def __init__(
         self,
         *,
-        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(),
+        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx"),
         sigma: float,
         window_size: float = 0,
         axis_2d: Optional[Axis2D],
@@ -217,7 +217,11 @@ class SigmaWindowFilter(ChannelwiseFastFilter):
 
     @classmethod
     def from_ilp_scale(
-        cls: Type[SIGMA_FILTER], *, preprocessor: Operator[DataRoi, Array5D] = OpRetriever(), scale: float, axis_2d: Optional[Axis2D]
+        cls: Type[SIGMA_FILTER],
+        *,
+        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx"),
+        scale: float,
+        axis_2d: Optional[Axis2D]
     ) -> SIGMA_FILTER:
         return cls(
             preprocessor=preprocessor,
@@ -247,7 +251,7 @@ class DifferenceOfGaussians(ChannelwiseFastFilter):
     def __init__(
         self,
         *,
-        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(),
+        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx"),
         sigma0: float,
         sigma1: float,
         window_size: float = 0,
@@ -296,7 +300,7 @@ class ScaleWindowFilter(ChannelwiseFastFilter):
     def __init__(
         self,
         *,
-        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(),
+        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx"),
         scale: float,
         window_size: float = 0,
         axis_2d: Optional[Axis2D],
