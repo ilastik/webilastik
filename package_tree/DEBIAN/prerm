@@ -3,7 +3,5 @@
 set -u
 set -e
 
-SERVICE_INSTANCE_NAME="$(systemctl list-units -t service --all | grep webilastik@ | head -n 1 | awk '{print $1}')"
-
-systemctl stop "$SERVICE_INSTANCE_NAME"
-systemctl disable webilastik@.service
+systemctl stop webilastik@-opt-webilastik.service
+systemctl disable webilastik@-opt-webilastik.service

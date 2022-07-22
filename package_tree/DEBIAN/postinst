@@ -4,7 +4,7 @@ set -u
 set -e
 
 
-systemctl enable webilastik@.service #enables the default instance
+systemctl enable webilastik@-opt-webilastik.service
 systemctl daemon-reload
-systemctl restart "$(systemctl list-units -t service --all | grep webilastik@ | head -n 1 | awk '{print $1}')"
+systemctl restart webilastik@-opt-webilastik.service
 systemctl restart nginx.service
