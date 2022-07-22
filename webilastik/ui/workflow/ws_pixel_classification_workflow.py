@@ -432,7 +432,7 @@ if __name__ == '__main__':
 
     mpi_rank = 0
     try:
-        from mpi4py import MPI #type: ignore
+        from mpi4py import MPI
         mpi_rank = MPI.COMM_WORLD.Get_rank()
     except ModuleNotFoundError:
         pass
