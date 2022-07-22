@@ -252,7 +252,7 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         executor = get_executor(hint="predicting")
         f = partial(_compute_partial_predictions, feature_data)
         futures = [executor.submit(f, forest) for forest in self.forests]
-        for partial_predictions_future in concurrent.futures.as_completed(futures):
+        for partial_predictions_future in futures:
             raw_linear_predictions += partial_predictions_future.result()
 
         raw_linear_predictions /= self.num_trees
