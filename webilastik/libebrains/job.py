@@ -135,6 +135,7 @@ class JobDescription(IJsonable):
 
 class SiteName(enum.Enum):
     DAINT_CSCS = "DAINT-CSCS"
+    JUSUF = "JUSUF"
 
     def to_json_value(self) -> str:
         return self.value

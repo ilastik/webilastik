@@ -7,16 +7,18 @@ from ndstructs.utils.json_serializable import JsonValue, ensureJsonInt, ensureJs
 from webilastik.utility.url import Url
 from webilastik.libebrains.user_token import UserToken
 from webilastik.libebrains.job import JobDescription, JobStatus, SiteName
+from webilastik.libebrains.service_token import ServiceToken
 
 import aiohttp
 
+# https://wiki.ebrains.eu/bin/view/Collabs/ebrains-hpc-job-proxy/User%20documentation/
 
 class JobProxyClient:
     API_URL: Url = Url.parse_or_raise("https://unicore-job-proxy.apps.hbp.eu/api")
 
-    def __init__(self, http_client_session: aiohttp.ClientSession, service_account_access_token: str) -> None:
+    def __init__(self, http_client_session: aiohttp.ClientSession, service_token: ServiceToken) -> None:
         self.http_client_session = http_client_session
-        self.service_account_access_token: str = service_account_access_token
+        self.service_token = service_token
         super().__init__()
 
     async def start_job(
@@ -32,7 +34,7 @@ class JobProxyClient:
         resp = await self.http_client_session.post(
             self.API_URL.concatpath("jobs/").raw + "/",
             json=payload,
-            headers={"Authorization": f"Bearer {self.service_account_access_token}"},
+            headers={"Authorization": f"Bearer {self.service_token.access_token}"},
         )
         if not resp.ok:
             return Exception(f"Request failed {await resp.text()}: {resp.text}")
