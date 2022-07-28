@@ -4,18 +4,18 @@ import { createElement, getNowString } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
 import { DataType, dataTypes, Scale } from "../../util/precomputed_chunks";
 import { PathInput } from "./path_input";
-import { DropdownSelect } from "./selector_widget";
 import { Shape5DInput } from "./shape5d_input";
 import { Vec3Input } from "./vec3_input";
 import { BucketFsInput } from "./bucket_fs_input";
+import { PopupSelect } from "./selector_widget";
 
 
 export class PrecomputedChunksScale_DataSink_Input{
     private infoDirectoryPathInput: PathInput;
     private scaleKeyInput: PathInput;
     private fileSystemSelector: BucketFsInput;
-    private dataTypeSelector: DropdownSelect<DataType>;
-    private encoderSelector: DropdownSelect<"raw" | "jpeg" | "compressed_segmentation">;
+    private dataTypeSelector: PopupSelect<DataType>;
+    private encoderSelector: PopupSelect<"raw" | "jpeg" | "compressed_segmentation">;
     private tileShapeInput: Shape5DInput;
     private sinkShapeInput: Shape5DInput;
     private resolutionInput: Vec3Input;
@@ -50,11 +50,11 @@ export class PrecomputedChunksScale_DataSink_Input{
 
         let p = createElement({tagName: "p", parentElement})
         createElement({tagName: "label", parentElement: p, innerText: "Data Type: "})
-        this.dataTypeSelector = new DropdownSelect<DataType>({
+        this.dataTypeSelector = new PopupSelect<DataType>({
+            popupTitle: "Select a Data Type",
             parentElement: p,
-            firstOption: dataTypes[0],
-            otherOptions: dataTypes.slice(1),
-            optionRenderer: (dt) => dt,
+            options: dataTypes.slice(0),
+            optionRenderer: (args) => createElement({tagName: "span", parentElement: args.parentElement, innerHTML: args.option}),
             disabled: params.disableDataType,
         })
         if(params.dataType){
@@ -93,11 +93,11 @@ export class PrecomputedChunksScale_DataSink_Input{
 
         p = createElement({tagName: "p", parentElement})
         createElement({tagName: "label", parentElement: p, innerText: "Encoding: "})
-        this.encoderSelector = new DropdownSelect<"raw" | "jpeg" | "compressed_segmentation">({
+        this.encoderSelector = new PopupSelect<"raw" | "jpeg" | "compressed_segmentation">({
+            popupTitle: "Select an encoding",
             parentElement: p,
-            firstOption: "raw",
-            otherOptions: ["jpeg"], //FIXME?
-            optionRenderer: (opt) => opt,
+            options: ["raw", "jpeg"], //FIXME?
+            optionRenderer: (args) => createElement({tagName: "span", parentElement: args.parentElement, innerText: args.option}),
             disabled: params.disableEncoding,
         })
         if(params.encoding){

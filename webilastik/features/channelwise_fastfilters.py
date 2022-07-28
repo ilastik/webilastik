@@ -31,7 +31,7 @@ class PresmoothedFilter(FeatureExtractor):
         *,
         ilp_scale: float,
         axis_2d: Optional[Axis2D],
-        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(),
+        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx"),
     ):
         self.ilp_scale = ilp_scale
         self.presmoother = GaussianSmoothing(
@@ -48,7 +48,7 @@ class ChannelwiseFastFilter(JsonableFeatureExtractor):
     def __init__(
         self,
         *,
-        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(),
+        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx"),
         axis_2d: Optional[Axis2D],
     ):
         super().__init__()
@@ -87,47 +87,52 @@ class ChannelwiseFastFilter(JsonableFeatureExtractor):
 
     @global_cache
     def __call__(self, roi: DataRoi) -> FeatureData:
-        roi_step: Shape5D = roi.shape.updated(c=1, t=1)  # compute features independently for each c and each t
-        if self.axis_2d:
-            roi_step = roi_step.updated(**{self.axis_2d: 1})  # also compute in 2D slices
+        haloed_roi = roi.enlarged(self.halo)
+        source_data = self.preprocessor(haloed_roi)
 
-        per_channel_results : List[FeatureData] = []
-        for roi_slice in roi.split(roi_step):
-            haloed_roi = roi_slice.enlarged(self.halo)
-            channel_offset = roi_slice.start.c - roi.start.c
-            source_data = self.preprocessor(haloed_roi)
+        step_shape: Shape5D = Shape5D(
+            c=1,
+            t=1,
+            x= 1 if self.axis_2d == "x" else source_data.shape.x,
+            y= 1 if self.axis_2d == "y" else source_data.shape.y,
+            z= 1 if self.axis_2d == "z" else source_data.shape.z,
+        )
 
+        out = Array5D.allocate(
+            interval=roi.updated(
+                c=(roi.c[0] * self.channel_multiplier, roi.c[1] * self.channel_multiplier)
+            ),
+            dtype=numpy.dtype("float32"),
+            axiskeys=source_data.axiskeys.replace("c", "") + "c" # fastfilters puts channel last
+        )
+
+        for data_slice in source_data.split(step_shape):
             source_axes = "zyx"
             if self.axis_2d:
                 source_axes = source_axes.replace(self.axis_2d, "")
 
-            raw_data: "ndarray[Any, dtype[float32]]" = source_data.raw(source_axes).astype(numpy.float32)
+            raw_data: "ndarray[Any, dtype[float32]]" = data_slice.raw(source_axes).astype(numpy.float32)
             raw_feature_data: "ndarray[Any, dtype[float32]]" = self.filter_fn(raw_data)
-            if len(raw_feature_data.shape) > len(source_axes):
-                output_axes = source_axes + "c"
-                channel_multiplier = raw_feature_data.shape[-1]
-            else:
-                output_axes = source_axes
-                channel_multiplier = 1
+
             feature_data = FeatureData(
                 raw_feature_data,
-                axiskeys=output_axes,
-                location=haloed_roi.start.updated(c=channel_offset * channel_multiplier)
+                axiskeys=source_axes + "c" if len(raw_feature_data.shape) > len(source_axes) else source_axes,
+                location=data_slice.location.updated(c=data_slice.location.c * self.channel_multiplier)
             )
-            per_channel_results.append(feature_data.cut(roi_slice, c=All()))
-        combined_result = Array5D.combine(per_channel_results)
-        out = FeatureData(
-            combined_result.raw(combined_result.axiskeys), axiskeys=combined_result.axiskeys, location=combined_result.location
-        )
+            out.set(feature_data, autocrop=True)
         out.setflags(write=False)
-        return out
+        return FeatureData(
+            out.raw(out.axiskeys),
+            axiskeys=out.axiskeys,
+            location=out.location,
+        )
 
 
 class StructureTensorEigenvalues(ChannelwiseFastFilter):
     def __init__(
         self,
         *,
-        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(),
+        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx"),
         innerScale: float,
         outerScale: float,
         window_size: float = 0,
@@ -167,7 +172,7 @@ class StructureTensorEigenvalues(ChannelwiseFastFilter):
 
     @classmethod
     def from_ilp_scale(
-        cls, *, preprocessor: Operator[DataRoi, Array5D] = OpRetriever(), scale: float, axis_2d: Optional[Axis2D]
+        cls, *, preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx"), scale: float, axis_2d: Optional[Axis2D]
     ) -> "StructureTensorEigenvalues":
         capped_scale = min(scale, 1.0)
         return cls(
@@ -185,7 +190,7 @@ class SigmaWindowFilter(ChannelwiseFastFilter):
     def __init__(
         self,
         *,
-        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(),
+        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx"),
         sigma: float,
         window_size: float = 0,
         axis_2d: Optional[Axis2D],
@@ -212,7 +217,11 @@ class SigmaWindowFilter(ChannelwiseFastFilter):
 
     @classmethod
     def from_ilp_scale(
-        cls: Type[SIGMA_FILTER], *, preprocessor: Operator[DataRoi, Array5D] = OpRetriever(), scale: float, axis_2d: Optional[Axis2D]
+        cls: Type[SIGMA_FILTER],
+        *,
+        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx"),
+        scale: float,
+        axis_2d: Optional[Axis2D]
     ) -> SIGMA_FILTER:
         return cls(
             preprocessor=preprocessor,
@@ -242,7 +251,7 @@ class DifferenceOfGaussians(ChannelwiseFastFilter):
     def __init__(
         self,
         *,
-        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(),
+        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx"),
         sigma0: float,
         sigma1: float,
         window_size: float = 0,
@@ -291,7 +300,7 @@ class ScaleWindowFilter(ChannelwiseFastFilter):
     def __init__(
         self,
         *,
-        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(),
+        preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx"),
         scale: float,
         window_size: float = 0,
         axis_2d: Optional[Axis2D],

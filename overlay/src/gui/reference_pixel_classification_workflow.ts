@@ -38,7 +38,9 @@ export class ReferencePixelClassificationWorkflowGui{
                 as that of the neighboring pixels. Each one of this characteristics requires some computational power, which
                 is why you can select only the ones that are sensible for your particular dataset.`,
 
-                `Use the checkboxes below to select some image features and their corresponding sigma (~ radius around the pixel).`,
+                `Use the checkboxes below to select some image features and their corresponding gaussian sigma,
+                which will also determine the size of the neighborhood around each pixel that should be taken into
+                account when approximating the computation for that feature.`,
             ].map(text => text.replace(/^ +/, "").replace("\n", " "))
         })
         this.brushing_widget = new BrushingWidget({

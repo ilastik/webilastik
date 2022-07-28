@@ -17,17 +17,27 @@ Description=Webilastik session allocator server
 Documentation=https://github.com/ilastik/webilastik
 Wants=nginx.service redis-server.service
 
+[Install]
+WantedBy=multi-user.target
+DefaultInstance=-opt-webilastik
+
 [Service]
 Type=simple
 # FIXME/BUG: aiohttp must be told where certs are when running from packed environment
 Environment=SSL_CERT_DIR=/etc/ssl/certs/
-Environment=PYTHONPATH=/opt/webilastik/:/opt/webilastik/caching/redis_cache/
-ExecStart=/opt/webilastik_conda_env/bin/python3 -B /opt/webilastik/webilastik/server/session_allocator.py \
+Environment=REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+WorkingDirectory=%I
+
+Environment=REDIS_UNIX_SOCKET_PATH=/var/run/redis/redis-server.sock
+Environment=PYTHONPATH=./:./caching/redis_cache/:./executor_getters/default/
+ExecStartPre=bash -c "echo -e 'FLUSHDB\nQUIT\n' | redis-cli -s $REDIS_UNIX_SOCKET_PATH"
+ExecStart=bash -c "conda_env/bin/python3 -B webilastik/server/session_allocator.py \
     --session-type=Local \
     --master-host=localhost \
     --master-username=www-data \
     --external-url=https://app.ilastik.org/ \
     --oidc-client-json=/etc/webilastik/oidc_client.json \
+"
 
 TimeoutStopSec=30
 KillMode=mixed

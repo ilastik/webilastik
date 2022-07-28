@@ -541,15 +541,15 @@ class IlpFeatureSelectionsGroup:
         default_scales = [0.3, 0.7, 1.0, 1.6, 3.5, 5.0, 10.0]
         extra_scales = set(fe.ilp_scale for fe in self.feature_extractors if fe.ilp_scale not in default_scales)
         scales = default_scales + sorted(extra_scales)
-        group["Scales"] = np.asarray(scales) # pyright: ignore [reportUnknownMemberType]
+        group["Scales"] = np.asarray(scales)
 
-        SelectionMatrix: "ndarray[Any, Any]" = np.zeros((len(self.feature_classes), len(scales)), dtype=bool) # pyright: ignore [reportUnknownMemberType]
+        SelectionMatrix: "ndarray[Any, Any]" = np.zeros((len(self.feature_classes), len(scales)), dtype=bool)
         for fe in self.feature_extractors:
             name_idx = self.feature_classes.index(fe.__class__)
             scale_idx = scales.index(fe.ilp_scale)
             SelectionMatrix[name_idx, scale_idx] = True
 
-        ComputeIn2d: "ndarray[Any, Any]" = np.full(len(scales), True, dtype=bool) # pyright: ignore [reportUnknownMemberType]
+        ComputeIn2d: "ndarray[Any, Any]" = np.full(len(scales), True, dtype=bool)
         for idx, fname in enumerate(self.feature_classes):
             ComputeIn2d[idx] = all(fe.axis_2d for fe in self.feature_extractors if fe.__class__.__name__ == fname)
 

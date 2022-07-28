@@ -29,7 +29,7 @@ class DummyDatasourceApplet(StatelesApplet):
 
 if __name__ == "__main__":
     executor = ThreadPoolExecutor(max_workers=4)
-    priority_executor= PriorityExecutor(executor=executor, num_concurrent_tasks=2)
+    priority_executor= PriorityExecutor(executor=executor, max_active_job_steps=2)
 
 
 

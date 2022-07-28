@@ -1,8 +1,8 @@
 import { DataSource, Session } from "../../client/ilastik";
 import { createElement, createInput } from "../../util/misc";
 import { CssClasses } from "../css_classes";
-import { ErrorPopupWidget, PopupWidget } from "./popup";
-import { OneShotSelectorWidget } from "./selector_widget";
+import { ErrorPopupWidget, InputPopupWidget } from "./popup";
+import { SelectorWidget } from "./selector_widget";
 import { UrlInput } from "./url_input";
 
 
@@ -76,16 +76,18 @@ export class DataSourceInput{
     }
 
     protected popupSuggestions(suggestions: DataSource[]){
-        let popup = new PopupWidget("Select a Data Source")
-        new OneShotSelectorWidget({
-            parentElement: popup.element,
-            options: suggestions,
-            optionRenderer: (ds) => ds.getDisplayString(),
-            onOk: (ds) => {
-                this.value = ds
-                popup.destroy()
+        new InputPopupWidget<DataSource>({
+            title: "Select a Data Source",
+            inputWidgetFactory: (parentElement) => {
+                return new SelectorWidget({
+                    parentElement: parentElement,
+                    options: suggestions,
+                    optionRenderer: (args) => createElement({tagName: "span", parentElement: args.parentElement, innerText: args.option.getDisplayString()}),
+                })
             },
-            onCancel: () => popup.destroy(),
+            onConfirm: (ds) => {
+                this.value = ds
+            },
         })
     }
 

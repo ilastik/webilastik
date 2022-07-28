@@ -25,7 +25,6 @@ from webilastik.ui.usage_error import UsageError
 from webilastik.ui.applet import UserPrompt
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.applet.ws_pixel_classification_applet import WsPixelClassificationApplet
-from webilastik.libebrains.user_token import UserToken
 from webilastik.classic_ilastik.ilp.pixel_classification_ilp import IlpPixelClassificationWorkflowGroup
 from webilastik.utility.url import Protocol
 
@@ -35,7 +34,6 @@ class PixelClassificationWorkflow:
     def __init__(
         self,
         *,
-        ebrains_user_token: UserToken,
         on_async_change: Callable[[], None],
         executor: Executor,
         priority_executor: PriorityExecutor,
@@ -45,7 +43,6 @@ class PixelClassificationWorkflow:
         pixel_classifier: "VigraPixelClassifier[IlpFilter] | None" = None,
     ):
         super().__init__()
-        UserToken.login_globally(ebrains_user_token)
 
         self.brushing_applet = WsBrushingApplet(
             name="brushing_applet",
@@ -71,7 +68,7 @@ class PixelClassificationWorkflow:
             "pixel_classification_applet",
             feature_extractors=self.feature_selection_applet.feature_extractors,
             label_classes=self.brushing_applet.label_classes,
-            executor=executor,
+            executor=priority_executor,
             on_async_change=on_async_change,
             pixel_classifier=pixel_classifier,
         )
@@ -98,7 +95,6 @@ class PixelClassificationWorkflow:
         cls,
         *,
         ilp_path: Path,
-        ebrains_user_token: UserToken,
         on_async_change: Callable[[], None],
         executor: Executor,
         priority_executor: PriorityExecutor,
@@ -115,7 +111,6 @@ class PixelClassificationWorkflow:
                 return parsing_result
 
             return PixelClassificationWorkflow(
-                ebrains_user_token=ebrains_user_token,
                 on_async_change=on_async_change,
                 executor=executor,
                 priority_executor=priority_executor,
@@ -130,7 +125,6 @@ class PixelClassificationWorkflow:
         cls,
         *,
         ilp_bytes: bytes,
-        ebrains_user_token: UserToken,
         on_async_change: Callable[[], None],
         executor: Executor,
         priority_executor: PriorityExecutor,
@@ -142,7 +136,6 @@ class PixelClassificationWorkflow:
         os.close(tmp_file_handle)
         workflow =  PixelClassificationWorkflow.from_ilp(
             ilp_path=Path(tmp_file_path),
-            ebrains_user_token=ebrains_user_token,
             on_async_change=on_async_change,
             executor=executor,
             priority_executor=priority_executor,

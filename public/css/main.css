@@ -83,6 +83,8 @@
 /*https://stackoverflow.com/a/21457838*/
 .ItkGrayedOut {
     position: relative;
+    color: gray;
+    pointer-events: none;
 }
 
 .ItkGrayedOut::after {
@@ -94,7 +96,21 @@
     top: 0;
     left: 0;
     right: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.ItkButton{
+    border: solid 1px gray;
+    padding: 5px;
+    margin: 5px;
+    background-color: white;
+    user-select: none;
+}
+
+.ItkButton:active{
+    background: #e5e5e5;
+    box-shadow: inset 0px 0px 5px #c1c1c1;
+    outline: none;
 }
 
 .ItkInputParagraph{

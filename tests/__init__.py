@@ -29,7 +29,13 @@ from webilastik.libebrains.user_token import UserToken
 from webilastik.ui.applet.brushing_applet import Label
 
 def get_project_root_dir() -> Path:
-    return Path(__name__).parent
+    return Path(__file__).parent.parent
+
+def get_project_test_dir() -> Path:
+    return get_project_root_dir() / "tests"
+
+def get_tmp_dir() -> Path:
+    return get_project_test_dir() / "tmp"
 
 def get_sample_c_cells_datasource() -> SkimageDataSource:
     return SkimageDataSource(
@@ -37,9 +43,9 @@ def get_sample_c_cells_datasource() -> SkimageDataSource:
     )
 
 def get_test_output_osfs() -> OsFs:
-    test_dir_path = f"/tmp/webilastik-test-{time.monotonic()}/"
+    test_dir_path = get_tmp_dir() / f"test-{time.monotonic()}/"
     os.makedirs(test_dir_path, exist_ok=True)
-    return OsFs(test_dir_path)
+    return OsFs(str(test_dir_path))
 
 def get_test_output_bucket_fs() -> BucketFs:
     now = datetime.now()

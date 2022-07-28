@@ -1,3 +1,4 @@
+from pathlib import Path, PurePosixPath
 import time
 from concurrent.futures import ProcessPoolExecutor
 import json
@@ -13,13 +14,17 @@ from webilastik.features.ilp_filter import (
     IlpHessianOfGaussianEigenvalues, IlpLaplacianOfGaussian, IlpStructureTensorEigenvalues,
 )
 from webilastik.features.ilp_filter import IlpFilter
+from webilastik.filesystem.osfs import OsFs
 from webilastik.libebrains.user_token import UserToken
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet import dummy_prompt
 from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
+from webilastik.utility.url import Protocol, Url
+from executor_getter import get_executor
 
+test_output_osfs = get_test_output_osfs()
 
-def wait_until_jobs_completed(workflow: PixelClassificationWorkflow, timeout: float = 10):
+def wait_until_jobs_completed(workflow: PixelClassificationWorkflow, timeout: float = 50):
     wait_time = 0.5
     while timeout > 0:
         export_status: JsonObject = workflow.export_applet._get_json_state()
@@ -35,14 +40,14 @@ def wait_until_jobs_completed(workflow: PixelClassificationWorkflow, timeout: fl
                 break
         else:
             return
+    raise TimeoutError("Waiting on jobs timed out!")
 
 
 def test_pixel_classification_workflow():
-    executor = ProcessPoolExecutor()
-    priority_executor = PriorityExecutor(executor=executor, num_concurrent_tasks=8)
+    executor = get_executor(hint="server_tile_handler")
+    priority_executor = PriorityExecutor(executor=executor, max_active_job_steps=8)
 
     workflow = PixelClassificationWorkflow(
-        ebrains_user_token=UserToken.get_global_token_or_raise(),
         on_async_change=lambda : print(json.dumps(workflow.export_applet._get_json_state(), indent=4)),
         executor=executor,
         priority_executor=priority_executor,
@@ -86,6 +91,30 @@ def test_pixel_classification_workflow():
     assert classifier != None
 
 
+
+
+
+    _ = workflow.save_project(fs=test_output_osfs, path=PurePosixPath("blas.ilp"))
+
+    url = Url.parse(test_output_osfs.geturl('blas.ilp'))
+    assert url is not None
+
+    loaded_workflow = PixelClassificationWorkflow.from_ilp(
+        ilp_path=Path(url.path),
+        on_async_change=lambda : print(json.dumps(workflow.export_applet._get_json_state(), indent=4)),
+        executor=executor,
+        priority_executor=priority_executor,
+        allowed_protocols=[Protocol.FILE],
+    )
+    print("what")
+    print(loaded_workflow)
+    assert isinstance(loaded_workflow, PixelClassificationWorkflow)
+    print(f"Loaded workflow and atete pixel aplet description is {loaded_workflow.pixel_classifier_applet._state.description}")
+
+
+
+
+
     # # calculate predictions on an entire data source
     raw_data_source = get_sample_c_cells_datasource()
     # preds_future = executor.submit(classifier.compute, raw_data_source.roi)
@@ -127,7 +156,7 @@ def test_pixel_classification_workflow():
         resolution=(1,1,1)
     )
     for tile in predictions_output.roi.get_datasource_tiles():
-        tile.retrieve().cut(c=1).as_uint8(normalized=True).show_channels()
+        _ = tile.retrieve().cut(c=1).as_uint8(normalized=True)#.show_channels()
 
 ##################################333
 
@@ -162,7 +191,7 @@ def test_pixel_classification_workflow():
         resolution=(1,1,1)
     )
     for tile in segmentation_output_1.roi.get_datasource_tiles():
-        tile.retrieve().show_images()
+        _ = tile.retrieve()#.show_images()
 
 ####################################3
 

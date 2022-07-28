@@ -1,3 +1,4 @@
+from functools import partial
 from typing import List, Sequence, Mapping, Tuple, Dict, Iterable, Sequence, Any, Optional
 import itertools
 
@@ -8,6 +9,7 @@ from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonA
 
 from webilastik.datasource import DataSource, DataRoi, FsDataSource
 from webilastik.features.feature_extractor import FeatureExtractor, FeatureData
+from executor_getter import get_executor
 
 
 class Color:
@@ -99,6 +101,10 @@ class AnnotationOutOfBounds(Exception):
     def __init__(self, annotation_roi: Interval5D, raw_data: DataSource):
         super().__init__(f"Annotation roi {annotation_roi} exceeds bounds of raw_data {raw_data}")
 
+def _make_samples(data_tile: DataRoi, annotation: "Annotation", feature_extractor: FeatureExtractor) -> FeatureSamples:
+    annotation_tile = annotation.clamped(data_tile)
+    feature_tile = feature_extractor(data_tile).cut(annotation_tile.interval, c=All())
+    return FeatureSamples.create(annotation_tile, feature_tile)
 
 class Annotation(ScalarData):
     """User annotation attached to the raw data onto which they were drawn"""
@@ -107,14 +113,16 @@ class Annotation(ScalarData):
         return hash(self._data.tobytes())
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Annotation):
+        if not isinstance(other, Annotation) or self.interval != other.interval:
             return False
-        return self.interval == other.interval and bool(np.all(self._data == other._data))
+        equal = np.all(self.raw(Point5D.LABELS) == other.raw(Point5D.LABELS))
+        return bool(equal)
 
     def __init__(
         self, arr: "np.ndarray[Any, Any]", *, axiskeys: str, location: Point5D = Point5D.zero(), raw_data: DataSource
     ):
-        super().__init__(arr.astype(bool), axiskeys=axiskeys, location=location)
+        data5d = Array5D(arr.astype(bool), axiskeys=axiskeys, location=location).contracted_to_non_zero()
+        super().__init__(data5d._data, axiskeys=data5d.axiskeys, location=data5d.location)
         if not raw_data.interval.contains(self.interval):
             raise AnnotationOutOfBounds(annotation_roi=self.interval, raw_data=raw_data)
         self.raw_data = raw_data
@@ -182,14 +190,12 @@ class Annotation(ScalarData):
     def get_feature_samples(self, feature_extractor: FeatureExtractor) -> FeatureSamples:
         interval_under_annotation = self.interval.updated(c=self.raw_data.interval.c)
 
-        def make_samples(data_tile: DataRoi) -> FeatureSamples:
-            annotation_tile = self.clamped(data_tile)
-            feature_tile = feature_extractor(data_tile).cut(annotation_tile.interval, c=All())
-            return FeatureSamples.create(annotation_tile, feature_tile)
-
         tile_shape = self.raw_data.tile_shape.updated(c=self.raw_data.shape.c)
-        all_feature_samples = list(map(
-            make_samples,
+        make_samples_on_tile = partial(_make_samples, annotation=self, feature_extractor=feature_extractor)
+        num_tiles = interval_under_annotation.get_num_tiles(tile_shape=tile_shape)
+        executor = get_executor(hint="sampling", max_workers=num_tiles)
+        all_feature_samples = list(executor.map(
+            make_samples_on_tile,
             self.raw_data.roi.clamped(interval_under_annotation).get_tiles(tile_shape=tile_shape, tiles_origin=self.raw_data.location)
         ))
 

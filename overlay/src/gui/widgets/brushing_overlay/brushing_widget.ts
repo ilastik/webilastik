@@ -3,7 +3,7 @@ import { BrushStroke } from "../../.."
 import { Color, DataSource, Session } from "../../../client/ilastik"
 import { createElement, createInputParagraph, removeElement } from "../../../util/misc"
 import { CollapsableWidget } from "../collapsable_applet_gui"
-import { OneShotSelectorWidget } from "../selector_widget"
+import { PopupSelect } from "../selector_widget"
 import { BrushingOverlay } from "./brushing_overlay"
 import { BrushelBoxRenderer } from "./brush_boxes_renderer"
 import { BrushingApplet } from "./brush_strokes_container"
@@ -171,11 +171,19 @@ export class BrushingWidget{
         this.showStatus(`Viewing multi-resolution datasource`)
 
         createElement({tagName: "label", innerHTML: "Select a voxel size to annotate on:", parentElement: this.resolutionSelectionContainer});
-        new OneShotSelectorWidget<DataSource>({
+        new PopupSelect<DataSource>({
+            popupTitle: "Select a voxel size to annotate on",
             parentElement: this.resolutionSelectionContainer,
             options: view.datasources,
-            optionRenderer: (datasource) => `${datasource.spatial_resolution[0]} x ${datasource.spatial_resolution[1]} x ${datasource.spatial_resolution[2]} nm`,
-            onOk: async (datasource) => {
+            optionRenderer: (args) => {
+                let datasource = args.option
+                return createElement({
+                    tagName: "span",
+                    parentElement: args.parentElement,
+                    innerText: `${datasource.spatial_resolution[0]} x ${datasource.spatial_resolution[1]} x ${datasource.spatial_resolution[2]} nm`
+                })
+            },
+            onChange: async (datasource) => {
                 const training_view = view.toTrainingView({resolution: datasource.spatial_resolution, session: this.session})
                 this.openTrainingView(training_view)
             },

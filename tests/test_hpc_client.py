@@ -2,15 +2,16 @@ import aiohttp
 import asyncio
 import pprint
 
-from webilastik.libebrains.job import JobDescription, JobProxyClient, JobResources, Memory, SiteName
+from webilastik.libebrains.job import JobDescription, JobResources, Memory, SiteName
+from webilastik.libebrains.job_proxy_client import JobDescription, JobProxyClient
 from webilastik.libebrains.user_token import UserToken
 
 async def test_hpc_client():
     http_client = aiohttp.ClientSession()
-    job_client = JobProxyClient(http_client_session=http_client)
+    job_client = JobProxyClient(http_client_session=http_client, service_account_access_token="FIXME")
     job_submission = await job_client.start_job(
         site=SiteName.DAINT_CSCS,
-        service_account_token=UserToken.get_global_token_or_raise(),
+        end_user_token=UserToken.get_global_token_or_raise(),
         job_def=JobDescription(
             Name="my_test_job",
             Project="ich005",

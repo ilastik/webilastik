@@ -2,26 +2,20 @@
 
 import dataclasses
 import enum
-from typing import Literal, NewType, Optional, Tuple
+from typing import Literal, NewType, Optional, Tuple, cast
 import typing
-import uuid
-import datetime
-import requests
-
-import aiohttp
+import re
 
 from ndstructs.utils.json_serializable import (
     IJsonable,
     JsonObject,
     JsonValue,
+    ensureJsonArray,
     ensureJsonInt,
     ensureJsonObject,
     ensureJsonString,
-    ensureOptional,
-    toJsonValue,
+    ensureJsonStringArray,
 )
-from webilastik.libebrains.user_token import UserToken
-from webilastik.utility.url import Url
 
 
 Seconds = NewType("Seconds", int)
@@ -34,6 +28,15 @@ class Memory:
 
     def to_json_value(self) -> str:
         return f"{self.amount}{self.unit}"
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "Memory":
+        value_str = ensureJsonString(value)
+        match = re.compile(r"(?<amount>\d+)(?<unit>[G]))", re.IGNORECASE).fullmatch(value_str)
+        if not match:
+            raise ValueError(f"Bad memory value: {value}")
+        return Memory(amount=int(match.group("amount")), unit=cast(Literal["G"], match.group("unit")))
+
 
 @dataclasses.dataclass
 class JobResources(IJsonable):
@@ -55,6 +58,18 @@ class JobResources(IJsonable):
         }
         return {k:v for k, v in json_obj.items() if v is not None}
 
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "JobResources":
+        value_obj = ensureJsonObject(value)
+        return JobResources(
+            Memory=Memory.from_json_value(value_obj.get("Memory")),
+            Runtime=Seconds(ensureJsonInt(value_obj.get("Runtime"))),
+            CPUs=ensureJsonInt(value_obj.get("CPUs")),
+            Nodes=ensureJsonInt(value_obj.get("Nodes")),
+            CPUsPerNode=ensureJsonInt(value_obj.get("CPUsPerNode")),
+            Reservation=ensureJsonString(value_obj.get("Reservation")),
+        )
+
 @dataclasses.dataclass
 class JobImport(IJsonable):
     From: str #FIXME: PurePosixPath | Url ?
@@ -65,6 +80,14 @@ class JobImport(IJsonable):
             "From": self.From,
             "To": self.To,
         }
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "JobImport":
+        value_obj = ensureJsonObject(value)
+        return JobImport(
+            From=ensureJsonString(value_obj.get("From")),
+            To=ensureJsonString(value_obj.get("To")),
+        )
 
 
 @dataclasses.dataclass
@@ -88,15 +111,31 @@ class JobDescription(IJsonable):
                 "Arguments": self.Arguments,
                 "Resources": self.Resources.to_json_value(),
                 "Environment": self.Environment,
-                # "Exports": self.Exports,
-                # "Imports": tuple(imp.to_json_value() for imp in self.Imports),
-                # "Tags": self.Tags,
+                "Exports": self.Exports,
+                "Imports": tuple(imp.to_json_value() for imp in self.Imports),
+                "Tags": self.Tags,
             }.items()
             if v is not None
         }
 
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "JobDescription":
+        value_obj = ensureJsonObject(value)
+        return JobDescription(
+            Name=ensureJsonString(value_obj.get("Name")),
+            Project=ensureJsonString(value_obj.get("Project")),
+            Executable=ensureJsonString(value_obj.get("Executable")),
+            Arguments=tuple(ensureJsonString(arg) for arg in ensureJsonArray(value_obj.get("Arguments"))),
+            Resources=JobResources.from_json_value(value_obj.get("Resources")),
+            Environment={k: ensureJsonString(v) for k, v in ensureJsonObject(value_obj.get("Environment")).items()},
+            Exports=ensureJsonStringArray(value_obj.get("Exports")),
+            Imports=tuple(JobImport.from_json_value(v) for v in ensureJsonArray(value_obj.get("Imports"))),
+            Tags=ensureJsonStringArray(value_obj.get("Tags")),
+        )
+
 class SiteName(enum.Enum):
     DAINT_CSCS = "DAINT-CSCS"
+    JUSUF = "JUSUF"
 
     def to_json_value(self) -> str:
         return self.value
@@ -120,74 +159,3 @@ class JobStatus(enum.Enum):
             if status.value == value_str:
                 return status
         raise ValueError(f"Bad job status name: {value_str}")
-
-
-@dataclasses.dataclass
-class JobSubmission:
-    id: uuid.UUID
-    job_id: uuid.UUID
-    site: SiteName
-    num_cpus: Optional[int]
-    num_nodes: Optional[int]
-    runtime: Optional[int]
-    total_runtime: Optional[int]
-    status: JobStatus
-    #pre_command_status: None
-    #post_command_status: None
-    error: Optional[str]
-    created: datetime.datetime
-    updated: datetime.datetime
-    # job_def: JobDescription
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "JobSubmission":
-        value_obj = ensureJsonObject(value)
-        return JobSubmission(
-            id=uuid.UUID(ensureJsonString(value_obj.get("id"))),
-            job_id=uuid.UUID(ensureJsonString(value_obj.get("job_id"))),
-            site=SiteName.from_json_value(value_obj.get("site")),
-            num_cpus=ensureOptional(ensureJsonInt, value_obj.get("num_cpus")),
-            num_nodes=ensureOptional(ensureJsonInt, value_obj.get("num_nodes")),
-            runtime=ensureOptional(ensureJsonInt, value_obj.get("runtime")),
-            total_runtime=ensureOptional(ensureJsonInt, value_obj.get("total_runtime")),
-            status=JobStatus.from_json_value(value_obj.get("status")),
-            error=ensureOptional(ensureJsonString, value_obj.get("error")),
-            created=datetime.datetime.strptime(
-                ensureJsonString(value_obj.get("created")),
-                '%Y-%m-%dT%H:%M:%S.%f'
-            ),
-            updated=datetime.datetime.strptime(
-                ensureJsonString(value_obj.get("updated")),
-                '%Y-%m-%dT%H:%M:%S.%f'
-            ),
-        )
-
-
-class JobProxyClient:
-    API_URL: Url = Url.parse_or_raise("https://unicore-job-proxy.apps.hbp.eu/api")
-
-    def __init__(self, http_client_session: aiohttp.ClientSession) -> None:
-        self.http_client_session = http_client_session
-        super().__init__()
-
-    async def start_job(
-        self, *, job_def: JobDescription, site: SiteName, service_account_token: UserToken,
-    ) -> "JobSubmission | Exception":
-        payload: JsonValue = toJsonValue({
-            "job_def": job_def,
-            "site": site,
-            "user_info": service_account_token.access_token
-        })
-        # print(f"Posting this payload:\n{json.dumps(payload, indent=4)}")
-
-        resp = requests.post(
-            self.API_URL.concatpath("jobs/").raw + "/",
-            json=payload,
-            headers=service_account_token.as_auth_header(),
-        )
-        if resp.status_code // 100 != 2:
-            return Exception(f"Request failed {resp.status_code}: {resp.text}")
-
-        return JobSubmission.from_json_value(await resp.json())
-
-

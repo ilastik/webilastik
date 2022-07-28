@@ -4,6 +4,7 @@ import { Url } from "../../util/parsed_url"
 
 export class SessionCreatorWidget{
     element: HTMLElement
+    public readonly create_session_btn: HTMLInputElement
     constructor({parentElement, ilastikUrl, onUsageError, onNewSession}:{
         parentElement: HTMLElement,
         ilastikUrl: Url,
@@ -29,13 +30,17 @@ export class SessionCreatorWidget{
         })
         duration_input.min = "5"
 
-        const create_session_btn = createInputParagraph({inputType: "submit", value: "Create", parentElement: form})
+        this.create_session_btn = createInputParagraph({inputType: "submit", value: "Create", parentElement: form})
 
         const creation_log_p = createElement({tagName: "p", parentElement: form, inlineCss: {display: "none"}})
         createElement({tagName: "label", innerHTML: "Creation Log: ", parentElement: creation_log_p})
         const status_messages = createElement({tagName: "div", parentElement: creation_log_p, cssClasses: ["ItkSessionCreatorWidget_status-messages"]})
 
-        form.addEventListener("submit", (ev) => {
+        form.addEventListener("submit", (ev): false => {
+            this.set_disabled(true);
+            this.create_session_btn.value = "Creating Session..."
+            status_messages.innerHTML = "";
+
             (async () => {
                 try{
                     creation_log_p.style.display = "block"
@@ -45,11 +50,9 @@ export class SessionCreatorWidget{
                         const login_url = ilastikUrl.joinPath("api/login_then_close").raw
                         status_messages.innerHTML = `<p><a target="_blank" rel="noopener noreferrer" href="${login_url}">Login on ebrains</a> required.</p>`
                         window.open(login_url)
+                        this.set_disabled(false);
                         return
                     }
-                    create_session_btn.value = "Creating Session..."
-                    this.set_disabled(true)
-                    status_messages.innerHTML = "";
 
                     let session = await Session.create({
                         ilastikUrl: Url.parse(ilastikUrlInput.value),
@@ -62,7 +65,7 @@ export class SessionCreatorWidget{
                         onUsageError,
                     })
                     onNewSession(session)
-                    create_session_btn.value = "Create"
+                    this.create_session_btn.value = "Session is running"
                 }catch(e){
                     status_messages.innerHTML = e.message
                     this.set_disabled(false)
@@ -80,5 +83,8 @@ export class SessionCreatorWidget{
         this.element.querySelectorAll("input").forEach(inp => {
             (inp as HTMLInputElement).disabled = disabled
         })
+        if(!disabled){
+            this.create_session_btn.value = "Create"
+        }
     }
 }

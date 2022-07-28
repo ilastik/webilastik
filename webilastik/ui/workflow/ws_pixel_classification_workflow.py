@@ -36,6 +36,7 @@ from webilastik.utility.url import Protocol, Url
 from webilastik.server.tunnel import ReverseSshTunnel
 from webilastik.ui.applet import dummy_prompt
 from webilastik.libebrains.user_token import UserToken
+from executor_getter import get_executor
 
 
 class MyLogger:
@@ -129,11 +130,10 @@ class WebIlastik:
         self._http_client_session: Optional[ClientSession] = None
         self._loop: Optional[AbstractEventLoop] = None
 
-        self.executor = ProcessPoolExecutor(max_workers=multiprocessing.cpu_count())
-        self.priority_executor = PriorityExecutor(executor=self.executor, num_concurrent_tasks=multiprocessing.cpu_count())
+        self.executor = get_executor(hint="server_tile_handler", max_workers=multiprocessing.cpu_count())
+        self.priority_executor = PriorityExecutor(executor=self.executor, max_active_job_steps=2 * multiprocessing.cpu_count())
 
         self.workflow = PixelClassificationWorkflow(
-            ebrains_user_token=ebrains_user_token,
             on_async_change=lambda : self.enqueue_user_interaction(lambda: None), #FIXME?
             executor=self.executor,
             priority_executor=self.priority_executor
@@ -334,7 +334,6 @@ class WebIlastik:
         ))
         new_workflow_result = PixelClassificationWorkflow.from_ilp_bytes(
             ilp_bytes=ilp_bytes,
-            ebrains_user_token=UserToken.get_global_token_or_raise(),
             on_async_change=lambda : self.enqueue_user_interaction(lambda: None), #FIXME?
             executor=self.executor,
             priority_executor=self.priority_executor,
@@ -433,7 +432,7 @@ if __name__ == '__main__':
 
     mpi_rank = 0
     try:
-        from mpi4py import MPI #type: ignore
+        from mpi4py import MPI
         mpi_rank = MPI.COMM_WORLD.Get_rank()
     except ModuleNotFoundError:
         pass

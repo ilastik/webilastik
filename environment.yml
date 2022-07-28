@@ -1,4 +1,4 @@
-name: webilastikbla
+name: webilastik
 channels:
   - ilastik-forge
   - conda-forge
@@ -19,4 +19,4 @@ dependencies:
   - redis-py
   - pip
   - pip:
-    - git+https://git@github.com/ilastik/ndstructs@dev
+    - git+https://git@github.com/ilastik/ndstructs@f70de7c61f55d22c237bc032cb364e06199afb09

@@ -94,8 +94,8 @@ class DataSource(ABC):
     def close(self) -> None:
         pass
 
-    def _allocate(self, interval: Union[Shape5D, Interval5D], fill_value: int) -> Array5D:
-        return Array5D.allocate(interval, dtype=self.dtype, value=fill_value)
+    def _allocate(self, interval: Union[Shape5D, Interval5D], fill_value: int, axiskeys_hint: str = "tzyxc") -> Array5D:
+        return Array5D.allocate(interval, dtype=self.dtype, value=fill_value, axiskeys=axiskeys_hint)
 
     def retrieve(
         self,
@@ -107,6 +107,7 @@ class DataSource(ABC):
         t: Optional[SPAN_OVERRIDE] = None,
         c: Optional[SPAN_OVERRIDE] = None,
         address_mode: AddressMode = AddressMode.BLACK,
+        axiskeys_hint: str = "tzyxc"
     ) -> Array5D:
         interval = (interval or self.interval).updated(
             x=self.interval.x if isinstance(x, All) else x,
@@ -115,7 +116,7 @@ class DataSource(ABC):
             t=self.interval.t if isinstance(t, All) else t,
             c=self.interval.c if isinstance(c, All) else c,
         )
-        out = self._allocate(interval, fill_value=0)
+        out = self._allocate(interval, fill_value=0, axiskeys_hint=axiskeys_hint)
         for tile in self.roi.clamped(interval).get_datasource_tiles(clamp_to_datasource=True):
             tile_data = self.get_tile(tile)
             out.set(tile_data, autocrop=True)
@@ -192,8 +193,8 @@ class DataRoi(Interval5D):
     def interval(self) -> Interval5D:
         return Interval5D(t=self.t, c=self.c, x=self.x, y=self.y, z=self.z)
 
-    def retrieve(self, address_mode: AddressMode = AddressMode.BLACK) -> Array5D:
-        return self.datasource.retrieve(self.interval, address_mode=address_mode)
+    def retrieve(self, *, address_mode: AddressMode = AddressMode.BLACK, axiskeys_hint: str = "tzyxc") -> Array5D:
+        return self.datasource.retrieve(self.interval, address_mode=address_mode, axiskeys_hint=axiskeys_hint)
 
     def default_split(self) -> Iterator["DataRoi"]:
         yield from super().split(self.tile_shape)

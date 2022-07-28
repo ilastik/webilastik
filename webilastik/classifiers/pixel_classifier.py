@@ -10,22 +10,24 @@ import h5py
 import PIL
 import io
 from dataclasses import dataclass
+# import time
 
 
 import numpy as np
 from numpy import ndarray, dtype, float32
 from vigra.learning import RandomForest as VigraRandomForest
-from concurrent.futures import ProcessPoolExecutor
+import concurrent.futures
 
 from ndstructs.array5D import Array5D
 from ndstructs.point5D import Interval5D, Point5D
 from webilastik import annotations
-from webilastik.features.feature_extractor import FeatureExtractor
+from webilastik.features.feature_extractor import FeatureData, FeatureExtractor
 from webilastik.features.feature_extractor import FeatureExtractorCollection
 from webilastik.annotations import Annotation, Color
 from webilastik.classic_ilastik.ilp import IlpGroup, populate_h5_group, read_h5_group
 from webilastik.operator import Operator
 from webilastik.datasource import DataRoi, DataSource
+from executor_getter import get_executor
 
 class Predictions(Array5D):
     """An array of floats from 0.0 to 1.0. The value in each channel represents
@@ -173,10 +175,17 @@ def h5_bytes_to_vigra_forest(h5_bytes: VigraForestH5Bytes) -> VigraRandomForest:
     return out
 
 def _train_forest(random_seed: int, num_trees: int, training_data: TrainingData) -> VigraForestH5Bytes:
+    # t = time.time()
     forest = VigraRandomForest(num_trees)
-    # forest.learnRF(training_data.X, training_data.y, random_seed)
     _ = forest.learnRF(training_data.X, training_data.y, 0)
-    return vigra_forest_to_h5_bytes(forest)
+    # t_trained = time.time()
+    serialized = vigra_forest_to_h5_bytes(forest)
+    # t_serialized = time.time()
+    # print(f"Trained in {t_trained - t}s, serialized in {t_serialized - t_trained}")
+    return serialized
+
+def _compute_partial_predictions(feature_data: FeatureData, forest: VigraRandomForest) -> "np.ndarray[Any, np.dtype[np.float32]]":
+    return forest.predictProbabilities(feature_data.linear_raw()) * forest.treeCount()
 
 class VigraPixelClassifier(PixelClassifier[FE]):
     def __init__(
@@ -213,13 +222,13 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         random_seeds = range(random_seed, random_seed + num_forests)
         trees_per_forest = ((num_trees // num_forests) + (forest_index < num_trees % num_forests) for forest_index in range(num_forests))
 
-        with ProcessPoolExecutor(max_workers=num_trees) as executor:
-            # we're taking the bytes instead of the forest itself because vigra forests are not picklable
-            forests_bytes: Sequence[VigraForestH5Bytes] = list(executor.map(
-                partial(_train_forest, training_data=training_data_result),
-                random_seeds,
-                trees_per_forest
-            ))
+        executor = get_executor(hint="training", max_workers=num_forests)
+        # we're taking the bytes instead of the forest itself because vigra forests are not picklable
+        forests_bytes: Sequence[VigraForestH5Bytes] = list(executor.map(
+            partial(_train_forest, training_data=training_data_result),
+            random_seeds,
+            trees_per_forest
+        ))
 
         return cls(
             feature_extractors=feature_extractors,
@@ -240,9 +249,11 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         assert predictions.interval == self.get_expected_roi(roi)
         raw_linear_predictions: "ndarray[Any, dtype[float32]]" = predictions.linear_raw()
 
-        #fixme: should this run in some sort of worker pool?
-        for forest in self.forests:
-            raw_linear_predictions += forest.predictProbabilities(feature_data.linear_raw()) * forest.treeCount()
+        executor = get_executor(hint="predicting")
+        f = partial(_compute_partial_predictions, feature_data)
+        futures = [executor.submit(f, forest) for forest in self.forests]
+        for partial_predictions_future in futures:
+            raw_linear_predictions += partial_predictions_future.result()
 
         raw_linear_predictions /= self.num_trees
         predictions.setflags(write=False)

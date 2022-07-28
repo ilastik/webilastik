@@ -42,7 +42,7 @@ export class Session{
         return websocket
     }
 
-    private closeWebsocket(){
+    public closeWebsocket(){
         this.websocket.removeEventListener("close", this.refreshWebsocket)
         this.websocket.removeEventListener("error", this.refreshWebsocket)
         for(let handler of this.messageHandlers){
@@ -62,7 +62,7 @@ export class Session{
         this.websocket.addEventListener("message", handler)
     }
 
-    public async close(): Promise<true | undefined>{
+    public async terminate(): Promise<true | undefined>{
         this.closeWebsocket()
         let closeSession_response = await fetch(this.sessionUrl.joinPath("close").schemeless_raw, {method: "DELETE"})
         if(closeSession_response.ok){

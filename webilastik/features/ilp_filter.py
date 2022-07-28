@@ -59,7 +59,9 @@ class IlpFilter(PresmoothedFilter, JsonableFeatureExtractor):
         return self.op(roi)
 
 class IlpGaussianSmoothing(IlpFilter):
-    def __init__(self, ilp_scale: float, axis_2d: Optional[Axis2D], preprocessor: Operator[DataRoi, Array5D] = OpRetriever()):
+    def __init__(
+        self, ilp_scale: float, axis_2d: Optional[Axis2D], preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx")
+    ):
         super().__init__(ilp_scale=ilp_scale, axis_2d=axis_2d, preprocessor=preprocessor)
         self._op = GaussianSmoothing(
             preprocessor=self.presmoother,
@@ -72,7 +74,9 @@ class IlpGaussianSmoothing(IlpFilter):
         return self._op
 
 class IlpLaplacianOfGaussian(IlpFilter):
-    def __init__(self, ilp_scale: float, axis_2d: Optional[Axis2D], preprocessor: Operator[DataRoi, Array5D] = OpRetriever()):
+    def __init__(
+        self, ilp_scale: float, axis_2d: Optional[Axis2D], preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx")
+    ):
         super().__init__(ilp_scale=ilp_scale, axis_2d=axis_2d, preprocessor=preprocessor)
         self._op = LaplacianOfGaussian(
             preprocessor=self.presmoother,
@@ -85,7 +89,9 @@ class IlpLaplacianOfGaussian(IlpFilter):
         return self._op
 
 class IlpGaussianGradientMagnitude(IlpFilter):
-    def __init__(self, ilp_scale: float, axis_2d: Optional[Axis2D], preprocessor: Operator[DataRoi, Array5D] = OpRetriever()):
+    def __init__(
+        self, ilp_scale: float, axis_2d: Optional[Axis2D], preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx")
+    ):
         super().__init__(ilp_scale=ilp_scale, axis_2d=axis_2d, preprocessor=preprocessor)
         self._op = GaussianGradientMagnitude(
             preprocessor=self.presmoother,
@@ -98,7 +104,9 @@ class IlpGaussianGradientMagnitude(IlpFilter):
         return self._op
 
 class IlpDifferenceOfGaussians(IlpFilter):
-    def __init__(self, ilp_scale: float, axis_2d: Optional[Axis2D], preprocessor: Operator[DataRoi, Array5D] = OpRetriever()):
+    def __init__(
+        self, ilp_scale: float, axis_2d: Optional[Axis2D], preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx")
+    ):
         super().__init__(ilp_scale=ilp_scale, axis_2d=axis_2d, preprocessor=preprocessor)
         capped_scale = min(ilp_scale, 1.0)
         self._op = DifferenceOfGaussians(
@@ -114,7 +122,7 @@ class IlpDifferenceOfGaussians(IlpFilter):
 
 class IlpStructureTensorEigenvalues(IlpFilter):
     def __init__(
-        self, *, ilp_scale: float, axis_2d: Optional[Axis2D], preprocessor: Operator[DataRoi, Array5D] = OpRetriever()
+        self, *, ilp_scale: float, axis_2d: Optional[Axis2D], preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx")
     ):
         super().__init__(ilp_scale=ilp_scale, preprocessor=preprocessor, axis_2d=axis_2d)
         capped_scale = min(ilp_scale, 1.0)
