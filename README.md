@@ -117,9 +117,9 @@ Even the local server needs Nginx to be running. This is because webilastik allo
         ```
 - Restart nginx after SSL is configured: `sudo systemctl restart nginx.service`
 
-- Run the "dev" server locally: `task start-local-server`. This task will do some basic checking to see if you have completed the previous steps before attempting to run the server. Now every time you edit something anywhere in the project you can just restart the server by re-running the `start-local-server` task.
+- Run the "dev" server locally: `task start-local-server`. This task will do some basic checking to see if you have completed the previous steps before attempting to run the server. It will fire the server using `systemctl` to better emulate production behavior, but it will output to the current `tty` so that you don't have to wait for the buffered output while debugging. You can stop the server by running `task stop-local-server`.
 
 ## Testing it out:
 
-Just go to https://app.ilastik.org/
+Once your server is up, just go to https://app.ilastik.org/
 
