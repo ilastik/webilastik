@@ -3,7 +3,6 @@ from typing import Optional, Sequence, Set, Tuple, Union, Iterable, List
 import json
 
 from aiohttp.client import ClientSession
-from webilastik.libebrains.developer_token import DeveloperToken
 from webilastik.libebrains.user_token import UserToken
 import requests
 import enum
@@ -210,126 +209,6 @@ class OidcClient:
             "webOrigins": self.webOrigins,
         }
 
-    def updated_with(
-        self,
-        *,
-        alwaysDisplayInConsole: Optional[bool] = None,
-        baseUrl: Optional[Url] = None,
-        bearerOnly: Optional[bool] = None,
-        clientAuthenticatorType: Optional[str] = None,
-        clientId: Optional[str] = None,
-        consentRequired: Optional[bool] = None,
-        defaultClientScopes: Optional[Tuple[str, ...]] = None,
-        description: Optional[str] = None,
-        directAccessGrantsEnabled: Optional[bool] = None,
-        enabled: Optional[bool] = None,
-        frontchannelLogout: Optional[bool] = None,
-        fullScopeAllowed: Optional[bool] = None,
-        id: Optional[str] = None,
-        implicitFlowEnabled: Optional[bool] = None,
-        name: Optional[str] = None,
-        nodeReRegistrationTimeout: Optional[int] = None,
-        notBefore: Optional[int] = None,
-        optionalClientScopes: Optional[Set["Scope"]] = None,
-        protocol: Optional[str] = None,
-        publicClient: Optional[bool] = None,
-        redirectUris: Optional[Tuple[Url, ...]] = None,
-        registrationAccessToken: Optional[str] = None,
-        rootUrl: Optional[Url] = None,
-        secret: Optional[str] = None,
-        serviceAccountsEnabled: Optional[bool] = None,
-        standardFlowEnabled: Optional[bool] = None,
-        surrogateAuthRequired: Optional[bool] = None,
-        webOrigins: Optional[Tuple[str, ...]] = None,
-    ) -> "OidcClient":
-        return OidcClient(
-            alwaysDisplayInConsole = self.alwaysDisplayInConsole if alwaysDisplayInConsole is None else alwaysDisplayInConsole,
-            baseUrl = self.baseUrl if baseUrl is None else baseUrl,
-            bearerOnly = self.bearerOnly if bearerOnly is None else bearerOnly,
-            clientAuthenticatorType = self.clientAuthenticatorType if clientAuthenticatorType is None else clientAuthenticatorType,
-            clientId = self.clientId if clientId is None else clientId,
-            consentRequired = self.consentRequired if consentRequired is None else consentRequired,
-            defaultClientScopes = self.defaultClientScopes if defaultClientScopes is None else defaultClientScopes,
-            description = self.description if description is None else description,
-            directAccessGrantsEnabled = self.directAccessGrantsEnabled if directAccessGrantsEnabled is None else directAccessGrantsEnabled,
-            enabled = self.enabled if enabled is None else enabled,
-            frontchannelLogout = self.frontchannelLogout if frontchannelLogout is None else frontchannelLogout,
-            fullScopeAllowed = self.fullScopeAllowed if fullScopeAllowed is None else fullScopeAllowed,
-            id = self.id if id is None else id,
-            implicitFlowEnabled = self.implicitFlowEnabled if implicitFlowEnabled is None else implicitFlowEnabled,
-            name = self.name if name is None else name,
-            nodeReRegistrationTimeout = self.nodeReRegistrationTimeout if nodeReRegistrationTimeout is None else nodeReRegistrationTimeout,
-            notBefore = self.notBefore if notBefore is None else notBefore,
-            optionalClientScopes = self.optionalClientScopes if optionalClientScopes is None else optionalClientScopes,
-            protocol = self.protocol if protocol is None else protocol,
-            publicClient = self.publicClient if publicClient is None else publicClient,
-            redirectUris = self.redirectUris if redirectUris is None else redirectUris,
-            registrationAccessToken = self.registrationAccessToken if registrationAccessToken is None else registrationAccessToken,
-            rootUrl = self.rootUrl if rootUrl is None else rootUrl,
-            secret = self.secret if secret is None else secret,
-            serviceAccountsEnabled = self.serviceAccountsEnabled if serviceAccountsEnabled is None else serviceAccountsEnabled,
-            standardFlowEnabled = self.standardFlowEnabled if standardFlowEnabled is None else standardFlowEnabled,
-            surrogateAuthRequired = self.surrogateAuthRequired if surrogateAuthRequired is None else surrogateAuthRequired,
-            webOrigins = self.webOrigins if webOrigins is None else webOrigins,
-        )
-
-    def update_upstream(self, dev_token: DeveloperToken):
-        payload = self.to_json_value()
-        resp = requests.put(
-            f"https://iam.ebrains.eu/auth/realms/hbp/clients-registrations/default/{self.clientId}",
-            headers={
-                "Authorization": f"Bearer {dev_token.access_token}"
-            },
-            json=payload
-        )
-        resp.raise_for_status()
-
-    @classmethod
-    def create(
-        cls,
-        *,
-        dev_token: DeveloperToken,
-        clientId: str,
-        name: str,
-        descritpion: str,
-        rootUrl: Url,
-        baseUrl: Union[PurePosixPath, Url],
-        redirectUris: Iterable[Union[PurePosixPath, Url]],
-    ) -> "OidcClient":
-        response = requests.post(
-            "https://iam.ebrains.eu/auth/realms/hbp/clients-registrations/default/",
-            headers={
-                "Authorization": f"Bearer {dev_token.access_token}" \
-            },
-            json={
-                "clientId": clientId,
-                "name": name,
-                "description": descritpion,
-                "rootUrl": rootUrl.raw,
-                "baseUrl": str(baseUrl),
-                "redirectUris": [str(uri) for uri in redirectUris],
-                "webOrigins": ["+"],
-                "bearerOnly": False,
-                "consentRequired": True,
-                "standardFlowEnabled": True,
-                "implicitFlowEnabled": True,
-                "directAccessGrantsEnabled": False,
-                "attributes": {
-                    "contacts": "team@ilastik.org"
-                }
-            }
-        )
-
-        payload = response.json()
-        print(f"Client creation response:\n{json.dumps(payload, indent=4)}")
-        response.raise_for_status()
-
-        filename = f"/tmp/oidc_client_{clientId}.json"
-        with open(filename, "w") as f:
-            _ = f.write(json.dumps(payload, indent=4))
-        print(f"Dumped {clientId} info to {filename}")
-        return OidcClient.from_json_value(payload)
-
     def can_redirect_to(self, url: Url) -> bool:
         for allowed_uri in self.redirectUris:
             if url.protocol != allowed_uri.protocol or url.host != allowed_uri.host:
@@ -385,14 +264,3 @@ class OidcClient:
                 # 'code_challenge_method': ['S256'],
             }
         )
-
-    @classmethod
-    def get(cls, *, dev_token: DeveloperToken, clientId: str):
-        resp = requests.get(
-            f"http://iam.ebrains.eu/auth/realms/hbp/clients-registrations/default/{clientId}",
-            headers={
-                "Authorization": f"Bearer {dev_token.access_token}"
-            },
-        )
-        resp.raise_for_status()
-        return OidcClient.from_json_value(resp.json())
