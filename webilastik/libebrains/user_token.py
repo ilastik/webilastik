@@ -54,6 +54,7 @@ class UserToken:
     @classmethod
     def login_globally(cls, token: "UserToken"):
         cls._global_login_token = token
+        os.environ[cls.ENV_VAR_NAME] = token.access_token
 
     @classmethod
     def login_globally_from_environment(cls):
