@@ -121,9 +121,8 @@ class WebIlastik:
                 }).encode("utf8")
             )
 
-    def __init__(self, ebrains_user_token: UserToken, ssl_context: Optional[ssl.SSLContext] = None):
+    def __init__(self, ssl_context: Optional[ssl.SSLContext] = None):
         super().__init__()
-        UserToken.login_globally(ebrains_user_token)
 
         self.ssl_context = ssl_context
         self.websockets: List[web.WebSocketResponse] = []
@@ -456,9 +455,10 @@ if __name__ == '__main__':
     else:
         server_context = contextlib.nullcontext()
 
+    UserToken.login_globally(token=UserToken(access_token=args.ebrains_user_access_token))
+
     with server_context:
         WebIlastik(
-            ebrains_user_token=UserToken(access_token=args.ebrains_user_access_token),
             ssl_context=ssl_context
         ).run(
             unix_socket_path=str(args.listen_socket),
