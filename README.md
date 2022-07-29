@@ -79,7 +79,7 @@ This project contains an npm project in `./overlay`, which can be used to build 
 # Building
  - Install build dependencies:
     - [conda-pack](https://conda.github.io/conda-pack/) (for wrapping the conda environment)
-    - [go-task](https://taskfile.dev/#/installation) (make-like application to build the targets in Taskfile.yml)
+    - [go-task](https://taskfile.dev/installation) (make-like application to build the targets in Taskfile.yml)
     - npm (for building neuroglancer and the overlay)
  - Grab the oidc client json from Ebrains:
     - Go to https://lab.ch.ebrains.eu/hub/user-redirect/lab/tree/shared/Collaboratory%20Community%20Apps/Managing%20an%20OpenID%20Connect%20client%20-%20V2.ipynb
