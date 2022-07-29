@@ -1,31 +1,26 @@
-from ndstructs.point5D import Interval5D
+from tests import create_tmp_dir
 from webilastik.filesystem.osfs import OsFs
 from pathlib import PurePosixPath
 
-import pytest
 import numpy as np
-from ndstructs import Point5D, Array5D, Shape5D
+from ndstructs.point5D import Point5D, Shape5D
+from ndstructs.array5D import Array5D
 
 from webilastik.datasink.n5_dataset_sink import N5DatasetSink
 from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksScaleSink
-from webilastik.datasource import DataRoi, DataSource
+from webilastik.datasource import DataRoi
 from webilastik.datasource.array_datasource import ArrayDataSource
 from webilastik.datasource.n5_datasource import N5DataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale, RawEncoder
 from webilastik.datasource.n5_attributes import GzipCompressor, N5DatasetAttributes, RawCompressor
-from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource, PrecomputedChunksInfo
+from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 
 
 
-@pytest.fixture
-def data() -> Array5D:
-    array = Array5D(np.arange(20 * 10 * 7).reshape(20, 10, 7), axiskeys="xyz")
-    array.setflags(write=False)
-    return array
+data = Array5D(np.arange(20 * 10 * 7).reshape(20, 10, 7), axiskeys="xyz")
+data.setflags(write=False)
 
-@pytest.fixture
-def datasource(data: Array5D) -> DataSource:
-    return ArrayDataSource(data=data, tile_shape=Shape5D(x=10, y=10))
+datasource = ArrayDataSource(data=data, tile_shape=Shape5D(x=10, y=10))
 
 def test_n5_attributes():
     attributes = N5DatasetAttributes(
@@ -40,7 +35,8 @@ def test_n5_attributes():
     assert reserialized_attributes == attributes
     assert attributes.to_json_data()["axes"] == ("x", "y")
 
-def test_n5_datasink(tmp_path: PurePosixPath, data: Array5D, datasource: DataSource):
+def test_n5_datasink():
+    tmp_path = create_tmp_dir(prefix="test_n5_datasink")
     sink = N5DatasetSink(
         filesystem=OsFs(tmp_path.as_posix()),
         outer_path=PurePosixPath("test_n5_datasink.n5"),
@@ -64,7 +60,8 @@ def test_n5_datasink(tmp_path: PurePosixPath, data: Array5D, datasource: DataSou
     assert saved_data.location == Point5D.zero(x=7, y=13)
     assert saved_data == data
 
-def test_distributed_n5_datasink(tmp_path: PurePosixPath, data: Array5D, datasource: DataSource):
+def test_distributed_n5_datasink():
+    tmp_path = create_tmp_dir(prefix="test_distributed_n5_datasink")
     filesystem = OsFs(tmp_path.as_posix())
     outer_path = PurePosixPath("test_distributed_n5_datasink.n5")
     inner_path = PurePosixPath("/data")
@@ -88,7 +85,8 @@ def test_distributed_n5_datasink(tmp_path: PurePosixPath, data: Array5D, datasou
     n5ds = N5DataSource(filesystem=filesystem, path=full_path)
     assert n5ds.retrieve() == data
 
-def test_writing_to_precomputed_chunks(tmp_path: PurePosixPath, data: Array5D):
+def test_writing_to_precomputed_chunks():
+    tmp_path = create_tmp_dir(prefix="test_writing_to_precomputed_chunks")
     datasource = ArrayDataSource(data=data, tile_shape=Shape5D(x=10, y=10))
     scale = PrecomputedChunksScale.from_datasource(datasource=datasource, key=PurePosixPath("my_test_data"), encoding=RawEncoder())
     sink_path = PurePosixPath("mytest.precomputed")
@@ -113,7 +111,8 @@ def test_writing_to_precomputed_chunks(tmp_path: PurePosixPath, data: Array5D):
     assert reloaded_data == data
 
 
-def test_writing_to_offset_precomputed_chunks(tmp_path: PurePosixPath, data: Array5D):
+def test_writing_to_offset_precomputed_chunks():
+    tmp_path = create_tmp_dir(prefix="test_writing_to_offset_precomputed_chunks")
     data_at_1000_1000 = data.translated(Point5D(x=1000, y=1000) - data.location)
     datasource = ArrayDataSource(data=data_at_1000_1000, tile_shape=Shape5D(x=10, y=10))
     scale = PrecomputedChunksScale.from_datasource(datasource=datasource, key=PurePosixPath("my_test_data"), encoding=RawEncoder())
@@ -140,3 +139,12 @@ def test_writing_to_offset_precomputed_chunks(tmp_path: PurePosixPath, data: Arr
 
     reloaded_data = precomp_datasource.retrieve(interval=data_at_1000_1000.interval)
     assert (reloaded_data.raw("xyz") == data.raw("xyz")).all()
+
+
+if __name__ == "__main__":
+    import inspect
+    import sys
+    for item_name, item in inspect.getmembers(sys.modules[__name__]):
+        if inspect.isfunction(item) and item_name.startswith('test'):
+            print(f"Running test: {item_name}")
+            item()

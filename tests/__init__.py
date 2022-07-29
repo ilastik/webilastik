@@ -37,6 +37,11 @@ def get_project_test_dir() -> Path:
 def get_tmp_dir() -> Path:
     return get_project_test_dir() / "tmp"
 
+def create_tmp_dir(prefix: str) -> Path:
+    path = get_tmp_dir() / f"prefix_{uuid.uuid4()}"
+    path.mkdir(parents=True)
+    return path
+
 def get_sample_c_cells_datasource() -> SkimageDataSource:
     return SkimageDataSource(
         filesystem=OsFs(get_project_root_dir().as_posix()), path=PurePosixPath("public/images/c_cells_1.png")
