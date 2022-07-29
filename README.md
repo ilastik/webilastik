@@ -64,7 +64,9 @@ A method decorated with `@cascade` must take a `user_prompt: UserPrompt` paramet
 
 ## Workflows
 
-Workflows are a predefined collection of `Applets`. Ideally, workflows would implement no logic; As much as possible, the `Applets` should be independant of external logic, so that they can be reused in multiple workflows. Interaction with a workflow should also be through the applets, so in a `PixelClassificationWorkflow`, for example, adding brush strokes is done via the `PixelClassificationWorkflow.brushing_applet : BrushingApplet` attribute, and not through some custom workflow method that would have to be re-implemented for every workflow.
+Workflows are a predefined collection of `Applets` (and therefore a concept of the UI, not the API). Ideally, workflows would implement no extra logic; As much as possible, the `Applets` should be independant of external logic, so that they can be reused in multiple workflows. Interaction with a workflow should also be through the applets, so in a `PixelClassificationWorkflow`, for example, adding brush strokes is done via the `PixelClassificationWorkflow.brushing_applet : BrushingApplet` attribute, and not through some custom workflow method that would have to be re-implemented for every workflow.
+
+Check out `webilastik/ui/workflow/pixel_classification_workflow.py` of what a typical workflow should look like.
 
 # Server
 
