@@ -259,7 +259,7 @@ class SessionAllocator(Generic[SESSION_TYPE]):
 if __name__ == '__main__':
     from argparse import ArgumentParser
     parser = ArgumentParser()
-    parser.add_argument("--session-type", choices=["Local", "Hpc"], required=True)
+    parser.add_argument("--session-type", choices=["Local"], required=True)
     parser.add_argument("--master-host", required=True, help="Host name or IP where workers should ssh back to")
     parser.add_argument("--master-username", default="wwww-data", help="username with which workers should ssh back to master")
     parser.add_argument("--external-url", type=Url.parse, required=True, help="Url from which sessions can be accessed (where the session sockets live)")
@@ -273,11 +273,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # multiprocessing.set_start_method('spawn') #start a fresh interpreter so it doesn't 'inherit' the event loop
-    if args.session_type == "Local":
-        session_type = LocalSession
-    else:
-        from webilastik.server.hpc_session import HpcSession
-        session_type = HpcSession
+    # if args.session_type == "Local":
+    session_type = LocalSession
 
     # if args.oidc_client_json == "skip":
     #     oidc_client = None
