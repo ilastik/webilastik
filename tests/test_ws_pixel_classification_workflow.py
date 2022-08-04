@@ -1,11 +1,8 @@
 # pyright: reportUnusedCallResult=false
 
 import os
-from tests import create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations, get_sample_feature_extractors
-from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
-from webilastik.filesystem.bucket_fs import BucketFs
 
-from webilastik.ui.workflow.ws_pixel_classification_workflow import RPCPayload
+from webilastik.datasource import DataSource
 # ensure requests will use the mkcert cert. Requests uses certifi by default, i think
 os.environ["REQUESTS_CA_BUNDLE"] = "/etc/ssl/certs/ca-certificates.crt"
 # ensure aiohttp will use the mkcert certts. I don't really know where it otherwise gets its certs from
@@ -17,9 +14,16 @@ import asyncio
 import json
 from typing import Dict, Any
 
+
 import numpy as np
 from aiohttp.client_ws import ClientWebSocketResponse
 
+
+from tests import create_precomputed_chunks_sink, get_sample_c_cells_pixel_annotations, get_sample_feature_extractors
+from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
+from webilastik.filesystem.bucket_fs import BucketFs
+from webilastik.ui.datasource import try_get_datasources_from_url
+from webilastik.ui.workflow.ws_pixel_classification_workflow import RPCPayload
 from webilastik.utility.url import Url
 from webilastik.libebrains.user_token import UserToken
 from webilastik.server.session_allocator import EbrainsSession
@@ -47,7 +51,13 @@ async def read_server_status(websocket: ClientWebSocketResponse):
 async def main():
     ilastik_root_url = Url.parse("https://app.ilastik.org/")
     assert ilastik_root_url is not None
-    ds = get_sample_c_cells_datasource()
+    data_url = Url.parse("precomputed://https://app.ilastik.org/public/images/c_cells_2.precomputed")
+    assert data_url is not None
+    datasources = try_get_datasources_from_url(url=data_url)
+    if isinstance(datasources, Exception):
+        raise datasources
+    assert not isinstance(datasources, Exception)
+    ds = datasources[0]
     token = UserToken.from_environment()
     assert isinstance(token, UserToken)
 
@@ -91,12 +101,12 @@ async def main():
 
             print("sending some annotations=======")
             default_label_names = ["Foreground", "Background"]
-            for label_name, label in zip(default_label_names, get_sample_c_cells_pixel_annotations()):
+            for label_name, label in zip(default_label_names, get_sample_c_cells_pixel_annotations(override_datasource=ds)):
                 for a in label.annotations:
                     await ws.send_json(
                         RPCPayload(
                             applet_name="brushing_applet",
-                            method_name="add_annotations",
+                            method_name="add_annotation",
                             arguments={
                                 "label_name": label_name,
                                 "annotation": a.to_json_data(),
@@ -184,7 +194,7 @@ async def main():
                 ),
             ]
 
-            print(f"Sending simpoe segmentation job request??????")
+            print(f"Sending simple segmentation job request??????")
             await ws.send_json(
                 RPCPayload(
                     applet_name="export_applet",
@@ -208,7 +218,7 @@ async def main():
                 resolution=(1,1,1)
             )
             for tile in predictions_output.roi.get_datasource_tiles():
-                tile.retrieve().as_uint8(normalized=True).show_channels()
+                tile.retrieve().as_uint8(normalized=True)#.show_channels()
 
             segmentation_output_1 = PrecomputedChunksDataSource(
                 filesystem=hbp_image_service_bucket_fs,
@@ -216,7 +226,7 @@ async def main():
                 resolution=(1,1,1)
             )
             for tile in segmentation_output_1.roi.get_datasource_tiles():
-                tile.retrieve().show_images()
+                tile.retrieve()#.show_images()
 
 
             close_url = f"{session_url}/close"
