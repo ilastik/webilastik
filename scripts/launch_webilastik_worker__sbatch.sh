@@ -5,7 +5,7 @@ set -xeu
 #--- Script params -----
 # These combined with "set -u" check that all params are set
 EBRAINS_USER_ACCESS_TOKEN="${EBRAINS_USER_ACCESS_TOKEN}"
-WORKER_SESSION_ID="${WORKER_SESSION_ID}"
+SESSION_ID="${SESSION_ID}"
 MODULES_TO_LOAD="${MODULES_TO_LOAD:-}"
 CONDA_ENV_DIR="${CONDA_ENV_DIR}"
 WEBILASTIK_SOURCE_DIR="${WEBILASTIK_SOURCE_DIR}"
@@ -24,8 +24,8 @@ CPUS_PER_NODE="$(echo $SLURM_JOB_CPUS_PER_NODE | grep -E '^[0-9]+' -o)"
 REDIS_CPUS=10 #FIXME: this is probably too much
 WEBILASTIK_WORKER_CPUS="$(expr $CPUS_PER_NODE - $REDIS_CPUS)"
 
-export REDIS_UNIX_SOCKET_PATH="$PROJECT/redis-$WORKER_SESSION_ID.sock"
-REDIS_PID_FILE="$PROJECT/redis-$WORKER_SESSION_ID.pid"
+export REDIS_UNIX_SOCKET_PATH="$PROJECT/redis-$SESSION_ID.sock"
+REDIS_PID_FILE="$PROJECT/redis-$SESSION_ID.pid"
 srun -n 1 --overlap -u --cpu_bind=none --cpus-per-task $REDIS_CPUS\
     $CONDA_ENV_DIR/bin/redis-server \
     --pidfile $REDIS_PID_FILE \
@@ -44,11 +44,11 @@ export PYTHONPATH="${WEBILASTIK_SOURCE_DIR}:${WEBILASTIK_SOURCE_DIR}/executor_ge
 srun -n 1 --overlap -u --cpus-per-task $WEBILASTIK_WORKER_CPUS\
     "$CONDA_ENV_DIR/bin/python" ${WEBILASTIK_SOURCE_DIR}/webilastik/ui/workflow/ws_pixel_classification_workflow.py \
     --ebrains-user-access-token=$EBRAINS_USER_ACCESS_TOKEN \
-    --listen-socket="$PROJECT/to-master-$WORKER_SESSION_ID" \
+    --listen-socket="$PROJECT/to-master-$SESSION_ID" \
     tunnel \
     --remote-username=www-data \
     --remote-host=app.ilastik.org \
-    --remote-unix-socket="/tmp/to-session-$WORKER_SESSION_ID" \
+    --remote-unix-socket="/tmp/to-session-$SESSION_ID" \
 
 kill -2 $(cat $REDIS_PID_FILE)
 
