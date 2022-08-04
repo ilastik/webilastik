@@ -7,7 +7,8 @@ from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonI
 
 import numpy as np
 from fs.errors import ResourceNotFound
-from ndstructs import Point5D, Interval5D, Array5D
+from ndstructs.point5D import Point5D, Interval5D
+from ndstructs.array5D import Array5D
 
 from webilastik.datasource.n5_attributes import N5Compressor, N5DatasetAttributes
 from webilastik.datasource import FsDataSource

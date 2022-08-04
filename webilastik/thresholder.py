@@ -1,8 +1,7 @@
 from ndstructs.point5D import Point5D
 import numpy as np
-from typing import Optional, Set
 
-from ndstructs import Array5D, Interval5D, ScalarData
+from ndstructs.array5D import Array5D, ScalarData
 from webilastik.datasource import DataRoi
 
 from webilastik.operator import Operator, OpRetriever

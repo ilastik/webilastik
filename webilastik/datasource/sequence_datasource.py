@@ -1,7 +1,8 @@
 from typing import Iterable
 import bisect
 
-from ndstructs import Interval5D, Point5D, Array5D
+from ndstructs.point5D import Interval5D, Point5D
+from ndstructs.array5D import Array5D
 from ndstructs.utils.json_serializable import JsonValue
 
 from webilastik.datasource import DataSource
