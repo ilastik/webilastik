@@ -38,6 +38,7 @@ class JobState(Enum):
 Minutes = NewType("Minutes", int)
 Seconds = NewType("Seconds", int)
 SlurmJobId = NewType("SlurmJobId", int)
+NodeSeconds = NewType("NodeSeconds", int)
 
 
 class SlurmJob:
@@ -50,10 +51,12 @@ class SlurmJob:
         name: str,
         state: JobState,
         duration: "Seconds | None",
+        num_nodes: int,
     ) -> None:
         self.job_id = job_id
         self.state = state
         self.duration = duration
+        self.num_nodes = num_nodes
         self.name = name
         raw_user_sub, raw_session_id = name.split("-user-")[1].split("-session-")
         self.user_sub = uuid.UUID(raw_user_sub)
@@ -72,6 +75,7 @@ class SlurmJob:
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "SlurmJob":
         value_obj = ensureJsonObject(value)
+        job_id = SlurmJobId(ensureJsonInt(value_obj.get("job_id")))
         raw_state = ensureJsonObject(value_obj.get("state"))
         state = JobState.from_json_value(raw_state.get("current"))
 
@@ -83,11 +87,23 @@ class SlurmJob:
         else:
             duration = None
 
+        tres_resources = ensureJsonObject(value_obj.get("tres"))
+        raw_allocated_resources = ensureJsonArray(tres_resources.get("allocated"))
+        for raw_resource in raw_allocated_resources:
+            resource_obj = ensureJsonObject(raw_resource)
+            resource_type = ensureJsonString(resource_obj.get("type"))
+            if resource_type == "node":
+                num_nodes = ensureJsonInt(resource_obj.get("count"))
+                break
+        else:
+            raise Exception(f"Could not determine number of nodes for job {job_id}")
+
         return SlurmJob(
-            job_id=SlurmJobId(ensureJsonInt(value_obj.get("job_id"))),
+            job_id=job_id,
             name=ensureJsonString(value_obj.get("name")),
             state=state,
             duration=duration,
+            num_nodes=num_nodes,
         )
 
 
@@ -167,7 +183,7 @@ class SshJobLauncher:
         job_id = SlurmJobId(int(stdout.decode().split()[3]))
 
         for i in range(5):
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.7)
             print(f"~~~~~>> Trying to fetch job.... ({i})")
             job = await self.get_job(job_id=job_id)
             if isinstance(job, (Exception, SlurmJob)):
@@ -223,6 +239,17 @@ class SshJobLauncher:
             for raw_job in raw_jobs
             if SlurmJob.recognizes_raw_job(raw_job)
         ]
+
+    async def get_usage_for_user(self, user_info: UserInfo) -> "NodeSeconds | Exception":
+        all_jobs_result = await self.get_jobs()
+        if isinstance(all_jobs_result, Exception):
+            return all_jobs_result
+        node_seconds = sum(
+            (job.duration * job.num_nodes)
+            for job in all_jobs_result
+            if job.duration != None and job.user_sub == user_info.sub
+        )
+        return NodeSeconds(node_seconds)
 
 class JusufSshJobLauncher(SshJobLauncher):
     def __init__(self) -> None:
