@@ -2,10 +2,11 @@
 
 import asyncio
 from enum import Enum
-from typing import ClassVar, NewType, Dict, Mapping, List, Sequence
+from typing import ClassVar, NewType, Dict, Mapping, List, Sequence, Set
 import uuid
 from pathlib import PurePosixPath
 import json
+from datetime import datetime
 
 from ndstructs.utils.json_serializable import JsonValue, ensureJsonArray, ensureJsonInt, ensureJsonObject, ensureJsonString
 
@@ -13,15 +14,24 @@ from webilastik.libebrains.user_info import UserInfo
 from webilastik.libebrains.user_token import UserToken
 
 class JobState(Enum):
-    PENDING="PENDING"
-    RUNNING="RUNNING"
-    COMPLETED="COMPLETED"
-    CANCELLED="CANCELLED"
-    FAILED="FAILED"
-    TIMEOUT="TIMEOUT"
+    BOOT_FAIL = "BOOT_FAIL"
+    CANCELLED = "CANCELLED"
+    COMPLETED = "COMPLETED"
+    DEADLINE = "DEADLINE"
+    FAILED = "FAILED"
+    NODE_FAIL = "NODE_FAIL"
+    OUT_OF_MEMORY = "OUT_OF_MEMORY"
+    PENDING = "PENDING"
+    PREEMPTED = "PREEMPTED"
+    RUNNING = "RUNNING"
+    REQUEUED = "REQUEUED"
+    RESIZING = "RESIZING"
+    REVOKED = "REVOKED"
+    SUSPENDED = "SUSPENDED"
+    TIMEOUT = "TIMEOUT"
 
     def is_done(self) -> bool:
-        return self in (JobState.COMPLETED, JobState.CANCELLED, JobState.FAILED, JobState.TIMEOUT)
+        return self in DONE_STATES
 
     def to_json_value(self) -> str:
         return self.value
@@ -33,6 +43,27 @@ class JobState(Enum):
             if state.value == value_str:
                 return state
         raise ValueError(f"Bad job state: {value_str}")
+
+DONE_STATES = set([
+    JobState.BOOT_FAIL,
+    JobState.CANCELLED,
+    JobState.COMPLETED,
+    JobState.DEADLINE,
+    JobState.FAILED,
+    JobState.NODE_FAIL,
+    JobState.OUT_OF_MEMORY,
+    JobState.PREEMPTED,
+    JobState.REVOKED,
+    JobState.TIMEOUT,
+])
+
+RUNNABLE_STATES = set([
+    JobState.PENDING,
+    JobState.RUNNING,
+    JobState.REQUEUED,
+    JobState.RESIZING,
+    JobState.SUSPENDED,
+])
 
 
 Minutes = NewType("Minutes", int)
@@ -51,7 +82,7 @@ class SlurmJob:
         name: str,
         state: JobState,
         duration: "Seconds | None",
-        num_nodes: int,
+        num_nodes: "int | None",
     ) -> None:
         self.job_id = job_id
         self.state = state
@@ -71,6 +102,15 @@ class SlurmJob:
     def recognizes_raw_job(cls, raw_job: JsonValue) -> bool:
         name = ensureJsonString(ensureJsonObject(raw_job).get("name"))
         return name.startswith(cls.NAME_PREFIX)
+
+    def is_running(self) -> bool:
+        return self.state == JobState.RUNNING
+
+    def is_runnable(self) -> bool:
+        return self.state in RUNNABLE_STATES
+
+    def belongs_to(self, user_info: UserInfo) -> bool:
+        return self.user_sub == user_info.sub
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "SlurmJob":
@@ -96,7 +136,7 @@ class SlurmJob:
                 num_nodes = ensureJsonInt(resource_obj.get("count"))
                 break
         else:
-            raise Exception(f"Could not determine number of nodes for job {job_id}")
+            num_nodes = None
 
         return SlurmJob(
             job_id=job_id,
@@ -164,7 +204,7 @@ class SshJobLauncher:
 
         try:
             process = await asyncio.create_subprocess_exec(
-                "ssh", "-v", f"{self.user}@{self.hostname}",
+                "ssh", "-v", "-oBatchMode=yes", f"{self.user}@{self.hostname}",
                 "--",
                 "sbatch",
                 *[f"{key}={value}" for key, value in sbatch_args.items()],
@@ -185,14 +225,14 @@ class SshJobLauncher:
         for i in range(5):
             await asyncio.sleep(0.7)
             print(f"~~~~~>> Trying to fetch job.... ({i})")
-            job = await self.get_job(job_id=job_id)
+            job = await self.get_job_by_slurm_id(job_id=job_id)
             if isinstance(job, (Exception, SlurmJob)):
                 return job
         return Exception(f"Could not retrieve job with id {job_id}")
 
     async def cancel(self, job: SlurmJob):
         process = await asyncio.create_subprocess_exec(
-            "ssh", "-v", f"{self.user}@{self.hostname}",
+            "ssh", "-v", "-oBatchMode=yes", f"{self.user}@{self.hostname}",
             "--",
             "scancel", f"{job.job_id}",
             stdout=asyncio.subprocess.PIPE,
@@ -203,7 +243,16 @@ class SshJobLauncher:
             return Exception(stderr.decode())
         return None
 
-    async def get_job(self, job_id: SlurmJobId) -> "SlurmJob | None | Exception":
+    async def get_current_job_for_user(self, user_info: UserInfo) -> "SlurmJob | None | Exception":
+        runnable_jobs_result = await self.get_jobs(state=RUNNABLE_STATES)
+        if isinstance(runnable_jobs_result, Exception):
+            return runnable_jobs_result
+        for job in runnable_jobs_result:
+            if job.belongs_to(user_info=user_info):
+                return job
+        return None
+
+    async def get_job_by_slurm_id(self, job_id: SlurmJobId) -> "SlurmJob | None | Exception":
         jobs_result = await self.get_jobs(job_id=job_id)
         if isinstance(jobs_result, Exception):
             return jobs_result
@@ -211,19 +260,40 @@ class SshJobLauncher:
             return None
         return jobs_result[0]
 
-    async def get_jobs(self, job_id: "SlurmJobId | None" = None) -> "List[SlurmJob] | Exception":
+    async def get_job_by_session_id(self, session_id: uuid.UUID, user_info: UserInfo) -> "SlurmJob | None | Exception":
+        jobs_result = await self.get_jobs(name=SlurmJob.make_name(session_id=session_id, user_info=user_info))
+        if isinstance(jobs_result, Exception):
+            return jobs_result
+        if len(jobs_result) == 0:
+            return None
+        return jobs_result[0]
+
+    async def get_jobs(
+        self,
+        *,
+        job_id: "SlurmJobId | None" = None,
+        name: "str | None" = None,
+        state: "Set[JobState] | None" = None,
+        starttime: "datetime | None" = None,
+    ) -> "List[SlurmJob] | Exception":
+        starttime_str = f"{starttime.year:04d}-{starttime.month:02d}-{starttime.day:02d}" if starttime else "2022-01-01"
         sacct_params = [
             "--json",
-            "--starttime=2022-01-01",
+            f"--starttime={starttime_str}",
+            "--endtime=now",
             f"--user={self.user}",
             f"--account={self.account}",
         ]
 
         if job_id is not None:
             sacct_params.append(f"--jobs={job_id}")
+        if name is not None:
+            sacct_params.append(f"--name={name}")
+        if state != None and len(state) > 0:
+            sacct_params.append(f"--state={','.join(s.value for s in state)}")
 
         process = await asyncio.create_subprocess_exec(
-            "ssh", "-v", f"{self.user}@{self.hostname}",
+            "ssh", "-v", "-oBatchMode=yes", f"{self.user}@{self.hostname}",
             "--",
             "sacct", *sacct_params,
             stdout=asyncio.subprocess.PIPE,
@@ -241,13 +311,13 @@ class SshJobLauncher:
         ]
 
     async def get_usage_for_user(self, user_info: UserInfo) -> "NodeSeconds | Exception":
-        all_jobs_result = await self.get_jobs()
-        if isinstance(all_jobs_result, Exception):
-            return all_jobs_result
+        this_month_jobs_result = await self.get_jobs(starttime=datetime.today().replace(day=1))
+        if isinstance(this_month_jobs_result, Exception):
+            return this_month_jobs_result
         node_seconds = sum(
             (job.duration * job.num_nodes)
-            for job in all_jobs_result
-            if job.duration != None and job.user_sub == user_info.sub
+            for job in this_month_jobs_result
+            if job.duration != None and job.num_nodes != None and job.user_sub == user_info.sub
         )
         return NodeSeconds(node_seconds)
 
