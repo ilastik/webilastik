@@ -195,7 +195,7 @@ class SessionAllocator:
         raw_payload = await request.content.read()
         try:
             payload_dict = ensureJsonObject(json.loads(raw_payload.decode('utf8')))
-            session_duration = Minutes(ensureJsonInt(payload_dict.get("session_duration")))
+            session_duration = Minutes(ensureJsonInt(payload_dict.get("session_duration_minutes")))
         except Exception:
             return web.json_response({"error": "Bad payload"}, status=400)
         session_id = uuid.uuid4()

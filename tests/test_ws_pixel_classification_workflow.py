@@ -26,7 +26,7 @@ from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.ui.workflow.ws_pixel_classification_workflow import RPCPayload
 from webilastik.utility.url import Url
 from webilastik.libebrains.user_token import UserToken
-from webilastik.server.session_allocator import EbrainsSession
+from webilastik.server.session_allocator import EbrainsLogin
 
 
 finished = False
@@ -62,10 +62,10 @@ async def main():
     assert isinstance(token, UserToken)
 
     async with aiohttp.ClientSession(
-        cookies={EbrainsSession.AUTH_COOKIE_KEY: token.access_token}
+        cookies={EbrainsLogin.AUTH_COOKIE_KEY: token.access_token}
     ) as session:
         print(f"Creating new session--------------")
-        async with session.post(ilastik_root_url.concatpath("api/session").raw, json={"session_duration": 60 * 15}) as response:
+        async with session.post(ilastik_root_url.concatpath("api/session").raw, json={"session_duration_minutes": 15}) as response:
             response.raise_for_status()
             session_data : Dict[str, Any] = await response.json()
             session_id = session_data["id"]

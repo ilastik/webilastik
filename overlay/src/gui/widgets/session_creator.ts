@@ -26,9 +26,10 @@ export class SessionCreatorWidget{
         timeout_input.min = "1"
 
         const duration_input = createInputParagraph({
-            label_text: "Session Duration (minutes): ", inputType: "number", parentElement: form, required: true, value: "5", name: "itk_session_request_duration"
+            label_text: "Session Duration (minutes): ", inputType: "number", parentElement: form, required: true, value: "15", name: "itk_session_request_duration"
         })
         duration_input.min = "5"
+        duration_input.max = "60"
 
         this.create_session_btn = createInputParagraph({inputType: "submit", value: "Create", parentElement: form})
 
@@ -42,33 +43,33 @@ export class SessionCreatorWidget{
             status_messages.innerHTML = "";
 
             (async () => {
-                try{
-                    creation_log_p.style.display = "block"
-                    const ilastikUrl = Url.parse(ilastikUrlInput.value)
-                    let is_logged_in = await Session.check_login({ilastikUrl})
-                    if(!is_logged_in){
-                        const login_url = ilastikUrl.joinPath("api/login_then_close").raw
-                        status_messages.innerHTML = `<p><a target="_blank" rel="noopener noreferrer" href="${login_url}">Login on ebrains</a> required.</p>`
-                        window.open(login_url)
-                        this.set_disabled(false);
-                        return
-                    }
+                creation_log_p.style.display = "block"
+                const ilastikUrl = Url.parse(ilastikUrlInput.value)
+                let is_logged_in = await Session.check_login({ilastikUrl})
+                if(!is_logged_in){
+                    const login_url = ilastikUrl.joinPath("api/login_then_close").raw
+                    status_messages.innerHTML = `<p><a target="_blank" rel="noopener noreferrer" href="${login_url}">Login on ebrains</a> required.</p>`
+                    window.open(login_url)
+                    this.set_disabled(false);
+                    return
+                }
 
-                    let session = await Session.create({
-                        ilastikUrl: Url.parse(ilastikUrlInput.value),
-                        timeout_s: parseInt(timeout_input.value) * 60,
-                        session_duration_seconds: parseInt(duration_input.value) * 60,
-                        onProgress: (message) => {
-                            status_messages.innerHTML += `<p><em>${new Date().toLocaleString()}</em> ${message}</p>`
-                            status_messages.scrollTop = status_messages.scrollHeight
-                        },
-                        onUsageError,
-                    })
-                    onNewSession(session)
-                    this.create_session_btn.value = "Session is running"
-                }catch(e){
-                    status_messages.innerHTML = e.message
+                let session_result = await Session.create({
+                    ilastikUrl: Url.parse(ilastikUrlInput.value),
+                    timeout_minutes: parseInt(timeout_input.value),
+                    session_duration_minutes: parseInt(duration_input.value),
+                    onProgress: (message) => {
+                        status_messages.innerHTML += `<p><em>${new Date().toLocaleString()}</em> ${message}</p>`
+                        status_messages.scrollTop = status_messages.scrollHeight
+                    },
+                    onUsageError,
+                })
+                if(session_result instanceof Error){
+                    status_messages.innerHTML = session_result.message
                     this.set_disabled(false)
+                }else{
+                    onNewSession(session_result)
+                    this.create_session_btn.value = "Session is running"
                 }
             })()
 

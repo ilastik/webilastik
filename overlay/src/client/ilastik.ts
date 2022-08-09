@@ -132,43 +132,49 @@ export class Session{
             .find(row => row.startsWith('ebrains_user_access_token='))?.split('=')[1];
     }
 
-    public static async create({ilastikUrl, session_duration_seconds, timeout_s, onProgress=(_) => {}, onUsageError}: {
+    public static async create({ilastikUrl, session_duration_minutes, timeout_minutes, onProgress=(_) => {}, onUsageError}: {
         ilastikUrl: Url,
-        session_duration_seconds: number,
-        timeout_s: number,
+        session_duration_minutes: number,
+        timeout_minutes: number,
         onProgress?: (message: string) => void,
-        onUsageError: (message: string) => void
-
-    }): Promise<Session>{
+        onUsageError: (message: string) => void,
+    }): Promise<Session | Error>{
         const newSessionUrl = ilastikUrl.joinPath("/api/session")
-        while(timeout_s > 0){
+        const timeout_ms = timeout_minutes * 60 * 1000
+        const start_time_ms = Date.now()
+
+        onProgress("Requesting session...")
+
+        while(Date.now() - start_time_ms < timeout_ms){
             let session_creation_response = await fetch(newSessionUrl.schemeless_raw, {
                 method: "POST",
-                body: JSON.stringify({session_duration: session_duration_seconds})
+                body: JSON.stringify({session_duration_minutes})
             })
+            if(Math.floor(session_creation_response.status / 100) == 5){
+                onProgress(`Server-side error when creating a session`)
+                return Error(`Server could not create session: ${session_creation_response.text}`)
+            }
             if(!session_creation_response.ok){
                 onProgress(
                     `Requesting session failed (${session_creation_response.status}): ${session_creation_response.body}`
                 )
-                timeout_s -= 2
                 await sleep(2000)
                 continue
             }
             onProgress(`Successfully requested a session!`)
             let rawSession_data: {url: string, id: string, token: string} = await session_creation_response.json()
-            while(timeout_s){
+            while(Date.now() - start_time_ms < timeout_ms){
                 let session_status_response = await fetch(ilastikUrl.joinPath(`/api/session/${rawSession_data.id}`).schemeless_raw)
                 if(session_status_response.ok  && (await session_status_response.json())["status"] == "ready"){
                     onProgress(`Session has become ready!`)
                     break
                 }
                 onProgress(`Session is not ready yet`)
-                timeout_s -= 2
                 await sleep(2000)
             }
             return new Session({ilastikUrl, sessionUrl: Url.parse(rawSession_data.url), onUsageError})
         }
-        throw `Could not create a session`
+        return Error(`Could not create a session`)
     }
 
     public static async load({ilastikUrl, sessionUrl, onUsageError}: {
