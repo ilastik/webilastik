@@ -11,6 +11,10 @@ CONDA_ENV_DIR="${CONDA_ENV_DIR}"
 WEBILASTIK_SOURCE_DIR="${WEBILASTIK_SOURCE_DIR}"
 # ----- end script params -----
 
+# prevent numpy from spawning its own threads
+export OPENBLAS_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+
 if [ $SLURM_NTASKS -lt 2 ]; then
     >&2 echo "Need at least 2 tasks to run redis and the worker concurrently. Provided: {$SLURM_NTASKS}"
     exit 1
