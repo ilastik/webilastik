@@ -2,7 +2,7 @@
 
 import asyncio
 from enum import Enum
-from typing import ClassVar, NewType, Dict, Mapping, List, Sequence, Set
+from typing import ClassVar, NewType, Dict, Mapping, List, Sequence, Set, Literal
 import uuid
 from pathlib import PurePosixPath
 import json
@@ -157,6 +157,8 @@ class SshJobLauncher:
         WEBILASTIK_SOURCE_DIR: PurePosixPath,
         CONDA_ENV_DIR: PurePosixPath,
         MODULES_TO_LOAD: Sequence[str],
+        EXECUTOR_GETTER_IMPLEMENTATION: Literal["default", "jusuf"],
+        CACHING_IMPLEMENTATION: Literal["lru_cache",  "no_cache",  "redis_cache"],
 
         extra_sbatch_opts: Mapping[str, str] = {},
         extra_environment_vars: Mapping[str, str] = {}
@@ -168,6 +170,8 @@ class SshJobLauncher:
         self.WEBILASTIK_SOURCE_DIR = WEBILASTIK_SOURCE_DIR
         self.CONDA_ENV_DIR = CONDA_ENV_DIR
         self.MODULES_TO_LOAD = MODULES_TO_LOAD
+        self.EXECUTOR_GETTER_IMPLEMENTATION = EXECUTOR_GETTER_IMPLEMENTATION
+        self.CACHING_IMPLEMENTATION = CACHING_IMPLEMENTATION
 
         self.extra_sbatch_opts = extra_sbatch_opts
         self.extra_environment_vars = extra_environment_vars
@@ -186,6 +190,8 @@ class SshJobLauncher:
             "CONDA_ENV_DIR": str(self.CONDA_ENV_DIR),
             "SESSION_ID": str(SESSION_ID),
             "MODULES_TO_LOAD": '@'.join(self.MODULES_TO_LOAD),
+            "EXECUTOR_GETTER_IMPLEMENTATION": self.EXECUTOR_GETTER_IMPLEMENTATION,
+            "CACHING_IMPLEMENTATION": self.CACHING_IMPLEMENTATION,
             "EBRAINS_USER_ACCESS_TOKEN": EBRAINS_USER_ACCESS_TOKEN.access_token,
             **self.extra_environment_vars
         }
@@ -333,4 +339,6 @@ class JusufSshJobLauncher(SshJobLauncher):
             extra_sbatch_opts={
                 "--partition": "batch"
             },
+            EXECUTOR_GETTER_IMPLEMENTATION="jusuf",
+            CACHING_IMPLEMENTATION="redis_cache",
         )
