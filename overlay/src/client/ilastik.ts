@@ -152,7 +152,7 @@ export class Session{
             })
             if(Math.floor(session_creation_response.status / 100) == 5){
                 onProgress(`Server-side error when creating a session`)
-                return Error(`Server could not create session: ${session_creation_response.text}`)
+                return Error(`Server could not create session: ${await session_creation_response.text()}`)
             }
             if(!session_creation_response.ok){
                 onProgress(
