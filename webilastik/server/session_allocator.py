@@ -202,6 +202,10 @@ class SessionAllocator:
         quota: NodeSeconds = NodeSeconds(100 * 60 * 60) #FIXME
 
         user_info = await ebrains_login.user_token.get_userinfo(self.http_client_session)
+
+        if user_info.sub != uuid.UUID("bdca269c-f207-4cdb-8b68-a562e434faed"): #FIXME
+            return web.json_response({"error": "This user can't allocate sessions yet"}, status=400)
+
         if user_info.sub not in self.session_user_locks:
             self.session_user_locks[user_info.sub] = asyncio.Lock()
         async with self.session_user_locks[user_info.sub]:
