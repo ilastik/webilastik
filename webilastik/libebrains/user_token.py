@@ -122,9 +122,7 @@ class UserToken:
     async def is_valid(self, http_client_session: ClientSession) -> bool:
         #FIXME: maybe just validate signature + time ?
         try:
-            user_info = await self.get_userinfo(http_client_session)
-            import pprint
-            pprint.pprint(user_info)
+            _ = await self.get_userinfo(http_client_session)
             return True
         except ClientResponseError:
             return False
