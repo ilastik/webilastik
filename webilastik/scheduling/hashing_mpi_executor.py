@@ -124,8 +124,10 @@ class HashingMpiExecutor(Executor):
             future: Future[_T] = Future()
             task: _Task[_T] = _Task(functools.partial(fn, *args, **kwargs), future_id=id(future))
             self._active_futures[task.future_id] = future
-            worker_index = hash((*args, *kwargs.items())) % len(self._worker_handles)#FIXME: it's possible the args are not hashable
-            worker_handle = self._worker_handles[worker_index]
+
+            args_hash = hash((fn, *args, *kwargs.items()))
+            # print(f"Args hash is {args_hash}, index should be {args_hash % len(self._worker_handles)}")
+            worker_handle = self._worker_handles[args_hash % len(self._worker_handles)]
             worker_handle.submit(task)
             _ = future.set_running_or_notify_cancel()
             return future
