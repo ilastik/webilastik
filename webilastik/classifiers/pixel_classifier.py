@@ -1,30 +1,23 @@
 from abc import abstractmethod
 from functools import partial
 from pathlib import Path
-import pickle
-from typing import Any, Final, Iterator, List, Generic, NewType, Optional, Sequence, Dict, TypeVar
+from typing import Any, Final, Iterator, List, Generic, NewType, Sequence, TypeVar
 import tempfile
 import os
 import typing
-import h5py
 import PIL
 import io
 from dataclasses import dataclass
-# import time
-
 
 import numpy as np
 from numpy import ndarray, dtype, float32
 from vigra.learning import RandomForest as VigraRandomForest
-import concurrent.futures
 
 from ndstructs.array5D import Array5D
-from ndstructs.point5D import Interval5D, Point5D
-from webilastik import annotations
-from webilastik.features.feature_extractor import FeatureData, FeatureExtractor
+from ndstructs.point5D import Interval5D
+from webilastik.features.feature_extractor import FeatureExtractor
 from webilastik.features.feature_extractor import FeatureExtractorCollection
 from webilastik.annotations import Annotation, Color
-from webilastik.classic_ilastik.ilp import IlpGroup, populate_h5_group, read_h5_group
 from webilastik.operator import Operator
 from webilastik.datasource import DataRoi, DataSource
 from executor_getter import get_executor
@@ -184,8 +177,8 @@ def _train_forest(random_seed: int, num_trees: int, training_data: TrainingData)
     # print(f"Trained in {t_trained - t}s, serialized in {t_serialized - t_trained}")
     return serialized
 
-def _compute_partial_predictions(feature_data: FeatureData, forest: VigraRandomForest) -> "np.ndarray[Any, np.dtype[np.float32]]":
-    return forest.predictProbabilities(feature_data.linear_raw()) * forest.treeCount()
+def _compute_partial_predictions(feature_data: "np.ndarray[Any, np.dtype[np.float32]]", forest: VigraRandomForest) -> "np.ndarray[Any, np.dtype[np.float32]]":
+    return forest.predictProbabilities(feature_data) * forest.treeCount()
 
 class VigraPixelClassifier(PixelClassifier[FE]):
     def __init__(
@@ -240,17 +233,24 @@ class VigraPixelClassifier(PixelClassifier[FE]):
 
     def _do_predict(self, roi: DataRoi) -> Predictions:
         feature_data = self.feature_extractor(roi)
+        linear_feature_data = feature_data.raw("tzyxc").reshape(
+            (feature_data.shape.t * feature_data.shape.volume, feature_data.shape.c)
+        )
 
         predictions = Array5D.allocate(
+            axiskeys="tzyxc",
             interval=self.get_expected_roi(roi),
             dtype=np.dtype('float32'),
             value=0,
         )
+
         assert predictions.interval == self.get_expected_roi(roi)
-        raw_linear_predictions: "ndarray[Any, dtype[float32]]" = predictions.linear_raw()
+        raw_linear_predictions: "ndarray[Any, dtype[float32]]" = predictions.raw("tzyxc").reshape(
+            (predictions.shape.t * predictions.shape.volume, predictions.shape.c)
+        )
 
         executor = get_executor(hint="predicting")
-        f = partial(_compute_partial_predictions, feature_data)
+        f = partial(_compute_partial_predictions, linear_feature_data)
         futures = [executor.submit(f, forest) for forest in self.forests]
         for partial_predictions_future in futures:
             raw_linear_predictions += partial_predictions_future.result()

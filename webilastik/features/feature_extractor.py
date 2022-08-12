@@ -71,7 +71,7 @@ class FeatureExtractorCollection(FeatureExtractor):
         out = Array5D.allocate(
             dtype=np.dtype("float32"),
             interval=roi.shape.updated(c=sum(feat.shape.c for feat in features)),
-            axiskeys="ctzyx",
+            axiskeys="tzyxc",
         ).translated(roi.start)
         # print(f"Allocated {out} for storing features of {roi.interval}")
 
