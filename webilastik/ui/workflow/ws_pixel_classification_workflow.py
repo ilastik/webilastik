@@ -1,7 +1,7 @@
 # pyright: reportUnusedCallResult=false
 
 from asyncio.events import AbstractEventLoop
-from concurrent.futures.process import ProcessPoolExecutor
+from concurrent.futures import Executor
 from dataclasses import dataclass
 from functools import partial
 import multiprocessing
@@ -23,10 +23,8 @@ from aiohttp.client import ClientSession
 from aiohttp.http_websocket import WSCloseCode
 from aiohttp.web_app import Application
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
-from webilastik import filesystem
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
-from webilastik.filesystem import JsonableFilesystem
 from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.datasource import try_get_datasources_from_url
@@ -121,7 +119,7 @@ class WebIlastik:
                 }).encode("utf8")
             )
 
-    def __init__(self, ssl_context: Optional[ssl.SSLContext] = None):
+    def __init__(self, executor: Executor, ssl_context: Optional[ssl.SSLContext] = None):
         super().__init__()
 
         self.ssl_context = ssl_context
@@ -129,7 +127,7 @@ class WebIlastik:
         self._http_client_session: Optional[ClientSession] = None
         self._loop: Optional[AbstractEventLoop] = None
 
-        self.executor = get_executor(hint="server_tile_handler", max_workers=multiprocessing.cpu_count())
+        self.executor = executor
         self.priority_executor = PriorityExecutor(executor=self.executor, max_active_job_steps=2 * multiprocessing.cpu_count())
 
         self.workflow = PixelClassificationWorkflow(
@@ -419,7 +417,6 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument("--ebrains-user-access-token", type=str, required=True)
     parser.add_argument("--listen-socket", type=Path, required=True)
-    parser.add_argument("--ca-cert-path", "--ca_cert_path", help="Path to CA crt file. Useful e.g. for testing with mkcert")
 
     subparsers = parser.add_subparsers(required=False, help="tunnel stuff")
     tunnel_parser = subparsers.add_parser("tunnel", help="Creates a reverse tunnel to an orchestrator")
@@ -429,23 +426,9 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    mpi_rank = 0
-    try:
-        from mpi4py import MPI
-        mpi_rank = MPI.COMM_WORLD.Get_rank()
-    except ModuleNotFoundError:
-        pass
+    executor = get_executor(hint="server_tile_handler", max_workers=multiprocessing.cpu_count())
 
-    ca_crt: Optional[str] = args.ca_cert_path or os.environ.get("CA_CERT_PATH")
-    ssl_context: Optional[ssl.SSLContext] = None
-
-    if ca_crt is not None:
-        if not Path(ca_crt).exists():
-            logger.error(f"File not found: {ca_crt}")
-            exit(1)
-        ssl_context = ssl.create_default_context(cafile=ca_crt)
-
-    if "remote_username" in vars(args) and mpi_rank == 0:
+    if "remote_username" in vars(args):
         server_context = ReverseSshTunnel(
             remote_username=args.remote_username,
             remote_host=args.remote_host,
@@ -459,7 +442,7 @@ if __name__ == '__main__':
 
     with server_context:
         WebIlastik(
-            ssl_context=ssl_context
+            executor=executor,
         ).run(
             unix_socket_path=str(args.listen_socket),
         )
