@@ -89,6 +89,9 @@ class HashingMpiExecutor(Executor):
     """
 
     def __init__(self):
+        if MPI.COMM_WORLD.Get_rank() != 0:
+            Worker().start()
+            exit(0)
         self.rank = MPI.COMM_WORLD.Get_rank()
         self.num_workers = MPI.COMM_WORLD.size - 1
         if self.num_workers <= 0:
