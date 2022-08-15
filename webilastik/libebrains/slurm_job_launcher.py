@@ -337,7 +337,8 @@ class JusufSshJobLauncher(SshJobLauncher):
             CONDA_ENV_DIR=PurePosixPath("/p/project/icei-hbp-2022-0010/miniconda3/envs/webilastik"),
             MODULES_TO_LOAD=["GCC/11.2.0", "OpenMPI/4.1.2"],
             extra_sbatch_opts={
-                "--partition": "batch"
+                "--partition": "batch",
+                "--hint": "nomultithread",
             },
             EXECUTOR_GETTER_IMPLEMENTATION="jusuf",
             CACHING_IMPLEMENTATION="redis_cache",
