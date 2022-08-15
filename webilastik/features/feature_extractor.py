@@ -1,7 +1,6 @@
-from abc import abstractmethod, ABC
-from typing import Any, List, Iterable, Protocol
-import time
-from concurrent.futures import as_completed
+from abc import abstractmethod
+from typing import Any, Dict, Iterable, Protocol
+from concurrent.futures import Future
 
 import numpy as np
 from ndstructs.point5D import Point5D
@@ -56,30 +55,34 @@ class FeatureExtractorCollection(FeatureExtractor):
 
     def __call__(self, /, roi: DataRoi) -> FeatureData:
         assert roi.interval.c[0] == 0
-        features: List[FeatureData] = []
+        feature_promises: Dict[int, Future[FeatureData]] = {}
 
-        channel_offset: int = 0
-        # t0 = time.time()
         executor = get_executor(hint="feature_extraction", max_workers=len(self.extractors))
-        for fut in [executor.submit(fx, roi) for fx in self.extractors]:
-            result = fut.result().translated(Point5D.zero(c=channel_offset))
-            features.append(result)
-            channel_offset += result.shape.c
-        # t1 = time.time()
-        # print(f"computed features in {t1 - t0}s")
+        from webilastik.features.ilp_filter import IlpGaussianSmoothing
+
+        feature_promises = {
+            fx_index: executor.submit(fx, roi)
+            for fx_index, fx in enumerate(self.extractors)
+            if isinstance(fx, IlpGaussianSmoothing)
+        }
+        feature_promises.update({
+            fx_index: executor.submit(fx, roi)
+            for fx_index, fx in enumerate(self.extractors)
+            if not isinstance(fx, IlpGaussianSmoothing)
+        })
+        assert len(feature_promises) == len(self.extractors)
+        features = [feature_promises[i].result() for i in range(len(self.extractors))]
 
         out = Array5D.allocate(
             dtype=np.dtype("float32"),
             interval=roi.shape.updated(c=sum(feat.shape.c for feat in features)),
             axiskeys="tzyxc",
         ).translated(roi.start)
-        # print(f"Allocated {out} for storing features of {roi.interval}")
 
-        # t0 = time.time()
+        channel_offset: int = 0
         for feature in features:
-            out.set(feature)
-        # t1 = time.time()
-        # print(f"Copied features in {t1 - t0}s")
+            out.set(feature.translated(Point5D.zero(c=channel_offset)))
+            channel_offset += feature.shape.c
 
         return FeatureData(
             arr=out.raw(out.axiskeys),
