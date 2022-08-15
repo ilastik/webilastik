@@ -1,29 +1,32 @@
 #pyright: strict
 
+from abc import ABC, abstractmethod
 import atexit
 import threading
-from concurrent.futures import Executor, ProcessPoolExecutor, ThreadPoolExecutor
-from typing import Optional, Protocol
+from concurrent.futures import Executor, ThreadPoolExecutor, ProcessPoolExecutor
+from typing import Optional
 import multiprocessing as mp
 import sys
 
 from webilastik.scheduling import ExecutorGetter, ExecutorHint, SerialExecutor
+from webilastik.scheduling.hashing_mpi_executor import HashingMpiExecutor
+from webilastik.scheduling.mpi_comm_executor_wrapper import MPICommExecutorWrapper
 
-class ExecutorFactory(Protocol):
-    def __call__(self, *, max_workers: Optional[int]) -> Executor:
-        ...
 
-class ExecutorManager:
-    def __init__(self, executor_factory: ExecutorFactory) -> None:
+class ExecutorManager(ABC):
+    def __init__(self) -> None:
         self._lock = threading.Lock()
         self._executor: "Executor | None" = None
-        self._executor_factory = executor_factory
         super().__init__()
+
+    @abstractmethod
+    def _create_executor(self, max_workers: Optional[int]) -> Executor:
+        raise NotImplementedError()
 
     def get_executor(self, max_workers: Optional[int]) -> Executor:
         with self._lock:
             if self._executor is None:
-                self._executor = self._executor_factory(max_workers=max_workers)
+                self._executor = self._create_executor(max_workers=max_workers)
         return self._executor
 
     def shutdown(self):
@@ -33,23 +36,34 @@ class ExecutorManager:
     def __del__(self):
         self.shutdown()
 
+class MPICommExecutorManager(ExecutorManager):
+    def _create_executor(self, max_workers: Optional[int]) -> Executor:
+        return MPICommExecutorWrapper()
 
-def _create_process_pool(max_workers: Optional[int]) -> ProcessPoolExecutor:
-    return ProcessPoolExecutor(max_workers=10, mp_context=mp.get_context("spawn"))
-_server_executor_manager = ExecutorManager(executor_factory=_create_process_pool)
+class HashingMpiExecutorManager(ExecutorManager):
+    def _create_executor(self, max_workers: Optional[int]) -> Executor:
+        return HashingMpiExecutor()
 
-_worker_thread_prefix = "worker_pool_thread_"
-def _create_worker_thread_pool(max_workers: Optional[int]) -> ThreadPoolExecutor:
-    return ThreadPoolExecutor(max_workers=10, thread_name_prefix=_worker_thread_prefix)
-_worker_thread_pool_manager = ExecutorManager(executor_factory=_create_worker_thread_pool)
+class ProcessPoolExecutorManager(ExecutorManager):
+    def _create_executor(self, max_workers: Optional[int]) -> Executor:
+        return ProcessPoolExecutor(max_workers=10, mp_context=mp.get_context("spawn"))
+
+class ThreadPoolExecutorManager(ExecutorManager):
+    WORKER_THERAD_PREFIX = "worker_pool_thread_"
+
+    def _create_executor(self, max_workers: Optional[int]) -> Executor:
+        return ThreadPoolExecutor(max_workers=10, thread_name_prefix=self.WORKER_THERAD_PREFIX)
+
+
+_server_executor_manager = ProcessPoolExecutorManager()
+_worker_thread_pool_manager = ThreadPoolExecutorManager()
 
 
 def _get_executor(*, hint: ExecutorHint, max_workers: Optional[int] = None) -> Executor:
-    if threading.current_thread().name.startswith(_worker_thread_prefix):
+    if threading.current_thread().name.startswith(ThreadPoolExecutorManager.WORKER_THERAD_PREFIX):
         print(f"[WARNING]{hint} needs an executor but already inside one", file=sys.stderr)
         return SerialExecutor()
     if hint == "server_tile_handler":
-        print(f"Is something requesting a pool already???????????????????")
         return _server_executor_manager.get_executor(max_workers=max_workers)
     if hint == "training":
         return SerialExecutor()
