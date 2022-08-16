@@ -126,6 +126,7 @@ class SshJobLauncher:
         EXECUTOR_GETTER_IMPLEMENTATION: Literal["default", "jusuf", "cscs"],
         CACHING_IMPLEMENTATION: Literal["lru_cache",  "no_cache",  "redis_cache"],
 
+        num_nodes: int,
         extra_sbatch_opts: Mapping[str, str] = {},
         extra_environment_vars: Mapping[str, str] = {}
     ) -> None:
@@ -140,6 +141,7 @@ class SshJobLauncher:
         self.EXECUTOR_GETTER_IMPLEMENTATION = EXECUTOR_GETTER_IMPLEMENTATION
         self.CACHING_IMPLEMENTATION = CACHING_IMPLEMENTATION
 
+        self.num_nodes = num_nodes
         self.extra_sbatch_opts = extra_sbatch_opts
         self.extra_environment_vars = extra_environment_vars
         super().__init__()
@@ -192,7 +194,7 @@ class SshJobLauncher:
 
         sbatch_args: Dict[str, str] = {
             "--job-name": SlurmJob.make_name(user_info=user_info, session_id=SESSION_ID),
-            "--nodes": "1", #FIXME
+            "--nodes": str(self.num_nodes), #FIXME
             "--ntasks": "2", #FIXME
             "--account": self.account,
             "--time": str(time),
@@ -325,4 +327,5 @@ class JusufSshJobLauncher(SshJobLauncher):
             },
             EXECUTOR_GETTER_IMPLEMENTATION="jusuf",
             CACHING_IMPLEMENTATION="redis_cache",
+            num_nodes=1,
         )
