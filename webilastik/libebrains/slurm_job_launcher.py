@@ -350,6 +350,11 @@ class JusufSshJobLauncher(SshJobLauncher):
                 --dir {project} \\
                 &
 
+            while [ ! -S {redis_unix_socket_path} -o ! -e {redis_pid_file} ]; do
+                echo "Redis not ready yet. Sleeping..."
+                sleep 1
+            done
+
             PYTHONPATH="{webilastik_source_dir}"
             PYTHONPATH+=":{webilastik_source_dir}/executor_getters/jusuf/"
             PYTHONPATH+=":{webilastik_source_dir}/caching/redis_cache/"
@@ -369,3 +374,80 @@ class JusufSshJobLauncher(SshJobLauncher):
             kill -2 $(cat {redis_pid_file}) #FXME: this only works because it's a single node
             sleep 2
         """)
+
+class CscsSshJobLauncher(SshJobLauncher):
+    def __init__(self):
+        super().__init__(
+            user=Username("bp000188"),
+            hostname=Hostname("daint.cscs.ch"),
+            login_node_info=(Username("bp000188"), Hostname("ela.cscs.ch")),
+            account="ich005",
+        )
+
+    def get_sbatch_launch_script(
+        self,
+        *,
+        ebrains_user_token: UserToken,
+        session_id: uuid.UUID,
+    ) -> str:
+        scratch = "/scratch/snx3000/bp000188"
+        project = "/users/bp000188"
+        webilastik_source_dir = f"{project}/source/webilastik"
+        conda_env_dir = f"{project}/miniconda3/envs/webilastik"
+        redis_pid_file = f"{scratch}/redis-{session_id}.pid"
+        redis_unix_socket_path = f"{scratch}/redis-{session_id}.sock"
+
+        out =  textwrap.dedent(f"""\
+            #!/bin/bash
+            #SBATCH --nodes=1
+            #SBATCH --ntasks=2
+            #SBATCH --partition=debug
+            #SBATCH --hint=nomultithread
+            #SBATCH --constraint=mc
+
+            set -xeu
+
+            # prevent numpy from spawning its own threads
+            export OPENBLAS_NUM_THREADS=1
+            export MKL_NUM_THREADS=1
+
+            srun -n 1 --overlap -u --cpu_bind=none --cpus-per-task 6 \\
+                {conda_env_dir}/bin/redis-server \\
+                --pidfile {redis_pid_file} \\
+                --unixsocket {redis_unix_socket_path} \\
+                --unixsocketperm 777 \\
+                --port 0 \\
+                --daemonize no \\
+                --maxmemory-policy allkeys-lru \\
+                --maxmemory 100gb \\
+                --appendonly no \\
+                --save "" \\
+                --dir {scratch} \\
+                &
+
+            while [ ! -S {redis_unix_socket_path} -o ! -e {redis_pid_file} ]; do
+                echo "Redis not ready yet. Sleeping..."
+                sleep 1
+            done
+
+            PYTHONPATH="{webilastik_source_dir}"
+            PYTHONPATH+=":{webilastik_source_dir}/executor_getters/cscs/"
+            PYTHONPATH+=":{webilastik_source_dir}/caching/redis_cache/"
+
+            export PYTHONPATH
+            export REDIS_UNIX_SOCKET_PATH="{redis_unix_socket_path}"
+
+            srun -n 1 --overlap -u --cpus-per-task 30 \\
+                "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py \\
+                --ebrains-user-access-token={ebrains_user_token.access_token} \\
+                --listen-socket="{scratch}/to-master-{session_id}" \\
+                tunnel \\
+                --remote-username=www-data \\
+                --remote-host=app.ilastik.org \\
+                --remote-unix-socket="/tmp/to-session-{session_id}" \\
+
+            kill -2 $(cat {redis_pid_file}) #FXME: this only works because it's a single node
+            sleep 2
+        """)
+        # print(out)
+        return out
