@@ -5,10 +5,9 @@ from enum import Enum
 from typing import ClassVar, NewType, Dict, Mapping, List, Sequence, Set, Literal, Tuple
 import uuid
 from pathlib import PurePosixPath
-import json
-from datetime import datetime
+import datetime
 
-from ndstructs.utils.json_serializable import JsonValue, ensureJsonArray, ensureJsonInt, ensureJsonObject, ensureJsonString
+from ndstructs.utils.json_serializable import JsonValue, ensureJsonString
 
 from webilastik.libebrains.user_info import UserInfo
 from webilastik.libebrains.user_token import UserToken
@@ -83,8 +82,8 @@ class SlurmJob:
         job_id: SlurmJobId,
         name: str,
         state: JobState,
-        duration: "Seconds | None",
-        num_nodes: "int | None",
+        duration: "Seconds",
+        num_nodes: "int",
     ) -> None:
         self.job_id = job_id
         self.state = state
@@ -101,8 +100,7 @@ class SlurmJob:
         return f"{cls.NAME_PREFIX}-user-{user_info.sub}-session-{session_id}"
 
     @classmethod
-    def recognizes_raw_job(cls, raw_job: JsonValue) -> bool:
-        name = ensureJsonString(ensureJsonObject(raw_job).get("name"))
+    def recognizes_job_name(cls, name: str) -> bool:
         return name.startswith(cls.NAME_PREFIX)
 
     def is_running(self) -> bool:
@@ -113,41 +111,6 @@ class SlurmJob:
 
     def belongs_to(self, user_info: UserInfo) -> bool:
         return self.user_sub == user_info.sub
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "SlurmJob":
-        value_obj = ensureJsonObject(value)
-        job_id = SlurmJobId(ensureJsonInt(value_obj.get("job_id")))
-        raw_state = ensureJsonObject(value_obj.get("state"))
-        state = JobState.from_json_value(raw_state.get("current"))
-
-        if state.is_done():
-            time_obj = ensureJsonObject(value_obj["time"])
-            start = ensureJsonInt(time_obj["start"])
-            end = ensureJsonInt(time_obj["end"])
-            duration = Seconds(end - start)
-        else:
-            duration = None
-
-        tres_resources = ensureJsonObject(value_obj.get("tres"))
-        raw_allocated_resources = ensureJsonArray(tres_resources.get("allocated"))
-        for raw_resource in raw_allocated_resources:
-            resource_obj = ensureJsonObject(raw_resource)
-            resource_type = ensureJsonString(resource_obj.get("type"))
-            if resource_type == "node":
-                num_nodes = ensureJsonInt(resource_obj.get("count"))
-                break
-        else:
-            num_nodes = None
-
-        return SlurmJob(
-            job_id=job_id,
-            name=ensureJsonString(value_obj.get("name")),
-            state=state,
-            duration=duration,
-            num_nodes=num_nodes,
-        )
-
 
 class SshJobLauncher:
     def __init__(
@@ -249,12 +212,10 @@ class SshJobLauncher:
         if isinstance(output_result, Exception):
             return output_result
 
-        print(output_result.split())
         job_id = SlurmJobId(int(output_result.split()[3]))
 
-        for i in range(5):
+        for _ in range(5):
             await asyncio.sleep(0.7)
-            print(f"~~~~~>> Trying to fetch job.... ({i})")
             job = await self.get_job_by_slurm_id(job_id=job_id)
             if isinstance(job, (Exception, SlurmJob)):
                 return job
@@ -297,13 +258,16 @@ class SshJobLauncher:
         job_id: "SlurmJobId | None" = None,
         name: "str | None" = None,
         state: "Set[JobState] | None" = None,
-        starttime: "datetime | None" = None,
+        starttime: "datetime.datetime" = datetime.datetime(year=2020, month=1, day=1),
+        endtime: "datetime.datetime" = datetime.datetime.today() + datetime.timedelta(days=2), #definetely in the future
     ) -> "List[SlurmJob] | Exception":
-        starttime_str = f"{starttime.year:04d}-{starttime.month:02d}-{starttime.day:02d}" if starttime else "2022-01-01"
         sacct_params = [
-            "--json",
-            f"--starttime={starttime_str}",
-            "--endtime=now",
+            "--allocations", # don't show individual steps
+            "--noheader",
+            "--parsable2", #items separated with '|'. No trailing '|'
+            "--format=JobID,JobName,State,ElapsedRaw,AllocNodes",
+            f"--starttime={starttime.year:04d}-{starttime.month:02d}-{starttime.day:02d}",
+            f"--endtime={endtime.year:04d}-{endtime.month:02d}-{endtime.day:02d}",
             f"--user={self.user}",
             f"--account={self.account}",
         ]
@@ -319,22 +283,30 @@ class SshJobLauncher:
         if isinstance(output_result, Exception):
             return output_result
 
-        payload = ensureJsonObject(json.loads(output_result))
-        raw_jobs = ensureJsonArray(payload.get("jobs"))
-        return [
-            SlurmJob.from_json_value(raw_job)
-            for raw_job in raw_jobs
-            if SlurmJob.recognizes_raw_job(raw_job)
-        ]
+        jobs: List[SlurmJob] = []
+        for line in output_result.split("\n")[:-1]: #skip empty newline
+            raw_id, job_name, raw_state, raw_elapsed, raw_alloc_nodes = line.split("|")
+            if not SlurmJob.recognizes_job_name(job_name):
+                continue
+            jobs.append(
+                SlurmJob(
+                    job_id=SlurmJobId(int(raw_id)),
+                    name=job_name,
+                    state=JobState.from_json_value(raw_state.split(" ")[0]),
+                    duration=Seconds(int(raw_elapsed)),
+                    num_nodes=int(raw_alloc_nodes),
+                )
+            )
+        return jobs
 
     async def get_usage_for_user(self, user_info: UserInfo) -> "NodeSeconds | Exception":
-        this_month_jobs_result = await self.get_jobs(starttime=datetime.today().replace(day=1))
+        this_month_jobs_result = await self.get_jobs(starttime=datetime.datetime.today().replace(day=1))
         if isinstance(this_month_jobs_result, Exception):
             return this_month_jobs_result
         node_seconds = sum(
             (job.duration * job.num_nodes)
             for job in this_month_jobs_result
-            if job.duration != None and job.num_nodes != None and job.user_sub == user_info.sub
+            if job.user_sub == user_info.sub
         )
         return NodeSeconds(node_seconds)
 
