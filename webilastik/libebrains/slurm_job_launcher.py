@@ -1,11 +1,13 @@
 #pyright: strict
 
+from abc import abstractmethod
 import asyncio
 from enum import Enum
-from typing import ClassVar, NewType, Dict, Mapping, List, Sequence, Set, Literal, Tuple
+from typing import ClassVar, NewType, List, Set, Tuple
 import uuid
-from pathlib import PurePosixPath
 import datetime
+import textwrap
+import tempfile
 
 from ndstructs.utils.json_serializable import JsonValue, ensureJsonString
 
@@ -120,38 +122,32 @@ class SshJobLauncher:
         hostname: Hostname,
         login_node_info: "Tuple[Username, Hostname] | None" = None,
         account: str,
-        WEBILASTIK_SOURCE_DIR: PurePosixPath,
-        CONDA_ENV_DIR: PurePosixPath,
-        MODULES_TO_LOAD: Sequence[str],
-        EXECUTOR_GETTER_IMPLEMENTATION: Literal["default", "jusuf", "cscs"],
-        CACHING_IMPLEMENTATION: Literal["lru_cache",  "no_cache",  "redis_cache"],
-
-        num_nodes: int,
-        extra_sbatch_opts: Mapping[str, str] = {},
-        extra_environment_vars: Mapping[str, str] = {}
     ) -> None:
         self.user = user
         self.hostname = hostname
         self.account = account
         self.login_node_info = login_node_info
 
-        self.WEBILASTIK_SOURCE_DIR = WEBILASTIK_SOURCE_DIR
-        self.CONDA_ENV_DIR = CONDA_ENV_DIR
-        self.MODULES_TO_LOAD = MODULES_TO_LOAD
-        self.EXECUTOR_GETTER_IMPLEMENTATION = EXECUTOR_GETTER_IMPLEMENTATION
-        self.CACHING_IMPLEMENTATION = CACHING_IMPLEMENTATION
-
-        self.num_nodes = num_nodes
-        self.extra_sbatch_opts = extra_sbatch_opts
-        self.extra_environment_vars = extra_environment_vars
         super().__init__()
 
-    async def do_ssh(self, *, command: str, command_args: List[str]) -> "str | Exception":
+    async def do_ssh(
+        self, *, command: str, command_args: List[str], stdin: "str | None" = None
+    ) -> "str | Exception":
         login_node_preamble: List[str] = []
         if self.login_node_info:
             login_node_preamble = [
                 "ssh", "-oCheckHostIP=no", "-oBatchMode=yes", f"{self.login_node_info[0]}@{self.login_node_info[1]}",
             ]
+
+        if stdin:
+            stdin_file = tempfile.TemporaryFile()
+            stdin_contents = stdin.encode('utf8')
+            num_bytes_written = stdin_file.write(stdin_contents)
+            if num_bytes_written != len(stdin_contents):
+                return Exception(f"Could not write sbatch script to temp file")
+            _ = stdin_file.seek(0)
+        else:
+            stdin_file = None
 
         try:
             process = await asyncio.create_subprocess_exec(
@@ -162,6 +158,7 @@ class SshJobLauncher:
                 *command_args,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                stdin=stdin_file,
             )
             stdout, stderr = await process.communicate()
         except Exception as e:
@@ -173,43 +170,32 @@ class SshJobLauncher:
         return stdout.decode()
 
 
+    @abstractmethod
+    def get_sbatch_launch_script(
+        self,
+        *,
+        ebrains_user_token: UserToken,
+        session_id: uuid.UUID,
+    ) -> "str":
+        pass
+
     async def launch(
         self,
         *,
         user_info: UserInfo,
         time: Minutes,
-        EBRAINS_USER_ACCESS_TOKEN: UserToken,
-        SESSION_ID: uuid.UUID,
+        ebrains_user_token: UserToken,
+        session_id: uuid.UUID,
     ) -> "SlurmJob | Exception":
-        env_vars: Dict[str, str] = {
-            "WEBILASTIK_SOURCE_DIR": str(self.WEBILASTIK_SOURCE_DIR),
-            "CONDA_ENV_DIR": str(self.CONDA_ENV_DIR),
-            "SESSION_ID": str(SESSION_ID),
-            "MODULES_TO_LOAD": '@'.join(self.MODULES_TO_LOAD),
-            "EXECUTOR_GETTER_IMPLEMENTATION": self.EXECUTOR_GETTER_IMPLEMENTATION,
-            "CACHING_IMPLEMENTATION": self.CACHING_IMPLEMENTATION,
-            "EBRAINS_USER_ACCESS_TOKEN": EBRAINS_USER_ACCESS_TOKEN.access_token,
-            **self.extra_environment_vars
-        }
-
-        sbatch_args: Dict[str, str] = {
-            "--job-name": SlurmJob.make_name(user_info=user_info, session_id=SESSION_ID),
-            "--nodes": str(self.num_nodes), #FIXME
-            "--ntasks": "2", #FIXME
-            "--account": self.account,
-            "--time": str(time),
-            "--export": ",".join([
-                "ALL",
-                *[f"{key}={value}" for key, value in env_vars.items()]
-            ])
-        }
+        job_name = SlurmJob.make_name(user_info=user_info, session_id=session_id)
 
         output_result = await self.do_ssh(
             command="sbatch",
-            command_args=[
-                *[f"{key}={value}" for key, value in sbatch_args.items()],
-               f"{self.WEBILASTIK_SOURCE_DIR}/scripts/launch_webilastik_worker__sbatch.sh",
-            ]
+            command_args=[f"--job-name={job_name}", f"--time={time}", f"--account={self.account}"],
+            stdin=self.get_sbatch_launch_script(
+                ebrains_user_token=ebrains_user_token,
+                session_id=session_id,
+            ),
         )
         if isinstance(output_result, Exception):
             return output_result
@@ -222,6 +208,7 @@ class SshJobLauncher:
             if isinstance(job, (Exception, SlurmJob)):
                 return job
         return Exception(f"Could not retrieve job with id {job_id}")
+
 
     async def cancel(self, job: SlurmJob) -> "Exception | None":
         result = await self.do_ssh(command="scancel", command_args=[str(job.job_id)])
@@ -318,14 +305,67 @@ class JusufSshJobLauncher(SshJobLauncher):
             user=Username("vieira2"),
             hostname=Hostname("jusuf.fz-juelich.de"),
             account="icei-hbp-2022-0010",
-            WEBILASTIK_SOURCE_DIR=PurePosixPath("/p/project/icei-hbp-2022-0010/source/webilastik"),
-            CONDA_ENV_DIR=PurePosixPath("/p/project/icei-hbp-2022-0010/miniconda3/envs/webilastik"),
-            MODULES_TO_LOAD=["GCC/11.2.0", "OpenMPI/4.1.2"],
-            extra_sbatch_opts={
-                "--partition": "batch",
-                "--hint": "nomultithread",
-            },
-            EXECUTOR_GETTER_IMPLEMENTATION="jusuf",
-            CACHING_IMPLEMENTATION="redis_cache",
-            num_nodes=1,
         )
+
+    def get_sbatch_launch_script(
+        self,
+        *,
+        ebrains_user_token: UserToken,
+        session_id: uuid.UUID,
+    ) -> str:
+        project = "/p/project/icei-hbp-2022-0010"
+        webilastik_source_dir = f"{project}/source/webilastik"
+        conda_env_dir = f"{project}/miniconda3/envs/webilastik"
+        redis_pid_file = f"{project}/redis-{session_id}.pid"
+        redis_unix_socket_path = f"{project}/redis-{session_id}.sock"
+
+        return textwrap.dedent(f"""\
+            #!/bin/bash
+            #SBATCH --nodes=1
+            #SBATCH --ntasks=2
+            #SBATCH --partition=batch
+            #SBATCH --hint=nomultithread
+
+            set -xeu
+
+            # prevent numpy from spawning its own threads
+            export OPENBLAS_NUM_THREADS=1
+            export MKL_NUM_THREADS=1
+
+            module load GCC/11.2.0
+            module load OpenMPI/4.1.2
+
+
+            srun -n 1 --overlap -u --cpu_bind=none --cpus-per-task 6 \\
+                {conda_env_dir}/bin/redis-server \\
+                --pidfile {redis_pid_file} \\
+                --unixsocket {redis_unix_socket_path} \\
+                --unixsocketperm 777 \\
+                --port 0 \\
+                --daemonize no \\
+                --maxmemory-policy allkeys-lru \\
+                --maxmemory 100gb \\
+                --appendonly no \\
+                --save "" \\
+                --dir {project} \\
+                &
+
+            PYTHONPATH="{webilastik_source_dir}"
+            PYTHONPATH+=":{webilastik_source_dir}/executor_getters/jusuf/"
+            PYTHONPATH+=":{webilastik_source_dir}/caching/redis_cache/"
+
+            export PYTHONPATH
+            export REDIS_UNIX_SOCKET_PATH="{redis_unix_socket_path}"
+
+            srun -n 1 --overlap -u --cpus-per-task 120 \\
+                "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py \\
+                --ebrains-user-access-token={ebrains_user_token.access_token} \\
+                --listen-socket="{project}/to-master-{session_id}" \\
+                tunnel \\
+                --remote-username=www-data \\
+                --remote-host=app.ilastik.org \\
+                --remote-unix-socket="/tmp/to-session-{session_id}" \\
+
+            kill -2 $(cat {redis_pid_file}) #FXME: this only works because it's a single node
+            sleep 2
+        """)

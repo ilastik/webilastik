@@ -2,25 +2,24 @@
 
 from functools import wraps
 import json
-from typing import Any, Callable, Coroutine, Dict, NoReturn, TypeVar, Optional
+from typing import Any, Callable, Coroutine, Dict, NoReturn, Optional
 from pathlib import Path, PurePosixPath
 import uuid
 import asyncio
 import sys
 from datetime import datetime
+import subprocess
 
 from aiohttp import web
 import aiohttp
 from aiohttp.client import ClientSession
 from ndstructs.utils.json_serializable import ensureJsonInt, ensureJsonObject
-from webilastik.libebrains.slurm_job_launcher import JusufSshJobLauncher, Minutes, NodeSeconds, SlurmJob, SshJobLauncher
+from webilastik.libebrains.slurm_job_launcher import JusufSshJobLauncher, Minutes, NodeSeconds, SshJobLauncher
 
 from webilastik.libebrains.user_token import UserToken
 from webilastik.libebrains.oidc_client import OidcClient, Scope
 from webilastik.utility.url import Url, Protocol as UrlProtocol
-from webilastik.server.session import Session
 
-SESSION_TYPE = TypeVar("SESSION_TYPE", bound=Session)
 
 def get_requested_url(request: web.Request) -> Url:
     protocol = UrlProtocol.from_str(request.headers['X-Forwarded-Proto'])
@@ -217,10 +216,10 @@ class SessionAllocator:
             for job in this_months_jobs_result:
                 if not job.belongs_to(user_info=user_info):
                     continue
-                if job.duration != None and job.num_nodes != None:
-                    quota = NodeSeconds(quota - job.duration * job.num_nodes)
                 if job.is_running():
                     return web.json_response({"error": "Already running a session"}, status=400)
+                quota = NodeSeconds(quota - job.duration * job.num_nodes)
+
 
             if quota <= 0: #FIXME
                 return web.json_response({"error": "Out of quota"}, status=400)
@@ -228,8 +227,8 @@ class SessionAllocator:
             session_result = await self.session_launcher.launch(
                 user_info=user_info,
                 time=Minutes(min(quota, session_duration)),
-                EBRAINS_USER_ACCESS_TOKEN=ebrains_login.user_token,
-                SESSION_ID=session_id,
+                ebrains_user_token=ebrains_login.user_token,
+                session_id=session_id,
             )
 
             if isinstance(session_result, Exception):
