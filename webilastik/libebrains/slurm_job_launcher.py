@@ -411,33 +411,33 @@ class CscsSshJobLauncher(SshJobLauncher):
             export OPENBLAS_NUM_THREADS=1
             export MKL_NUM_THREADS=1
 
-            srun -n 1 --overlap -u --cpu_bind=none --cpus-per-task 6 \\
-                {conda_env_dir}/bin/redis-server \\
-                --pidfile {redis_pid_file} \\
-                --unixsocket {redis_unix_socket_path} \\
-                --unixsocketperm 777 \\
-                --port 0 \\
-                --daemonize no \\
-                --maxmemory-policy allkeys-lru \\
-                --maxmemory 100gb \\
-                --appendonly no \\
-                --save "" \\
-                --dir {scratch} \\
-                &
-
-            while [ ! -S {redis_unix_socket_path} -o ! -e {redis_pid_file} ]; do
-                echo "Redis not ready yet. Sleeping..."
-                sleep 1
-            done
+            # srun -n 1 --overlap -u --cpu_bind=none --cpus-per-task 6 \\
+            #     {conda_env_dir}/bin/redis-server \\
+            #     --pidfile {redis_pid_file} \\
+            #     --unixsocket {redis_unix_socket_path} \\
+            #     --unixsocketperm 777 \\
+            #     --port 0 \\
+            #     --daemonize no \\
+            #     --maxmemory-policy allkeys-lru \\
+            #     --maxmemory 100gb \\
+            #     --appendonly no \\
+            #     --save "" \\
+            #     --dir {scratch} \\
+            #     &
+            #
+            # while [ ! -S {redis_unix_socket_path} -o ! -e {redis_pid_file} ]; do
+            #     echo "Redis not ready yet. Sleeping..."
+            #     sleep 1
+            # done
 
             PYTHONPATH="{webilastik_source_dir}"
             PYTHONPATH+=":{webilastik_source_dir}/executor_getters/cscs/"
-            PYTHONPATH+=":{webilastik_source_dir}/caching/redis_cache/"
+            PYTHONPATH+=":{webilastik_source_dir}/caching/lru_cache/"
 
             export PYTHONPATH
             export REDIS_UNIX_SOCKET_PATH="{redis_unix_socket_path}"
 
-            srun -n 1 --overlap -u --cpus-per-task 30 \\
+            srun -n 1 --overlap -u --cpus-per-task 36 \\
                 "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py \\
                 --ebrains-user-access-token={ebrains_user_token.access_token} \\
                 --listen-socket="{scratch}/to-master-{session_id}" \\
@@ -446,8 +446,8 @@ class CscsSshJobLauncher(SshJobLauncher):
                 --remote-host=app.ilastik.org \\
                 --remote-unix-socket="/tmp/to-session-{session_id}" \\
 
-            kill -2 $(cat {redis_pid_file}) #FXME: this only works because it's a single node
-            sleep 2
+            # kill -2 $(cat {redis_pid_file}) #FXME: this only works because it's a single node
+            # sleep 2
         """)
         # print(out)
         return out
