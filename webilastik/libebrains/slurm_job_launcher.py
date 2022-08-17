@@ -399,8 +399,9 @@ class CscsSshJobLauncher(SshJobLauncher):
 
         out =  textwrap.dedent(f"""\
             #!/bin/bash
-            #SBATCH --nodes=1
-            #SBATCH --ntasks=2
+            #SBATCH --nodes=10
+            #SBATCH --ntasks=30
+            #SBATCH --cpus-per-task=12
             #SBATCH --partition=debug
             #SBATCH --hint=nomultithread
             #SBATCH --constraint=mc
@@ -436,8 +437,9 @@ class CscsSshJobLauncher(SshJobLauncher):
 
             export PYTHONPATH
             export REDIS_UNIX_SOCKET_PATH="{redis_unix_socket_path}"
+            export LRU_CACHE_MAX_SIZE=512
 
-            srun -n 1 --overlap -u --cpus-per-task 36 \\
+            srun -n 30\\
                 "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py \\
                 --ebrains-user-access-token={ebrains_user_token.access_token} \\
                 --listen-socket="{scratch}/to-master-{session_id}" \\
