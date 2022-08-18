@@ -438,6 +438,7 @@ class CscsSshJobLauncher(SshJobLauncher):
             export PYTHONPATH
             export REDIS_UNIX_SOCKET_PATH="{redis_unix_socket_path}"
             export LRU_CACHE_MAX_SIZE=512
+            export EBRAINS_USER_ACCESS_TOKEN="{ebrains_user_token.access_token}"
 
             srun -n 30\\
                 "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py \\
