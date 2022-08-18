@@ -426,6 +426,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    UserToken.login_globally(token=UserToken(access_token=args.ebrains_user_access_token))
+
     executor = get_executor(hint="server_tile_handler", max_workers=multiprocessing.cpu_count())
 
     if "remote_username" in vars(args):
@@ -438,7 +440,6 @@ if __name__ == '__main__':
     else:
         server_context = contextlib.nullcontext()
 
-    UserToken.login_globally(token=UserToken(access_token=args.ebrains_user_access_token))
 
     with server_context:
         WebIlastik(
