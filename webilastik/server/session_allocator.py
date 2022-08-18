@@ -14,7 +14,7 @@ from aiohttp import web
 import aiohttp
 from aiohttp.client import ClientSession
 from ndstructs.utils.json_serializable import ensureJsonInt, ensureJsonObject
-from webilastik.libebrains.slurm_job_launcher import JusufSshJobLauncher, Minutes, NodeSeconds, SshJobLauncher
+from webilastik.libebrains.slurm_job_launcher import CscsSshJobLauncher, JusufSshJobLauncher, Minutes, NodeSeconds, SshJobLauncher
 
 from webilastik.libebrains.user_token import UserToken
 from webilastik.libebrains.oidc_client import OidcClient, Scope
@@ -268,7 +268,7 @@ class SessionAllocator:
 if __name__ == '__main__':
     from argparse import ArgumentParser
     parser = ArgumentParser()
-    parser.add_argument("--session-launcher", choices=["JUSUF"], required=True)
+    parser.add_argument("--session-launcher", choices=["JUSUF", "CSCS"], required=True)
     parser.add_argument("--external-url", type=Url.parse, required=True, help="Url from which sessions can be accessed (where the session sockets live)")
     parser.add_argument(
         "--oidc-client-json",
@@ -280,6 +280,8 @@ if __name__ == '__main__':
     # multiprocessing.set_start_method('spawn') #start a fresh interpreter so it doesn't 'inherit' the event loop
     if args.session_launcher == "JUSUF":
         session_launcher = JusufSshJobLauncher()
+    elif args.session_launcher == "CSCS":
+        session_launcher = CscsSshJobLauncher()
     else:
         print(f"Can get a session launcher for {args.session_launcher}")
         exit(1)
