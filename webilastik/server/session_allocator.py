@@ -13,7 +13,7 @@ import subprocess
 from aiohttp import web
 import aiohttp
 from aiohttp.client import ClientSession
-from ndstructs.utils.json_serializable import ensureJsonInt, ensureJsonObject
+from ndstructs.utils.json_serializable import JsonValue, ensureJsonInt, ensureJsonObject
 from webilastik.libebrains.slurm_job_launcher import CscsSshJobLauncher, JusufSshJobLauncher, Minutes, NodeSeconds, SshJobLauncher
 
 from webilastik.libebrains.user_token import UserToken
@@ -40,6 +40,16 @@ def redirect_to_ebrains_login(request: web.Request, oidc_client: OidcClient) -> 
             redirect_uri=get_requested_url(request),
             scopes=set([Scope.OPENID, Scope.GROUP, Scope.TEAM, Scope.EMAIL, Scope.PROFILE]),
         ).raw
+    )
+
+def uncachable_json_response(payload: JsonValue, *, status: int) -> web.Response:
+    return web.json_response(
+        payload,
+        status=status,
+        headers={
+            "Cache-Control": "no-store, must-revalidate",
+            "Expires": "0",
+        }
     )
 
 class EbrainsLogin:
@@ -248,18 +258,19 @@ class SessionAllocator:
         try:
             session_id =  uuid.UUID(request.match_info.get("session_id"))
         except Exception:
-            return web.json_response({"error": "Bad session id"}, status=400)
+            return uncachable_json_response({"error": "Bad session id"}, status=400)
         user_info = await ebrains_login.user_token.get_userinfo(self.http_client_session)
         session_result = await self.session_launcher.get_job_by_session_id(session_id=session_id, user_info=user_info)
         if isinstance(session_result, Exception):
-            return web.json_response({"error": "Could not retrieve session"}, status=500)
+            return uncachable_json_response({"error": "Could not retrieve session"}, status=500)
         if session_result is None:
-            return web.json_response({"error": "Session not found"}, status=404)
-        return web.json_response(
+            return uncachable_json_response({"error": "Session not found"}, status=404)
+        return uncachable_json_response(
             {
                 "status": "ready" if session_result.is_running() else "not ready", #FIXME: check all session states?
                 "url": self._make_session_url(session_id).raw
             },
+            status=200,
         )
 
     def run(self, port: int):

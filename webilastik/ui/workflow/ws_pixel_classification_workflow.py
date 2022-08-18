@@ -28,6 +28,7 @@ from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonO
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
 from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.scheduling.job import PriorityExecutor
+from webilastik.server.session_allocator import uncachable_json_response
 from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError
 from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
@@ -210,13 +211,13 @@ class WebIlastik:
         })
 
     async def get_status(self, request: web.Request) -> web.Response:
-        return web.Response(
-            text=json.dumps({
+        return uncachable_json_response(
+            {
                 "status": "running",
                 "start_time_utc": self.start_time_utc.timestamp(),
                 "max_duration_minutes": self.max_duration_minutes,
-            }),
-            content_type="application/json",
+            },
+            status=200
         )
 
     async def close_session(self, request: web.Request) -> web.Response:
