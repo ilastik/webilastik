@@ -124,7 +124,7 @@ class WebIlastik:
     def __init__(self, max_duration_minutes: Minutes, executor: Executor, ssl_context: Optional[ssl.SSLContext] = None):
         super().__init__()
 
-        self.start_time: Final[datetime.datetime] = datetime.datetime.now()
+        self.start_time_utc: Final[datetime.datetime] = datetime.datetime.now(datetime.timezone.utc)
         self.max_duration_minutes = max_duration_minutes
         self.ssl_context = ssl_context
         self.websockets: List[web.WebSocketResponse] = []
@@ -213,7 +213,7 @@ class WebIlastik:
         return web.Response(
             text=json.dumps({
                 "status": "running",
-                "start_time": datetime.datetime.now().timestamp(),
+                "start_time_utc": self.start_time_utc.timestamp(),
                 "max_duration_minutes": self.max_duration_minutes,
             }),
             content_type="application/json",
