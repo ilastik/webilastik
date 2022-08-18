@@ -400,7 +400,7 @@ class CscsSshJobLauncher(SshJobLauncher):
             #SBATCH --nodes=10
             #SBATCH --ntasks=30
             #SBATCH --cpus-per-task=12
-            #SBATCH --partition=debug
+            #SBATCH --partition=normal
             #SBATCH --hint=nomultithread
             #SBATCH --constraint=mc
 
