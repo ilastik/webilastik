@@ -394,8 +394,6 @@ class CscsSshJobLauncher(SshJobLauncher):
         project = "/users/bp000188"
         webilastik_source_dir = f"{project}/source/webilastik"
         conda_env_dir = f"{project}/miniconda3/envs/webilastik"
-        redis_pid_file = f"{scratch}/redis-{session_id}.pid"
-        redis_unix_socket_path = f"{scratch}/redis-{session_id}.sock"
 
         out =  textwrap.dedent(f"""\
             #!/bin/bash
@@ -412,31 +410,11 @@ class CscsSshJobLauncher(SshJobLauncher):
             export OPENBLAS_NUM_THREADS=1
             export MKL_NUM_THREADS=1
 
-            # srun -n 1 --overlap -u --cpu_bind=none --cpus-per-task 6 \\
-            #     {conda_env_dir}/bin/redis-server \\
-            #     --pidfile {redis_pid_file} \\
-            #     --unixsocket {redis_unix_socket_path} \\
-            #     --unixsocketperm 777 \\
-            #     --port 0 \\
-            #     --daemonize no \\
-            #     --maxmemory-policy allkeys-lru \\
-            #     --maxmemory 100gb \\
-            #     --appendonly no \\
-            #     --save "" \\
-            #     --dir {scratch} \\
-            #     &
-            #
-            # while [ ! -S {redis_unix_socket_path} -o ! -e {redis_pid_file} ]; do
-            #     echo "Redis not ready yet. Sleeping..."
-            #     sleep 1
-            # done
-
             PYTHONPATH="{webilastik_source_dir}"
             PYTHONPATH+=":{webilastik_source_dir}/executor_getters/cscs/"
             PYTHONPATH+=":{webilastik_source_dir}/caching/lru_cache/"
 
             export PYTHONPATH
-            export REDIS_UNIX_SOCKET_PATH="{redis_unix_socket_path}"
             export LRU_CACHE_MAX_SIZE=512
             export EBRAINS_USER_ACCESS_TOKEN="{ebrains_user_token.access_token}"
 
@@ -448,9 +426,6 @@ class CscsSshJobLauncher(SshJobLauncher):
                 --remote-username=www-data \\
                 --remote-host=app.ilastik.org \\
                 --remote-unix-socket="/tmp/to-session-{session_id}" \\
-
-            # kill -2 $(cat {redis_pid_file}) #FXME: this only works because it's a single node
-            # sleep 2
         """)
         # print(out)
         return out
