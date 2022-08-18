@@ -8,7 +8,7 @@ import multiprocessing
 import os
 import signal
 import asyncio
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, Final, List, Optional, Tuple
 import json
 from base64 import b64decode
 import ssl
@@ -16,6 +16,7 @@ import contextlib
 from pathlib import Path, PurePosixPath
 import traceback
 import re
+import datetime
 
 import aiohttp
 from aiohttp import web
@@ -34,6 +35,7 @@ from webilastik.utility.url import Protocol, Url
 from webilastik.server.tunnel import ReverseSshTunnel
 from webilastik.ui.applet import dummy_prompt
 from webilastik.libebrains.user_token import UserToken
+from webilastik.libebrains.slurm_job_launcher import Minutes
 from executor_getter import get_executor
 
 
@@ -119,9 +121,11 @@ class WebIlastik:
                 }).encode("utf8")
             )
 
-    def __init__(self, executor: Executor, ssl_context: Optional[ssl.SSLContext] = None):
+    def __init__(self, max_duration_minutes: Minutes, executor: Executor, ssl_context: Optional[ssl.SSLContext] = None):
         super().__init__()
 
+        self.start_time: Final[datetime.datetime] = datetime.datetime.now()
+        self.max_duration_minutes = max_duration_minutes
         self.ssl_context = ssl_context
         self.websockets: List[web.WebSocketResponse] = []
         self._http_client_session: Optional[ClientSession] = None
@@ -208,7 +212,9 @@ class WebIlastik:
     async def get_status(self, request: web.Request) -> web.Response:
         return web.Response(
             text=json.dumps({
-                "status": "running"
+                "status": "running",
+                "start_time": datetime.datetime.now().timestamp(),
+                "max_duration_minutes": self.max_duration_minutes,
             }),
             content_type="application/json",
         )
@@ -415,6 +421,7 @@ if __name__ == '__main__':
     from argparse import ArgumentParser
 
     parser = ArgumentParser()
+    parser.add_argument("--max-duration-minutes", type=int, required=True, help="Number of minutes this workflow can run for")
     parser.add_argument("--ebrains-user-access-token", type=str, required=True)
     parser.add_argument("--listen-socket", type=Path, required=True)
 
@@ -444,6 +451,7 @@ if __name__ == '__main__':
     with server_context:
         WebIlastik(
             executor=executor,
+            max_duration_minutes=Minutes(args.max_duration_minutes),
         ).run(
             unix_socket_path=str(args.listen_socket),
         )

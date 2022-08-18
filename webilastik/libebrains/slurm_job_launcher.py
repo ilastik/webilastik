@@ -174,6 +174,7 @@ class SshJobLauncher:
     def get_sbatch_launch_script(
         self,
         *,
+        time: Minutes,
         ebrains_user_token: UserToken,
         session_id: uuid.UUID,
     ) -> "str":
@@ -193,6 +194,7 @@ class SshJobLauncher:
             command="sbatch",
             command_args=[f"--job-name={job_name}", f"--time={time}", f"--account={self.account}"],
             stdin=self.get_sbatch_launch_script(
+                time=time,
                 ebrains_user_token=ebrains_user_token,
                 session_id=session_id,
             ),
@@ -310,6 +312,7 @@ class JusufSshJobLauncher(SshJobLauncher):
     def get_sbatch_launch_script(
         self,
         *,
+        time: Minutes,
         ebrains_user_token: UserToken,
         session_id: uuid.UUID,
     ) -> str:
@@ -364,6 +367,7 @@ class JusufSshJobLauncher(SshJobLauncher):
 
             srun -n 1 --overlap -u --cpus-per-task 120 \\
                 "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py \\
+                --max-duration-minutes={time} \\
                 --ebrains-user-access-token={ebrains_user_token.access_token} \\
                 --listen-socket="{project}/to-master-{session_id}" \\
                 tunnel \\
@@ -387,6 +391,7 @@ class CscsSshJobLauncher(SshJobLauncher):
     def get_sbatch_launch_script(
         self,
         *,
+        time: Minutes,
         ebrains_user_token: UserToken,
         session_id: uuid.UUID,
     ) -> str:
@@ -420,6 +425,7 @@ class CscsSshJobLauncher(SshJobLauncher):
 
             srun -n 30\\
                 "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py \\
+                --max-duration-minutes={time} \\
                 --ebrains-user-access-token={ebrains_user_token.access_token} \\
                 --listen-socket="{scratch}/to-master-{session_id}" \\
                 tunnel \\
