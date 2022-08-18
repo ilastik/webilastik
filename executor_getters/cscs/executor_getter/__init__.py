@@ -3,13 +3,11 @@
 from abc import ABC, abstractmethod
 import atexit
 import threading
-from concurrent.futures import Executor, ThreadPoolExecutor, ProcessPoolExecutor
+from concurrent.futures import Executor, ThreadPoolExecutor
 from typing import Optional, List
-import multiprocessing as mp
 import sys
 
 from webilastik.scheduling import ExecutorGetter, ExecutorHint, SerialExecutor
-from webilastik.scheduling.hashing_mpi_executor import HashingMpiExecutor
 
 
 _executor_managers: List["ExecutorManager"] = []
@@ -51,13 +49,15 @@ class ExecutorManager(ABC):
 #
 # 4 + (4 processes * (5 threads + 1 worker process task)) = 28
 
-class HashingMpiExecutorManager(ExecutorManager):
-    def _create_executor(self, max_workers: Optional[int]) -> HashingMpiExecutor:
-        return HashingMpiExecutor()
+# from webilastik.scheduling.hashing_mpi_executor import HashingMpiExecutor
+# class HashingMpiExecutorManager(ExecutorManager):
+#     def _create_executor(self, max_workers: Optional[int]) -> HashingMpiExecutor:
+#         return HashingMpiExecutor()
 
-class ProcessPoolExecutorManager(ExecutorManager):
-    def _create_executor(self, max_workers: Optional[int]) -> Executor:
-        return ProcessPoolExecutor(max_workers=4, mp_context=mp.get_context("spawn"))
+from webilastik.scheduling.mpi_comm_executor_wrapper import MPICommExecutorWrapper
+class MpiCommExecutorManager(ExecutorManager):
+    def _create_executor(self, max_workers: Optional[int]) -> MPICommExecutorWrapper:
+        return MPICommExecutorWrapper()
 
 class ThreadPoolExecutorManager(ExecutorManager):
     WORKER_THERAD_PREFIX = "worker_pool_thread_"
@@ -66,7 +66,7 @@ class ThreadPoolExecutorManager(ExecutorManager):
         return ThreadPoolExecutor(max_workers=12, thread_name_prefix=self.WORKER_THERAD_PREFIX)
 
 
-_server_executor_manager = HashingMpiExecutorManager()
+_server_executor_manager = MpiCommExecutorManager()
 _worker_thread_pool_manager = ThreadPoolExecutorManager()
 
 
