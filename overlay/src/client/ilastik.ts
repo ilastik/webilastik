@@ -1,5 +1,5 @@
 import { vec3 } from "gl-matrix"
-import { sleep } from "../util/misc"
+import { fetchJson, sleep } from "../util/misc"
 import { Path, Url } from "../util/parsed_url"
 import { DataType, Scale } from "../util/precomputed_chunks"
 import { ensureJsonArray, ensureJsonNumber, ensureJsonNumberPair, ensureJsonNumberTripplet, ensureJsonObject, ensureJsonString, ensureOptional, IJsonable, IJsonableObject, JsonObject, JsonValue, toJsonValue } from "../util/serialization"
@@ -10,14 +10,21 @@ export class Session{
     private websocket: WebSocket
     private messageHandlers = new Array<(ev: MessageEvent) => void>();
     private readonly onUsageError: (message: string) => void
+    public readonly startTime: Date
+    public readonly maxDurationMinutes: number
 
     protected constructor(params: {
         ilastikUrl: Url,
         sessionUrl: Url,
+        startTime: Date,
+        maxDurationMinutes: number,
         onUsageError: (message: string) => void,
     }){
         this.ilastikUrl = params.ilastikUrl
         this.sessionUrl = params.sessionUrl
+        this.startTime = params.startTime
+        this.maxDurationMinutes = params.maxDurationMinutes
+
         this.onUsageError = params.onUsageError
         this.websocket = this.openWebsocket()
     }
@@ -71,7 +78,7 @@ export class Session{
         return true
     }
 
-    public async saveProject(params: {fs: FileSystem, project_file_name: string}): Promise<Error | undefined>{
+    public async saveProject(params: {fs: FileSystem, project_file_path: Path}): Promise<Error | undefined>{
         let response = await fetch(
             this.sessionUrl.joinPath("save_project").schemeless_raw,
             {
@@ -84,7 +91,7 @@ export class Session{
         return Error(`Could not save project: ${await response.text()}`)
     }
 
-    public async loadProject(params: {fs: FileSystem, project_file_name: string}): Promise<Error | undefined>{
+    public async loadProject(params: {fs: FileSystem, project_file_path: Path}): Promise<Error | undefined>{
         let response = await fetch(
             this.sessionUrl.joinPath("load_project").schemeless_raw,
             {
@@ -115,7 +122,8 @@ export class Session{
 
     public static async check_login({ilastikUrl}: {ilastikUrl: Url}): Promise<boolean>{
         let response = await fetch(ilastikUrl.joinPath("/api/check_login").raw, {
-            credentials: "include"
+            credentials: "include",
+            cache: "no-store",
         });
         if(response.ok){
             return true
@@ -125,6 +133,22 @@ export class Session{
         }
         let contents = await response.text()
         throw new Error(`Checking loging faield with ${response.status}:\n${contents}`)
+    }
+
+    public static async getStatus(sessionUrl: Url): Promise<{status: string, start_time: Date, max_duration_minutes: number} | Error>{
+        let result = await fetchJson(
+            sessionUrl.joinPath("/status").raw,
+            {cache: "no-store"}
+        )
+        if(result instanceof Error){
+            return result
+        }
+        let resultObj = ensureJsonObject(result)
+        return {
+            status: ensureJsonString(resultObj.status),
+            start_time: new Date(ensureJsonNumber(resultObj.start_time_utc) * 1000),
+            max_duration_minutes: ensureJsonNumber(resultObj.max_duration_minutes),
+        }
     }
 
     public static getEbrainsToken(): string | undefined{
@@ -164,7 +188,10 @@ export class Session{
             onProgress(`Successfully requested a session!`)
             let rawSession_data: {url: string, id: string, token: string} = await session_creation_response.json()
             while(Date.now() - start_time_ms < timeout_ms){
-                let session_status_response = await fetch(ilastikUrl.joinPath(`/api/session/${rawSession_data.id}`).schemeless_raw)
+                let session_status_response = await fetch(
+                    ilastikUrl.joinPath(`/api/session/${rawSession_data.id}`).schemeless_raw,
+                    {cache: "no-cache"}
+                )
                 if(session_status_response.ok  && (await session_status_response.json())["status"] == "ready"){
                     onProgress(`Session has become ready!`)
                     break
@@ -172,19 +199,28 @@ export class Session{
                 onProgress(`Session is not ready yet`)
                 await sleep(2000)
             }
-            return new Session({ilastikUrl, sessionUrl: Url.parse(rawSession_data.url), onUsageError})
+            onProgress("Getting session data...")
+            const sessionUrl = Url.parse(rawSession_data.url)
+            return Session.load({ilastikUrl, sessionUrl, onUsageError})
         }
         return Error(`Could not create a session`)
     }
 
     public static async load({ilastikUrl, sessionUrl, onUsageError}: {
         ilastikUrl: Url, sessionUrl:Url, onUsageError: (message: string) => void
-    }): Promise<Session>{
-        let session_status_resp = await fetch(sessionUrl.joinPath("status").schemeless_raw)
-        if(!session_status_resp.ok){
-            throw Error(`Bad response from session: ${session_status_resp.status}`)
+    }): Promise<Session | Error>{
+        //FIXME:
+        let sessionStatusResult = await Session.getStatus(sessionUrl)
+        if(sessionStatusResult instanceof Error){
+            return sessionStatusResult
         }
-        return new Session({ilastikUrl, sessionUrl, onUsageError})
+        return new Session({
+            ilastikUrl,
+            sessionUrl,
+            startTime: sessionStatusResult.start_time,
+            maxDurationMinutes: sessionStatusResult.max_duration_minutes,
+            onUsageError
+        })
     }
 }
 

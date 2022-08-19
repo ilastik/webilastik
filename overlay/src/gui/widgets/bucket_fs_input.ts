@@ -8,15 +8,22 @@ export class BucketFsInput{
     private readonly prefixInput: PathInput;
 
     constructor(params: {
-        parentElement: HTMLElement, bucketName?: string, prefix?: Path, required?: boolean, value?: BucketFs
+        parentElement: HTMLElement,
+        bucketName?: string,
+        prefix?: Path,
+        required?: boolean,
+        value?: BucketFs,
+        hidePrefix?: boolean,
     }){
         let required = params.required === undefined ? true : params.required;
         this.bucketNameInput = createInputParagraph({
             inputType: "text", parentElement: params.parentElement, label_text: "Bucket Name: ", value: params.bucketName, required
         })
 
-        createElement({tagName: "label", parentElement: params.parentElement, innerHTML: "Prefix: "})
-        this.prefixInput = new PathInput({parentElement: params.parentElement, value: params.prefix, required})
+        let prefixDisplay = params.hidePrefix === undefined || params.hidePrefix == false ? "block" : "none"
+        let prefixContainer = createElement({tagName: "p", parentElement: params.parentElement, inlineCss: {display: prefixDisplay}})
+        createElement({tagName: "label", parentElement: prefixContainer, innerHTML: "Prefix: "})
+        this.prefixInput = new PathInput({parentElement: prefixContainer, value: params.prefix, required})
 
         if(params.value){
             this.value = params.value

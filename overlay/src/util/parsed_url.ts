@@ -80,6 +80,10 @@ export class Path{
     public toString(){
         return this.raw
     }
+
+    public toJsonValue(): string{
+        return this.toString()
+    }
 }
 
 export class Url implements IJsonable{

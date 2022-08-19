@@ -41,8 +41,13 @@ export class SessionLoaderWidget{
                 sessionUrl: Url.parse(this.sessionUrlField.value.trim()),
                 onUsageError,
             }).then(
-                session => onNewSession(session),
-                failure => {message_p.innerHTML = failure.message},
+                sessionResult => {
+                    if(sessionResult instanceof Error){
+                        message_p.innerHTML = sessionResult.message
+                    }else{
+                        onNewSession(sessionResult)
+                    }
+                },
             ).then(_ => {
                 load_session_button.value = "Rejoin Session"
                 load_session_button.disabled = false

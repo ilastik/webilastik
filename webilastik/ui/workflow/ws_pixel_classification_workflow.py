@@ -78,12 +78,12 @@ class RPCPayload:
             "arguments": self.arguments,
         }
 
-def do_save_project(filesystem: BucketFs, file_name: str, workflow_contents: bytes):
-    with filesystem.openbin(file_name, "w") as f:
+def do_save_project(filesystem: BucketFs, file_path: PurePosixPath, workflow_contents: bytes):
+    with filesystem.openbin(file_path.as_posix(), "w") as f:
         f.write(workflow_contents)
 
-def do_load_project_bytes(filesystem: BucketFs, file_name: str) -> bytes:
-    with filesystem.openbin(file_name, "r") as f:
+def do_load_project_bytes(filesystem: BucketFs, file_path: PurePosixPath) -> bytes:
+    with filesystem.openbin(file_path.as_posix(), "r") as f:
         return f.read()
 
 class WebIlastik:
@@ -311,14 +311,14 @@ class WebIlastik:
     async def save_project(self, request: web.Request) -> web.Response:
         payload = await request.json()
         filesystem = BucketFs.from_json_value(payload.get("fs"))
-        file_path = PurePosixPath(ensureJsonString(payload.get("project_file_name")))
-        if len(file_path.parts) > 1 or ".." in file_path.parts or "." in file_path.parts:
-            return web.Response(status=400, text=f"Bad project file name: {file_path}")
+        file_path = PurePosixPath(ensureJsonString(payload.get("project_file_path")))
+        if len(file_path.parts) == 0 or ".." in file_path.parts:
+            return web.Response(status=400, text=f"Bad project file path: {file_path}")
 
         await asyncio.wrap_future(self.executor.submit(
             do_save_project,
             filesystem=filesystem,
-            file_name=file_path.as_posix(),
+            file_path=file_path,
             workflow_contents=self.workflow.get_ilp_contents()
         ))
 
@@ -327,14 +327,14 @@ class WebIlastik:
     async def load_project(self, request: web.Request) -> web.Response:
         payload = await request.json()
         filesystem = BucketFs.from_json_value(payload.get("fs"))
-        file_path = PurePosixPath(ensureJsonString(payload.get("project_file_name")))
-        if len(file_path.parts) > 1 or ".." in file_path.parts or "." in file_path.parts:
-            return web.Response(status=400, text=f"Bad project file name: {file_path}")
+        file_path = PurePosixPath(ensureJsonString(payload.get("project_file_path")))
+        if len(file_path.parts) == 0 or ".." in file_path.parts:
+            return web.Response(status=400, text=f"Bad project file path: {file_path}")
 
         ilp_bytes = await asyncio.wrap_future(self.executor.submit(
             do_load_project_bytes,
             filesystem=filesystem,
-            file_name=file_path.as_posix(),
+            file_path=file_path,
         ))
         new_workflow_result = PixelClassificationWorkflow.from_ilp_bytes(
             ilp_bytes=ilp_bytes,
