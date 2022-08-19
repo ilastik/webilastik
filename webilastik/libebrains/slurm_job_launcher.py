@@ -304,7 +304,7 @@ class SshJobLauncher:
 class JusufSshJobLauncher(SshJobLauncher):
     def __init__(self) -> None:
         super().__init__(
-            user=Username("vieira2"),
+            user=Username("webilastik"),
             hostname=Hostname("jusuf.fz-juelich.de"),
             account="icei-hbp-2022-0010",
         )
@@ -316,14 +316,15 @@ class JusufSshJobLauncher(SshJobLauncher):
         ebrains_user_token: UserToken,
         session_id: uuid.UUID,
     ) -> str:
-        project = "/p/project/icei-hbp-2022-0010"
-        webilastik_source_dir = f"{project}/source/webilastik"
-        conda_env_dir = f"{project}/miniconda3/envs/webilastik"
-        redis_pid_file = f"{project}/redis-{session_id}.pid"
-        redis_unix_socket_path = f"{project}/redis-{session_id}.sock"
+        working_dir = f"$SCRATCH/{session_id}"
+        home="/p/home/jusers/webilastik/jusuf"
+        webilastik_source_dir = f"{working_dir}/webilastik"
+        conda_env_dir = f"{home}/miniconda3/envs/webilastik"
+        redis_pid_file = f"{working_dir}/redis.pid"
+        redis_unix_socket_path = f"{working_dir}/redis.sock"
 
         return textwrap.dedent(f"""\
-            #!/bin/bash
+            #!/bin/bash -l
             #SBATCH --nodes=1
             #SBATCH --ntasks=2
             #SBATCH --partition=batch
@@ -331,13 +332,19 @@ class JusufSshJobLauncher(SshJobLauncher):
 
             set -xeu
 
-            # prevent numpy from spawning its own threads
-            export OPENBLAS_NUM_THREADS=1
-            export MKL_NUM_THREADS=1
-
+            jutil env activate -p icei-hbp-2022-0010
+            module load git
             module load GCC/11.2.0
             module load OpenMPI/4.1.2
 
+            mkdir {working_dir}
+            cd {working_dir}
+            # FIXME: download from github when possible
+            git clone --depth 1 --branch master {home}/webilastik.git {webilastik_source_dir}
+
+            # prevent numpy from spawning its own threads
+            export OPENBLAS_NUM_THREADS=1
+            export MKL_NUM_THREADS=1
 
             srun -n 1 --overlap -u --cpu_bind=none --cpus-per-task 6 \\
                 {conda_env_dir}/bin/redis-server \\
@@ -350,7 +357,7 @@ class JusufSshJobLauncher(SshJobLauncher):
                 --maxmemory 100gb \\
                 --appendonly no \\
                 --save "" \\
-                --dir {project} \\
+                --dir {working_dir} \\
                 &
 
             while [ ! -S {redis_unix_socket_path} -o ! -e {redis_pid_file} ]; do
@@ -369,7 +376,7 @@ class JusufSshJobLauncher(SshJobLauncher):
                 "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py \\
                 --max-duration-minutes={time} \\
                 --ebrains-user-access-token={ebrains_user_token.access_token} \\
-                --listen-socket="{project}/to-master-{session_id}" \\
+                --listen-socket="{working_dir}/to-master.sock" \\
                 tunnel \\
                 --remote-username=www-data \\
                 --remote-host=app.ilastik.org \\
