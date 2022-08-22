@@ -64,10 +64,14 @@
 }
 
 .ItkBrushStrokesContainer{
-    background-color: rgba(0,0,0, 0.1);
+    /* background-color: rgba(0,0,0, 0.1); */
 }
 
-.ItkBrushStrokesContainer td{
+.ItkLabelWidget{
+
+}
+
+.ItkBrushStrokeWidget td{
     padding: 0.4em;
     background-color: rgba(0,0,0, 0.1);
 }

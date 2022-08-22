@@ -3,6 +3,7 @@ import { Applet } from "../../../client/applets/applet";
 import { Color, DataSource, Session } from "../../../client/ilastik";
 import { createElement, createInput, createInputParagraph, removeElement, vecToString } from "../../../util/misc";
 import { ensureJsonArray, ensureJsonObject, ensureJsonString, JsonValue } from "../../../util/serialization";
+import { CssClasses } from "../../css_classes";
 import { ColorPicker } from "../color_picker";
 import { ErrorPopupWidget, PopupWidget } from "../popup";
 import { PopupSelect } from "../selector_widget";
@@ -44,7 +45,7 @@ export class BrushingApplet extends Applet<State>{
             onNewState: (new_state) => this.onNewState(new_state)
         })
 
-        this.element = createElement({tagName: "div", parentElement: params.parentElement, cssClasses: ["ItkBrushStrokesContainer"]});
+        this.element = createElement({tagName: "div", parentElement: params.parentElement});
 
         this.labelSelectorContainer = createElement({tagName: "span", parentElement: this.element})
 
@@ -189,6 +190,7 @@ class LabelWidget{
     public readonly element: HTMLDivElement;
     private colorPicker: ColorPicker;
     private nameInput: HTMLInputElement;
+    private readonly noAnnotationsMessage: HTMLParagraphElement;
 
     constructor({name, color, parentElement, onLabelDeleteClicked, onBrushStrokeDeleteClicked, onColorChange, onNameChange}: {
         name: string,
@@ -199,22 +201,25 @@ class LabelWidget{
         onColorChange: (newColor: Color) => void,
         onNameChange: (newName: string) => void,
     }){
-        this.element = createElement({tagName: "div", parentElement, cssClasses: ["ItkBrushStrokesContainer"]});
+        this.element = createElement({tagName: "div", parentElement, cssClasses: ["ItkLabelWidget"]});
 
-        this.nameInput = createInputParagraph({label_text: "Label Name:", inputType: "text", parentElement: this.element, value: name})
-        this.nameInput.addEventListener("focusout", () => onNameChange(this.nameInput.value))
-
+        let labelControlsContainer = createElement({tagName: "p", parentElement: this.element})
         this.colorPicker = new ColorPicker({
-            parentElement: this.element, color, label: "Label Color: ", onChange: colors => onColorChange(colors.newColor)
+            parentElement: labelControlsContainer, color, onChange: colors => onColorChange(colors.newColor)
         })
-
-        createInputParagraph({inputType: "button", parentElement: this.element, value: "Delete Label", onClick: () => onLabelDeleteClicked(this.name)})
+        this.nameInput = createInput({inputType: "text", parentElement: labelControlsContainer, value: name})
+        this.nameInput.addEventListener("focusout", () => onNameChange(this.nameInput.value))
+        createInput({inputType: "button", parentElement: labelControlsContainer, value: "Delete Annotations", onClick: () => onLabelDeleteClicked(this.name)})
 
         this.table = createElement({
-            tagName: "table", parentElement: this.element, cssClasses: ["ItkBrushStrokesContainer"], inlineCss: {
+            tagName: "table", parentElement: this.element, inlineCss: {
                 border: `solid 2px ${color.hexCode}`,
-            }
+                display: "none",
+            },
         });
+        this.noAnnotationsMessage = createElement({
+            tagName: "p", parentElement: this.element, cssClasses: [CssClasses.InfoText], innerText: "No Annotations"
+        })
         this.onBrushStrokeDeleteClicked = onBrushStrokeDeleteClicked
     }
 
@@ -243,10 +248,13 @@ class LabelWidget{
             onDeleteClicked: () => this.onBrushStrokeDeleteClicked(this.colorPicker.value, brushStroke)
         })
         this.brushStrokeWidgets.push(brush_widget)
+        this.table.style.display = "table"
+        this.noAnnotationsMessage.style.display = "none"
     }
 
     public clear(){
         this.brushStrokeWidgets.forEach(bsw => bsw.destroy())
+        this.noAnnotationsMessage.style.display = "block"
     }
 
     public destroy(){
@@ -267,7 +275,7 @@ class BrushStrokeWidget{
         onDeleteClicked : (stroke: BrushStroke) => void,
     }){
         this.brushStroke = brushStroke
-        this.element = createElement({tagName: "tr", parentElement, cssClasses: ["BrushStrokeWidget"], inlineCss: {
+        this.element = createElement({tagName: "tr", parentElement, cssClasses: ["ItkBrushStrokeWidget"], inlineCss: {
             listStyleType: "none",
         }})
 

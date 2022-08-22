@@ -66,7 +66,6 @@ export class BrushingWidget{
                 onClick: () => this.overlay?.setBrushingEnabled(this.brushingEnabledCheckbox.checked)
             })
 
-            createElement({tagName: "label", innerHTML: "Brush Strokes:", parentElement: this.trainingWidget})
             this.brushingApplet = new BrushingApplet({
                 parentElement: this.trainingWidget,
                 session,
