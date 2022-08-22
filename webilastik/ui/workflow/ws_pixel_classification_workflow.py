@@ -292,11 +292,10 @@ class WebIlastik:
                 self.websockets.remove(websocket)
 
     def _update_clients(self, error_message: Optional[str] = None):
-        if error_message is not None:
-            payload = {"error": error_message}
-        else:
-            payload = self.workflow.get_json_state()
         loop = self.app.loop # FIXME?
+        if error_message is not None:
+            loop.create_task(self.do_update({"error": error_message}))
+        payload = self.workflow.get_json_state()
         loop.create_task(self.do_update(payload))
 
     async def download_project_as_ilp(self, request: web.Request):
