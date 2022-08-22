@@ -138,7 +138,7 @@ export class BrushingApplet extends Applet<State>{
             this.labelWidgets.set(name, colorGroupWidget)
         }
 
-        let currentLabel = this.labelSelector?.value;
+        let previousLabel = this.labelSelector?.value;
         this.labelSelectorContainer.innerHTML = ""
         if(labelOptions.length == 0){
             this.labelSelector = undefined
@@ -160,18 +160,20 @@ export class BrushingApplet extends Applet<State>{
                 }})
             },
         })
-        if(currentLabel){
-            if(this.labelWidgets.has(currentLabel.name)){
-                this.labelSelector.value = currentLabel
+        if(!previousLabel){
+            return
+        }
+        let currentLabelByName = this.labelWidgets.get(previousLabel.name)
+        if(currentLabelByName){
+            this.labelSelector.value = currentLabelByName
+            return
+        }
+        for(let labelWidget of this.labelWidgets.values()){
+            if(labelWidget.color.equals(previousLabel.color)){
+                this.labelSelector.value = {name: labelWidget.name, color: labelWidget.color}
                 return
             }
-            for(let labelWidget of this.labelWidgets.values()){
-                if(labelWidget.color.equals(currentLabel.color)){
-                    this.labelSelector.value = {name: labelWidget.name, color: labelWidget.color}
-                    return
-                }
-            };
-        }
+        };
     }
 
     public destroy(){
