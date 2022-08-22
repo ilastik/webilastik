@@ -71,6 +71,10 @@
 
 }
 
+.ItkPencilCursor{
+    cursor: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAdklEQVRIie3SwQmAMAxG4TeCo3QkR3EER3Aj3cAR2g3qJaURevzbUwI5iPA9CIWYBXMBL5Bm4dU2qyMNL8Cjjng8AZuL3Cq87W6RbN+nAi/Awf/+1f5L8HZnH5Hj/iyBB74Ih/6mp+A+MAX3Ab8yfBSQ4jHD+QAU2l7EdHJYSwAAAABJRU5ErkJggg==) 3 20, auto;
+}
+
 .ItkBrushStrokeTableCaption{
     color: grey;
     font-style: italic;

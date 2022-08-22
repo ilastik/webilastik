@@ -70,7 +70,14 @@ export class OverlayViewport{
     }
 
     public setBrushingEnabled(enabled: boolean){
-        this.element.style.pointerEvents = enabled ? "auto" : "none"
+        if(enabled){
+            this.element.style.pointerEvents = "auto"
+            this.element.classList.add("ItkPencilCursor")
+
+        }else{
+            this.element.style.pointerEvents = "none"
+            this.element.classList.remove("ItkPencilCursor")
+        }
     }
 
     public getCameraPoseInWorldSpace(): {position_w: vec3, orientation_w: quat}{
