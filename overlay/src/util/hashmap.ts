@@ -46,4 +46,8 @@ export class HashMap<K extends {hashValue: HK}, V, HK extends string | number>{
     public entries(): Array<[K, V]>{
         return Array.from(this.registry.values())
     }
+
+    public get size(): number{
+        return this.registry.size
+    }
 }

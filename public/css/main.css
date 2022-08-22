@@ -71,6 +71,11 @@
 
 }
 
+.ItkBrushStrokeTableCaption{
+    color: grey;
+    font-style: italic;
+}
+
 .ItkBrushStrokeWidget td{
     padding: 0.4em;
     background-color: rgba(0,0,0, 0.1);
