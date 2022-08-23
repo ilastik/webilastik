@@ -114,7 +114,7 @@ export class PredictionsView extends View{
     public static createFor(params: {raw_data: DataSource, ilastik_session: Session, classifier_generation: number}): PredictionsView{
         let raw_data_json = JSON.stringify(params.raw_data.toJsonValue())
         let predictions_url = params.ilastik_session.sessionUrl
-            .updatedWith({datascheme: "precomputed"})
+            .updatedWith({datascheme: "precomputed"}) //FIXME: this assumes neuroglancer as the viewer
             .joinPath(`predictions/raw_data=${Session.btoa(raw_data_json)}/generation=${params.classifier_generation}`);
         return new PredictionsView({
             native_view: {
