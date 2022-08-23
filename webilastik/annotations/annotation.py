@@ -115,6 +115,10 @@ class Annotation(ScalarData):
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Annotation) or self.interval != other.interval:
             return False
+        if not isinstance(self.raw_data, FsDataSource) or not isinstance(other.raw_data, FsDataSource):
+            return False #FIXME
+        if self.raw_data.url != other.raw_data.url:
+            return False
         equal = np.all(self.raw(Point5D.LABELS) == other.raw(Point5D.LABELS))
         return bool(equal)
 
