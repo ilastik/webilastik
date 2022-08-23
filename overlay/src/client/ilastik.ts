@@ -624,6 +624,7 @@ export abstract class DataSource implements IJsonable{
             spatial_resolution: [this.spatial_resolution[0], this.spatial_resolution[1], this.spatial_resolution[2]],
             shape: this.shape.toJsonValue(),
             tile_shape: this.tile_shape.toJsonValue(),
+            url: this.url.raw,
             ...this.doToJsonValue()
         }
     }
