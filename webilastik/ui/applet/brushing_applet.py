@@ -89,10 +89,20 @@ class BrushingApplet(Applet):
 
     @cascade(refresh_self=False)
     def add_annotation(self, user_prompt: UserPrompt, label_name: str, annotation: Annotation) -> CascadeResult:
-        label = self.get_label(label_name)
-        if label is None:
+        target_label = self.get_label(label_name)
+        if target_label is None:
             return CascadeError(f"No label with name {label_name}")
-        label.annotations.append(annotation)
+        for label in self._labels:
+            fixed_annotations: List[Annotation] = []
+            for a in label.annotations:
+                if a.raw_data != annotation.raw_data or a.interval.intersection(annotation.interval) is None:
+                    fixed_annotations.append(a)
+                else:
+                    a.clear_collision(annotation=annotation)
+                    if not a.is_blank():
+                        fixed_annotations.append(a)
+            label.annotations = fixed_annotations
+        target_label.annotations.append(annotation)
         return CascadeOk()
 
     @cascade(refresh_self=False)

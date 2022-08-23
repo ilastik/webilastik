@@ -152,6 +152,17 @@ class Annotation(ScalarData):
 
         return cls(scribblings._data, axiskeys=scribblings.axiskeys, raw_data=raw_data, location=start)
 
+    def clear_collision(self, annotation: "Annotation"):
+        intersection_interval = annotation.interval.intersection(self.interval)
+        if intersection_interval is None:
+            return
+        mask = annotation.cut(intersection_interval).as_mask()
+        raw_mask = mask.raw(self.axiskeys)
+        self.cut(intersection_interval).raw(self.axiskeys)[raw_mask] = False
+
+    def is_blank(self) -> bool:
+        return not np.any(self._data)
+
     @classmethod
     def from_json_value(cls, data: JsonValue) -> "Annotation":
         data_dict = ensureJsonObject(data)
