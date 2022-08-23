@@ -575,15 +575,17 @@ export abstract class DataSource implements IJsonable{
     public readonly spatial_resolution: vec3
     public readonly shape: Shape5D
     public readonly tile_shape: Shape5D
+    public readonly url: Url
 
     constructor(params: {
-        filesystem: FileSystem, path: Path, shape: Shape5D, spatial_resolution?: vec3, tile_shape: Shape5D
+        filesystem: FileSystem, path: Path, shape: Shape5D, spatial_resolution?: vec3, tile_shape: Shape5D, url: Url
     }){
         this.filesystem = params.filesystem
         this.path = params.path
         this.spatial_resolution = params.spatial_resolution || vec3.fromValues(1,1,1)
         this.shape = params.shape
         this.tile_shape = params.tile_shape
+        this.url = params.url
     }
 
     public get hashValue(): string{
@@ -611,6 +613,7 @@ export abstract class DataSource implements IJsonable{
             spatial_resolution: spatial_resolution === undefined ? vec3.fromValues(1,1,1) : ensureJsonNumberTripplet(spatial_resolution),
             shape: Shape5D.fromJsonData(json_object["shape"]),
             tile_shape: Shape5D.fromJsonData(json_object["tile_shape"]),
+            url: Url.parse(ensureJsonString(json_object["url"])),
         }
     }
 
