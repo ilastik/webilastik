@@ -71,6 +71,9 @@ export class BrushingWidget{
                 session,
                 applet_name,
                 gl: this.gl,
+                onDataSourceClicked: (datasource) => {
+                    this.viewer.refreshView({view: TrainingView.fromDataSource({datasource, session})})
+                },
             })
 
         viewer.onViewportsChanged(() => this.handleViewerDataDisplayChange())

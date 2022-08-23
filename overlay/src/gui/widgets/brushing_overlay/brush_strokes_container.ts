@@ -22,11 +22,14 @@ export class BrushingApplet extends Applet<State>{
     private labelWidgets = new Map<string, LabelWidget>()
     private labelSelectorContainer: HTMLSpanElement;
     private labelSelector: PopupSelect<{name: string, color: Color}> | undefined
+    private onDataSourceClicked?: (datasource: DataSource) => void
+
 
     constructor(params: {
         session: Session,
         applet_name: string,
         parentElement: HTMLElement,
+        onDataSourceClicked?: (datasource: DataSource) => void,
         gl: WebGL2RenderingContext
     }){
         super({
@@ -48,6 +51,7 @@ export class BrushingApplet extends Applet<State>{
             onNewState: (new_state) => this.onNewState(new_state)
         })
 
+        this.onDataSourceClicked = params.onDataSourceClicked
         this.element = createElement({tagName: "div", parentElement: params.parentElement});
 
         this.labelSelectorContainer = createElement({tagName: "span", parentElement: this.element})
@@ -142,7 +146,8 @@ export class BrushingApplet extends Applet<State>{
                 },
                 onNameChange: (newName: string) => {
                     this.doRPC("rename_label", {old_name: name, new_name: newName})
-                }
+                },
+                onDataSourceClicked: this.onDataSourceClicked,
             })
             this.labelWidgets.set(name, colorGroupWidget)
         }
@@ -208,6 +213,7 @@ class LabelWidget{
         onBrushStrokeDeleteClicked: (color: Color, stroke: BrushStroke) => void,
         onColorChange: (newColor: Color) => void,
         onNameChange: (newName: string) => void,
+        onDataSourceClicked?: (datasource: DataSource) => void,
     }){
         this.element = createElement({tagName: "div", parentElement: params.parentElement, cssClasses: ["ItkLabelWidget"]});
 
@@ -245,6 +251,11 @@ class LabelWidget{
                 parentElement: this.element,
                 caption: datasource.getDisplayString(),
                 onBrushStrokeDeleteClicked: (stroke) => params.onBrushStrokeDeleteClicked(this.colorPicker.value, stroke),
+                onCaptionCliked: () => {
+                    if(params.onDataSourceClicked){
+                        params.onDataSourceClicked(datasource)
+                    }
+                },
                 strokes: strokes,
                 inlineCss: {border: `solid 2px ${this.colorPicker.value.hexCode}`,}
             }))
@@ -301,12 +312,25 @@ class BrushStokeTable{
         caption: string,
         strokes: BrushStroke[],
         onBrushStrokeDeleteClicked: (stroke: BrushStroke) => void,
+        onCaptionCliked?: () => void,
         inlineCss?: InlineCss,
     }){
         this.element = createElement({tagName: "table", parentElement: params.parentElement})
         let strokesTable = createElement({tagName: "table", parentElement: this.element, inlineCss: params.inlineCss});
         createElement({
-            tagName: "caption", parentElement: strokesTable, innerText: params.caption, cssClasses: [CssClasses.ItkBrushStrokeTableCaption]
+            tagName: "caption",
+            parentElement: strokesTable,
+            innerText: params.caption,
+            cssClasses: [CssClasses.ItkBrushStrokeTableCaption],
+            onClick: () => {
+                if(params.onCaptionCliked){
+                    params.onCaptionCliked()
+                }
+            },
+            inlineCss: {
+                textDecoration: params.onCaptionCliked ? "underline" : "none",
+                cursor: params.onCaptionCliked ? "pointer" : "auto",
+            }
         })
         this.strokeWidgets = params.strokes.map(stroke => new BrushStrokeWidget({
                 brushStroke: stroke,
