@@ -38,13 +38,7 @@ export class RawDataView extends View{
         if(raw_data === undefined){
             throw `Resolution ${vec3.str(params.resolution)} not found on ${JSON.stringify(this.native_view)}`
         }
-        return new TrainingView({
-            native_view: {
-                name: `training on: ${raw_data.getDisplayString()}`,
-                url: raw_data.toTrainingUrl(params.session).raw
-            },
-            raw_data
-        })
+        return TrainingView.fromDataSource({datasource: raw_data, session: params.session})
     }
 
     public static async tryFromNative(params: {native_view: INativeView, session: Session}): Promise<RawDataView | undefined>{
@@ -72,6 +66,17 @@ export class TrainingView extends View{
             return undefined
         }
         return new TrainingView({native_view: params.native_view, raw_data: datasources[0]})
+    }
+
+    public static fromDataSource({datasource, session}: {datasource: DataSource, session: Session}): TrainingView{
+        let resolutionString = `${datasource.spatial_resolution[0]}x${datasource.spatial_resolution[1]}x${datasource.spatial_resolution[2]}nm`
+        return new TrainingView({
+            native_view: {
+                name: `training on: ${datasource.url.path.name} ${resolutionString}`,
+                url: datasource.toTrainingUrl(session).raw
+            },
+            raw_data: datasource
+        })
     }
 }
 
