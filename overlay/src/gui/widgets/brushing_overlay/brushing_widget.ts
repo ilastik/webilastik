@@ -115,7 +115,7 @@ export class BrushingWidget{
 
         window.cancelAnimationFrame(this.animationRequestId)
         const render = () => {
-            let strokes = brushStrokesGetter();
+            let strokes = new Array<[Color, BrushStroke[]]>();
             if(this.stagingStroke){
                 if(!this.brushingApplet.currentColor){
                     console.error("FIXME: no color selected but still brushing")
@@ -123,6 +123,7 @@ export class BrushingWidget{
                     strokes.push([this.brushingApplet.currentColor, [this.stagingStroke]])
                 }
             }
+            strokes = strokes.concat(brushStrokesGetter())
             overlay.render(strokes, new BrushelBoxRenderer({gl: this.gl, highlightCrossSection: false, onlyCrossSection: true})) //FIXME? remove this optional override?
             this.animationRequestId = window.requestAnimationFrame(render)
         }
