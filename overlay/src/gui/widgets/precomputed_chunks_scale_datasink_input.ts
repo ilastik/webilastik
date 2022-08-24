@@ -37,11 +37,16 @@ export class PrecomputedChunksScale_DataSink_Input{
     }){
         let parentElement = params.parentElement
         this.fileSystemSelector = BucketFsInput.createLabeledFieldset({
-            parentElement, legend: "Data Proxy Bucket:", bucketName: "hbp-image-service", prefix: Path.parse("ilastik_exports")
+            parentElement, legend: "Data Proxy Bucket:",
+            bucketName: "hbp-image-service",
+            prefix: Path.parse("/"),
+            hidePrefix: true,
         })
 
         this.infoDirectoryPathInput = PathInput.createLabeled({
-            parentElement: createElement({tagName: "p", parentElement}), label: "'info' Directory Path: ", value: Path.parse(`/ilastik_export_${getNowString()}`)
+            parentElement: createElement({tagName: "p", parentElement}),
+            label: "'info' Directory Path: ",
+            value: Path.parse(`/ilastik_exports/${getNowString()}`)
         })
 
         this.scaleKeyInput = PathInput.createLabeled({
