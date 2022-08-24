@@ -176,10 +176,14 @@
     width: 3em;
 }
 
-input[type=button], input[type=submit]{
-    background-color: black;
-    color: white;
+input[type=button], input[type=submit], .ItkPopupSelectTrigger{
     font-weight: bold;
     border-radius: 2px;
     margin-left: 2px;
+}
+
+.ItkPopupSelectTrigger{
+    border: solid 1px black;
+    padding: 4px;
+    cursor: default;
 }
