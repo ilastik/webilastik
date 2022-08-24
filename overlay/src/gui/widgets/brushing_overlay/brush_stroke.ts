@@ -45,6 +45,24 @@ export class BrushStroke extends VertexArray implements IJsonable{
         return this.getVertRef(this.num_points - 1)
     }
 
+    public interpolate_until_point_uvw(point_uvw: vec3){
+        let point_vx = vec3.floor(vec3.create(), vec3.divide(vec3.create(), point_uvw, this.resolution))
+        let previous_point_vx = this.getVertRef(this.num_points - 1)
+        let delta_vx = vec3.subtract(vec3.create(), point_vx, previous_point_vx)
+        let num_steps = Math.max(Math.abs(delta_vx[0]), Math.abs(delta_vx[1]), Math.abs(delta_vx[2]))
+
+        let step_increment_vx = vec3.div(vec3.create(), delta_vx, vec3.fromValues(num_steps, num_steps, num_steps))
+        for(let i=1; i < num_steps; i++){
+            let interpolated_point_vx =  vec3.fromValues(
+                Math.floor(previous_point_vx[0] + step_increment_vx[0] * i),
+                Math.floor(previous_point_vx[1] + step_increment_vx[1] * i),
+                Math.floor(previous_point_vx[2] + step_increment_vx[2] * i),
+            )
+            this.try_add_point_vx(interpolated_point_vx)
+        }
+        this.try_add_point_vx(point_vx) //Ensure last point is present
+    }
+
     public try_add_point_uvw(point_uvw: vec3): boolean{
         let point_vx = vec3.floor(vec3.create(), vec3.divide(vec3.create(), point_uvw, this.resolution))
         return this.try_add_point_vx(point_vx)
