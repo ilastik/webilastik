@@ -24,7 +24,7 @@ export class OverlayControls{
             header.style.userSelect = "none"
             header.style.cursor = "move"
             createElement({
-                tagName: "span", parentElement: header, innerHTML: "•••", cssClasses: ["ItkOverlayControls_drag_handle"], inlineCss: {float: "right"}
+                tagName: "span", parentElement: header, innerText: "⠿", cssClasses: ["ItkOverlayControls_drag_handle"], inlineCss: {float: "right"}
             })
             header.addEventListener("mousedown", (mouse_down_event) => {
                 let current_pos = {x: parseInt(this.element.style.left), y: parseInt(this.element.style.top)}
