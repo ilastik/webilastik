@@ -1,9 +1,6 @@
-from concurrent.futures import ProcessPoolExecutor, wait as wait_futures
+from concurrent.futures import wait as wait_futures
 import time
-from mpi4py import MPI
 import functools
-
-from webilastik.scheduling.hashing_mpi_executor import Worker
 
 def wait_then_echo(wait_time: int, x: int) -> int:
     time.sleep(wait_time)
@@ -12,12 +9,8 @@ def wait_then_echo(wait_time: int, x: int) -> int:
 def test_hashing_mpi_executor():
     from webilastik.scheduling.hashing_mpi_executor import HashingMpiExecutor
 
-    if MPI.COMM_WORLD.Get_rank() != 0:
-        Worker().start()
-        exit(0)
-
-    print(f"Creating executor....")
     executor = HashingMpiExecutor()
+    print(f"Created executor!")
     num_workers = executor.num_workers
 
     # num_workers = 7

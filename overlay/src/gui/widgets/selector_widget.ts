@@ -1,5 +1,4 @@
 import { createElement, createInput, removeElement, uuidv4 } from "../../util/misc";
-import { CssClasses } from "../css_classes";
 import { InputPopupWidget } from "./popup";
 
 export class WidgetSelector<T extends {element: HTMLElement}>{
@@ -166,7 +165,7 @@ export class PopupSelect<T>{
         this.element = createElement({
             tagName: "span",
             parentElement: params.parentElement,
-            cssClasses: [CssClasses.ItkButton],
+            cssClasses: ["ItkPopupSelectTrigger"],
             onClick: () => {
                 new InputPopupWidget<T>({
                     title: params.popupTitle,
@@ -184,7 +183,7 @@ export class PopupSelect<T>{
                 });
             }
         })
-        params.optionRenderer({option: params.options[0], parentElement: this.element})
+        this.value = params.options[0]
         let disabled = params.disabled === undefined ? false : params.disabled
         if(disabled){
             this.element.classList.add("ItkGrayedOut") // FIXME: double check this
@@ -199,6 +198,7 @@ export class PopupSelect<T>{
         this._value = val
         this.element.innerHTML = ""
         this.optionRenderer({option: val, parentElement: this.element})
+        createElement({tagName: "span", parentElement: this.element, innerText: "▼"})
     }
 
     public destroy(){

@@ -18,6 +18,7 @@ from webilastik.annotations.annotation import Annotation, Color
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.datasink import FsDataSink
 from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksScaleSink
+from webilastik.datasource import FsDataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale, RawEncoder
 from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.features.ilp_filter import IlpGaussianSmoothing, IlpHessianOfGaussianEigenvalues
@@ -36,6 +37,11 @@ def get_project_test_dir() -> Path:
 
 def get_tmp_dir() -> Path:
     return get_project_test_dir() / "tmp"
+
+def create_tmp_dir(prefix: str) -> Path:
+    path = get_tmp_dir() / f"prefix_{uuid.uuid4()}"
+    path.mkdir(parents=True)
+    return path
 
 def get_sample_c_cells_datasource() -> SkimageDataSource:
     return SkimageDataSource(
@@ -74,8 +80,8 @@ def create_precomputed_chunks_sink(*, shape: Shape5D, dtype: "np.dtype[Any]", ch
         )
     )
 
-def get_sample_c_cells_pixel_annotations() -> Sequence[Label]:
-    raw_data_source = get_sample_c_cells_datasource()
+def get_sample_c_cells_pixel_annotations(override_datasource: "FsDataSource | None" = None) -> Sequence[Label]:
+    raw_data_source = override_datasource or get_sample_c_cells_datasource()
     return [
         Label(
             name="Foreground",

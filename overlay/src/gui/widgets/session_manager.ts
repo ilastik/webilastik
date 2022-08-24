@@ -1,6 +1,6 @@
 import { IViewerDriver } from "../..";
 import { Session } from "../../client/ilastik";
-import { createInput } from "../../util/misc";
+import { createElement, createInput, secondsToTimeDeltaString } from "../../util/misc";
 import { Url } from "../../util/parsed_url";
 import { ReferencePixelClassificationWorkflowGui } from "../reference_pixel_classification_workflow";
 import { CollapsableWidget } from "./collapsable_applet_gui";
@@ -14,12 +14,18 @@ export class SessionManagerWidget{
     workflow?: ReferencePixelClassificationWorkflowGui
     session_creator: SessionCreatorWidget;
     session_loader: SessionLoaderWidget;
+
+    private remainingTimeIntervalID: number = 0;
+    private reminaningTimeContainer: HTMLParagraphElement
+    private remainingTimeDisplay: HTMLInputElement
+
     constructor({parentElement, ilastikUrl=Url.parse("https://app.ilastik.org/"), viewer_driver, workflow_container}: {
         parentElement: HTMLElement, ilastikUrl?: Url, viewer_driver: IViewerDriver, workflow_container: HTMLElement
     }){
         this.element = new CollapsableWidget({
             display_name: "Session Management",
             parentElement,
+            open: true,
             help: [
                 `Normal ilastik operation can be computationally intensive, requiring dedicated compute resources
                 to be allocated to every user working with it.`,
@@ -56,6 +62,16 @@ export class SessionManagerWidget{
                 ilastikUrl,
                 sessionUrl: new_session.sessionUrl,
             })
+            this.reminaningTimeContainer.style.display = "block"
+            this.remainingTimeIntervalID = window.setInterval(() => {
+                if(this.session === undefined){
+                    window.clearInterval(this.remainingTimeIntervalID)
+                    return
+                }
+                const ellapsedTimeMs = new Date().getTime() - this.session.startTime.getTime()
+                const remainingTimeSec = (this.session.maxDurationMinutes * 60 - ellapsedTimeMs / 1000)
+                this.remainingTimeDisplay.value = secondsToTimeDeltaString(Math.floor(remainingTimeSec))
+            }, 1000);
             window.addEventListener("beforeunload", onUnload);
         }
         const onUsageError = (message: string) => {
@@ -67,6 +83,8 @@ export class SessionManagerWidget{
         const onLeaveSession = () => {
             this.session?.closeWebsocket()
             this.session = undefined
+            window.clearInterval(this.remainingTimeIntervalID)
+            this.reminaningTimeContainer.style.display = "none"
             this.workflow?.destroy()
             close_session_btn.disabled = true
             leave_session_btn.disabled = true
@@ -107,5 +125,9 @@ export class SessionManagerWidget{
             disabled: true,
         })
         leave_session_btn.title = "Leaves session running on the server"
+
+        this.reminaningTimeContainer = createElement({tagName: "p", parentElement: this.element, inlineCss: {display: "none"}})
+        createElement({tagName: "label", parentElement: this.reminaningTimeContainer, innerText: " Time remaining: "})
+        this.remainingTimeDisplay = createInput({inputType: "text", parentElement: this.reminaningTimeContainer, disabled: true, value: ""})
     }
 }

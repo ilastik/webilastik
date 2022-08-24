@@ -8,4 +8,5 @@ export enum CssClasses{
     ItkNumberInput = "ItkNumberInput",
     ItkStringInput = "ItkStringInput",
     ItkButton = "ItkButton",
+    ItkBrushStrokeTableCaption = "ItkBrushStrokeTableCaption",
 }

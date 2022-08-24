@@ -1,5 +1,6 @@
 import { vec3, mat4, vec4, quat } from "gl-matrix";
 import { Url } from "./parsed_url";
+import { JsonValue } from "./serialization";
 
 export function project(out: vec3, v: vec3, onto: vec3){
     // a . b = |a| * |b| * cos(alpha)
@@ -402,4 +403,45 @@ export function getNowString(): string{
     let seconds = now.getSeconds().toString().padStart(2, '0')
 
     return `${now.getFullYear()}y_${month}m_${day}d__${hours}h_${minutes}min_${seconds}s`
+}
+
+const SECONDS_PER_DAY = 60 * 60 * 24
+const SECONDS_PER_HOUR = 60 * 60
+
+export function secondsToTimeDeltaString(seconds: number): string{
+    const out_seconds = seconds % 60
+    seconds -= out_seconds
+    const out_minutes = (seconds % SECONDS_PER_HOUR) / 60
+    seconds -= out_minutes * 60
+    const out_hours = (seconds % SECONDS_PER_DAY) / SECONDS_PER_HOUR
+    seconds -= out_hours * SECONDS_PER_HOUR
+    const out_days = Math.floor(seconds / SECONDS_PER_DAY)
+
+    const components = []
+    if(out_days > 0){
+        components.push(out_days.toString().padStart(2, '0') + "D")
+    }
+    if(out_hours > 0 || components.length){
+        components.push(out_hours.toString().padStart(2, '0') + "H")
+    }
+    if(out_minutes > 0 || components.length){
+        components.push(out_minutes.toString().padStart(2, '0') + "min")
+    }
+    if(out_seconds > 0 || components.length){
+        components.push(out_seconds.toString().padStart(2, '0') + "s")
+    }
+    return components.join(":")
+}
+
+export async function fetchJson(...params: Parameters<typeof fetch>): Promise<JsonValue | Error>{
+    try{
+        let response = await fetch(...params)
+        if(!response.ok){
+            return Error(await response.text())
+        }
+        let payload = await response.json()
+        return payload
+    }catch(e: unknown){
+        return Error(`${e}`)
+    }
 }

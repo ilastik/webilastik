@@ -115,14 +115,18 @@ class Annotation(ScalarData):
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Annotation) or self.interval != other.interval:
             return False
+        if not isinstance(self.raw_data, FsDataSource) or not isinstance(other.raw_data, FsDataSource):
+            return False #FIXME
+        if self.raw_data.url != other.raw_data.url:
+            return False
         equal = np.all(self.raw(Point5D.LABELS) == other.raw(Point5D.LABELS))
         return bool(equal)
 
     def __init__(
         self, arr: "np.ndarray[Any, Any]", *, axiskeys: str, location: Point5D = Point5D.zero(), raw_data: DataSource
     ):
-        data5d = Array5D(arr.astype(bool), axiskeys=axiskeys, location=location).contracted_to_non_zero()
-        super().__init__(data5d._data, axiskeys=data5d.axiskeys, location=data5d.location)
+        assert arr.dtype == np.dtype(bool)
+        super().__init__(arr, axiskeys=axiskeys, location=location)
         if not raw_data.interval.contains(self.interval):
             raise AnnotationOutOfBounds(annotation_roi=self.interval, raw_data=raw_data)
         self.raw_data = raw_data
@@ -147,6 +151,17 @@ class Annotation(ScalarData):
             anchor = voxel
 
         return cls(scribblings._data, axiskeys=scribblings.axiskeys, raw_data=raw_data, location=start)
+
+    def clear_collision(self, annotation: "Annotation"):
+        intersection_interval = annotation.interval.intersection(self.interval)
+        if intersection_interval is None:
+            return
+        mask = annotation.cut(intersection_interval).as_mask()
+        raw_mask = mask.raw(self.axiskeys)
+        self.cut(intersection_interval).raw(self.axiskeys)[raw_mask] = False
+
+    def is_blank(self) -> bool:
+        return not np.any(self._data)
 
     @classmethod
     def from_json_value(cls, data: JsonValue) -> "Annotation":
@@ -207,11 +222,11 @@ class Annotation(ScalarData):
     def __repr__(self):
         return f"<Annotation {self.interval} onto {self.raw_data}>"
 
-    def show(self, color: Color):
-        background = self.raw_data.retrieve(self.interval.updated(c=self.raw_data.interval.c)).cut(copy=True)
+    # def show(self, color: Color):
+    #     background = self.raw_data.retrieve(self.interval.updated(c=self.raw_data.interval.c)).cut(copy=True)
 
-        raw_background = background.raw("tzyxc")
-        raw_annotation = self.raw("tzyx")
-        raw_background[raw_annotation > 0] = [color.r, color.g, color.b]
+    #     raw_background = background.raw("tzyxc")
+    #     raw_annotation = self.raw("tzyx")
+    #     raw_background[raw_annotation > 0] = [color.r, color.g, color.b]
 
-        background.show_images()
+    #     background.show_images()

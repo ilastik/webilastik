@@ -6,6 +6,7 @@ from aiohttp.client_exceptions import ClientResponseError
 
 import requests
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString, ensureOptional
+from webilastik.libebrains.user_info import UserInfo
 from webilastik.ui.usage_error import UsageError
 
 from webilastik.utility.url import Url
@@ -126,7 +127,7 @@ class UserToken:
         except ClientResponseError:
             return False
 
-    async def get_userinfo(self, http_client_session: ClientSession) -> JsonObject:
-        return ensureJsonObject(await self._get(
+    async def get_userinfo(self, http_client_session: ClientSession) -> UserInfo:
+        return UserInfo.from_json_value(await self._get(
             path=PurePosixPath("userinfo"), http_client_session=http_client_session
         ))

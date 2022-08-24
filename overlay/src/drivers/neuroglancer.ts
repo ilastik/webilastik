@@ -86,13 +86,12 @@ class Layer{
 const defaultShader = 'void main() {\n  emitGrayscale(toNormalized(getDataValue()));\n}\n'
 
 export class NeuroglancerDriver implements IViewerDriver{
-    private layerUrlsWithFixedShaders = new Set<string>()
     private generation = 0
     constructor(public readonly viewer: any){
         const guessShader = async () => {
             const generation = this.generation += 1
             for(let layer of this.getImageLayers()){
-                if(layer.fragmentShader != defaultShader || this.layerUrlsWithFixedShaders.has(layer.sourceUrl)){
+                if(layer.fragmentShader != defaultShader){
                     continue
                 }
                 let numChannels = await layer.getNumChannels()
@@ -104,7 +103,6 @@ export class NeuroglancerDriver implements IViewerDriver{
                         vec3.fromValues(255, 0, 0), vec3.fromValues(0, 255, 0), vec3.fromValues(0, 0, 255)
                     ])
                 }
-                this.layerUrlsWithFixedShaders.add(layer.sourceUrl)
             }
         }
         guessShader()

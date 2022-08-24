@@ -89,6 +89,9 @@ class HashingMpiExecutor(Executor):
     """
 
     def __init__(self):
+        if MPI.COMM_WORLD.Get_rank() != 0:
+            Worker().start()
+            exit(0)
         self.rank = MPI.COMM_WORLD.Get_rank()
         self.num_workers = MPI.COMM_WORLD.size - 1
         if self.num_workers <= 0:
@@ -121,8 +124,10 @@ class HashingMpiExecutor(Executor):
             future: Future[_T] = Future()
             task: _Task[_T] = _Task(functools.partial(fn, *args, **kwargs), future_id=id(future))
             self._active_futures[task.future_id] = future
-            worker_index = hash((*args, *kwargs.items())) % len(self._worker_handles)#FIXME: it's possible the args are not hashable
-            worker_handle = self._worker_handles[worker_index]
+
+            args_hash = hash((fn, *args, *kwargs.items()))
+            # print(f"Args hash is {args_hash}, index should be {args_hash % len(self._worker_handles)}")
+            worker_handle = self._worker_handles[args_hash % len(self._worker_handles)]
             worker_handle.submit(task)
             _ = future.set_running_or_notify_cancel()
             return future

@@ -1,7 +1,7 @@
 #pyright: strict
 from typing import Tuple, Iterable, Any
 
-from ndstructs import Point5D, Interval5D
+from ndstructs.point5D import Point5D, Interval5D
 from webilastik.datasource import DataSource, DataRoi
 import numpy as np
 from numpy import ndarray, dtype, uint32, float32

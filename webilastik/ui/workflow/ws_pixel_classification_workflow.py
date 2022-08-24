@@ -1,14 +1,14 @@
 # pyright: reportUnusedCallResult=false
 
 from asyncio.events import AbstractEventLoop
-from concurrent.futures.process import ProcessPoolExecutor
+from concurrent.futures import Executor
 from dataclasses import dataclass
 from functools import partial
 import multiprocessing
 import os
 import signal
 import asyncio
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, Final, List, Optional, Tuple
 import json
 from base64 import b64decode
 import ssl
@@ -16,6 +16,7 @@ import contextlib
 from pathlib import Path, PurePosixPath
 import traceback
 import re
+import datetime
 
 import aiohttp
 from aiohttp import web
@@ -23,12 +24,11 @@ from aiohttp.client import ClientSession
 from aiohttp.http_websocket import WSCloseCode
 from aiohttp.web_app import Application
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
-from webilastik import filesystem
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
-from webilastik.filesystem import JsonableFilesystem
 from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.scheduling.job import PriorityExecutor
+from webilastik.server.session_allocator import uncachable_json_response
 from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError
 from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
@@ -36,6 +36,7 @@ from webilastik.utility.url import Protocol, Url
 from webilastik.server.tunnel import ReverseSshTunnel
 from webilastik.ui.applet import dummy_prompt
 from webilastik.libebrains.user_token import UserToken
+from webilastik.libebrains.slurm_job_launcher import Minutes
 from executor_getter import get_executor
 
 
@@ -77,12 +78,12 @@ class RPCPayload:
             "arguments": self.arguments,
         }
 
-def do_save_project(filesystem: BucketFs, file_name: str, workflow_contents: bytes):
-    with filesystem.openbin(file_name, "w") as f:
+def do_save_project(filesystem: BucketFs, file_path: PurePosixPath, workflow_contents: bytes):
+    with filesystem.openbin(file_path.as_posix(), "w") as f:
         f.write(workflow_contents)
 
-def do_load_project_bytes(filesystem: BucketFs, file_name: str) -> bytes:
-    with filesystem.openbin(file_name, "r") as f:
+def do_load_project_bytes(filesystem: BucketFs, file_path: PurePosixPath) -> bytes:
+    with filesystem.openbin(file_path.as_posix(), "r") as f:
         return f.read()
 
 class WebIlastik:
@@ -121,15 +122,17 @@ class WebIlastik:
                 }).encode("utf8")
             )
 
-    def __init__(self, ssl_context: Optional[ssl.SSLContext] = None):
+    def __init__(self, max_duration_minutes: Minutes, executor: Executor, ssl_context: Optional[ssl.SSLContext] = None):
         super().__init__()
 
+        self.start_time_utc: Final[datetime.datetime] = datetime.datetime.now(datetime.timezone.utc)
+        self.max_duration_minutes = max_duration_minutes
         self.ssl_context = ssl_context
         self.websockets: List[web.WebSocketResponse] = []
         self._http_client_session: Optional[ClientSession] = None
         self._loop: Optional[AbstractEventLoop] = None
 
-        self.executor = get_executor(hint="server_tile_handler", max_workers=multiprocessing.cpu_count())
+        self.executor = executor
         self.priority_executor = PriorityExecutor(executor=self.executor, max_active_job_steps=2 * multiprocessing.cpu_count())
 
         self.workflow = PixelClassificationWorkflow(
@@ -208,11 +211,13 @@ class WebIlastik:
         })
 
     async def get_status(self, request: web.Request) -> web.Response:
-        return web.Response(
-            text=json.dumps({
-                "status": "running"
-            }),
-            content_type="application/json",
+        return uncachable_json_response(
+            {
+                "status": "running",
+                "start_time_utc": self.start_time_utc.timestamp(),
+                "max_duration_minutes": self.max_duration_minutes,
+            },
+            status=200
         )
 
     async def close_session(self, request: web.Request) -> web.Response:
@@ -287,11 +292,10 @@ class WebIlastik:
                 self.websockets.remove(websocket)
 
     def _update_clients(self, error_message: Optional[str] = None):
-        if error_message is not None:
-            payload = {"error": error_message}
-        else:
-            payload = self.workflow.get_json_state()
         loop = self.app.loop # FIXME?
+        if error_message is not None:
+            loop.create_task(self.do_update({"error": error_message}))
+        payload = self.workflow.get_json_state()
         loop.create_task(self.do_update(payload))
 
     async def download_project_as_ilp(self, request: web.Request):
@@ -306,14 +310,14 @@ class WebIlastik:
     async def save_project(self, request: web.Request) -> web.Response:
         payload = await request.json()
         filesystem = BucketFs.from_json_value(payload.get("fs"))
-        file_path = PurePosixPath(ensureJsonString(payload.get("project_file_name")))
-        if len(file_path.parts) > 1 or ".." in file_path.parts or "." in file_path.parts:
-            return web.Response(status=400, text=f"Bad project file name: {file_path}")
+        file_path = PurePosixPath(ensureJsonString(payload.get("project_file_path")))
+        if len(file_path.parts) == 0 or ".." in file_path.parts:
+            return web.Response(status=400, text=f"Bad project file path: {file_path}")
 
         await asyncio.wrap_future(self.executor.submit(
             do_save_project,
             filesystem=filesystem,
-            file_name=file_path.as_posix(),
+            file_path=file_path,
             workflow_contents=self.workflow.get_ilp_contents()
         ))
 
@@ -322,14 +326,14 @@ class WebIlastik:
     async def load_project(self, request: web.Request) -> web.Response:
         payload = await request.json()
         filesystem = BucketFs.from_json_value(payload.get("fs"))
-        file_path = PurePosixPath(ensureJsonString(payload.get("project_file_name")))
-        if len(file_path.parts) > 1 or ".." in file_path.parts or "." in file_path.parts:
-            return web.Response(status=400, text=f"Bad project file name: {file_path}")
+        file_path = PurePosixPath(ensureJsonString(payload.get("project_file_path")))
+        if len(file_path.parts) == 0 or ".." in file_path.parts:
+            return web.Response(status=400, text=f"Bad project file path: {file_path}")
 
         ilp_bytes = await asyncio.wrap_future(self.executor.submit(
             do_load_project_bytes,
             filesystem=filesystem,
-            file_name=file_path.as_posix(),
+            file_path=file_path,
         ))
         new_workflow_result = PixelClassificationWorkflow.from_ilp_bytes(
             ilp_bytes=ilp_bytes,
@@ -417,9 +421,9 @@ if __name__ == '__main__':
     from argparse import ArgumentParser
 
     parser = ArgumentParser()
+    parser.add_argument("--max-duration-minutes", type=int, required=True, help="Number of minutes this workflow can run for")
     parser.add_argument("--ebrains-user-access-token", type=str, required=True)
     parser.add_argument("--listen-socket", type=Path, required=True)
-    parser.add_argument("--ca-cert-path", "--ca_cert_path", help="Path to CA crt file. Useful e.g. for testing with mkcert")
 
     subparsers = parser.add_subparsers(required=False, help="tunnel stuff")
     tunnel_parser = subparsers.add_parser("tunnel", help="Creates a reverse tunnel to an orchestrator")
@@ -429,23 +433,11 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    mpi_rank = 0
-    try:
-        from mpi4py import MPI
-        mpi_rank = MPI.COMM_WORLD.Get_rank()
-    except ModuleNotFoundError:
-        pass
+    UserToken.login_globally(token=UserToken(access_token=args.ebrains_user_access_token))
 
-    ca_crt: Optional[str] = args.ca_cert_path or os.environ.get("CA_CERT_PATH")
-    ssl_context: Optional[ssl.SSLContext] = None
+    executor = get_executor(hint="server_tile_handler", max_workers=multiprocessing.cpu_count())
 
-    if ca_crt is not None:
-        if not Path(ca_crt).exists():
-            logger.error(f"File not found: {ca_crt}")
-            exit(1)
-        ssl_context = ssl.create_default_context(cafile=ca_crt)
-
-    if "remote_username" in vars(args) and mpi_rank == 0:
+    if "remote_username" in vars(args):
         server_context = ReverseSshTunnel(
             remote_username=args.remote_username,
             remote_host=args.remote_host,
@@ -455,11 +447,11 @@ if __name__ == '__main__':
     else:
         server_context = contextlib.nullcontext()
 
-    UserToken.login_globally(token=UserToken(access_token=args.ebrains_user_access_token))
 
     with server_context:
         WebIlastik(
-            ssl_context=ssl_context
+            executor=executor,
+            max_duration_minutes=Minutes(args.max_duration_minutes),
         ).run(
             unix_socket_path=str(args.listen_socket),
         )

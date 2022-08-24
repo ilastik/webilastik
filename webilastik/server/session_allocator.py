@@ -2,25 +2,27 @@
 
 from functools import wraps
 import json
-from typing import Any, Callable, Coroutine, Dict, NoReturn, TypeVar,  Type, Generic, Optional
+from typing import Any, Callable, Coroutine, Dict, NoReturn, Optional
 from pathlib import Path, PurePosixPath
-import tempfile
 import uuid
 import asyncio
+import sys
+from datetime import datetime
+import subprocess
 
 from aiohttp import web
 import aiohttp
 from aiohttp.client import ClientSession
+from ndstructs.utils.json_serializable import JsonValue, ensureJsonInt, ensureJsonObject
+from webilastik.libebrains.slurm_job_launcher import CscsSshJobLauncher, JusufSshJobLauncher, Minutes, NodeSeconds, SshJobLauncher
 
 from webilastik.libebrains.user_token import UserToken
 from webilastik.libebrains.oidc_client import OidcClient, Scope
-from webilastik.utility.url import Url, Protocol
-from webilastik.server.session import Session, LocalSession
+from webilastik.utility.url import Url, Protocol as UrlProtocol
 
-SESSION_TYPE = TypeVar("SESSION_TYPE", bound=Session)
 
 def get_requested_url(request: web.Request) -> Url:
-    protocol = Protocol.from_str(request.headers['X-Forwarded-Proto'])
+    protocol = UrlProtocol.from_str(request.headers['X-Forwarded-Proto'])
     host = request.headers['X-Forwarded-Host']
     if ":" in host:
         hostname, port_str = host.split(":")
@@ -40,7 +42,17 @@ def redirect_to_ebrains_login(request: web.Request, oidc_client: OidcClient) -> 
         ).raw
     )
 
-class EbrainsSession:
+def uncachable_json_response(payload: JsonValue, *, status: int) -> web.Response:
+    return web.json_response(
+        payload,
+        status=status,
+        headers={
+            "Cache-Control": "no-store, must-revalidate",
+            "Expires": "0",
+        }
+    )
+
+class EbrainsLogin:
     AUTH_COOKIE_KEY = "ebrains_user_access_token"
 
     def __init__(self, user_token: UserToken):
@@ -48,30 +60,30 @@ class EbrainsSession:
         super().__init__()
 
     @classmethod
-    async def from_cookie(cls, request: web.Request, http_client_session: ClientSession) -> Optional["EbrainsSession"]:
+    async def from_cookie(cls, request: web.Request, http_client_session: ClientSession) -> Optional["EbrainsLogin"]:
         access_token = request.cookies.get(cls.AUTH_COOKIE_KEY)
         if access_token is None:
             return None
         user_token = UserToken(access_token=access_token)
         if not await user_token.is_valid(http_client_session):
             return None
-        return EbrainsSession(user_token=user_token)
+        return EbrainsLogin(user_token=user_token)
 
     @classmethod
-    async def from_code(cls, request: web.Request, oidc_client: OidcClient, http_client_session: ClientSession) -> Optional["EbrainsSession"]:
+    async def from_code(cls, request: web.Request, oidc_client: OidcClient, http_client_session: ClientSession) -> Optional["EbrainsLogin"]:
         auth_code = request.query.get("code")
         if auth_code is None:
             return None
         user_token = await oidc_client.get_user_token(
             code=auth_code, redirect_uri=get_requested_url(request), http_client_session=http_client_session
         )
-        return EbrainsSession(user_token=user_token)
+        return EbrainsLogin(user_token=user_token)
 
     @classmethod
-    async def try_from_request(cls, request: web.Request, oidc_client: OidcClient, http_client_session: ClientSession) -> Optional["EbrainsSession"]:
+    async def try_from_request(cls, request: web.Request, oidc_client: OidcClient, http_client_session: ClientSession) -> Optional["EbrainsLogin"]:
         return (
             (await cls.from_cookie(request, http_client_session=http_client_session)) or
-            (await EbrainsSession.from_code(request, oidc_client=oidc_client, http_client_session=http_client_session))
+            (await EbrainsLogin.from_code(request, oidc_client=oidc_client, http_client_session=http_client_session))
         )
 
     def set_cookie(self, response: web.Response) -> web.Response:
@@ -82,44 +94,34 @@ class EbrainsSession:
 
 
 def require_ebrains_login(
-    endpoint: Callable[["SessionAllocator[Any]", web.Request], Coroutine[Any, Any, web.Response]]
-) -> Callable[["SessionAllocator[Any]", web.Request], Coroutine[Any, Any, web.Response]]:
+    endpoint: Callable[["SessionAllocator", EbrainsLogin, web.Request], Coroutine[Any, Any, web.Response]]
+) -> Callable[["SessionAllocator", web.Request], Coroutine[Any, Any, web.Response]]:
 
     @wraps(endpoint)
-    async def wrapper(self: "SessionAllocator[Any]", request: web.Request) -> web.Response:
-        if self.oidc_client is None:
-            return await endpoint(self, request)
-        ebrains_session = await EbrainsSession.try_from_request(
+    async def wrapper(self: "SessionAllocator", request: web.Request) -> web.Response:
+        ebrains_login = await EbrainsLogin.try_from_request(
             request, oidc_client=self.oidc_client, http_client_session=self.http_client_session
         )
-        if ebrains_session is None:
+        if ebrains_login is None:
             redirect_to_ebrains_login(request, oidc_client=self.oidc_client)
-        response = await endpoint(self, request)
-        return ebrains_session.set_cookie(response)
+        response = await endpoint(self, ebrains_login, request)
+        return ebrains_login.set_cookie(response)
 
     return wrapper
 
-class SessionAllocator(Generic[SESSION_TYPE]):
+class SessionAllocator:
     def __init__(
         self,
         *,
-        session_type: Type[SESSION_TYPE],
-        master_host: str,
+        session_launcher: SshJobLauncher,
         external_url: Url,
-        sockets_dir_at_master: Path,
-        master_username: str,
         oidc_client: OidcClient,
     ):
-        self.session_type = session_type
-        self.sockets_dir_at_master = sockets_dir_at_master
-        self.master_username = master_username
-        self.master_host = master_host
-        self.external_url = external_url
-        self.oidc_client = oidc_client
+        self.session_launcher: SshJobLauncher = session_launcher
+        self.external_url: Url = external_url
+        self.oidc_client: OidcClient = oidc_client
         self._http_client_session: Optional[ClientSession] = None
-
-
-        self.sessions : Dict[uuid.UUID, Session] = {}
+        self.session_user_locks: Dict[uuid.UUID, asyncio.Lock] = {}
 
         self.app = web.Application()
         self.app.add_routes([
@@ -150,10 +152,10 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         origin = request.headers.get("Origin")
         if origin != "https://app.ilastik.org":
             return web.json_response({"error": f"Bad origin: {origin}"}, status=400)
-        session = await EbrainsSession.from_cookie(request, http_client_session=self.http_client_session)
+        session = await EbrainsLogin.from_cookie(request, http_client_session=self.http_client_session)
         if session is None:
             return web.json_response({"error": f"Not logged in"}, status=400)
-        return web.json_response({EbrainsSession.AUTH_COOKIE_KEY: session.user_token.access_token})
+        return web.json_response({EbrainsLogin.AUTH_COOKIE_KEY: session.user_token.access_token})
 
     async def serve_service_worker(self, request: web.Request) -> web.StreamResponse:
         public_dir_path = Path(__file__).parent.parent.parent.joinpath("public")
@@ -164,27 +166,24 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         raise web.HTTPFound(location=redirect_url.raw)
 
     @require_ebrains_login
-    async def login_then_open_viewer(self, request: web.Request) -> web.Response:
+    async def login_then_open_viewer(self, ebrains_login: EbrainsLogin, request: web.Request) -> web.Response:
         redirect_url = get_requested_url(request).updated_with(path=PurePosixPath("/public/nehuba/index.html"))
         raise web.HTTPFound(location=redirect_url.raw)
 
     def _make_session_url(self, session_id: uuid.UUID) -> Url:
         return self.external_url.joinpath(f"session-{session_id}")
 
-    def _make_socket_path_at_master(self, session_id: uuid.UUID) -> Path:
-        return self.sockets_dir_at_master.joinpath(f"to-session-{session_id}")
-
     @require_ebrains_login
-    async def hello(self, request: web.Request) -> web.Response:
+    async def hello(self, ebrains_login: EbrainsLogin, request: web.Request) -> web.Response:
         return web.json_response("hello!", status=200)
 
     async def check_login(self, request: web.Request) -> web.Response:
-        if (await EbrainsSession.from_cookie(request, http_client_session=self.http_client_session)) is None:
+        if (await EbrainsLogin.from_cookie(request, http_client_session=self.http_client_session)) is None:
             return web.json_response({"logged_in": False}, status=401)
         return web.json_response({"logged_in": True}, status=200)
 
     @require_ebrains_login
-    async def login_then_close(self, request: web.Request) -> web.Response:
+    async def login_then_close(self, ebrains_login: EbrainsLogin, request: web.Request) -> web.Response:
         return  web.Response(
             text="""
                 <html>
@@ -201,57 +200,78 @@ class SessionAllocator(Generic[SESSION_TYPE]):
         )
 
     @require_ebrains_login
-    async def spawn_session(self, request: web.Request) -> web.Response:
+    async def spawn_session(self, ebrains_login: EbrainsLogin, request: web.Request) -> web.Response:
         raw_payload = await request.content.read()
         try:
-            payload_dict = json.loads(raw_payload.decode('utf8'))
-            session_duration = int(payload_dict["session_duration"])
+            payload_dict = ensureJsonObject(json.loads(raw_payload.decode('utf8')))
+            session_duration = Minutes(ensureJsonInt(payload_dict.get("session_duration_minutes")))
         except Exception:
             return web.json_response({"error": "Bad payload"}, status=400)
         session_id = uuid.uuid4()
+        quota: NodeSeconds = NodeSeconds(100 * 60 * 60) #FIXME
 
-        ebrains_session = await EbrainsSession.try_from_request(
-            request, oidc_client=self.oidc_client, http_client_session=self.http_client_session
-        )
-        if ebrains_session is None:
-            redirect_to_ebrains_login(request, self.oidc_client)
+        user_info = await ebrains_login.user_token.get_userinfo(self.http_client_session)
 
-        #FIXME: remove stuff from self.sessions
-        self.sessions[session_id] = await self.session_type.create(
-            session_id=session_id,
-            master_host=self.master_host,
-            master_username=self.master_username,
-            socket_at_master=self._make_socket_path_at_master(session_id),
-            time_limit_seconds=session_duration,
-            user_token=ebrains_session.user_token
-        )
+        if user_info.sub != uuid.UUID("bdca269c-f207-4cdb-8b68-a562e434faed"): #FIXME
+            return web.json_response({"error": "This user can't allocate sessions yet"}, status=400)
 
-        return web.json_response(
-            {
-                "id": str(session_id),
-                "url": self._make_session_url(session_id).raw,
-            },
-        )
+        if user_info.sub not in self.session_user_locks:
+            self.session_user_locks[user_info.sub] = asyncio.Lock()
+        async with self.session_user_locks[user_info.sub]:
+            this_months_jobs_result = await self.session_launcher.get_jobs(starttime=datetime.today().replace(day=1))
+            if isinstance(this_months_jobs_result, Exception):
+                print(f"Could not get session information:\n{this_months_jobs_result}\n", file=sys.stderr)
+                return web.json_response({"error": "Could get session information"}, status=500)
+
+            for job in this_months_jobs_result:
+                if not job.belongs_to(user_info=user_info):
+                    continue
+                if job.is_running():
+                    return web.json_response({"error": "Already running a session"}, status=400)
+                quota = NodeSeconds(quota - job.duration * job.num_nodes)
+
+
+            if quota <= 0: #FIXME
+                return web.json_response({"error": "Out of quota"}, status=400)
+
+            session_result = await self.session_launcher.launch(
+                user_info=user_info,
+                time=Minutes(min(quota, session_duration)),
+                ebrains_user_token=ebrains_login.user_token,
+                session_id=session_id,
+            )
+
+            if isinstance(session_result, Exception):
+                print(f"Could not create compute session:\n{session_result}", file=sys.stderr)
+                return web.json_response({"error": "Could not create compute session"}, status=500)
+
+            return web.json_response(
+                {
+                    "id": str(session_id),
+                    "url": self._make_session_url(session_id).raw,
+                },
+            )
 
     @require_ebrains_login
-    async def session_status(self, request: web.Request):
+    async def session_status(self, ebrains_login: EbrainsLogin, request: web.Request) -> web.Response:
         # FIXME: do security checks here?
         try:
             session_id =  uuid.UUID(request.match_info.get("session_id"))
         except Exception:
-            return web.json_response({"error": "Bad session id"}, status=400)
-        if session_id not in self.sessions:
-            return web.json_response({"error": "Session not found"}, status=404)
-        return web.json_response(
+            return uncachable_json_response({"error": "Bad session id"}, status=400)
+        user_info = await ebrains_login.user_token.get_userinfo(self.http_client_session)
+        session_result = await self.session_launcher.get_job_by_session_id(session_id=session_id, user_info=user_info)
+        if isinstance(session_result, Exception):
+            return uncachable_json_response({"error": "Could not retrieve session"}, status=500)
+        if session_result is None:
+            return uncachable_json_response({"error": "Session not found"}, status=404)
+        return uncachable_json_response(
             {
-                "status": "ready" if self._make_socket_path_at_master(session_id).exists() else "not ready",
+                "status": "ready" if session_result.is_running() else "not ready", #FIXME: check all session states?
                 "url": self._make_session_url(session_id).raw
             },
+            status=200,
         )
-
-    async def kill_session(self, session_id: uuid.UUID, after_seconds: int = 0):
-        await asyncio.sleep(after_seconds)
-        await self.sessions.pop(session_id).kill(after_seconds=after_seconds)
 
     def run(self, port: int):
         web.run_app(self.app, port=port)
@@ -259,40 +279,29 @@ class SessionAllocator(Generic[SESSION_TYPE]):
 if __name__ == '__main__':
     from argparse import ArgumentParser
     parser = ArgumentParser()
-    parser.add_argument("--session-type", choices=["Local", "Hpc"], required=True)
-    parser.add_argument("--master-host", required=True, help="Host name or IP where workers should ssh back to")
-    parser.add_argument("--master-username", default="wwww-data", help="username with which workers should ssh back to master")
+    parser.add_argument("--session-launcher", choices=["JUSUF", "CSCS"], required=True)
     parser.add_argument("--external-url", type=Url.parse, required=True, help="Url from which sessions can be accessed (where the session sockets live)")
-    parser.add_argument("--sockets-dir-at-master", type=Path, default=Path(tempfile.gettempdir()))
     parser.add_argument(
         "--oidc-client-json",
         help="Path to a json file representing the keycloak client or the special value 'skip'. You can get this data via OidcClient.get"
     )
 
-
     args = parser.parse_args()
 
     # multiprocessing.set_start_method('spawn') #start a fresh interpreter so it doesn't 'inherit' the event loop
-    if args.session_type == "Local":
-        session_type = LocalSession
+    if args.session_launcher == "JUSUF":
+        session_launcher = JusufSshJobLauncher()
+    elif args.session_launcher == "CSCS":
+        session_launcher = CscsSshJobLauncher()
     else:
-        from webilastik.server.hpc_session import HpcSession
-        session_type = HpcSession
-
-    # if args.oidc_client_json == "skip":
-    #     oidc_client = None
-    # else:
-    #     with open(args.oidc_client_json) as f:
-    #         oidc_client = OidcClient.from_json_value(json.load(f))
+        print(f"Can get a session launcher for {args.session_launcher}")
+        exit(1)
 
     with open(args.oidc_client_json) as f:
         oidc_client = OidcClient.from_json_value(json.load(f))
 
     SessionAllocator(
-        session_type=session_type,
-        master_host=args.master_host,
+        session_launcher=session_launcher,
         external_url=args.external_url,
-        master_username=args.master_username,
-        sockets_dir_at_master=args.sockets_dir_at_master,
         oidc_client=oidc_client,
     ).run(port=5000)

@@ -6,6 +6,7 @@ export class SessionLoaderWidget{
     element: HTMLElement;
     public readonly ilastikUrlInput: HTMLInputElement;
     public readonly sessionUrlField: HTMLInputElement;
+    private loadSessionButton: HTMLInputElement
     constructor({
         ilastikUrl, sessionUrl, parentElement, onUsageError, onNewSession
     }: {
@@ -28,25 +29,31 @@ export class SessionLoaderWidget{
             label_text: "Session url: ", inputType: "url", parentElement: form, required: true, value: sessionUrl?.toString() || ""
         })
 
-        const load_session_button = createInputParagraph({inputType: "submit", value: "Rejoin Session", parentElement: form})
+        this.loadSessionButton = createInputParagraph({inputType: "submit", value: "Rejoin Session", parentElement: form})
 
         const message_p = createElement({tagName: "p", parentElement: form})
 
         form.addEventListener("submit", (ev) => {
-            load_session_button.value = "Loading Session..."
+            this.loadSessionButton.value = "Loading Session..."
             message_p.innerHTML = ""
-            load_session_button.disabled = true
+            this.set_disabled(true)
             Session.load({
                 ilastikUrl: Url.parse(this.ilastikUrlInput.value),
                 sessionUrl: Url.parse(this.sessionUrlField.value.trim()),
                 onUsageError,
             }).then(
-                session => onNewSession(session),
-                failure => {message_p.innerHTML = failure.message},
-            ).then(_ => {
-                load_session_button.value = "Rejoin Session"
-                load_session_button.disabled = false
-            })
+                sessionResult => {
+                    if(sessionResult instanceof Error){
+                        message_p.innerHTML = sessionResult.message
+                        this.set_disabled(false)
+                    }else{
+                        this.set_disabled(true)
+                        this.sessionUrlField.value = sessionResult.sessionUrl.raw
+                        this.ilastikUrlInput.value = sessionResult.ilastikUrl.raw
+                        onNewSession(sessionResult)
+                    }
+                },
+            )
             ev.preventDefault()
             return false
         })
@@ -56,6 +63,11 @@ export class SessionLoaderWidget{
         this.element.querySelectorAll("input").forEach(inp => {
             (inp as HTMLInputElement).disabled = disabled
         })
+        if(disabled){
+            this.loadSessionButton.value = "Session is running..."
+        }else{
+            this.loadSessionButton.value = "Rejoin Session"
+        }
     }
 
     public setFields(params: {ilastikUrl: Url, sessionUrl?: Url}){

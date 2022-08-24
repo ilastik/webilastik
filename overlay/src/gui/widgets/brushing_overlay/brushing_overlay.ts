@@ -56,7 +56,7 @@ export class OverlayViewport{
             })
 
             let scribbleHandler = (mouseMoveEvent: MouseEvent) => {
-                currentBrushStroke.try_add_point_uvw(this.getMouseUvwPosition(mouseMoveEvent))
+                currentBrushStroke.interpolate_until_point_uvw(this.getMouseUvwPosition(mouseMoveEvent))
             }
 
             let handlerCleanup = () => {
@@ -70,7 +70,14 @@ export class OverlayViewport{
     }
 
     public setBrushingEnabled(enabled: boolean){
-        this.element.style.pointerEvents = enabled ? "auto" : "none"
+        if(enabled){
+            this.element.style.pointerEvents = "auto"
+            this.element.classList.add("ItkPencilCursor")
+
+        }else{
+            this.element.style.pointerEvents = "none"
+            this.element.classList.remove("ItkPencilCursor")
+        }
     }
 
     public getCameraPoseInWorldSpace(): {position_w: vec3, orientation_w: quat}{

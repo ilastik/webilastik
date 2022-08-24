@@ -101,5 +101,5 @@ assert not isinstance(sink_writer, Exception)
 # predict on independent tiles. You could run this with e.g. concurrent.futures.Executor
 for lazy_tile in data_source.roi.get_datasource_tiles():
     predictions: Array5D = classifier(lazy_tile) #if you need the raw numpy array, call .e.g predictions.raw("yx")
-    predictions.as_uint8().show_channels()
+    #predictions.as_uint8().show_channels()
     sink_writer.write(predictions)

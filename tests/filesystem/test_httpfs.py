@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 from fs.errors import ResourceNotFound
 import uuid
 import sys
@@ -8,10 +10,9 @@ import functools
 from http.server import HTTPServer
 from http.server import SimpleHTTPRequestHandler
 
-import pytest
-
 from webilastik.filesystem.http_fs import HttpFs
 from webilastik.utility.url import Url
+from tests import create_tmp_dir, get_project_test_dir
 
 
 def eprint(*args, **kwargs):
@@ -20,7 +21,7 @@ def eprint(*args, **kwargs):
 
 def start_test_server(tmp_path: Path, port: int) -> HTTPServer:
     dir1 = tmp_path / "dir1"
-    dir1.mkdir()
+    dir1.mkdir(parents=True)
     with open(dir1 / "file1.txt", "wb") as f:
         _ = f.write("file1_contents".encode("ascii"))
 
@@ -45,8 +46,8 @@ def start_test_server(tmp_path: Path, port: int) -> HTTPServer:
     return httpd
 
 
-def test_httpfs(tmp_path):
-    httpd = start_test_server(tmp_path, port=8123)
+def test_httpfs():
+    httpd = start_test_server(create_tmp_dir(prefix="http_fs_test"), port=8123)
     try:
         fs = HttpFs(read_url=Url.parse_or_raise("http://localhost:8123/"))
 
@@ -71,3 +72,6 @@ def test_httpfs(tmp_path):
 
     finally:
         httpd.shutdown()
+
+if __name__ == "__main__":
+    test_httpfs()

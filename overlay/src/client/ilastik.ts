@@ -1,5 +1,5 @@
 import { vec3 } from "gl-matrix"
-import { sleep } from "../util/misc"
+import { fetchJson, sleep } from "../util/misc"
 import { Path, Url } from "../util/parsed_url"
 import { DataType, Scale } from "../util/precomputed_chunks"
 import { ensureJsonArray, ensureJsonNumber, ensureJsonNumberPair, ensureJsonNumberTripplet, ensureJsonObject, ensureJsonString, ensureOptional, IJsonable, IJsonableObject, JsonObject, JsonValue, toJsonValue } from "../util/serialization"
@@ -10,14 +10,21 @@ export class Session{
     private websocket: WebSocket
     private messageHandlers = new Array<(ev: MessageEvent) => void>();
     private readonly onUsageError: (message: string) => void
+    public readonly startTime: Date
+    public readonly maxDurationMinutes: number
 
     protected constructor(params: {
         ilastikUrl: Url,
         sessionUrl: Url,
+        startTime: Date,
+        maxDurationMinutes: number,
         onUsageError: (message: string) => void,
     }){
         this.ilastikUrl = params.ilastikUrl
         this.sessionUrl = params.sessionUrl
+        this.startTime = params.startTime
+        this.maxDurationMinutes = params.maxDurationMinutes
+
         this.onUsageError = params.onUsageError
         this.websocket = this.openWebsocket()
     }
@@ -71,7 +78,7 @@ export class Session{
         return true
     }
 
-    public async saveProject(params: {fs: FileSystem, project_file_name: string}): Promise<Error | undefined>{
+    public async saveProject(params: {fs: FileSystem, project_file_path: Path}): Promise<Error | undefined>{
         let response = await fetch(
             this.sessionUrl.joinPath("save_project").schemeless_raw,
             {
@@ -84,7 +91,7 @@ export class Session{
         return Error(`Could not save project: ${await response.text()}`)
     }
 
-    public async loadProject(params: {fs: FileSystem, project_file_name: string}): Promise<Error | undefined>{
+    public async loadProject(params: {fs: FileSystem, project_file_path: Path}): Promise<Error | undefined>{
         let response = await fetch(
             this.sessionUrl.joinPath("load_project").schemeless_raw,
             {
@@ -115,7 +122,8 @@ export class Session{
 
     public static async check_login({ilastikUrl}: {ilastikUrl: Url}): Promise<boolean>{
         let response = await fetch(ilastikUrl.joinPath("/api/check_login").raw, {
-            credentials: "include"
+            credentials: "include",
+            cache: "no-store",
         });
         if(response.ok){
             return true
@@ -127,58 +135,92 @@ export class Session{
         throw new Error(`Checking loging faield with ${response.status}:\n${contents}`)
     }
 
+    public static async getStatus(sessionUrl: Url): Promise<{status: string, start_time: Date, max_duration_minutes: number} | Error>{
+        let result = await fetchJson(
+            sessionUrl.joinPath("/status").raw,
+            {cache: "no-store"}
+        )
+        if(result instanceof Error){
+            return result
+        }
+        let resultObj = ensureJsonObject(result)
+        return {
+            status: ensureJsonString(resultObj.status),
+            start_time: new Date(ensureJsonNumber(resultObj.start_time_utc) * 1000),
+            max_duration_minutes: ensureJsonNumber(resultObj.max_duration_minutes),
+        }
+    }
+
     public static getEbrainsToken(): string | undefined{
         return document.cookie.split('; ')
             .find(row => row.startsWith('ebrains_user_access_token='))?.split('=')[1];
     }
 
-    public static async create({ilastikUrl, session_duration_seconds, timeout_s, onProgress=(_) => {}, onUsageError}: {
+    public static async create({ilastikUrl, session_duration_minutes, timeout_minutes, onProgress=(_) => {}, onUsageError}: {
         ilastikUrl: Url,
-        session_duration_seconds: number,
-        timeout_s: number,
+        session_duration_minutes: number,
+        timeout_minutes: number,
         onProgress?: (message: string) => void,
-        onUsageError: (message: string) => void
-
-    }): Promise<Session>{
+        onUsageError: (message: string) => void,
+    }): Promise<Session | Error>{
         const newSessionUrl = ilastikUrl.joinPath("/api/session")
-        while(timeout_s > 0){
+        const timeout_ms = timeout_minutes * 60 * 1000
+        const start_time_ms = Date.now()
+
+        onProgress("Requesting session...")
+
+        while(Date.now() - start_time_ms < timeout_ms){
             let session_creation_response = await fetch(newSessionUrl.schemeless_raw, {
                 method: "POST",
-                body: JSON.stringify({session_duration: session_duration_seconds})
+                body: JSON.stringify({session_duration_minutes})
             })
+            if(Math.floor(session_creation_response.status / 100) == 5){
+                onProgress(`Server-side error when creating a session`)
+                return Error(`Server could not create session: ${await session_creation_response.text()}`)
+            }
             if(!session_creation_response.ok){
                 onProgress(
                     `Requesting session failed (${session_creation_response.status}): ${session_creation_response.body}`
                 )
-                timeout_s -= 2
                 await sleep(2000)
                 continue
             }
             onProgress(`Successfully requested a session!`)
             let rawSession_data: {url: string, id: string, token: string} = await session_creation_response.json()
-            while(timeout_s){
-                let session_status_response = await fetch(ilastikUrl.joinPath(`/api/session/${rawSession_data.id}`).schemeless_raw)
+            while(Date.now() - start_time_ms < timeout_ms){
+                let session_status_response = await fetch(
+                    ilastikUrl.joinPath(`/api/session/${rawSession_data.id}`).schemeless_raw,
+                    {cache: "no-cache"}
+                )
                 if(session_status_response.ok  && (await session_status_response.json())["status"] == "ready"){
                     onProgress(`Session has become ready!`)
                     break
                 }
                 onProgress(`Session is not ready yet`)
-                timeout_s -= 2
                 await sleep(2000)
             }
-            return new Session({ilastikUrl, sessionUrl: Url.parse(rawSession_data.url), onUsageError})
+            onProgress("Getting session data...")
+            const sessionUrl = Url.parse(rawSession_data.url)
+            return Session.load({ilastikUrl, sessionUrl, onUsageError})
         }
-        throw `Could not create a session`
+        return Error(`Could not create a session`)
     }
 
     public static async load({ilastikUrl, sessionUrl, onUsageError}: {
         ilastikUrl: Url, sessionUrl:Url, onUsageError: (message: string) => void
-    }): Promise<Session>{
-        let session_status_resp = await fetch(sessionUrl.joinPath("status").schemeless_raw)
-        if(!session_status_resp.ok){
-            throw Error(`Bad response from session: ${session_status_resp.status}`)
+    }): Promise<Session | Error>{
+        //FIXME:
+        let sessionStatusResult = await Session.getStatus(sessionUrl)
+        if(sessionStatusResult instanceof Error){
+            return sessionStatusResult
         }
-        return new Session({ilastikUrl, sessionUrl, onUsageError})
+        return new Session({
+            ilastikUrl,
+            sessionUrl,
+            startTime: sessionStatusResult.start_time,
+            maxDurationMinutes: sessionStatusResult.max_duration_minutes,
+            onUsageError
+        })
     }
 }
 
@@ -533,15 +575,17 @@ export abstract class DataSource implements IJsonable{
     public readonly spatial_resolution: vec3
     public readonly shape: Shape5D
     public readonly tile_shape: Shape5D
+    public readonly url: Url
 
     constructor(params: {
-        filesystem: FileSystem, path: Path, shape: Shape5D, spatial_resolution?: vec3, tile_shape: Shape5D
+        filesystem: FileSystem, path: Path, shape: Shape5D, spatial_resolution?: vec3, tile_shape: Shape5D, url: Url
     }){
         this.filesystem = params.filesystem
         this.path = params.path
         this.spatial_resolution = params.spatial_resolution || vec3.fromValues(1,1,1)
         this.shape = params.shape
         this.tile_shape = params.tile_shape
+        this.url = params.url
     }
 
     public get hashValue(): string{
@@ -569,6 +613,7 @@ export abstract class DataSource implements IJsonable{
             spatial_resolution: spatial_resolution === undefined ? vec3.fromValues(1,1,1) : ensureJsonNumberTripplet(spatial_resolution),
             shape: Shape5D.fromJsonData(json_object["shape"]),
             tile_shape: Shape5D.fromJsonData(json_object["tile_shape"]),
+            url: Url.parse(ensureJsonString(json_object["url"])),
         }
     }
 
@@ -579,6 +624,7 @@ export abstract class DataSource implements IJsonable{
             spatial_resolution: [this.spatial_resolution[0], this.spatial_resolution[1], this.spatial_resolution[2]],
             shape: this.shape.toJsonValue(),
             tile_shape: this.tile_shape.toJsonValue(),
+            url: this.url.raw,
             ...this.doToJsonValue()
         }
     }

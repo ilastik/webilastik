@@ -1,20 +1,33 @@
-.ItkOverlayControls, .ItkCollapsableApplet, .ItkPopupWidget{
+.ItkOverlayControls, .ItkPopupWidget{
     padding: 10px;
     border-radius: 3px;
     font-family: helvetica;
-    border: solid 2px black;
     background-color: rgb(239 239 239);
     margin-bottom: 5px;
     color: black
 }
 
-.ItkCollapsableApplet_header{
-    margin: 0.1em;
-    padding: 0.2em;
-    background-color: rgba(0,0,0, 5%);
+.ItkCollapsableApplet{
+    font-family: helvetica;
+    background-color: rgb(239 239 239);
+    color: black;
+    border-bottom: solid 2px black;
+    padding-left: 0px;
+}
+
+.ItkCollapsableApplet > *{
+    margin-left: 8px;
+}
+
+.ItkCollapsableApplet summary{
+    margin-left: 0px;
+    font-weight: bolder;
+    background-color: rgba(0,0,0, 15%);
+    padding: 5px;
 }
 
 .ItkOverlayControls{
+    padding: 0px;
     position: fixed;
     resize: both;
     overflow: scroll;
@@ -24,12 +37,17 @@
 }
 
 .ItkOverlayControls_header{
-    margin-top: 0;
+    margin: 0;
     padding: 0.3em;
+    color: white;
+    background-color: black;
+    font-size: 15px;
+    position: sticky;
+    top: 0
 }
 
 .ItkOverlayControls_drag_handle{
-    color: rgba(0,0,0, 0.2);
+    color: white;
     font-size: 1.0em;
 }
 
@@ -64,16 +82,25 @@
 }
 
 .ItkBrushStrokesContainer{
-    background-color: rgba(0,0,0, 0.1);
+    /* background-color: rgba(0,0,0, 0.1); */
 }
 
-.ItkBrushStrokesContainer td{
+.ItkLabelWidget{
+
+}
+
+.ItkPencilCursor{
+    cursor: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAdklEQVRIie3SwQmAMAxG4TeCo3QkR3EER3Aj3cAR2g3qJaURevzbUwI5iPA9CIWYBXMBL5Bm4dU2qyMNL8Cjjng8AZuL3Cq87W6RbN+nAi/Awf/+1f5L8HZnH5Hj/iyBB74Ih/6mp+A+MAX3Ab8yfBSQ4jHD+QAU2l7EdHJYSwAAAABJRU5ErkJggg==) 3 20, auto;
+}
+
+.ItkBrushStrokeTableCaption{
+    color: grey;
+    font-style: italic;
+}
+
+.ItkBrushStrokeWidget td{
     padding: 0.4em;
     background-color: rgba(0,0,0, 0.1);
-}
-
-.itk_hidden_element{
-    display: none;
 }
 
 .ItkSelector{
@@ -153,3 +180,20 @@
 .ItkNumberInput{
     width: 3em;
 }
+
+input[type=button], input[type=submit], .ItkPopupSelectTrigger{
+    font-weight: bold;
+    border-radius: 2px;
+    margin-left: 2px;
+}
+
+.ItkPopupSelectTrigger{
+    border: solid 1px black;
+    padding: 4px;
+    cursor: default;
+}
+
+.ItkBrushStrokeTable{
+    margin-left: 10px;
+}
+

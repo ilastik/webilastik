@@ -2,8 +2,8 @@ import numpy as np
 from typing import Optional, Set, Any
 
 from skimage import measure as skmeasure #type: ignore
-from ndstructs import Array5D, Interval5D, Shape5D, ScalarData, Point5D
-from ndstructs.array5D import ARR
+from ndstructs.point5D import Interval5D, Shape5D, Point5D
+from ndstructs.array5D import ARR, Array5D, ScalarData
 from webilastik.datasource import DataRoi
 
 from webilastik.operator import Operator, OpRetriever

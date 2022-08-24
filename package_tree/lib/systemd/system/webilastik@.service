@@ -32,9 +32,7 @@ Environment=REDIS_UNIX_SOCKET_PATH=/var/run/redis/redis-server.sock
 Environment=PYTHONPATH=./:./caching/redis_cache/:./executor_getters/default/
 ExecStartPre=bash -c "echo -e 'FLUSHDB\nQUIT\n' | redis-cli -s $REDIS_UNIX_SOCKET_PATH"
 ExecStart=bash -c "conda_env/bin/python3 -B webilastik/server/session_allocator.py \
-    --session-type=Local \
-    --master-host=localhost \
-    --master-username=www-data \
+    --session-launcher=JUSUF \
     --external-url=https://app.ilastik.org/ \
     --oidc-client-json=/etc/webilastik/oidc_client.json \
 "

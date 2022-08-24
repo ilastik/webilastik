@@ -4,7 +4,7 @@ import { Path } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
 import { BucketFsInput } from "./bucket_fs_input";
 import { CollapsableWidget } from "./collapsable_applet_gui";
-import { FileNameInput } from "./file_name_input";
+import { PathInput } from "./path_input";
 import { ErrorPopupWidget } from "./popup";
 
 export class ProjectWidget{
@@ -14,13 +14,18 @@ export class ProjectWidget{
         this.containerWidget = new CollapsableWidget({display_name: "Project", parentElement: params.parentElement})
         let form = createElement({tagName: "form", parentElement: this.containerWidget.element})
         let bucketInput = new BucketFsInput({
-            parentElement: form, required: true, value: new BucketFs({bucket_name: "hbp-image-service", prefix: Path.parse("/")})
+            parentElement: form,
+            hidePrefix: true,
+            required: true,
+            value: new BucketFs({
+                bucket_name: "hbp-image-service", prefix: Path.parse("/")
+            })
         })
 
         let p = createElement({tagName: "p", parentElement: form, cssClasses: [CssClasses.ItkInputParagraph]})
-        createElement({tagName: "label", parentElement: p, innerText: "Project File Name: "})
-        let projectFileNameInput = new FileNameInput({
-            parentElement: p, required: true, value: `MyProject_${getNowString()}.ilp`
+        createElement({tagName: "label", parentElement: p, innerText: "Project File Path: "})
+        let projectFilePathInput = new PathInput({
+            parentElement: p, required: true, value: Path.parse(`/MyProject_${getNowString()}.ilp`)
         })
 
         p = createElement({tagName: "p", parentElement: form})
@@ -32,8 +37,8 @@ export class ProjectWidget{
             ev.preventDefault()
 
             let fs = bucketInput.tryGetFileSystem()
-            let project_file_name = projectFileNameInput.value
-            if(!fs || !project_file_name){
+            let project_file_path = projectFilePathInput.value
+            if(!fs || !project_file_path){
                 new ErrorPopupWidget({message: "Some inputs missing"})
                 return false
             }
@@ -42,7 +47,7 @@ export class ProjectWidget{
 
             if(ev.submitter == loadButton){
                 loadButton.value = "Loading project..."
-                params.session.loadProject({fs,  project_file_name}).then(result => {
+                params.session.loadProject({fs,  project_file_path}).then(result => {
                     if(result instanceof Error){
                         new ErrorPopupWidget({message: result.message})
                     }
@@ -51,7 +56,7 @@ export class ProjectWidget{
                 })
             }else if(ev.submitter == saveButton){
                 saveButton.value = "Saving project..."
-                params.session.saveProject({fs,  project_file_name}).then(result => {
+                params.session.saveProject({fs,  project_file_path}).then(result => {
                     if(result instanceof Error){
                         new ErrorPopupWidget({message: result.message})
                     }

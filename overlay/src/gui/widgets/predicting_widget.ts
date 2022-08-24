@@ -2,7 +2,7 @@ import { vec3 } from "gl-matrix";
 import { Applet } from "../../client/applets/applet";
 import { DataSource, Session } from "../../client/ilastik";
 import { HashMap } from "../../util/hashmap";
-import { createElement, createImage, createInputParagraph, removeElement } from "../../util/misc";
+import { createElement, createImage, createInput, createInputParagraph, removeElement } from "../../util/misc";
 import { ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonObject, ensureJsonString, JsonValue } from "../../util/serialization";
 import { PredictionsView, TrainingView } from "../../viewer/view";
 import { Viewer } from "../../viewer/viewer";
@@ -47,7 +47,7 @@ export class PredictingWidget extends Applet<State>{
     public readonly session: Session
 
     public readonly element: HTMLDivElement
-    private classifierDescriptionDisplay: HTMLParagraphElement
+    private classifierDescriptionDisplay: HTMLSpanElement
     private liveUpdateCheckbox: HTMLInputElement
 
     constructor({session, viewer, parentElement}: {session: Session, viewer: Viewer, parentElement: HTMLElement}){
@@ -61,12 +61,13 @@ export class PredictingWidget extends Applet<State>{
         this.session = session
 
         this.element = createElement({tagName: "div", parentElement})
-        this.classifierDescriptionDisplay = createElement({tagName: "p", parentElement: this.element})
-        this.liveUpdateCheckbox = createInputParagraph({
-            inputType: "checkbox", parentElement: this.element, label_text: "Live Update", onClick: () => {
+        createElement({tagName: "label", innerText: "Live Update", parentElement: this.element})
+        this.liveUpdateCheckbox = createInput({
+            inputType: "checkbox", parentElement: this.element, onClick: () => {
                 this.doRPC("set_live_update", {live_update: this.liveUpdateCheckbox.checked})
             }
         })
+        this.classifierDescriptionDisplay = createElement({tagName: "span", parentElement: this.element})
         createInputParagraph({
             inputType: "button", parentElement: this.element, value: "Clear Predictions", onClick: (ev) => {
                 this.closePredictionViews()

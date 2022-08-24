@@ -1,7 +1,7 @@
 import { quat, vec3 } from "gl-matrix"
 import { BrushStroke } from "../../.."
 import { Color, DataSource, Session } from "../../../client/ilastik"
-import { createElement, createInputParagraph, removeElement } from "../../../util/misc"
+import { createElement, createInput, removeElement } from "../../../util/misc"
 import { CollapsableWidget } from "../collapsable_applet_gui"
 import { PopupSelect } from "../selector_widget"
 import { BrushingOverlay } from "./brushing_overlay"
@@ -10,6 +10,7 @@ import { BrushingApplet } from "./brush_strokes_container"
 import { Viewer } from "../../../viewer/viewer"
 import { PredictionsView, RawDataView, TrainingView } from "../../../viewer/view"
 import { PredictingWidget } from "../predicting_widget";
+import { CssClasses } from "../../css_classes"
 
 
 export class BrushingWidget{
@@ -28,6 +29,7 @@ export class BrushingWidget{
     public readonly canvas: HTMLCanvasElement
     private brushingApplet: BrushingApplet
     private predictingWidget: PredictingWidget
+    private brushingEnabledInfoSpan: HTMLSpanElement
 
     constructor({
         applet_name,
@@ -58,24 +60,45 @@ export class BrushingWidget{
         this.trainingWidget = createElement({tagName: "div", parentElement: this.element})
             this.predictingWidget = new PredictingWidget({session, viewer: this.viewer, parentElement: this.trainingWidget})
 
-            this.brushingEnabledCheckbox = createInputParagraph({
-                parentElement: this.trainingWidget,
-                label_text: "Enable Brushing: ",
+            let brushingEnabledParagraph = createElement({tagName: "p", parentElement: this.trainingWidget})
+            createElement({tagName: "label", parentElement: brushingEnabledParagraph, innerText: "Enable Brushing: "})
+            this.brushingEnabledCheckbox = createInput({
+                parentElement: brushingEnabledParagraph,
                 inputType: "checkbox",
                 title: "Enable to draw annotations by clicking and dragging. Disable to use the viewer's controls to navigate over the data.",
-                onClick: () => this.overlay?.setBrushingEnabled(this.brushingEnabledCheckbox.checked)
+                onClick: () => {
+                    this.setBrushingEnabled(this.brushingEnabledCheckbox.checked)
+                }
+            })
+            this.brushingEnabledInfoSpan = createElement({
+                tagName: "span",
+                parentElement: brushingEnabledParagraph,
+                cssClasses: [CssClasses.InfoText],
+                innerText: ""
             })
 
-            createElement({tagName: "label", innerHTML: "Brush Strokes:", parentElement: this.trainingWidget})
             this.brushingApplet = new BrushingApplet({
                 parentElement: this.trainingWidget,
                 session,
                 applet_name,
                 gl: this.gl,
+                onDataSourceClicked: (datasource) => {
+                    this.viewer.refreshView({view: TrainingView.fromDataSource({datasource, session})})
+                },
+                onLabelSelected: () => {
+                    this.setBrushingEnabled(true)
+                }
             })
 
         viewer.onViewportsChanged(() => this.handleViewerDataDisplayChange())
+        this.setBrushingEnabled(false)
         this.handleViewerDataDisplayChange()
+    }
+
+    private setBrushingEnabled(brushingEnabled: boolean){
+        this.brushingEnabledCheckbox.checked = brushingEnabled
+        this.overlay?.setBrushingEnabled(brushingEnabled)
+        this.brushingEnabledInfoSpan.innerText = brushingEnabled ? "Navigating is disabled" : "Navigating is enabled"
     }
 
     public hideTrainingUi(){
@@ -113,7 +136,7 @@ export class BrushingWidget{
 
         window.cancelAnimationFrame(this.animationRequestId)
         const render = () => {
-            let strokes = brushStrokesGetter();
+            let strokes = new Array<[Color, BrushStroke[]]>();
             if(this.stagingStroke){
                 if(!this.brushingApplet.currentColor){
                     console.error("FIXME: no color selected but still brushing")
@@ -121,6 +144,7 @@ export class BrushingWidget{
                     strokes.push([this.brushingApplet.currentColor, [this.stagingStroke]])
                 }
             }
+            strokes = strokes.concat(brushStrokesGetter())
             overlay.render(strokes, new BrushelBoxRenderer({gl: this.gl, highlightCrossSection: false, onlyCrossSection: true})) //FIXME? remove this optional override?
             this.animationRequestId = window.requestAnimationFrame(render)
         }

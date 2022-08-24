@@ -1,6 +1,6 @@
-import pytest
-from typing import List, Optional, Iterator, Any
-import os
+#!/usr/bin/env python
+
+from typing import List, Optional, Any
 import tempfile
 from pathlib import PurePosixPath
 import pickle
@@ -9,7 +9,8 @@ import numpy as np
 import h5py
 import json
 import skimage.io # type: ignore
-from ndstructs import Shape5D, Interval5D, Array5D, Point5D
+from ndstructs.point5D import Shape5D, Interval5D, Point5D
+from ndstructs.array5D import Array5D
 
 from webilastik.datasource import DataRoi
 from webilastik.datasink.n5_dataset_sink import N5DatasetSink
@@ -111,12 +112,7 @@ def create_h5(array: Array5D, axiskeys_style: str, chunk_shape: Optional[Shape5D
     return PurePosixPath(path)
 
 
-@pytest.fixture
-def png_image() -> Iterator[PurePosixPath]:
-    png_path = create_png(Array5D(raw, axiskeys="yx"))
-    yield png_path
-    os.remove(png_path)
-
+png_image: PurePosixPath = create_png(Array5D(raw, axiskeys="yx"))
 
 def tile_equals(tile: DataSource, axiskeys: str, raw: "np.ndarray[Any, Any]") -> bool:
     return (tile.retrieve().raw(axiskeys) == raw).all()
@@ -195,7 +191,7 @@ def test_h5_datasource():
 
 
 
-def test_skimage_datasource_tiles(png_image: PurePosixPath):
+def test_skimage_datasource_tiles():
     bs = DataRoi(SkimageDataSource(path=png_image, filesystem=OsFs("/")))
     num_checked_tiles = 0
     for tile in bs.split(Shape5D(x=2, y=2)):
@@ -473,3 +469,11 @@ def test_data_roi_get_tiles_can_clamp_to_datasource_tiles():
         expected_data = expected_slice_dict.pop(piece.interval)
         assert expected_data == piece.retrieve()
     assert len(expected_slice_dict) == 0
+
+if __name__ == "__main__":
+    import inspect
+    import sys
+    for item_name, item in inspect.getmembers(sys.modules[__name__]):
+        if inspect.isfunction(item) and item_name.startswith('test'):
+            print(f"Running test: {item_name}")
+            item()
