@@ -25,6 +25,7 @@ export class SessionManagerWidget{
         this.element = new CollapsableWidget({
             display_name: "Session Management",
             parentElement,
+            open: true,
             help: [
                 `Normal ilastik operation can be computationally intensive, requiring dedicated compute resources
                 to be allocated to every user working with it.`,

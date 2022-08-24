@@ -1,4 +1,4 @@
-.ItkOverlayControls, .ItkCollapsableApplet, .ItkPopupWidget{
+.ItkOverlayControls, .ItkPopupWidget{
     padding: 10px;
     border-radius: 3px;
     font-family: helvetica;
@@ -8,13 +8,22 @@
 }
 
 .ItkCollapsableApplet{
+    font-family: helvetica;
+    background-color: rgb(239 239 239);
+    color: black;
     border-bottom: solid 2px black;
+    padding-left: 0px;
 }
 
-.ItkCollapsableApplet_header{
-    margin: 0.1em;
-    padding: 0.2em;
-    background-color: rgba(0,0,0, 5%);
+.ItkCollapsableApplet > *{
+    margin-left: 8px;
+}
+
+.ItkCollapsableApplet summary{
+    margin-left: 0px;
+    font-weight: bolder;
+    background-color: rgba(0,0,0, 15%);
+    padding: 5px;
 }
 
 .ItkOverlayControls{
@@ -92,10 +101,6 @@
 .ItkBrushStrokeWidget td{
     padding: 0.4em;
     background-color: rgba(0,0,0, 0.1);
-}
-
-.itk_hidden_element{
-    display: none;
 }
 
 .ItkSelector{
@@ -191,3 +196,4 @@ input[type=button], input[type=submit], .ItkPopupSelectTrigger{
 .ItkBrushStrokeTable{
     margin-left: 10px;
 }
+
