@@ -23,6 +23,7 @@ export class BrushingApplet extends Applet<State>{
     private labelSelectorContainer: HTMLSpanElement;
     private labelSelector: PopupSelect<{name: string, color: Color}> | undefined
     private onDataSourceClicked?: (datasource: DataSource) => void
+    private onLabelSelected?: () => void;
 
 
     constructor(params: {
@@ -30,6 +31,7 @@ export class BrushingApplet extends Applet<State>{
         applet_name: string,
         parentElement: HTMLElement,
         onDataSourceClicked?: (datasource: DataSource) => void,
+        onLabelSelected?: () => void;
         gl: WebGL2RenderingContext
     }){
         super({
@@ -52,6 +54,7 @@ export class BrushingApplet extends Applet<State>{
         })
 
         this.onDataSourceClicked = params.onDataSourceClicked
+        this.onLabelSelected = params.onLabelSelected
         this.element = createElement({tagName: "div", parentElement: params.parentElement});
 
         this.labelSelectorContainer = createElement({tagName: "span", parentElement: this.element})
@@ -137,6 +140,14 @@ export class BrushingApplet extends Applet<State>{
                 color,
                 brushStrokes: annotations,
                 onLabelDeleteClicked: (labelName: string) => this.doRPC("remove_label", {label_name: labelName}),
+                onLabelSelected: (label: Label) => {
+                    if(this.labelSelector){
+                        this.labelSelector.value = label
+                    }
+                    if(this.onLabelSelected){
+                        this.onLabelSelected()
+                    }
+                },
                 onBrushStrokeDeleteClicked: (_color, brushStroke) => this.doRPC(
                     "remove_annotation", {label_name: name, annotation: brushStroke}
                 ),
@@ -173,6 +184,11 @@ export class BrushingApplet extends Applet<State>{
                     border: "solid 1px black"
                 }})
             },
+            onChange: () => {
+                if(this.onLabelSelected){
+                    this.onLabelSelected()
+                }
+            }
         })
         if(!previousLabel){
             return
@@ -210,6 +226,7 @@ class LabelWidget{
         brushStrokes: BrushStroke[],
         parentElement: HTMLElement,
         onLabelDeleteClicked: (labelName: string) => void,
+        onLabelSelected: (label: Label) => void,
         onBrushStrokeDeleteClicked: (color: Color, stroke: BrushStroke) => void,
         onColorChange: (newColor: Color) => void,
         onNameChange: (newName: string) => void,
@@ -221,10 +238,13 @@ class LabelWidget{
         this.colorPicker = new ColorPicker({
             parentElement: labelControlsContainer, color: params.color, onChange: colors => params.onColorChange(colors.newColor)
         })
+        createInput({
+            inputType: "button", parentElement: labelControlsContainer, value: "Select Label", onClick: () => params.onLabelSelected(this.label)
+        })
         this.nameInput = createInput({inputType: "text", parentElement: labelControlsContainer, value: params.name})
         this.nameInput.addEventListener("focusout", () => params.onNameChange(this.nameInput.value))
         createInput({
-            inputType: "button", parentElement: labelControlsContainer, value: "Delete Annotations", onClick: () => params.onLabelDeleteClicked(this.name)
+            inputType: "button", parentElement: labelControlsContainer, value: "Delete Label", onClick: () => params.onLabelDeleteClicked(this.name)
         })
 
         let strokesPerDataSource = new HashMap<DataSource, BrushStroke[], string>();
@@ -315,11 +335,12 @@ class BrushStokeTable{
         onCaptionCliked?: () => void,
         inlineCss?: InlineCss,
     }){
-        this.element = createElement({tagName: "table", parentElement: params.parentElement})
-        let strokesTable = createElement({tagName: "table", parentElement: this.element, inlineCss: params.inlineCss});
+        this.element = createElement({
+            tagName: "table", parentElement: params.parentElement, inlineCss: params.inlineCss, cssClasses: ["ItkBrushStrokeTable"]
+        });
         createElement({
             tagName: "caption",
-            parentElement: strokesTable,
+            parentElement: this.element,
             innerText: params.caption,
             cssClasses: [CssClasses.ItkBrushStrokeTableCaption],
             onClick: () => {
@@ -334,7 +355,7 @@ class BrushStokeTable{
         })
         this.strokeWidgets = params.strokes.map(stroke => new BrushStrokeWidget({
                 brushStroke: stroke,
-                parentElement: strokesTable,
+                parentElement: this.element,
                 onLabelClicked: (_) => {}, //FIXME: snap viewer to coord
                 onDeleteClicked: () => params.onBrushStrokeDeleteClicked(stroke)
         }))

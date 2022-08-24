@@ -187,3 +187,7 @@ input[type=button], input[type=submit], .ItkPopupSelectTrigger{
     padding: 4px;
     cursor: default;
 }
+
+.ItkBrushStrokeTable{
+    margin-left: 10px;
+}
