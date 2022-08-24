@@ -2,10 +2,13 @@
     padding: 10px;
     border-radius: 3px;
     font-family: helvetica;
-    border: solid 2px black;
     background-color: rgb(239 239 239);
     margin-bottom: 5px;
     color: black
+}
+
+.ItkCollapsableApplet{
+    border-bottom: solid 2px black;
 }
 
 .ItkCollapsableApplet_header{
@@ -15,6 +18,7 @@
 }
 
 .ItkOverlayControls{
+    padding: 0px;
     position: fixed;
     resize: both;
     overflow: scroll;
@@ -24,12 +28,17 @@
 }
 
 .ItkOverlayControls_header{
-    margin-top: 0;
+    margin: 0;
     padding: 0.3em;
+    color: white;
+    background-color: black;
+    font-size: 15px;
+    position: sticky;
+    top: 0
 }
 
 .ItkOverlayControls_drag_handle{
-    color: rgba(0,0,0, 0.2);
+    color: white;
     font-size: 1.0em;
 }
 
@@ -165,4 +174,12 @@
 
 .ItkNumberInput{
     width: 3em;
+}
+
+input[type=button], input[type=submit]{
+    background-color: black;
+    color: white;
+    font-weight: bold;
+    border-radius: 2px;
+    margin-left: 2px;
 }
