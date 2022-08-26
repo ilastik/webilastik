@@ -170,9 +170,12 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
 
                 void main(){
                     vec3 voxel_shape_w = abs(u_voxel_to_world * vec4(u_brush_resolution, 0)).xyz; // w=0 because this is a distance, not a point
-                    if(all(lessThanEqual(
-                        abs(v_dist_vert_proj_to_box_center_w), voxel_shape_w / 2.0  //if projection onto slicing plane is still inside box
-                    ))){
+                    vec3 dist = (voxel_shape_w / 2.0) - abs(v_dist_vert_proj_to_box_center_w);
+                    bool projected_point_is_inside_cube_but_not_on_face = all( greaterThan(dist, vec3(0,0,0)) );
+                    bool projected_point_is_on_face = dist == vec3(0,0,0);
+                    if(
+                        projected_point_is_inside_cube_but_not_on_face || gl_FrontFacing && projected_point_is_on_face
+                    ){
                         ${highlightCrossSection ?
                             'outf_color = vec4(mix(color, vec3(1,1,1), 0.5), 1); //increase brightness'
                             :
