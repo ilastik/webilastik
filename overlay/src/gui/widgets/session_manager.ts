@@ -60,7 +60,7 @@ export class SessionManagerWidget{
             this.session_loader.set_disabled(true)
             this.session_loader.setFields({
                 ilastikUrl,
-                sessionUrl: new_session.sessionUrl,
+                sessionId: new_session.sessionId,
             })
             this.reminaningTimeContainer.style.display = "block"
             this.remainingTimeIntervalID = window.setInterval(() => {
@@ -68,8 +68,13 @@ export class SessionManagerWidget{
                     window.clearInterval(this.remainingTimeIntervalID)
                     return
                 }
-                const ellapsedTimeMs = new Date().getTime() - this.session.startTime.getTime()
-                const remainingTimeSec = (this.session.maxDurationMinutes * 60 - ellapsedTimeMs / 1000)
+                const startTime = this.session.startTime
+                if(startTime === undefined){
+                    this.remainingTimeDisplay.value = "Not started yet"
+                    return
+                }
+                const ellapsedTimeMs = new Date().getTime() - startTime.getTime()
+                const remainingTimeSec = (this.session.timeLimitMinutes * 60 - ellapsedTimeMs / 1000)
                 this.remainingTimeDisplay.value = secondsToTimeDeltaString(Math.floor(remainingTimeSec))
             }, 1000);
             window.addEventListener("beforeunload", onUnload);
@@ -103,7 +108,7 @@ export class SessionManagerWidget{
                 onLeaveSession()
                 this.session_loader.setFields({
                     ilastikUrl,
-                    sessionUrl: undefined,
+                    sessionId: undefined,
                 })
             },
             inlineCss: {

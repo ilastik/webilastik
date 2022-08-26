@@ -2,31 +2,151 @@ import { vec3 } from "gl-matrix"
 import { fetchJson, sleep } from "../util/misc"
 import { Path, Url } from "../util/parsed_url"
 import { DataType, Scale } from "../util/precomputed_chunks"
-import { ensureJsonArray, ensureJsonNumber, ensureJsonNumberPair, ensureJsonNumberTripplet, ensureJsonObject, ensureJsonString, ensureOptional, IJsonable, IJsonableObject, JsonObject, JsonValue, toJsonValue } from "../util/serialization"
+import {
+    ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonNumberPair, ensureJsonNumberTripplet, ensureJsonObject,
+    ensureJsonString, ensureOptional, IJsonable, IJsonableObject, JsonObject, JsonValue, toJsonValue
+} from "../util/serialization"
+
+export const slurmJobStates = [
+    "BOOT_FAIL", "CANCELLED", "COMPLETED", "DEADLINE", "FAILED", "NODE_FAIL", "OUT_OF_MEMORY",
+    "PENDING", "PREEMPTED", "RUNNING", "REQUEUED", "RESIZING", "REVOKED", "SUSPENDED", "TIMEOUT"
+] as const;
+
+export const slurmJobRunnableStates = [
+    "PENDING", "RUNNING", "REQUEUED", "RESIZING", "SUSPENDED"
+] as const;
+
+export const slurmJobFailedStates = [
+    "BOOT_FAIL", "CANCELLED", "DEADLINE", "FAILED", "NODE_FAIL", "OUT_OF_MEMORY", "PREEMPTED", "REVOKED", "TIMEOUT"
+] as const;
+
+export const slurmJobDoneStates = [
+    "COMPLETED", ...slurmJobFailedStates
+] as const;
+
+export type SlurmJobState = typeof slurmJobStates[number]
+export function ensureSlurmJobState(value: string): SlurmJobState{
+    const variant = slurmJobStates.find(variant => variant === value)
+    if(variant === undefined){
+        throw Error(`Invalid slurm job state: ${value}`)
+    }
+    return variant
+}
+
+export class SlurmJob{
+    public readonly job_id: number
+    public readonly state: string
+    public readonly start_time_utc_sec?: number
+    public readonly time_elapsed_sec: number
+    public readonly time_limit_minutes: number
+    public readonly num_nodes: number
+    public readonly name: string
+    public readonly session_id: string
+
+    constructor(params: {
+        job_id: number,
+        state: SlurmJobState
+        start_time_utc_sec?: number,
+        time_elapsed_sec: number,
+        time_limit_minutes: number,
+        num_nodes: number,
+        name: string,
+        session_id: string,
+    }){
+        this.job_id = params.job_id
+        this.state = params.state
+        this.start_time_utc_sec = params.start_time_utc_sec
+        this.time_elapsed_sec = params.time_elapsed_sec
+        this.time_limit_minutes = params.time_limit_minutes
+        this.num_nodes = params.num_nodes
+        this.name = params.name
+        this.session_id = params.session_id
+    }
+
+    public is_failure(): boolean{
+        return this.state in slurmJobFailedStates
+    }
+
+    public is_done(): boolean{
+        return this.state in slurmJobDoneStates
+    }
+
+    public static fromJsonValue(value: JsonValue): SlurmJob{
+        const value_obj = ensureJsonObject(value)
+        return new this({
+            job_id: ensureJsonNumber(value_obj['job_id']),
+            state: ensureSlurmJobState(ensureJsonString(value_obj['state'])),
+            start_time_utc_sec: ensureOptional(ensureJsonNumber, value_obj['start_time_utc_sec']),
+            time_elapsed_sec: ensureJsonNumber(value_obj['time_elapsed_sec']),
+            time_limit_minutes: ensureJsonNumber(value_obj['time_limit_minutes']),
+            num_nodes: ensureJsonNumber(value_obj['num_nodes']),
+            name: ensureJsonString(value_obj['name']),
+            session_id: ensureJsonString(value_obj['session_id']),
+        })
+    }
+}
+
+export class SessionStatus{
+    public readonly slurm_job: SlurmJob
+    public readonly session_url: Url
+    public readonly connected: boolean
+
+    constructor(params:{
+        slurm_job: SlurmJob,
+        session_url: Url,
+        connected: boolean,
+    }){
+        this.slurm_job = params.slurm_job
+        this.session_url = params.session_url
+        this.connected = params.connected
+    }
+
+    public static fromJsonValue(value: JsonValue): SessionStatus{
+        const value_obj = ensureJsonObject(value)
+        return new this({
+            slurm_job: SlurmJob.fromJsonValue(value_obj['slurm_job']),
+            session_url: Url.parse(ensureJsonString(value_obj['session_url'])),
+            connected: ensureJsonBoolean(value_obj['connected'])
+        })
+    }
+}
 
 export class Session{
     public readonly ilastikUrl: Url
-    public readonly sessionUrl: Url
+    public readonly sessionStatus: SessionStatus
     private websocket: WebSocket
     private messageHandlers = new Array<(ev: MessageEvent) => void>();
     private readonly onUsageError: (message: string) => void
-    public readonly startTime: Date
-    public readonly maxDurationMinutes: number
 
     protected constructor(params: {
         ilastikUrl: Url,
-        sessionUrl: Url,
-        startTime: Date,
-        maxDurationMinutes: number,
+        sessionStatus: SessionStatus,
         onUsageError: (message: string) => void,
     }){
         this.ilastikUrl = params.ilastikUrl
-        this.sessionUrl = params.sessionUrl
-        this.startTime = params.startTime
-        this.maxDurationMinutes = params.maxDurationMinutes
-
+        this.sessionStatus = params.sessionStatus
         this.onUsageError = params.onUsageError
         this.websocket = this.openWebsocket()
+    }
+
+    public get sessionUrl(): Url{
+        return this.sessionStatus.session_url
+    }
+
+    public get startTime(): Date | undefined{
+        const {start_time_utc_sec} = this.sessionStatus.slurm_job
+        if(start_time_utc_sec === undefined){
+            return undefined
+        }
+        return new Date(start_time_utc_sec * 1000)
+    }
+
+    public get timeLimitMinutes(): number{
+        return this.sessionStatus.slurm_job.time_limit_minutes
+    }
+
+    public get sessionId(): string{
+        return this.sessionStatus.slurm_job.session_id
     }
 
     private openWebsocket(): WebSocket{
@@ -135,20 +255,15 @@ export class Session{
         throw new Error(`Checking loging faield with ${response.status}:\n${contents}`)
     }
 
-    public static async getStatus(sessionUrl: Url): Promise<{status: string, start_time: Date, max_duration_minutes: number} | Error>{
+    public static async getStatus(params: {ilastikUrl: Url, sessionId: string}): Promise<SessionStatus | Error>{
         let result = await fetchJson(
-            sessionUrl.joinPath("/status").raw,
+            params.ilastikUrl.joinPath(`/api/session/${params.sessionId}`).raw,
             {cache: "no-store"}
         )
         if(result instanceof Error){
             return result
         }
-        let resultObj = ensureJsonObject(result)
-        return {
-            status: ensureJsonString(resultObj.status),
-            start_time: new Date(ensureJsonNumber(resultObj.start_time_utc) * 1000),
-            max_duration_minutes: ensureJsonNumber(resultObj.max_duration_minutes),
-        }
+        return SessionStatus.fromJsonValue(result)
     }
 
     public static getEbrainsToken(): string | undefined{
@@ -164,63 +279,56 @@ export class Session{
         onUsageError: (message: string) => void,
     }): Promise<Session | Error>{
         const newSessionUrl = ilastikUrl.joinPath("/api/session")
-        const timeout_ms = timeout_minutes * 60 * 1000
-        const start_time_ms = Date.now()
-
         onProgress("Requesting session...")
 
+        let session_creation_response = await fetch(newSessionUrl.schemeless_raw, {
+            method: "POST",
+            body: JSON.stringify({session_duration_minutes})
+        })
+        if(Math.floor(session_creation_response.status / 100) == 5){
+            onProgress(`Server-side error when creating a session`)
+            return Error(`Server could not create session: ${await session_creation_response.text()}`)
+        }
+        if(!session_creation_response.ok){
+            return Error(`Requesting session failed (${session_creation_response.status}): ${await session_creation_response.text()}`)
+        }
+        const sessionStatus = SessionStatus.fromJsonValue(await session_creation_response.json())
+        onProgress(`Successfully requested a session! Waiting for it to be ready...`)
+        return Session.load({
+            ilastikUrl, timeout_minutes, sessionId: sessionStatus.slurm_job.session_id, onProgress, onUsageError
+        })
+    }
+
+    public static async load({ilastikUrl, sessionId, timeout_minutes, onProgress=() => {}, onUsageError}: {
+        ilastikUrl: Url,
+        sessionId: string,
+        timeout_minutes: number,
+        onProgress?: (message: string) => void,
+        onUsageError: (message: string) => void,
+    }): Promise<Session | Error>{
+        const start_time_ms = Date.now()
+        const timeout_ms = timeout_minutes * 60 * 1000
         while(Date.now() - start_time_ms < timeout_ms){
-            let session_creation_response = await fetch(newSessionUrl.schemeless_raw, {
-                method: "POST",
-                body: JSON.stringify({session_duration_minutes})
-            })
-            if(Math.floor(session_creation_response.status / 100) == 5){
-                onProgress(`Server-side error when creating a session`)
-                return Error(`Server could not create session: ${await session_creation_response.text()}`)
+            let sessionStatus = await Session.getStatus({ilastikUrl, sessionId})
+            if(sessionStatus instanceof Error){
+                return sessionStatus
             }
-            if(!session_creation_response.ok){
-                onProgress(
-                    `Requesting session failed (${session_creation_response.status}): ${session_creation_response.body}`
-                )
+            if(sessionStatus.slurm_job.is_done()){
+                return Error(`Session ${sessionId} is already closed`)
+            }
+            if(!sessionStatus.connected){
+                onProgress(`Session is not ready yet`)
                 await sleep(2000)
                 continue
             }
-            onProgress(`Successfully requested a session!`)
-            let rawSession_data: {url: string, id: string, token: string} = await session_creation_response.json()
-            while(Date.now() - start_time_ms < timeout_ms){
-                let session_status_response = await fetch(
-                    ilastikUrl.joinPath(`/api/session/${rawSession_data.id}`).schemeless_raw,
-                    {cache: "no-cache"}
-                )
-                if(session_status_response.ok  && (await session_status_response.json())["status"] == "ready"){
-                    onProgress(`Session has become ready!`)
-                    break
-                }
-                onProgress(`Session is not ready yet`)
-                await sleep(2000)
-            }
-            onProgress("Getting session data...")
-            const sessionUrl = Url.parse(rawSession_data.url)
-            return Session.load({ilastikUrl, sessionUrl, onUsageError})
+            onProgress(`Session is ready!`)
+            return new Session({
+                ilastikUrl,
+                sessionStatus,
+                onUsageError,
+            })
         }
-        return Error(`Could not create a session`)
-    }
-
-    public static async load({ilastikUrl, sessionUrl, onUsageError}: {
-        ilastikUrl: Url, sessionUrl:Url, onUsageError: (message: string) => void
-    }): Promise<Session | Error>{
-        //FIXME:
-        let sessionStatusResult = await Session.getStatus(sessionUrl)
-        if(sessionStatusResult instanceof Error){
-            return sessionStatusResult
-        }
-        return new Session({
-            ilastikUrl,
-            sessionUrl,
-            startTime: sessionStatusResult.start_time,
-            maxDurationMinutes: sessionStatusResult.max_duration_minutes,
-            onUsageError
-        })
+        return Error(`Could not create a session: timeout`)
     }
 }
 

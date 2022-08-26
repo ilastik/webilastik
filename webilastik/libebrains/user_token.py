@@ -122,12 +122,15 @@ class UserToken:
     async def is_valid(self, http_client_session: ClientSession) -> bool:
         #FIXME: maybe just validate signature + time ?
         try:
-            _ = await self.get_userinfo(http_client_session)
-            return True
+            user_info_result = await self.get_userinfo(http_client_session)
+            return isinstance(user_info_result, UserInfo)
         except ClientResponseError:
             return False
 
-    async def get_userinfo(self, http_client_session: ClientSession) -> UserInfo:
-        return UserInfo.from_json_value(await self._get(
-            path=PurePosixPath("userinfo"), http_client_session=http_client_session
-        ))
+    async def get_userinfo(self, http_client_session: ClientSession) -> "UserInfo | Exception":
+        try:
+            return UserInfo.from_json_value(await self._get(
+                path=PurePosixPath("userinfo"), http_client_session=http_client_session
+            ))
+        except Exception as e:
+            return e

@@ -9,12 +9,13 @@ import asyncio
 import sys
 from datetime import datetime
 import subprocess
+from dataclasses import dataclass
 
 from aiohttp import web
 import aiohttp
 from aiohttp.client import ClientSession
-from ndstructs.utils.json_serializable import JsonValue, ensureJsonInt, ensureJsonObject
-from webilastik.libebrains.slurm_job_launcher import CscsSshJobLauncher, JusufSshJobLauncher, Minutes, NodeSeconds, SshJobLauncher
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonInt, ensureJsonObject
+from webilastik.libebrains.slurm_job_launcher import CscsSshJobLauncher, JobState, JusufSshJobLauncher, Minutes, NodeSeconds, SlurmJob, SshJobLauncher
 
 from webilastik.libebrains.user_token import UserToken
 from webilastik.libebrains.oidc_client import OidcClient, Scope
@@ -109,6 +110,19 @@ def require_ebrains_login(
 
     return wrapper
 
+@dataclass
+class SessionStatus:
+    slurm_job: SlurmJob
+    session_url: Url
+    connected: bool
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "slurm_job": self.slurm_job.to_json_value(),
+            "session_url": self.session_url.to_json_value(),
+            "connected": self.connected,
+        }
+
 class SessionAllocator:
     def __init__(
         self,
@@ -121,6 +135,8 @@ class SessionAllocator:
         self.external_url: Url = external_url
         self.oidc_client: OidcClient = oidc_client
         self._http_client_session: Optional[ClientSession] = None
+
+        self.quotas_lock = asyncio.Lock()
         self.session_user_locks: Dict[uuid.UUID, asyncio.Lock] = {}
 
         self.app = web.Application()
@@ -204,39 +220,47 @@ class SessionAllocator:
         raw_payload = await request.content.read()
         try:
             payload_dict = ensureJsonObject(json.loads(raw_payload.decode('utf8')))
-            session_duration = Minutes(ensureJsonInt(payload_dict.get("session_duration_minutes")))
+            requested_duration_minutes = Minutes(ensureJsonInt(payload_dict.get("session_duration_minutes")))
         except Exception:
             return web.json_response({"error": "Bad payload"}, status=400)
-        session_id = uuid.uuid4()
-        quota: NodeSeconds = NodeSeconds(100 * 60 * 60) #FIXME
 
         user_info = await ebrains_login.user_token.get_userinfo(self.http_client_session)
-
+        if isinstance(user_info, Exception):
+            return web.json_response({"error": "Could not retrieve user info"}, status=400)
         if user_info.sub != uuid.UUID("bdca269c-f207-4cdb-8b68-a562e434faed"): #FIXME
             return web.json_response({"error": "This user can't allocate sessions yet"}, status=400)
 
-        if user_info.sub not in self.session_user_locks:
-            self.session_user_locks[user_info.sub] = asyncio.Lock()
+        async with self.quotas_lock:
+            if user_info.sub not in self.session_user_locks:
+                self.session_user_locks[user_info.sub] = asyncio.Lock()
+
         async with self.session_user_locks[user_info.sub]:
-            this_months_jobs_result = await self.session_launcher.get_jobs(starttime=datetime.today().replace(day=1))
+            this_months_jobs_result = await self.session_launcher.get_jobs(
+                user_info=user_info, starttime=datetime.today().replace(day=1)
+            )
             if isinstance(this_months_jobs_result, Exception):
                 print(f"Could not get session information:\n{this_months_jobs_result}\n", file=sys.stderr)
                 return web.json_response({"error": "Could get session information"}, status=500)
-
             for job in this_months_jobs_result:
-                if not job.belongs_to(user_info=user_info):
-                    continue
-                if job.is_running():
-                    return web.json_response({"error": "Already running a session"}, status=400)
-                quota = NodeSeconds(quota - job.duration * job.num_nodes)
+                if job.is_runnable():
+                    return web.json_response({"error": f"Already running a session ({job.session_id})"}, status=400)
+            used_quota_node_sec = SlurmJob.compute_used_quota(this_months_jobs_result)
+            monthly_quota_node_sec: NodeSeconds = NodeSeconds(100 * 60 * 60) #FIXME
+            available_quota_node_min = (monthly_quota_node_sec - used_quota_node_sec) / 60
+            if available_quota_node_min < 0: #FIXME
+                return web.json_response({
+                    "error": f"Not enough quota. Requested {requested_duration_minutes}min, only {available_quota_node_min}min available"
+                },
+                status=400
+            )
 
-
-            if quota <= 0: #FIXME
-                return web.json_response({"error": "Out of quota"}, status=400)
+            session_id = uuid.uuid4()
 
             session_result = await self.session_launcher.launch(
                 user_info=user_info,
-                time=Minutes(min(quota, session_duration)),
+                time=Minutes(min(
+                    int(available_quota_node_min), int(requested_duration_minutes)
+                )),
                 ebrains_user_token=ebrains_login.user_token,
                 session_id=session_id,
             )
@@ -246,10 +270,10 @@ class SessionAllocator:
                 return web.json_response({"error": "Could not create compute session"}, status=500)
 
             return web.json_response(
-                {
-                    "id": str(session_id),
-                    "url": self._make_session_url(session_id).raw,
-                },
+                SessionStatus(
+                    slurm_job=session_result, session_url=self._make_session_url(session_id), connected=False
+                ).to_json_value(),
+                status=201,
             )
 
     @require_ebrains_login
@@ -259,18 +283,29 @@ class SessionAllocator:
             session_id =  uuid.UUID(request.match_info.get("session_id"))
         except Exception:
             return uncachable_json_response({"error": "Bad session id"}, status=400)
-        user_info = await ebrains_login.user_token.get_userinfo(self.http_client_session)
-        session_result = await self.session_launcher.get_job_by_session_id(session_id=session_id, user_info=user_info)
+        user_info_result = await ebrains_login.user_token.get_userinfo(self.http_client_session)
+        if isinstance(user_info_result, Exception):
+            print(f"Error retrieving user info: {user_info_result}")
+            return uncachable_json_response({"error": "Could not get user information"}, status=500) #FIXME: 500?
+        session_result = await self.session_launcher.get_job_by_session_id(session_id=session_id, user_info=user_info_result)
         if isinstance(session_result, Exception):
             return uncachable_json_response({"error": "Could not retrieve session"}, status=500)
         if session_result is None:
             return uncachable_json_response({"error": "Session not found"}, status=404)
+
+        session_url = self._make_session_url(session_id=session_id)
+
+        ping_session_result = await self.http_client_session.get(session_url.concatpath("status").raw)
+        print(f"Ping session result: {ping_session_result.status}   ok? {ping_session_result.ok}", file=sys.stderr)
+        print(f"Tunnel file exists? {Path(f'/tmp/to-session-{session_id}').exists()}")
+
         return uncachable_json_response(
-            {
-                "status": "ready" if session_result.is_running() else "not ready", #FIXME: check all session states?
-                "url": self._make_session_url(session_id).raw
-            },
-            status=200,
+            SessionStatus(
+                slurm_job=session_result,
+                session_url=session_url,
+                connected=ping_session_result.ok and Path(f"/tmp/to-session-{session_id}").exists(),
+            ).to_json_value(),
+            status=200
         )
 
     def run(self, port: int):

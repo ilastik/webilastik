@@ -3,13 +3,13 @@
 from abc import abstractmethod
 import asyncio
 from enum import Enum
-from typing import ClassVar, NewType, List, Set, Tuple
+from typing import ClassVar, Dict, Iterable, NewType, List, Set, Tuple
 import uuid
 import datetime
 import textwrap
 import tempfile
 
-from ndstructs.utils.json_serializable import JsonValue, ensureJsonString
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonString
 
 from webilastik.libebrains.user_info import UserInfo
 from webilastik.libebrains.user_token import UserToken
@@ -31,6 +31,9 @@ class JobState(Enum):
     SUSPENDED = "SUSPENDED"
     TIMEOUT = "TIMEOUT"
 
+    def is_failure(self) -> bool:
+        return self in FAILED_STATES
+
     def is_done(self) -> bool:
         return self in DONE_STATES
 
@@ -45,10 +48,9 @@ class JobState(Enum):
                 return state
         raise ValueError(f"Bad job state: {value_str}")
 
-DONE_STATES = set([
+FAILED_STATES = set([
     JobState.BOOT_FAIL,
     JobState.CANCELLED,
-    JobState.COMPLETED,
     JobState.DEADLINE,
     JobState.FAILED,
     JobState.NODE_FAIL,
@@ -57,6 +59,8 @@ DONE_STATES = set([
     JobState.REVOKED,
     JobState.TIMEOUT,
 ])
+
+DONE_STATES = set([JobState.COMPLETED]).union(FAILED_STATES)
 
 RUNNABLE_STATES = set([
     JobState.PENDING,
@@ -84,18 +88,35 @@ class SlurmJob:
         job_id: SlurmJobId,
         name: str,
         state: JobState,
-        duration: "Seconds",
+        start_time_utc_sec: "Seconds | None",
+        time_elapsed_sec: "Seconds",
+        time_limit_minutes: "Minutes",
         num_nodes: "int",
     ) -> None:
         self.job_id = job_id
         self.state = state
-        self.duration = duration
+        self.start_time_utc_sec = start_time_utc_sec
+        self.time_elapsed_sec = time_elapsed_sec
+        self.time_limit_minutes = time_limit_minutes
         self.num_nodes = num_nodes
         self.name = name
         raw_user_sub, raw_session_id = name.split("-user-")[1].split("-session-")
         self.user_sub = uuid.UUID(raw_user_sub)
-        self.sesson_id = uuid.UUID(raw_session_id)
+        self.session_id = uuid.UUID(raw_session_id)
         super().__init__()
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "job_id": self.job_id,
+            "state": self.state.to_json_value(),
+            "start_time_utc_sec": self.start_time_utc_sec,
+            "time_elapsed_sec": self.time_elapsed_sec,
+            "time_limit_minutes": self.time_limit_minutes,
+            "num_nodes": self.num_nodes,
+            "name": self.name,
+            # "user_sub": self.uuid,
+            "session_id": str(self.session_id),
+        }
 
     @classmethod
     def make_name(cls, user_info: UserInfo, session_id: uuid.UUID) -> str:
@@ -111,8 +132,18 @@ class SlurmJob:
     def is_runnable(self) -> bool:
         return self.state in RUNNABLE_STATES
 
+    def has_failed(self) -> bool:
+        return self.state.is_failure()
+
+    def is_done(self) -> bool:
+        return self.state.is_done()
+
     def belongs_to(self, user_info: UserInfo) -> bool:
         return self.user_sub == user_info.sub
+
+    @classmethod
+    def compute_used_quota(cls, jobs: Iterable["SlurmJob"]) -> NodeSeconds:
+        return NodeSeconds(sum(job.time_elapsed_sec * job.num_nodes for job in jobs))
 
 class SshJobLauncher:
     def __init__(
@@ -131,8 +162,17 @@ class SshJobLauncher:
         super().__init__()
 
     async def do_ssh(
-        self, *, command: str, command_args: List[str], stdin: "str | None" = None
+        self,
+        *,
+        command: str,
+        command_args: List[str],
+        environment: "Dict[str, str] | None" = None,
+        stdin: "str | None" = None,
     ) -> "str | Exception":
+        environment_preamble = ""
+        if environment:
+            environment_preamble = " ".join([f"{key}={value}" for key, value in environment.items()])
+
         login_node_preamble: List[str] = []
         if self.login_node_info:
             login_node_preamble = [
@@ -154,8 +194,7 @@ class SshJobLauncher:
                 *login_node_preamble,
                 "ssh", "-v", "-oBatchMode=yes", f"{self.user}@{self.hostname}",
                 "--",
-                command,
-                *command_args,
+                f"{environment_preamble} {command} " + " ".join(command_args),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 stdin=stdin_file,
@@ -251,12 +290,13 @@ class SshJobLauncher:
         state: "Set[JobState] | None" = None,
         starttime: "datetime.datetime" = datetime.datetime(year=2020, month=1, day=1),
         endtime: "datetime.datetime" = datetime.datetime.today() + datetime.timedelta(days=2), #definetely in the future
+        user_info: "UserInfo | None" = None,
     ) -> "List[SlurmJob] | Exception":
         sacct_params = [
             "--allocations", # don't show individual steps
             "--noheader",
             "--parsable2", #items separated with '|'. No trailing '|'
-            "--format=JobID,JobName,State,ElapsedRaw,AllocNodes",
+            "--format=JobID,JobName,State,ElapsedRaw,TimelimitRaw,Start,AllocNodes",
             f"--starttime={starttime.year:04d}-{starttime.month:02d}-{starttime.day:02d}",
             f"--endtime={endtime.year:04d}-{endtime.month:02d}-{endtime.day:02d}",
             f"--user={self.user}",
@@ -270,24 +310,31 @@ class SshJobLauncher:
         if state != None and len(state) > 0:
             sacct_params.append(f"--state={','.join(s.value for s in state)}")
 
-        output_result = await self.do_ssh(command="sacct", command_args=sacct_params)
+        output_result = await self.do_ssh(
+            environment={"SLURM_TIME_FORMAT": r"%s"},
+            command="sacct",
+            command_args=sacct_params
+        )
         if isinstance(output_result, Exception):
             return output_result
 
         jobs: List[SlurmJob] = []
         for line in output_result.split("\n")[:-1]: #skip empty newline
-            raw_id, job_name, raw_state, raw_elapsed, raw_alloc_nodes = line.split("|")
+            raw_id, job_name, raw_state, raw_elapsed, raw_time_limit, raw_start_time_utc_sec, raw_alloc_nodes = line.split("|")
             if not SlurmJob.recognizes_job_name(job_name):
                 continue
-            jobs.append(
-                SlurmJob(
-                    job_id=SlurmJobId(int(raw_id)),
-                    name=job_name,
-                    state=JobState.from_json_value(raw_state.split(" ")[0]),
-                    duration=Seconds(int(raw_elapsed)),
-                    num_nodes=int(raw_alloc_nodes),
-                )
+            job = SlurmJob(
+                job_id=SlurmJobId(int(raw_id)),
+                name=job_name,
+                state=JobState.from_json_value(raw_state.split(" ")[0]),
+                start_time_utc_sec=None if raw_start_time_utc_sec == "Unknown" else Seconds(int(raw_start_time_utc_sec)),
+                time_elapsed_sec=Seconds(int(raw_elapsed)),
+                time_limit_minutes=Minutes(int(raw_time_limit)),
+                num_nodes=int(raw_alloc_nodes),
             )
+            if user_info and not job.belongs_to(user_info=user_info):
+                continue
+            jobs.append(job)
         return jobs
 
     async def get_usage_for_user(self, user_info: UserInfo) -> "NodeSeconds | Exception":
@@ -295,7 +342,7 @@ class SshJobLauncher:
         if isinstance(this_month_jobs_result, Exception):
             return this_month_jobs_result
         node_seconds = sum(
-            (job.duration * job.num_nodes)
+            (job.time_elapsed_sec * job.num_nodes)
             for job in this_month_jobs_result
             if job.user_sub == user_info.sub
         )
@@ -340,7 +387,7 @@ class JusufSshJobLauncher(SshJobLauncher):
             mkdir {working_dir}
             cd {working_dir}
             # FIXME: download from github when possible
-            git clone --depth 1 --branch master {home}/webilastik.git {webilastik_source_dir}
+            git clone --depth 1 --branch experimental {home}/webilastik.git {webilastik_source_dir}
 
             # prevent numpy from spawning its own threads
             export OPENBLAS_NUM_THREADS=1

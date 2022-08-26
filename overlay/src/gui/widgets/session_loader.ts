@@ -5,13 +5,13 @@ import { Url } from "../../util/parsed_url";
 export class SessionLoaderWidget{
     element: HTMLElement;
     public readonly ilastikUrlInput: HTMLInputElement;
-    public readonly sessionUrlField: HTMLInputElement;
+    public readonly sessionIdField: HTMLInputElement;
     private loadSessionButton: HTMLInputElement
     constructor({
-        ilastikUrl, sessionUrl, parentElement, onUsageError, onNewSession
+        ilastikUrl, sessionId, parentElement, onUsageError, onNewSession
     }: {
         ilastikUrl: Url,
-        sessionUrl?: Url,
+        sessionId?: string,
         parentElement: HTMLElement,
         onUsageError: (message: string) => void,
         onNewSession: (session: Session) => void,
@@ -25,8 +25,13 @@ export class SessionLoaderWidget{
             label_text: "Ilastik api URL: ", inputType: "url", parentElement: form, required: true, value: ilastikUrl.toString()
         })
 
-        this.sessionUrlField = createInputParagraph({
-            label_text: "Session url: ", inputType: "url", parentElement: form, required: true, value: sessionUrl?.toString() || ""
+        const timeoutInput = createInputParagraph({
+            label_text: "Timeout (minutes): ", inputType: "number", parentElement: form, required: true, value: "5"
+        })
+        timeoutInput.min = "1"
+
+        this.sessionIdField = createInputParagraph({
+            label_text: "Session ID: ", inputType: "text", parentElement: form, required: true, value: sessionId?.toString() || ""
         })
 
         this.loadSessionButton = createInputParagraph({inputType: "submit", value: "Rejoin Session", parentElement: form})
@@ -39,7 +44,8 @@ export class SessionLoaderWidget{
             this.set_disabled(true)
             Session.load({
                 ilastikUrl: Url.parse(this.ilastikUrlInput.value),
-                sessionUrl: Url.parse(this.sessionUrlField.value.trim()),
+                sessionId: this.sessionIdField.value,
+                timeout_minutes: parseInt(timeoutInput.value),
                 onUsageError,
             }).then(
                 sessionResult => {
@@ -48,7 +54,7 @@ export class SessionLoaderWidget{
                         this.set_disabled(false)
                     }else{
                         this.set_disabled(true)
-                        this.sessionUrlField.value = sessionResult.sessionUrl.raw
+                        this.sessionIdField.value = sessionResult.sessionUrl.raw
                         this.ilastikUrlInput.value = sessionResult.ilastikUrl.raw
                         onNewSession(sessionResult)
                     }
@@ -70,8 +76,8 @@ export class SessionLoaderWidget{
         }
     }
 
-    public setFields(params: {ilastikUrl: Url, sessionUrl?: Url}){
+    public setFields(params: {ilastikUrl: Url, sessionId?: string}){
         this.ilastikUrlInput.value = params.ilastikUrl.raw
-        this.sessionUrlField.value = params.sessionUrl?.raw || ""
+        this.sessionIdField.value = params.sessionId || ""
     }
 }
