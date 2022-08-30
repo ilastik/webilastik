@@ -424,6 +424,7 @@ class JusufSshJobLauncher(SshJobLauncher):
                 --max-duration-minutes={time} \\
                 --ebrains-user-access-token={ebrains_user_token.access_token} \\
                 --listen-socket="{working_dir}/to-master.sock" \\
+                --session-url=https://app.ilastik.org/session-{session_id} \\
                 tunnel \\
                 --remote-username=www-data \\
                 --remote-host=app.ilastik.org \\
@@ -482,6 +483,7 @@ class CscsSshJobLauncher(SshJobLauncher):
                 --max-duration-minutes={time} \\
                 --ebrains-user-access-token={ebrains_user_token.access_token} \\
                 --listen-socket="{scratch}/to-master-{session_id}" \\
+                --session-url=https://app.ilastik.org/session-{session_id} \\
                 tunnel \\
                 --remote-username=www-data \\
                 --remote-host=app.ilastik.org \\
