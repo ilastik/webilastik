@@ -423,6 +423,8 @@ class IlpDatasetInfo:
         if url is None:
             return Exception(f"Could not parse {self.filePath} as URL")
         datasources_result = try_get_datasources_from_url(url=url, allowed_protocols=allowed_protocols)
+        if datasources_result is None:
+            return Exception(f"Could not open {url} as a data source: unsupported format")
         if isinstance(datasources_result, Exception):
             return Exception(f"Could not open {url} as a data source: {datasources_result}")
         if len(datasources_result) != 1:

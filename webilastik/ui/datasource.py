@@ -18,7 +18,7 @@ def try_get_datasources_from_url(
     url: Union[Url, str],
     ebrains_user_token: Optional[UserToken] = None,
     allowed_protocols: Sequence[Protocol] = (Protocol.HTTP, Protocol.HTTPS)
-) -> "Sequence[FsDataSource] | Exception":
+) -> "Sequence[FsDataSource] | None | Exception":
     if isinstance(url, str):
         parsing_result = parse_url(url)
         if isinstance(parsing_result, UsageError):
@@ -32,4 +32,4 @@ def try_get_datasources_from_url(
         return SkimageDataSource.from_url(url)
     if PrecomputedChunksDataSource.supports_url(url):
         return PrecomputedChunksDataSource.from_url(url)
-    return Exception(f"Could not open url {url}")
+    return None

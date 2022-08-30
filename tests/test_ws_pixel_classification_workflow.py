@@ -56,7 +56,7 @@ async def main():
     datasources = try_get_datasources_from_url(url=data_url)
     if isinstance(datasources, Exception):
         raise datasources
-    assert not isinstance(datasources, Exception)
+    assert not isinstance(datasources, (Exception, type(None)))
     ds = datasources[0]
     token = UserToken.from_environment()
     assert isinstance(token, UserToken)
