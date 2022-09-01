@@ -189,10 +189,10 @@ class WebIlastik:
         payload = await request.json()
         raw_url = payload.get("url")
         if raw_url is None:
-            return  web.json_response({"error", "Missing 'url' key in payload"}, status=400)
+            return  uncachable_json_response({"error": "Missing 'url' key in payload"}, status=400)
         url = Url.parse(raw_url)
         if url is None:
-            return  web.json_response({"error", "Bad url in payload"}, status=400)
+            return  uncachable_json_response({"error": "Bad url in payload"}, status=400)
 
         selected_resolution: "Tuple[int, int, int] | None" = None
         stripped_precomputed_url_regex = re.compile(r"/stripped_precomputed/url=(?P<url>[^/]+)/resolution=(?P<resolution>\d+_\d+_\d+)")
@@ -209,15 +209,17 @@ class WebIlastik:
         if selected_resolution:
             datasources = [ds for ds in datasources_result if ds.spatial_resolution == selected_resolution]
             if len(datasources) != 1:
-                return web.json_response({
-                    "error": f"Expected single datasource, found these: {json.dumps([ds.to_json_value() for ds in datasources], indent=4)}"
-                })
+                return uncachable_json_response(
+                    {"error": f"Expected single datasource, found these: {json.dumps([ds.to_json_value() for ds in datasources], indent=4)}"},
+                    status=400,
+                )
         else:
             datasources = datasources_result
 
-        return web.json_response({
-            "datasources": tuple([ds.to_json_value() for ds in datasources])
-        })
+        return uncachable_json_response(
+            {"datasources": tuple([ds.to_json_value() for ds in datasources])},
+            status=200,
+        )
 
     async def get_status(self, request: web.Request) -> web.Response:
         return uncachable_json_response(
