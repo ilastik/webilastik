@@ -154,8 +154,8 @@ export class Session{
             protocol: this.sessionUrl.protocol == "http" ? "ws" : "wss"
         }).joinPath("ws")
         let websocket = new WebSocket(wsUrl.schemeless_raw)
-        websocket.addEventListener("close", this.refreshWebsocket)
         websocket.addEventListener("error", this.refreshWebsocket)
+        websocket.addEventListener("close", this.refreshWebsocket)
         websocket.addEventListener("message", (ev: MessageEvent) => {
             let payload = JSON.parse(ev.data)
             let payload_obj = ensureJsonObject(payload)
@@ -322,10 +322,20 @@ export class Session{
                 continue
             }
             onProgress(`Session is ready!`)
-            return new Session({
+            let session = new Session({
                 ilastikUrl,
                 sessionStatus,
                 onUsageError,
+            })
+
+            //FIXME
+            return new Promise((resolve) => {
+                let websocket = session.websocket
+                let resolveThenClean = () => {
+                    resolve(session)
+                    websocket.removeEventListener("open", resolveThenClean)
+                }
+                websocket.addEventListener("open", resolveThenClean)
             })
         }
         return Error(`Could not create a session: timeout`)
