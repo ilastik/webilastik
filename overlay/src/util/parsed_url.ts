@@ -141,6 +141,10 @@ export class Url implements IJsonable{
         return this.raw
     }
 
+    public get hashValue(): string{
+        return this.toString()
+    }
+
     public static fromJsonValue(value: JsonValue): Url{
         return Url.parse(ensureJsonString(value))
     }
