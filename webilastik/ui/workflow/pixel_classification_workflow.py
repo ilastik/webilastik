@@ -3,7 +3,7 @@
 from concurrent.futures import Executor
 import os
 from pathlib import Path, PurePosixPath
-from typing import Callable, Mapping, Sequence, Set
+from typing import Callable, Dict, Sequence, Set
 import tempfile
 
 import h5py
@@ -21,12 +21,13 @@ from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet.brushing_applet import Label, WsBrushingApplet
 from webilastik.ui.applet.feature_selection_applet import WsFeatureSelectionApplet
 from webilastik.ui.applet.pixel_predictions_export_applet import WsPixelClassificationExportApplet
+from webilastik.ui.applet.ws_viewer_applet import WsViewerApplet
 from webilastik.ui.usage_error import UsageError
 from webilastik.ui.applet import UserPrompt
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.applet.ws_pixel_classification_applet import WsPixelClassificationApplet
 from webilastik.classic_ilastik.ilp.pixel_classification_ilp import IlpPixelClassificationWorkflowGroup
-from webilastik.utility.url import Protocol
+from webilastik.utility.url import Protocol, Url
 
 
 
@@ -43,6 +44,10 @@ class PixelClassificationWorkflow:
         pixel_classifier: "VigraPixelClassifier[IlpFilter] | None" = None,
     ):
         super().__init__()
+
+        self.executor = executor
+        self.priority_executor = priority_executor
+        self.on_async_change = on_async_change
 
         self.brushing_applet = WsBrushingApplet(
             name="brushing_applet",
@@ -83,7 +88,7 @@ class PixelClassificationWorkflow:
             on_async_change=on_async_change,
         )
 
-        self.wsapplets: Mapping[str, WsApplet] = {
+        self.wsapplets: Dict[str, WsApplet] = {
             self.feature_selection_applet.name: self.feature_selection_applet,
             self.brushing_applet.name: self.brushing_applet,
             self.pixel_classifier_applet.name: self.pixel_classifier_applet,
@@ -163,3 +168,92 @@ class PixelClassificationWorkflow:
 
     def get_json_state(self) -> JsonObject:
         return {name: applet._get_json_state() for name, applet in self.wsapplets.items()} #pyright: ignore [reportPrivateUsage]
+
+
+class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
+    def __init__(
+        self,
+        *,
+        on_async_change: Callable[[], None],
+        executor: Executor,
+        priority_executor: PriorityExecutor,
+        session_url: Url,
+
+        feature_extractors: "Set[IlpFilter] | None" = None,
+        labels: Sequence[Label] = (),
+        pixel_classifier: "VigraPixelClassifier[IlpFilter] | None" = None,
+    ):
+        super().__init__(
+            on_async_change=on_async_change,
+            executor=executor,
+            priority_executor=priority_executor,
+            feature_extractors=feature_extractors,
+            labels=labels,
+            pixel_classifier=pixel_classifier,
+        )
+
+        self.viewer_applet = WsViewerApplet(
+            name="viewer_applet",
+            allowed_protocols=set([Protocol.HTTP, Protocol.HTTPS]),
+            executor=priority_executor,
+            generational_classifier=self.pixel_classifier_applet.generational_pixel_classifier,
+            label_colors=self.brushing_applet.label_colors,
+            session_url=session_url,
+            on_async_change=on_async_change,
+        )
+
+        self.wsapplets[self.viewer_applet.name] = self.viewer_applet
+
+    @staticmethod
+    def from_pixel_classification_workflow(workflow: PixelClassificationWorkflow, session_url: Url) -> "WsPixelClassificationWorkflow":
+        return WsPixelClassificationWorkflow(
+            on_async_change=workflow.on_async_change,
+            executor=workflow.executor,
+            priority_executor=workflow.priority_executor,
+            session_url=session_url,
+            feature_extractors=set(workflow.feature_selection_applet.feature_extractors()),
+            labels=workflow.brushing_applet.labels(),
+            pixel_classifier=workflow.pixel_classifier_applet.pixel_classifier(),
+        )
+
+    @staticmethod
+    def load_from_ilp(
+        *,
+        ilp_path: Path,
+        on_async_change: Callable[[], None],
+        executor: Executor,
+        priority_executor: PriorityExecutor,
+        allowed_protocols: "Sequence[Protocol] | None" = None,
+        session_url: Url,
+    ) -> "WsPixelClassificationWorkflow | Exception":
+        workflow_result = PixelClassificationWorkflow.from_ilp(
+            ilp_path=ilp_path,
+            on_async_change=on_async_change,
+            executor=executor,
+            priority_executor=priority_executor,
+            allowed_protocols=allowed_protocols,
+        )
+        if isinstance(workflow_result, Exception):
+            return workflow_result
+        return WsPixelClassificationWorkflow.from_pixel_classification_workflow(workflow_result, session_url=session_url)
+
+    @staticmethod
+    def load_from_ilp_bytes(
+        *,
+        ilp_bytes: bytes,
+        on_async_change: Callable[[], None],
+        executor: Executor,
+        priority_executor: PriorityExecutor,
+        allowed_protocols: "Sequence[Protocol] | None" = None,
+        session_url: Url,
+    ) -> "WsPixelClassificationWorkflow | Exception":
+        workflow_result = PixelClassificationWorkflow.from_ilp_bytes(
+            ilp_bytes=ilp_bytes,
+            on_async_change=on_async_change,
+            executor=executor,
+            priority_executor=priority_executor,
+            allowed_protocols=allowed_protocols,
+        )
+        if isinstance(workflow_result, Exception):
+            return workflow_result
+        return WsPixelClassificationWorkflow.from_pixel_classification_workflow(workflow_result, session_url=session_url)
