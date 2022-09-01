@@ -29,6 +29,7 @@ export class BrushingWidget{
     private brushingApplet: BrushingApplet
     private predictingWidget: PredictingWidget
     private brushingEnabledInfoSpan: HTMLSpanElement
+    private brushStrokeRenderer: BrushelBoxRenderer
 
     constructor({
         applet_name,
@@ -46,6 +47,7 @@ export class BrushingWidget{
         this.session = session
         this.canvas = createElement({tagName: "canvas", parentElement: document.body, inlineCss: {display: "none"}})
         this.gl = this.canvas.getContext("webgl2", {depth: true, stencil: true})!
+        this.brushStrokeRenderer = new BrushelBoxRenderer({gl: this.gl, highlightCrossSection: false, onlyCrossSection: true})
 
         this.element = new CollapsableWidget({display_name: "Training", parentElement, help}).element
         this.element.classList.add("ItkBrushingWidget")
@@ -145,7 +147,7 @@ export class BrushingWidget{
                 }
             }
             strokes = strokes.concat(brushStrokesGetter())
-            overlay.render(strokes, new BrushelBoxRenderer({gl: this.gl, highlightCrossSection: false, onlyCrossSection: true})) //FIXME? remove this optional override?
+            overlay.render(strokes, this.brushStrokeRenderer) //FIXME? remove this optional override?
             this.animationRequestId = window.requestAnimationFrame(render)
         }
         render()
