@@ -24,7 +24,7 @@ export class ReferencePixelClassificationWorkflowGui{
     }){
         this.session = session
         this.element = createElement({tagName: "div", parentElement, cssClasses: ["ReferencePixelClassificationWorkflowGui"]})
-        this.viewer = new Viewer({driver: viewer_driver, ilastik_session: session})
+        this.viewer = new Viewer({name: "viewer_applet", driver: viewer_driver, ilastik_session: session})
 
         this.project_widget = new ProjectWidget({parentElement: this.element, session})
 

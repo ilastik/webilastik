@@ -1,10 +1,7 @@
-import { vec3 } from "gl-matrix";
 import { Applet } from "../../client/applets/applet";
-import { DataSource, Session } from "../../client/ilastik";
-import { HashMap } from "../../util/hashmap";
+import { PredictionsView, Session } from "../../client/ilastik";
 import { createElement, createImage, createInput, createInputParagraph, removeElement } from "../../util/misc";
 import { ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonObject, ensureJsonString, JsonValue } from "../../util/serialization";
-import { PredictionsView, TrainingView } from "../../viewer/view";
 import { Viewer } from "../../viewer/viewer";
 import { CssClasses } from "../css_classes";
 
@@ -106,41 +103,6 @@ export class PredictingWidget extends Applet<State>{
     private async onNewState(new_state: State){
         this.showInfo(new_state.description)
         this.liveUpdateCheckbox.checked = new_state.live_update
-        if(new_state.description != "ready"){
-            return
-        }
-
-        let viewsToOpen = new HashMap<DataSource, PredictionsView, string>()
-
-        for(let view of this.viewer.getViews()){
-            // All training views need a prediction view...
-            if(view instanceof TrainingView){
-                let predictions_view = PredictionsView.createFor({
-                    raw_data: view.raw_data,
-                    ilastik_session: this.session,
-                    classifier_generation: new_state.generation,
-                })
-                viewsToOpen.set(predictions_view.raw_data, predictions_view)
-            }
-        }
-
-        for(let view of this.viewer.getViews()){
-            if(!(view instanceof PredictionsView)){
-                continue
-            }
-            if(view.classifier_generation == new_state.generation){
-                // ... but predictions views with the same classifier generation need no refresh ...
-                viewsToOpen.delete(view.raw_data)
-            }else{
-                // ... and predictions with an old classifier_generation need to be closed
-                this.viewer.closeView(view)
-            }
-        }
-
-        viewsToOpen.values().forEach(view => this.viewer.refreshView({
-            view,
-            channel_colors: new_state.channel_colors.map(color => vec3.fromValues(color.r, color.g, color.b))
-        }))
     }
 
     public destroy(){

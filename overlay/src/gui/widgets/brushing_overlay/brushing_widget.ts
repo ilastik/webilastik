@@ -1,6 +1,6 @@
 import { quat, vec3 } from "gl-matrix"
 import { BrushStroke } from "../../.."
-import { Color, DataSource, Session } from "../../../client/ilastik"
+import { Color, DataSource, FailedView, PredictionsView, RawDataView, Session, UnsupportedDatasetView } from "../../../client/ilastik"
 import { createElement, createInput, removeElement } from "../../../util/misc"
 import { CollapsableWidget } from "../collapsable_applet_gui"
 import { PopupSelect } from "../selector_widget"
@@ -8,7 +8,6 @@ import { BrushingOverlay } from "./brushing_overlay"
 import { BrushelBoxRenderer } from "./brush_boxes_renderer"
 import { BrushingApplet } from "./brush_strokes_container"
 import { Viewer } from "../../../viewer/viewer"
-import { PredictionsView, RawDataView, TrainingView } from "../../../viewer/view"
 import { PredictingWidget } from "../predicting_widget";
 import { CssClasses } from "../../css_classes"
 
@@ -83,7 +82,8 @@ export class BrushingWidget{
                 applet_name,
                 gl: this.gl,
                 onDataSourceClicked: (datasource) => {
-                    this.viewer.refreshView({view: TrainingView.fromDataSource({datasource, session})})
+                    console.log(`Should open this: ${datasource.url}`)
+                    // this.viewer.refreshView({view: TrainingView.fromDataSource({datasource, session})})
                 },
                 onLabelSelected: () => {
                     this.setBrushingEnabled(true)
@@ -166,12 +166,6 @@ export class BrushingWidget{
         this.clearStatus()
     }
 
-    private async openTrainingView(training_view: TrainingView){
-        if(!this.viewer.findView(training_view)){
-            this.viewer.refreshView({view: training_view})
-        }
-    }
-
     private async handleViewerDataDisplayChange(){
         this.resetWidgets()
 
@@ -182,16 +176,22 @@ export class BrushingWidget{
         if(view instanceof Error){ //FIXME: remove this? or return error from viewer?
             return this.showStatus(`${view}`)
         }
-        if(view instanceof TrainingView){
-            return this.startTraining(view.raw_data)
+        if(view instanceof UnsupportedDatasetView){
+            return this.showStatus(`Unsupported data: ${view.url}`)
+        }
+        if(view instanceof FailedView){
+            return this.showStatus(`Failed opening data: ${view.url}`)
         }
         if(view instanceof PredictionsView){
-            //FIXME: allow more annotations?
-            return this.showStatus(`Showing predictions for ${view.raw_data.getDisplayString()}`)
+            return this.startTraining(view.raw_data)
         }
         if(!(view instanceof RawDataView)){
             throw `Unexpected view type (${view.constructor.name}): ${JSON.stringify(view)}`
         }
+        if(view.datasources.length == 1){
+            return this.startTraining(view.datasources[0])
+        }
+
         this.showStatus(`Viewing multi-resolution datasource`)
 
         createElement({tagName: "label", innerHTML: "Select a voxel size to annotate on:", parentElement: this.resolutionSelectionContainer});
@@ -208,8 +208,8 @@ export class BrushingWidget{
                 })
             },
             onChange: async (datasource) => {
-                const training_view = view.toTrainingView({resolution: datasource.spatial_resolution, session: this.session})
-                this.openTrainingView(training_view)
+                let resolution_string = `${datasource.spatial_resolution[0]} x ${datasource.spatial_resolution[1]} x ${datasource.spatial_resolution[2]} nm`
+                this.viewer.openDatasource({name: `${view.name} (${resolution_string})`, datasource})
             },
         })
     }

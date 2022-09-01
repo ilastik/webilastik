@@ -31,7 +31,7 @@ from webilastik.scheduling.job import PriorityExecutor
 from webilastik.server.session_allocator import uncachable_json_response
 from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError
-from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
+from webilastik.ui.workflow.pixel_classification_workflow import WsPixelClassificationWorkflow
 from webilastik.utility.url import Protocol, Url
 from webilastik.server.tunnel import ReverseSshTunnel
 from webilastik.ui.applet import dummy_prompt
@@ -143,9 +143,10 @@ class WebIlastik:
         self.executor = executor
         self.priority_executor = PriorityExecutor(executor=self.executor, max_active_job_steps=2 * multiprocessing.cpu_count())
 
-        self.workflow = PixelClassificationWorkflow(
-            on_async_change=lambda : self.enqueue_user_interaction(lambda: None), #FIXME?
+        self.workflow = WsPixelClassificationWorkflow(
+            on_async_change=lambda: self.enqueue_user_interaction(user_interaction=lambda: None), #FIXME?
             executor=self.executor,
+            session_url=self.session_url,
             priority_executor=self.priority_executor
         )
         self.app = web.Application()
@@ -153,11 +154,11 @@ class WebIlastik:
             web.get('/status', self.get_status),
             web.get('/ws', self.open_websocket),
             web.get(
-                "/predictions/raw_data={encoded_raw_data}/generation={generation}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}",
+                "/predictions/raw_data={encoded_raw_data_url}/generation={generation}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}",
                 lambda request: self.workflow.pixel_classifier_applet.precomputed_chunks_compute(request)
             ),
             web.get(
-                "/predictions/raw_data={encoded_raw_data}/generation={generation}/info",
+                "/predictions/raw_data={encoded_raw_data_url}/generation={generation}/info",
                 lambda request: self.workflow.pixel_classifier_applet.predictions_precomputed_chunks_info(request)
             ),
             web.post("/download_project_as_ilp", self.download_project_as_ilp),
@@ -170,7 +171,7 @@ class WebIlastik:
                 "/stripped_precomputed/url={encoded_original_url}/resolution={resolution_x}_{resolution_y}_{resolution_z}/{rest:.*}",
                 self.forward_chunk_request
             ),
-            web.post(
+            web.get(
                 "/get_datasources_from_url",
                 self.get_datasources_from_url
             ),
@@ -346,12 +347,13 @@ class WebIlastik:
             filesystem=filesystem,
             file_path=file_path,
         ))
-        new_workflow_result = PixelClassificationWorkflow.from_ilp_bytes(
+        new_workflow_result = WsPixelClassificationWorkflow.load_from_ilp_bytes(
             ilp_bytes=ilp_bytes,
-            on_async_change=lambda : self.enqueue_user_interaction(lambda: None), #FIXME?
+            on_async_change=lambda: self._update_clients(), #FIXME?
             executor=self.executor,
             priority_executor=self.priority_executor,
             allowed_protocols=(Protocol.HTTP, Protocol.HTTPS),
+            session_url=self.session_url,
         )
         if isinstance(new_workflow_result, Exception):
             return web.Response(status=400, text=f"Could not load project: {new_workflow_result}")

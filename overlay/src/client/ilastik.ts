@@ -1,4 +1,5 @@
 import { vec3 } from "gl-matrix"
+import { INativeView } from "../drivers/viewer_driver"
 import { fetchJson, sleep } from "../util/misc"
 import { Path, Url } from "../util/parsed_url"
 import { DataType, Scale } from "../util/precomputed_chunks"
@@ -766,9 +767,14 @@ export abstract class DataSource implements IJsonable{
     public abstract toTrainingUrl(_session: Session): Url;
 
     public static async getDatasourcesFromUrl(params: {datasource_url: Url, session: Session}): Promise<Array<DataSource> | Error>{
-        let response = await fetch(params.session.sessionUrl.joinPath("get_datasources_from_url").raw, {
-            method: "POST",
-            body: JSON.stringify({url: params.datasource_url.raw})
+        let url = params.session.sessionUrl.joinPath("get_datasources_from_url")
+            .updatedWith({
+                search: new Map([["url", Session.btoa(params.datasource_url.raw)]])
+            })
+        let response = await fetch(url.raw, {
+            method: "GET",
+            body: JSON.stringify({url: params.datasource_url.raw}),
+            cache: "no-store", //FIXME: why can't this be cached again? Nonces in URLs? Tokens in Filesystems?
         })
         if(!response.ok){
             let error_message = (await response.json())["error"]
@@ -910,6 +916,126 @@ export class PrecomputedChunksScaleDataSink extends FsDataSink{
             scale: this.scale,
             dtype: this.dtype,
             num_channels: this.shape.c,
+        })
+    }
+}
+
+export abstract class View{
+    public readonly name: string;
+    public readonly url: Url;
+
+    constructor(params: {name: string, url: Url}){
+        this.name = params.name
+        this.url = params.url
+    }
+
+    public toNative(): INativeView{
+        return {
+            name: this.name,
+            url: this.url.updatedWith({search: new Map(), hash: ""}).raw
+        }
+    }
+
+    public static fromJsonValue(value: JsonValue): View{
+        const value_obj = ensureJsonObject(value)
+        const label = ensureJsonString(value_obj["__class__"])
+        if(label == "RawDataView"){
+            return RawDataView.fromJsonValue(value)
+        }
+        if(label == "PredictionsView"){
+            return PredictionsView.fromJsonValue(value)
+        }
+        if(label == "StrippedPrecomputedView"){
+            return StrippedPrecomputedView.fromJsonValue(value)
+        }
+        if(label == "UnsupportedDatasetView"){
+            return UnsupportedDatasetView.fromJsonValue(value)
+        }
+        if(label == "FailedView"){
+            return FailedView.fromJsonValue(value)
+        }
+        throw Error(`Could not deserialize View: ${JSON.stringify(value)}`)
+    }
+}
+
+export class RawDataView extends View{
+    public readonly datasources: DataSource[]
+    constructor(params: {name: string, url: Url, datasources: Array<DataSource>}){
+        super(params)
+        this.datasources = params.datasources
+    }
+
+    public static fromJsonValue(value: JsonValue): RawDataView {
+        const value_obj = ensureJsonObject(value)
+        return new RawDataView({
+            name: ensureJsonString(value_obj["name"]),
+            url: Url.parse(ensureJsonString(value_obj["url"])),
+            datasources: ensureJsonArray(value_obj["datasources"]).map(raw_ds => DataSource.fromJsonValue(raw_ds))
+        })
+    }
+}
+
+export class StrippedPrecomputedView extends View{
+    public readonly datasource: DataSource
+    constructor(params: {name: string, url: Url, datasource: DataSource}){
+        super(params)
+        this.datasource = params.datasource
+    }
+
+    public static fromJsonValue(value: JsonValue): StrippedPrecomputedView {
+        const value_obj = ensureJsonObject(value)
+        return new StrippedPrecomputedView({
+            name: ensureJsonString(value_obj["name"]),
+            url: Url.parse(ensureJsonString(value_obj["url"])),
+            datasource: DataSource.fromJsonValue(value_obj["datasource"]),
+        })
+    }
+}
+
+export class PredictionsView extends View{
+    public readonly raw_data: DataSource
+    public readonly classifier_generation: number
+    constructor(params: {name: string, url: Url, raw_data: DataSource, classifier_generation: number}){
+        super(params)
+        this.raw_data = params.raw_data
+        this.classifier_generation = params.classifier_generation
+    }
+
+    public static fromJsonValue(value: JsonValue): PredictionsView {
+        const value_obj = ensureJsonObject(value)
+        return new PredictionsView({
+            name: ensureJsonString(value_obj["name"]),
+            url: Url.parse(ensureJsonString(value_obj["url"])),
+            raw_data: DataSource.fromJsonValue(value_obj["raw_data"]),
+            classifier_generation: ensureJsonNumber(value_obj["classifier_generation"]),
+        })
+    }
+
+}
+
+export class UnsupportedDatasetView extends View{
+    public static fromJsonValue(value: JsonValue): UnsupportedDatasetView {
+        const value_obj = ensureJsonObject(value)
+        return new UnsupportedDatasetView({
+            name: ensureJsonString(value_obj["name"]),
+            url: Url.parse(ensureJsonString(value_obj["url"])),
+        })
+    }
+}
+
+export class FailedView extends View{
+    public readonly error_message: string
+    constructor(params: {name: string, url: Url, error_message: string}){
+        super(params)
+        this.error_message = params.error_message
+    }
+
+    public static fromJsonValue(value: JsonValue): FailedView {
+        const value_obj = ensureJsonObject(value)
+        return new FailedView({
+            name: ensureJsonString(value_obj["name"]),
+            url: Url.parse(ensureJsonString(value_obj["url"])),
+            error_message: ensureJsonString(value_obj["error_message"]),
         })
     }
 }
