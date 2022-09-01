@@ -4,7 +4,7 @@ from concurrent.futures import Future, Executor
 from dataclasses import dataclass
 from functools import partial
 import threading
-from typing import Any, Callable, Literal, Optional, Sequence, Dict, Union, Mapping
+from typing import Any, Callable, Literal, Optional, Sequence, Dict, Union, Mapping, Tuple
 
 import numpy as np
 
@@ -92,6 +92,14 @@ class PixelClassificationApplet(Applet):
     def pixel_classifier(self) -> Optional[VigraPixelClassifier[IlpFilter]]:
         classifier = self._state.classifier
         return classifier if isinstance(classifier, VigraPixelClassifier) else None #FIXME?
+
+    @applet_output
+    def generational_pixel_classifier(self) -> "Tuple[VigraPixelClassifier[IlpFilter], int] | None":
+        with self.lock:
+            classifier = self._state.classifier
+            if not isinstance(classifier, VigraPixelClassifier):
+                return None
+            return (classifier, self._state.generation)
 
     def refresh(self, user_prompt: UserPrompt) -> CascadeResult:
         with self.lock:
