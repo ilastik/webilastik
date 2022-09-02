@@ -33,6 +33,14 @@ def try_get_datasources_from_url(
     if cached_datasources is not None:
         return cached_datasources
 
+    hashless_url = url.updated_with(hash_="")
+    cached_datasources = _datasource_cache.get(hashless_url)
+    for ds in cached_datasources or ():
+        if ds.url == url:
+            out = [ds]
+            _datasource_cache[hashless_url] = out
+            return out
+
     if SkimageDataSource.supports_url(url):
         datasources = SkimageDataSource.from_url(url)
     if PrecomputedChunksDataSource.supports_url(url):
