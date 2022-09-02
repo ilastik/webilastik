@@ -108,7 +108,7 @@ export class BrushingWidget{
         this.overlay = undefined
     }
 
-    public showTrainingUi({trainingDatasource, brushStrokesGetter}: {trainingDatasource: DataSource, brushStrokesGetter: () => Array<[Color, BrushStroke[]]>}){
+    public showTrainingUi(trainingDatasource: DataSource){
         this.trainingWidget.style.display = "block"
         this.canvas.style.display = "block"
         let overlay = this.overlay = new BrushingOverlay({
@@ -143,7 +143,7 @@ export class BrushingWidget{
                     strokes.push([this.brushingApplet.currentColor, [this.stagingStroke]])
                 }
             }
-            strokes = strokes.concat(brushStrokesGetter())
+            strokes = strokes.concat(this.brushingApplet.getBrushStrokes(trainingDatasource))
             overlay.render(strokes, this.brushStrokeRenderer) //FIXME? remove this optional override?
             this.animationRequestId = window.requestAnimationFrame(render)
         }
@@ -217,10 +217,7 @@ export class BrushingWidget{
 
     private startTraining(datasource: DataSource){
         this.resetWidgets()
-        this.showTrainingUi({
-            trainingDatasource: datasource,
-            brushStrokesGetter: () => this.brushingApplet.getBrushStrokes(datasource)
-        })
+        this.showTrainingUi(datasource)
         this.showStatus(`Now training on ${datasource.getDisplayString()}`)
     }
 
