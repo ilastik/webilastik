@@ -1,6 +1,6 @@
 import { quat, vec3 } from "gl-matrix"
 import { BrushStroke } from "../../.."
-import { Color, DataSource, DataView, FailedView, PredictionsView, RawDataView, Session, UnsupportedDatasetView } from "../../../client/ilastik"
+import { Color, DataSource, FailedView, PredictionsView, RawDataView, Session, StrippedPrecomputedView, UnsupportedDatasetView } from "../../../client/ilastik"
 import { createElement, createInput, removeElement } from "../../../util/misc"
 import { CollapsableWidget } from "../collapsable_applet_gui"
 import { PopupSelect } from "../selector_widget"
@@ -10,7 +10,6 @@ import { BrushingApplet } from "./brush_strokes_container"
 import { Viewer } from "../../../viewer/viewer"
 import { PredictingWidget } from "../predicting_widget";
 import { CssClasses } from "../../css_classes"
-import { ErrorPopupWidget } from "../popup"
 
 
 export class BrushingWidget{
@@ -84,15 +83,7 @@ export class BrushingWidget{
                 session,
                 applet_name,
                 gl: this.gl,
-                onDataSourceClicked: async (datasource) => {
-                    console.log(`Should open ${datasource.url}`)
-                    let dataViewResult = await DataView.makeDataView({name: datasource.url.path.name, url: datasource.url, session: this.session})
-                    if(dataViewResult instanceof Error){
-                        new ErrorPopupWidget({message: `Could not create a view for ${datasource.url}: ${dataViewResult.message}`})
-                        return
-                    }
-                    this.viewer.openDataView(dataViewResult)
-                },
+                onDataSourceClicked: async (datasource) => this.viewer.openDataViewFromDataSource(datasource),
                 onLabelSelected: () => {
                     this.setBrushingEnabled(true)
                 }
@@ -193,6 +184,9 @@ export class BrushingWidget{
         if(view instanceof PredictionsView){
             return this.startTraining(view.raw_data)
         }
+        if(view instanceof StrippedPrecomputedView){
+            return this.startTraining(view.datasource)
+        }
         if(!(view instanceof RawDataView)){
             throw `Unexpected view type (${view.constructor.name}): ${JSON.stringify(view)}`
         }
@@ -212,12 +206,11 @@ export class BrushingWidget{
                 return createElement({
                     tagName: "span",
                     parentElement: args.parentElement,
-                    innerText: `${datasource.spatial_resolution[0]} x ${datasource.spatial_resolution[1]} x ${datasource.spatial_resolution[2]} nm`
+                    innerText: datasource.resolutionString
                 })
             },
             onChange: async (datasource) => {
-                let resolution_string = `${datasource.spatial_resolution[0]} x ${datasource.spatial_resolution[1]} x ${datasource.spatial_resolution[2]} nm`
-                this.viewer.openDatasource({name: `${view.name} (${resolution_string})`, datasource})
+                this.viewer.openDataViewFromDataSource(datasource)
             },
         })
     }

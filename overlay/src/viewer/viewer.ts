@@ -3,6 +3,7 @@ import { vec3 } from "gl-matrix";
 import { Applet } from "../client/applets/applet";
 import { DataSource, PredictionsView, Session, View, DataView } from "../client/ilastik";
 import { INativeView, IViewerDriver, IViewportDriver } from "../drivers/viewer_driver";
+import { ErrorPopupWidget } from "../gui/widgets/popup";
 import { HashMap } from "../util/hashmap";
 import { Url } from "../util/parsed_url";
 import { ensureJsonArray, ensureJsonNumber, ensureJsonObject, JsonValue, toJsonValue } from "../util/serialization";
@@ -165,10 +166,14 @@ export class Viewer extends Applet<ViewerAppletState>{
         this.driver.refreshView({native_view: view.toNative()})
     }
 
-    public openDatasource(params: {name: string, datasource: DataSource}){
-        this.doRPC("open_datasource", {
-            name: params.name, datasource: params.datasource
-        })
+    public async openDataViewFromDataSource(datasource: DataSource){
+        let name = datasource.url.path.name + " " + datasource.resolutionString
+        let dataViewResult = await DataView.makeDataView({name, url: datasource.url, session: this.session})
+        if(dataViewResult instanceof Error){
+            new ErrorPopupWidget({message: `Could not create a view for ${datasource.url}: ${dataViewResult.message}`})
+            return
+        }
+        this.openDataView(dataViewResult)
     }
 
     public getActiveView(): View | undefined{

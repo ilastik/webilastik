@@ -40,20 +40,6 @@ class View(ABC):
             "__class__": self.__class__.__name__,
         }
 
-    @staticmethod
-    def try_open(*, name: str, url: Url, session_url: Url, allowed_protocols: Sequence[Protocol]) -> "View":
-        view_result = (
-            PredictionsView.try_from_url(name=name, url=url, session_url=session_url, allowed_protocols=allowed_protocols) or
-            StrippedPrecomputedView.try_from_url(name=name, url=url, session_url=session_url, allowed_protocols=allowed_protocols) or
-            RawDataView.try_from_url(name=name, url=url, allowed_protocols=allowed_protocols)
-        )
-        if isinstance(view_result, type(None)):
-            return UnsupportedDatasetView(name=name, url=url)
-        if isinstance(view_result, Exception):
-            return FailedView(name=name, url=url, error_message=str(view_result))
-        return view_result
-
-
 class DataView(View):
     pass
 
@@ -385,8 +371,11 @@ class WsViewerApplet(WsApplet):
                 return web.json_response(view.to_json_value(), status=200)
             if url.datascheme == DataScheme.PRECOMPUTED:
                 for view in self.state.data_views.values():
-                    if isinstance(view, RawDataView) and len(view.datasources) == 1 and view.datasources[0].url == url:
-                        return web.json_response(view.to_json_value(), status=200)
+                    if isinstance(view, RawDataView):
+                        for ds in view.datasources:
+                            if isinstance(ds, PrecomputedChunksDataSource) and ds.url == url:
+                                stripped_view = StrippedPrecomputedView(name=view_name, session_url=self.session_url, datasource=ds)
+                                return web.json_response(stripped_view.to_json_value(), status=200)
                     if isinstance(view, StrippedPrecomputedView) and view.datasource.url == url:
                         return web.json_response(view.to_json_value(), status=200)
         view = await asyncio.wrap_future(self.executor.submit(
@@ -399,6 +388,12 @@ class WsViewerApplet(WsApplet):
 def _try_open_data_view(
     *, name: str, url: Url, session_url: Url, allowed_protocols: Sequence[Protocol] = (Protocol.HTTPS, Protocol.HTTP)
 ) -> "DataView":
+    stripped_view_result = StrippedPrecomputedView.try_from_url(name=name, url=url, session_url=session_url, allowed_protocols=allowed_protocols)
+    if isinstance(stripped_view_result, Exception):
+        return FailedView(name=name, url=url, error_message=str(stripped_view_result))
+    if isinstance(stripped_view_result, StrippedPrecomputedView):
+        return stripped_view_result
+
     fixed_url = url.updated_with(hash_="")
     datasources_result = try_get_datasources_from_url(url=fixed_url, allowed_protocols=allowed_protocols)
     if isinstance(datasources_result, type(None)):
