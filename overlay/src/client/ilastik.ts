@@ -748,9 +748,12 @@ export abstract class DataSource implements IJsonable{
         }
     }
 
+    public get resolutionString(): string{
+        return `${this.spatial_resolution[0]} x ${this.spatial_resolution[1]} x ${this.spatial_resolution[2]}nm`
+    }
+
     public getDisplayString() : string{
-        const resolution_str = `${this.spatial_resolution[0]} x ${this.spatial_resolution[1]} x ${this.spatial_resolution[2]}`
-        return `${this.filesystem.getUrl().joinPath(this.path.raw)} (${resolution_str})`
+        return `${this.filesystem.getUrl().joinPath(this.path.raw)} (${this.resolutionString})`
     }
 
     protected abstract doToJsonValue() : JsonObject & {__class__: string}
