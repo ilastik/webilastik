@@ -198,6 +198,12 @@ class Url:
     ) -> "Url":
 
         new_search = search if search is not None else self.search
+        if hash_ is None:
+            new_hash = self.hash_
+        elif hash_ == "":
+            new_hash = None
+        else:
+            new_hash = hash_
         return Url(
             path=path or self.path,
             datascheme=datascheme or self.datascheme,
@@ -205,7 +211,7 @@ class Url:
             hostname=hostname or self.hostname,
             port=port or self.port,
             search={**new_search, **(extra_search or {})},
-            hash_=hash_ if hash_ is not None else self.hash_,
+            hash_=new_hash
         )
 
     def schemeless(self) -> "Url":
@@ -231,7 +237,7 @@ class Url:
         )
 
     def get_hash_params(self) -> "Dict[str, str]":
-        if self.hash_ is None:
+        if not self.hash_:
             return {}
         return parse_params(self.hash_)
 
