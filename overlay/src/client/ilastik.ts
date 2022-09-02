@@ -967,6 +967,22 @@ export class DataView extends View{
             throw Error(`Expected an instance of DataView, found ${JSON.stringify(value)}`)
         }
     }
+
+    public static async makeDataView(params: {name: string, url: Url, session: Session}): Promise<DataView | Error>{
+        let result = await fetchJson(
+            params.session.sessionUrl.joinPath("make_data_view").raw,
+            {
+                method: "POST",
+                body: JSON.stringify({
+                    name: params.name, url: params.url.toString()
+                }),
+            }
+        )
+        if(result instanceof Error){
+            return result
+        }
+        return DataView.fromJsonValue(result)
+    }
 }
 
 export class RawDataView extends DataView{

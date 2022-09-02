@@ -183,6 +183,10 @@ class WebIlastik:
                 "/load_project",
                 self.load_project
             ),
+            web.post(
+                "/make_data_view",
+                self.workflow.viewer_applet.make_data_view
+            )
         ])
         self.app.on_shutdown.append(self.close_websockets)
 

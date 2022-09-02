@@ -381,15 +381,19 @@ class WsViewerApplet(WsApplet):
 
         with self.lock:
             view = self.cached_views.get(url)
-        if view is None:
-            view = await asyncio.wrap_future(self.executor.submit(
-                _try_open_data_view,
-                name=view_name, url=url, session_url=self.session_url, allowed_protocols=[Protocol.HTTPS, Protocol.HTTP]
-            ))
-        return web.json_response(
-            view.to_json_value(),
-            status=200
-        )
+            if view:
+                return web.json_response(view.to_json_value(), status=200)
+            if url.datascheme == DataScheme.PRECOMPUTED:
+                for view in self.state.data_views.values():
+                    if isinstance(view, RawDataView) and len(view.datasources) == 1 and view.datasources[0].url == url:
+                        return web.json_response(view.to_json_value(), status=200)
+                    if isinstance(view, StrippedPrecomputedView) and view.datasource.url == url:
+                        return web.json_response(view.to_json_value(), status=200)
+        view = await asyncio.wrap_future(self.executor.submit(
+            _try_open_data_view,
+            name=view_name, url=url, session_url=self.session_url, allowed_protocols=[Protocol.HTTPS, Protocol.HTTP]
+        ))
+        return web.json_response(view.to_json_value(), status=200)
 
 
 def _try_open_data_view(

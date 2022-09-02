@@ -90,6 +90,8 @@ export class Viewer extends Applet<ViewerAppletState>{
         this.doRPC("set_data_views", {frontend_timestamp: new Date().getTime(), native_views: nativeViews})
     }
 
+
+
     private async onNewState(newState: ViewerAppletState){
         console.log(`Got new state:\n${
             JSON.stringify(
@@ -159,8 +161,8 @@ export class Viewer extends Applet<ViewerAppletState>{
         this.onViewportsChangedHandlers.push(handler)
     }
 
-    public refreshView({view, channel_colors}: {view: View, channel_colors?: vec3[]}){
-        this.driver.refreshView({channel_colors, native_view: view.toNative()})
+    public openDataView(view: DataView){
+        this.driver.refreshView({native_view: view.toNative()})
     }
 
     public openDatasource(params: {name: string, datasource: DataSource}){

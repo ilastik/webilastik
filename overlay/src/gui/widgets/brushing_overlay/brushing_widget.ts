@@ -1,6 +1,6 @@
 import { quat, vec3 } from "gl-matrix"
 import { BrushStroke } from "../../.."
-import { Color, DataSource, FailedView, PredictionsView, RawDataView, Session, UnsupportedDatasetView } from "../../../client/ilastik"
+import { Color, DataSource, DataView, FailedView, PredictionsView, RawDataView, Session, UnsupportedDatasetView } from "../../../client/ilastik"
 import { createElement, createInput, removeElement } from "../../../util/misc"
 import { CollapsableWidget } from "../collapsable_applet_gui"
 import { PopupSelect } from "../selector_widget"
@@ -10,6 +10,7 @@ import { BrushingApplet } from "./brush_strokes_container"
 import { Viewer } from "../../../viewer/viewer"
 import { PredictingWidget } from "../predicting_widget";
 import { CssClasses } from "../../css_classes"
+import { ErrorPopupWidget } from "../popup"
 
 
 export class BrushingWidget{
@@ -83,9 +84,14 @@ export class BrushingWidget{
                 session,
                 applet_name,
                 gl: this.gl,
-                onDataSourceClicked: (datasource) => {
+                onDataSourceClicked: async (datasource) => {
                     console.log(`Should open ${datasource.url}`)
-                    // this.viewer.addNativeViews([{name: datasource.url.path.name, url: datasource.url}])
+                    let dataViewResult = await DataView.makeDataView({name: datasource.url.path.name, url: datasource.url, session: this.session})
+                    if(dataViewResult instanceof Error){
+                        new ErrorPopupWidget({message: `Could not create a view for ${datasource.url}: ${dataViewResult.message}`})
+                        return
+                    }
+                    this.viewer.openDataView(dataViewResult)
                 },
                 onLabelSelected: () => {
                     this.setBrushingEnabled(true)
