@@ -1,33 +1,43 @@
 // import { vec3 } from "gl-matrix";
 import { vec3 } from "gl-matrix";
 import { Applet } from "../client/applets/applet";
-import { DataSource, PredictionsView, Session, View } from "../client/ilastik";
-import { IViewerDriver, IViewportDriver } from "../drivers/viewer_driver";
+import { DataSource, PredictionsView, Session, View, DataView } from "../client/ilastik";
+import { INativeView, IViewerDriver, IViewportDriver } from "../drivers/viewer_driver";
 import { HashMap } from "../util/hashmap";
 import { Url } from "../util/parsed_url";
-import { ensureJsonArray, ensureJsonNumber, ensureJsonObject, JsonValue } from "../util/serialization";
+import { ensureJsonArray, ensureJsonNumber, ensureJsonObject, JsonValue, toJsonValue } from "../util/serialization";
 
 
 export class ViewerAppletState{
-    public readonly active_views: HashMap<Url, View, string>
+    public readonly data_views: HashMap<Url, DataView, string>
+    public readonly prediction_views: HashMap<Url, PredictionsView, string>
     public readonly label_colors: Array<{r: number, g: number, b: number}>
 
     constructor(params: {
-        active_views: HashMap<Url, View, string>,
+        data_views: HashMap<Url, DataView, string>,
+        prediction_views: HashMap<Url, PredictionsView, string>,
         label_colors: Array<{r: number, g: number, b: number}>,
     }){
-        this.active_views = params.active_views
+        this.data_views = params.data_views
+        this.prediction_views = params.prediction_views
         this.label_colors = params.label_colors
     }
 
     public static fromJsonValue(value: JsonValue): ViewerAppletState{
         const value_obj = ensureJsonObject(value)
-        let active_views = new HashMap<Url, View, string>();
-        for(let view of ensureJsonArray(value_obj["active_views"]).map(raw_view => View.fromJsonValue(raw_view))){
-            active_views.set(view.url, view)
+        let data_views = new HashMap<Url, DataView, string>();
+        for(let view of ensureJsonArray(value_obj["data_views"]).map(raw_view => DataView.fromJsonValue(raw_view))){
+            data_views.set(view.url, view)
         }
+
+        let prediction_views = new HashMap<Url, PredictionsView, string>()
+        for(let view of ensureJsonArray(value_obj["prediction_views"]).map(raw_view => PredictionsView.fromJsonValue(raw_view))){
+            prediction_views.set(view.url, view)
+        }
+
         return new ViewerAppletState({
-            active_views,
+            data_views,
+            prediction_views,
             label_colors: ensureJsonArray(value_obj["label_colors"]).map(raw_color => {
                 const color_obj = ensureJsonObject(raw_color)
                 return {
@@ -43,11 +53,9 @@ export class ViewerAppletState{
 export class Viewer extends Applet<ViewerAppletState>{
     public readonly driver: IViewerDriver;
     private onViewportsChangedHandlers = new Array<() => void>();
-    private state: ViewerAppletState = new ViewerAppletState({active_views: new HashMap(), label_colors: []})
-
-    private stateSwitchingPromise?: Promise<undefined>
-    private resolveStateSwitching?: () => void
-    private gotFirstState: boolean = false
+    private state: ViewerAppletState = new ViewerAppletState({
+        data_views: new HashMap(), prediction_views: new HashMap(), label_colors: []
+    })
 
     public constructor(params: {
         name: string,
@@ -66,105 +74,73 @@ export class Viewer extends Applet<ViewerAppletState>{
                 // call handlers so they can react to e.g. layers hiding/showing
                 handler() //FIXME
             }
-
-            let {missingUpstream, removedDownstream} = this.diffNativeAndUpstreamViews()
-            if(this.resolveStateSwitching !== undefined){
-                if(missingUpstream.length == 0 && removedDownstream.length == 0){
-                    this.resolveStateSwitching()
-                }
-                return
-            }
-
-            if(missingUpstream.length > 0){
-                this.doRPC("add_native_views", {native_views: missingUpstream})
-            }
-            if(removedDownstream.length > 0){
-                this.doRPC("remove_native_views", {native_views: removedDownstream})
-            }
+            let nativeViews = this.driver.getOpenDataViews().map(nv => ({name: nv.name, url: Url.parse(nv.url)}))
+            this.setDataViews(nativeViews)
         }
         this.driver.onViewportsChanged(onViewportsChangedHandler)
+        this.setDataViews(
+            this.driver.getOpenDataViews().map(nv => ({name: nv.name, url: Url.parse(nv.url)}))
+        )
     }
 
-    private diffNativeAndUpstreamViews(): {missingUpstream: {name: string, url: Url}[], removedDownstream: {name: string, url: Url}[]}{
-        let nativeViews = this.driver.getOpenDataViews()
-        let missingUpstream = new Array<{name: string, url: Url}>()
-        for(let nativeView of nativeViews){
-            let nativeViewUrl = Url.parse(nativeView.url)
-            if(!this.state.active_views.has(nativeViewUrl)){
-                missingUpstream.push({name: nativeViewUrl.name, url: nativeViewUrl})
-            }
-        }
-        let removedDownstream = new Array<{name: string, url: Url}>()
-        for(let view of this.state.active_views.values()){
-            if(!nativeViews.find(nv => Url.parse(nv.url).equals(view.url))){
-                removedDownstream.push({name: view.name, url: view.url})
-            }
-        }
-        return {missingUpstream, removedDownstream}
+    public setDataViews(nativeViews: Array<{name: string, url: Url}>){
+        console.log(`Setting data views to\n${
+            JSON.stringify(toJsonValue(nativeViews), null, 2)
+        }`)
+        this.doRPC("set_data_views", {frontend_timestamp: new Date().getTime(), native_views: nativeViews})
     }
 
     private async onNewState(newState: ViewerAppletState){
-        if(!this.gotFirstState){
-            let missingUpstream = this.diffNativeAndUpstreamViews().missingUpstream
-            this.doRPC("add_native_views", {native_views: missingUpstream}) //once the state comes back it will have everything
-            this.gotFirstState = true
-            return
-        }
-        if(this.stateSwitchingPromise !== undefined){
-            let acuallyDoIt = () => {
-                this.onNewState(newState)
-            }
-            this.stateSwitchingPromise.then(acuallyDoIt, acuallyDoIt)
-            return
-        }
+        console.log(`Got new state:\n${
+            JSON.stringify(
+                {
+                    data_views: newState.data_views.values().map(dv => ({name: dv.name, url: dv.url.toString()})),
+                    prediction_views: newState.prediction_views.values().map(dv => ({name: dv.name, url: dv.url.toString()}))
+                },
+                null,
+                2
+            )
+        }`)
 
+        let oldState = this.state
         this.state = newState
 
-        this.stateSwitchingPromise = new Promise((resolve, _reject) => {
-            this.resolveStateSwitching = () => {
-                resolve(undefined)
-                this.resolveStateSwitching = undefined
-                this.stateSwitchingPromise = undefined
-            }
-        })
-
-        let nativeViews = this.driver.getOpenDataViews()
-        // Close all native views that are not in the new state
-
-        let expectingChanges = false
-        for(let native_view of nativeViews){
-            let native_view_url = Url.parse(native_view.url)
-            if(!newState.active_views.has(native_view_url)){
-                this.driver.closeView({native_view})
-                expectingChanges = true
-            }
-        }
-        let channel_colors = newState.label_colors.map(c => vec3.fromValues(c.r, c.g, c.b))
-        // open all missing views
-        for(let view of newState.active_views.values()){
-            if(nativeViews.find(nv => Url.parse(nv.url).equals(view.url))){
-                continue
-            }
-            this.driver.refreshView({
-                native_view: view.toNative(),
-                channel_colors: view instanceof PredictionsView ? channel_colors : undefined
-            })
-            expectingChanges = true
+        let nativeViewsMap = new HashMap<Url, INativeView, string>()
+        for(let nativeView of this.driver.getOpenDataViews()){
+            nativeViewsMap.set(Url.parse(nativeView.url), nativeView);
         }
 
-        if(!expectingChanges && this.resolveStateSwitching){
-            this.resolveStateSwitching()
+        // Close all stale Predictions native views
+        for(let [nativeViewUrl, nativeView] of nativeViewsMap.entries()){
+            if(oldState.prediction_views.has(nativeViewUrl) && !newState.prediction_views.has(nativeViewUrl)){
+                console.log(`Removing stale predictions: ${nativeViewUrl}`)
+                this.driver.closeView({native_view: nativeView})
+            }
+        }
+
+        let channel_colors: vec3[] = newState.label_colors.map(c => vec3.fromValues(c.r, c.g, c.b))
+
+        // open all missing PredictionView's
+        for(let view of newState.prediction_views.values()){
+            if(!nativeViewsMap.has(view.url)){
+                this.driver.refreshView({native_view: view.toNative(), channel_colors: channel_colors})
+            }
+        }
+
+        for(let handler of this.onViewportsChangedHandlers){
+            // call handlers so they can react the actual Views coming down from upstream
+            handler() //FIXME
         }
     }
 
     public getViews(): Array<View>{
-        return this.state.active_views.values()
+        return [...this.state.data_views.values(), ...this.state.prediction_views.values()]
     }
 
     public findView(view: View) : View | undefined{
         //FIXME: is this safe? think auto-context
         //also, training on raw data that has a single scale?
-        return this.state.active_views.get(view.url)
+        return this.state.data_views.get(view.url) || this.state.prediction_views.get(view.url)
     }
 
     public closeView(view: View){
@@ -198,7 +174,8 @@ export class Viewer extends Applet<ViewerAppletState>{
         if(native_view === undefined){
             return undefined
         }
-        return this.state.active_views.get(Url.parse(native_view.url))
+        let viewUrl = Url.parse(native_view.url)
+        return this.state.data_views.get(viewUrl) || this.state.prediction_views.get(viewUrl)
     }
 
     public destroy(){

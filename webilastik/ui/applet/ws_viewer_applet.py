@@ -6,11 +6,18 @@ from typing import Dict, Optional, Sequence, Tuple, Set, Callable, Any, Mapping
 import re
 import json
 import threading
-from ndstructs.utils.json_serializable import JsonObject, ensureJsonArray, ensureJsonObject, ensureJsonString
+from dataclasses import dataclass
+import asyncio
+
+
+from ndstructs.utils.json_serializable import JsonObject, ensureJsonArray, ensureJsonInt, ensureJsonObject, ensureJsonString
+from aiohttp import web
+
 from webilastik.annotations.annotation import Color
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.features.ilp_filter import IlpFilter
+from webilastik.server.session_allocator import uncachable_json_response
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.usage_error import UsageError
 
@@ -47,7 +54,10 @@ class View(ABC):
         return view_result
 
 
-class RawDataView(View):
+class DataView(View):
+    pass
+
+class RawDataView(DataView):
     def __init__(self, name: str, url: Url, datasources: Sequence[FsDataSource]) -> None:
         self.datasources = datasources
         super().__init__(name=name, url=url)
@@ -65,16 +75,16 @@ class RawDataView(View):
             return datasources_result
         return RawDataView(name=name, url=url, datasources=datasources_result)
 
-class StrippedPrecomputedView(View):
+class StrippedPrecomputedView(DataView):
     def __init__(self, *, name: str, session_url: Url, datasource: PrecomputedChunksDataSource) -> None:
         self.datasource = datasource
-        original_url = datasource.url.updated_with(hash_="")
+        all_scales_url = datasource.url.updated_with(hash_="")
         resolution_str = "_".join(str(axis) for axis in datasource.spatial_resolution)
         super().__init__(
             name=name,
             url=session_url.updated_with(
                 datascheme=DataScheme.PRECOMPUTED
-            ).concatpath(f"stripped_precomputed/url={original_url.raw}/resolution={resolution_str}"),
+            ).concatpath(f"stripped_precomputed/url={all_scales_url.to_base64()}/resolution={resolution_str}"),
         )
 
     def to_json_value(self) -> JsonObject:
@@ -177,11 +187,11 @@ class PredictionsView(View):
         except Exception as e:
             return e
 
-class UnsupportedDatasetView(View):
+class UnsupportedDatasetView(DataView):
     def to_json_value(self) -> JsonObject:
         return super().to_json_value()
 
-class FailedView(View):
+class FailedView(DataView):
     def __init__(self, name: str, url: Url, error_message: str) -> None:
         super().__init__(name, url)
         self.error_message: str = error_message
@@ -191,6 +201,48 @@ class FailedView(View):
             **super().to_json_value(),
             "error_message": self.error_message,
         }
+
+@dataclass
+class ViewsState:
+    frontend_timestamp: int
+    data_views: Mapping[Url, DataView]
+    prediction_views: Mapping[Url, PredictionsView]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "frontend_timestamp": self.frontend_timestamp,
+            "data_views": tuple(view.to_json_value() for view in self.data_views.values()),
+            "prediction_views": tuple(view.to_json_value() for view in self.prediction_views.values()),
+        }
+
+    def updated_with(
+        self,
+        *,
+        frontend_timestamp: int,
+        data_views: "None | Mapping[Url, DataView]" = None,
+        prediction_views: "None | Mapping[Url, PredictionsView]" = None,
+    ) -> "ViewsState":
+        if frontend_timestamp < self.frontend_timestamp:
+            return self.updated_with(frontend_timestamp=self.frontend_timestamp)
+        return ViewsState(
+            frontend_timestamp=frontend_timestamp,
+            data_views=self.data_views if data_views is None else data_views,
+            prediction_views=self.prediction_views if prediction_views is None else prediction_views,
+        )
+
+    def with_extra_views(
+        self,
+        *,
+        frontend_timestamp: int,
+        extra_data_views: "Mapping[Url, DataView]" = {},
+        extra_prediction_views: "Mapping[Url, PredictionsView]" = {},
+    ) -> "ViewsState":
+        return self.updated_with(
+            frontend_timestamp=frontend_timestamp,
+            data_views={**self.data_views, **extra_data_views},
+            prediction_views={**self.prediction_views, **extra_prediction_views},
+        )
+
 
 class WsViewerApplet(WsApplet):
     def __init__(
@@ -213,30 +265,30 @@ class WsViewerApplet(WsApplet):
         self.lock = threading.Lock()
 
         self.cached_views: Dict[Url, View] = {}
-        self.active_views: Dict[Url, View] = {}
-
+        self.state: ViewsState = ViewsState(frontend_timestamp=0, data_views={}, prediction_views={})
+        self.frontend_timestamp = 0
         super().__init__(name=name)
 
     def _get_json_state(self) -> JsonObject:
         with self.lock:
-            label_colors = self._in_label_colors()
+            label_colors = self._in_label_colors() or ()
             return {
-                "active_views": tuple(view.to_json_value() for view in self.active_views.values()),
-                "label_colors": tuple(c.to_json_data() for c in label_colors) if label_colors else (),
+                **self.state.to_json_value(),
+                "label_colors": tuple(c.to_json_data() for c in label_colors), # FIXME
             }
 
-    def take_snapshot(self) -> Dict[Url, View]:
+    def take_snapshot(self) -> ViewsState:
         with self.lock:
-            return {**self.active_views}
+            return self.state
 
-    def restore_snaphot(self, snapshot: Dict[Url, View]) -> None:
+    def restore_snaphot(self, snapshot: ViewsState) -> None:
         with self.lock:
-            self.active_views = {**snapshot}
+            self.state = snapshot
 
     @cascade(refresh_self=True)
-    def _add_active_view(self, user_prompt: UserPrompt, view: "View") -> CascadeResult:
+    def _add_data_view(self, user_prompt: UserPrompt, view: DataView, frontend_timestamp: int) -> CascadeResult:
         with self.lock:
-            self.active_views[view.url] = view
+            self.state = self.state.with_extra_views(frontend_timestamp=frontend_timestamp, extra_data_views={view.url: view})
             if view.url not in self.cached_views or isinstance(self.cached_views[view.url], FailedView):
                 self.cached_views[view.url] = view
         return CascadeOk()
@@ -245,70 +297,59 @@ class WsViewerApplet(WsApplet):
         label_colors = self._in_label_colors()
         classifier_and_generation = self._in_generational_classifier()
         with self.lock:
-            self.active_views = {url: view for url, view in self.active_views.items() if not isinstance(view, PredictionsView)}
             self.cached_views = {url: view for url, view in self.cached_views.items() if not isinstance(view, PredictionsView)}
-            if classifier_and_generation is None or label_colors is None:
-                return CascadeOk()
-            _, generation = classifier_and_generation
-            for view in tuple(self.active_views.values()):
-                if isinstance(view, RawDataView) and len(view.datasources) == 1:
-                    training_datasource = view.datasources[0]
-                elif isinstance(view, StrippedPrecomputedView):
-                    training_datasource = view.datasource
-                else:
-                    continue
-                predictions_view = PredictionsView(
-                    name=f"Predicting on {view.name}",
-                    classifier_generation=generation,
-                    raw_data=training_datasource,
-                    session_url=self.session_url,
-                )
-                self.active_views[predictions_view.url] = predictions_view
-                self.cached_views[predictions_view.url] = predictions_view
+            new_prediction_views: Dict[Url, PredictionsView] = {}
+            if classifier_and_generation is not None and label_colors is not None:
+                _, generation = classifier_and_generation
+                for view in tuple(self.state.data_views.values()):
+                    if isinstance(view, RawDataView) and len(view.datasources) == 1:
+                        training_datasource = view.datasources[0]
+                    elif isinstance(view, StrippedPrecomputedView):
+                        training_datasource = view.datasource
+                    else:
+                        continue
+                    predictions_view = PredictionsView(
+                        name=f"Predicting on {view.name}",
+                        classifier_generation=generation,
+                        raw_data=training_datasource,
+                        session_url=self.session_url,
+                    )
+                    new_prediction_views[predictions_view.url] = predictions_view
+                    self.cached_views[predictions_view.url] = predictions_view
+            self.state = self.state.updated_with(frontend_timestamp=self.state.frontend_timestamp, prediction_views=new_prediction_views)
         self.on_async_change() #FIXME: this should probably be done at the workflow level, not at the applet level
         return CascadeOk()
 
     @cascade(refresh_self=False)
-    def close_predictions(self, user_prompt: UserPrompt) -> CascadeResult:
+    def close_predictions(self, user_prompt: UserPrompt, frontend_timestamp: int) -> CascadeResult:
         with self.lock:
-            self.active_views = {url: view for url, view in self.active_views.items() if not isinstance(view, PredictionsView)}
+            self.state = self.state.updated_with(frontend_timestamp=frontend_timestamp, prediction_views={})
             return CascadeOk()
 
     @cascade(refresh_self=True)
-    def add_native_views(self, user_prompt: UserPrompt, native_views: Mapping[str, Url]) -> CascadeResult:
-        for view_name, view_url in native_views.items():
-            if view_url in self.active_views:
-                continue
-            if  PredictionsView.matches(view_url):
-                continue
-            if view_url in self.cached_views:
-                self.active_views[view_url] = self.cached_views[view_url]
-                continue
-            future_view = self.executor.submit(
-                _try_open_view,
-                name=view_name, url=view_url, allowed_protocols=tuple(self.allowed_protocols), session_url=self.session_url
-            )
-            future_view.add_done_callback(lambda fut: self._add_active_view(user_prompt, fut.result()))
-            future_view.add_done_callback(lambda _: self.on_async_change())
-        return CascadeOk()
-
-    @cascade(refresh_self=True)
-    def remove_native_views(self, user_prompt: UserPrompt, native_views: Mapping[str, Url]) -> CascadeResult:
+    def set_data_views(self, user_prompt: UserPrompt, native_views: Mapping[str, Url], frontend_timestamp: int) -> CascadeResult:
         with self.lock:
-            for url in native_views.values():
-                _ = self.active_views.pop(url, None)
+            new_data_views: Dict[Url, DataView] = {}
+            for view_name, view_url in native_views.items():
+                if  PredictionsView.matches(view_url):
+                    continue
+                cached_view = self.cached_views.get(view_url)
+                if isinstance(cached_view, (RawDataView, StrippedPrecomputedView, UnsupportedDatasetView)):
+                    new_data_views[view_url] = cached_view
+                    continue
+                future_view = self.executor.submit(
+                    _try_open_data_view,
+                    name=view_name, url=view_url, allowed_protocols=tuple(self.allowed_protocols), session_url=self.session_url
+                )
+                future_view.add_done_callback(lambda fut: self._add_data_view(user_prompt, fut.result(), frontend_timestamp=frontend_timestamp))
+                future_view.add_done_callback(lambda _: self.on_async_change())
+            self.state = self.state.updated_with(frontend_timestamp=frontend_timestamp, data_views=new_data_views, prediction_views={})
         return CascadeOk()
-
-    @cascade(refresh_self=False)
-    def open_datasource(self, user_prompt: UserPrompt, name: str, datasource: FsDataSource) -> CascadeResult:
-        if isinstance(datasource, PrecomputedChunksDataSource):
-            view = StrippedPrecomputedView(name=name, session_url=self.session_url, datasource=datasource)
-        else:
-            view = RawDataView(name=name, url=datasource.url, datasources=[datasource])
-        return self._add_active_view(user_prompt=user_prompt, view=view)
 
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
-        if method_name == "add_native_views"  or method_name == "remove_native_views":
+        frontend_timestamp = ensureJsonInt(arguments.get("frontend_timestamp"))
+
+        if method_name == "set_data_views":
             active_view_urls: Dict[str, Url] = {}
             for native_view in ensureJsonArray(arguments.get("native_views")):
                 native_view_obj = ensureJsonObject(native_view)
@@ -317,16 +358,9 @@ class WsViewerApplet(WsApplet):
                 if view_url is None:
                     raise ValueError(f"Could not parse url in {json.dumps(native_view)}")
                 active_view_urls[view_name] = view_url
-            if method_name == "add_native_views":
-                result = self.add_native_views(user_prompt=user_prompt, native_views=active_view_urls)
-            else:
-                result = self.remove_native_views(user_prompt=user_prompt, native_views=active_view_urls)
-        elif(method_name == "open_datasource"):
-            name = ensureJsonString(arguments.get("name"))
-            datasource = FsDataSource.from_json_value(arguments.get("datasource"))
-            if not isinstance(datasource, FsDataSource):
-                return UsageError(f"Expecting datasource to be a FsDataSource")
-            result = self.open_datasource(user_prompt=user_prompt, name=name, datasource=datasource)
+            result = self.set_data_views(user_prompt=user_prompt, native_views=active_view_urls, frontend_timestamp=frontend_timestamp)
+        elif method_name == "close_predictions":
+            result = self.close_predictions(user_prompt=user_prompt, frontend_timestamp=frontend_timestamp)
         else:
             raise ValueError(f"Invalid method name: '{method_name}'")
 
@@ -335,14 +369,43 @@ class WsViewerApplet(WsApplet):
         else:
             return None
 
+    async def make_data_view(self, request: web.Request) -> web.Response:
+        payload = await request.json()
+        view_name = ensureJsonString(payload.get("name"))
+        raw_url = ensureJsonString(payload.get("url"))
+        if raw_url is None:
+            return  uncachable_json_response({"error": "Missing 'url' key in payload"}, status=400)
+        url = Url.parse(raw_url)
+        if url is None:
+            return  uncachable_json_response({"error": "Bad url in payload"}, status=400)
 
-def _try_open_view(*, name: str, url: Url, session_url: Url, allowed_protocols: Sequence[Protocol]) -> "View":
-    view_result = (
-        StrippedPrecomputedView.try_from_url(name=name, url=url, session_url=session_url, allowed_protocols=allowed_protocols) or
-        RawDataView.try_from_url(name=name, url=url, allowed_protocols=allowed_protocols)
-    )
-    if isinstance(view_result, type(None)):
+        with self.lock:
+            view = self.cached_views.get(url)
+        if view is None:
+            view = await asyncio.wrap_future(self.executor.submit(
+                _try_open_data_view,
+                name=view_name, url=url, session_url=self.session_url, allowed_protocols=[Protocol.HTTPS, Protocol.HTTP]
+            ))
+        return web.json_response(
+            view.to_json_value(),
+            status=200
+        )
+
+
+def _try_open_data_view(
+    *, name: str, url: Url, session_url: Url, allowed_protocols: Sequence[Protocol] = (Protocol.HTTPS, Protocol.HTTP)
+) -> "DataView":
+    fixed_url = url.updated_with(hash_="")
+    datasources_result = try_get_datasources_from_url(url=fixed_url, allowed_protocols=allowed_protocols)
+    if isinstance(datasources_result, type(None)):
         return UnsupportedDatasetView(name=name, url=url)
-    if isinstance(view_result, Exception):
-        return FailedView(name=name, url=url, error_message=str(view_result))
-    return view_result
+    if isinstance(datasources_result, Exception):
+        return FailedView(name=name, url=url, error_message=str(datasources_result))
+
+    # if the requested URL matches the URL of a single returned datasource, we have to strip it out of the other scales
+    if len(datasources_result) > 1:
+        for ds in datasources_result:
+            if isinstance(ds, PrecomputedChunksDataSource) and ds.url == url:
+                return StrippedPrecomputedView(name=name, session_url=session_url, datasource=ds)
+
+    return RawDataView(name=name, url=url, datasources=datasources_result)

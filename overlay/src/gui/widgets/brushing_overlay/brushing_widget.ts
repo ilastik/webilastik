@@ -84,8 +84,8 @@ export class BrushingWidget{
                 applet_name,
                 gl: this.gl,
                 onDataSourceClicked: (datasource) => {
-                    console.log(`Should open this: ${datasource.url}`)
-                    // this.viewer.refreshView({view: TrainingView.fromDataSource({datasource, session})})
+                    console.log(`Should open ${datasource.url}`)
+                    // this.viewer.addNativeViews([{name: datasource.url.path.name, url: datasource.url}])
                 },
                 onLabelSelected: () => {
                     this.setBrushingEnabled(true)

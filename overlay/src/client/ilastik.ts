@@ -958,7 +958,18 @@ export abstract class View{
     }
 }
 
-export class RawDataView extends View{
+export class DataView extends View{
+    public static fromJsonValue(value: JsonValue): DataView{
+        let view = View.fromJsonValue(value)
+        if(view instanceof DataView){
+            return view
+        }else{
+            throw Error(`Expected an instance of DataView, found ${JSON.stringify(value)}`)
+        }
+    }
+}
+
+export class RawDataView extends DataView{
     public readonly datasources: DataSource[]
     constructor(params: {name: string, url: Url, datasources: Array<DataSource>}){
         super(params)
@@ -975,7 +986,7 @@ export class RawDataView extends View{
     }
 }
 
-export class StrippedPrecomputedView extends View{
+export class StrippedPrecomputedView extends DataView{
     public readonly datasource: DataSource
     constructor(params: {name: string, url: Url, datasource: DataSource}){
         super(params)
@@ -1013,7 +1024,7 @@ export class PredictionsView extends View{
 
 }
 
-export class UnsupportedDatasetView extends View{
+export class UnsupportedDatasetView extends DataView{
     public static fromJsonValue(value: JsonValue): UnsupportedDatasetView {
         const value_obj = ensureJsonObject(value)
         return new UnsupportedDatasetView({
@@ -1023,7 +1034,7 @@ export class UnsupportedDatasetView extends View{
     }
 }
 
-export class FailedView extends View{
+export class FailedView extends DataView{
     public readonly error_message: string
     constructor(params: {name: string, url: Url, error_message: string}){
         super(params)
