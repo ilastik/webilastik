@@ -767,8 +767,6 @@ export abstract class DataSource implements IJsonable{
         )
     }
 
-    public abstract toTrainingUrl(_session: Session): Url;
-
     public static async getDatasourcesFromUrl(params: {datasource_url: Url, session: Session}): Promise<Array<DataSource> | Error>{
         let url = params.session.sessionUrl.joinPath("get_datasources_from_url")
             .updatedWith({
@@ -803,14 +801,6 @@ export class PrecomputedChunksDataSource extends DataSource{
     protected doToJsonValue() : JsonObject & {__class__: string}{
         return { __class__: "PrecomputedChunksDataSource"}
     }
-
-    public toTrainingUrl(session: Session): Url{
-        const original_url = this.filesystem.getUrl().joinPath(this.path.raw).updatedWith({datascheme: "precomputed"})
-        const resolution_str = `${this.spatial_resolution[0]}_${this.spatial_resolution[1]}_${this.spatial_resolution[2]}`
-        return session.sessionUrl
-            .ensureDataScheme("precomputed")
-            .joinPath(`stripped_precomputed/url=${Session.btoa(original_url.raw)}/resolution=${resolution_str}`)
-    }
 }
 
 export class SkimageDataSource extends DataSource{
@@ -823,10 +813,6 @@ export class SkimageDataSource extends DataSource{
 
     protected doToJsonValue() : JsonObject & {__class__: string}{
         return { __class__: "SkimageDataSource"}
-    }
-
-    public toTrainingUrl(_session: Session): Url{
-        return this.filesystem.getUrl().joinPath(this.path.raw)
     }
 }
 
