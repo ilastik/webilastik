@@ -130,7 +130,7 @@ export class PrecomputedChunksScale_DataSink_Input{
             info_dir: infoPath,
             dtype,
             num_channels: sinkShape.c,
-            scale: new Scale(filesystem.getUrl().joinPath(infoPath), {
+            scale: new Scale({
                 key: scaleKey.raw,
                 size: [sinkShape.x, sinkShape.y, sinkShape.z],
                 resolution: [resolution[0], resolution[1], resolution[2]],

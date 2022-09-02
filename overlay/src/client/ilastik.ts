@@ -2,7 +2,7 @@ import { vec3 } from "gl-matrix"
 import { INativeView } from "../drivers/viewer_driver"
 import { fetchJson, sleep } from "../util/misc"
 import { Path, Url } from "../util/parsed_url"
-import { DataType, Scale } from "../util/precomputed_chunks"
+import { DataType, ensureDataType, Scale } from "../util/precomputed_chunks"
 import {
     ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonNumberPair, ensureJsonNumberTripplet, ensureJsonObject,
     ensureJsonString, ensureOptional, IJsonable, IJsonableObject, JsonObject, JsonValue, toJsonValue
@@ -695,9 +695,10 @@ export abstract class DataSource implements IJsonable{
     public readonly shape: Shape5D
     public readonly tile_shape: Shape5D
     public readonly url: Url
+    public readonly dtype: DataType
 
     constructor(params: {
-        filesystem: FileSystem, path: Path, shape: Shape5D, spatial_resolution?: vec3, tile_shape: Shape5D, url: Url
+        filesystem: FileSystem, path: Path, shape: Shape5D, spatial_resolution?: vec3, tile_shape: Shape5D, url: Url, dtype: DataType
     }){
         this.filesystem = params.filesystem
         this.path = params.path
@@ -705,6 +706,7 @@ export abstract class DataSource implements IJsonable{
         this.shape = params.shape
         this.tile_shape = params.tile_shape
         this.url = params.url
+        this.dtype = params.dtype
     }
 
     public get hashValue(): string{
@@ -733,6 +735,7 @@ export abstract class DataSource implements IJsonable{
             shape: Shape5D.fromJsonData(json_object["shape"]),
             tile_shape: Shape5D.fromJsonData(json_object["tile_shape"]),
             url: Url.parse(ensureJsonString(json_object["url"])),
+            dtype: ensureDataType(ensureJsonString(json_object["dtype"]))
         }
     }
 
@@ -744,6 +747,7 @@ export abstract class DataSource implements IJsonable{
             shape: this.shape.toJsonValue(),
             tile_shape: this.tile_shape.toJsonValue(),
             url: this.url.raw,
+            dtype: this.dtype,
             ...this.doToJsonValue()
         }
     }
@@ -791,15 +795,27 @@ export abstract class DataSource implements IJsonable{
 
 // Represents a single scale from precomputed chunks
 export class PrecomputedChunksDataSource extends DataSource{
+    public readonly scale: Scale
+    constructor(params: {
+        filesystem: FileSystem, path: Path, shape: Shape5D, spatial_resolution?: vec3, tile_shape: Shape5D, url: Url, scale: Scale, dtype: DataType
+    }){
+        super(params)
+        this.scale = params.scale
+    }
+
     public static fromJsonValue(data: JsonValue) : PrecomputedChunksDataSource{
         const data_obj = ensureJsonObject(data)
         return new PrecomputedChunksDataSource({
             ...DataSource.extractBasicData(data_obj),
+            scale: Scale.fromJsonValue(data_obj["scale"]),
         })
     }
 
     protected doToJsonValue() : JsonObject & {__class__: string}{
-        return { __class__: "PrecomputedChunksDataSource"}
+        return {
+            __class__: "PrecomputedChunksDataSource",
+            scale: this.scale.toJsonValue(),
+        }
     }
 }
 

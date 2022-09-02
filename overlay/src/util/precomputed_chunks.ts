@@ -1,5 +1,5 @@
 import { Url } from "../util/parsed_url";
-import { ensureJsonArray, ensureJsonNumber, ensureJsonNumberTripplet, ensureJsonObject, ensureJsonString, JsonObject, JsonValue } from "../util/serialization"
+import { ensureJsonArray, ensureJsonNumberTripplet, ensureJsonObject, ensureJsonString, JsonObject, JsonValue } from "../util/serialization"
 
 
 export const encodings = ["raw", "jpeg", "compressed_segmentation"] as const;
@@ -13,7 +13,6 @@ export function ensureEncoding(value: string): Encoding{
 }
 
 export class Scale{
-    public readonly base_url: Url
     public readonly key: string
     public readonly size: [number, number, number]
     public readonly resolution: [number, number, number]
@@ -21,7 +20,7 @@ export class Scale{
     public readonly chunk_sizes: [number, number, number][]
     public readonly encoding: Encoding
 
-    constructor(base_url: Url, params: {
+    constructor(params: {
         key: string,
         size: [number, number, number],
         resolution: [number, number, number],
@@ -29,7 +28,6 @@ export class Scale{
         chunk_sizes: Array<[number, number, number]>,
         encoding: Encoding,
     }){
-        this.base_url = base_url
         this.key = params.key.replace(/^\//, "")
         this.size = params.size
         this.resolution = params.resolution
@@ -38,15 +36,9 @@ export class Scale{
         this.encoding = params.encoding
     }
 
-    public getChunkUrl(interval: {x: [number, number], y: [number, number], z: [number, number]}): Url{
-        return this.base_url.joinPath(
-            `${this.key}/${interval.x[0]}-${interval.x[1]}_${interval.y[0]}-${interval.y[1]}_${interval.z[0]}-${interval.z[1]}`
-        )
-    }
-
-    public static fromJsonValue(base_url: Url, value: JsonValue){
+    public static fromJsonValue(value: JsonValue){
         const obj = ensureJsonObject(value)
-        return new Scale(base_url, {
+        return new Scale({
             key: ensureJsonString(obj.key),
             size: ensureJsonNumberTripplet(obj.size),
             resolution: ensureJsonNumberTripplet(obj.resolution),
@@ -108,28 +100,5 @@ export class PrecomputedChunks{
         this.data_type = params.data_type
         this.num_channels = params.num_channels
         this.scales = params.scales
-    }
-
-    public static async tryFromUrl(url: Url): Promise<PrecomputedChunks | undefined>{
-        if(url.datascheme !== "precomputed"){
-            return undefined
-        }
-        if(url.protocol != "http" && url.protocol != "https"){
-            return undefined
-        }
-        const info_url = url.joinPath("info").schemeless_raw
-        const info_resp = await fetch(info_url)
-        if(!info_resp.ok){
-            throw `Failed requesting ${info_url}`
-        }
-
-        const raw_info = ensureJsonObject(await info_resp.json())
-        return new PrecomputedChunks({
-            url,
-            type: ensureType(ensureJsonString(raw_info["type"])),
-            data_type: ensureDataType(ensureJsonString(raw_info["data_type"])),
-            num_channels: ensureJsonNumber(raw_info["num_channels"]),
-            scales: ensureJsonArray(raw_info["scales"]).map(raw_scale => Scale.fromJsonValue(url, raw_scale))
-        })
     }
 }
