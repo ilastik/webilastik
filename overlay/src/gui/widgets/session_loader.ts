@@ -7,6 +7,9 @@ export class SessionLoaderWidget{
     public readonly ilastikUrlInput: HTMLInputElement;
     public readonly sessionIdField: HTMLInputElement;
     private loadSessionButton: HTMLInputElement
+    private messagesContainer: HTMLParagraphElement;
+    messagesContainerLabel: HTMLLabelElement;
+
     constructor({
         ilastikUrl, sessionId, parentElement, onUsageError, onNewSession
     }: {
@@ -36,33 +39,57 @@ export class SessionLoaderWidget{
 
         this.loadSessionButton = createInputParagraph({inputType: "submit", value: "Rejoin Session", parentElement: form})
 
-        const message_p = createElement({tagName: "p", parentElement: form})
+        this.messagesContainerLabel = createElement({tagName: "label", parentElement: form, innerText: "Session joining log:", inlineCss: {display: "none"}})
+        this.messagesContainer = createElement({tagName: "p", parentElement: form, cssClasses: ["ItkSessionCreatorWidget_status-messages"], inlineCss: {display: "none"}})
 
-        form.addEventListener("submit", (ev) => {
-            this.loadSessionButton.value = "Loading Session..."
-            message_p.innerHTML = ""
-            this.set_disabled(true)
-            Session.load({
-                ilastikUrl: Url.parse(this.ilastikUrlInput.value),
-                sessionId: this.sessionIdField.value,
-                timeout_minutes: parseInt(timeoutInput.value),
-                onUsageError,
-            }).then(
-                sessionResult => {
-                    if(sessionResult instanceof Error){
-                        message_p.innerHTML = sessionResult.message
-                        this.set_disabled(false)
-                    }else{
-                        this.set_disabled(true)
-                        this.sessionIdField.value = sessionResult.sessionUrl.raw
-                        this.ilastikUrlInput.value = sessionResult.ilastikUrl.raw
-                        onNewSession(sessionResult)
-                    }
-                },
-            )
+        form.addEventListener("submit", (ev): false => {
+            this.messagesContainer.innerHTML = "";
+
+            (async () => {
+                const ilastikUrl = Url.parse(this.ilastikUrlInput.value)
+                let is_logged_in = await Session.check_login({ilastikUrl})
+                if(!is_logged_in){
+                    this.logMessage("Not looged in.")
+                    const login_url = ilastikUrl.joinPath("api/login_then_close").raw
+                    this.messagesContainer.innerHTML += `<p><a target="_blank" rel="noopener noreferrer" href="${login_url}">Login on ebrains</a> and try again.</p>`
+                    window.open(login_url)
+                    this.set_disabled(false);
+                    return
+                }
+
+                this.loadSessionButton.value = "Loading Session..."
+                this.set_disabled(true)
+                let sessionResult = await Session.load({
+                    ilastikUrl,
+                    sessionId: this.sessionIdField.value,
+                    timeout_minutes: parseInt(timeoutInput.value),
+                    onUsageError,
+                    onProgress: (message) => this.logMessage(message)
+                })
+
+                if(sessionResult instanceof Error){
+                    this.logMessage(sessionResult.message)
+                    this.set_disabled(false)
+                }else{
+                    this.set_disabled(true)
+                    this.sessionIdField.value = sessionResult.sessionUrl.raw
+                    this.ilastikUrlInput.value = sessionResult.ilastikUrl.raw
+                    onNewSession(sessionResult)
+                }
+            })()
+
             ev.preventDefault()
             return false
         })
+    }
+
+    private logMessage(message: string){
+        this.messagesContainerLabel.style.display = "inline"
+        this.messagesContainer.style.display = "block"
+
+        let p = createElement({tagName: "p", parentElement: this.messagesContainer})
+        createElement({tagName: "em", parentElement: p, innerText: `${new Date().toLocaleString()} ${message}`})
+        this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight
     }
 
     public set_disabled(disabled: boolean){
