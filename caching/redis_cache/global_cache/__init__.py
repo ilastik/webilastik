@@ -20,7 +20,6 @@ def parse_ip_port(value: str) -> Tuple[str, int]:
 REDIS_HOST_PORT = os.environ.get("REDIS_HOST_PORT")
 if REDIS_HOST_PORT is not None:
     redis_host, port_str = REDIS_HOST_PORT.split(":")
-    print(f"!!!!! {redis_host=}   {port_str=}")
     redis_factory = lambda: redis.Redis(host=redis_host, port=int(port_str))
 else:
     REDIS_UNIX_SOCKET_PATH = get_env_var_or_exit(var_name="REDIS_UNIX_SOCKET_PATH", parser=Path)
