@@ -450,45 +450,78 @@ class CscsSshJobLauncher(SshJobLauncher):
         ebrains_user_token: UserToken,
         session_id: uuid.UUID,
     ) -> str:
-        scratch = "/scratch/snx3000/bp000188"
-        project = "/users/bp000188"
-        webilastik_source_dir = f"{project}/source/webilastik"
-        conda_env_dir = f"{project}/miniconda3/envs/webilastik"
+        working_dir = f"$SCRATCH/{session_id}"
+        home="/users/bp000188"
+        webilastik_source_dir = f"{working_dir}/webilastik"
+        conda_env_dir = f"{home}/miniconda3/envs/webilastik"
+        redis_pid_file = f"{working_dir}/redis.pid"
+        redis_port = "6379"
 
         out =  textwrap.dedent(f"""\
             #!/bin/bash
             #SBATCH --nodes=10
-            #SBATCH --ntasks=30
-            #SBATCH --cpus-per-task=12
-            #SBATCH --partition=normal
+            #SBATCH --ntasks-per-node=2
+            #SBATCH --partition=debug
             #SBATCH --hint=nomultithread
             #SBATCH --constraint=mc
 
             export EBRAINS_USER_ACCESS_TOKEN="{ebrains_user_token.access_token}"
             set -xeu
 
+            mkdir {working_dir}
+            cd {working_dir}
+            git clone --depth 1 --branch experimental https://github.com/ilastik/webilastik {webilastik_source_dir}
+
             # prevent numpy from spawning its own threads
             export OPENBLAS_NUM_THREADS=1
             export MKL_NUM_THREADS=1
 
+            REDIS_IP=$(ip -o addr show ipogif0 | grep -E '\\binet\\b' | awk '{{print $4}}' | cut -d/ -f1)
+
+            srun --nodes=1-1 --ntasks 1 -u --cpu_bind=none \\
+                {conda_env_dir}/bin/redis-server \\
+                --pidfile {redis_pid_file} \\
+                --bind $REDIS_IP \\
+                --port {redis_port} \\
+                --daemonize no \\
+                --maxmemory-policy allkeys-lru \\
+                --maxmemory 100gb \\
+                --appendonly no \\
+                --save "" \\
+                --dir {working_dir} \\
+                &
+
+            NUM_TRIES=10;
+            while [ ! -e {redis_pid_file} -a $NUM_TRIES -gt 0 ]; do
+                echo "Redis not ready yet. Sleeping..."
+                NUM_TRIES=$(expr $NUM_TRIES - 1)
+                sleep 1
+            done
+
+            if [ $NUM_TRIES -eq 0 ]; then
+                echo "Could not start redis"
+                exit 1
+            fi
+
             PYTHONPATH="{webilastik_source_dir}"
             PYTHONPATH+=":{webilastik_source_dir}/executor_getters/cscs/"
-            PYTHONPATH+=":{webilastik_source_dir}/caching/lru_cache/"
+            PYTHONPATH+=":{webilastik_source_dir}/caching/redis_cache/"
 
             export PYTHONPATH
-            export LRU_CACHE_MAX_SIZE=512
-            export EBRAINS_USER_ACCESS_TOKEN="{ebrains_user_token.access_token}"
+            export REDIS_HOST_PORT="$REDIS_IP:{redis_port}"
 
-            srun -n 30\\
+            srun -N 9 \\
                 "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py \\
                 --max-duration-minutes={time} \\
-                --ebrains-user-access-token={ebrains_user_token.access_token} \\
-                --listen-socket="{scratch}/to-master-{session_id}" \\
+                --listen-socket="{working_dir}/to-master.sock" \\
                 --session-url=https://app.ilastik.org/session-{session_id} \\
                 tunnel \\
                 --remote-username=www-data \\
                 --remote-host=app.ilastik.org \\
                 --remote-unix-socket="/tmp/to-session-{session_id}" \\
+
+            kill -2 $(cat {redis_pid_file})
+            sleep 2
         """)
         # print(out)
         return out
