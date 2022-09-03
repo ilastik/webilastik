@@ -377,6 +377,7 @@ class JusufSshJobLauncher(SshJobLauncher):
             #SBATCH --partition=batch
             #SBATCH --hint=nomultithread
 
+            export EBRAINS_USER_ACCESS_TOKEN="{ebrains_user_token.access_token}"
             set -xeu
 
             jutil env activate -p icei-hbp-2022-0010
@@ -422,7 +423,6 @@ class JusufSshJobLauncher(SshJobLauncher):
             srun -n 1 --overlap -u --cpus-per-task 120 \\
                 "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py \\
                 --max-duration-minutes={time} \\
-                --ebrains-user-access-token={ebrains_user_token.access_token} \\
                 --listen-socket="{working_dir}/to-master.sock" \\
                 --session-url=https://app.ilastik.org/session-{session_id} \\
                 tunnel \\
@@ -464,6 +464,7 @@ class CscsSshJobLauncher(SshJobLauncher):
             #SBATCH --hint=nomultithread
             #SBATCH --constraint=mc
 
+            export EBRAINS_USER_ACCESS_TOKEN="{ebrains_user_token.access_token}"
             set -xeu
 
             # prevent numpy from spawning its own threads

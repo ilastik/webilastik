@@ -439,7 +439,6 @@ if __name__ == '__main__':
 
     parser = ArgumentParser()
     parser.add_argument("--max-duration-minutes", type=int, required=True, help="Number of minutes this workflow can run for")
-    parser.add_argument("--ebrains-user-access-token", type=str, required=True)
     parser.add_argument("--listen-socket", type=Path, required=True)
     parser.add_argument("--session-url", required=True)
 
@@ -453,7 +452,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     session_url = Url.parse_or_raise(args.session_url)
-    UserToken.login_globally(token=UserToken(access_token=args.ebrains_user_access_token))
+    UserToken.login_globally_from_environment()
 
     executor = get_executor(hint="server_tile_handler", max_workers=multiprocessing.cpu_count())
 
