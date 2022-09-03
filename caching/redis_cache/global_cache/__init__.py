@@ -31,8 +31,6 @@ else:
         exit(1)
     redis_factory = lambda: redis.Redis(unix_socket_path=str(REDIS_UNIX_SOCKET_PATH))
 
-_ = redis_factory().set("test", "test")
-
 def _redis_cache(func: T) -> T: #FIXME: use Callabe[P, OUT] ?
     @wraps(func)
     def wrapper(*args, **kwargs):
