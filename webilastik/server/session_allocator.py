@@ -150,11 +150,6 @@ class SessionAllocator:
             web.get('/api/session/{session_id}', self.session_status),
             web.post('/api/get_ebrains_token', self.get_ebrains_token), #FIXME: I'm using this in NG web workers
             web.get('/service_worker.js', self.serve_service_worker),
-            web.static(
-                '/public',
-                Path(__file__).joinpath("../../../public"), # FIXME: how does this work?
-                follow_symlinks=True, show_index=True
-            ),
         ])
         super().__init__()
 
@@ -174,8 +169,9 @@ class SessionAllocator:
         return web.json_response({EbrainsLogin.AUTH_COOKIE_KEY: session.user_token.access_token})
 
     async def serve_service_worker(self, request: web.Request) -> web.StreamResponse:
-        public_dir_path = Path(__file__).parent.parent.parent.joinpath("public")
-        return web.FileResponse(public_dir_path / "js/service_worker.js")
+        requested_url = get_requested_url(request)
+        redirect_url = requested_url.updated_with(path=requested_url.path.parent.joinpath("public/js/service_worker.js"))
+        raise web.HTTPFound(location=redirect_url.raw)
 
     async def welcome(self, request: web.Request) -> web.Response:
         redirect_url = get_requested_url(request).joinpath("public/html/welcome.html")
