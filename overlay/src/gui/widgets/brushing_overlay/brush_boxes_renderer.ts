@@ -5,6 +5,7 @@ import { VertexArrayObject, BufferUsageHint } from "../../../gl/buffer";
 import { RenderParams } from "../../../gl/gl";
 import { ShaderProgram, VertexShader, FragmentShader } from "../../../gl/shader";
 import { TriangleArray } from "../../../gl/vertex_primitives";
+import { show_if_changed } from "../../../util/misc";
 import { BrushRenderer } from "./brush_renderer"
 import { Camera } from "./camera"
 
@@ -114,7 +115,7 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
             gl,
             new VertexShader(gl, `
                 //vertex shader to render a single voxel of the brush stroke. Use instanced rendering to render the whole stroke
-                precision mediump float;
+                precision highp float;
 
                 in vec3 a_vert_pos_o; //box vertex, different for every vertex
                 in vec3 a_offset_vx; //voxel coordinates (cube)
@@ -157,7 +158,7 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
                 }
             `),
             new FragmentShader(gl, `
-                precision mediump float;
+                precision highp float;
 
                 uniform mat4 u_voxel_to_world;
                 uniform vec3 u_brush_resolution;
@@ -174,7 +175,7 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
                     bool projected_point_is_inside_cube_but_not_on_face = all( greaterThan(dist, vec3(0,0,0)) );
                     bool projected_point_is_on_face = dist == vec3(0,0,0);
                     if(
-                        projected_point_is_inside_cube_but_not_on_face || gl_FrontFacing && projected_point_is_on_face
+                        projected_point_is_inside_cube_but_not_on_face || gl_FrontFacing && projected_point_is_on_face || gl_FragCoord.z == 0.5
                     ){
                         ${highlightCrossSection ?
                             'outf_color = vec4(mix(color, vec3(1,1,1), 0.5), 1); //increase brightness'
@@ -218,6 +219,8 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
 
         let u_voxel_to_world = mat4.clone(voxelToWorld);
         this.uniformMatrix4fv("u_voxel_to_world", u_voxel_to_world);
+
+        show_if_changed("u_voxel_to_world", mat4.str(u_voxel_to_world))
 
         let u_world_to_clip = mat4.clone(camera.world_to_clip);
         this.uniformMatrix4fv("u_world_to_clip", u_world_to_clip);
