@@ -44,6 +44,7 @@ export class SessionLoaderWidget{
 
         form.addEventListener("submit", (ev): false => {
             this.messagesContainer.innerHTML = "";
+            this.set_disabled({disabled: true, buttonText: "Loading Session..."});
 
             (async () => {
                 const ilastikUrl = Url.parse(this.ilastikUrlInput.value)
@@ -53,12 +54,10 @@ export class SessionLoaderWidget{
                     const login_url = ilastikUrl.joinPath("api/login_then_close").raw
                     this.messagesContainer.innerHTML += `<p><a target="_blank" rel="noopener noreferrer" href="${login_url}">Login on ebrains</a> and try again.</p>`
                     window.open(login_url)
-                    this.set_disabled(false);
+                    this.set_disabled({disabled: false, buttonText: "Rejoin Session"});
                     return
                 }
 
-                this.loadSessionButton.value = "Loading Session..."
-                this.set_disabled(true)
                 let sessionResult = await Session.load({
                     ilastikUrl,
                     sessionId: this.sessionIdField.value,
@@ -69,9 +68,9 @@ export class SessionLoaderWidget{
 
                 if(sessionResult instanceof Error){
                     this.logMessage(sessionResult.message)
-                    this.set_disabled(false)
+                    this.set_disabled({disabled: false, buttonText: "Rejoin Session"})
                 }else{
-                    this.set_disabled(true)
+                    this.set_disabled({disabled: true, buttonText: "Session is running..."})
                     this.sessionIdField.value = sessionResult.sessionUrl.raw
                     this.ilastikUrlInput.value = sessionResult.ilastikUrl.raw
                     onNewSession(sessionResult)
@@ -92,15 +91,11 @@ export class SessionLoaderWidget{
         this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight
     }
 
-    public set_disabled(disabled: boolean){
+    public set_disabled(params: {disabled: boolean, buttonText: string}){
         this.element.querySelectorAll("input").forEach(inp => {
-            (inp as HTMLInputElement).disabled = disabled
+            (inp as HTMLInputElement).disabled = params.disabled
         })
-        if(disabled){
-            this.loadSessionButton.value = "Session is running..."
-        }else{
-            this.loadSessionButton.value = "Rejoin Session"
-        }
+        this.loadSessionButton.value = params.buttonText
     }
 
     public setFields(params: {ilastikUrl: Url, sessionId?: string}){
