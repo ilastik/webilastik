@@ -461,7 +461,7 @@ class CscsSshJobLauncher(SshJobLauncher):
             #!/bin/bash
             #SBATCH --nodes=10
             #SBATCH --ntasks-per-node=2
-            #SBATCH --partition=debug
+            #SBATCH --partition=normal
             #SBATCH --hint=nomultithread
             #SBATCH --constraint=mc
 
