@@ -934,9 +934,9 @@ export abstract class View{
         this.url = params.url
     }
 
-    public toNative(): INativeView{
+    public toNative(name?: string): INativeView{
         return {
-            name: this.name,
+            name: name || this.name,
             url: this.url.updatedWith({search: new Map(), hash: ""}).raw
         }
     }

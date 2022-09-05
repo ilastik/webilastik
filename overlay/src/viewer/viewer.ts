@@ -1,7 +1,7 @@
 // import { vec3 } from "gl-matrix";
 import { vec3 } from "gl-matrix";
 import { Applet } from "../client/applets/applet";
-import { DataSource, PredictionsView, Session, View, DataView } from "../client/ilastik";
+import { DataSource, PredictionsView, Session, View, DataView, RawDataView, StrippedPrecomputedView } from "../client/ilastik";
 import { INativeView, IViewerDriver, IViewportDriver } from "../drivers/viewer_driver";
 import { ErrorPopupWidget } from "../gui/widgets/popup";
 import { HashMap } from "../util/hashmap";
@@ -85,10 +85,12 @@ export class Viewer extends Applet<ViewerAppletState>{
     }
 
     public setDataViews(nativeViews: Array<{name: string, url: Url}>){
-        console.log(`Setting data views to\n${
-            JSON.stringify(toJsonValue(nativeViews), null, 2)
-        }`)
-        this.doRPC("set_data_views", {frontend_timestamp: new Date().getTime(), native_views: nativeViews})
+        if(nativeViews.find(nv => !this.state.data_views.has(nv.url))){
+            console.log(`Setting data views to\n${
+                JSON.stringify(toJsonValue(nativeViews), null, 2)
+            }`)
+            this.doRPC("set_data_views", {frontend_timestamp: new Date().getTime(), native_views: nativeViews})
+        }
     }
 
 
@@ -124,9 +126,24 @@ export class Viewer extends Applet<ViewerAppletState>{
         let channel_colors: vec3[] = newState.label_colors.map(c => vec3.fromValues(c.r, c.g, c.b))
 
         // open all missing PredictionView's
-        for(let view of newState.prediction_views.values()){
-            if(!nativeViewsMap.has(view.url)){
-                this.driver.refreshView({native_view: view.toNative(), channel_colors: channel_colors})
+        for(let predictionView of newState.prediction_views.values()){
+            if(nativeViewsMap.has(predictionView.url)){
+                continue
+            }
+            for(let [nativeUrl, nativeView] of nativeViewsMap.entries()){
+                let dataView = newState.data_views.get(nativeUrl);
+                let datasourceInView: DataSource;
+                if(dataView instanceof RawDataView && dataView.datasources.length == 1){
+                    datasourceInView = dataView.datasources[0]
+                }else if(dataView instanceof StrippedPrecomputedView){
+                    datasourceInView = dataView.datasource
+                }else{
+                    continue
+                }
+                if(datasourceInView.equals(predictionView.raw_data)){
+                    this.driver.refreshView({native_view: predictionView.toNative(`Predicting on ${nativeView.name}`), channel_colors: channel_colors})
+                    break
+                }
             }
         }
 
