@@ -11,10 +11,8 @@ vars:
   ENV_CHECKSUM_PATH: "{{.BUILD_DIR}}/environment.yml.sha256"
   PACKED_ENV_PATH: "{{.ENV_PATH}}.tar.gz"
   DEB_TREE_PATH: "{{.BUILD_DIR}}/deb_tree"
-  WEBILASTIK_DEV_UNIT_NAME:
-    sh: systemd-escape "{{.DEB_TREE_PATH}}/opt/webilastik" --template=webilastik@.service
-  WEBILASTIK_UNIT_INSTALL_PATH: "/lib/systemd/system/webilastik@.service"
-  WEBILASTIK_DEV_UNIT_CONFIG_DIR: "/etc/systemd/system/{{.WEBILASTIK_DEV_UNIT_NAME}}.d"
+  WEBILASTIK_UNIT_INSTALL_PATH: "/lib/systemd/system/webilastik.service"
+  WEBILASTIK_DEV_UNIT_CONFIG_DIR: "/etc/systemd/system/webilastik.service.d"
   DEB_PKG_PATH: "{{.BUILD_DIR}}/{{.PKG_NAME}}.deb"
   REMOTE_PACKAGE_PATH: "/home/ubuntu/{{.PKG_NAME}}.deb"
   NEUROGLANCER_GIT_DIR: "{{.BUILD_DIR}}/neuroglancer"
@@ -229,7 +227,8 @@ tasks:
 
       - echo "Ensuring webilastik service is visible to systemd"
       - sudo rm -f {{.WEBILASTIK_UNIT_INSTALL_PATH}}
-      - sudo ln -s {{.PROJECT_ROOT}}/package_tree/lib/systemd/system/webilastik@.service {{.WEBILASTIK_UNIT_INSTALL_PATH}}
+      - sudo ln -s {{.PROJECT_ROOT}}/package_tree/lib/systemd/system/webilastik.service {{.WEBILASTIK_UNIT_INSTALL_PATH}}
+      - sudo ln -s {{.DEB_TREE_PATH}}/opt/webilastik /opt/webilastik
 
       - echo "Configuring webilastik service to log to this tty ($(tty))"
       - sudo mkdir -p {{.WEBILASTIK_DEV_UNIT_CONFIG_DIR}}
@@ -244,14 +243,15 @@ tasks:
         ' > {{.WEBILASTIK_DEV_UNIT_CONFIG_DIR}}/output_to_tty.conf"
 
       - sudo systemctl daemon-reload
-      - sudo systemctl restart "{{.WEBILASTIK_DEV_UNIT_NAME}}"
+      - sudo systemctl restart webilastik.service
 
   stop-local-server:
     cmds:
-      - sudo systemctl stop "{{.WEBILASTIK_DEV_UNIT_NAME}}" || true
-      - sudo systemctl reset-failed {{.WEBILASTIK_DEV_UNIT_NAME}} || true
+      - sudo systemctl stop webilastik.service || true
+      - sudo systemctl reset-failed webilastik.service || true
       - sudo rm -f {{.WEBILASTIK_DEV_UNIT_CONFIG_DIR}}/output_to_tty.conf
       - sudo rm -f {{.WEBILASTIK_UNIT_INSTALL_PATH}}
+      - sudo rm -f /opt/webilastik
       - >
         ps -ef | grep ws_pixel_classification_workflow.py | awk '{print $2}' | sudo xargs kill -9 || true;
         ps -ef | ag ssh.*batchmode | awk '{print $2}' | sudo xargs kill -9 || true;
