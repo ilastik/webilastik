@@ -236,7 +236,7 @@ class SessionAllocator:
             )
             if isinstance(this_months_jobs_result, Exception):
                 print(f"Could not get session information:\n{this_months_jobs_result}\n", file=sys.stderr)
-                return web.json_response({"error": "Could get session information"}, status=500)
+                return web.json_response({"error": "Could not get session information"}, status=500)
             for job in this_months_jobs_result:
                 if job.is_runnable():
                     return web.json_response({"error": f"Already running a session ({job.session_id})"}, status=400)
