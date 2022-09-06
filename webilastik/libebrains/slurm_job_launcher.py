@@ -494,7 +494,7 @@ class CscsSshJobLauncher(SshJobLauncher):
                 --port {redis_port} \\
                 --daemonize no \\
                 --maxmemory-policy allkeys-lru \\
-                --maxmemory 100gb \\
+                --maxmemory 48gb \\
                 --appendonly no \\
                 --save "" \\
                 --dir {working_dir} \\
