@@ -394,6 +394,7 @@ class JusufSshJobLauncher(SshJobLauncher):
             export OPENBLAS_NUM_THREADS=1
             export MKL_NUM_THREADS=1
 
+            test -x {conda_env_dir}/bin/redis-server
             srun -n 1 --overlap -u --cpu_bind=none --cpus-per-task 6 \\
                 {conda_env_dir}/bin/redis-server \\
                 --pidfile {redis_pid_file} \\
@@ -408,10 +409,17 @@ class JusufSshJobLauncher(SshJobLauncher):
                 --dir {working_dir} \\
                 &
 
-            while [ ! -S {redis_unix_socket_path} -o ! -e {redis_pid_file} ]; do
+            NUM_TRIES=10;
+            while [ ! -e {redis_pid_file} -a $NUM_TRIES -gt 0 ]; do
                 echo "Redis not ready yet. Sleeping..."
+                NUM_TRIES=$(expr $NUM_TRIES - 1)
                 sleep 1
             done
+
+            if [ $NUM_TRIES -eq 0 ]; then
+                echo "Could not start redis"
+                exit 1
+            fi
 
             PYTHONPATH="{webilastik_source_dir}"
             PYTHONPATH+=":{webilastik_source_dir}/executor_getters/jusuf/"
@@ -478,6 +486,7 @@ class CscsSshJobLauncher(SshJobLauncher):
 
             REDIS_IP=$(ip -o addr show ipogif0 | grep -E '\\binet\\b' | awk '{{print $4}}' | cut -d/ -f1)
 
+            test -x {conda_env_dir}/bin/redis-server
             srun --nodes=1-1 --ntasks 1 -u --cpu_bind=none \\
                 {conda_env_dir}/bin/redis-server \\
                 --pidfile {redis_pid_file} \\
