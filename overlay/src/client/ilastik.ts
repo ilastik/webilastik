@@ -963,7 +963,7 @@ export abstract class View{
     }
 }
 
-export class DataView extends View{
+export abstract class DataView extends View{
     public static fromJsonValue(value: JsonValue): DataView{
         let view = View.fromJsonValue(value)
         if(view instanceof DataView){
@@ -988,6 +988,8 @@ export class DataView extends View{
         }
         return DataView.fromJsonValue(result)
     }
+
+    public abstract getDatasources(): Array<DataSource> | undefined;
 }
 
 export class RawDataView extends DataView{
@@ -1005,6 +1007,10 @@ export class RawDataView extends DataView{
             datasources: ensureJsonArray(value_obj["datasources"]).map(raw_ds => DataSource.fromJsonValue(raw_ds))
         })
     }
+
+    public getDatasources(): Array<DataSource> | undefined{
+        return this.datasources.slice()
+    }
 }
 
 export class StrippedPrecomputedView extends DataView{
@@ -1021,6 +1027,10 @@ export class StrippedPrecomputedView extends DataView{
             url: Url.parse(ensureJsonString(value_obj["url"])),
             datasource: DataSource.fromJsonValue(value_obj["datasource"]),
         })
+    }
+
+    public getDatasources(): Array<DataSource>{
+        return [this.datasource]
     }
 }
 
@@ -1053,6 +1063,10 @@ export class UnsupportedDatasetView extends DataView{
             url: Url.parse(ensureJsonString(value_obj["url"])),
         })
     }
+
+    public getDatasources(): undefined{
+        return undefined
+    }
 }
 
 export class FailedView extends DataView{
@@ -1069,5 +1083,9 @@ export class FailedView extends DataView{
             url: Url.parse(ensureJsonString(value_obj["url"])),
             error_message: ensureJsonString(value_obj["error_message"]),
         })
+    }
+
+    public getDatasources(): undefined{
+        return undefined
     }
 }

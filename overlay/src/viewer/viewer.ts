@@ -1,10 +1,11 @@
 // import { vec3 } from "gl-matrix";
-import { vec3 } from "gl-matrix";
+import { quat, vec3 } from "gl-matrix";
 import { Applet } from "../client/applets/applet";
 import { DataSource, PredictionsView, Session, View, DataView, RawDataView, StrippedPrecomputedView } from "../client/ilastik";
 import { INativeView, IViewerDriver, IViewportDriver } from "../drivers/viewer_driver";
 import { ErrorPopupWidget } from "../gui/widgets/popup";
 import { HashMap } from "../util/hashmap";
+import { createInput, removeElement } from "../util/misc";
 import { Url } from "../util/parsed_url";
 import { ensureJsonArray, ensureJsonNumber, ensureJsonObject, JsonValue, toJsonValue } from "../util/serialization";
 
@@ -57,6 +58,7 @@ export class Viewer extends Applet<ViewerAppletState>{
     private state: ViewerAppletState = new ViewerAppletState({
         data_views: new HashMap(), prediction_views: new HashMap(), label_colors: []
     })
+    recenterButton: HTMLInputElement;
 
     public constructor(params: {
         name: string,
@@ -82,6 +84,31 @@ export class Viewer extends Applet<ViewerAppletState>{
         this.setDataViews(
             this.driver.getOpenDataViews().map(nv => ({name: nv.name, url: Url.parse(nv.url)}))
         )
+        this.recenterButton = createInput({
+            inputType: "button",
+            parentElement: document.body,
+            cssClasses: ["ItkRecenterButton"],
+            value: "Recenter",
+            onClick: () => {
+                if(!this.driver.snapTo){
+                    return
+                }
+                this.driver.snapTo({
+                    position_uvw: vec3.div(vec3.create(), this.getVolume(), vec3.fromValues(2,2,2)),
+                    orientation_uvw: quat.identity(quat.create()),
+                })
+            }
+        })
+    }
+
+    public getVolume(): vec3{
+        let max = vec3.fromValues(0,0,0)
+        for(let dv of this.state.data_views.values()){
+            for(let datasource of (dv.getDatasources() || [])){
+                vec3.max(max, max, vec3.fromValues(datasource.shape.x, datasource.shape.y, datasource.shape.z))
+            }
+        }
+        return max
     }
 
     public setDataViews(nativeViews: Array<{name: string, url: Url}>){
@@ -203,6 +230,7 @@ export class Viewer extends Applet<ViewerAppletState>{
     }
 
     public destroy(){
+        removeElement(this.recenterButton)
         //FIXME: unregister events from native viewer using the driver
     }
 }

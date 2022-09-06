@@ -219,4 +219,13 @@ export class NeuroglancerDriver implements IViewerDriver{
                 url: layer.sourceUrl,
             }))[0];
     }
+
+    public snapTo(pose: {position_uvw?: vec3, orientation_uvw?: quat}): void{
+        if(pose.orientation_uvw !== undefined){
+            this.viewer.navigationState.pose.position.setVoxelCoordinates(pose.position_uvw)
+        }
+        if(pose.orientation_uvw !== undefined){
+            this.viewer.navigationState.pose.orientation.restoreState(pose.orientation_uvw)
+        }
+    }
 }

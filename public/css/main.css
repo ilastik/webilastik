@@ -197,3 +197,12 @@ input[type=button], input[type=submit], .ItkPopupSelectTrigger{
     margin-left: 10px;
 }
 
+.ItkRecenterButton{
+    position: fixed;
+    bottom: 10px;
+    display: inline;
+    z-index: 99999;
+    right: 10px;
+    padding: 10px;
+    border-radius: 5px;
+}

@@ -70,6 +70,8 @@ export interface IViewerDriver{
      * @returns an array of `IDataView`s representing all data sources currently opened by the viewer
      */
     getOpenDataViews(): Array<INativeView>;
+
+    snapTo?: (pose: {position_uvw: vec3, orientation_uvw?: quat}) => void;
 }
 
 /**
