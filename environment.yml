@@ -17,6 +17,7 @@ dependencies:
   - aiohttp
   - requests
   - redis-py
+  - cryptography
   - pip
   - pip:
     - git+https://git@github.com/ilastik/ndstructs@1a5b02d34df0517ef6f3d1ba863e2e8169daf76a

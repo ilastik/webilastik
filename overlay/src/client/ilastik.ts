@@ -41,7 +41,7 @@ export class SlurmJob{
     public readonly time_elapsed_sec: number
     public readonly time_limit_minutes: number
     public readonly num_nodes: number
-    public readonly name: string
+    public readonly job_name: string
     public readonly session_id: string
 
     constructor(params: {
@@ -51,7 +51,7 @@ export class SlurmJob{
         time_elapsed_sec: number,
         time_limit_minutes: number,
         num_nodes: number,
-        name: string,
+        job_name: string,
         session_id: string,
     }){
         this.job_id = params.job_id
@@ -60,7 +60,7 @@ export class SlurmJob{
         this.time_elapsed_sec = params.time_elapsed_sec
         this.time_limit_minutes = params.time_limit_minutes
         this.num_nodes = params.num_nodes
-        this.name = params.name
+        this.job_name = params.job_name
         this.session_id = params.session_id
     }
 
@@ -81,7 +81,7 @@ export class SlurmJob{
             time_elapsed_sec: ensureJsonNumber(value_obj['time_elapsed_sec']),
             time_limit_minutes: ensureJsonNumber(value_obj['time_limit_minutes']),
             num_nodes: ensureJsonNumber(value_obj['num_nodes']),
-            name: ensureJsonString(value_obj['name']),
+            job_name: ensureJsonString(value_obj['job_name']),
             session_id: ensureJsonString(value_obj['session_id']),
         })
     }

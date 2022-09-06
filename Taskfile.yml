@@ -121,6 +121,14 @@ tasks:
       - "{{.NEUROGLANCER_BUNDLE_PATH}}"
     generates:
       - "{{.DEB_TREE_PATH}}/**/*"
+    preconditions:
+      - test -n "$WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY"
+      - |
+        python3 <<CHECK_FERNET_KEY
+        import os;
+        from cryptography.fernet import Fernet;
+        Fernet(key=os.environ["WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY"].encode())
+        CHECK_FERNET_KEY
     vars:
       CONTROL_FILE_CONTENTS: |-
           Package: webilastik
@@ -132,12 +140,49 @@ tasks:
           Maintainer: ilastik Team <team@ilastik.org>
           Description: Webilastik
            Server and frontend for the web version of ilastik
+      SERVICE_FILE_CONTENTS: |-
+        [Unit]
+        Description=Webilastik session allocator server
+        Documentation=https://github.com/ilastik/webilastik
+        Wants=nginx.service
+
+        [Install]
+        WantedBy=multi-user.target
+
+        [Service]
+        Type=simple
+        # FIXME/BUG: aiohttp must be told where certs are when running from packed environment
+        Environment=SSL_CERT_DIR=/etc/ssl/certs/
+        Environment=REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+        Environment=WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY={{.WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY}}
+
+        Environment=PYTHONPATH=/opt/webilastik/
+        ExecStart=/opt/webilastik/conda_env/bin/python3 -B /opt/webilastik/webilastik/server/session_allocator.py \
+            --session-launcher=CSCS \
+            --external-url=https://app.ilastik.org/ \
+            --oidc-client-json=/etc/webilastik/oidc_client.json \
+
+        TimeoutStopSec=30
+        KillMode=mixed
+        Restart=on-failure
+        User=www-data
+        Group=www-data
+        KillSignal=SIGQUIT
+        NotifyAccess=all
+
+        [Install]
+        WantedBy=multi-user.target
     cmds:
       - echo 2>&1 '[INFO] Generating basic package tree'
       - rm -rf {{.DEB_TREE_PATH}}
       - cp -r {{.PROJECT_ROOT}}/package_tree {{.DEB_TREE_PATH}}
+
       - echo 2>&1 '[INFO] Generating DEBIAN/control file'
       - echo '{{.CONTROL_FILE_CONTENTS}}' > {{.DEB_TREE_PATH}}/DEBIAN/control
+
+      - echo 2>&1 '[INFO] Generating webilastik.service file'
+      - mkdir -p {{.DEB_TREE_PATH}}/lib/systemd/system/
+      - echo '{{.SERVICE_FILE_CONTENTS}}' > {{.DEB_TREE_PATH}}/{{.WEBILASTIK_UNIT_INSTALL_PATH}}
 
       - mkdir -p {{.DEB_TREE_PATH}}/etc/webilastik
       - |
@@ -227,7 +272,7 @@ tasks:
 
       - echo "Ensuring webilastik service is visible to systemd"
       - sudo rm -f {{.WEBILASTIK_UNIT_INSTALL_PATH}}
-      - sudo ln -s {{.PROJECT_ROOT}}/package_tree/lib/systemd/system/webilastik.service {{.WEBILASTIK_UNIT_INSTALL_PATH}}
+      - sudo ln -s {{.DEB_TREE_PATH}}/{{.WEBILASTIK_UNIT_INSTALL_PATH}} {{.WEBILASTIK_UNIT_INSTALL_PATH}}
       - sudo ln -s {{.DEB_TREE_PATH}}/opt/webilastik /opt/webilastik
 
       - echo "Configuring webilastik service to log to this tty ($(tty))"

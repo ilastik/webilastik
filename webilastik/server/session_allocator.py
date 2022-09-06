@@ -14,8 +14,9 @@ from dataclasses import dataclass
 from aiohttp import web
 import aiohttp
 from aiohttp.client import ClientSession
+from cryptography.fernet import Fernet
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonInt, ensureJsonObject
-from webilastik.libebrains.slurm_job_launcher import CscsSshJobLauncher, JobState, JusufSshJobLauncher, Minutes, NodeSeconds, SlurmJob, SshJobLauncher
+from webilastik.libebrains.slurm_job_launcher import CscsSshJobLauncher, JobState, JusufSshJobLauncher, Minutes, NodeSeconds, Seconds, SlurmJob, SlurmJobId, SshJobLauncher
 
 from webilastik.libebrains.user_token import UserToken
 from webilastik.libebrains.oidc_client import OidcClient, Scope
@@ -232,14 +233,15 @@ class SessionAllocator:
 
         async with self.session_user_locks[user_info.sub]:
             this_months_jobs_result = await self.session_launcher.get_jobs(
-                user_info=user_info, starttime=datetime.today().replace(day=1)
+                user_id=user_info.sub, starttime=datetime.today().replace(day=1)
             )
             if isinstance(this_months_jobs_result, Exception):
                 print(f"Could not get session information:\n{this_months_jobs_result}\n", file=sys.stderr)
                 return web.json_response({"error": "Could not get session information"}, status=500)
             for job in this_months_jobs_result:
                 if job.is_runnable():
-                    return web.json_response({"error": f"Already running a session ({job.session_id})"}, status=400)
+                    pass
+                    # return web.json_response({"error": f"Already running a session ({job.session_id})"}, status=400)
             used_quota_node_sec = SlurmJob.compute_used_quota(this_months_jobs_result)
             monthly_quota_node_sec: NodeSeconds = NodeSeconds(100 * 60 * 60) #FIXME
             available_quota_node_min = (monthly_quota_node_sec - used_quota_node_sec) / 60
@@ -252,8 +254,28 @@ class SessionAllocator:
 
             session_id = uuid.uuid4()
 
+            #############################################################
+            # print(f">>>>>>>>>>>>>> Opening tunnel to app.ilastik.org....")
+            # _tunnel_process = subprocess.run(
+            #     [
+            #         "ssh", "-fnNT",
+            #         "-oBatchMode=yes",
+            #         "-oExitOnForwardFailure=yes",
+            #         "-oControlPersist=yes",
+            #         "-M", "-S", f"/tmp/session-{session_id}.control",
+            #         "-L", f"/tmp/to-session-{session_id}:/tmp/to-session-{session_id}",
+            #         f"www-data@148.187.149.187",
+            #     ],
+            # )
+            # await asyncio.sleep(1)
+            # print(f"<<<<<<<<<<<<< Hopefully it worked? sesion id is {session_id}")
+            # if _tunnel_process.returncode != 0 or not Path(f"/tmp/to-session-{session_id}").exists():
+            #     return uncachable_json_response({"error": "Could not forward ports i think"}, status=500)
+
+            ###################################################################
+
             session_result = await self.session_launcher.launch(
-                user_info=user_info,
+                user_id=user_info.sub,
                 time=Minutes(min(
                     int(available_quota_node_min), int(requested_duration_minutes)
                 )),
@@ -283,21 +305,55 @@ class SessionAllocator:
         if isinstance(user_info_result, Exception):
             print(f"Error retrieving user info: {user_info_result}")
             return uncachable_json_response({"error": "Could not get user information"}, status=500) #FIXME: 500?
-        session_result = await self.session_launcher.get_job_by_session_id(session_id=session_id, user_info=user_info_result)
-        if isinstance(session_result, Exception):
-            return uncachable_json_response({"error": "Could not retrieve session"}, status=500)
-        if session_result is None:
-            return uncachable_json_response({"error": "Session not found"}, status=404)
+        # session_result = await self.session_launcher.get_job_by_session_id(session_id=session_id, user_info=user_info_result)
+        # if isinstance(session_result, Exception):
+        #     return uncachable_json_response({"error": "Could not retrieve session"}, status=500)
+        # if session_result is None:
+        #     return uncachable_json_response({"error": "Session not found"}, status=404)
 
         session_url = self._make_session_url(session_id=session_id)
+
+        #################################################################################
+        # print(f">>>>>>>>>>>>>> Checking if tunnel socket exists on app.ilastik.org....")
+        # tunnel_exists_check = subprocess.run(
+        #     [
+        #         "ssh",
+        #         "-T",
+        #         "-oBatchMode=yes",
+        #         f"www-data@148.187.149.187",
+        #         "ls", f"/tmp/to-session-{session_id}"
+        #     ],
+        # )
+        # if tunnel_exists_check.returncode != 0:
+        #     print(f"Tunnel was not ready in web server")
+        #     return uncachable_json_response(
+        #         SessionStatus(
+        #             slurm_job=session_result, session_url=session_url, connected=False
+        #         ).to_json_value(),
+        #         status=200
+        #     )
+        ##################################################################################
 
         ping_session_result = await self.http_client_session.get(session_url.concatpath("status").raw)
         print(f"Ping session result: {ping_session_result.status}   ok? {ping_session_result.ok}", file=sys.stderr)
         print(f"Tunnel file exists? {Path(f'/tmp/to-session-{session_id}').exists()}")
 
+        import datetime
         return uncachable_json_response(
             SessionStatus(
-                slurm_job=session_result,
+                # slurm_job=session_result,
+                slurm_job=SlurmJob(
+                    job_id=SlurmJobId(123),
+                    user_id=user_info_result.sub,
+                    job_name=f"EBRAINS-{user_info_result.sub}",
+                    state=JobState.RUNNING,
+                    start_time_utc_sec=Seconds(int(datetime.datetime.now(datetime.timezone.utc).timestamp())),
+                    num_nodes=1,
+                    time_elapsed_sec=Seconds(1),
+                    time_limit_minutes=Minutes(99999),
+                    session_id=session_id,
+                    display_name="Dummy job",
+                ),
                 session_url=session_url,
                 connected=ping_session_result.ok and Path(f"/tmp/to-session-{session_id}").exists(),
             ).to_json_value(),
@@ -309,6 +365,8 @@ class SessionAllocator:
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
+    import os
+    fernet = Fernet(key=os.environ["WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY"].encode('utf8'))
     parser = ArgumentParser()
     parser.add_argument("--session-launcher", choices=["JUSUF", "CSCS"], required=True)
     parser.add_argument("--external-url", type=Url.parse, required=True, help="Url from which sessions can be accessed (where the session sockets live)")
@@ -321,9 +379,9 @@ if __name__ == '__main__':
 
     # multiprocessing.set_start_method('spawn') #start a fresh interpreter so it doesn't 'inherit' the event loop
     if args.session_launcher == "JUSUF":
-        session_launcher = JusufSshJobLauncher()
+        session_launcher = JusufSshJobLauncher(fernet=fernet)
     elif args.session_launcher == "CSCS":
-        session_launcher = CscsSshJobLauncher()
+        session_launcher = CscsSshJobLauncher(fernet=fernet)
     else:
         print(f"Can get a session launcher for {args.session_launcher}")
         exit(1)

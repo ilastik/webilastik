@@ -3,13 +3,15 @@
 from abc import abstractmethod
 import asyncio
 from enum import Enum
-from typing import ClassVar, Dict, Iterable, NewType, List, Set, Tuple
+from typing import Dict, Iterable, Mapping, NewType, List, Set, Tuple
 import uuid
 import datetime
 import textwrap
 import tempfile
+import json
 
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonString
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
+from cryptography.fernet import Fernet
 
 from webilastik.libebrains.user_info import UserInfo
 from webilastik.libebrains.user_token import UserToken
@@ -78,53 +80,103 @@ Seconds = NewType("Seconds", int)
 SlurmJobId = NewType("SlurmJobId", int)
 NodeSeconds = NewType("NodeSeconds", int)
 
-
 class SlurmJob:
-    NAME_PREFIX: ClassVar[str] = "EBRAINS"
+    SACCT_FORMAT_ITEMS = ["JobID", "JobName", "State", "ElapsedRaw", "TimelimitRaw", "Start", "AllocNodes", "Comment"]
+
+    @classmethod
+    def try_from_parsable2_raw_job_data(cls, parsable2_raw_job_data: str, fernet: Fernet) -> "SlurmJob | None | Exception":
+        items = parsable2_raw_job_data.split("|")
+        try:
+            raw_id, job_name, raw_state, raw_elapsed, raw_time_limit, raw_start_time_utc_sec, raw_alloc_nodes, raw_comment = items
+        except Exception as e:
+            return Exception(f"Bad number of raw job parameters: {e}")
+
+        if not raw_comment:
+            return None
+        try:
+            metadata_json = fernet.decrypt(raw_comment.encode('utf8'))
+        except Exception as e:
+            return Exception(f"Could not decrypt metadata comment: {e}")
+        try:
+            metadata = json.loads(metadata_json)
+        except Exception as e:
+            return Exception(f"Could not interpret metadata comment as json: {metadata_json}")
+
+        try:
+            metadata_obj = ensureJsonObject(metadata)
+            user_id = uuid.UUID(ensureJsonString(metadata_obj.get("user_id")))
+            session_id = uuid.UUID(ensureJsonString(metadata_obj.get("session_id")))
+            display_name = ensureJsonString(metadata_obj.get("display_name"))
+        except Exception as e:
+            return Exception(f"Bad metadata json: {metadata_json}")
+
+        return SlurmJob(
+            job_id=SlurmJobId(int(raw_id)),
+            job_name=job_name,
+            state=JobState.from_json_value(raw_state.split(" ")[0]),
+            start_time_utc_sec=None if raw_start_time_utc_sec == "Unknown" else Seconds(int(raw_start_time_utc_sec)),
+            time_elapsed_sec=Seconds(int(raw_elapsed)),
+            time_limit_minutes=Minutes(int(raw_time_limit)),
+            num_nodes=int(raw_alloc_nodes),
+            user_id=user_id,
+            session_id=session_id,
+            display_name=display_name
+        )
+
+    @classmethod
+    def make_sbatch_args(
+        cls, *, user_id: uuid.UUID, session_id: uuid.UUID, display_name: str, fernet: Fernet
+    ) -> Mapping[str, str]:
+        comment_data = {
+            "user_id": str(user_id),
+            "session_id": str(session_id),
+            "display_name": display_name,
+        }
+        return {
+            "--comment": fernet.encrypt(json.dumps(comment_data).encode('utf8')).decode('utf8'),
+        }
+
 
     def __init__(
         self,
         *,
         job_id: SlurmJobId,
-        name: str,
+        job_name: str,
+        display_name: str,
         state: JobState,
         start_time_utc_sec: "Seconds | None",
         time_elapsed_sec: "Seconds",
         time_limit_minutes: "Minutes",
-        num_nodes: "int",
+        num_nodes: int,
+        user_id: uuid.UUID,
+        session_id: uuid.UUID,
     ) -> None:
         self.job_id = job_id
+        self.job_name = job_name
+        self.display_name = display_name
         self.state = state
         self.start_time_utc_sec = start_time_utc_sec
         self.time_elapsed_sec = time_elapsed_sec
         self.time_limit_minutes = time_limit_minutes
         self.num_nodes = num_nodes
-        self.name = name
-        raw_user_sub, raw_session_id = name.split("-user-")[1].split("-session-")
-        self.user_sub = uuid.UUID(raw_user_sub)
-        self.session_id = uuid.UUID(raw_session_id)
+        self.user_id = user_id
+        self.session_id = session_id
         super().__init__()
+
 
     def to_json_value(self) -> JsonObject:
         return {
             "job_id": self.job_id,
+            "job_name": self.job_name,
             "state": self.state.to_json_value(),
             "start_time_utc_sec": self.start_time_utc_sec,
             "time_elapsed_sec": self.time_elapsed_sec,
             "time_limit_minutes": self.time_limit_minutes,
             "num_nodes": self.num_nodes,
-            "name": self.name,
+            "display_name": self.display_name,
             # "user_sub": self.uuid,
             "session_id": str(self.session_id),
         }
-
-    @classmethod
-    def make_name(cls, user_info: UserInfo, session_id: uuid.UUID) -> str:
-        return f"{cls.NAME_PREFIX}-user-{user_info.sub}-session-{session_id}"
-
-    @classmethod
-    def recognizes_job_name(cls, name: str) -> bool:
-        return name.startswith(cls.NAME_PREFIX)
 
     def is_running(self) -> bool:
         return self.state == JobState.RUNNING
@@ -139,13 +191,15 @@ class SlurmJob:
         return self.state.is_done()
 
     def belongs_to(self, user_info: UserInfo) -> bool:
-        return self.user_sub == user_info.sub
+        return self.user_id == user_info.sub
 
     @classmethod
     def compute_used_quota(cls, jobs: Iterable["SlurmJob"]) -> NodeSeconds:
         return NodeSeconds(sum(job.time_elapsed_sec * job.num_nodes for job in jobs))
 
 class SshJobLauncher:
+    JOB_NAME_PREFIX = "EBRAINS"
+
     def __init__(
         self,
         *,
@@ -153,13 +207,19 @@ class SshJobLauncher:
         hostname: Hostname,
         login_node_info: "Tuple[Username, Hostname] | None" = None,
         account: str,
+        fernet: Fernet,
     ) -> None:
         self.user = user
         self.hostname = hostname
         self.account = account
+        self.fernet = fernet
         self.login_node_info = login_node_info
 
         super().__init__()
+
+    @classmethod
+    def make_job_name(cls, user_id: uuid.UUID) -> str:
+        return f"{cls.JOB_NAME_PREFIX}-{user_id}"
 
     async def do_ssh(
         self,
@@ -222,16 +282,27 @@ class SshJobLauncher:
     async def launch(
         self,
         *,
-        user_info: UserInfo,
+        user_id: uuid.UUID,
         time: Minutes,
         ebrains_user_token: UserToken,
         session_id: uuid.UUID,
+        display_name: str = ""
     ) -> "SlurmJob | Exception":
-        job_name = SlurmJob.make_name(user_info=user_info, session_id=session_id)
-
         output_result = await self.do_ssh(
             command="sbatch",
-            command_args=[f"--job-name={job_name}", f"--time={time}", f"--account={self.account}"],
+            command_args=[
+                f"{key}={value}" for key, value in {
+                    **SlurmJob.make_sbatch_args(
+                        user_id=user_id,
+                        session_id=session_id,
+                        display_name=display_name or str(session_id),
+                        fernet=self.fernet
+                    ),
+                    "--job-name": self.make_job_name(user_id),
+                    "--time": str(time),
+                    "--account": self.account,
+                }.items()
+            ],
             stdin=self.get_sbatch_launch_script(
                 time=time,
                 ebrains_user_token=ebrains_user_token,
@@ -274,29 +345,30 @@ class SshJobLauncher:
             return None
         return jobs_result[0]
 
-    async def get_job_by_session_id(self, session_id: uuid.UUID, user_info: UserInfo) -> "SlurmJob | None | Exception":
-        jobs_result = await self.get_jobs(name=SlurmJob.make_name(session_id=session_id, user_info=user_info))
+    async def get_job_by_session_id(self, session_id: uuid.UUID, user_id: uuid.UUID) -> "SlurmJob | None | Exception":
+        jobs_result = await self.get_jobs(user_id=user_id)
         if isinstance(jobs_result, Exception):
             return jobs_result
-        if len(jobs_result) == 0:
-            return None
-        return jobs_result[0]
+        for job in jobs_result:
+            if job.session_id == session_id:
+                return job
+        return None
 
     async def get_jobs(
         self,
         *,
         job_id: "SlurmJobId | None" = None,
-        name: "str | None" = None,
         state: "Set[JobState] | None" = None,
         starttime: "datetime.datetime" = datetime.datetime(year=2020, month=1, day=1),
         endtime: "datetime.datetime" = datetime.datetime.today() + datetime.timedelta(days=2), #definetely in the future
-        user_info: "UserInfo | None" = None,
+        user_id: "uuid.UUID | None" = None,
+        session_id: "uuid.UUID | None" = None,
     ) -> "List[SlurmJob] | Exception":
         sacct_params = [
             "--allocations", # don't show individual steps
             "--noheader",
             "--parsable2", #items separated with '|'. No trailing '|'
-            "--format=JobID,JobName,State,ElapsedRaw,TimelimitRaw,Start,AllocNodes",
+            f"--format={','.join(SlurmJob.SACCT_FORMAT_ITEMS)}",
             f"--starttime={starttime.year:04d}-{starttime.month:02d}-{starttime.day:02d}",
             f"--endtime={endtime.year:04d}-{endtime.month:02d}-{endtime.day:02d}",
             f"--user={self.user}",
@@ -305,8 +377,8 @@ class SshJobLauncher:
 
         if job_id is not None:
             sacct_params.append(f"--jobs={job_id}")
-        if name is not None:
-            sacct_params.append(f"--name={name}")
+        if user_id is not None:
+            sacct_params.append(f"--name={self.make_job_name(user_id=user_id)}")
         if state != None and len(state) > 0:
             sacct_params.append(f"--state={','.join(s.value for s in state)}")
 
@@ -320,40 +392,23 @@ class SshJobLauncher:
 
         jobs: List[SlurmJob] = []
         for line in output_result.split("\n")[:-1]: #skip empty newline
-            raw_id, job_name, raw_state, raw_elapsed, raw_time_limit, raw_start_time_utc_sec, raw_alloc_nodes = line.split("|")
-            if not SlurmJob.recognizes_job_name(job_name):
+            job_result = SlurmJob.try_from_parsable2_raw_job_data(line, fernet=self.fernet)
+            if isinstance(job_result, Exception):
+                return job_result
+            if job_result is None:
                 continue
-            job = SlurmJob(
-                job_id=SlurmJobId(int(raw_id)),
-                name=job_name,
-                state=JobState.from_json_value(raw_state.split(" ")[0]),
-                start_time_utc_sec=None if raw_start_time_utc_sec == "Unknown" else Seconds(int(raw_start_time_utc_sec)),
-                time_elapsed_sec=Seconds(int(raw_elapsed)),
-                time_limit_minutes=Minutes(int(raw_time_limit)),
-                num_nodes=int(raw_alloc_nodes),
-            )
-            if user_info and not job.belongs_to(user_info=user_info):
-                continue
-            jobs.append(job)
+            if session_id and job_result.session_id == session_id:
+                return [job_result]
+            jobs.append(job_result)
         return jobs
 
-    async def get_usage_for_user(self, user_info: UserInfo) -> "NodeSeconds | Exception":
-        this_month_jobs_result = await self.get_jobs(starttime=datetime.datetime.today().replace(day=1))
-        if isinstance(this_month_jobs_result, Exception):
-            return this_month_jobs_result
-        node_seconds = sum(
-            (job.time_elapsed_sec * job.num_nodes)
-            for job in this_month_jobs_result
-            if job.user_sub == user_info.sub
-        )
-        return NodeSeconds(node_seconds)
-
 class JusufSshJobLauncher(SshJobLauncher):
-    def __init__(self) -> None:
+    def __init__(self, fernet: Fernet) -> None:
         super().__init__(
             user=Username("webilastik"),
             hostname=Hostname("jusuf.fz-juelich.de"),
             account="icei-hbp-2022-0010",
+            fernet=fernet,
         )
 
     def get_sbatch_launch_script(
@@ -443,12 +498,13 @@ class JusufSshJobLauncher(SshJobLauncher):
         """)
 
 class CscsSshJobLauncher(SshJobLauncher):
-    def __init__(self):
+    def __init__(self, fernet: Fernet):
         super().__init__(
             user=Username("bp000188"),
             hostname=Hostname("daint.cscs.ch"),
             login_node_info=(Username("bp000188"), Hostname("ela.cscs.ch")),
             account="ich005",
+            fernet=fernet,
         )
 
     def get_sbatch_launch_script(
@@ -469,7 +525,7 @@ class CscsSshJobLauncher(SshJobLauncher):
             #!/bin/bash
             #SBATCH --nodes=10
             #SBATCH --ntasks-per-node=2
-            #SBATCH --partition=normal
+            #SBATCH --partition=debug
             #SBATCH --hint=nomultithread
             #SBATCH --constraint=mc
 
