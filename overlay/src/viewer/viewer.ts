@@ -7,7 +7,7 @@ import { ErrorPopupWidget } from "../gui/widgets/popup";
 import { HashMap } from "../util/hashmap";
 import { createInput, removeElement } from "../util/misc";
 import { Url } from "../util/parsed_url";
-import { ensureJsonArray, ensureJsonNumber, ensureJsonObject, JsonValue, toJsonValue } from "../util/serialization";
+import { ensureJsonArray, ensureJsonNumber, ensureJsonObject, JsonValue } from "../util/serialization";
 
 
 export class ViewerAppletState{
@@ -113,9 +113,6 @@ export class Viewer extends Applet<ViewerAppletState>{
 
     public setDataViews(nativeViews: Array<{name: string, url: Url}>){
         if(nativeViews.find(nv => !this.state.data_views.has(nv.url))){
-            console.log(`Setting data views to\n${
-                JSON.stringify(toJsonValue(nativeViews), null, 2)
-            }`)
             this.doRPC("set_data_views", {frontend_timestamp: new Date().getTime(), native_views: nativeViews})
         }
     }
@@ -123,17 +120,6 @@ export class Viewer extends Applet<ViewerAppletState>{
 
 
     private async onNewState(newState: ViewerAppletState){
-        console.log(`Got new state:\n${
-            JSON.stringify(
-                {
-                    data_views: newState.data_views.values().map(dv => ({name: dv.name, url: dv.url.toString()})),
-                    prediction_views: newState.prediction_views.values().map(dv => ({name: dv.name, url: dv.url.toString()}))
-                },
-                null,
-                2
-            )
-        }`)
-
         let oldState = this.state
         this.state = newState
 
