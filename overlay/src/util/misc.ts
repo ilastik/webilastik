@@ -42,18 +42,23 @@ export type InlineCss = Partial<Omit<
     "getPropertyPriority" | "getPropertyValue" | "item" | "removeProperty" | "setProperty"
 >>
 
-export function createElement<K extends keyof HTMLElementTagNameMap>({tagName, parentElement, innerHTML, innerText, cssClasses, inlineCss={}, onClick}:{
+export function createElement<K extends keyof HTMLElementTagNameMap>({tagName, parentElement, prepend=false, innerHTML, innerText, cssClasses, inlineCss={}, onClick}:{
     tagName: K,
     parentElement:HTMLElement,
+    prepend?: boolean,
     innerHTML?:string,
     innerText?:string,
     cssClasses?:Array<string>,
     inlineCss?: InlineCss,
-    onClick?(event: Event): void},
-): HTMLElementTagNameMap[K]{
+    onClick?(event: Event): void
+}): HTMLElementTagNameMap[K]{
 
     const element = document.createElement(tagName);
-    parentElement.appendChild(element)
+    if(prepend){
+        parentElement.prepend(element)
+    }else{
+        parentElement.appendChild(element)
+    }
     if(innerHTML !== undefined){
         element.innerHTML = innerHTML
     }
