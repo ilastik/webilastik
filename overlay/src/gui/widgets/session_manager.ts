@@ -56,7 +56,7 @@ export class SessionManagerWidget{
             })
             close_session_btn.disabled = false
             leave_session_btn.disabled = false
-            this.session_creator.set_disabled(true)
+            this.session_creator.set_disabled({disabled: true, buttonText: "Session is running..."})
             this.session_loader.set_disabled({disabled: true, buttonText: "Session is running..."})
             this.session_loader.setFields({
                 ilastikUrl,
@@ -93,7 +93,7 @@ export class SessionManagerWidget{
             this.workflow?.destroy()
             close_session_btn.disabled = true
             leave_session_btn.disabled = true
-            this.session_creator.set_disabled(false)
+            this.session_creator.set_disabled({disabled: false})
             this.session_loader.set_disabled({disabled: false, buttonText: "Rejoin Session"})
             window.removeEventListener("beforeunload", onUnload);
         }

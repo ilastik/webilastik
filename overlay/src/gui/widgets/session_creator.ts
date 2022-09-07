@@ -1,92 +1,50 @@
 import { Session } from "../../client/ilastik"
-import { createElement, createInputParagraph } from "../../util/misc"
+import { createElement, createInput } from "../../util/misc"
 import { Url } from "../../util/parsed_url"
+import { SessionWidget } from "./session_widget"
 
-export class SessionCreatorWidget{
-    element: HTMLElement
-    public readonly create_session_btn: HTMLInputElement
-    constructor({parentElement, ilastikUrl, onUsageError, onNewSession}:{
-        parentElement: HTMLElement,
+export class SessionCreatorWidget extends SessionWidget{
+    private readonly durationInput: HTMLInputElement
+    onUsageError: (message: string) => void
+    onNewSession: (session: Session) => void
+
+    constructor(params:{
         ilastikUrl: Url,
+        sessionId?: string,
+        parentElement: HTMLElement,
         onUsageError: (message: string) => void,
-        onNewSession: (new_session: Session) => void,
+        onNewSession: (session: Session) => void,
     }){
-        this.element = createElement({tagName: "div", parentElement, cssClasses: ["ItkSessionCreatorWidget"]})
-        createElement({tagName: "h3", parentElement: this.element, innerHTML: "Create New Session"})
+        super({...params, title: "Create New Compute Session", submitButtonValue: "Create Session"})
+        this.onUsageError = params.onUsageError
+        this.onNewSession = params.onNewSession
 
-        const form = createElement({tagName: "form", parentElement: this.element})
 
-        const ilastikUrlInput = createInputParagraph({
-            label_text: "Ilastik URL: ",inputType: "url", parentElement: form, required: true, value: ilastikUrl.toString(), name: "itk_api_url"
+        createElement({tagName: "label", parentElement: this.extraFieldsContainer, innerText: "Session Duration (minutes): "})
+        this.durationInput = createInput({
+            inputType: "number", parentElement: this.extraFieldsContainer, required: true, value: "15", name: "itk_session_request_duration"
         })
-
-        const timeout_input = createInputParagraph({
-            label_text: "Timeout (minutes): ", inputType: "number", parentElement: form, required: true, value: "5", name: "itk_session_request_timeout"
-        })
-        timeout_input.min = "1"
-
-        const duration_input = createInputParagraph({
-            label_text: "Session Duration (minutes): ", inputType: "number", parentElement: form, required: true, value: "15", name: "itk_session_request_duration"
-        })
-        duration_input.min = "5"
-        duration_input.max = "60"
-
-        this.create_session_btn = createInputParagraph({inputType: "submit", value: "Create", parentElement: form})
-
-        const creation_log_p = createElement({tagName: "p", parentElement: form, inlineCss: {display: "none"}})
-        createElement({tagName: "label", innerHTML: "Creation Log: ", parentElement: creation_log_p})
-        const status_messages = createElement({tagName: "div", parentElement: creation_log_p, cssClasses: ["ItkSessionCreatorWidget_status-messages"]})
-
-        form.addEventListener("submit", (ev): false => {
-            this.set_disabled(true);
-            this.create_session_btn.value = "Creating Session..."
-            status_messages.innerHTML = "";
-
-            (async () => {
-                creation_log_p.style.display = "block"
-                const ilastikUrl = Url.parse(ilastikUrlInput.value)
-                let is_logged_in = await Session.check_login({ilastikUrl})
-                if(!is_logged_in){
-                    const login_url = ilastikUrl.joinPath("api/login_then_close").raw
-                    status_messages.innerHTML = `<p><a target="_blank" rel="noopener noreferrer" href="${login_url}">Login on ebrains</a> required.</p>`
-                    window.open(login_url)
-                    this.set_disabled(false);
-                    return
-                }
-
-                let session_result = await Session.create({
-                    ilastikUrl: Url.parse(ilastikUrlInput.value),
-                    timeout_minutes: parseInt(timeout_input.value),
-                    session_duration_minutes: parseInt(duration_input.value),
-                    onProgress: (message) => {
-                        status_messages.innerHTML += `<p><em>${new Date().toLocaleString()}</em> ${message}</p>`
-                        status_messages.scrollTop = status_messages.scrollHeight
-                    },
-                    onUsageError,
-                    autoCloseOnTimeout: true,
-                })
-                if(session_result instanceof Error){
-                    status_messages.innerHTML = session_result.message
-                    this.set_disabled(false)
-                }else{
-                    onNewSession(session_result)
-                    this.create_session_btn.value = "Session is running"
-                }
-            })()
-
-            //don't submit synchronously
-            ev.preventDefault()
-            return false
-        })
-
+        this.durationInput.min = "5"
+        this.durationInput.max = "60"
     }
 
-    public set_disabled(disabled: boolean){
-        this.element.querySelectorAll("input").forEach(inp => {
-            (inp as HTMLInputElement).disabled = disabled
+    protected async onSubmit(params: {ilastikUrl: Url, timeout_minutes: number}){
+        this.logMessage("Creating session...")
+
+        let session_result = await Session.create({
+            ilastikUrl: params.ilastikUrl,
+            timeout_minutes: params.timeout_minutes,
+            session_duration_minutes: parseInt(this.durationInput.value),
+            onProgress: (message) => this.logMessage(message),
+            onUsageError: this.onUsageError,
+            autoCloseOnTimeout: true,
         })
-        if(!disabled){
-            this.create_session_btn.value = "Create"
+        if(session_result instanceof Error){
+            this.logMessage(session_result.message)
+            this.set_disabled({disabled: false})
+        }else{
+            this.onNewSession(session_result)
+            this.set_disabled({disabled: true, buttonText: "Session is running"})
         }
     }
 }
