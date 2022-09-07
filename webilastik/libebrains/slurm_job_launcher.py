@@ -434,6 +434,7 @@ class JusufSshJobLauncher(SshJobLauncher):
 
             export EBRAINS_USER_ACCESS_TOKEN="{ebrains_user_token.access_token}"
             set -xeu
+            set -o pipefail
 
             jutil env activate -p icei-hbp-2022-0010
             module load git
@@ -531,6 +532,7 @@ class CscsSshJobLauncher(SshJobLauncher):
 
             export EBRAINS_USER_ACCESS_TOKEN="{ebrains_user_token.access_token}"
             set -xeu
+            set -o pipefail
 
             mkdir {working_dir}
             cd {working_dir}
