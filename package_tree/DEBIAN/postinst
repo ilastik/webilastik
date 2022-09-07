@@ -4,7 +4,7 @@ set -u
 set -e
 
 
-systemctl enable webilastik@-opt-webilastik.service
+systemctl enable webilastik.service
 systemctl daemon-reload
-systemctl restart webilastik@-opt-webilastik.service
+systemctl restart webilastik.service
 systemctl restart nginx.service
