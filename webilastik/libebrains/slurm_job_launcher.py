@@ -504,10 +504,11 @@ class CscsSshJobLauncher(SshJobLauncher):
         conda_env_dir = f"{home}/miniconda3/envs/webilastik"
         redis_pid_file = f"{working_dir}/redis.pid"
         redis_port = "6379"
+        num_nodes = 10
 
         out =  textwrap.dedent(f"""\
             #!/bin/bash
-            #SBATCH --nodes=10
+            #SBATCH --nodes={num_nodes}
             #SBATCH --ntasks-per-node=2
             #SBATCH --partition=debug
             #SBATCH --hint=nomultithread
@@ -560,7 +561,7 @@ class CscsSshJobLauncher(SshJobLauncher):
             export PYTHONPATH
             export REDIS_HOST_PORT="$REDIS_IP:{redis_port}"
 
-            srun -N 9 \\
+            srun -N {num_nodes - 1} \\
                 "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py \\
                 --max-duration-minutes={time} \\
                 --listen-socket="{working_dir}/to-master.sock" \\
