@@ -149,6 +149,7 @@ class SessionAllocator:
             web.get('/api/hello', self.hello),
             web.post('/api/session', self.spawn_session),
             web.get('/api/session/{session_id}', self.session_status),
+            web.delete('/api/session/{session_id}', self.close_session),
             web.post('/api/get_ebrains_token', self.get_ebrains_token), #FIXME: I'm using this in NG web workers
             web.get('/service_worker.js', self.serve_service_worker),
         ])
@@ -357,6 +358,27 @@ class SessionAllocator:
             ).to_json_value(),
             status=200
         )
+
+    @require_ebrains_login
+    async def close_session(self, ebrains_login: EbrainsLogin, request: web.Request) -> web.Response:
+        # FIXME: do security checks here?
+        try:
+            session_id =  uuid.UUID(request.match_info.get("session_id"))
+        except Exception:
+            return uncachable_json_response({"error": "Bad session id"}, status=400)
+        user_info_result = await ebrains_login.user_token.get_userinfo(self.http_client_session)
+        if isinstance(user_info_result, Exception):
+            print(f"Error retrieving user info: {user_info_result}")
+            return uncachable_json_response({"error": "Could not get user information"}, status=500) #FIXME: 500?
+        session_result = await self.session_launcher.get_job_by_session_id(session_id=session_id, user_id=user_info_result.sub)
+        if isinstance(session_result, Exception):
+            return uncachable_json_response({"error": "Could not retrieve session"}, status=500)
+        if session_result is None:
+            return uncachable_json_response({"error": "Session not found"}, status=404)
+        cancellation_result = await self.session_launcher.cancel(session_result)
+        if isinstance(cancellation_result, Exception):
+            return uncachable_json_response({"error": f"Failed to cancel session {session_id}"}, status=500)
+        return uncachable_json_response({"session_id": str(session_id)}, status=200)
 
     def run(self, port: int):
         web.run_app(self.app, port=port)

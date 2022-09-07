@@ -63,7 +63,8 @@ export class SessionLoaderWidget{
                     sessionId: this.sessionIdField.value,
                     timeout_minutes: parseInt(timeoutInput.value),
                     onUsageError,
-                    onProgress: (message) => this.logMessage(message)
+                    onProgress: (message) => this.logMessage(message),
+                    autoCloseOnTimeout: false,
                 })
 
                 if(sessionResult instanceof Error){

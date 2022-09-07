@@ -63,6 +63,7 @@ export class SessionCreatorWidget{
                         status_messages.scrollTop = status_messages.scrollHeight
                     },
                     onUsageError,
+                    autoCloseOnTimeout: true,
                 })
                 if(session_result instanceof Error){
                     status_messages.innerHTML = session_result.message

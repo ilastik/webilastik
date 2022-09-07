@@ -268,19 +268,21 @@ export class Session{
             .find(row => row.startsWith('ebrains_user_access_token='))?.split('=')[1];
     }
 
-    public static async create({ilastikUrl, session_duration_minutes, timeout_minutes, onProgress=(_) => {}, onUsageError}: {
+    public static async create(params: {
         ilastikUrl: Url,
         session_duration_minutes: number,
         timeout_minutes: number,
         onProgress?: (message: string) => void,
         onUsageError: (message: string) => void,
+        autoCloseOnTimeout: boolean,
     }): Promise<Session | Error>{
-        const newSessionUrl = ilastikUrl.joinPath("/api/session")
+        const onProgress = params.onProgress || (() => {})
+        const newSessionUrl = params.ilastikUrl.joinPath("/api/session")
         onProgress("Requesting session...")
 
         let session_creation_response = await fetch(newSessionUrl.schemeless_raw, {
             method: "POST",
-            body: JSON.stringify({session_duration_minutes})
+            body: JSON.stringify({session_duration_minutes: params.session_duration_minutes})
         })
         if(Math.floor(session_creation_response.status / 100) == 5){
             onProgress(`Server-side error when creating a session`)
@@ -292,26 +294,33 @@ export class Session{
         const sessionStatus = SessionStatus.fromJsonValue(await session_creation_response.json())
         onProgress(`Successfully requested a session! Waiting for it to be ready...`)
         return Session.load({
-            ilastikUrl, timeout_minutes, sessionId: sessionStatus.slurm_job.session_id, onProgress, onUsageError
+            ilastikUrl: params.ilastikUrl,
+            timeout_minutes: params.timeout_minutes,
+            sessionId: sessionStatus.slurm_job.session_id,
+            onProgress,
+            onUsageError: params.onUsageError,
+            autoCloseOnTimeout: params.autoCloseOnTimeout,
         })
     }
 
-    public static async load({ilastikUrl, sessionId, timeout_minutes, onProgress=() => {}, onUsageError}: {
+    public static async load(params: {
         ilastikUrl: Url,
         sessionId: string,
         timeout_minutes: number,
         onProgress?: (message: string) => void,
         onUsageError: (message: string) => void,
+        autoCloseOnTimeout: boolean,
     }): Promise<Session | Error>{
         const start_time_ms = Date.now()
-        const timeout_ms = timeout_minutes * 60 * 1000
+        const timeout_ms = params.timeout_minutes * 60 * 1000
+        const onProgress = params.onProgress || (() => {})
         while(Date.now() - start_time_ms < timeout_ms){
-            let sessionStatus = await Session.getStatus({ilastikUrl, sessionId})
+            let sessionStatus = await Session.getStatus({ilastikUrl: params.ilastikUrl, sessionId: params.sessionId})
             if(sessionStatus instanceof Error){
                 return sessionStatus
             }
             if(sessionStatus.slurm_job.is_done()){
-                return Error(`Session ${sessionId} is already closed`)
+                return Error(`Session ${params.sessionId} is already closed`)
             }
             if(!sessionStatus.connected){
                 onProgress(`Session is not ready yet`)
@@ -320,9 +329,9 @@ export class Session{
             }
             onProgress(`Session is ready!`)
             let session = new Session({
-                ilastikUrl,
+                ilastikUrl: params.ilastikUrl,
                 sessionStatus,
-                onUsageError,
+                onUsageError: params.onUsageError,
             })
 
             //FIXME
@@ -335,7 +344,28 @@ export class Session{
                 websocket.addEventListener("open", resolveThenClean)
             })
         }
+        onProgress(`Timed out waiting for session ${params.sessionId}`)
+        if(params.autoCloseOnTimeout){
+            onProgress(`Cancelling session ${params.sessionId}`)
+            const cancellation_result = await Session.cancel({ilastikUrl: params.ilastikUrl, sessionId: params.sessionId})
+            if(cancellation_result instanceof Error){
+                onProgress(`Could not cancel session ${params.sessionId}: ${cancellation_result.message}`)
+            }else{
+                onProgress(`Cancelled session ${params.sessionId}`)
+            }
+        }
         return Error(`Could not create a session: timeout`)
+    }
+
+    public static async cancel(params: {ilastikUrl: Url, sessionId: string}): Promise<Error | undefined>{
+        let result = await fetchJson(
+            params.ilastikUrl.joinPath(`api/session/${params.sessionId}`).raw,
+            {method: "DELETE"}
+        )
+        if(result instanceof Error){
+            return result
+        }
+        return undefined
     }
 }
 
