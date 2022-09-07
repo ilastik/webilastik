@@ -241,8 +241,7 @@ class SessionAllocator:
                 return web.json_response({"error": "Could not get session information"}, status=500)
             for job in this_months_jobs_result:
                 if job.is_runnable():
-                    pass
-                    # return web.json_response({"error": f"Already running a session ({job.session_id})"}, status=400)
+                    return web.json_response({"error": f"Already running a session ({job.session_id})"}, status=400)
             used_quota_node_sec = SlurmJob.compute_used_quota(this_months_jobs_result)
             monthly_quota_node_sec: NodeSeconds = NodeSeconds(100 * 60 * 60) #FIXME
             available_quota_node_min = (monthly_quota_node_sec - used_quota_node_sec) / 60
