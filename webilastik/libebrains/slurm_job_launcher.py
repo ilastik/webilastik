@@ -3,7 +3,7 @@
 from abc import abstractmethod
 import asyncio
 from enum import Enum
-from typing import Dict, Iterable, Mapping, NewType, List, Set, Tuple
+from typing import Dict, Iterable, NewType, List, Set, Tuple
 import uuid
 import datetime
 import textwrap
@@ -81,22 +81,24 @@ SlurmJobId = NewType("SlurmJobId", int)
 NodeSeconds = NewType("NodeSeconds", int)
 
 class SlurmJob:
-    SACCT_FORMAT_ITEMS = ["JobID", "JobName", "State", "ElapsedRaw", "TimelimitRaw", "Start", "AllocNodes", "Comment"]
+    SACCT_FORMAT_ITEMS = ["JobID", "JobName", "State", "ElapsedRaw", "TimelimitRaw", "Start", "AllocNodes"]
 
     @classmethod
     def try_from_parsable2_raw_job_data(cls, parsable2_raw_job_data: str, fernet: Fernet) -> "SlurmJob | None | Exception":
         items = parsable2_raw_job_data.split("|")
         try:
-            raw_id, job_name, raw_state, raw_elapsed, raw_time_limit, raw_start_time_utc_sec, raw_alloc_nodes, raw_comment = items
+            raw_id, job_name, raw_state, raw_elapsed, raw_time_limit, raw_start_time_utc_sec, raw_alloc_nodes = items
         except Exception as e:
             return Exception(f"Bad number of raw job parameters: {e}")
 
-        if not raw_comment:
+        # discard old jobs for now
+        if job_name.startswith("EBRAINS"):
             return None
+
         try:
-            metadata_json = fernet.decrypt(raw_comment.encode('utf8'))
+            metadata_json = fernet.decrypt(job_name.encode('utf8'))
         except Exception as e:
-            return Exception(f"Could not decrypt metadata comment: {e}")
+            return None
         try:
             metadata = json.loads(metadata_json)
         except Exception as e:
@@ -104,15 +106,13 @@ class SlurmJob:
 
         try:
             metadata_obj = ensureJsonObject(metadata)
-            user_id = uuid.UUID(ensureJsonString(metadata_obj.get("user_id")))
-            session_id = uuid.UUID(ensureJsonString(metadata_obj.get("session_id")))
-            display_name = ensureJsonString(metadata_obj.get("display_name"))
+            user_id = uuid.UUID(ensureJsonString(metadata_obj.get("uid")))
+            session_id = uuid.UUID(ensureJsonString(metadata_obj.get("sid")))
         except Exception as e:
             return Exception(f"Bad metadata json: {metadata_json}")
 
         return SlurmJob(
             job_id=SlurmJobId(int(raw_id)),
-            job_name=job_name,
             state=JobState.from_json_value(raw_state.split(" ")[0]),
             start_time_utc_sec=None if raw_start_time_utc_sec == "Unknown" else Seconds(int(raw_start_time_utc_sec)),
             time_elapsed_sec=Seconds(int(raw_elapsed)),
@@ -120,29 +120,24 @@ class SlurmJob:
             num_nodes=int(raw_alloc_nodes),
             user_id=user_id,
             session_id=session_id,
-            display_name=display_name
         )
 
     @classmethod
-    def make_sbatch_args(
-        cls, *, user_id: uuid.UUID, session_id: uuid.UUID, display_name: str, fernet: Fernet
-    ) -> Mapping[str, str]:
+    def make_job_name(
+        cls, *, user_id: uuid.UUID, session_id: uuid.UUID, fernet: Fernet
+    ) -> str:
         comment_data = {
-            "user_id": str(user_id),
-            "session_id": str(session_id),
-            "display_name": display_name,
+            "uid": str(user_id),
+            "sid": str(session_id),
         }
-        return {
-            "--comment": fernet.encrypt(json.dumps(comment_data).encode('utf8')).decode('utf8'),
-        }
-
+        return fernet.encrypt(
+            json.dumps(comment_data, separators=(',', ':')).encode('utf8'),
+        ).decode('utf8')
 
     def __init__(
         self,
         *,
         job_id: SlurmJobId,
-        job_name: str,
-        display_name: str,
         state: JobState,
         start_time_utc_sec: "Seconds | None",
         time_elapsed_sec: "Seconds",
@@ -152,8 +147,6 @@ class SlurmJob:
         session_id: uuid.UUID,
     ) -> None:
         self.job_id = job_id
-        self.job_name = job_name
-        self.display_name = display_name
         self.state = state
         self.start_time_utc_sec = start_time_utc_sec
         self.time_elapsed_sec = time_elapsed_sec
@@ -167,13 +160,11 @@ class SlurmJob:
     def to_json_value(self) -> JsonObject:
         return {
             "job_id": self.job_id,
-            "job_name": self.job_name,
             "state": self.state.to_json_value(),
             "start_time_utc_sec": self.start_time_utc_sec,
             "time_elapsed_sec": self.time_elapsed_sec,
             "time_limit_minutes": self.time_limit_minutes,
             "num_nodes": self.num_nodes,
-            "display_name": self.display_name,
             # "user_sub": self.uuid,
             "session_id": str(self.session_id),
         }
@@ -291,17 +282,9 @@ class SshJobLauncher:
         output_result = await self.do_ssh(
             command="sbatch",
             command_args=[
-                f"{key}={value}" for key, value in {
-                    **SlurmJob.make_sbatch_args(
-                        user_id=user_id,
-                        session_id=session_id,
-                        display_name=display_name or str(session_id),
-                        fernet=self.fernet
-                    ),
-                    "--job-name": self.make_job_name(user_id),
-                    "--time": str(time),
-                    "--account": self.account,
-                }.items()
+                f"--job-name={SlurmJob.make_job_name(user_id=user_id, session_id=session_id, fernet=self.fernet)}",
+                f"--time={time}",
+                f"--account={self.account}",
             ],
             stdin=self.get_sbatch_launch_script(
                 time=time,
@@ -377,8 +360,6 @@ class SshJobLauncher:
 
         if job_id is not None:
             sacct_params.append(f"--jobs={job_id}")
-        if user_id is not None:
-            sacct_params.append(f"--name={self.make_job_name(user_id=user_id)}")
         if state != None and len(state) > 0:
             sacct_params.append(f"--state={','.join(s.value for s in state)}")
 
@@ -396,6 +377,8 @@ class SshJobLauncher:
             if isinstance(job_result, Exception):
                 return job_result
             if job_result is None:
+                continue
+            if user_id and job_result.user_id != user_id:
                 continue
             if session_id and job_result.session_id == session_id:
                 return [job_result]
