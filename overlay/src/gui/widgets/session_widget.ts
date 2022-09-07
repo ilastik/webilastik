@@ -84,6 +84,6 @@ export abstract class SessionWidget{
         const login_url = ilastikUrl.joinPath("api/login_then_close").raw
         this.messagesContainer.innerHTML += `<p><a target="_blank" rel="noopener noreferrer" href="${login_url}">Login on ebrains</a> and try again.</p>`
         window.open(login_url)
-        this.set_disabled({disabled: false, buttonText: "Rejoin Session"});
+        this.set_disabled({disabled: false});
     }
 }
