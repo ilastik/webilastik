@@ -305,11 +305,11 @@ class SessionAllocator:
         if isinstance(user_info_result, Exception):
             print(f"Error retrieving user info: {user_info_result}")
             return uncachable_json_response({"error": "Could not get user information"}, status=500) #FIXME: 500?
-        # session_result = await self.session_launcher.get_job_by_session_id(session_id=session_id, user_info=user_info_result)
-        # if isinstance(session_result, Exception):
-        #     return uncachable_json_response({"error": "Could not retrieve session"}, status=500)
-        # if session_result is None:
-        #     return uncachable_json_response({"error": "Session not found"}, status=404)
+        session_result = await self.session_launcher.get_job_by_session_id(session_id=session_id, user_id=user_info_result.sub)
+        if isinstance(session_result, Exception):
+            return uncachable_json_response({"error": "Could not retrieve session"}, status=500)
+        if session_result is None:
+            return uncachable_json_response({"error": "Session not found"}, status=404)
 
         session_url = self._make_session_url(session_id=session_id)
 
@@ -341,19 +341,17 @@ class SessionAllocator:
         import datetime
         return uncachable_json_response(
             SessionStatus(
-                # slurm_job=session_result,
-                slurm_job=SlurmJob(
-                    job_id=SlurmJobId(123),
-                    user_id=user_info_result.sub,
-                    job_name=f"EBRAINS-{user_info_result.sub}",
-                    state=JobState.RUNNING,
-                    start_time_utc_sec=Seconds(int(datetime.datetime.now(datetime.timezone.utc).timestamp())),
-                    num_nodes=1,
-                    time_elapsed_sec=Seconds(1),
-                    time_limit_minutes=Minutes(99999),
-                    session_id=session_id,
-                    display_name="Dummy job",
-                ),
+                slurm_job=session_result,
+                # slurm_job=SlurmJob(
+                #     job_id=SlurmJobId(123),
+                #     user_id=user_info_result.sub,
+                #     state=JobState.RUNNING,
+                #     start_time_utc_sec=Seconds(int(datetime.datetime.now(datetime.timezone.utc).timestamp())),
+                #     num_nodes=1,
+                #     time_elapsed_sec=Seconds(1),
+                #     time_limit_minutes=Minutes(99999),
+                #     session_id=session_id,
+                # ),
                 session_url=session_url,
                 connected=ping_session_result.ok and Path(f"/tmp/to-session-{session_id}").exists(),
             ).to_json_value(),
