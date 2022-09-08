@@ -206,3 +206,9 @@ input[type=button], input[type=submit], .ItkPopupSelectTrigger{
     padding: 10px;
     border-radius: 5px;
 }
+
+.ItkLoadingBackground{
+    background: url(/public/images/loading.gif) no-repeat;
+    background-size: contain;
+    background-position: center;
+}

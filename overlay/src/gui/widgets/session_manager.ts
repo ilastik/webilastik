@@ -1,27 +1,39 @@
 import { IViewerDriver } from "../..";
 import { Session } from "../../client/ilastik";
-import { createElement, createInput, secondsToTimeDeltaString } from "../../util/misc";
+import { createElement, createInput, createInputParagraph, secondsToTimeDeltaString } from "../../util/misc";
 import { Url } from "../../util/parsed_url";
 import { ReferencePixelClassificationWorkflowGui } from "../reference_pixel_classification_workflow";
 import { CollapsableWidget } from "./collapsable_applet_gui";
-import { ErrorPopupWidget } from "./popup";
-import { SessionCreatorWidget } from "./session_creator";
-import { SessionLoaderWidget } from "./session_loader";
+import { ErrorPopupWidget, PopupWidget } from "./popup";
+import { SessionsPopup } from "./sessions_list_widget";
 
 export class SessionManagerWidget{
     element: HTMLElement
     session?: Session
     workflow?: ReferencePixelClassificationWorkflowGui
-    session_creator: SessionCreatorWidget;
-    session_loader: SessionLoaderWidget;
 
     private remainingTimeIntervalID: number = 0;
     private reminaningTimeContainer: HTMLParagraphElement
     private remainingTimeDisplay: HTMLInputElement
+    ilastikUrlInput: HTMLInputElement;
+    timeoutInput: HTMLInputElement;
+    createSessionButton: HTMLInputElement;
+    messagesContainerLabel: HTMLLabelElement;
+    messagesContainer: HTMLParagraphElement;
+    sessionIdField: HTMLInputElement;
+    rejoinSessionButton: HTMLInputElement;
+    workflowContainer: HTMLElement;
+    viewerDriver: IViewerDriver;
+    closeSessionButton: HTMLInputElement;
+    leaveSessionButton: HTMLInputElement;
+    listSessionsButton: HTMLInputElement;
+    sessionDurationInput: HTMLInputElement;
 
     constructor({parentElement, ilastikUrl=Url.parse("https://app.ilastik.org/"), viewer_driver, workflow_container}: {
         parentElement: HTMLElement, ilastikUrl?: Url, viewer_driver: IViewerDriver, workflow_container: HTMLElement
     }){
+        this.workflowContainer = workflow_container
+        this.viewerDriver = viewer_driver
         this.element = new CollapsableWidget({
             display_name: "Session Management",
             parentElement,
@@ -43,96 +55,272 @@ export class SessionManagerWidget{
         }).element;
         this.element.classList.add("ItkLauncherWidget")
 
-        const onUnload = (event: BeforeUnloadEvent) => {
-            event.preventDefault();
-            return event.returnValue = "Are you sure you want to exit? Your compute session is still running.";
-        };
 
-        const onNewSession = (new_session: Session) => {
-            this.session = new_session
-            this.workflow?.element.parentElement?.removeChild(this.workflow.element)
-            this.workflow = new ReferencePixelClassificationWorkflowGui({
-                session: new_session, parentElement: workflow_container, viewer_driver
-            })
-            close_session_btn.disabled = false
-            leave_session_btn.disabled = false
-            this.session_creator.set_disabled({disabled: true, buttonText: "Session is running..."})
-            this.session_loader.set_disabled({disabled: true, buttonText: "Session is running..."})
-            this.session_loader.setFields({
-                ilastikUrl,
-                sessionId: new_session.sessionId,
-            })
-            this.reminaningTimeContainer.style.display = "block"
-            this.remainingTimeIntervalID = window.setInterval(() => {
-                if(this.session === undefined){
-                    window.clearInterval(this.remainingTimeIntervalID)
+        this.ilastikUrlInput = createInputParagraph({
+            label_text: "Ilastik api URL: ", inputType: "url", parentElement: this.element, required: true, value: ilastikUrl.toString()
+        })
+        this.timeoutInput = createInputParagraph({
+            label_text: "Timeout (minutes): ", inputType: "number", parentElement: this.element, required: true, value: "15"
+        })
+        this.timeoutInput.min = "1"
+
+
+        createElement({tagName: "h3", parentElement: this.element, innerText: "Create Session"})
+        this.sessionDurationInput = createInputParagraph({inputType: "text", parentElement: this.element, label_text: "Session Duration (minutes): ", value: "15"})
+        this.sessionDurationInput.min = "5"
+        this.createSessionButton = createInputParagraph({
+            inputType: "button",
+            value: "Create Session",
+            parentElement: this.element,
+            onClick: async () => {
+                let timeoutMinutes = this.getWaitTimeout()
+                if(timeoutMinutes === undefined){
                     return
                 }
-                const startTime = this.session.startTime
-                if(startTime === undefined){
-                    this.remainingTimeDisplay.value = "Not started yet"
+                this.enableSessionAccquisitionControls({enabled: false})
+                let ilastikUrl = await this.ensureLoggedInAndGetIlastikUrl();
+                if(!ilastikUrl){
+                    return this.enableSessionAccquisitionControls({enabled: true})
+                }
+                let sessionDurationMinutes = parseInt(this.sessionDurationInput.value)
+                if(Number.isNaN(sessionDurationMinutes)){
+                    new ErrorPopupWidget({message: `Bad session duration: ${this.sessionDurationInput.value}`})
                     return
                 }
-                const ellapsedTimeMs = new Date().getTime() - startTime.getTime()
-                const remainingTimeSec = (this.session.timeLimitMinutes * 60 - ellapsedTimeMs / 1000)
-                this.remainingTimeDisplay.value = secondsToTimeDeltaString(Math.floor(remainingTimeSec))
-            }, 1000);
-            window.addEventListener("beforeunload", onUnload);
-        }
-        const onUsageError = (message: string) => {
-            new ErrorPopupWidget({message})
-        };
-        this.session_creator = new SessionCreatorWidget({parentElement: this.element, ilastikUrl, onNewSession, onUsageError})
-        this.session_loader = new SessionLoaderWidget({parentElement: this.element, ilastikUrl, onNewSession, onUsageError})
+                this.logMessage("Creating session....")
+                this.enableSessionAccquisitionControls({enabled: false})
+                this.sessionIdField.value = ""
+                let sessionResult = await Session.create({
+                    ilastikUrl,
+                    timeout_minutes: timeoutMinutes,
+                    session_duration_minutes: sessionDurationMinutes,
+                    onProgress: (message) => this.logMessage(message),
+                    onUsageError: (message) => this.logMessage(message),
+                    autoCloseOnTimeout: true,
+                })
+                this.onNewSession(sessionResult)
+            }
+        })
 
-        const onLeaveSession = () => {
-            this.session?.closeWebsocket()
-            this.session = undefined
-            window.clearInterval(this.remainingTimeIntervalID)
-            this.reminaningTimeContainer.style.display = "none"
-            this.workflow?.destroy()
-            close_session_btn.disabled = true
-            leave_session_btn.disabled = true
-            this.session_creator.set_disabled({disabled: false})
-            this.session_loader.set_disabled({disabled: false, buttonText: "Rejoin Session"})
-            window.removeEventListener("beforeunload", onUnload);
-        }
 
-        const close_session_btn = createInput({
+        createElement({tagName: "h3", parentElement: this.element, innerText: "Rejoin Session"})
+        this.sessionIdField = createInputParagraph({inputType: "text", parentElement: this.element, label_text: "Session ID: "})
+        this.rejoinSessionButton = createInputParagraph({
+            inputType: "button",
+            value: "Rejoin Session",
+            parentElement: this.element,
+            onClick: async () => {
+                let timeoutMinutes = this.getWaitTimeout()
+                if(timeoutMinutes === undefined){
+                    return
+                }
+                let sessionId = this.sessionIdField.value
+                if(!sessionId){
+                    new ErrorPopupWidget({message: "Bad session ID"})
+                    return
+                }
+                this.enableSessionAccquisitionControls({enabled: false})
+                let ilastikUrl = await this.ensureLoggedInAndGetIlastikUrl();
+                if(!ilastikUrl){
+                    return this.enableSessionAccquisitionControls({enabled: true})
+                }
+                this.logMessage("Joining session....")
+                let sessionResult = await Session.load({
+                    ilastikUrl,
+                    sessionId,
+                    timeout_minutes: timeoutMinutes,
+                    onUsageError: (message) => this.logMessage(message),
+                    onProgress: (message) => this.logMessage(message),
+                    autoCloseOnTimeout: false,
+                })
+                this.onNewSession(sessionResult)
+            }
+        })
+
+
+        this.messagesContainerLabel = createElement({tagName: "label", parentElement: this.element, innerText: "Log:", inlineCss: {display: "none"}})
+        this.messagesContainer = createElement({tagName: "p", parentElement: this.element, cssClasses: ["ItkSessionCreatorWidget_status-messages"], inlineCss: {display: "none"}})
+
+
+        this.closeSessionButton = createInput({
             inputType: "button",
             value: "Close Session",
             parentElement: this.element,
             onClick: async () => {
                 this.session?.terminate()
                 this.session = undefined
-                onLeaveSession()
-                this.session_loader.setFields({
-                    ilastikUrl,
-                    sessionId: undefined,
-                })
+                this.onLeaveSession()
+                this.sessionIdField.value = ""
             },
-            inlineCss: {
-                marginTop: "10px",
-            },
+            inlineCss: {marginTop: "10px"},
             disabled: true,
         })
-        close_session_btn.title = "Terminates session and any running processing"
+        this.closeSessionButton.title = "Terminates session and any running processing"
 
 
-        const leave_session_btn = createInput({
+        this.leaveSessionButton = createInput({
             inputType: "button",
             value: "Leave Session",
             parentElement: this.element,
-            onClick: onLeaveSession,
-            inlineCss: {
-                marginTop: "10px",
-            },
+            onClick: this.onLeaveSession,
+            inlineCss: {marginTop: "10px"},
             disabled: true,
         })
-        leave_session_btn.title = "Leaves session running on the server"
+        this.leaveSessionButton.title = "Leaves session running on the server"
+
+        this.listSessionsButton = createInput({
+            inputType: "button",
+            value: "List Sessions",
+            parentElement: this.element,
+            inlineCss: {marginTop: "10px"},
+            onClick: async () => {
+                this.listSessionsButton.disabled = true
+                let ilastikUrl = await this.ensureLoggedInAndGetIlastikUrl();
+                if(!ilastikUrl){
+                    this.listSessionsButton.disabled = false
+                    return
+                }
+                await SessionsPopup.create({
+                    ilastikUrl,
+                    onSessionClosed: (status) => {
+                        if(this.session && this.session.sessionUrl.equals(status.session_url)){
+                            this.onLeaveSession()
+                        }
+                    }
+                });
+                this.listSessionsButton.disabled = false
+            }
+        })
 
         this.reminaningTimeContainer = createElement({tagName: "p", parentElement: this.element, inlineCss: {display: "none"}})
         createElement({tagName: "label", parentElement: this.reminaningTimeContainer, innerText: " Time remaining: "})
         this.remainingTimeDisplay = createInput({inputType: "text", parentElement: this.reminaningTimeContainer, disabled: true, value: ""})
+    }
+
+    private enableSessionAccquisitionControls(params: {enabled: boolean}){
+        this.ilastikUrlInput.disabled = !params.enabled
+        this.timeoutInput.disabled = !params.enabled
+
+        this.sessionDurationInput.disabled = !params.enabled
+        this.createSessionButton.disabled = !params.enabled
+
+        this.sessionIdField.disabled = !params.enabled
+        this.rejoinSessionButton.disabled = !params.enabled
+    }
+
+    private enableSessionDismissalControls(params: {enabled: boolean}){
+        this.closeSessionButton.disabled = !params.enabled
+        this.leaveSessionButton.disabled = !params.enabled
+    }
+
+    private logMessage = (message: string) => {
+        this.messagesContainerLabel.style.display = "inline"
+        this.messagesContainer.style.display = "block"
+
+        let p = createElement({tagName: "p", parentElement: this.messagesContainer})
+        createElement({tagName: "em", parentElement: p, innerText: `${new Date().toLocaleString()} ${message}`})
+        this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight
+    }
+
+    private getIlastikUrl(): Url | undefined{
+        try{
+            return Url.parse(this.ilastikUrlInput.value)
+        }catch{
+            new ErrorPopupWidget({message: `Could not parse ilastik url: ${this.ilastikUrlInput.value}`})
+            return
+        }
+    }
+
+    private getWaitTimeout(): number | undefined{
+        const timeoutMinutes = parseInt(this.timeoutInput.value)
+        if(Number.isNaN(timeoutMinutes)){
+            new ErrorPopupWidget({message: `Bad timeout value: ${this.timeoutInput.value}`})
+            return
+        }
+        return timeoutMinutes
+    }
+
+    private async ensureLoggedInAndGetIlastikUrl(): Promise<Url | undefined>{
+        let ilastikUrl = this.getIlastikUrl()
+        if(ilastikUrl === undefined){
+            return undefined
+        }
+        let logInResult = await Session.check_login({ilastikUrl})
+        if(logInResult instanceof Error){
+            new ErrorPopupWidget({message: `Could not login: ${logInResult.message}`})
+            return
+        }
+        if(logInResult === true){
+            return ilastikUrl
+        }
+
+        let popup = new PopupWidget("Not logged in")
+        const loginUrl = ilastikUrl.joinPath("api/login_then_close")
+        let loginLink = createElement({
+            tagName: "a",
+            parentElement: createElement({tagName: "p", parentElement: popup.element}),
+            innerHTML: "Login on ebrains and try again.",
+            onClick: () => popup.destroy()
+        })
+        loginLink.target = "_blank"
+        loginLink.rel = "noopener noreferrer"
+        loginLink.href = loginUrl.raw
+
+        createInputParagraph({inputType: "button", parentElement: popup.element, value: "close", onClick: () => {
+            popup.destroy()
+        }})
+
+        window.open(loginUrl.raw)
+        return undefined
+    }
+
+    private onNewSession(sessionResult: Session | Error){
+        if(sessionResult instanceof Error){
+            this.logMessage(sessionResult.message)
+            this.enableSessionAccquisitionControls({enabled: true})
+            return
+        }
+        this.sessionIdField.value = sessionResult.sessionUrl.raw
+
+        this.enableSessionAccquisitionControls({enabled: false})
+        this.session = sessionResult
+        this.workflow?.element.parentElement?.removeChild(this.workflow.element)
+        this.workflow = new ReferencePixelClassificationWorkflowGui({
+            session: sessionResult, parentElement: this.workflowContainer, viewer_driver: this.viewerDriver
+        })
+        this.sessionIdField.value = sessionResult.sessionId
+        this.reminaningTimeContainer.style.display = "block"
+        this.remainingTimeIntervalID = window.setInterval(() => {
+            if(this.session === undefined){
+                window.clearInterval(this.remainingTimeIntervalID)
+                return
+            }
+            const startTime = this.session.startTime
+            if(startTime === undefined){
+                this.remainingTimeDisplay.value = "Not started yet"
+                return
+            }
+            const ellapsedTimeMs = new Date().getTime() - startTime.getTime()
+            const remainingTimeSec = (this.session.timeLimitMinutes * 60 - ellapsedTimeMs / 1000)
+            this.remainingTimeDisplay.value = secondsToTimeDeltaString(Math.floor(remainingTimeSec))
+        }, 1000);
+        window.addEventListener("beforeunload", this.onUnload);
+        this.enableSessionDismissalControls({enabled: true})
+    }
+
+    private onUnload = (event: BeforeUnloadEvent) => {
+        event.preventDefault();
+        return event.returnValue = "Are you sure you want to exit? Your compute session is still running.";
+    };
+
+    private onLeaveSession = () => {
+        this.session?.closeWebsocket()
+        this.session = undefined
+        window.clearInterval(this.remainingTimeIntervalID)
+        this.reminaningTimeContainer.style.display = "none"
+        this.workflow?.destroy()
+        window.removeEventListener("beforeunload", this.onUnload);
+        this.enableSessionDismissalControls({enabled: false})
+        this.enableSessionAccquisitionControls({enabled: true})
     }
 }

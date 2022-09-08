@@ -237,7 +237,7 @@ export class Session{
         return atob(encoded.replace("-", "+").replace("_", "/"))
     }
 
-    public static async check_login({ilastikUrl}: {ilastikUrl: Url}): Promise<boolean>{
+    public static async check_login({ilastikUrl}: {ilastikUrl: Url}): Promise<Error | boolean>{
         let response = await fetch(ilastikUrl.joinPath("/api/check_login").raw, {
             credentials: "include",
             cache: "no-store",
@@ -249,7 +249,7 @@ export class Session{
             return false
         }
         let contents = await response.text()
-        throw new Error(`Checking loging faield with ${response.status}:\n${contents}`)
+        return new Error(`Checking loging faield with ${response.status}:\n${contents}`)
     }
 
     public static async getStatus(params: {ilastikUrl: Url, sessionId: string}): Promise<SessionStatus | Error>{
@@ -261,6 +261,17 @@ export class Session{
             return result
         }
         return SessionStatus.fromJsonValue(result)
+    }
+
+    public static async listSessions(params: {ilastikUrl: Url}): Promise<SessionStatus[] | Error>{
+        let payload_result = await fetchJson(
+            params.ilastikUrl.joinPath("/api/sessions").raw,
+            {cache: "no-store"},
+        )
+        if(payload_result instanceof Error){
+            return payload_result
+        }
+        return ensureJsonArray(payload_result).map(item => SessionStatus.fromJsonValue(item))
     }
 
     public static getEbrainsToken(): string | undefined{
