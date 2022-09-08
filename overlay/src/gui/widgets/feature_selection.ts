@@ -99,8 +99,12 @@ export class FeatureSelectionWidget extends Applet<{feature_extractors: IlpFeatu
             let tr = createElement({tagName: "tr", parentElement: table})
             createElement({tagName: "td", parentElement: tr, innerHTML: label})
             scales.forEach(scale => {
+                let td = createElement({tagName: "td", parentElement: tr})
+                if(scale == 0.3 && class_name != "IlpGaussianSmoothing"){
+                    return
+                }
                 this.checkboxes.push(new FeatureSelectionCheckbox({
-                    parentElement: createElement({tagName: "td", parentElement: tr}),
+                    parentElement: td,
                     featureExtractor: new IlpFeatureExtractor({ilp_scale: scale, axis_2d: "z", __class__: class_name}),
                     lastUpstreamState: false, // FIXME? Maybe initialize straight with the upstream state?
                 }))
