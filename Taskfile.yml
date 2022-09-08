@@ -158,7 +158,7 @@ tasks:
 
         Environment=PYTHONPATH=/opt/webilastik/
         ExecStart=/opt/webilastik/conda_env/bin/python3 -B /opt/webilastik/webilastik/server/session_allocator.py \
-            --session-launcher=CSCS \
+            --session-launcher=JUSUF \
             --external-url=https://app.ilastik.org/ \
             --oidc-client-json=/etc/webilastik/oidc_client.json \
 
