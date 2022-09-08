@@ -197,7 +197,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             allowed_protocols=set([Protocol.HTTP, Protocol.HTTPS]),
             executor=priority_executor,
             generational_classifier=self.pixel_classifier_applet.generational_pixel_classifier,
-            label_colors=self.brushing_applet.label_colors,
+            labels=self.brushing_applet.labels,
             session_url=session_url,
             on_async_change=on_async_change,
         )

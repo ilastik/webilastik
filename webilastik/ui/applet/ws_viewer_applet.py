@@ -13,11 +13,11 @@ import asyncio
 from ndstructs.utils.json_serializable import JsonObject, ensureJsonArray, ensureJsonInt, ensureJsonObject, ensureJsonString
 from aiohttp import web
 
-from webilastik.annotations.annotation import Color
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.server.session_allocator import uncachable_json_response
+from webilastik.ui.applet.brushing_applet import Label
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.usage_error import UsageError
 
@@ -236,14 +236,14 @@ class WsViewerApplet(WsApplet):
         *,
         name: str,
         generational_classifier: AppletOutput["Tuple[VigraPixelClassifier[IlpFilter], int] | None"],
-        label_colors: AppletOutput["Sequence[Color] | None"],
+        labels: AppletOutput["Sequence[Label] | None"],
         allowed_protocols: Set[Protocol],
         session_url: Url,
         executor: Executor,
         on_async_change: Callable[[], Any]
     ) -> None:
         self._in_generational_classifier = generational_classifier
-        self._in_label_colors = label_colors
+        self._in_labels = labels
         self.allowed_protocols = allowed_protocols
         self.session_url = session_url
         self.executor = executor
@@ -257,10 +257,10 @@ class WsViewerApplet(WsApplet):
 
     def _get_json_state(self) -> JsonObject:
         with self.lock:
-            label_colors = self._in_label_colors() or ()
+            labels = self._in_labels() or ()
             return {
                 **self.state.to_json_value(),
-                "label_colors": tuple(c.to_json_data() for c in label_colors), # FIXME
+                "label_colors": tuple(label.color.to_json_data() for label in labels if len(label.annotations) > 0), # FIXME
             }
 
     def take_snapshot(self) -> ViewsState:
@@ -280,12 +280,12 @@ class WsViewerApplet(WsApplet):
         return CascadeOk()
 
     def refresh(self, user_prompt: UserPrompt) -> CascadeResult:
-        label_colors = self._in_label_colors()
+        labels = self._in_labels()
         classifier_and_generation = self._in_generational_classifier()
         with self.lock:
             self.cached_views = {url: view for url, view in self.cached_views.items() if not isinstance(view, PredictionsView)}
             new_prediction_views: Dict[Url, PredictionsView] = {}
-            if classifier_and_generation is not None and label_colors is not None:
+            if classifier_and_generation is not None and labels is not None:
                 _, generation = classifier_and_generation
                 for view in tuple(self.state.data_views.values()):
                     if isinstance(view, RawDataView) and len(view.datasources) == 1:
