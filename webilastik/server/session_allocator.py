@@ -432,7 +432,7 @@ if __name__ == '__main__':
     elif args.session_launcher == "CSCS":
         session_launcher = CscsSshJobLauncher(fernet=fernet)
     else:
-        print(f"Can get a session launcher for {args.session_launcher}")
+        print(f"Can't get a session launcher for {args.session_launcher}", file=sys.stderr)
         exit(1)
 
     with open(args.oidc_client_json) as f:
