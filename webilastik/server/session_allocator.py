@@ -226,7 +226,7 @@ class SessionAllocator:
         user_info = await ebrains_login.user_token.get_userinfo(self.http_client_session)
         if isinstance(user_info, Exception):
             return web.json_response({"error": "Could not retrieve user info"}, status=400)
-        if user_info.preferred_username not in ["dominik", "tomazvieira", "em"]:
+        if user_info.preferred_username not in ["dominik", "tomazvieira", "em", "akreshuk"]:
             return web.json_response({"error": "This user can't allocate sessions yet"}, status=400)
 
         async with self.quotas_lock:
