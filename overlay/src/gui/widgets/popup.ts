@@ -15,13 +15,7 @@ export class PopupWidget{
             zIndex: zIndex + "",
             backgroundColor: "rgba(0,0,0, 0.5)",
         }})
-        this.element = createElement({tagName: "div", parentElement: document.body, cssClasses: ["ItkPopupWidget"], inlineCss: {
-            position: "fixed",
-            zIndex: zIndex + 1 + "",
-            left: "50%",
-            top: "50%",
-            transform: "translate(-50%, -50%)",
-        }})
+        this.element = createElement({tagName: "div", parentElement: document.body, cssClasses: ["ItkPopupWidget"]})
         createElement({tagName: "h2", parentElement: this.element, innerHTML: title})
     }
 

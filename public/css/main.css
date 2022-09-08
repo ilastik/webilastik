@@ -7,6 +7,17 @@
     color: black
 }
 
+.ItkPopupWidget{
+    position: fixed;
+    z-index: 100000;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    max-height: 90vh;
+    max-width: 90vw;
+    overflow: scroll;
+}
+
 .ItkCollapsableApplet{
     font-family: helvetica;
     background-color: rgb(239 239 239);
