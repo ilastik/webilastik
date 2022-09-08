@@ -2,7 +2,7 @@
 
 from functools import wraps
 import json
-from typing import Any, Callable, Coroutine, Dict, NoReturn, Optional
+from typing import Any, Callable, Coroutine, Dict, List, NoReturn, Optional
 from pathlib import Path, PurePosixPath
 import uuid
 import asyncio
@@ -148,6 +148,7 @@ class SessionAllocator:
             web.get('/api/login_then_close', self.login_then_close),
             web.get('/api/hello', self.hello),
             web.post('/api/session', self.spawn_session),
+            web.get('/api/sessions', self.list_sessions),
             web.get('/api/session/{session_id}', self.session_status),
             web.delete('/api/session/{session_id}', self.close_session),
             web.post('/api/get_ebrains_token', self.get_ebrains_token), #FIXME: I'm using this in NG web workers
@@ -334,10 +335,6 @@ class SessionAllocator:
         #     )
         ##################################################################################
 
-        ping_session_result = await self.http_client_session.get(session_url.concatpath("status").raw)
-        print(f"Ping session result: {ping_session_result.status}   ok? {ping_session_result.ok}", file=sys.stderr)
-        print(f"Tunnel file exists? {Path(f'/tmp/to-session-{session_id}').exists()}")
-
         import datetime
         return uncachable_json_response(
             SessionStatus(
@@ -353,7 +350,7 @@ class SessionAllocator:
                 #     session_id=session_id,
                 # ),
                 session_url=session_url,
-                connected=ping_session_result.ok and Path(f"/tmp/to-session-{session_id}").exists(),
+                connected=await self.check_session_connection_state(session_result),
             ).to_json_value(),
             status=200
         )
@@ -378,6 +375,39 @@ class SessionAllocator:
         if isinstance(cancellation_result, Exception):
             return uncachable_json_response({"error": f"Failed to cancel session {session_id}"}, status=500)
         return uncachable_json_response({"session_id": str(session_id)}, status=200)
+
+    async def check_session_connection_state(self, job: SlurmJob) -> bool:
+        if job.is_done() or not Path(f"/tmp/to-session-{job.session_id}").exists():
+            return False
+        session_url = self._make_session_url(session_id=job.session_id)
+        ping_session_result = await self.http_client_session.get(session_url.concatpath("status").raw)
+        return ping_session_result.ok
+
+    @require_ebrains_login
+    async def list_sessions(self, ebrains_login: EbrainsLogin, request: web.Request) -> web.Response:
+        user_info_result = await ebrains_login.user_token.get_userinfo(self.http_client_session)
+        if isinstance(user_info_result, Exception):
+            print(f"Error retrieving user info: {user_info_result}")
+            return uncachable_json_response({"error": "Could not get user information"}, status=500) #FIXME: 500?
+        jobs_result = await self.session_launcher.get_jobs(
+            user_id=user_info_result.sub, starttime=datetime.today().replace(day=1),
+        )
+        if isinstance(jobs_result, Exception):
+            return uncachable_json_response({"error": "Could not retrieve sessions"}, status=500)
+        session_stati: List[SessionStatus] = []
+        for job in jobs_result:
+            session_stati.append(
+                SessionStatus(
+                    slurm_job=job,
+                    session_url=self._make_session_url(job.session_id),
+                    connected=await self.check_session_connection_state(job),
+                )
+            )
+
+        return uncachable_json_response(
+            tuple(ss.to_json_value() for ss in session_stati),
+            status=200
+        )
 
     def run(self, port: int):
         web.run_app(self.app, port=port)
