@@ -312,8 +312,8 @@ tasks:
         sh: sha256sum {{.DEB_PKG_PATH}} | awk '{print $1}'
       REMOTE_DEB_PACKAGE_HASH:
         sh: ssh ubuntu@148.187.149.187 "sha256sum {{.REMOTE_PACKAGE_PATH}} | awk '{print \$1}' " || echo "nothing"
-    status:
-      - test {{.REMOTE_DEB_PACKAGE_HASH}} = {{.LOCAL_DEB_PACKAGE_HASH}}
+    # status:
+    #   - test {{.REMOTE_DEB_PACKAGE_HASH}} = {{.LOCAL_DEB_PACKAGE_HASH}}
     cmds:
       - scp {{.DEB_PKG_PATH}} ubuntu@148.187.149.187:{{.REMOTE_PACKAGE_PATH}}
 
