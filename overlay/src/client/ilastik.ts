@@ -36,7 +36,7 @@ export function ensureSlurmJobState(value: string): SlurmJobState{
 
 export class SlurmJob{
     public readonly job_id: number
-    public readonly state: string
+    public readonly state: SlurmJobState
     public readonly start_time_utc_sec?: number
     public readonly time_elapsed_sec: number
     public readonly time_limit_minutes: number
@@ -62,11 +62,11 @@ export class SlurmJob{
     }
 
     public is_failure(): boolean{
-        return this.state in slurmJobFailedStates
+        return slurmJobFailedStates.find(st => st == this.state) !== undefined
     }
 
     public is_done(): boolean{
-        return this.state in slurmJobDoneStates
+        return slurmJobDoneStates.find(st => st == this.state) !== undefined
     }
 
     public static fromJsonValue(value: JsonValue): SlurmJob{
