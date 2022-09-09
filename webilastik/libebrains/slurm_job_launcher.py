@@ -15,6 +15,7 @@ from cryptography.fernet import Fernet
 
 from webilastik.libebrains.user_info import UserInfo
 from webilastik.libebrains.user_token import UserToken
+from webilastik.libebrains.oidc_client import EBRAINS_CLIENT_ID, EBRAINS_CLIENT_SECRET
 
 class JobState(Enum):
     BOOT_FAIL = "BOOT_FAIL"
@@ -415,7 +416,10 @@ class JusufSshJobLauncher(SshJobLauncher):
             #SBATCH --partition=batch
             #SBATCH --hint=nomultithread
 
-            export EBRAINS_USER_ACCESS_TOKEN="{ebrains_user_token.access_token}"
+            export {UserToken.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME}="{ebrains_user_token.access_token}"
+            export {UserToken.EBRAINS_USER_REFRESH_TOKEN_ENV_VAR_NAME}="{ebrains_user_token.refresh_token}"
+            export EBRAINS_CLIENT_ID="{EBRAINS_CLIENT_ID}"
+            export EBRAINS_CLIENT_SECRET="{EBRAINS_CLIENT_SECRET}"
             set -xeu
             set -o pipefail
 
@@ -514,7 +518,10 @@ class CscsSshJobLauncher(SshJobLauncher):
             #SBATCH --hint=nomultithread
             #SBATCH --constraint=mc
 
-            export EBRAINS_USER_ACCESS_TOKEN="{ebrains_user_token.access_token}"
+            export {UserToken.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME}="{ebrains_user_token.access_token}"
+            export {UserToken.EBRAINS_USER_REFRESH_TOKEN_ENV_VAR_NAME}="{ebrains_user_token.refresh_token}"
+            export EBRAINS_CLIENT_ID="{EBRAINS_CLIENT_ID}"
+            export EBRAINS_CLIENT_SECRET="{EBRAINS_CLIENT_SECRET}"
             set -xeu
             set -o pipefail
 

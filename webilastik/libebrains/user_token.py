@@ -1,20 +1,20 @@
 import os
 from pathlib import PurePosixPath
 from typing import ClassVar, Dict, Optional, Mapping
+import json
+import requests
+
 from aiohttp.client import ClientSession
 from aiohttp.client_exceptions import ClientResponseError
-
-import requests
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString, ensureOptional
+
 from webilastik.libebrains.user_info import UserInfo
 from webilastik.ui.usage_error import UsageError
-
 from webilastik.utility.url import Url
 
-
-
 class UserToken:
-    ENV_VAR_NAME = "EBRAINS_USER_ACCESS_TOKEN"
+    EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME = "EBRAINS_USER_ACCESS_TOKEN"
+    EBRAINS_USER_REFRESH_TOKEN_ENV_VAR_NAME = "EBRAINS_USER_REFRESH_TOKEN"
 
     _global_login_token: "ClassVar[UserToken | None]" = None
 
@@ -22,40 +22,73 @@ class UserToken:
         self,
         *,
         access_token: str,
-        refresh_token: Optional[str] = None,
-        # expires_in: int,
-        # refresh_expires_in: int,
-        # token_type: str,
-        # id_token: str,
-        # not_before_policy: int,
-        # session_state: str,
-        # scope: str
+        refresh_token: str,
     ):
         api_url = Url.parse("https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect")
         assert api_url is not None
         self._api_url = api_url
         self.access_token = access_token
         self.refresh_token = refresh_token
-        # self.expires_in = expires_in
-        # self.refresh_expires_in = refresh_expires_in
-        # self.token_type = token_type
-        # self.id_token = id_token
-        # self.not_before_policy = not_before_policy
-        # self.session_state = session_state
-        # self.scope = scope
         super().__init__()
+
+    async def async_refreshed(self, *, http_client_session: ClientSession) -> "UserToken | Exception":
+        from webilastik.libebrains.oidc_client import EBRAINS_CLIENT_ID, EBRAINS_CLIENT_SECRET
+
+        resp = await http_client_session.request(
+            method="post",
+            url="https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect/token",
+            allow_redirects=False,
+            data={
+                "client_id": EBRAINS_CLIENT_ID,
+                "client_secret": EBRAINS_CLIENT_SECRET,
+                "grant_type": "refresh_token",
+                "refresh_token": self.refresh_token,
+            }
+        )
+        if not resp.ok:
+            return Exception(f"Could not refresh user token via refresh_token: {await resp.text()}")
+
+        data = ensureJsonObject(await resp.json())
+        return UserToken.from_json_value(data)
+
+    def refreshed(self) -> "UserToken | Exception":
+        from webilastik.libebrains.oidc_client import EBRAINS_CLIENT_ID, EBRAINS_CLIENT_SECRET
+
+        resp = requests.post(
+            "https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect/token",
+            allow_redirects=False,
+            data={
+                "client_id": EBRAINS_CLIENT_ID,
+                "client_secret": EBRAINS_CLIENT_SECRET,
+                "grant_type": "refresh_token",
+                "refresh_token": self.refresh_token,
+            }
+        )
+        if not resp.ok:
+            return Exception(f"Could not refresh user token via refresh_token: {resp.text}")
+
+        data = ensureJsonObject(resp.json())
+        return UserToken.from_json_value(data)
 
     @classmethod
     def from_environment(cls) -> "UserToken | UsageError":
-        access_token = os.environ.get(cls.ENV_VAR_NAME)
-        if access_token is None:
-            return UsageError(f"Environment variable '{cls.ENV_VAR_NAME}' is not set")
-        return UserToken(access_token=access_token)
+        access_token = os.environ.get(cls.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME)
+        refresh_token = os.environ.get(cls.EBRAINS_USER_REFRESH_TOKEN_ENV_VAR_NAME)
+        if access_token is None or refresh_token is None:
+            print(f"Environment variables '{cls.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME}' and '{cls.EBRAINS_USER_REFRESH_TOKEN_ENV_VAR_NAME}' must be set")
+            return UsageError(
+                f"Environment variables '{cls.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME}' and '{cls.EBRAINS_USER_REFRESH_TOKEN_ENV_VAR_NAME}' must be set"
+            )
+        try:
+            return UserToken(access_token=access_token, refresh_token=refresh_token)
+        except Exception as e:
+            return UsageError(str(e))
 
     @classmethod
     def login_globally(cls, token: "UserToken"):
         cls._global_login_token = token
-        os.environ[cls.ENV_VAR_NAME] = token.access_token
+        os.environ[cls.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME] = token.access_token
+        os.environ[cls.EBRAINS_USER_REFRESH_TOKEN_ENV_VAR_NAME] = token.refresh_token
 
     @classmethod
     def login_globally_from_environment(cls):
@@ -85,7 +118,7 @@ class UserToken:
         value_obj = ensureJsonObject(value)
         return UserToken(
             access_token=ensureJsonString(value_obj.get("access_token")),
-            refresh_token=ensureOptional(ensureJsonString, value_obj.get("refresh_token")),
+            refresh_token=ensureJsonString(value_obj.get("refresh_token")),
         )
 
     def to_json_value(self) -> JsonObject:

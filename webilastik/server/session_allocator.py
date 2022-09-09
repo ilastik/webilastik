@@ -55,21 +55,24 @@ def uncachable_json_response(payload: JsonValue, *, status: int) -> web.Response
     )
 
 class EbrainsLogin:
-    AUTH_COOKIE_KEY = "ebrains_user_access_token"
-
-    def __init__(self, user_token: UserToken):
+    def __init__(self, user_token: UserToken, refreshed: bool):
         self.user_token = user_token
+        self.refreshed = refreshed
         super().__init__()
 
     @classmethod
     async def from_cookie(cls, request: web.Request, http_client_session: ClientSession) -> Optional["EbrainsLogin"]:
-        access_token = request.cookies.get(cls.AUTH_COOKIE_KEY)
-        if access_token is None:
+        access_token = request.cookies.get(UserToken.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME.lower())
+        refresh_token = request.cookies.get(UserToken.EBRAINS_USER_REFRESH_TOKEN_ENV_VAR_NAME.lower())
+        if access_token is None or refresh_token is None:
             return None
-        user_token = UserToken(access_token=access_token)
-        if not await user_token.is_valid(http_client_session):
+        user_token = UserToken(access_token=access_token, refresh_token=refresh_token)
+        if await user_token.is_valid(http_client_session):
+            return EbrainsLogin(user_token=user_token, refreshed=False)
+        refreshed_token = await user_token.async_refreshed(http_client_session=http_client_session)
+        if isinstance(refreshed_token, Exception):
             return None
-        return EbrainsLogin(user_token=user_token)
+        return EbrainsLogin(user_token=refreshed_token, refreshed=True)
 
     @classmethod
     async def from_code(cls, request: web.Request, oidc_client: OidcClient, http_client_session: ClientSession) -> Optional["EbrainsLogin"]:
@@ -79,18 +82,14 @@ class EbrainsLogin:
         user_token = await oidc_client.get_user_token(
             code=auth_code, redirect_uri=get_requested_url(request), http_client_session=http_client_session
         )
-        return EbrainsLogin(user_token=user_token)
-
-    @classmethod
-    async def try_from_request(cls, request: web.Request, oidc_client: OidcClient, http_client_session: ClientSession) -> Optional["EbrainsLogin"]:
-        return (
-            (await cls.from_cookie(request, http_client_session=http_client_session)) or
-            (await EbrainsLogin.from_code(request, oidc_client=oidc_client, http_client_session=http_client_session))
-        )
+        return EbrainsLogin(user_token=user_token, refreshed=True)
 
     def set_cookie(self, response: web.Response) -> web.Response:
         response.set_cookie(
-            name=self.AUTH_COOKIE_KEY, value=self.user_token.access_token, secure=True
+            name=UserToken.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME.lower(), value=self.user_token.access_token, secure=True
+        )
+        response.set_cookie(
+            name=UserToken.EBRAINS_USER_REFRESH_TOKEN_ENV_VAR_NAME.lower(), value=self.user_token.refresh_token, secure=True
         )
         return response
 
@@ -101,13 +100,15 @@ def require_ebrains_login(
 
     @wraps(endpoint)
     async def wrapper(self: "SessionAllocator", request: web.Request) -> web.Response:
-        ebrains_login = await EbrainsLogin.try_from_request(
-            request, oidc_client=self.oidc_client, http_client_session=self.http_client_session
-        )
+        ebrains_login = await EbrainsLogin.from_cookie(request, http_client_session=self.http_client_session)
+        if ebrains_login is None:
+            ebrains_login = await EbrainsLogin.from_code(request, oidc_client=self.oidc_client, http_client_session=self.http_client_session)
         if ebrains_login is None:
             redirect_to_ebrains_login(request, oidc_client=self.oidc_client)
         response = await endpoint(self, ebrains_login, request)
-        return ebrains_login.set_cookie(response)
+        if ebrains_login.refreshed:
+            ebrains_login.set_cookie(response)
+        return response
 
     return wrapper
 
@@ -169,7 +170,7 @@ class SessionAllocator:
         session = await EbrainsLogin.from_cookie(request, http_client_session=self.http_client_session)
         if session is None:
             return web.json_response({"error": f"Not logged in"}, status=400)
-        return web.json_response({EbrainsLogin.AUTH_COOKIE_KEY: session.user_token.access_token})
+        return web.json_response({UserToken.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME.lower(): session.user_token.access_token})
 
     async def serve_service_worker(self, request: web.Request) -> web.StreamResponse:
         requested_url = get_requested_url(request)
@@ -419,10 +420,6 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument("--session-launcher", choices=["JUSUF", "CSCS"], required=True)
     parser.add_argument("--external-url", type=Url.parse, required=True, help="Url from which sessions can be accessed (where the session sockets live)")
-    parser.add_argument(
-        "--oidc-client-json",
-        help="Path to a json file representing the keycloak client or the special value 'skip'. You can get this data via OidcClient.get"
-    )
 
     args = parser.parse_args()
 
@@ -435,11 +432,8 @@ if __name__ == '__main__':
         print(f"Can't get a session launcher for {args.session_launcher}", file=sys.stderr)
         exit(1)
 
-    with open(args.oidc_client_json) as f:
-        oidc_client = OidcClient.from_json_value(json.load(f))
-
     SessionAllocator(
         session_launcher=session_launcher,
         external_url=args.external_url,
-        oidc_client=oidc_client,
+        oidc_client=OidcClient.from_environment(),
     ).run(port=5000)

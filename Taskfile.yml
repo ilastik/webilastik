@@ -63,7 +63,7 @@ tasks:
     deps: [create-neuroglancer-git-dir]
     dir: "{{.NEUROGLANCER_GIT_DIR}}"
     vars:
-      COMMIT_HASH: "4f9a9c70577d494b26857c5f231a9964ae330272"
+      COMMIT_HASH: "6027b247439b1373a43150b6158b4865062a8d61"
       # COMMIT_HASH: "with-ilastik-overlay"
     cmds:
       - git clone https://github.com/ilastik/neuroglancer . && git fetch
@@ -122,6 +122,8 @@ tasks:
     generates:
       - "{{.DEB_TREE_PATH}}/**/*"
     preconditions:
+      - test -n "$EBRAINS_CLIENT_ID"
+      - test -n "$EBRAINS_CLIENT_SECRET"
       - test -n "$WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY"
       - |
         python3 <<CHECK_FERNET_KEY
@@ -155,12 +157,13 @@ tasks:
         Environment=SSL_CERT_DIR=/etc/ssl/certs/
         Environment=REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
         Environment=WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY={{.WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY}}
+        Environment=EBRAINS_CLIENT_ID={{.EBRAINS_CLIENT_ID}}
+        Environment=EBRAINS_CLIENT_SECRET={{.EBRAINS_CLIENT_SECRET}}
 
         Environment=PYTHONPATH=/opt/webilastik/
         ExecStart=/opt/webilastik/conda_env/bin/python3 -B /opt/webilastik/webilastik/server/session_allocator.py \
             --session-launcher=JUSUF \
-            --external-url=https://app.ilastik.org/ \
-            --oidc-client-json=/etc/webilastik/oidc_client.json \
+            --external-url=https://app.ilastik.org/
 
         TimeoutStopSec=30
         KillMode=mixed
