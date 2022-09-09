@@ -185,7 +185,7 @@ class WebIlastik:
             ),
             web.post(
                 "/make_data_view",
-                self.workflow.viewer_applet.make_data_view
+                lambda request: self.workflow.viewer_applet.make_data_view(request)
             )
         ])
         self.app.on_shutdown.append(self.close_websockets)
@@ -353,7 +353,7 @@ class WebIlastik:
         ))
         new_workflow_result = WsPixelClassificationWorkflow.load_from_ilp_bytes(
             ilp_bytes=ilp_bytes,
-            on_async_change=lambda: self._update_clients(), #FIXME?
+            on_async_change=lambda: self.enqueue_user_interaction(user_interaction=lambda: None), #FIXME?
             executor=self.executor,
             priority_executor=self.priority_executor,
             allowed_protocols=(Protocol.HTTP, Protocol.HTTPS),
