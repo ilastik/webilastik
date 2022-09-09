@@ -286,18 +286,20 @@ class WsViewerApplet(WsApplet):
             self.cached_views = {url: view for url, view in self.cached_views.items() if not isinstance(view, PredictionsView)}
             new_prediction_views: Dict[Url, PredictionsView] = {}
             if classifier_and_generation is not None and labels is not None:
-                _, generation = classifier_and_generation
+                classifier, generation = classifier_and_generation
                 for view in tuple(self.state.data_views.values()):
                     if isinstance(view, RawDataView) and len(view.datasources) == 1:
-                        training_datasource = view.datasources[0]
+                        raw_data_datasource = view.datasources[0]
                     elif isinstance(view, StrippedPrecomputedView):
-                        training_datasource = view.datasource
+                        raw_data_datasource = view.datasource
                     else:
+                        continue
+                    if not classifier.is_applicable_to(raw_data_datasource):
                         continue
                     predictions_view = PredictionsView(
                         name=f"Predicting on {view.name}",
                         classifier_generation=generation,
-                        raw_data=training_datasource,
+                        raw_data=raw_data_datasource,
                         session_url=self.session_url,
                     )
                     new_prediction_views[predictions_view.url] = predictions_view
