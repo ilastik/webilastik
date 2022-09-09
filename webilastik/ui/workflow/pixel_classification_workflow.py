@@ -226,16 +226,26 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         allowed_protocols: "Sequence[Protocol] | None" = None,
         session_url: Url,
     ) -> "WsPixelClassificationWorkflow | Exception":
-        workflow_result = PixelClassificationWorkflow.from_ilp(
-            ilp_path=ilp_path,
-            on_async_change=on_async_change,
-            executor=executor,
-            priority_executor=priority_executor,
-            allowed_protocols=allowed_protocols,
-        )
-        if isinstance(workflow_result, Exception):
-            return workflow_result
-        return WsPixelClassificationWorkflow.from_pixel_classification_workflow(workflow_result, session_url=session_url)
+        allowed_protocols = allowed_protocols or (Protocol.HTTP, Protocol.HTTPS)
+        with h5py.File(ilp_path, "r") as f:
+            parsing_result = IlpPixelClassificationWorkflowGroup.parse(
+                group=f,
+                ilp_fs=OsFs("/"),
+                allowed_protocols=allowed_protocols,
+            )
+            if isinstance(parsing_result, Exception):
+                return parsing_result
+
+            return WsPixelClassificationWorkflow(
+                on_async_change=on_async_change,
+                executor=executor,
+                priority_executor=priority_executor,
+
+                feature_extractors=set(parsing_result.FeatureSelections.feature_extractors),
+                labels=parsing_result.PixelClassification.labels,
+                pixel_classifier=parsing_result.PixelClassification.classifier,
+                session_url=session_url,
+            )
 
     @staticmethod
     def load_from_ilp_bytes(
@@ -247,13 +257,18 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         allowed_protocols: "Sequence[Protocol] | None" = None,
         session_url: Url,
     ) -> "WsPixelClassificationWorkflow | Exception":
-        workflow_result = PixelClassificationWorkflow.from_ilp_bytes(
-            ilp_bytes=ilp_bytes,
+        tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5") # FIXME
+        num_bytes_written = os.write(tmp_file_handle, ilp_bytes)
+        assert num_bytes_written == len(ilp_bytes)
+        os.close(tmp_file_handle)
+        workflow =  WsPixelClassificationWorkflow.load_from_ilp(
+            ilp_path=Path(tmp_file_path),
             on_async_change=on_async_change,
             executor=executor,
             priority_executor=priority_executor,
             allowed_protocols=allowed_protocols,
+            session_url=session_url,
         )
-        if isinstance(workflow_result, Exception):
-            return workflow_result
-        return WsPixelClassificationWorkflow.from_pixel_classification_workflow(workflow_result, session_url=session_url)
+        os.remove(tmp_file_path)
+        return workflow
+
