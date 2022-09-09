@@ -28,6 +28,7 @@ export class SessionManagerWidget{
     leaveSessionButton: HTMLInputElement;
     listSessionsButton: HTMLInputElement;
     sessionDurationInput: HTMLInputElement;
+    private warnedUserOfImpendingClose = false
 
     constructor({parentElement, ilastikUrl=Url.parse("https://app.ilastik.org/"), viewer_driver, workflow_container}: {
         parentElement: HTMLElement, ilastikUrl?: Url, viewer_driver: IViewerDriver, workflow_container: HTMLElement
@@ -146,12 +147,7 @@ export class SessionManagerWidget{
             inputType: "button",
             value: "Close Session",
             parentElement: this.element,
-            onClick: async () => {
-                this.session?.terminate()
-                this.session = undefined
-                this.onLeaveSession()
-                this.sessionIdField.value = ""
-            },
+            onClick: () => this.closeSession(),
             inlineCss: {marginTop: "10px"},
             disabled: true,
         })
@@ -195,6 +191,14 @@ export class SessionManagerWidget{
         this.reminaningTimeContainer = createElement({tagName: "p", parentElement: this.element, inlineCss: {display: "none"}})
         createElement({tagName: "label", parentElement: this.reminaningTimeContainer, innerText: " Time remaining: "})
         this.remainingTimeDisplay = createInput({inputType: "text", parentElement: this.reminaningTimeContainer, disabled: true, value: ""})
+    }
+
+    private closeSession = () => {
+        this.logMessage(`Closing session ${this.session?.sessionId}`)
+        this.session?.terminate()
+        this.session = undefined
+        this.onLeaveSession()
+        this.sessionIdField.value = ""
     }
 
     private enableSessionAccquisitionControls(params: {enabled: boolean}){
@@ -290,6 +294,8 @@ export class SessionManagerWidget{
         })
         this.sessionIdField.value = sessionResult.sessionId
         this.reminaningTimeContainer.style.display = "block"
+
+        this.warnedUserOfImpendingClose = false
         this.remainingTimeIntervalID = window.setInterval(() => {
             if(this.session === undefined){
                 window.clearInterval(this.remainingTimeIntervalID)
@@ -303,6 +309,13 @@ export class SessionManagerWidget{
             const ellapsedTimeMs = new Date().getTime() - startTime.getTime()
             const remainingTimeSec = (this.session.timeLimitMinutes * 60 - ellapsedTimeMs / 1000)
             this.remainingTimeDisplay.value = secondsToTimeDeltaString(Math.floor(remainingTimeSec))
+            if(!this.warnedUserOfImpendingClose && remainingTimeSec < 3 * 60){
+                this.warnedUserOfImpendingClose = true
+                PopupWidget.OkPopup({title: "Session is about to close", paragraphs: ["You should save your project"]})
+            }
+            if(remainingTimeSec <= 0){
+                this.closeSession()
+            }
         }, 1000);
         window.addEventListener("beforeunload", this.onUnload);
         this.enableSessionDismissalControls({enabled: true})
