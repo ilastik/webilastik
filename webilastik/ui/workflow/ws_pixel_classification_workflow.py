@@ -24,6 +24,7 @@ from aiohttp.client import ClientSession
 from aiohttp.http_websocket import WSCloseCode
 from aiohttp.web_app import Application
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
+from fs.errors import ResourceNotFound
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
 from webilastik.filesystem.bucket_fs import BucketFs
@@ -82,9 +83,12 @@ def do_save_project(filesystem: BucketFs, file_path: PurePosixPath, workflow_con
     with filesystem.openbin(file_path.as_posix(), "w") as f:
         f.write(workflow_contents)
 
-def do_load_project_bytes(filesystem: BucketFs, file_path: PurePosixPath) -> bytes:
-    with filesystem.openbin(file_path.as_posix(), "r") as f:
-        return f.read()
+def do_load_project_bytes(filesystem: BucketFs, file_path: PurePosixPath) -> "bytes | ResourceNotFound":
+    try:
+        with filesystem.openbin(file_path.as_posix(), "r") as f:
+            return f.read()
+    except ResourceNotFound as e:
+        return e
 
 class WebIlastik:
     @property
@@ -346,13 +350,15 @@ class WebIlastik:
         if len(file_path.parts) == 0 or ".." in file_path.parts:
             return web.Response(status=400, text=f"Bad project file path: {file_path}")
 
-        ilp_bytes = await asyncio.wrap_future(self.executor.submit(
+        ilp_bytes_result = await asyncio.wrap_future(self.executor.submit(
             do_load_project_bytes,
             filesystem=filesystem,
             file_path=file_path,
         ))
+        if isinstance(ilp_bytes_result, ResourceNotFound):
+            return uncachable_json_response({"error": f"Not found: {filesystem.geturl(file_path.as_posix())}"}, status=404)
         new_workflow_result = WsPixelClassificationWorkflow.load_from_ilp_bytes(
-            ilp_bytes=ilp_bytes,
+            ilp_bytes=ilp_bytes_result,
             on_async_change=lambda: self.enqueue_user_interaction(user_interaction=lambda: None), #FIXME?
             executor=self.executor,
             priority_executor=self.priority_executor,
