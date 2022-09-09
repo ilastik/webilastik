@@ -134,7 +134,7 @@ class PixelClassifier(Operator[DataRoi, Predictions], Generic[FE]):
     def is_applicable_to(self, datasource: DataSource) -> bool:
         return (
             self.feature_extractor.is_applicable_to(datasource) and
-            datasource.roi.c == self.num_input_channels
+            datasource.shape.c == self.num_input_channels
         )
 
     def __call__(self, /, roi: DataRoi) -> Predictions:
