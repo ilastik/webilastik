@@ -112,8 +112,11 @@ export class Viewer extends Applet<ViewerAppletState>{
     }
 
     public setDataViews(nativeViews: Array<{name: string, url: Url}>){
-        if(nativeViews.find(nv => !this.state.data_views.has(nv.url))){
-            this.doRPC("set_data_views", {frontend_timestamp: new Date().getTime(), native_views: nativeViews})
+        for(let nv of nativeViews){
+            if(!this.state.data_views.has(nv.url) && !this.state.prediction_views.has(nv.url)){
+                this.doRPC("set_data_views", {frontend_timestamp: new Date().getTime(), native_views: nativeViews})
+                return
+            }
         }
     }
 
