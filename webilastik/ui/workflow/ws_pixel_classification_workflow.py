@@ -177,7 +177,7 @@ class WebIlastik:
                 "/stripped_precomputed/url={encoded_original_url}/resolution={resolution_x}_{resolution_y}_{resolution_z}/{rest:.*}",
                 self.forward_chunk_request
             ),
-            web.get(
+            web.post(
                 "/get_datasources_from_url",
                 self.get_datasources_from_url
             ),

@@ -814,7 +814,7 @@ export abstract class DataSource implements IJsonable{
                 search: new Map([["url", Session.btoa(params.datasource_url.raw)]])
             })
         let response = await fetch(url.raw, {
-            method: "GET",
+            method: "POST",
             body: JSON.stringify({url: params.datasource_url.raw}),
             cache: "no-store", //FIXME: why can't this be cached again? Nonces in URLs? Tokens in Filesystems?
         })
