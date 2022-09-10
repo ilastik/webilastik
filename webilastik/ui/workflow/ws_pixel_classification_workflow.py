@@ -17,6 +17,7 @@ from pathlib import Path, PurePosixPath
 import traceback
 import re
 import datetime
+from typing_extensions import Never
 
 import aiohttp
 from aiohttp import web
@@ -38,6 +39,7 @@ from webilastik.server.tunnel import ReverseSshTunnel
 from webilastik.ui.applet import dummy_prompt
 from webilastik.libebrains.user_token import UserToken
 from webilastik.libebrains.slurm_job_launcher import Minutes
+from webilastik.libebrains import global_user_login
 from executor_getter import get_executor
 
 
@@ -394,23 +396,24 @@ class WebIlastik:
         info_url = base_url.joinpath("info")
         logger.debug(f"Will request this info: {info_url.schemeless_raw}")
 
-        token = UserToken.get_global_login_token()
-        if isinstance(token, UsageError):
-            return web.Response(status=403, text="Token has expired") # FIXME
-
-        async with self.http_client_session.get(
-            info_url.schemeless_raw,
-            ssl=self.ssl_context,
-            headers=token.as_auth_header() if info_url.hostname == "data-proxy.ebrains.eu" else {},
-            params={"redirect": "true"} if info_url.hostname == "data-proxy.ebrains.eu" else {},
-        ) as response:
-            response_text = await response.text()
-            if response.status // 100 != 2:
-                return web.Response(status=response.status, text=response_text)
-            info = PrecomputedChunksInfo.from_json_value(json.loads(response_text))
-
-        stripped_info = info.stripped(resolution=resolution)
-        return web.json_response(stripped_info.to_json_value())
+        fetching_from_data_proxy = info_url.hostname == "data-proxy.ebrains.eu"
+        for trial_number in [1, 2]:
+            async with self.http_client_session.get(
+                info_url.schemeless_raw,
+                ssl=self.ssl_context,
+                headers=global_user_login.get_global_login_token().as_auth_header() if fetching_from_data_proxy else {},
+                params={"redirect": "true"} if fetching_from_data_proxy else {}
+            ) as response:
+                if response.status == 401 and trial_number == 1 and fetching_from_data_proxy:
+                    global_user_login.refresh_global_login_token()
+                    continue
+                response_text = await response.text()
+                if response.status // 100 != 2:
+                    return web.Response(status=response.status, text=response_text)
+                info = PrecomputedChunksInfo.from_json_value(json.loads(response_text))
+                stripped_info = info.stripped(resolution=resolution)
+                return web.json_response(stripped_info.to_json_value())
+        raise Exception(f"Should be unreachable") #FIMXE
 
     async def forward_chunk_request(self, request: web.Request) -> web.Response:
         """Redirects a precomp chunk request to the original URL"""
@@ -427,18 +430,21 @@ class WebIlastik:
         if tile_url.hostname != "data-proxy.ebrains.eu":
             raise web.HTTPFound(location=tile_url.schemeless_raw)
 
-        token = UserToken.get_global_login_token()
-        if isinstance(token, UsageError):
-            return web.Response(status=403, text="Token has expired") # FIXME
-
-        async with self.http_client_session.get(
-            tile_url.schemeless_raw,
-            ssl=self.ssl_context,
-            headers=token.as_auth_header(),
-        ) as response:
-            cscs_url = (await response.json())["url"]
-            raise web.HTTPFound(location=cscs_url)
-
+        for trial_number in [1, 2]:
+            async with self.http_client_session.get(
+                url.schemeless_raw,
+                ssl=self.ssl_context,
+                headers=global_user_login.get_global_login_token().as_auth_header(),
+            ) as response:
+                if response.status == 401 and trial_number == 1:
+                    global_user_login.refresh_global_login_token()
+                    continue
+                if response.ok:
+                    cscs_url = (await response.json())["url"]
+                    raise web.HTTPFound(location=cscs_url)
+                error_message = await response.text()
+                return uncachable_json_response({"error": error_message}, status=500)
+        raise Exception(f"Should be unreachable") #FIMXE
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
@@ -458,7 +464,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     session_url = Url.parse_or_raise(args.session_url)
-    UserToken.login_globally_from_environment()
 
     executor = get_executor(hint="server_tile_handler", max_workers=multiprocessing.cpu_count())
 

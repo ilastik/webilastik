@@ -61,7 +61,7 @@ class EbrainsLogin:
         super().__init__()
 
     @classmethod
-    async def from_cookie(cls, request: web.Request, http_client_session: ClientSession) -> Optional["EbrainsLogin"]:
+    async def from_cookie(cls, request: web.Request, http_client_session: ClientSession, oidc_client: OidcClient) -> Optional["EbrainsLogin"]:
         access_token = request.cookies.get(UserToken.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME.lower())
         refresh_token = request.cookies.get(UserToken.EBRAINS_USER_REFRESH_TOKEN_ENV_VAR_NAME.lower())
         if access_token is None or refresh_token is None:
@@ -69,7 +69,7 @@ class EbrainsLogin:
         user_token = UserToken(access_token=access_token, refresh_token=refresh_token)
         if await user_token.is_valid(http_client_session):
             return EbrainsLogin(user_token=user_token, refreshed=False)
-        refreshed_token = await user_token.async_refreshed(http_client_session=http_client_session)
+        refreshed_token = await user_token.async_refreshed(http_client_session=http_client_session, oidc_client=oidc_client)
         if isinstance(refreshed_token, Exception):
             return None
         return EbrainsLogin(user_token=refreshed_token, refreshed=True)
@@ -79,8 +79,8 @@ class EbrainsLogin:
         auth_code = request.query.get("code")
         if auth_code is None:
             return None
-        user_token = await oidc_client.get_user_token(
-            code=auth_code, redirect_uri=get_requested_url(request), http_client_session=http_client_session
+        user_token = await UserToken.async_from_code(
+            code=auth_code, redirect_uri=get_requested_url(request), http_client_session=http_client_session, oidc_client=oidc_client
         )
         return EbrainsLogin(user_token=user_token, refreshed=True)
 
@@ -100,7 +100,7 @@ def require_ebrains_login(
 
     @wraps(endpoint)
     async def wrapper(self: "SessionAllocator", request: web.Request) -> web.Response:
-        ebrains_login = await EbrainsLogin.from_cookie(request, http_client_session=self.http_client_session)
+        ebrains_login = await EbrainsLogin.from_cookie(request, http_client_session=self.http_client_session, oidc_client=self.oidc_client)
         if ebrains_login is None:
             ebrains_login = await EbrainsLogin.from_code(request, oidc_client=self.oidc_client, http_client_session=self.http_client_session)
         if ebrains_login is None:
@@ -167,10 +167,12 @@ class SessionAllocator:
         origin = request.headers.get("Origin")
         if origin != "https://app.ilastik.org":
             return web.json_response({"error": f"Bad origin: {origin}"}, status=400)
-        session = await EbrainsLogin.from_cookie(request, http_client_session=self.http_client_session)
-        if session is None:
+        ebrains_login = await EbrainsLogin.from_cookie(request, http_client_session=self.http_client_session, oidc_client=self.oidc_client)
+        if ebrains_login is None:
             return web.json_response({"error": f"Not logged in"}, status=400)
-        return web.json_response({UserToken.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME.lower(): session.user_token.access_token})
+        response = web.json_response({UserToken.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME.lower(): ebrains_login.user_token.access_token})
+        ebrains_login.set_cookie(response)
+        return response
 
     async def serve_service_worker(self, request: web.Request) -> web.StreamResponse:
         requested_url = get_requested_url(request)
@@ -194,9 +196,12 @@ class SessionAllocator:
         return web.json_response("hello!", status=200)
 
     async def check_login(self, request: web.Request) -> web.Response:
-        if (await EbrainsLogin.from_cookie(request, http_client_session=self.http_client_session)) is None:
+        ebrains_login = await EbrainsLogin.from_cookie(request, http_client_session=self.http_client_session, oidc_client=self.oidc_client)
+        if ebrains_login is None:
             return web.json_response({"logged_in": False}, status=401)
-        return web.json_response({"logged_in": True}, status=200)
+        response = web.json_response({"logged_in": True}, status=200)
+        ebrains_login.set_cookie(response=response)
+        return response
 
     @require_ebrains_login
     async def login_then_close(self, ebrains_login: EbrainsLogin, request: web.Request) -> web.Response:

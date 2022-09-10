@@ -1,12 +1,12 @@
 import os
 from pathlib import PurePosixPath
-from typing import ClassVar, Dict, Optional, Mapping
-import json
+from typing import Dict, Optional, Mapping
 import requests
 
 from aiohttp.client import ClientSession
 from aiohttp.client_exceptions import ClientResponseError
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString, ensureOptional
+from webilastik.libebrains.oidc_client import OidcClient
 
 from webilastik.libebrains.user_info import UserInfo
 from webilastik.ui.usage_error import UsageError
@@ -15,8 +15,6 @@ from webilastik.utility.url import Url
 class UserToken:
     EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME = "EBRAINS_USER_ACCESS_TOKEN"
     EBRAINS_USER_REFRESH_TOKEN_ENV_VAR_NAME = "EBRAINS_USER_REFRESH_TOKEN"
-
-    _global_login_token: "ClassVar[UserToken | None]" = None
 
     def __init__(
         self,
@@ -31,16 +29,34 @@ class UserToken:
         self.refresh_token = refresh_token
         super().__init__()
 
-    async def async_refreshed(self, *, http_client_session: ClientSession) -> "UserToken | Exception":
-        from webilastik.libebrains.oidc_client import EBRAINS_CLIENT_ID, EBRAINS_CLIENT_SECRET
+    @classmethod
+    async def async_from_code(cls, *, code: str, redirect_uri: Url, http_client_session: ClientSession, oidc_client: OidcClient) -> "UserToken":
+        data = {
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": redirect_uri.raw,
+            "client_id": oidc_client.client_id,
+            "client_secret": oidc_client.client_secret,
+        }
+        resp = await http_client_session.request(
+            method="post",
+            url="https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect/token",
+            allow_redirects=False,
+            data=data
+        )
+        resp.raise_for_status()
 
+        data = ensureJsonObject(await resp.json())
+        return UserToken.from_json_value(data)
+
+    async def async_refreshed(self, *, http_client_session: ClientSession, oidc_client: OidcClient) -> "UserToken | Exception":
         resp = await http_client_session.request(
             method="post",
             url="https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect/token",
             allow_redirects=False,
             data={
-                "client_id": EBRAINS_CLIENT_ID,
-                "client_secret": EBRAINS_CLIENT_SECRET,
+                "client_id": oidc_client.client_id,
+                "client_secret": oidc_client.client_secret,
                 "grant_type": "refresh_token",
                 "refresh_token": self.refresh_token,
             }
@@ -51,15 +67,13 @@ class UserToken:
         data = ensureJsonObject(await resp.json())
         return UserToken.from_json_value(data)
 
-    def refreshed(self) -> "UserToken | Exception":
-        from webilastik.libebrains.oidc_client import EBRAINS_CLIENT_ID, EBRAINS_CLIENT_SECRET
-
+    def refreshed(self, *, oidc_client: OidcClient) -> "UserToken | Exception":
         resp = requests.post(
             "https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect/token",
             allow_redirects=False,
             data={
-                "client_id": EBRAINS_CLIENT_ID,
-                "client_secret": EBRAINS_CLIENT_SECRET,
+                "client_id": oidc_client.client_id,
+                "client_secret": oidc_client.client_secret,
                 "grant_type": "refresh_token",
                 "refresh_token": self.refresh_token,
             }
@@ -85,33 +99,11 @@ class UserToken:
             return UsageError(str(e))
 
     @classmethod
-    def login_globally(cls, token: "UserToken"):
-        cls._global_login_token = token
-        os.environ[cls.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME] = token.access_token
-        os.environ[cls.EBRAINS_USER_REFRESH_TOKEN_ENV_VAR_NAME] = token.refresh_token
-
-    @classmethod
-    def login_globally_from_environment(cls):
+    def from_environment_or_raise(cls) -> "UserToken":
         token_result = cls.from_environment()
-        if isinstance(token_result, UsageError):
+        if isinstance(token_result, Exception):
             raise token_result
-        cls.login_globally(token_result)
-
-    @classmethod
-    def get_global_login_token(cls) -> "UserToken | UsageError":
-        if cls._global_login_token is None:
-            token_result = cls.from_environment()
-            if isinstance(token_result, UsageError):
-                return token_result
-            cls._global_login_token = token_result
-        return cls._global_login_token
-
-    @classmethod
-    def get_global_token_or_raise(cls) -> "UserToken":
-        token = cls.get_global_login_token()
-        if isinstance(token, UsageError):
-            raise token
-        return token
+        return token_result
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "UserToken":

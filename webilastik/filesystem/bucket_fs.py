@@ -3,7 +3,6 @@ from pathlib import PurePosixPath
 import io
 from typing import Any, Collection, Optional, Union, Dict, List, cast
 from datetime import datetime
-import time
 
 import requests
 from fs.base import FS
@@ -19,6 +18,7 @@ from webilastik.filesystem.RemoteFile import RemoteFile
 from webilastik.libebrains.user_token import UserToken
 from webilastik.ui.usage_error import UsageError
 from webilastik.utility.url import Protocol, Url
+from webilastik.libebrains import global_user_login
 
 
 class BucketObject:
@@ -79,34 +79,25 @@ class BucketSubdir:
 
 class DataProxySession:
     # @private
-    def __init__(self, token: UserToken) -> None:
+    def __init__(self) -> None:
         self.requests_session = requests.Session()
-        self.token: UserToken = token
         super().__init__()
-
-    @staticmethod
-    def create() -> "DataProxySession | UsageError":
-        token_result = UserToken.get_global_login_token()
-        if isinstance(token_result, UsageError):
-            return token_result
-        return DataProxySession(token=token_result)
 
     def _do_request(self, method: str, url: Url, refresh_on_401: bool = True) -> "requests.Response | Exception":
         out = self.requests_session.request(
             url=url.schemeless_raw,
             method=method,
-            headers=self.token.as_auth_header()
+            headers=global_user_login.get_global_login_token().as_auth_header()
         )
         if out.ok:
             return out
         if out.status_code != 401 or not refresh_on_401:
             return Exception(out.text)
         print(f"Asking to refresh token in BucketFS.........................")
-        refreshed_token = self.token.refreshed()
+        refreshed_token = global_user_login.refresh_global_login_token()
         if isinstance(refreshed_token, Exception):
             return refreshed_token
-        print(f"Successfully refreshed token in BucketFS")
-        self.token = refreshed_token
+        print(f"Successfully refreshed token in BucketFS...................")
         return self._do_request(method=method, url=url, refresh_on_401=False)
 
     def get(self, url: Url) -> "requests.Response | Exception":
@@ -121,23 +112,20 @@ class DataProxySession:
 class BucketFs(JsonableFilesystem):
     API_URL = Url(protocol=Protocol.HTTPS, hostname="data-proxy.ebrains.eu", path=PurePosixPath("/api/v1/buckets"))
 
-    def __init__(self, bucket_name: str, prefix: PurePosixPath, data_proxy_session: DataProxySession):
+    def __init__(self, bucket_name: str, prefix: PurePosixPath):
         self.bucket_name = bucket_name
         self.prefix = prefix
         self.bucket_url = self.API_URL.concatpath(bucket_name)
         self.url = self.bucket_url.concatpath(prefix)
         super().__init__()
 
-        self.session = data_proxy_session
+        self.session = DataProxySession()
         self.cscs_session = requests.Session()
         self.pid = os.getpid()
 
     @classmethod
     def try_create(cls, bucket_name: str, prefix: PurePosixPath) -> "BucketFs | UsageError":
-        data_proxy_session_result = DataProxySession.create()
-        if isinstance(data_proxy_session_result, UsageError):
-            return data_proxy_session_result
-        return BucketFs(bucket_name=bucket_name, prefix=prefix, data_proxy_session=data_proxy_session_result)
+        return BucketFs(bucket_name=bucket_name, prefix=prefix)
 
     @classmethod
     def try_from_url(cls, url: Url, ebrains_user_token: "UserToken | None" = None) -> "BucketFs | Exception":
@@ -146,13 +134,9 @@ class BucketFs(JsonableFilesystem):
         bucket_name_part_index = len(cls.API_URL.path.parts)
         if len(url.path.parts) <= bucket_name_part_index:
             return Exception(f"Bad bucket url: {url}")
-        data_proxy_session_result = DataProxySession.create()
-        if isinstance(data_proxy_session_result, UsageError):
-            return data_proxy_session_result
         return BucketFs(
             bucket_name=url.path.parts[bucket_name_part_index],
             prefix=PurePosixPath("/".join(url.path.parts[bucket_name_part_index + 1:])),
-            data_proxy_session=data_proxy_session_result,
         )
 
     def _make_prefix(self, subpath: str) -> PurePosixPath:
@@ -230,7 +214,7 @@ class BucketFs(JsonableFilesystem):
 
     def makedir(self, path: str, permissions: Optional[Permissions] = None, recreate: bool = False) -> SubFS[FS]:
         return cast(SubFS[FS], BucketFs(
-            bucket_name=self.bucket_name, prefix=self._make_prefix(path), data_proxy_session=self.session
+            bucket_name=self.bucket_name, prefix=self._make_prefix(path)
         ))
 
     def makedirs(self, path: str, permissions: Optional[Permissions] = None, recreate: bool = False) -> SubFS[FS]:
@@ -302,13 +286,9 @@ class BucketFs(JsonableFilesystem):
         return bucket_fs_result
 
     def __setstate__(self, value_obj: Dict[str, Any]):
-        data_proxy_session_result = DataProxySession.create()
-        if isinstance(data_proxy_session_result, UsageError):
-            raise data_proxy_session_result
         self.__init__(
             bucket_name=ensureJsonString(value_obj.get("bucket_name")),
             prefix=PurePosixPath(ensureJsonString(value_obj.get("prefix"))),
-            data_proxy_session=data_proxy_session_result,
         )
 
     def to_json_value(self) -> JsonObject:

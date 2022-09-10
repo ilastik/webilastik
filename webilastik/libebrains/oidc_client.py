@@ -6,14 +6,9 @@ import os
 import enum
 import uuid
 
-from aiohttp.client import ClientSession
-from ndstructs.utils.json_serializable import JsonValue, ensureJsonObject, ensureJsonString
+from ndstructs.utils.json_serializable import JsonValue, ensureJsonString
 
-from webilastik.libebrains.user_token import UserToken
 from webilastik.utility.url import Url, Protocol
-
-EBRAINS_CLIENT_ID = os.environ["EBRAINS_CLIENT_ID"]
-EBRAINS_CLIENT_SECRET = os.environ["EBRAINS_CLIENT_SECRET"]
 
 class Scope(enum.Enum):
     # This scope is required because we use the OIDC protocol. It will give your app access to the
@@ -66,26 +61,9 @@ class OidcClient:
 
     @classmethod
     def from_environment(cls) -> "OidcClient":
+        EBRAINS_CLIENT_ID = os.environ["EBRAINS_CLIENT_ID"]
+        EBRAINS_CLIENT_SECRET = os.environ["EBRAINS_CLIENT_SECRET"]
         return OidcClient(client_id=EBRAINS_CLIENT_ID, client_secret=EBRAINS_CLIENT_SECRET)
-
-    async def get_user_token(self, *, code: str, redirect_uri: Url, http_client_session: ClientSession) -> "UserToken":
-        data = {
-            "grant_type": "authorization_code",
-            "code": code,
-            "redirect_uri": redirect_uri.raw,
-            "client_id": self.client_id,
-            "client_secret": self.client_secret,
-        }
-        resp = await http_client_session.request(
-            method="post",
-            url="https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect/token",
-            allow_redirects=False,
-            data=data
-        )
-        resp.raise_for_status()
-
-        data = ensureJsonObject(await resp.json())
-        return UserToken.from_json_value(data)
 
     def create_user_login_url(self, *, redirect_uri: Url, scopes: Optional[Set["Scope"]] = None, state: Optional[str] = None) -> Url:
         scopes = scopes or set()
