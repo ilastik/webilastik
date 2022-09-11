@@ -62,6 +62,7 @@ export class SessionManagerWidget{
         this.ilastikUrlInput = createInputParagraph({
             label_text: "Ilastik api URL: ", inputType: "url", parentElement: this.element, required: true, value: ilastikUrl.toString()
         })
+
         let p = createElement({tagName: "p", parentElement: this.element})
         createElement({tagName: "label", parentElement: p, innerText: "HPC site: "})
         this.hpcSiteInput = new PopupSelect<HpcSiteName>({
@@ -70,6 +71,31 @@ export class SessionManagerWidget{
             options: ["JUSUF", "CSCS"],
             optionRenderer: (args) => createElement({tagName: "span", parentElement: args.parentElement, innerText: args.option}),
         })
+        this.listSessionsButton = createInput({
+            inputType: "button",
+            value: "List Sessions",
+            parentElement: p,
+            inlineCss: {marginTop: "10px"},
+            onClick: async () => {
+                this.listSessionsButton.disabled = true
+                let ilastikUrl = await this.ensureLoggedInAndGetIlastikUrl();
+                if(!ilastikUrl){
+                    this.listSessionsButton.disabled = false
+                    return
+                }
+                await SessionsPopup.create({
+                    ilastikUrl,
+                    hpc_site: this.hpcSiteInput.value,
+                    onSessionClosed: (status) => {
+                        if(this.session && this.session.sessionUrl.equals(status.session_url)){
+                            this.onLeaveSession()
+                        }
+                    }
+                });
+                this.listSessionsButton.disabled = false
+            }
+        })
+
         this.timeoutInput = createInputParagraph({
             label_text: "Timeout (minutes): ", inputType: "number", parentElement: this.element, required: true, value: "15"
         })
@@ -175,31 +201,6 @@ export class SessionManagerWidget{
             disabled: true,
         })
         this.leaveSessionButton.title = "Leaves session running on the server"
-
-        this.listSessionsButton = createInput({
-            inputType: "button",
-            value: "List Sessions",
-            parentElement: this.element,
-            inlineCss: {marginTop: "10px"},
-            onClick: async () => {
-                this.listSessionsButton.disabled = true
-                let ilastikUrl = await this.ensureLoggedInAndGetIlastikUrl();
-                if(!ilastikUrl){
-                    this.listSessionsButton.disabled = false
-                    return
-                }
-                await SessionsPopup.create({
-                    ilastikUrl,
-                    hpc_site: this.hpcSiteInput.value,
-                    onSessionClosed: (status) => {
-                        if(this.session && this.session.sessionUrl.equals(status.session_url)){
-                            this.onLeaveSession()
-                        }
-                    }
-                });
-                this.listSessionsButton.disabled = false
-            }
-        })
 
         this.reminaningTimeContainer = createElement({tagName: "p", parentElement: this.element, inlineCss: {display: "none"}})
         createElement({tagName: "label", parentElement: this.reminaningTimeContainer, innerText: " Time remaining: "})
