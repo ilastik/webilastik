@@ -67,7 +67,7 @@ export class SessionManagerWidget{
 
 
         createElement({tagName: "h3", parentElement: this.element, innerText: "Create Session"})
-        this.sessionDurationInput = createInputParagraph({inputType: "text", parentElement: this.element, label_text: "Session Duration (minutes): ", value: "15"})
+        this.sessionDurationInput = createInputParagraph({inputType: "number", parentElement: this.element, label_text: "Session Duration (minutes): ", value: "60"})
         this.sessionDurationInput.min = "5"
         this.createSessionButton = createInputParagraph({
             inputType: "button",
@@ -105,7 +105,7 @@ export class SessionManagerWidget{
 
 
         createElement({tagName: "h3", parentElement: this.element, innerText: "Rejoin Session"})
-        this.sessionIdField = createInputParagraph({inputType: "text", parentElement: this.element, label_text: "Session ID: "})
+        this.sessionIdField = createInputParagraph({inputType: "number", parentElement: this.element, label_text: "Session ID: "})
         this.rejoinSessionButton = createInputParagraph({
             inputType: "button",
             value: "Rejoin Session",
