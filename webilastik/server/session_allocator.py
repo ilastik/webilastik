@@ -1,8 +1,9 @@
 # pyright: reportUnusedCallResult=false
 
+import enum
 from functools import wraps
 import json
-from typing import Any, Callable, Coroutine, Dict, List, NoReturn, Optional
+from typing import Any, Callable, Coroutine, Dict, List, Mapping, NoReturn, Optional
 from pathlib import Path, PurePosixPath
 import uuid
 import asyncio
@@ -15,7 +16,7 @@ from aiohttp import web
 import aiohttp
 from aiohttp.client import ClientSession
 from cryptography.fernet import Fernet
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonInt, ensureJsonObject
+from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonInt, ensureJsonObject, ensureJsonString
 from webilastik.libebrains.slurm_job_launcher import CscsSshJobLauncher, JobState, JusufSshJobLauncher, Minutes, NodeSeconds, Seconds, SlurmJob, SlurmJobId, SshJobLauncher
 
 from webilastik.libebrains.user_token import UserToken
@@ -115,25 +116,44 @@ def require_ebrains_login(
 @dataclass
 class SessionStatus:
     slurm_job: SlurmJob
+    hpc_site: "HpcSiteName"
     session_url: Url
     connected: bool
 
     def to_json_value(self) -> JsonObject:
         return {
             "slurm_job": self.slurm_job.to_json_value(),
+            "hpc_site": self.hpc_site.value,
             "session_url": self.session_url.to_json_value(),
             "connected": self.connected,
         }
+
+class HpcSiteName(enum.Enum):
+    CSCS = "CSCS"
+    JUSUF = "JUSUF"
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "HpcSiteName":
+        value_str = ensureJsonString(value)
+        for site_name in HpcSiteName:
+            if site_name.value == value_str:
+                return site_name
+        raise ValueError(f"Bad hpc site name: {value_str}")
+
 
 class SessionAllocator:
     def __init__(
         self,
         *,
-        session_launcher: SshJobLauncher,
+        fernet: Fernet,
         external_url: Url,
         oidc_client: OidcClient,
     ):
-        self.session_launcher: SshJobLauncher = session_launcher
+        self.fernet = fernet
+        self.session_launchers: Mapping[HpcSiteName, SshJobLauncher] = {
+            HpcSiteName.JUSUF: JusufSshJobLauncher(fernet=fernet),
+            HpcSiteName.CSCS: CscsSshJobLauncher(fernet=fernet),
+        }
         self.external_url: Url = external_url
         self.oidc_client: OidcClient = oidc_client
         self._http_client_session: Optional[ClientSession] = None
@@ -149,9 +169,9 @@ class SessionAllocator:
             web.get('/api/login_then_close', self.login_then_close),
             web.get('/api/hello', self.hello),
             web.post('/api/session', self.spawn_session),
-            web.get('/api/sessions', self.list_sessions),
-            web.get('/api/session/{session_id}', self.session_status),
-            web.delete('/api/session/{session_id}', self.close_session),
+            web.post('/api/list_sessions', self.list_sessions),
+            web.post('/api/get_session_status', self.session_status),
+            web.post('/api/delete_session', self.close_session),
             web.post('/api/get_ebrains_token', self.get_ebrains_token), #FIXME: I'm using this in NG web workers
             web.get('/service_worker.js', self.serve_service_worker),
         ])
@@ -226,6 +246,7 @@ class SessionAllocator:
         try:
             payload_dict = ensureJsonObject(json.loads(raw_payload.decode('utf8')))
             requested_duration_minutes = Minutes(ensureJsonInt(payload_dict.get("session_duration_minutes")))
+            hpc_site = HpcSiteName.from_json_value(payload_dict.get("hpc_site"))
         except Exception:
             return web.json_response({"error": "Bad payload"}, status=400)
 
@@ -239,8 +260,9 @@ class SessionAllocator:
             if user_info.sub not in self.session_user_locks:
                 self.session_user_locks[user_info.sub] = asyncio.Lock()
 
+        session_launcher = self.session_launchers[hpc_site]
         async with self.session_user_locks[user_info.sub]:
-            this_months_jobs_result = await self.session_launcher.get_jobs(
+            this_months_jobs_result = await session_launcher.get_jobs(
                 user_id=user_info.sub, starttime=datetime.today().replace(day=1)
             )
             if isinstance(this_months_jobs_result, Exception):
@@ -281,7 +303,7 @@ class SessionAllocator:
 
             ###################################################################
 
-            session_result = await self.session_launcher.launch(
+            session_result = await session_launcher.launch(
                 user_id=user_info.sub,
                 time=Minutes(min(
                     int(available_quota_node_min), int(requested_duration_minutes)
@@ -296,23 +318,29 @@ class SessionAllocator:
 
             return web.json_response(
                 SessionStatus(
-                    slurm_job=session_result, session_url=self._make_session_url(session_id), connected=False
+                    slurm_job=session_result,
+                    session_url=self._make_session_url(session_id),
+                    connected=False,
+                    hpc_site=hpc_site,
                 ).to_json_value(),
                 status=201,
             )
 
     @require_ebrains_login
     async def session_status(self, ebrains_login: EbrainsLogin, request: web.Request) -> web.Response:
-        # FIXME: do security checks here?
+        raw_payload = await request.content.read()
         try:
-            session_id =  uuid.UUID(request.match_info.get("session_id"))
+            payload_dict = ensureJsonObject(json.loads(raw_payload.decode('utf8')))
+            session_id =  uuid.UUID(ensureJsonString(payload_dict.get("session_id")))
+            hpc_site = HpcSiteName.from_json_value(payload_dict.get("hpc_site"))
         except Exception:
-            return uncachable_json_response({"error": "Bad session id"}, status=400)
+            return uncachable_json_response({"error": "Bad payload"}, status=400)
         user_info_result = await ebrains_login.user_token.get_userinfo(self.http_client_session)
         if isinstance(user_info_result, Exception):
             print(f"Error retrieving user info: {user_info_result}")
             return uncachable_json_response({"error": "Could not get user information"}, status=500) #FIXME: 500?
-        session_result = await self.session_launcher.get_job_by_session_id(session_id=session_id, user_id=user_info_result.sub)
+        session_launcher = self.session_launchers[hpc_site]
+        session_result = await session_launcher.get_job_by_session_id(session_id=session_id, user_id=user_info_result.sub)
         if isinstance(session_result, Exception):
             return uncachable_json_response({"error": "Could not retrieve session"}, status=500)
         if session_result is None:
@@ -335,7 +363,10 @@ class SessionAllocator:
         #     print(f"Tunnel was not ready in web server")
         #     return uncachable_json_response(
         #         SessionStatus(
-        #             slurm_job=session_result, session_url=session_url, connected=False
+        #             slurm_job=session_result,
+        #             session_url=session_url,
+        #             connected=False,
+        #             hpc_site=hpc_site
         #         ).to_json_value(),
         #         status=200
         #     )
@@ -344,6 +375,7 @@ class SessionAllocator:
         import datetime
         return uncachable_json_response(
             SessionStatus(
+                hpc_site=hpc_site,
                 slurm_job=session_result,
                 # slurm_job=SlurmJob(
                 #     job_id=SlurmJobId(123),
@@ -363,21 +395,25 @@ class SessionAllocator:
 
     @require_ebrains_login
     async def close_session(self, ebrains_login: EbrainsLogin, request: web.Request) -> web.Response:
-        # FIXME: do security checks here?
+        raw_payload = await request.content.read()
         try:
-            session_id =  uuid.UUID(request.match_info.get("session_id"))
+            payload_dict = ensureJsonObject(json.loads(raw_payload.decode('utf8')))
+            session_id = uuid.UUID(ensureJsonString(payload_dict.get("session_id")))
+            hpc_site = HpcSiteName.from_json_value(payload_dict.get("hpc_site"))
         except Exception:
-            return uncachable_json_response({"error": "Bad session id"}, status=400)
+            return web.json_response({"error": "Bad payload"}, status=400)
+
+        session_launcher = self.session_launchers[hpc_site]
         user_info_result = await ebrains_login.user_token.get_userinfo(self.http_client_session)
         if isinstance(user_info_result, Exception):
             print(f"Error retrieving user info: {user_info_result}")
             return uncachable_json_response({"error": "Could not get user information"}, status=500) #FIXME: 500?
-        session_result = await self.session_launcher.get_job_by_session_id(session_id=session_id, user_id=user_info_result.sub)
+        session_result = await session_launcher.get_job_by_session_id(session_id=session_id, user_id=user_info_result.sub)
         if isinstance(session_result, Exception):
             return uncachable_json_response({"error": "Could not retrieve session"}, status=500)
         if session_result is None:
             return uncachable_json_response({"error": "Session not found"}, status=404)
-        cancellation_result = await self.session_launcher.cancel(session_result)
+        cancellation_result = await session_launcher.cancel(session_result)
         if isinstance(cancellation_result, Exception):
             return uncachable_json_response({"error": f"Failed to cancel session {session_id}"}, status=500)
         return uncachable_json_response({"session_id": str(session_id)}, status=200)
@@ -391,11 +427,19 @@ class SessionAllocator:
 
     @require_ebrains_login
     async def list_sessions(self, ebrains_login: EbrainsLogin, request: web.Request) -> web.Response:
+        raw_payload = await request.content.read()
+        try:
+            payload_dict = ensureJsonObject(json.loads(raw_payload.decode('utf8')))
+            hpc_site = HpcSiteName.from_json_value(payload_dict.get("hpc_site"))
+        except Exception:
+            return web.json_response({"error": "Bad payload"}, status=400)
+        session_launcher = self.session_launchers[hpc_site]
+
         user_info_result = await ebrains_login.user_token.get_userinfo(self.http_client_session)
         if isinstance(user_info_result, Exception):
             print(f"Error retrieving user info: {user_info_result}")
             return uncachable_json_response({"error": "Could not get user information"}, status=500) #FIXME: 500?
-        jobs_result = await self.session_launcher.get_jobs(
+        jobs_result = await session_launcher.get_jobs(
             user_id=user_info_result.sub, starttime=datetime.today().replace(day=1),
         )
         if isinstance(jobs_result, Exception):
@@ -407,6 +451,7 @@ class SessionAllocator:
                     slurm_job=job,
                     session_url=self._make_session_url(job.session_id),
                     connected=await self.check_session_connection_state(job),
+                    hpc_site=hpc_site,
                 )
             )
 
@@ -423,22 +468,12 @@ if __name__ == '__main__':
     import os
     fernet = Fernet(key=os.environ["WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY"].encode('utf8'))
     parser = ArgumentParser()
-    parser.add_argument("--session-launcher", choices=["JUSUF", "CSCS"], required=True)
     parser.add_argument("--external-url", type=Url.parse, required=True, help="Url from which sessions can be accessed (where the session sockets live)")
 
     args = parser.parse_args()
 
-    # multiprocessing.set_start_method('spawn') #start a fresh interpreter so it doesn't 'inherit' the event loop
-    if args.session_launcher == "JUSUF":
-        session_launcher = JusufSshJobLauncher(fernet=fernet)
-    elif args.session_launcher == "CSCS":
-        session_launcher = CscsSshJobLauncher(fernet=fernet)
-    else:
-        print(f"Can't get a session launcher for {args.session_launcher}", file=sys.stderr)
-        exit(1)
-
     SessionAllocator(
-        session_launcher=session_launcher,
+        fernet=fernet,
         external_url=args.external_url,
         oidc_client=OidcClient.from_environment(),
     ).run(port=5000)

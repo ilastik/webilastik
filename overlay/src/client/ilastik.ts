@@ -34,6 +34,17 @@ export function ensureSlurmJobState(value: string): SlurmJobState{
     return variant
 }
 
+export const hpcSiteNames = ["CSCS", "JUSUF"] as const;
+export type HpcSiteName = typeof hpcSiteNames[number]
+
+export function ensureHpcSiteName(value: string): HpcSiteName{
+    const variant = hpcSiteNames.find(variant => variant === value)
+    if(variant === undefined){
+        throw Error(`Invalid hpc site name: ${value}`)
+    }
+    return variant
+}
+
 export class SlurmJob{
     public readonly job_id: number
     public readonly state: SlurmJobState
@@ -87,15 +98,18 @@ export class SessionStatus{
     public readonly slurm_job: SlurmJob
     public readonly session_url: Url
     public readonly connected: boolean
+    public readonly hpc_site: HpcSiteName
 
     constructor(params:{
         slurm_job: SlurmJob,
         session_url: Url,
         connected: boolean,
+        hpc_site: HpcSiteName
     }){
         this.slurm_job = params.slurm_job
         this.session_url = params.session_url
         this.connected = params.connected
+        this.hpc_site = params.hpc_site
     }
 
     public static fromJsonValue(value: JsonValue): SessionStatus{
@@ -103,7 +117,8 @@ export class SessionStatus{
         return new this({
             slurm_job: SlurmJob.fromJsonValue(value_obj['slurm_job']),
             session_url: Url.parse(ensureJsonString(value_obj['session_url'])),
-            connected: ensureJsonBoolean(value_obj['connected'])
+            connected: ensureJsonBoolean(value_obj['connected']),
+            hpc_site: ensureHpcSiteName(ensureJsonString(value_obj['hpc_site'])),
         })
     }
 }
@@ -252,10 +267,17 @@ export class Session{
         return new Error(`Checking loging faield with ${response.status}:\n${contents}`)
     }
 
-    public static async getStatus(params: {ilastikUrl: Url, sessionId: string}): Promise<SessionStatus | Error>{
+    public static async getStatus(params: {ilastikUrl: Url, sessionId: string, hpc_site: HpcSiteName}): Promise<SessionStatus | Error>{
         let result = await fetchJson(
-            params.ilastikUrl.joinPath(`/api/session/${params.sessionId}`).raw,
-            {cache: "no-store"}
+            params.ilastikUrl.joinPath(`/api/get_session_status`).raw,
+            {
+                cache: "no-store",
+                method: "POST",
+                body: JSON.stringify({
+                    session_id: params.sessionId,
+                    hpc_site: params.hpc_site,
+                })
+            }
         )
         if(result instanceof Error){
             return result
@@ -263,10 +285,16 @@ export class Session{
         return SessionStatus.fromJsonValue(result)
     }
 
-    public static async listSessions(params: {ilastikUrl: Url}): Promise<SessionStatus[] | Error>{
+    public static async listSessions(params: {ilastikUrl: Url, hpc_site: HpcSiteName}): Promise<SessionStatus[] | Error>{
         let payload_result = await fetchJson(
-            params.ilastikUrl.joinPath("/api/sessions").raw,
-            {cache: "no-store"},
+            params.ilastikUrl.joinPath("/api/list_sessions").raw,
+            {
+                cache: "no-store",
+                method: "POST",
+                body: JSON.stringify({
+                    hpc_site: params.hpc_site
+                })
+            },
         )
         if(payload_result instanceof Error){
             return payload_result
@@ -283,6 +311,7 @@ export class Session{
         ilastikUrl: Url,
         session_duration_minutes: number,
         timeout_minutes: number,
+        hpc_site: HpcSiteName,
         onProgress?: (message: string) => void,
         onUsageError: (message: string) => void,
         autoCloseOnTimeout: boolean,
@@ -293,7 +322,10 @@ export class Session{
 
         let session_creation_response = await fetch(newSessionUrl.schemeless_raw, {
             method: "POST",
-            body: JSON.stringify({session_duration_minutes: params.session_duration_minutes})
+            body: JSON.stringify({
+                session_duration_minutes: params.session_duration_minutes,
+                hpc_site: params.hpc_site
+            })
         })
         if(Math.floor(session_creation_response.status / 100) == 5){
             onProgress(`Server-side error when creating a session`)
@@ -308,6 +340,7 @@ export class Session{
             ilastikUrl: params.ilastikUrl,
             timeout_minutes: params.timeout_minutes,
             sessionId: sessionStatus.slurm_job.session_id,
+            hpc_site: params.hpc_site,
             onProgress,
             onUsageError: params.onUsageError,
             autoCloseOnTimeout: params.autoCloseOnTimeout,
@@ -318,6 +351,7 @@ export class Session{
         ilastikUrl: Url,
         sessionId: string,
         timeout_minutes: number,
+        hpc_site: HpcSiteName,
         onProgress?: (message: string) => void,
         onUsageError: (message: string) => void,
         autoCloseOnTimeout: boolean,
@@ -326,7 +360,7 @@ export class Session{
         const timeout_ms = params.timeout_minutes * 60 * 1000
         const onProgress = params.onProgress || (() => {})
         while(Date.now() - start_time_ms < timeout_ms){
-            let sessionStatus = await Session.getStatus({ilastikUrl: params.ilastikUrl, sessionId: params.sessionId})
+            let sessionStatus = await Session.getStatus({ilastikUrl: params.ilastikUrl, sessionId: params.sessionId, hpc_site: params.hpc_site})
             if(sessionStatus instanceof Error){
                 return sessionStatus
             }
@@ -358,7 +392,7 @@ export class Session{
         onProgress(`Timed out waiting for session ${params.sessionId}`)
         if(params.autoCloseOnTimeout){
             onProgress(`Cancelling session ${params.sessionId}`)
-            const cancellation_result = await Session.cancel({ilastikUrl: params.ilastikUrl, sessionId: params.sessionId})
+            const cancellation_result = await Session.cancel({ilastikUrl: params.ilastikUrl, sessionId: params.sessionId, hpc_site: params.hpc_site})
             if(cancellation_result instanceof Error){
                 onProgress(`Could not cancel session ${params.sessionId}: ${cancellation_result.message}`)
             }else{
@@ -368,10 +402,16 @@ export class Session{
         return Error(`Could not create a session: timeout`)
     }
 
-    public static async cancel(params: {ilastikUrl: Url, sessionId: string}): Promise<Error | undefined>{
+    public static async cancel(params: {ilastikUrl: Url, sessionId: string, hpc_site: HpcSiteName}): Promise<Error | undefined>{
         let result = await fetchJson(
-            params.ilastikUrl.joinPath(`api/session/${params.sessionId}`).raw,
-            {method: "DELETE"}
+            params.ilastikUrl.joinPath(`api/delete_session`).raw,
+            {
+                method: "POST",
+                body: JSON.stringify({
+                    session_id: params.sessionId,
+                    hpc_site: params.hpc_site,
+                })
+            }
         )
         if(result instanceof Error){
             return result

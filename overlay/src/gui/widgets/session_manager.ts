@@ -1,10 +1,11 @@
 import { IViewerDriver } from "../..";
-import { Session } from "../../client/ilastik";
+import { HpcSiteName, Session } from "../../client/ilastik";
 import { createElement, createInput, createInputParagraph, secondsToTimeDeltaString } from "../../util/misc";
 import { Url } from "../../util/parsed_url";
 import { ReferencePixelClassificationWorkflowGui } from "../reference_pixel_classification_workflow";
 import { CollapsableWidget } from "./collapsable_applet_gui";
 import { ErrorPopupWidget, PopupWidget } from "./popup";
+import { PopupSelect } from "./selector_widget";
 import { SessionsPopup } from "./sessions_list_widget";
 
 export class SessionManagerWidget{
@@ -29,6 +30,7 @@ export class SessionManagerWidget{
     listSessionsButton: HTMLInputElement;
     sessionDurationInput: HTMLInputElement;
     private warnedUserOfImpendingClose = false
+    hpcSiteInput: PopupSelect<HpcSiteName>;
 
     constructor({parentElement, ilastikUrl=Url.parse("https://app.ilastik.org/"), viewer_driver, workflow_container}: {
         parentElement: HTMLElement, ilastikUrl?: Url, viewer_driver: IViewerDriver, workflow_container: HTMLElement
@@ -59,6 +61,14 @@ export class SessionManagerWidget{
 
         this.ilastikUrlInput = createInputParagraph({
             label_text: "Ilastik api URL: ", inputType: "url", parentElement: this.element, required: true, value: ilastikUrl.toString()
+        })
+        let p = createElement({tagName: "p", parentElement: this.element})
+        createElement({tagName: "label", parentElement: p, innerText: "HPC site: "})
+        this.hpcSiteInput = new PopupSelect<HpcSiteName>({
+            popupTitle: "Select an HPC Site",
+            parentElement: p,
+            options: ["JUSUF", "CSCS"],
+            optionRenderer: (args) => createElement({tagName: "span", parentElement: args.parentElement, innerText: args.option}),
         })
         this.timeoutInput = createInputParagraph({
             label_text: "Timeout (minutes): ", inputType: "number", parentElement: this.element, required: true, value: "15"
@@ -98,6 +108,7 @@ export class SessionManagerWidget{
                     onProgress: (message) => this.logMessage(message),
                     onUsageError: (message) => this.logMessage(message),
                     autoCloseOnTimeout: true,
+                    hpc_site: this.hpcSiteInput.value,
                 })
                 this.onNewSession(sessionResult)
             }
@@ -133,6 +144,7 @@ export class SessionManagerWidget{
                     onUsageError: (message) => this.logMessage(message),
                     onProgress: (message) => this.logMessage(message),
                     autoCloseOnTimeout: false,
+                    hpc_site: this.hpcSiteInput.value,
                 })
                 this.onNewSession(sessionResult)
             }
@@ -178,6 +190,7 @@ export class SessionManagerWidget{
                 }
                 await SessionsPopup.create({
                     ilastikUrl,
+                    hpc_site: this.hpcSiteInput.value,
                     onSessionClosed: (status) => {
                         if(this.session && this.session.sessionUrl.equals(status.session_url)){
                             this.onLeaveSession()

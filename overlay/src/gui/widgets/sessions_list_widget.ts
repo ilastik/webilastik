@@ -1,4 +1,4 @@
-import { Session, SessionStatus } from "../../client/ilastik";
+import { HpcSiteName, Session, SessionStatus } from "../../client/ilastik";
 import { createElement, createImage, createInput, removeElement, secondsToTimeDeltaString } from "../../util/misc";
 import { Url } from "../../util/parsed_url";
 import { ErrorPopupWidget, PopupWidget } from "./popup";
@@ -9,7 +9,10 @@ class SessionItemWidget{
     private cancelButton: HTMLInputElement
 
     constructor(params: {
-        status: SessionStatus, parentElement: HTMLTableElement, ilastikUrl: Url, onSessionClosed: (status: SessionStatus) => void
+        status: SessionStatus,
+        parentElement: HTMLTableElement,
+        ilastikUrl: Url,
+        onSessionClosed: (status: SessionStatus) => void,
     }){
         this.status = params.status
         this.element = createElement({tagName: "tr", parentElement: params.parentElement})
@@ -29,7 +32,9 @@ class SessionItemWidget{
             onClick: async () => {
                 this.cancelButton.disabled = true;
                 this.cancelButton.classList.add("ItkLoadingBackground");
-                let cancellationResult = await Session.cancel({ilastikUrl: params.ilastikUrl, sessionId: job.session_id})
+                let cancellationResult = await Session.cancel({
+                    ilastikUrl: params.ilastikUrl, sessionId: job.session_id, hpc_site: params.status.hpc_site,
+                })
                 if(cancellationResult instanceof Error){
                     new ErrorPopupWidget({
                         message: `Could not delete session: ${cancellationResult.message}`,
@@ -49,7 +54,9 @@ class SessionItemWidget{
 
 export class SessionsPopup{
     constructor(params: {
-        ilastikUrl: Url, sessionStati: Array<SessionStatus>, onSessionClosed: (status: SessionStatus) => void
+        ilastikUrl: Url,
+        sessionStati: Array<SessionStatus>,
+        onSessionClosed: (status: SessionStatus) => void,
     }){
         let popup = new PopupWidget("Sessions:")
         let table = createElement({tagName: "table", parentElement: popup.element, cssClasses: ["ItkTable"]})
@@ -65,7 +72,11 @@ export class SessionsPopup{
         createInput({inputType: "button", parentElement: popup.element, value: "OK", onClick: () => popup.destroy()})
     }
 
-    public static async create(params: {ilastikUrl: Url, onSessionClosed: (status: SessionStatus) => void}): Promise<SessionsPopup | Error | undefined>{
+    public static async create(params: {
+        ilastikUrl: Url,
+        onSessionClosed: (status: SessionStatus) => void,
+        hpc_site: HpcSiteName,
+    }): Promise<SessionsPopup | Error | undefined>{
         const loadingPopup = new PopupWidget("Fetching sessions...");
         createImage({
             src: "/public/images/loading.gif",
@@ -74,7 +85,7 @@ export class SessionsPopup{
         createInput({
             inputType: "button", parentElement: loadingPopup.element, value: "Cancel", onClick: () => loadingPopup.destroy()
         })
-        let sessionStatiResult = await Session.listSessions({ilastikUrl: params.ilastikUrl})
+        let sessionStatiResult = await Session.listSessions({ilastikUrl: params.ilastikUrl, hpc_site: params.hpc_site})
         if(!loadingPopup.element.parentElement){
             return undefined
         }
