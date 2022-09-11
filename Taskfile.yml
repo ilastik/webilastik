@@ -288,7 +288,7 @@ tasks:
   deploy-to-webilastik-server:
     deps: [send-deb-package-to-web-server]
     cmds:
-      - ssh ubuntu@148.187.149.187 "sudo apt-get --asume-yes remove webilastik && sudo apt-get --assume-yes install {{.REMOTE_PACKAGE_PATH}}"
+      - ssh ubuntu@148.187.149.187 "sudo apt-get --assume-yes remove webilastik && sudo apt-get --assume-yes install {{.REMOTE_PACKAGE_PATH}}"
 
   deploy:
     deps: [deploy-to-jusuf, deploy-to-webilastik-server]
