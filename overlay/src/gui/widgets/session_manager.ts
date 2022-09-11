@@ -105,7 +105,7 @@ export class SessionManagerWidget{
 
 
         createElement({tagName: "h3", parentElement: this.element, innerText: "Rejoin Session"})
-        this.sessionIdField = createInputParagraph({inputType: "number", parentElement: this.element, label_text: "Session ID: "})
+        this.sessionIdField = createInputParagraph({inputType: "text", parentElement: this.element, label_text: "Session ID: "})
         this.rejoinSessionButton = createInputParagraph({
             inputType: "button",
             value: "Rejoin Session",
