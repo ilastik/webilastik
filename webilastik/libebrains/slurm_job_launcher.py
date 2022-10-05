@@ -346,10 +346,11 @@ class SshJobLauncher:
         job_id: "SlurmJobId | None" = None,
         state: "Set[JobState] | None" = None,
         starttime: "datetime.datetime" = datetime.datetime(year=2020, month=1, day=1),
-        endtime: "datetime.datetime" = datetime.datetime.today() + datetime.timedelta(days=2), #definetely in the future
+        endtime: "datetime.datetime | None" = None,
         user_id: "uuid.UUID | None" = None,
         session_id: "uuid.UUID | None" = None,
     ) -> "List[SlurmJob] | Exception":
+        endtime = endtime or datetime.datetime.today() + datetime.timedelta(days=2) # definetely in the future
         sacct_params = [
             "--allocations", # don't show individual steps
             "--noheader",
