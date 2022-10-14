@@ -252,6 +252,7 @@ tasks:
         TTYPath=$(tty)
         StandardOutput=tty
         StandardError=inherit
+        Environment=WEBILASTIK_ALLOW_LOCAL_SESSIONS=1
 
         ' > {{.WEBILASTIK_DEV_UNIT_CONFIG_DIR}}/output_to_tty.conf"
 

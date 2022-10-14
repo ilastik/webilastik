@@ -2,7 +2,6 @@ name: webilastik
 channels:
   - ilastik-forge
   - conda-forge
-  - nodefaults
 dependencies:
   - python>=3.8
   - numpy
@@ -16,6 +15,7 @@ dependencies:
   - typing_extensions
   - aiohttp
   - requests
+  - redis
   - redis-py
   - cryptography
   - pip

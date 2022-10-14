@@ -9,8 +9,8 @@ import multiprocessing as mp
 import sys
 
 from webilastik.scheduling import ExecutorGetter, ExecutorHint, SerialExecutor
-from webilastik.scheduling.hashing_mpi_executor import HashingMpiExecutor
-from webilastik.scheduling.mpi_comm_executor_wrapper import MPICommExecutorWrapper
+# from webilastik.scheduling.hashing_mpi_executor import HashingMpiExecutor
+# from webilastik.scheduling.mpi_comm_executor_wrapper import MPICommExecutorWrapper
 
 
 class ExecutorManager(ABC):
@@ -36,13 +36,13 @@ class ExecutorManager(ABC):
     def __del__(self):
         self.shutdown()
 
-class MPICommExecutorManager(ExecutorManager):
-    def _create_executor(self, max_workers: Optional[int]) -> Executor:
-        return MPICommExecutorWrapper()
+# class MPICommExecutorManager(ExecutorManager):
+#     def _create_executor(self, max_workers: Optional[int]) -> Executor:
+#         return MPICommExecutorWrapper()
 
-class HashingMpiExecutorManager(ExecutorManager):
-    def _create_executor(self, max_workers: Optional[int]) -> Executor:
-        return HashingMpiExecutor()
+# class HashingMpiExecutorManager(ExecutorManager):
+#     def _create_executor(self, max_workers: Optional[int]) -> Executor:
+#         return HashingMpiExecutor()
 
 class ProcessPoolExecutorManager(ExecutorManager):
     def _create_executor(self, max_workers: Optional[int]) -> Executor:

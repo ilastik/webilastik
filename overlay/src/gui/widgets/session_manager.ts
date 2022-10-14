@@ -32,8 +32,8 @@ export class SessionManagerWidget{
     private warnedUserOfImpendingClose = false
     hpcSiteInput: PopupSelect<HpcSiteName>;
 
-    constructor({parentElement, ilastikUrl=Url.parse("https://app.ilastik.org/"), viewer_driver, workflow_container}: {
-        parentElement: HTMLElement, ilastikUrl?: Url, viewer_driver: IViewerDriver, workflow_container: HTMLElement
+    constructor({parentElement, ilastikUrl, viewer_driver, workflow_container, hpcSiteNames}: {
+        parentElement: HTMLElement, ilastikUrl: Url, viewer_driver: IViewerDriver, workflow_container: HTMLElement, hpcSiteNames: Array<HpcSiteName>
     }){
         this.workflowContainer = workflow_container
         this.viewerDriver = viewer_driver
@@ -68,7 +68,7 @@ export class SessionManagerWidget{
         this.hpcSiteInput = new PopupSelect<HpcSiteName>({
             popupTitle: "Select an HPC Site",
             parentElement: p,
-            options: ["JUSUF", "CSCS"],
+            options: hpcSiteNames,
             optionRenderer: (args) => createElement({tagName: "span", parentElement: args.parentElement, innerText: args.option}),
         })
         this.listSessionsButton = createInput({

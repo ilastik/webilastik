@@ -17,7 +17,7 @@ import aiohttp
 from aiohttp.client import ClientSession
 from cryptography.fernet import Fernet
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonInt, ensureJsonObject, ensureJsonString
-from webilastik.libebrains.slurm_job_launcher import CscsSshJobLauncher, JobState, JusufSshJobLauncher, Minutes, NodeSeconds, Seconds, SlurmJob, SlurmJobId, SshJobLauncher
+from webilastik.libebrains.slurm_job_launcher import CscsSshJobLauncher, JobState, JusufSshJobLauncher, LocalJobLauncher, Minutes, NodeSeconds, Seconds, SlurmJob, SlurmJobId, SshJobLauncher
 
 from webilastik.libebrains.user_token import UserToken
 from webilastik.libebrains.oidc_client import OidcClient, Scope
@@ -129,6 +129,7 @@ class SessionStatus:
         }
 
 class HpcSiteName(enum.Enum):
+    LOCAL = "LOCAL"
     CSCS = "CSCS"
     JUSUF = "JUSUF"
 
@@ -148,9 +149,11 @@ class SessionAllocator:
         fernet: Fernet,
         external_url: Url,
         oidc_client: OidcClient,
+        allow_local_sessions: bool = False,
     ):
         self.fernet = fernet
         self.session_launchers: Mapping[HpcSiteName, SshJobLauncher] = {
+            **({HpcSiteName.LOCAL: LocalJobLauncher(fernet=fernet)} if allow_local_sessions else {}),
             HpcSiteName.JUSUF: JusufSshJobLauncher(fernet=fernet),
             HpcSiteName.CSCS: CscsSshJobLauncher(fernet=fernet),
         }
@@ -170,6 +173,7 @@ class SessionAllocator:
             web.get('/api/hello', self.hello),
             web.post('/api/session', self.spawn_session),
             web.post('/api/list_sessions', self.list_sessions),
+            web.post('/api/get_available_hpc_sites', self.get_available_hpc_sites),
             web.post('/api/get_session_status', self.session_status),
             web.post('/api/delete_session', self.close_session),
             web.post('/api/get_ebrains_token', self.get_ebrains_token), #FIXME: I'm using this in NG web workers
@@ -247,6 +251,8 @@ class SessionAllocator:
             payload_dict = ensureJsonObject(json.loads(raw_payload.decode('utf8')))
             requested_duration_minutes = Minutes(ensureJsonInt(payload_dict.get("session_duration_minutes")))
             hpc_site = HpcSiteName.from_json_value(payload_dict.get("hpc_site"))
+            if hpc_site not in self.session_launchers:
+                return web.json_response({"error": f"Bad hpc site name: {hpc_site.value}"}, status=400)
         except Exception:
             return web.json_response({"error": "Bad payload"}, status=400)
 
@@ -370,21 +376,10 @@ class SessionAllocator:
         #     )
         ##################################################################################
 
-        import datetime
         return uncachable_json_response(
             SessionStatus(
                 hpc_site=hpc_site,
                 slurm_job=session_result,
-                # slurm_job=SlurmJob(
-                #     job_id=SlurmJobId(123),
-                #     user_id=user_info_result.sub,
-                #     state=JobState.RUNNING,
-                #     start_time_utc_sec=Seconds(int(datetime.datetime.now(datetime.timezone.utc).timestamp())),
-                #     num_nodes=1,
-                #     time_elapsed_sec=Seconds(1),
-                #     time_limit_minutes=Minutes(99999),
-                #     session_id=session_id,
-                # ),
                 session_url=session_url,
                 connected=await self.check_session_connection_state(session_result),
             ).to_json_value(),
@@ -458,6 +453,12 @@ class SessionAllocator:
             status=200
         )
 
+    async def get_available_hpc_sites(self, request: web.Request) -> web.Response:
+        return uncachable_json_response(
+            tuple(launcher_site.value for launcher_site in self.session_launchers.keys()),
+            status=200
+        )
+
     def run(self, port: int):
         web.run_app(self.app, port=port)
 
@@ -470,8 +471,11 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    allow_local_sessions = bool(int(os.environ.get("WEBILASTIK_ALLOW_LOCAL_SESSIONS", "0")))
+
     SessionAllocator(
         fernet=fernet,
         external_url=args.external_url,
         oidc_client=OidcClient.from_environment(),
+        allow_local_sessions=allow_local_sessions
     ).run(port=5000)

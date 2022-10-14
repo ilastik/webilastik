@@ -3,12 +3,17 @@
 from abc import abstractmethod
 import asyncio
 from enum import Enum
+from subprocess import Popen
 from typing import Dict, Iterable, NewType, List, Set, Tuple
 import uuid
 import datetime
 import textwrap
 import tempfile
 import json
+from pathlib import Path
+import getpass
+import sys
+import os
 
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 from cryptography.fernet import Fernet
@@ -374,7 +379,6 @@ class SshJobLauncher:
         )
         if isinstance(output_result, Exception):
             return output_result
-
         jobs: List[SlurmJob] = []
         for line in output_result.split("\n")[:-1]: #skip empty newline
             job_result = SlurmJob.try_from_parsable2_raw_job_data(line, fernet=self.fernet)
@@ -388,6 +392,163 @@ class SshJobLauncher:
                 return [job_result]
             jobs.append(job_result)
         return jobs
+
+class LocalJobLauncher(SshJobLauncher):
+    def __init__(
+        self,
+        *,
+        user: Username = Username(getpass.getuser()),
+        fernet: Fernet,
+    ) -> None:
+        super().__init__(
+            user=user,
+            hostname=Hostname("localhost"),
+            account="dummy",
+            fernet=fernet,
+        )
+        self.jobs: Dict[SlurmJobId, Tuple[SlurmJob, Popen[bytes]]] = {}
+
+    def get_sbatch_launch_script(
+        self,
+        *,
+        time: Minutes,
+        ebrains_user_token: UserToken,
+        session_id: uuid.UUID,
+    ) -> str:
+        working_dir = f"/tmp/{session_id}"
+        webilastik_source_dir = Path(__file__).parent.parent.parent
+        redis_pid_file = f"{working_dir}/redis.pid"
+        redis_unix_socket_path = f"{working_dir}/redis.sock"
+        conda_env_dir = Path(os.path.realpath(sys.executable)).parent.parent
+
+        return textwrap.dedent(f"""
+            #!/bin/bash -l
+
+            export {UserToken.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME}="{ebrains_user_token.access_token}"
+            export {UserToken.EBRAINS_USER_REFRESH_TOKEN_ENV_VAR_NAME}="{ebrains_user_token.refresh_token}"
+            export EBRAINS_CLIENT_ID="{_oidc_client.client_id}"
+            export EBRAINS_CLIENT_SECRET="{_oidc_client.client_secret}"
+            set -xeu
+            set -o pipefail
+
+            mkdir {working_dir}
+            cd {working_dir}
+
+            # prevent numpy from spawning its own threads
+            export OPENBLAS_NUM_THREADS=1
+            export MKL_NUM_THREADS=1
+
+            test -x {conda_env_dir}/bin/redis-server
+            {conda_env_dir}/bin/redis-server \\
+                --pidfile {redis_pid_file} \\
+                --unixsocket {redis_unix_socket_path} \\
+                --unixsocketperm 777 \\
+                --port 0 \\
+                --daemonize no \\
+                --maxmemory-policy allkeys-lru \\
+                --maxmemory 10gb \\
+                --appendonly no \\
+                --save "" \\
+                --dir {working_dir} \\
+                &
+
+            NUM_TRIES=10;
+            while [ ! -e {redis_pid_file} -a $NUM_TRIES -gt 0 ]; do
+                echo "Redis not ready yet. Sleeping..."
+                NUM_TRIES=$(expr $NUM_TRIES - 1)
+                sleep 1
+            done
+
+            if [ $NUM_TRIES -eq 0 ]; then
+                echo "Could not start redis"
+                exit 1
+            fi
+
+            PYTHONPATH="{webilastik_source_dir}"
+            PYTHONPATH+=":{webilastik_source_dir}/ndstructs/"
+            PYTHONPATH+=":{webilastik_source_dir}/executor_getters/default/"
+            PYTHONPATH+=":{webilastik_source_dir}/caching/redis_cache/"
+
+            export PYTHONPATH
+            export REDIS_UNIX_SOCKET_PATH="{redis_unix_socket_path}"
+
+            "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py \\
+                --max-duration-minutes={time} \\
+                --listen-socket="{working_dir}/to-master.sock" \\
+                --session-url=https://app.ilastik.org/session-{session_id} \\
+                tunnel \\
+                --remote-username=www-data \\
+                --remote-host=app.ilastik.org \\
+                --remote-unix-socket="/tmp/to-session-{session_id}" \\
+
+            kill -2 $(cat {redis_pid_file})
+            sleep 2
+        """)
+
+    async def launch(
+        self,
+        *,
+        user_id: uuid.UUID,
+        time: Minutes,
+        ebrains_user_token: UserToken,
+        session_id: uuid.UUID,
+        display_name: str = ""
+    ) -> "SlurmJob | Exception":
+        stdin_file = tempfile.TemporaryFile()
+        _ = stdin_file.write(
+            self.get_sbatch_launch_script(
+                time=time, ebrains_user_token=ebrains_user_token, session_id=session_id
+            ).encode("utf8")
+        )
+        _ = stdin_file.seek(0)
+
+        session_process = Popen(["bash"], stdin=stdin_file)
+        job_id = SlurmJobId(len(self.jobs))
+        dummy_slurm_job = SlurmJob(
+            job_id=job_id,
+            state=JobState.RUNNING,
+            start_time_utc_sec=Seconds(int(datetime.datetime.now(datetime.timezone.utc).timestamp())),
+            time_elapsed_sec=Seconds(1),
+            num_nodes=1, #FIXME
+            session_id=session_id,
+            time_limit_minutes=time,
+            user_id=user_id,
+        )
+        self.jobs[job_id] = (dummy_slurm_job, session_process)
+
+        return dummy_slurm_job
+
+    async def cancel(self, job: SlurmJob) -> "Exception | None":
+        self.jobs[job.job_id][1].kill()
+        self.jobs[job.job_id][0].state = JobState.CANCELLED
+        return None
+
+    async def get_jobs(
+        self,
+        *,
+        job_id: "SlurmJobId | None" = None,
+        state: "Set[JobState] | None" = None,
+        starttime: "datetime.datetime" = datetime.datetime(year=2020, month=1, day=1),
+        endtime: "datetime.datetime | None" = None,
+        user_id: "uuid.UUID | None" = None,
+        session_id: "uuid.UUID | None" = None,
+    ) -> "List[SlurmJob] | Exception":
+        jobs: List[SlurmJob] = []
+        for job_item_id, (slurm_job_item, _) in self.jobs.items():
+            if job_id and job_id == job_item_id:
+                return [slurm_job_item]
+            if session_id and slurm_job_item.session_id == session_id:
+                return [slurm_job_item]
+            if user_id and slurm_job_item.user_id != user_id:
+                continue
+            if state and slurm_job_item.state not in state:
+                continue
+            if slurm_job_item.start_time_utc_sec and slurm_job_item.start_time_utc_sec < starttime.timestamp():
+                continue
+            #FIXME: endtime?
+            jobs.append(slurm_job_item)
+        return jobs
+
 
 class JusufSshJobLauncher(SshJobLauncher):
     def __init__(self, fernet: Fernet) -> None:

@@ -1,13 +1,15 @@
+import { Session } from "../../client/ilastik";
 import { IViewerDriver } from "../../drivers/viewer_driver";
 import { createElement, injectCss } from "../../util/misc";
 import { Url } from "../../util/parsed_url";
+import { ErrorPopupWidget } from "./popup";
 import { SessionManagerWidget } from "./session_manager";
 // import { SessionManagerWidget } from "./session_manager";
 
 export class OverlayControls{
     element: HTMLElement;
     constructor({
-        parentElement=document.body, ilastikUrl, viewer_driver, draggable=true, css
+        parentElement=document.body, ilastikUrl=Url.parse("https://app.ilastik.org/"), viewer_driver, draggable=true, css
     }: {
         parentElement: HTMLElement, ilastikUrl?: Url, viewer_driver: IViewerDriver, draggable?: boolean, css?: Url
     }){
@@ -42,9 +44,16 @@ export class OverlayControls{
             })
         }
 
-
-        new SessionManagerWidget({
-            parentElement: this.element, ilastikUrl, viewer_driver, workflow_container: this.element
-        })
+        let showSessionWidget = async () => {
+            let hpcSiteNames = await Session.getAvailableHpcSites({ilastikUrl})
+            if(hpcSiteNames instanceof Error){
+                new ErrorPopupWidget({message: "Could not retrieve HPC site names"})
+                return
+            }
+            new SessionManagerWidget({
+                parentElement: this.element, ilastikUrl, viewer_driver, workflow_container: this.element, hpcSiteNames
+            })
+        };
+        showSessionWidget();
     }
 }

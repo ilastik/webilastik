@@ -34,7 +34,7 @@ export function ensureSlurmJobState(value: string): SlurmJobState{
     return variant
 }
 
-export const hpcSiteNames = ["CSCS", "JUSUF"] as const;
+export const hpcSiteNames = ["CSCS", "JUSUF", "LOCAL"] as const;
 export type HpcSiteName = typeof hpcSiteNames[number]
 
 export function ensureHpcSiteName(value: string): HpcSiteName{
@@ -300,6 +300,20 @@ export class Session{
             return payload_result
         }
         return ensureJsonArray(payload_result).map(item => SessionStatus.fromJsonValue(item))
+    }
+
+    public static async getAvailableHpcSites(params: {ilastikUrl: Url}): Promise<HpcSiteName[] | Error>{
+        let payload_result = await fetchJson(
+            params.ilastikUrl.joinPath("/api/get_available_hpc_sites").raw,
+            {
+                cache: "no-store",
+                method: "POST",
+            },
+        )
+        if(payload_result instanceof Error){
+            return payload_result
+        }
+        return ensureJsonArray(payload_result).map(item => ensureHpcSiteName(ensureJsonString(item)))
     }
 
     public static getEbrainsToken(): string | undefined{
