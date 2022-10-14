@@ -27,7 +27,7 @@ class ReverseSshTunnel:
 
     def _delete_sockets(self):
         result = subprocess.run(
-            ["ssh", f"{self.remote_username}@{self.remote_host}", "--", "rm", "-v", self.remote_unix_socket],
+            ["ssh", "-v", "-oCheckHostIP=no", "-oBatchMode=yes", f"{self.remote_username}@{self.remote_host}", "--", "rm", "-v", self.remote_unix_socket],
         )
         if result.returncode != 0:
             logger.warning(f"Removing socket {self.remote_host}:{self.remote_unix_socket} failed: {result.stderr.decode('utf8')}")
@@ -35,11 +35,13 @@ class ReverseSshTunnel:
 
     def __enter__(self):
         _ = subprocess.run(
-            ["ssh", f"{self.remote_username}@{self.remote_host}", "--", "rm", "-fv", self.remote_unix_socket],
+            ["ssh", "-v", "-oCheckHostIP=no", "-oBatchMode=yes", f"{self.remote_username}@{self.remote_host}", "--", "rm", "-fv", self.remote_unix_socket],
         )
+
         self.tunnel_process = Popen(
             [
                 "ssh", "-fnNT",
+                "-oCheckHostIP=no",
                 "-oBatchMode=yes",
                 # "-o", "StreamLocalBindMask=0111",
                 "-M", "-S", self.tunnel_control_socket,
