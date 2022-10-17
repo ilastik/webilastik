@@ -534,7 +534,12 @@ class LocalJobLauncher(SshJobLauncher):
         session_id: "uuid.UUID | None" = None,
     ) -> "List[SlurmJob] | Exception":
         jobs: List[SlurmJob] = []
-        for job_item_id, (slurm_job_item, _) in self.jobs.items():
+        for job_item_id, (slurm_job_item, process) in self.jobs.items():
+            if not slurm_job_item.state.is_done():
+                return_code = process.poll()
+                if return_code is not None:
+                    slurm_job_item.state = JobState.COMPLETED if return_code == 0 else JobState.FAILED
+
             if job_id and job_id == job_item_id:
                 return [slurm_job_item]
             if session_id and slurm_job_item.session_id == session_id:
