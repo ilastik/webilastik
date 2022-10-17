@@ -502,7 +502,7 @@ class LocalJobLauncher(SshJobLauncher):
         )
         _ = stdin_file.seek(0)
 
-        session_process = Popen(["bash"], stdin=stdin_file)
+        session_process = Popen(["bash"], stdin=stdin_file, start_new_session=True)
         job_id = SlurmJobId(len(self.jobs))
         dummy_slurm_job = SlurmJob(
             job_id=job_id,
