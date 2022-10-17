@@ -152,7 +152,7 @@ export class SessionManagerWidget{
                 if(timeoutMinutes === undefined){
                     return
                 }
-                let sessionId = this.sessionIdField.value
+                let sessionId = this.sessionIdField.value.trim()
                 if(!sessionId){
                     new ErrorPopupWidget({message: "Bad session ID"})
                     return
