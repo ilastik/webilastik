@@ -1,5 +1,5 @@
 import { vec3 } from "gl-matrix";
-import { BufferUsageHint, Vec3AttributeBuffer } from "./buffer";
+import { BufferUsageHint, VecAttributeBuffer } from "./buffer";
 import { DrawingMode, FrontFace } from "./gl";
 
 export class VertexArray{
@@ -78,13 +78,13 @@ export class Triangle extends VertexArray{
 }
 
 export abstract class VertexPrimitive extends VertexArray{
-    private positionsBuffer?: Vec3AttributeBuffer
+    private positionsBuffer?: VecAttributeBuffer<3, Float32Array>
 
     public abstract getDrawingMode() : DrawingMode;
 
-    public getPositionsBuffer(gl: WebGL2RenderingContext, hint: BufferUsageHint): Vec3AttributeBuffer{
+    public getPositionsBuffer(gl: WebGL2RenderingContext, usageHint: BufferUsageHint): VecAttributeBuffer<3, Float32Array>{
         if(this.positionsBuffer === undefined){
-            this.positionsBuffer = new Vec3AttributeBuffer(gl, this.data, hint)
+            this.positionsBuffer = new VecAttributeBuffer({gl, numComponents: 3, data: this.data, usageHint})
         }
         return this.positionsBuffer
     }

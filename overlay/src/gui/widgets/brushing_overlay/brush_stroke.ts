@@ -1,6 +1,6 @@
 import { quat, vec3 } from "gl-matrix";
 import { Color, DataSource } from "../../../client/ilastik";
-import { Vec3AttributeBuffer, BufferUsageHint } from "../../../gl/buffer";
+import { VecAttributeBuffer, BufferUsageHint } from "../../../gl/buffer";
 import { VertexArray } from "../../../gl/vertex_primitives";
 import { ensureJsonObject, IJsonable, JsonObject, JsonValue} from "../../../util/serialization";
 // import { vec3ToString } from "./utils";
@@ -8,7 +8,7 @@ import { ensureJsonObject, IJsonable, JsonObject, JsonValue} from "../../../util
 export class BrushStroke extends VertexArray implements IJsonable{
     public readonly camera_orientation: quat
     public num_points : number
-    public readonly positions_buffer: Vec3AttributeBuffer
+    public readonly positions_buffer: VecAttributeBuffer<3, Float32Array>
     public readonly annotated_data_source: DataSource;
 
     private constructor({gl, points_vx, camera_orientation, annotated_data_source}: {
@@ -22,7 +22,7 @@ export class BrushStroke extends VertexArray implements IJsonable{
         this.camera_orientation = quat.create(); quat.copy(this.camera_orientation, camera_orientation)
         this.annotated_data_source = annotated_data_source
         this.num_points = 0
-        this.positions_buffer = new Vec3AttributeBuffer(gl, data, BufferUsageHint.DYNAMIC_DRAW)
+        this.positions_buffer = new VecAttributeBuffer({gl, numComponents: 3, data, usageHint: BufferUsageHint.DYNAMIC_DRAW})
         points_vx.forEach(pt_vx => this.try_add_point_vx(pt_vx))
     }
 

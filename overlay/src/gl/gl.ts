@@ -1,6 +1,5 @@
 import { vec4 } from "gl-matrix"
-
-export type BinaryArray = ArrayBufferView & {length: number}
+import { BinaryArray } from "./buffer";
 
 export enum DrawingMode{
     POINTS = WebGL2RenderingContext.POINTS,
@@ -12,12 +11,31 @@ export enum DrawingMode{
     TRIANGLES = WebGL2RenderingContext.TRIANGLES,
 }
 
-export enum AttributeElementType{
-    BYTE = WebGL2RenderingContext.BYTE,
-    SHORT = WebGL2RenderingContext.SHORT,
-    UNSIGNED_BYTE = WebGL2RenderingContext.UNSIGNED_BYTE,
-    UNSIGNED_SHORT = WebGL2RenderingContext.UNSIGNED_SHORT,
-    FLOAT = WebGL2RenderingContext.FLOAT,
+export class AttributeElementType{
+    constructor(public readonly raw: number){}
+
+    public static readonly BYTE = new this(WebGL2RenderingContext.BYTE);
+    public static readonly UNSIGNED_BYTE = new this(WebGL2RenderingContext.UNSIGNED_BYTE);
+    public static readonly SHORT = new this(WebGL2RenderingContext.SHORT);
+    public static readonly UNSIGNED_SHORT = new this(WebGL2RenderingContext.UNSIGNED_SHORT);
+    public static readonly INT = new this(WebGL2RenderingContext.INT);
+    public static readonly UNSIGNED_INT = new this(WebGL2RenderingContext.UNSIGNED_INT);
+    public static readonly FLOAT = new this(WebGL2RenderingContext.FLOAT);
+
+    //https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/vertexAttribPointer
+    public static readonly NameMap = {
+        [Int8Array.name]: this.BYTE,
+        [Uint8Array.name]: this.UNSIGNED_BYTE,
+
+        [Int16Array.name]: this.SHORT,
+        [Uint16Array.name]: this.UNSIGNED_SHORT,
+
+        [Float32Array.name]: this.FLOAT,
+    }
+
+    public static fromBinaryArray(arr: BinaryArray): AttributeElementType{
+        return this.NameMap[arr.constructor.name]
+    }
 }
 
 // determines if each atribute value in the buffer is a single, vec2, vec3 or vec4
