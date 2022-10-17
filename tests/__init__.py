@@ -28,6 +28,7 @@ from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.filesystem.osfs import OsFs
 from webilastik.libebrains.user_token import UserToken
 from webilastik.ui.applet.brushing_applet import Label
+from webilastik.libebrains.global_user_login import get_global_login_token
 
 def get_project_root_dir() -> Path:
     return Path(__file__).parent.parent
@@ -59,7 +60,6 @@ def get_test_output_bucket_fs() -> BucketFs:
     return BucketFs(
         bucket_name="hbp-image-service",
         prefix=PurePosixPath(f"/test-{now_str}"),
-        ebrains_user_token=UserToken.get_global_token_or_raise(),
     )
 
 def create_precomputed_chunks_sink(*, shape: Shape5D, dtype: "np.dtype[Any]", chunk_size: Shape5D, fs: "JsonableFilesystem | None" = None) -> FsDataSink:

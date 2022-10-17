@@ -62,7 +62,7 @@ async def main():
     assert isinstance(token, UserToken)
 
     async with aiohttp.ClientSession(
-        cookies={EbrainsLogin.AUTH_COOKIE_KEY: token.access_token}
+        cookies={UserToken.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME.lower(): token.access_token}
     ) as session:
         print(f"Creating new session--------------")
         async with session.post(ilastik_root_url.concatpath("api/session").raw, json={"session_duration_minutes": 15}) as response:
@@ -155,7 +155,6 @@ async def main():
 
             hbp_image_service_bucket_fs = BucketFs(
                 bucket_name="hbp-image-service",
-                ebrains_user_token=UserToken.get_global_token_or_raise(),
                 prefix=PurePosixPath("/"),
             )
 
