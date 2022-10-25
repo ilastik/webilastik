@@ -30,7 +30,7 @@ tasks:
       - "{{.PROJECT_ROOT}}/overlay/src/client/message_schema.ts"
     cmds:
       - python {{.PROJECT_ROOT}}/scripts/generate_message_schemas.py
-      - deno fmt {{.PROJECT_ROOT}}/overlay/src/client/message_schema.ts
+      - deno fmt --options-line-width=120 {{.PROJECT_ROOT}}/overlay/src/client/message_schema.ts
       - black {{.PROJECT_ROOT}}/webilastik/server/message_schema.py
 
   check:
