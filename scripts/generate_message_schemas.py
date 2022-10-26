@@ -46,10 +46,13 @@ _ = GENERATED_PY_FILE.write(textwrap.dedent(f"""
 
 
 class PyFromJsonValueFunction:
+    @staticmethod
+    def make_name(*, py_hint: str) -> str:
+        return "parse_as_" + py_hint.replace("[", "_of_").replace("]", "_endof_").replace(" ", "").replace(",", "0" ).replace("...", "_varlen_")
+
     def __init__(self, *, py_hint: str, code: str) -> None:
         super().__init__()
-        regex = re.compile("|".join([r"\[", r"\]", r"\.", ",", " "]))
-        self.name = "parse_as_" + regex.sub('_', py_hint)
+        self.name = PyFromJsonValueFunction.make_name(py_hint=py_hint)
         self.full_code = (
             f"def {self.name}(value: JsonValue) -> '{py_hint} | MessageParsingError':" + "\n" +
             textwrap.indent(textwrap.dedent(code), prefix="    ") + "\n"
@@ -58,13 +61,26 @@ class PyFromJsonValueFunction:
     def __str__(self) -> str:
         return self.full_code
 
+class TsFromJsonValueFunction:
+    def __init__(self, *, py_hint: str, ts_hint: str, code: str) -> None:
+        super().__init__()
+        self.name = PyFromJsonValueFunction.make_name(py_hint=py_hint)
+        self.full_code = (
+            f"function {self.name}(value: JsonValue): {ts_hint} | Error{{" + "\n" +
+                textwrap.indent(textwrap.dedent(code), prefix="    ") + "\n" +
+            f"}}"
+        )
+
+    def __str__(self) -> str:
+        return self.full_code
+
+
 class Hint(ABC):
     hint_cache: ClassVar[Dict[Any, "Hint"]] = {}
 
 
     @classmethod
     def parse(cls, raw_hint: Any, context: str = "") -> "Hint":
-        print(f"===>>> Parsing {raw_hint} ({context})")
         if raw_hint in cls.hint_cache:
             return cls.hint_cache[raw_hint]
 
@@ -86,6 +102,9 @@ class Hint(ABC):
         else:
             raise TypeError(f"Unrecognized raw type hint: {raw_hint}")
 
+        _ = GENERATED_TS_FILE.write(hint.ts_fromJsonValue_function.full_code)
+        _ = GENERATED_TS_FILE.write("\n")
+
         _ = GENERATED_PY_FILE.write(hint.py_fromJsonValue_function.full_code)
         _ = GENERATED_PY_FILE.write("\n")
 
@@ -98,19 +117,16 @@ class Hint(ABC):
         ts_hint: str,
         py_hint: str,
         py_fromJsonValue_code: str,
+        ts_fromJsonValue_code: str,
     ) -> None:
         super().__init__()
         self.ts_hint = ts_hint
         self.py_hint = py_hint
         self.py_fromJsonValue_function = PyFromJsonValueFunction(py_hint=py_hint, code=py_fromJsonValue_code)
-
+        self.ts_fromJsonValue_function = TsFromJsonValueFunction(py_hint=py_hint, ts_hint=ts_hint, code=ts_fromJsonValue_code)
 
     @abstractmethod
     def make_py_to_json_expr(self, value_expr: str) -> str:
-        pass
-
-    @abstractmethod
-    def to_ts_fromJsonValue_expr(self, json_value_expr: str) -> str:
         pass
 
     @abstractmethod
@@ -152,6 +168,22 @@ class MessageSchemaHint(Hint):
                 f"return {self.message_generator_type.__name__}(",
                     *[f'{field_name}=tmp_{field_name},' for field_name in self.field_annotations.keys()],
                 ")"
+            ]),
+            ts_fromJsonValue_code="\n".join([
+                "const valueObject = ensureJsonObject(value);",
+                "if(valueObject instanceof Error){",
+                "    return valueObject;",
+                "}",
+                *list(itertools.chain(*(
+                    [
+                      f"const temp_{field_name} = {hint.ts_fromJsonValue_function.name}(valueObject.{field_name})",
+                      f"if(temp_{field_name} instanceof Error){{ return temp_{field_name}; }}",
+                    ]
+                    for field_name, hint in self.field_annotations.items()
+                ))),
+               f"return new {self.message_generator_type.__name__}({{",
+             *[f"    {field_name}: temp_{field_name}," for field_name in self.field_annotations.keys()],
+               f"}})",
             ])
         )
 
@@ -168,29 +200,17 @@ class MessageSchemaHint(Hint):
          *[f'        this.{field_name} = params.{field_name};' for field_name in self.field_annotations.keys()],
             "    }",
 
-           f"    public static fromJsonValue(value: JsonValue): {self.ts_hint} | Error{{",
-            "        const valueObject = ensureJsonObject(value);",
-            "        if(valueObject instanceof Error){",
-            "            return valueObject;",
-            "        }",
-            *list(itertools.chain(*(
-                    [
-                      f"const temp_{field_name} = {hint.to_ts_fromJsonValue_expr(f'valueObject.{field_name}')}",
-                      f"if(temp_{field_name} instanceof Error){{ return temp_{field_name}; }}",
-                    ]
-                    for field_name, hint in self.field_annotations.items()
-            ))),
-            "        return new this({",
-         *[f"            {field_name}: temp_{field_name}," for field_name in self.field_annotations.keys()],
-            "        })",
-           f"}}",
-
             "    public toJsonValue(): JsonObject{",
             "        return {",
          *[f"            {field_name}: " + hint.to_ts_toJsonValue_expr(f"this.{field_name}") + "," for field_name, hint in self.field_annotations.items()],
             "        }",
             "    }",
-            f"}}"
+
+           f"    public static fromJsonValue(value: JsonValue): {self.ts_hint} | Error{{",
+           f"        return {self.ts_fromJsonValue_function.name}(value)"
+           f"    }}",
+
+          f"}}"
         ])
 
         self.py_class_code: str = "\n".join([
@@ -210,9 +230,6 @@ class MessageSchemaHint(Hint):
     def make_py_to_json_expr(self, value_expr: str) -> str:
         return f"{value_expr}.to_json_value()"
 
-    def to_ts_fromJsonValue_expr(self, json_value_expr: str) -> str:
-        return f"{self.message_generator_type.__name__}.fromJsonValue({json_value_expr})"
-
     def to_ts_toJsonValue_expr(self, value_expr: str) -> str:
         return f"{value_expr}.toJsonValue()"
 
@@ -222,6 +239,17 @@ class PrimitiveHint(Hint):
         assert PrimitiveHint.is_primitive(hint)
         self.hint_type = hint
         py_hint='None' if self.hint_type in (None, type(None)) else self.hint_type.__name__
+
+        if self.hint_type == int or self.hint_type == float:
+            ts_fromJsonValue_code = f"return ensureJsonNumber(value)"
+        elif self.hint_type == str:
+            ts_fromJsonValue_code = f"return ensureJsonString(value)"
+        elif self.hint_type == bool:
+            ts_fromJsonValue_code = f"return ensureJsonBoolean(value)"
+        elif self.hint_type is None or self.hint_type == type(None):
+            ts_fromJsonValue_code = f"return ensureJsonUndefined(value)"
+        else:
+            raise Exception(f"Should be unreachable")
         super().__init__(
             ts_hint={int: "number", float: "number", str: "string", None: "undefined", type(None): "undefined"}[self.hint_type],
             py_hint=py_hint,
@@ -229,7 +257,8 @@ class PrimitiveHint(Hint):
                 f"if isinstance(value, {'type(None)' if self.hint_type in (None, type(None)) else self.hint_type.__name__}):",
                     "    return value",
                 f"return MessageParsingError(f'Could not parse {{json.dumps(value)}} as {py_hint}')",
-            ])
+            ]),
+            ts_fromJsonValue_code=ts_fromJsonValue_code,
         )
 
     @staticmethod
@@ -238,18 +267,6 @@ class PrimitiveHint(Hint):
 
     def make_py_to_json_expr(self, value_expr: str) -> str:
         return value_expr
-
-    def to_ts_fromJsonValue_expr(self, json_value_expr: str) -> str:
-        if self.hint_type == int or self.hint_type == float:
-            return f"ensureJsonNumber({json_value_expr})"
-        if self.hint_type == str:
-            return f"ensureJsonString({json_value_expr})"
-        if self.hint_type == bool:
-            return f"ensureJsonBoolean({json_value_expr})"
-        if self.hint_type is None or self.hint_type == type(None):
-            return f"ensureJsonUndefined({json_value_expr})"
-        #FIXME
-        raise Exception(f"Should be unreachable")
 
     def to_ts_toJsonValue_expr(self, value_expr: str) -> str:
         return value_expr
@@ -288,27 +305,23 @@ class NTuple(TupleHint):
                 "return (",
                     *[f"tmp_{temp_idx}," for temp_idx in range(len(self.generic_args))],
                 ")",
-            ])
+            ]),
+            ts_fromJsonValue_code="\n".join([
+                "const arr = ensureJsonArray(value); if(arr instanceof Error){return arr}",
+                *list(itertools.chain(*(
+                    [
+                        f"const temp_{arg_index} = {arg.ts_fromJsonValue_function.name}(arr[{arg_index}]);",
+                        f"if(temp_{arg_index} instanceof Error){{return temp_{arg_index}}}",
+                    ]
+                    for arg_index, arg in enumerate(self.generic_args)
+                ))),
+                "return [" + ", ".join(f"temp_{arg_index}" for arg_index, _ in enumerate(self.generic_args)) + "];"
+            ]),
         )
 
     @staticmethod
     def is_n_tuple(hint: Any) -> bool:
         return TupleHint.is_tuple_hint(hint) and (... not in hint.__args__)
-
-    def to_ts_fromJsonValue_expr(self, json_value_expr: str) -> str:
-        return "\n".join([
-           f"((value: JsonValue): {self.ts_hint} | Error => {{",
-            "    const arr = ensureJsonArray(value); if(arr instanceof Error){return arr}",
-            *list(itertools.chain(*(
-                [
-                  f"const temp_{arg_index} = " + arg.to_ts_fromJsonValue_expr(f"arr[{arg_index}]") + ";",
-                  f"if(temp_{arg_index} instanceof Error){{return temp_{arg_index}}}",
-                ]
-                for arg_index, arg in enumerate(self.generic_args)
-            ))),
-            "    return [" + ", ".join(f"temp_{arg_index}" for arg_index, _ in enumerate(self.generic_args)) + "];"
-          f"}}) ({json_value_expr})",
-        ])
 
     def make_py_to_json_expr(self, value_expr: str) -> str:
         return "(" + ",".join(
@@ -333,9 +346,10 @@ class VarLenTuple(TupleHint):
         assert VarLenTuple.is_varlen_tuple(hint)
         self.element_type = Hint.parse(hint.__args__[0])
         py_hint=f"Tuple[{self.element_type.py_hint}, ...]"
+        ts_hint=f"Array<{self.element_type.ts_hint}>"
         super().__init__(
-            py_hint=f"Tuple[{self.element_type.py_hint}, ...]",
-            ts_hint=f"Array<{self.element_type.ts_hint}>",
+            py_hint=py_hint,
+            ts_hint=ts_hint,
             py_fromJsonValue_code="\n".join([
                  "if not isinstance(value, (list, tuple)):",
                 f"    return MessageParsingError(f'Could not parse {py_hint} from {{json.dumps(value)}}')",
@@ -346,7 +360,22 @@ class VarLenTuple(TupleHint):
                  "        return parsed",
                  "    items.append(parsed)",
                  "return tuple(items) ",
-            ])
+            ]),
+            ts_fromJsonValue_code="\n".join([
+                "const arr = ensureJsonArray(value);",
+                "if(arr instanceof Error){"
+                "    return arr",
+                "}",
+               f"const out: {ts_hint} = []",
+                "for(let item of arr){",
+               f"    let parsed_item = {self.element_type.ts_fromJsonValue_function.name}(item);",
+                "    if(parsed_item instanceof Error){"
+                "        return parsed_item;"
+                "    }",
+                "    out.push(parsed_item);",
+                "}",
+                "return out;",
+            ]),
         )
 
     @staticmethod
@@ -355,26 +384,6 @@ class VarLenTuple(TupleHint):
 
     def make_py_to_json_expr(self, value_expr: str) -> str:
         return f"tuple({self.element_type.make_py_to_json_expr('item')} for item in {value_expr})"
-
-    def to_ts_fromJsonValue_expr(self, json_value_expr: str) -> str:
-        return "\n".join([
-            f"((value: JsonValue): {self.ts_hint} | Error => {{",
-             "    const arr = ensureJsonArray(value);",
-             "    if(arr instanceof Error){"
-             "        return arr",
-             "    }",
-            f"    const out: {self.ts_hint} = []",
-             "    for(let item of arr){",
-            f"        let parsed_item = {self.element_type.to_ts_fromJsonValue_expr('item')};",
-             "        if(parsed_item instanceof Error){"
-             "            return parsed_item;"
-             "        }",
-             "        out.push(parsed_item);",
-             "    }",
-             "    return out;",
-            f"}}) ({json_value_expr})"
-        ])
-        return f"ensureJsonArray({json_value_expr}).map(item => {self.element_type.to_ts_fromJsonValue_expr('item')})"
 
     def to_ts_toJsonValue_expr(self, value_expr: str) -> str:
         return f"{value_expr}.map(item => {self.element_type.to_ts_toJsonValue_expr('item')})"
@@ -385,9 +394,10 @@ class UnionHint(Hint):
         assert UnionHint.is_union_hint(raw_hint)
         self.union_args = [Hint.parse(arg) for arg in raw_hint.__args__]
         py_hint = f"Union[{', '.join(arg.py_hint for arg in self.union_args)}]"
+        ts_hint=" | ".join(arg.ts_hint for arg in self.union_args)
         super().__init__(
-            ts_hint=" | ".join(arg.ts_hint for arg in self.union_args),
             py_hint=py_hint,
+            ts_hint=ts_hint,
             py_fromJsonValue_code="\n".join([
                 *list(itertools.chain(*(
                     [
@@ -398,6 +408,18 @@ class UnionHint(Hint):
                     for arg_index, arg in enumerate(self.union_args)
                 ))),
                 f"return MessageParsingError(f'Could not parse {{json.dumps(value)}} into {py_hint}')"
+            ]),
+            ts_fromJsonValue_code="\n".join([
+                *list(itertools.chain(*(
+                    [
+                        f"const parsed_option_{arg_index} = {arg.ts_fromJsonValue_function.name}(value)",
+                        f"if(!(parsed_option_{arg_index} instanceof Error)){{",
+                        f"    return parsed_option_{arg_index};",
+                        f"}}"
+                    ]
+                    for arg_index, arg in enumerate(self.union_args)
+                ))),
+                f"return Error(`Could not parse ${{JSON.stringify(value)}} into {ts_hint}`)"
             ])
         )
 
@@ -408,24 +430,6 @@ class UnionHint(Hint):
 
     def make_py_to_json_expr(self, value_expr: str) -> str:
         return f"convert_to_json_value({value_expr})"
-
-    def to_ts_fromJsonValue_expr(self, json_value_expr: str) -> str:
-        return "\n".join([
-            f"((value: JsonValue): {self.ts_hint} | Error => {{",
-
-            *list(itertools.chain(*(
-                [
-                    f"const parsed_option_{arg_index} = {arg.to_ts_fromJsonValue_expr('value')}",
-                    f"if(!(parsed_option_{arg_index} instanceof Error)){{",
-                    f"    return parsed_option_{arg_index};",
-                    f"}}"
-                ]
-                for arg_index, arg in enumerate(self.union_args)
-            ))),
-            f"return Error(`Could not parse ${{JSON.stringify(value)}} into {self.ts_hint}`)"
-
-            f"}})({json_value_expr})",
-        ])
 
     def to_ts_toJsonValue_expr(self, value_expr: str) -> str:
         return f"toJsonValue({value_expr})"
