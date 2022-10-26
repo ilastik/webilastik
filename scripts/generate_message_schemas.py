@@ -2,11 +2,10 @@
 
 import inspect
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar, Dict, Literal, Optional, Sequence, Type, Tuple, Union
+from typing import Any, ClassVar, Dict, Literal, Optional, Sequence, Type, Tuple, Union, Mapping
 from pathlib import Path
 from dataclasses import dataclass
 import textwrap
-from collections.abc import Mapping
 from ndstructs.point5D import itertools
 
 
@@ -28,7 +27,7 @@ _ = GENERATED_PY_FILE.write(textwrap.dedent(f"""
     # Automatically generated via {Path(__file__).name}. Do not edit!
 
     from dataclasses import dataclass
-    from typing import Tuple, Optional, Union, List, Literal
+    from typing import Tuple, Optional, Union, List, Literal, Dict, Mapping
     import json
 
     from webilastik.serialization.json_serialization import (
@@ -43,22 +42,21 @@ _ = GENERATED_PY_FILE.write(textwrap.dedent(f"""
 """))
 
 
-class PyFromJsonValueFunction:
-    @staticmethod
-    def make_name(*, py_hint: str) -> str:
-        return "parse_as_" + py_hint.replace("[", "_of_").replace(
-            "]", "_endof_"
-        ).replace(
-            " ", ""
-        ).replace(
-            ",", "0"
-        ).replace(
-            "...", "_varlen_"
-        ).replace("'", "_quote_")
+def make_serialization_function_name(*, prefix: str, py_hint: str) -> str:
+    return "parse_as_" + py_hint.replace("[", "_of_").replace(
+        "]", "_endof_"
+    ).replace(
+        " ", ""
+    ).replace(
+        ",", "0"
+    ).replace(
+        "...", "_varlen_"
+    ).replace("'", "_quote_")
 
+class PyFromJsonValueFunction:
     def __init__(self, *, py_hint: str, code: str) -> None:
         super().__init__()
-        self.name = PyFromJsonValueFunction.make_name(py_hint=py_hint)
+        self.name = make_serialization_function_name(prefix="parse_as_", py_hint=py_hint)
         self.full_code = (
             f"def {self.name}(value: JsonValue) -> \"{py_hint} | MessageParsingError\":" + "\n" +
             textwrap.indent(textwrap.dedent(code), prefix="    ") + "\n"
@@ -70,7 +68,7 @@ class PyFromJsonValueFunction:
 class TsFromJsonValueFunction:
     def __init__(self, *, py_hint: str, ts_hint: str, code: str) -> None:
         super().__init__()
-        self.name = PyFromJsonValueFunction.make_name(py_hint=py_hint)
+        self.name = make_serialization_function_name(prefix="parse_as_", py_hint=py_hint)
         self.full_code = (
             f"function {self.name}(value: JsonValue): {ts_hint} | Error{{" + "\n" +
                 textwrap.indent(textwrap.dedent(code), prefix="    ") + "\n" +
@@ -79,7 +77,6 @@ class TsFromJsonValueFunction:
 
     def __str__(self) -> str:
         return self.full_code
-
 
 class Hint(ABC):
     hint_cache: ClassVar[Dict[Any, "Hint"]] = {}
@@ -107,6 +104,8 @@ class Hint(ABC):
             hint =  UnionHint(raw_hint)
         elif LiteralHint.is_literal(raw_hint=raw_hint):
             hint = LiteralHint(raw_hint=raw_hint)
+        elif MappingHint.is_mapping_hint(raw_hint):
+            hint = MappingHint(raw_hint)
         else:
             raise TypeError(f"Unrecognized raw type hint: {raw_hint}")
 
@@ -140,6 +139,80 @@ class Hint(ABC):
     @abstractmethod
     def to_ts_toJsonValue_expr(self, value_expr: str) -> str:
         pass
+
+class MappingHint(Hint):
+    key_hint: Hint
+    value_hint: Hint
+
+    def __init__(self, raw_hint: Any) -> None:
+        assert MappingHint.is_mapping_hint(raw_hint)
+        self.key_hint = Hint.parse(raw_hint=raw_hint.__args__[0])
+        self.value_hint = Hint.parse(raw_hint=raw_hint.__args__[1])
+        assert raw_hint.__args__[0] == str, "Mappings with keys other than strings are not supported yet"
+        py_hint = f"Mapping[{self.key_hint.py_hint}, {self.value_hint.py_hint}]"
+        ts_hint = f"{{ [key: {self.key_hint.ts_hint}]: {self.value_hint.ts_hint} }}"
+        super().__init__(
+            ts_hint=ts_hint,
+            py_hint=py_hint,
+            py_fromJsonValue_code="\n".join([
+                "from collections.abc import Mapping as AbcMapping",
+                "if not isinstance(value, AbcMapping):",
+               f"    return MessageParsingError(f\"Could not parse {{json.dumps(value)}} as a {py_hint}\")",
+               f"out: Dict[{self.value_hint.py_hint}, {self.value_hint.py_hint}] = {{}}",
+                "for key, val in value.items():",
+               f"    parsed_key = {self.key_hint.py_fromJsonValue_function.name}(key)",
+                "    if isinstance(parsed_key, MessageParsingError):",
+                "        return parsed_key",
+               f"    parsed_val = {self.value_hint.py_fromJsonValue_function.name}(val)",
+                "    if isinstance(parsed_val, MessageParsingError):",
+                "        return parsed_val",
+                "    out[parsed_key] = parsed_val",
+                "return out",
+            ]),
+            ts_fromJsonValue_code="\n".join([
+                "const valueObj = ensureJsonObject(value);"
+                "if(valueObj instanceof Error){",
+               f"    return valueObj",
+                "}",
+               f"const out: {ts_hint} = {{}}",
+                "for(let key in valueObj){",
+               f"    const parsed_key = {self.key_hint.ts_fromJsonValue_function.name}(key)",
+                "    if(parsed_key instanceof Error){",
+                "        return parsed_key",
+                "    }",
+                "    const val = valueObj[key]",
+               f"    const parsed_val = {self.value_hint.ts_fromJsonValue_function.name}(val)",
+                "    if(parsed_val instanceof Error){",
+                "        return parsed_val",
+                "    }",
+                "    out[parsed_key] = parsed_val",
+                "}",
+                "return out",
+            ]),
+        )
+    @staticmethod
+    def is_mapping_hint(raw_hint: Any) -> bool:
+        some_dummy_mapping_hint = Mapping[str, int]
+        return raw_hint.__class__ == some_dummy_mapping_hint.__class__
+
+    def make_py_to_json_expr(self, value_expr: str) -> str:
+        return (
+            "{" +
+                self.key_hint.make_py_to_json_expr('key') + ":" + self.value_hint.make_py_to_json_expr('value') +
+                f" for key, value in {value_expr}.items()" +
+            "}"
+        )
+
+    def to_ts_toJsonValue_expr(self, value_expr: str) -> str:
+        return "\n".join([
+            f"((value: {self.ts_hint}): JsonObject => {{",
+            f"    const out: {{ [key: {self.key_hint.ts_hint}]: {self.value_hint.ts_hint} }} = {{}};"
+             "    for(let key in value){"
+             "        out[key] = value[key];"
+             "    }"
+             "    return out;"
+            f"}})({value_expr})",
+        ])
 
 def literal_value_to_code(lit_value: 'int | bool | float | str | None') -> str:
     return f"'{lit_value}'" if isinstance(lit_value, str) else str(lit_value)
@@ -217,7 +290,7 @@ class MessageSchemaHint(Hint):
             py_fromJsonValue_code="\n".join([
                 "from collections.abc import Mapping",
                 "if not isinstance(value, Mapping):",
-                f"    return MessageParsingError(f'Could not parse {{json.dumps(value)}} as {self.message_generator_type.__name__}')",
+                f"    return MessageParsingError(f\"Could not parse {{json.dumps(value)}} as {self.message_generator_type.__name__}\")",
                 *list(itertools.chain(*(
                     [
                         f"tmp_{field_name} =  {hint.py_fromJsonValue_function.name}(value.get('{field_name}'))",
@@ -247,6 +320,10 @@ class MessageSchemaHint(Hint):
                f"}})",
             ])
         )
+
+        # if "Url" in str(self.message_generator_type):
+        #     import pydevd; pydevd.settrace()
+        #     print("all right... lets see")
 
         self.ts_class_code = "\n".join([
            f"// Automatically generated via {MessageGenerator.__qualname__} for {self.message_generator_type.__qualname__}",
@@ -317,7 +394,7 @@ class PrimitiveHint(Hint):
             py_fromJsonValue_code="\n".join([
                 f"if isinstance(value, {'type(None)' if self.hint_type in (None, type(None)) else self.hint_type.__name__}):",
                     "    return value",
-                f"return MessageParsingError(f'Could not parse {{json.dumps(value)}} as {py_hint}')",
+                f"return MessageParsingError(f\"Could not parse {{json.dumps(value)}} as {py_hint}\")",
             ]),
             ts_fromJsonValue_code=ts_fromJsonValue_code,
         )
@@ -354,7 +431,7 @@ class NTuple(TupleHint):
             py_hint=py_hint,
             py_fromJsonValue_code="\n".join([
                 f"if not isinstance(value, (list, tuple)) or len(value) < {len(self.generic_args)}:",
-                f"    return MessageParsingError(f'Could not parse {py_hint} from {{json.dumps(value)}}')",
+                f"    return MessageParsingError(f\"Could not parse {py_hint} from {{json.dumps(value)}}\")",
                 *list(itertools.chain(*(
                     [
                         f"tmp_{arg_index} = {arg.py_fromJsonValue_function.name}(value[{arg_index}])",
@@ -413,7 +490,7 @@ class VarLenTuple(TupleHint):
             ts_hint=ts_hint,
             py_fromJsonValue_code="\n".join([
                  "if not isinstance(value, (list, tuple)):",
-                f"    return MessageParsingError(f'Could not parse {py_hint} from {{json.dumps(value)}}')",
+                f"    return MessageParsingError(f\"Could not parse {py_hint} from {{json.dumps(value)}}\")",
                 f"items: List[{self.element_type.py_hint}] = []",
                 f"for item in value:",
                 f"    parsed = {self.element_type.py_fromJsonValue_function.name}(item)",
@@ -468,7 +545,7 @@ class UnionHint(Hint):
                     ]
                     for arg_index, arg in enumerate(self.union_args)
                 ))),
-                f"return MessageParsingError(f'Could not parse {{json.dumps(value)}} into {py_hint}')"
+                f"return MessageParsingError(f\"Could not parse {{json.dumps(value)}} into {py_hint}\")"
             ]),
             ts_fromJsonValue_code="\n".join([
                 *list(itertools.chain(*(
@@ -509,12 +586,12 @@ class Color(MessageGenerator):
 
 @dataclass
 class Url(MessageGenerator):
-    datascheme: Optional[str]
+    datascheme: Optional[Literal["precomputed"]]
     protocol: Literal["http", "https", "file"]
     hostname: str
-    port: Optional[str]
+    port: Optional[int]
     path: str
-    search: str
+    search: Optional[Mapping[str, str]]
     fragment: str
 
 @dataclass
