@@ -596,8 +596,8 @@ class Url(MessageGenerator):
 
 @dataclass
 class PixelAnnotation(MessageGenerator):
-    raw_data: Url
-    points: Tuple[Tuple[float, float, float], ...]
+    raw_data_url: Url
+    points: Tuple[Tuple[int, int, int], ...]
 
 @dataclass
 class RecolorLabelParams(MessageGenerator):
@@ -619,6 +619,11 @@ class RemoveLabelParams(MessageGenerator):
     label_name: str
 
 @dataclass
-class AddAnnotationParams(MessageGenerator):
+class AddPixelAnnotationParams(MessageGenerator):
     label_name: str
-    voxels: Tuple[Tuple[float, float, float], ...]
+    pixel_annotation: PixelAnnotation
+
+@dataclass
+class RemovePixelAnnotationParams(MessageGenerator):
+    label_name: str
+    pixel_annotation: PixelAnnotation
