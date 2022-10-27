@@ -34,7 +34,7 @@ _ = GENERATED_PY_FILE.write(textwrap.dedent(f"""
         JsonObject, JsonValue, convert_to_json_value
     )
 
-    class MessageGenerator:
+    class Schema:
         pass
 
     class MessageParsingError(Exception):
@@ -269,12 +269,12 @@ class LiteralHint(Hint):
 
 
 class MessageSchemaHint(Hint):
-    message_generator_type: Type['MessageGenerator']
+    message_generator_type: Type['Schema']
     field_annotations: Mapping[str, Hint]
 
     @staticmethod
     def is_message_schema_hint(hint: Any) -> bool:
-        return hint.__class__ == type and issubclass(hint, MessageGenerator)
+        return hint.__class__ == type and issubclass(hint, Schema)
 
     def __init__(self, hint: Any) -> None:
         assert MessageSchemaHint.is_message_schema_hint(hint)
@@ -326,7 +326,7 @@ class MessageSchemaHint(Hint):
         #     print("all right... lets see")
 
         self.ts_class_code = "\n".join([
-           f"// Automatically generated via {MessageGenerator.__qualname__} for {self.message_generator_type.__qualname__}",
+           f"// Automatically generated via {Schema.__qualname__} for {self.message_generator_type.__qualname__}",
             "// Do not edit!",
            f"export class {self.message_generator_type.__name__} {{",
 
@@ -352,7 +352,7 @@ class MessageSchemaHint(Hint):
         ])
 
         self.py_class_code: str = "\n".join([
-           f"# Automatically generated via {MessageGenerator.__qualname__} for {self.message_generator_type.__qualname__}",
+           f"# Automatically generated via {Schema.__qualname__} for {self.message_generator_type.__qualname__}",
             "# Do not edit!",
             inspect.getsource(self.message_generator_type),
             "    def to_json_value(self) -> JsonObject:",
@@ -572,20 +572,22 @@ class UnionHint(Hint):
     def to_ts_toJsonValue_expr(self, value_expr: str) -> str:
         return f"toJsonValue({value_expr})"
 
-class MessageGenerator:
+##############################################################################
+
+class Schema:
     def __init_subclass__(cls):
         super().__init_subclass__()
         _ = Hint.parse(cls)
 
 
 @dataclass
-class Color(MessageGenerator):
+class Color(Schema):
     r: int
     g: int
     b: int
 
 @dataclass
-class Url(MessageGenerator):
+class Url(Schema):
     datascheme: Optional[Literal["precomputed"]]
     protocol: Literal["http", "https", "file"]
     hostname: str
@@ -595,35 +597,35 @@ class Url(MessageGenerator):
     fragment: str
 
 @dataclass
-class PixelAnnotation(MessageGenerator):
+class PixelAnnotation(Schema):
     raw_data_url: Url
     points: Tuple[Tuple[int, int, int], ...]
 
 @dataclass
-class RecolorLabelParams(MessageGenerator):
+class RecolorLabelParams(Schema):
     label_name: str
     new_color: Color
 
 @dataclass
-class RenameLabelParams(MessageGenerator):
+class RenameLabelParams(Schema):
     old_name: str
     new_name: str
 
 @dataclass
-class CreateLabelParams(MessageGenerator):
+class CreateLabelParams(Schema):
     label_name: str
     color: Color
 
 @dataclass
-class RemoveLabelParams(MessageGenerator):
+class RemoveLabelParams(Schema):
     label_name: str
 
 @dataclass
-class AddPixelAnnotationParams(MessageGenerator):
+class AddPixelAnnotationParams(Schema):
     label_name: str
     pixel_annotation: PixelAnnotation
 
 @dataclass
-class RemovePixelAnnotationParams(MessageGenerator):
+class RemovePixelAnnotationParams(Schema):
     label_name: str
     pixel_annotation: PixelAnnotation
