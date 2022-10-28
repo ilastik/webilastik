@@ -14,8 +14,17 @@ GENERATED_TS_FILE_PATH.unlink(missing_ok=True)
 GENERATED_TS_FILE = open(GENERATED_TS_FILE_PATH, "w")
 _ = GENERATED_TS_FILE.write("""
     import {
-        ensureJsonNumber, ensureJsonString, ensureJsonUndefined, ensureJsonArray, ensureJsonObject, JsonValue, JsonObject, toJsonValue
+      ensureJsonArray,
+      ensureJsonNumber,
+      ensureJsonObject,
+      ensureJsonString,
+      ensureJsonUndefined,
     } from "../util/safe_serialization";
+    import {
+      JsonObject,
+      JsonValue,
+      toJsonValue,
+    } from "../util/serialization"
 \n""")
 
 GENERATED_PY_FILE_PATH = Path(__file__).parent.parent / "webilastik/server/message_schema.py"
@@ -34,7 +43,7 @@ _ = GENERATED_PY_FILE.write(textwrap.dedent(f"""
         JsonObject, JsonValue, convert_to_json_value
     )
 
-    class Schema:
+    class Message:
         pass
 
     class MessageParsingError(Exception):
@@ -269,12 +278,12 @@ class LiteralHint(Hint):
 
 
 class MessageSchemaHint(Hint):
-    message_generator_type: Type['Schema']
+    message_generator_type: Type['Message']
     field_annotations: Mapping[str, Hint]
 
     @staticmethod
     def is_message_schema_hint(hint: Any) -> bool:
-        return hint.__class__ == type and issubclass(hint, Schema)
+        return hint.__class__ == type and issubclass(hint, Message)
 
     def __init__(self, hint: Any) -> None:
         assert MessageSchemaHint.is_message_schema_hint(hint)
@@ -326,7 +335,7 @@ class MessageSchemaHint(Hint):
         #     print("all right... lets see")
 
         self.ts_class_code = "\n".join([
-           f"// Automatically generated via {Schema.__qualname__} for {self.message_generator_type.__qualname__}",
+           f"// Automatically generated via {Message.__qualname__} for {self.message_generator_type.__qualname__}",
             "// Do not edit!",
            f"export class {self.message_generator_type.__name__} {{",
 
@@ -352,7 +361,7 @@ class MessageSchemaHint(Hint):
         ])
 
         self.py_class_code: str = "\n".join([
-           f"# Automatically generated via {Schema.__qualname__} for {self.message_generator_type.__qualname__}",
+           f"# Automatically generated via {Message.__qualname__} for {self.message_generator_type.__qualname__}",
             "# Do not edit!",
             inspect.getsource(self.message_generator_type),
             "    def to_json_value(self) -> JsonObject:",
@@ -574,58 +583,96 @@ class UnionHint(Hint):
 
 ##############################################################################
 
-class Schema:
+
+class Message:
     def __init_subclass__(cls):
         super().__init_subclass__()
         _ = Hint.parse(cls)
 
-
 @dataclass
-class Color(Schema):
+class ColorMessage(Message):
     r: int
     g: int
     b: int
 
 @dataclass
-class Url(Schema):
+class UrlMessage(Message):
     datascheme: Optional[Literal["precomputed"]]
-    protocol: Literal["http", "https", "file"]
+    protocol: Literal["http", "https", "file", "memory"]
     hostname: str
     port: Optional[int]
     path: str
     search: Optional[Mapping[str, str]]
-    fragment: str
+    fragment: Optional[str]
 
 @dataclass
-class PixelAnnotation(Schema):
-    raw_data_url: Url
+class Point5DMessage(Message):
+    x: int
+    y: int
+    z: int
+    t: int
+    c: int
+
+@dataclass
+class Shape5DMessage(Point5DMessage):
+    pass
+
+@dataclass
+class Interval5DMessage(Message):
+    start: Point5DMessage
+    stop: Point5DMessage
+
+@dataclass
+class DataSourceMessage(Message):
+    url: UrlMessage
+    interval: Interval5DMessage
+    tile_shape: Shape5DMessage
+    spatial_resolution: Tuple[int, int, int]
+
+@dataclass
+class PixelAnnotationMessage(Message):
+    raw_data: DataSourceMessage
     points: Tuple[Tuple[int, int, int], ...]
 
-@dataclass
-class RecolorLabelParams(Schema):
-    label_name: str
-    new_color: Color
+######################################################################
 
 @dataclass
-class RenameLabelParams(Schema):
+class RecolorLabelParams(Message):
+    label_name: str
+    new_color: ColorMessage
+
+@dataclass
+class RenameLabelParams(Message):
     old_name: str
     new_name: str
 
 @dataclass
-class CreateLabelParams(Schema):
+class CreateLabelParams(Message):
     label_name: str
-    color: Color
+    color: ColorMessage
 
 @dataclass
-class RemoveLabelParams(Schema):
+class RemoveLabelParams(Message):
     label_name: str
 
 @dataclass
-class AddPixelAnnotationParams(Schema):
+class AddPixelAnnotationParams(Message):
     label_name: str
-    pixel_annotation: PixelAnnotation
+    pixel_annotation: PixelAnnotationMessage
 
 @dataclass
-class RemovePixelAnnotationParams(Schema):
+class RemovePixelAnnotationParams(Message):
     label_name: str
-    pixel_annotation: PixelAnnotation
+    pixel_annotation: PixelAnnotationMessage
+
+@dataclass
+class LabelMessage(Message):
+    name: str
+    color: ColorMessage
+    annotations: Tuple[PixelAnnotationMessage, ...]
+
+@dataclass
+class BrushingAppletState(Message):
+    labels: Tuple[LabelMessage, ...]
+
+##############################################3333
