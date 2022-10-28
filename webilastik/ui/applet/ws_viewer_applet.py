@@ -260,7 +260,7 @@ class WsViewerApplet(WsApplet):
             labels = self._in_labels() or ()
             return {
                 **self.state.to_json_value(),
-                "label_colors": tuple(label.color.to_json_data() for label in labels if len(label.annotations) > 0), # FIXME
+                "label_colors": tuple(label.color.to_message().to_json_value() for label in labels if len(label.annotations) > 0), # FIXME
             }
 
     def take_snapshot(self) -> ViewsState:

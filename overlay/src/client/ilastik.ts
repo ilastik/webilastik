@@ -2,11 +2,12 @@ import { vec3 } from "gl-matrix"
 import { INativeView } from "../drivers/viewer_driver"
 import { fetchJson, sleep } from "../util/misc"
 import { Path, Url } from "../util/parsed_url"
-import { DataType, ensureDataType, Scale } from "../util/precomputed_chunks"
+import { DataType, Scale } from "../util/precomputed_chunks"
 import {
-    ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonNumberPair, ensureJsonNumberTripplet, ensureJsonObject,
-    ensureJsonString, ensureOptional, IJsonable, IJsonableObject, JsonObject, JsonValue, toJsonValue
+    ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonObject,
+    ensureJsonString, ensureOptional, IJsonable, JsonableValue, JsonObject, JsonValue, toJsonValue
 } from "../util/serialization"
+import { ColorMessage, DataSourceMessage, Interval5DMessage, Point5DMessage, Shape5DMessage } from "./message_schema"
 
 export const slurmJobStates = [
     "BOOT_FAIL", "CANCELLED", "COMPLETED", "DEADLINE", "FAILED", "NODE_FAIL", "OUT_OF_MEMORY",
@@ -236,7 +237,7 @@ export class Session{
         return Error(`Could not load project: ${await response.text()}`)
     }
 
-    public doRPC(params: {applet_name: string, method_name: string, method_arguments: IJsonableObject}){
+    public doRPC(params: {applet_name: string, method_name: string, method_arguments: JsonableValue}){
         return this.websocket.send(JSON.stringify({
             applet_name: params.applet_name,
             method_name: params.method_name,
@@ -509,21 +510,20 @@ export class Color{
         return new Color({r: channels[0], g: channels[1], b: channels[2]})
     }
 
-    public static fromJsonValue(value: JsonValue){
-        let color_object = ensureJsonObject(value)
+    public static fromMessage(message: ColorMessage): Color{
         return new Color({
-            r: ensureJsonNumber(color_object["r"]),
-            g: ensureJsonNumber(color_object["g"]),
-            b: ensureJsonNumber(color_object["b"]),
+            r: message.r,
+            g: message.g,
+            b: message.b,
         })
     }
 
-    public toJsonValue(): JsonObject{
-        return {
+    public toMessage(): ColorMessage{
+        return new ColorMessage({
             r: this.r,
             g: this.g,
             b: this.b,
-        }
+        })
     }
 
     public equals(other: Color): boolean{
@@ -532,22 +532,6 @@ export class Color{
 
     public inverse(): Color{
         return new Color({r: 255 - this.r, g: 255 - this.g, b: 255 - this.b})
-    }
-}
-
-export class Annotation{
-    public constructor(
-        public readonly voxels: Array<{x:number, y:number, z:number}>,
-        public readonly color: Color,
-        public readonly raw_data: DataSource
-    ){
-    }
-    public static fromJsonData(data: any): Annotation{
-        return new Annotation(
-            data["voxels"],
-            Color.fromJsonValue(data["color"]),
-            DataSource.fromJsonValue(data["raw_data"])
-        )
     }
 }
 
@@ -564,15 +548,18 @@ export class Point5D{
         this.x = x; this.y = y; this.z = z; this.t = t; this.c = c;
     }
 
-    public static fromJsonData(data: JsonValue){
-        let value_obj = ensureJsonObject(data)
+    public static fromMessage(message: Point5DMessage): Point5D{
         return new this({
-            x: ensureOptional(ensureJsonNumber, value_obj.x) || 0,
-            y: ensureOptional(ensureJsonNumber, value_obj.y) || 0,
-            z: ensureOptional(ensureJsonNumber, value_obj.z) || 0,
-            t: ensureOptional(ensureJsonNumber, value_obj.t) || 0,
-            c: ensureOptional(ensureJsonNumber, value_obj.c) || 0,
+            x: message.x,
+            y: message.y,
+            z: message.z,
+            t: message.t,
+            c: message.c,
         })
+    }
+
+    public toMessage(): Point5DMessage {
+        return new Point5DMessage({x: this.x, y: this.y, z: this.z, t: this.t, c: this.c})
     }
 
     public toJsonValue(): JsonValue {
@@ -585,6 +572,20 @@ export class Shape5D extends Point5D{
         x?: number, y?: number, z?: number, t?: number, c?: number
     }){
         super({x, y, z, t, c})
+    }
+
+    public static fromMessage(message: Shape5DMessage): Shape5D{
+        return new this({
+            x: message.x,
+            y: message.y,
+            z: message.z,
+            t: message.t,
+            c: message.c,
+        })
+    }
+
+    public toMessage(): Shape5DMessage {
+        return new Shape5DMessage({x: this.x, y: this.y, z: this.z, t: this.t, c: this.c})
     }
 
     public updated(params: {x?: number, y?: number, z?: number, t?: number, c?: number}): Shape5D{
@@ -648,14 +649,19 @@ export class Interval5D{
         this.stop = new Point5D({x: x[1], y: y[1], z: z[1], t: t[1], c: c[1]})
     }
 
-    public static fromJsonData(data: any){
-        let value_obj = ensureJsonObject(data)
+    public static fromMessage(message: Interval5DMessage){
         return new this({
-            x: ensureJsonNumberPair(value_obj.x),
-            y: ensureJsonNumberPair(value_obj.y),
-            z: ensureJsonNumberPair(value_obj.z),
-            t: ensureJsonNumberPair(value_obj.t),
-            c: ensureJsonNumberPair(value_obj.c),
+            x: [message.start.x, message.stop.x],
+            y: [message.start.y, message.stop.y],
+            z: [message.start.z, message.stop.z],
+            t: [message.start.t, message.stop.t],
+            c: [message.start.c, message.stop.c],
+        })
+    }
+
+    public toMessage(): Interval5DMessage{
+        return new Interval5DMessage({
+            start: this.start.toMessage(), stop: this.stop.toMessage(),
         })
     }
 
@@ -779,68 +785,48 @@ export class BucketFs extends FileSystem{
     }
 }
 
-export abstract class DataSource implements IJsonable{
-    public readonly filesystem: FileSystem
-    public readonly path: Path
-    public readonly spatial_resolution: vec3
-    public readonly shape: Shape5D
-    public readonly tile_shape: Shape5D
+export class DataSource{
     public readonly url: Url
-    public readonly dtype: DataType
+    public readonly interval: Interval5D
+    public readonly tile_shape: Shape5D
+    public readonly spatial_resolution: [number, number, number]
 
     constructor(params: {
-        filesystem: FileSystem, path: Path, shape: Shape5D, spatial_resolution?: vec3, tile_shape: Shape5D, url: Url, dtype: DataType
+        url: Url,
+        interval: Interval5D,
+        tile_shape: Shape5D,
+        spatial_resolution: [number, number, number]
     }){
-        this.filesystem = params.filesystem
-        this.path = params.path
-        this.spatial_resolution = params.spatial_resolution || vec3.fromValues(1,1,1)
-        this.shape = params.shape
-        this.tile_shape = params.tile_shape
         this.url = params.url
-        this.dtype = params.dtype
+        this.interval = params.interval
+        this.tile_shape = params.tile_shape
+        this.spatial_resolution = params.spatial_resolution
+    }
+
+    public get shape(): Shape5D{
+        return this.interval.shape
     }
 
     public get hashValue(): string{
-        return JSON.stringify(this.toJsonValue())
+        return this.url.raw
     }
 
-    public static fromJsonValue(data: JsonValue) : DataSource{
-        const data_obj = ensureJsonObject(data)
-        const class_name = ensureJsonString(data_obj["__class__"])
-        switch(class_name){
-            case "PrecomputedChunksDataSource":
-                return PrecomputedChunksDataSource.fromJsonValue(data)
-            case "SkimageDataSource":
-                return SkimageDataSource.fromJsonValue(data)
-            default:
-                throw Error(`Could not create datasource of type ${class_name}`)
-        }
+    public static fromMessage(message: DataSourceMessage) : DataSource{
+        return new DataSource({
+            url: Url.fromMessage(message.url),
+            interval: Interval5D.fromMessage(message.interval),
+            tile_shape: Shape5D.fromMessage(message.tile_shape),
+            spatial_resolution: message.spatial_resolution,
+        })
     }
 
-    public static extractBasicData(json_object: JsonObject): ConstructorParameters<typeof DataSource>[0]{
-        const spatial_resolution = json_object["spatial_resolution"]
-        return {
-            filesystem: FileSystem.fromJsonValue(json_object["filesystem"]),
-            path: Path.parse(ensureJsonString(json_object["path"])),
-            spatial_resolution: spatial_resolution === undefined ? vec3.fromValues(1,1,1) : ensureJsonNumberTripplet(spatial_resolution),
-            shape: Shape5D.fromJsonData(json_object["shape"]),
-            tile_shape: Shape5D.fromJsonData(json_object["tile_shape"]),
-            url: Url.parse(ensureJsonString(json_object["url"])),
-            dtype: ensureDataType(ensureJsonString(json_object["dtype"]))
-        }
-    }
-
-    public toJsonValue(): JsonObject{
-        return {
-            filesystem: this.filesystem.toJsonValue(),
-            path: this.path.raw,
-            spatial_resolution: [this.spatial_resolution[0], this.spatial_resolution[1], this.spatial_resolution[2]],
-            shape: this.shape.toJsonValue(),
-            tile_shape: this.tile_shape.toJsonValue(),
-            url: this.url.raw,
-            dtype: this.dtype,
-            ...this.doToJsonValue()
-        }
+    public toMessage(): DataSourceMessage{
+        return new DataSourceMessage({
+            url: this.url.toMessage(),
+            interval: this.interval.toMessage(),
+            tile_shape: this.tile_shape.toMessage(),
+            spatial_resolution: this.spatial_resolution,
+        })
     }
 
     public get resolutionString(): string{
@@ -848,17 +834,12 @@ export abstract class DataSource implements IJsonable{
     }
 
     public getDisplayString() : string{
-        return `${this.filesystem.getUrl().joinPath(this.path.raw)} (${this.resolutionString})`
+        return `${this.url.raw} (${this.resolutionString})`
     }
-
-    protected abstract doToJsonValue() : JsonObject & {__class__: string}
 
     public equals(other: DataSource): boolean{
         return (
-            this.constructor.name == other.constructor.name &&
-            this.filesystem.equals(other.filesystem) &&
-            this.path.equals(other.path) &&
-            vec3.equals(this.spatial_resolution, other.spatial_resolution)
+            this.url.equals(other.url) && vec3.equals(this.spatial_resolution, other.spatial_resolution)
         )
     }
 
@@ -880,46 +861,17 @@ export abstract class DataSource implements IJsonable{
         if("error" in payload){
             return Error(ensureJsonString(payload.error))
         }
-        return ensureJsonArray(payload["datasources"]).map(rds => DataSource.fromJsonValue(rds))
-    }
-}
-
-// Represents a single scale from precomputed chunks
-export class PrecomputedChunksDataSource extends DataSource{
-    public readonly scale: Scale
-    constructor(params: {
-        filesystem: FileSystem, path: Path, shape: Shape5D, spatial_resolution?: vec3, tile_shape: Shape5D, url: Url, scale: Scale, dtype: DataType
-    }){
-        super(params)
-        this.scale = params.scale
-    }
-
-    public static fromJsonValue(data: JsonValue) : PrecomputedChunksDataSource{
-        const data_obj = ensureJsonObject(data)
-        return new PrecomputedChunksDataSource({
-            ...DataSource.extractBasicData(data_obj),
-            scale: Scale.fromJsonValue(data_obj["scale"]),
-        })
-    }
-
-    protected doToJsonValue() : JsonObject & {__class__: string}{
-        return {
-            __class__: "PrecomputedChunksDataSource",
-            scale: this.scale.toJsonValue(),
+        //FIXME: maybe fix this array processing? This should probably be a Message itself
+        const out = new Array<DataSource>()
+        const rawArray = ensureJsonArray(payload);
+        for(let item of rawArray){
+            let datasourceResult = DataSourceMessage.fromJsonValue(item)
+            if(datasourceResult instanceof Error){
+                return datasourceResult
+            }
+            out.push(DataSource.fromMessage(datasourceResult))
         }
-    }
-}
-
-export class SkimageDataSource extends DataSource{
-    public static fromJsonValue(data: JsonValue) : SkimageDataSource{
-        const data_obj = ensureJsonObject(data)
-        return new SkimageDataSource({
-            ...DataSource.extractBasicData(data_obj),
-        })
-    }
-
-    protected doToJsonValue() : JsonObject & {__class__: string}{
-        return { __class__: "SkimageDataSource"}
+        return out
     }
 }
 
@@ -1095,7 +1047,11 @@ export class RawDataView extends DataView{
         return new RawDataView({
             name: ensureJsonString(value_obj["name"]),
             url: Url.parse(ensureJsonString(value_obj["url"])),
-            datasources: ensureJsonArray(value_obj["datasources"]).map(raw_ds => DataSource.fromJsonValue(raw_ds))
+            datasources: ensureJsonArray(value_obj["datasources"]).map(raw_ds => {
+                const datasource_message = DataSourceMessage.fromJsonValue(raw_ds)
+                if(datasource_message instanceof Error){throw `FIXME`}
+                return DataSource.fromMessage(datasource_message)
+            })
         })
     }
 
@@ -1113,10 +1069,14 @@ export class StrippedPrecomputedView extends DataView{
 
     public static fromJsonValue(value: JsonValue): StrippedPrecomputedView {
         const value_obj = ensureJsonObject(value)
+        const datasource_message = DataSourceMessage.fromJsonValue(value_obj["datasource"])
+        if(datasource_message instanceof Error){
+            throw `FIXME`
+        }
         return new StrippedPrecomputedView({
             name: ensureJsonString(value_obj["name"]),
             url: Url.parse(ensureJsonString(value_obj["url"])),
-            datasource: DataSource.fromJsonValue(value_obj["datasource"]),
+            datasource: DataSource.fromMessage(datasource_message),
         })
     }
 
@@ -1136,10 +1096,14 @@ export class PredictionsView extends View{
 
     public static fromJsonValue(value: JsonValue): PredictionsView {
         const value_obj = ensureJsonObject(value)
+        const raw_data_message = DataSourceMessage.fromJsonValue(value_obj["raw_data"])
+        if(raw_data_message instanceof Error){
+            throw `FIXME`
+        }
         return new PredictionsView({
             name: ensureJsonString(value_obj["name"]),
             url: Url.parse(ensureJsonString(value_obj["url"])),
-            raw_data: DataSource.fromJsonValue(value_obj["raw_data"]),
+            raw_data: DataSource.fromMessage(raw_data_message),
             classifier_generation: ensureJsonNumber(value_obj["classifier_generation"]),
         })
     }

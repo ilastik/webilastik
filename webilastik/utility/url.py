@@ -105,7 +105,7 @@ class Url:
         return parsed
 
     @classmethod
-    def from_url_message(cls, url_message: message_schema.UrlMessage) -> 'Url':
+    def from_message(cls, url_message: message_schema.UrlMessage) -> 'Url':
         return Url(
             datascheme=url_message.datascheme,
             protocol=url_message.protocol,

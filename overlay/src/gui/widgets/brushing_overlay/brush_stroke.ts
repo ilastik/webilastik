@@ -1,11 +1,11 @@
 import { quat, vec3 } from "gl-matrix";
 import { Color, DataSource } from "../../../client/ilastik";
+import { PixelAnnotationMessage } from "../../../client/message_schema";
 import { VecAttributeBuffer, BufferUsageHint } from "../../../gl/buffer";
 import { VertexArray } from "../../../gl/vertex_primitives";
-import { ensureJsonObject, IJsonable, JsonObject, JsonValue} from "../../../util/serialization";
 // import { vec3ToString } from "./utils";
 
-export class BrushStroke extends VertexArray implements IJsonable{
+export class BrushStroke extends VertexArray{
     public readonly camera_orientation: quat
     public num_points : number
     public readonly positions_buffer: VecAttributeBuffer<3, Float32Array>
@@ -85,38 +85,37 @@ export class BrushStroke extends VertexArray implements IJsonable{
         this.positions_buffer.destroy()
     }
 
-    public toJsonValue(): JsonObject{
-        let raw_voxels: Array<{x: number, y: number, z: number}> = []
+    public toMessage(): PixelAnnotationMessage{
+        let raw_voxels: Array<[number, number, number]> = []
         for(let i=0; i<this.num_points; i++){
             let vert = this.getVertRef(i)
-            raw_voxels.push({x: vert[0], y: vert[1], z: vert[2]})
+            raw_voxels.push([vert[0], vert[1], vert[2]])
         }
 
-        return {
-            "voxels": raw_voxels,
-            "raw_data": this.annotated_data_source.toJsonValue(),
-            "camera_orientation": [
-                this.camera_orientation[0], this.camera_orientation[1], this.camera_orientation[2], this.camera_orientation[3],
-            ],
-        }
+        return new PixelAnnotationMessage({
+            points: raw_voxels,
+            raw_data: this.annotated_data_source.toMessage(),
+            // "camera_orientation": [
+                // this.camera_orientation[0], this.camera_orientation[1], this.camera_orientation[2], this.camera_orientation[3],
+            // ],
+
+        })
     }
 
-    public static fromJsonValue(gl: WebGL2RenderingContext, value: JsonValue): BrushStroke{
-        let raw = ensureJsonObject(value)
+    public static fromMessage(gl: WebGL2RenderingContext, message: PixelAnnotationMessage): BrushStroke{
         //FIXME: better error checking
-        let voxels = (raw["voxels"] as Array<any>).map(v => vec3.fromValues(v["x"], v["y"], v["z"]));
         let camera_orientation: quat;
-        if("camera_orientation" in raw){
-            let raw_camera_orientation = raw["camera_orientation"] as Array<number>;
-            camera_orientation = quat.fromValues(
-                raw_camera_orientation[0], raw_camera_orientation[1], raw_camera_orientation[2], raw_camera_orientation[3]
-            )
-        }else{
+        // if("camera_orientation" in message){
+        //     let raw_camera_orientation = message["camera_orientation"] as Array<number>;
+        //     camera_orientation = quat.fromValues(
+        //         raw_camera_orientation[0], raw_camera_orientation[1], raw_camera_orientation[2], raw_camera_orientation[3]
+        //     )
+        // }else{
             camera_orientation = quat.create()
-        }
-        let annotated_data_source = DataSource.fromJsonValue(raw["raw_data"])
+        // }
+        let annotated_data_source = DataSource.fromMessage(message.raw_data)
         return new BrushStroke({
-            gl, points_vx: voxels, camera_orientation, annotated_data_source
+            gl, points_vx: message.points, camera_orientation, annotated_data_source
         })
     }
 }

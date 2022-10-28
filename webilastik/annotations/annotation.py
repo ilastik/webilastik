@@ -10,6 +10,9 @@ from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonA
 from webilastik.datasource import DataSource, DataRoi, FsDataSource
 from webilastik.features.feature_extractor import FeatureExtractor, FeatureData
 from executor_getter import get_executor
+from webilastik.server.message_schema import ColorMessage, MessageParsingError, PixelAnnotationMessage
+from webilastik.ui.datasource import try_get_datasources_from_url
+from webilastik.utility.url import Protocol, Url
 
 
 class Color:
@@ -36,12 +39,8 @@ class Color:
             b=np.uint8(ensureJsonInt(data_dict.get("b", 0))),
         )
 
-    def to_json_data(self) -> JsonObject:
-        return {
-            "r": int(self.r),
-            "g": int(self.g),
-            "b": int(self.b),
-        }
+    def to_message(self) -> ColorMessage:
+        return ColorMessage(r=int(self.r), g=int(self.g), b=int(self.b))
 
     @classmethod
     def from_channels(cls, channels: List[np.uint8], name: str = "") -> "Color":
@@ -186,6 +185,48 @@ class Annotation(ScalarData):
             scribblings.paint_point(point=voxel, value=True)
 
         return cls(scribblings._data, axiskeys=scribblings.axiskeys, raw_data=raw_data, location=start)
+
+    @classmethod
+    def from_message(
+        cls,
+        message: PixelAnnotationMessage,
+        allowed_protocols: Sequence[Protocol] = ("http", "https"),
+    ) -> "Annotation | MessageParsingError":
+        raw_data_result = FsDataSource.try_from_message(message.raw_data, allowed_protocols=allowed_protocols)
+        if isinstance(raw_data_result, MessageParsingError):
+            return raw_data_result
+
+        # FIXME: do sothing more efficient than this
+        voxels = [Point5D(x=raw_point[0], y=raw_point[1], z=raw_point[2]) for raw_point in message.points]
+        start = Point5D.min_coords(voxels)
+        stop = Point5D.max_coords(voxels) + 1  # +1 because slice.stop is exclusive, but max_point isinclusive
+        scribbling_roi = Interval5D.create_from_start_stop(start=start, stop=stop)
+        if scribbling_roi.shape.c != 1:
+            return MessageParsingError(f"Annotations must not span multiple channels: {voxels}")
+        if not raw_data_result.roi.contains(scribbling_roi):
+            return MessageParsingError(f"Annotations can't overstep the boudns of the image they annotate")
+        scribblings = Array5D.allocate(scribbling_roi, dtype=np.dtype(bool), value=False)
+
+        for voxel in voxels:
+            scribblings.paint_point(point=voxel, value=True)
+
+        return cls(scribblings._data, axiskeys=scribblings.axiskeys, raw_data=raw_data_result, location=start)
+
+    def to_message(self) -> PixelAnnotationMessage:
+        if not isinstance(self.raw_data, FsDataSource):
+            #FIXME: maybe create a FsDatasourceAnnotation so we don't have to raise here?
+            raise ValueError(f"Can't serialize annotation over {self.raw_data}")
+
+        return PixelAnnotationMessage(
+            raw_data=self.raw_data.to_message(),
+            points=self.to_raw_points(),
+        )
+
+    def to_raw_points(self) -> Tuple[Tuple[int, int, int], ...]:
+        raw_offset = (self.location.x, self.location.y, self.location.z)
+        # FIXME: annotation should probably not be an Array5D
+        return tuple((x, y, z) + raw_offset for x, y, z in zip(*self.raw("xyz").nonzero())) # type: ignore
+
 
     def to_points(self) -> Iterable[Point5D]:
         # FIXME: annotation should probably not be an Array6D

@@ -1,9 +1,10 @@
 import { vec3 } from "gl-matrix";
 import { Applet } from "../../../client/applets/applet";
 import { Color, DataSource, Session } from "../../../client/ilastik";
+import * as schema from "../../../client/message_schema";
 import { HashMap } from "../../../util/hashmap";
 import { createElement, createInput, createInputParagraph, InlineCss, removeElement, vecToString } from "../../../util/misc";
-import { ensureJsonArray, ensureJsonObject, ensureJsonString, JsonValue } from "../../../util/serialization";
+import { JsonValue } from "../../../util/serialization";
 import { CssClasses } from "../../css_classes";
 import { ColorPicker } from "../color_picker";
 import { ErrorPopupWidget, PopupWidget } from "../popup";
@@ -12,7 +13,29 @@ import { BrushStroke } from "./brush_stroke";
 
 export type resolution = vec3;
 
-type Label = {name: string, color: Color, annotations: BrushStroke[]}
+class Label{
+    public readonly name: string
+    public readonly color: Color
+    public readonly annotations: BrushStroke[]
+
+    public constructor(params: {
+        name: string,
+        color: Color,
+        annotations: BrushStroke[],
+    }){
+        this.name = params.name
+        this.color = params.color
+        this.annotations = params.annotations
+    }
+
+    public static fromMessage(gl: WebGL2RenderingContext, message: schema.LabelMessage): Label{
+        return new Label({
+            annotations: message.annotations.map(a => BrushStroke.fromMessage(gl, a)),
+            color: Color.fromMessage(message.color),
+            name: message.name,
+        })
+    }
+}
 
 type State = {labels: Array<Label>}
 
@@ -37,17 +60,11 @@ export class BrushingApplet extends Applet<State>{
         super({
             name: params.applet_name,
             deserializer: (value: JsonValue) => {
-                let data_obj = ensureJsonObject(value)
-                return {
-                    labels: ensureJsonArray(data_obj["labels"]).map(raw_label_class => {
-                        let label_class = ensureJsonObject(raw_label_class)
-                        return {
-                            name: ensureJsonString(label_class["name"]),
-                            color: Color.fromJsonValue(label_class["color"]),
-                            annotations: ensureJsonArray(label_class["annotations"]).map(raw_annot => BrushStroke.fromJsonValue(params.gl, raw_annot))
-                        }
-                    })
+                const state = schema.BrushingAppletState.fromJsonValue(value)
+                if(state instanceof Error){
+                    throw `FIXME`
                 }
+                return {labels: state.labels.map(l => Label.fromMessage(params.gl, l))}
             },
             session: params.session,
             onNewState: (new_state) => this.onNewState(new_state)
@@ -77,7 +94,10 @@ export class BrushingApplet extends Applet<State>{
                 }else if(this.labelWidgets.has(labelNameInput.value)){
                     new ErrorPopupWidget({message: `There is already a label with color ${colorPicker.value.hexCode}`})
                 }else {
-                    this.doRPC("create_label",  {label_name: labelNameInput.value, color: colorPicker.value})
+                    this.doRPC("create_label",  new schema.CreateLabelParams({
+                        label_name: labelNameInput.value,
+                        color: colorPicker.value.toMessage()
+                    }))
                     popup.destroy()
                 }
                 //don't submit synchronously
@@ -122,7 +142,9 @@ export class BrushingApplet extends Applet<State>{
         }
         //Mask communication delay by updating GUI immediately
         this.onNewState(newState)
-        this.doRPC("add_annotation", {label_name: currentLabelWidget.name, color: currentLabelWidget.color, annotation: brushStroke})
+        this.doRPC("add_annotation", new schema.AddPixelAnnotationParams({
+            label_name: currentLabelWidget.name, pixel_annotation: brushStroke.toMessage()
+        }))
     }
 
     private onNewState(newState: State){
@@ -139,7 +161,7 @@ export class BrushingApplet extends Applet<State>{
                 parentElement: this.element,
                 color,
                 brushStrokes: annotations,
-                onLabelDeleteClicked: (labelName: string) => this.doRPC("remove_label", {label_name: labelName}),
+                onLabelDeleteClicked: (labelName: string) => this.doRPC("remove_label", new schema.RemoveLabelParams({label_name: labelName})),
                 onLabelSelected: (label: Label) => {
                     if(this.labelSelector){
                         this.labelSelector.value = label
@@ -149,14 +171,16 @@ export class BrushingApplet extends Applet<State>{
                     }
                 },
                 onBrushStrokeDeleteClicked: (_color, brushStroke) => this.doRPC(
-                    "remove_annotation", {label_name: name, annotation: brushStroke}
+                    "remove_annotation", new schema.RemovePixelAnnotationParams({
+                        label_name: name, pixel_annotation: brushStroke.toMessage()
+                    })
                 ),
                 onColorChange: (newColor: Color) => {
-                    this.doRPC("recolor_label", {label_name: name, new_color: newColor})
+                    this.doRPC("recolor_label", new schema.RecolorLabelParams({label_name: name, new_color: newColor.toMessage()}))
                     return true
                 },
                 onNameChange: (newName: string) => {
-                    this.doRPC("rename_label", {old_name: name, new_name: newName})
+                    this.doRPC("rename_label", new schema.RenameLabelParams({old_name: name, new_name: newName}))
                 },
                 onDataSourceClicked: this.onDataSourceClicked,
             })
