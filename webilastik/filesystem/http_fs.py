@@ -32,7 +32,7 @@ class HttpFs(JsonableFilesystem):
         self.read_url = read_url
         self.write_url = write_url or read_url
 
-        if not set([self.read_url.protocol, self.write_url.protocol]).issubset([Protocol.HTTP, Protocol.HTTPS]):
+        if not set([self.read_url.protocol, self.write_url.protocol]).issubset(["http", "https"]):
             raise ValueError("Can only handle http procotols")
         self.requests_verify: Union[str, bool] = os.environ.get("CA_CERT_PATH", True)
         if isinstance(self.requests_verify, str) and not Path(self.requests_verify).exists():
@@ -44,7 +44,7 @@ class HttpFs(JsonableFilesystem):
 
     @classmethod
     def try_from_url(cls, url: Url) -> "HttpFs | UsageError":
-        if url.protocol not in (Protocol.HTTP, Protocol.HTTPS):
+        if url.protocol not in ("http", "https"):
             return UsageError(f"Bad url for HttpFs: {url}")
         return HttpFs(read_url=url)
 

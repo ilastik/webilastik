@@ -18,7 +18,7 @@ def try_get_datasources_from_url(
     *,
     url: Union[Url, str],
     ebrains_user_token: Optional[UserToken] = None,
-    allowed_protocols: Sequence[Protocol] = (Protocol.HTTP, Protocol.HTTPS)
+    allowed_protocols: Sequence[Protocol] = ("http", "https")
 ) -> "Sequence[FsDataSource] | None | Exception":
     if isinstance(url, str):
         parsing_result = parse_url(url)

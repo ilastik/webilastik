@@ -25,7 +25,8 @@ from webilastik.utility.url import Url, Protocol as UrlProtocol
 
 
 def get_requested_url(request: web.Request) -> Url:
-    protocol = UrlProtocol.from_str(request.headers['X-Forwarded-Proto'])
+    protocol = request.headers['X-Forwarded-Proto'].lower()
+    assert protocol == "http" or protocol == "https"
     host = request.headers['X-Forwarded-Host']
     if ":" in host:
         hostname, port_str = host.split(":")

@@ -21,7 +21,7 @@ from webilastik.ui.applet.brushing_applet import Label
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.usage_error import UsageError
 
-from webilastik.utility.url import DataScheme, Url, Protocol
+from webilastik.utility.url import Url, Protocol
 from webilastik.datasource import FsDataSource
 from webilastik.ui.applet import AppletOutput, CascadeError, CascadeOk, CascadeResult, UserPrompt, cascade
 from webilastik.ui.datasource import try_get_datasources_from_url
@@ -69,7 +69,7 @@ class StrippedPrecomputedView(DataView):
         super().__init__(
             name=name,
             url=session_url.updated_with(
-                datascheme=DataScheme.PRECOMPUTED
+                datascheme="precomputed",
             ).concatpath(f"stripped_precomputed/url={all_scales_url.to_base64()}/resolution={resolution_str}"),
         )
 
@@ -124,7 +124,7 @@ class PredictionsView(View):
         super().__init__(
             name=name,
             url=session_url.updated_with(
-                datascheme=DataScheme.PRECOMPUTED # FIXME: this assumes neuroglancer as the viewer
+                datascheme="precomputed" # FIXME: this assumes neuroglancer as the viewer
             ).concatpath(f"predictions/raw_data={raw_data.url.to_base64()}/generation={classifier_generation}"),
         )
 
@@ -371,7 +371,7 @@ class WsViewerApplet(WsApplet):
             view = self.cached_views.get(url)
             if view:
                 return web.json_response(view.to_json_value(), status=200)
-            if url.datascheme == DataScheme.PRECOMPUTED:
+            if url.datascheme == "precomputed":
                 for view in self.state.data_views.values():
                     if isinstance(view, RawDataView):
                         for ds in view.datasources:
@@ -382,13 +382,13 @@ class WsViewerApplet(WsApplet):
                         return web.json_response(view.to_json_value(), status=200)
         view = await asyncio.wrap_future(self.executor.submit(
             _try_open_data_view,
-            name=view_name, url=url, session_url=self.session_url, allowed_protocols=[Protocol.HTTPS, Protocol.HTTP]
+            name=view_name, url=url, session_url=self.session_url, allowed_protocols=["https", "http"]
         ))
         return web.json_response(view.to_json_value(), status=200)
 
 
 def _try_open_data_view(
-    *, name: str, url: Url, session_url: Url, allowed_protocols: Sequence[Protocol] = (Protocol.HTTPS, Protocol.HTTP)
+    *, name: str, url: Url, session_url: Url, allowed_protocols: Sequence[Protocol] = ("https", "http")
 ) -> "DataView":
     stripped_view_result = StrippedPrecomputedView.try_from_url(name=name, url=url, session_url=session_url, allowed_protocols=allowed_protocols)
     if isinstance(stripped_view_result, Exception):

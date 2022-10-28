@@ -212,7 +212,7 @@ class WebIlastik:
             url = Url.from_base64(match.group("url"))
             selected_resolution = tuple(int(axis) for axis in match.group("resolution").split("_"))
 
-        datasources_result = try_get_datasources_from_url(url=url, allowed_protocols=(Protocol.HTTP, Protocol.HTTPS))
+        datasources_result = try_get_datasources_from_url(url=url, allowed_protocols=("http", "https"))
         if isinstance(datasources_result, Exception):
             return web.json_response({"error": str(datasources_result)}, status=400)
         if isinstance(datasources_result, type(None)):
@@ -364,7 +364,7 @@ class WebIlastik:
             on_async_change=lambda: self.enqueue_user_interaction(user_interaction=lambda: None), #FIXME?
             executor=self.executor,
             priority_executor=self.priority_executor,
-            allowed_protocols=(Protocol.HTTP, Protocol.HTTPS),
+            allowed_protocols=("http", "https"),
             session_url=self.session_url,
         )
         if isinstance(new_workflow_result, Exception):

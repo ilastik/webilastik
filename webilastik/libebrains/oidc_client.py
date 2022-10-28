@@ -8,7 +8,7 @@ import uuid
 
 from ndstructs.utils.json_serializable import JsonValue, ensureJsonString
 
-from webilastik.utility.url import Url, Protocol
+from webilastik.utility.url import Url
 
 class Scope(enum.Enum):
     # This scope is required because we use the OIDC protocol. It will give your app access to the
@@ -69,7 +69,7 @@ class OidcClient:
         scopes = scopes or set()
 
         return Url(
-            protocol=Protocol.HTTPS,
+            protocol="https",
             hostname="iam.ebrains.eu",
             path=PurePosixPath("/auth/realms/hbp/protocol/openid-connect/auth"),
             search={

@@ -43,7 +43,7 @@ class JsonableFilesystem(FS, IJsonable):
         from webilastik.filesystem.bucket_fs import BucketFs
         from webilastik.filesystem.http_fs import HttpFs
 
-        if url.protocol == Protocol.FILE:
+        if url.protocol == "file":
             return OsFs(url.path.as_posix())
         if url.raw.startswith(BucketFs.API_URL.raw):
             return BucketFs.try_from_url(url=url)

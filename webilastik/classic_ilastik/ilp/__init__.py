@@ -301,9 +301,9 @@ class IlpInfoClassName(enum.Enum):
 
     @classmethod
     def from_url(cls, url: Url) -> "IlpInfoClassName":
-        if url.protocol == Protocol.HTTP or url.protocol == Protocol.HTTPS:
+        if url.protocol == "http" or url.protocol == "https":
             return cls.URL_DATASET_INFO
-        if url.protocol == Protocol.FILE:
+        if url.protocol == "file":
             return cls.FILESYSTEM_DATASET_INFO
         else:
             return cls.PRELOADED_ARRAY_DATASET_INFO
@@ -414,7 +414,7 @@ class IlpDatasetInfo:
         *,
         ilp_fs: JsonableFilesystem,
         ilp_path: PurePosixPath,
-        allowed_protocols: Sequence[Protocol] = (Protocol.HTTP, Protocol.HTTPS)
+        allowed_protocols: Sequence[Protocol] = ("http", "https")
     ) -> "FsDataSource | Exception":
         url = Url.parse(self.filePath)
         if url is None: # filePath was probably a path, not an URL
@@ -502,7 +502,7 @@ class IlpInputDataGroup:
         role_name: str,
         ilp_fs: JsonableFilesystem,
         ilp_path: PurePosixPath,
-        allowed_protocols: Sequence[Protocol] = (Protocol.HTTP, Protocol.HTTPS)
+        allowed_protocols: Sequence[Protocol] = ("http", "https")
     ) -> "Dict[int, 'FsDataSource | None'] | Exception":
         infos = [lane.roles[role_name] for lane in self.lanes]
         raw_data_datasources: Dict[int, "FsDataSource | None"] = {}

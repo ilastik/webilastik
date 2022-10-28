@@ -110,7 +110,7 @@ class DataProxySession:
         return self._do_request("delete", url)
 
 class BucketFs(JsonableFilesystem):
-    API_URL = Url(protocol=Protocol.HTTPS, hostname="data-proxy.ebrains.eu", path=PurePosixPath("/api/v1/buckets"))
+    API_URL = Url(protocol="https", hostname="data-proxy.ebrains.eu", path=PurePosixPath("/api/v1/buckets"))
 
     def __init__(self, bucket_name: str, prefix: PurePosixPath):
         self.bucket_name = bucket_name
