@@ -104,6 +104,7 @@ tasks:
       - npm run build-with-ilastik-overlay
 
   compile-overlay:
+    deps: [generate-message-schemas]
     dir: "{{.OVERLAY_DIR}}"
     sources:
       - "{{.OVERLAY_DIR}}/package-lock.json"
