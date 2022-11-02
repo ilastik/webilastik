@@ -226,7 +226,7 @@ class WsBrushingApplet(WsApplet, BrushingApplet):
             annotation_result = Annotation.from_message(remove_pixel_annotation_params.pixel_annotation)
             if isinstance(annotation_result, Exception):
                 return UsageError(str(annotation_result)) # FIXME: this would be a bug, not an usage error
-            return UsageError.check(self.add_annotation(
+            return UsageError.check(self.remove_annotation(
                 user_prompt,
                 label_name=remove_pixel_annotation_params.label_name,
                 annotation=annotation_result,

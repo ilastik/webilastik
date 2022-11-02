@@ -11,8 +11,7 @@ import time
 from concurrent.futures import Executor, Future
 import functools
 
-from ndstructs.utils.json_serializable import JsonObject
-
+from webilastik.server.message_schema import JobMessage
 from webilastik.utility import PeekableIterator
 
 IN = TypeVar("IN", covariant=True)
@@ -108,17 +107,17 @@ class Job(Generic[IN, OUT]):
             self._status = "cancelled"
         return True
 
-    def to_json_value(self) -> JsonObject:
+    def to_message(self) -> JobMessage:
         error_message: "str | None" = None
         with self.job_lock:
-            return {
-                "name": self.name,
-                "num_args": self.num_args,
-                "uuid": str(self.uuid),
-                "status": self._status,
-                "num_completed_steps": self.num_completed_steps,
-                "error_message": error_message
-            }
+            return JobMessage(
+                name=self.name,
+                num_args=self.num_args,
+                uuid=str(self.uuid),
+                status=self._status,
+                num_completed_steps=self.num_completed_steps,
+                error_message=error_message
+            )
 
     def __lt__(self, other: object) -> bool:
         if isinstance(other, (_Shutdown, _Task)):

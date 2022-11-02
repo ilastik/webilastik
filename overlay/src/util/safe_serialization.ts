@@ -2,8 +2,8 @@ import { JsonValue, JsonObject, isJsonableObject, JsonArray, isJsonableArray } f
 
 
 export function ensureJsonUndefined(value: JsonValue): undefined | Error{
-    if(value === undefined || value === null){ //FIXME? null AND undefined?
-        return Error(`Expected boolean, found ${JSON.stringify(value)}`)
+    if(value !== undefined && value !== null){ //FIXME? null AND undefined?
+        return Error(`Expected undefined/null, found ${JSON.stringify(value)}`)
     }
     return undefined
 }

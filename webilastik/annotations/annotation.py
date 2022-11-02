@@ -197,20 +197,10 @@ class Annotation(ScalarData):
             return raw_data_result
 
         # FIXME: do sothing more efficient than this
-        voxels = [Point5D(x=raw_point[0], y=raw_point[1], z=raw_point[2]) for raw_point in message.points]
-        start = Point5D.min_coords(voxels)
-        stop = Point5D.max_coords(voxels) + 1  # +1 because slice.stop is exclusive, but max_point isinclusive
-        scribbling_roi = Interval5D.create_from_start_stop(start=start, stop=stop)
-        if scribbling_roi.shape.c != 1:
-            return MessageParsingError(f"Annotations must not span multiple channels: {voxels}")
-        if not raw_data_result.roi.contains(scribbling_roi):
-            return MessageParsingError(f"Annotations can't overstep the boudns of the image they annotate")
-        scribblings = Array5D.allocate(scribbling_roi, dtype=np.dtype(bool), value=False)
-
-        for voxel in voxels:
-            scribblings.paint_point(point=voxel, value=True)
-
-        return cls(scribblings._data, axiskeys=scribblings.axiskeys, raw_data=raw_data_result, location=start)
+        return Annotation.from_voxels(
+            voxels=[Point5D(x=raw_point[0], y=raw_point[1], z=raw_point[2]) for raw_point in message.points],
+            raw_data=raw_data_result,
+        )
 
     def to_message(self) -> PixelAnnotationMessage:
         if not isinstance(self.raw_data, FsDataSource):
@@ -223,9 +213,10 @@ class Annotation(ScalarData):
         )
 
     def to_raw_points(self) -> Tuple[Tuple[int, int, int], ...]:
-        raw_offset = (self.location.x, self.location.y, self.location.z)
-        # FIXME: annotation should probably not be an Array5D
-        return tuple((x, y, z) + raw_offset for x, y, z in zip(*self.raw("xyz").nonzero())) # type: ignore
+        return tuple(
+            (int(x) + self.location.x, int(y) + self.location.y, int(z) + self.location.z)
+            for x, y, z in zip(*self.raw("xyz").nonzero()) # type: ignore
+        )
 
 
     def to_points(self) -> Iterable[Point5D]:

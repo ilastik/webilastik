@@ -6,7 +6,8 @@ from typing import Any, ClassVar, Dict, Literal, Optional, Sequence, Type, Tuple
 from pathlib import Path
 from dataclasses import dataclass
 import textwrap
-from ndstructs.point5D import itertools
+
+from ndstructs.point5D import Interval5D, Point5D, Shape5D, itertools
 
 
 GENERATED_TS_FILE_PATH = Path(__file__).parent.parent / "overlay/src/client/message_schema.ts"
@@ -42,6 +43,8 @@ _ = GENERATED_PY_FILE.write(textwrap.dedent(f"""
     from webilastik.serialization.json_serialization import (
         JsonObject, JsonValue, convert_to_json_value
     )
+
+    from ndstructs.point5D import Point5D, Shape5D, Interval5D
 
     class Message:
         pass
@@ -613,14 +616,39 @@ class Point5DMessage(Message):
     t: int
     c: int
 
+    @classmethod
+    def from_point5d(cls, point: Point5D) -> "Point5DMessage":
+        return Point5DMessage(
+            x=point.x,
+            y=point.y,
+            z=point.z,
+            t=point.t,
+            c=point.c,
+        )
+
 @dataclass
 class Shape5DMessage(Point5DMessage):
-    pass
+    @classmethod
+    def from_shape5d(cls, shape: Shape5D) -> "Shape5DMessage":
+        return Shape5DMessage(
+            x=shape.x,
+            y=shape.y,
+            z=shape.z,
+            t=shape.t,
+            c=shape.c,
+        )
 
 @dataclass
 class Interval5DMessage(Message):
     start: Point5DMessage
     stop: Point5DMessage
+
+    @classmethod
+    def from_interval5d(cls, interval: Interval5D) -> 'Interval5DMessage':
+        return Interval5DMessage(
+            start=Point5DMessage.from_point5d(interval.start),
+            stop=Point5DMessage.from_point5d(interval.stop)
+        )
 
 @dataclass
 class DataSourceMessage(Message):
@@ -676,3 +704,64 @@ class BrushingAppletState(Message):
     labels: Tuple[LabelMessage, ...]
 
 ##############################################3333
+
+@dataclass
+class ViewMessage(Message):
+    name: str
+    url: UrlMessage
+
+@dataclass
+class DataView(ViewMessage):
+    pass
+
+@dataclass
+class RawDataViewMessage(ViewMessage):
+    datasources: Tuple[DataSourceMessage, ...]
+
+@dataclass
+class StrippedPrecomputedViewMessage(ViewMessage):
+    datasource: DataSourceMessage
+
+@dataclass
+class PredictionsViewMessage(ViewMessage):
+    raw_data: DataSourceMessage
+    classifier_generation: int
+
+@dataclass
+class FailedViewMessage(ViewMessage):
+    error_message: str
+
+@dataclass
+class UnsupportedDatasetViewMessage(ViewMessage):
+    pass
+
+DataViewUnion = Union[RawDataViewMessage, StrippedPrecomputedViewMessage, FailedViewMessage, UnsupportedDatasetViewMessage]
+
+@dataclass
+class ViewerAppletStateMessage(Message):
+    frontend_timestamp: int
+    data_views: Tuple[Union[RawDataViewMessage, StrippedPrecomputedViewMessage, FailedViewMessage, UnsupportedDatasetViewMessage], ...]
+    prediction_views: Tuple[PredictionsViewMessage, ...]
+    label_colors: Tuple[ColorMessage, ...]
+
+@dataclass
+class MakeDataViewParams(Message):
+    view_name: str
+    url: UrlMessage
+
+##################################################3
+
+@dataclass
+class JobMessage(Message):
+    name: str
+    num_args: Optional[int]
+    uuid: str
+    status: Literal["pending", "running", "cancelled", "failed", "succeeded"]
+    num_completed_steps: int
+    error_message: Optional[str]
+
+@dataclass
+class PixelClassificationExportAppletMessage(Message):
+    jobs: Tuple[JobMessage, ...]
+    num_classes: Optional[int]
+    datasource_suggestions: Optional[Tuple[DataSourceMessage, ...]]

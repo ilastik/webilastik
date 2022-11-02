@@ -14,6 +14,8 @@ from webilastik.datasource import DataRoi, DataSource, FsDataSource
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.operator import IN, Operator
 from webilastik.scheduling.job import Job, JobFailedCallback, JobSucceededCallback, PriorityExecutor, IN as JOB_IN, OUT as JOB_OUT
+from webilastik.serialization.json_serialization import JsonValue
+from webilastik.server.message_schema import PixelClassificationExportAppletMessage
 from webilastik.simple_segmenter import SimpleSegmenter
 from webilastik.ui.applet import AppletOutput, StatelesApplet, UserPrompt
 from webilastik.ui.applet.ws_applet import WsApplet
@@ -193,12 +195,12 @@ class WsPixelClassificationExportApplet(WsApplet, PixelClassificationExportApple
             raise ValueError(f"Invalid method name: '{method_name}'")
         return rpc_result
 
-    def _get_json_state(self) -> JsonObject:
+    def _get_json_state(self) -> JsonValue:
         with self._lock:
             classifier = self._in_operator()
             datasource_suggestions = self._in_datasource_suggestions()
-            return {
-                "jobs": tuple(job.to_json_value() for job in self._jobs.values()),
-                "num_classes":  classifier and classifier.num_classes,
-                "datasource_suggestions": None if datasource_suggestions is None else tuple(ds.to_json_value() for ds in datasource_suggestions)
-            }
+            return PixelClassificationExportAppletMessage(
+                jobs=tuple(job.to_message() for job in self._jobs.values()),
+                num_classes= classifier and classifier.num_classes,
+                datasource_suggestions=None if datasource_suggestions is None else tuple(ds.to_message() for ds in datasource_suggestions)
+            ).to_json_value()
