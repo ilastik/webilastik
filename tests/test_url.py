@@ -1,14 +1,14 @@
 # pyright: strict
 
 from pathlib import PurePosixPath
-from webilastik.utility.url import Url, DataScheme, Protocol
+from webilastik.utility.url import Url
 
 def test_url_basics():
     raw = "precomputed://http://some.host.com/some/path?a=123&b=456#myhash"
     url = Url.parse(raw)
     assert url is not None
-    assert url.datascheme == DataScheme.PRECOMPUTED
-    assert url.protocol == Protocol.HTTP
+    assert url.datascheme == "precomputed"
+    assert url.protocol == "http"
     assert url.port == None
     assert url.path == PurePosixPath("/some/path")
     assert url.search == {"a": '123', "b": '456'}

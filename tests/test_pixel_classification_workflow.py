@@ -27,7 +27,7 @@ test_output_osfs = get_test_output_osfs()
 def wait_until_jobs_completed(workflow: PixelClassificationWorkflow, timeout: float = 50):
     wait_time = 0.5
     while timeout > 0:
-        export_status: JsonObject = workflow.export_applet._get_json_state()
+        export_status: JsonObject = ensureJsonObject(workflow.export_applet._get_json_state())
         jobs = ensureJsonArray(export_status["jobs"])
         for job in jobs:
             job_obj = ensureJsonObject(job)
@@ -104,7 +104,7 @@ def test_pixel_classification_workflow():
         on_async_change=lambda : print(json.dumps(workflow.export_applet._get_json_state(), indent=4)),
         executor=executor,
         priority_executor=priority_executor,
-        allowed_protocols=[Protocol.FILE],
+        allowed_protocols=["file"],
     )
     print("what")
     print(loaded_workflow)
