@@ -17,7 +17,7 @@ import aiohttp
 from aiohttp.client import ClientSession
 from cryptography.fernet import Fernet
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonInt, ensureJsonObject, ensureJsonString
-from webilastik.libebrains.slurm_job_launcher import CscsSshJobLauncher, JobState, JusufSshJobLauncher, LocalJobLauncher, Minutes, NodeSeconds, Seconds, SlurmJob, SlurmJobId, SshJobLauncher
+from webilastik.libebrains.compute_session_launcher import CscsSshJobLauncher, JusufSshJobLauncher, LocalJobLauncher, Minutes, NodeSeconds, ComputeSession, SshJobLauncher
 
 from webilastik.libebrains.user_token import UserToken
 from webilastik.libebrains.oidc_client import OidcClient, Scope
@@ -116,7 +116,7 @@ def require_ebrains_login(
 
 @dataclass
 class SessionStatus:
-    slurm_job: SlurmJob
+    slurm_job: ComputeSession
     hpc_site: "HpcSiteName"
     session_url: Url
     connected: bool
@@ -213,8 +213,8 @@ class SessionAllocator:
         redirect_url = get_requested_url(request).updated_with(path=PurePosixPath("/public/nehuba/index.html"))
         raise web.HTTPFound(location=redirect_url.raw)
 
-    def _make_session_url(self, session_id: uuid.UUID) -> Url:
-        return self.external_url.joinpath(f"session-{session_id}")
+    def _make_compute_session_url(self, compute_session_id: uuid.UUID) -> Url:
+        return self.external_url.joinpath(f"session-{compute_session_id}")
 
     @require_ebrains_login
     async def hello(self, ebrains_login: EbrainsLogin, request: web.Request) -> web.Response:
@@ -267,7 +267,7 @@ class SessionAllocator:
 
         session_launcher = self.session_launchers[hpc_site]
         async with self.session_user_locks[user_info.sub]:
-            this_months_jobs_result = await session_launcher.get_jobs(
+            this_months_jobs_result = await session_launcher.get_compute_sessions(
                 user_id=user_info.sub, starttime=datetime.today().replace(day=1)
             )
             if isinstance(this_months_jobs_result, Exception):
@@ -275,8 +275,8 @@ class SessionAllocator:
                 return web.json_response({"error": "Could not get session information"}, status=500)
             for job in this_months_jobs_result:
                 if job.is_runnable():
-                    return web.json_response({"error": f"Already running a session ({job.session_id})"}, status=400)
-            used_quota_node_sec = SlurmJob.compute_used_quota(this_months_jobs_result)
+                    return web.json_response({"error": f"Already running a session ({job.compute_session_id})"}, status=400)
+            used_quota_node_sec = ComputeSession.compute_used_quota(this_months_jobs_result)
             monthly_quota_node_sec: NodeSeconds = NodeSeconds(30 * 60 * 60) #FIXME
             available_quota_node_min = (monthly_quota_node_sec - used_quota_node_sec) / 60
             if available_quota_node_min < 0: #FIXME
@@ -286,7 +286,7 @@ class SessionAllocator:
                 status=400
             )
 
-            session_id = uuid.uuid4()
+            compute_session_id = uuid.uuid4()
 
             #############################################################
             # print(f">>>>>>>>>>>>>> Opening tunnel to app.ilastik.org....")
@@ -296,14 +296,14 @@ class SessionAllocator:
             #         "-oBatchMode=yes",
             #         "-oExitOnForwardFailure=yes",
             #         "-oControlPersist=yes",
-            #         "-M", "-S", f"/tmp/session-{session_id}.control",
-            #         "-L", f"/tmp/to-session-{session_id}:/tmp/to-session-{session_id}",
+            #         "-M", "-S", f"/tmp/session-{compute_session_id}.control",
+            #         "-L", f"/tmp/to-session-{compute_session_id}:/tmp/to-session-{compute_session_id}",
             #         f"www-data@148.187.149.187",
             #     ],
             # )
             # await asyncio.sleep(1)
-            # print(f"<<<<<<<<<<<<< Hopefully it worked? sesion id is {session_id}")
-            # if _tunnel_process.returncode != 0 or not Path(f"/tmp/to-session-{session_id}").exists():
+            # print(f"<<<<<<<<<<<<< Hopefully it worked? sesion id is {compute_session_id}")
+            # if _tunnel_process.returncode != 0 or not Path(f"/tmp/to-session-{compute_session_id}").exists():
             #     return uncachable_json_response({"error": "Could not forward ports i think"}, status=500)
 
             ###################################################################
@@ -314,7 +314,7 @@ class SessionAllocator:
                     int(available_quota_node_min), int(requested_duration_minutes)
                 )),
                 ebrains_user_token=ebrains_login.user_token,
-                session_id=session_id,
+                compute_session_id=compute_session_id,
             )
 
             if isinstance(session_result, Exception):
@@ -324,7 +324,7 @@ class SessionAllocator:
             return web.json_response(
                 SessionStatus(
                     slurm_job=session_result,
-                    session_url=self._make_session_url(session_id),
+                    session_url=self._make_compute_session_url(compute_session_id),
                     connected=False,
                     hpc_site=hpc_site,
                 ).to_json_value(),
@@ -336,7 +336,7 @@ class SessionAllocator:
         raw_payload = await request.content.read()
         try:
             payload_dict = ensureJsonObject(json.loads(raw_payload.decode('utf8')))
-            session_id =  uuid.UUID(ensureJsonString(payload_dict.get("session_id")))
+            compute_session_id =  uuid.UUID(ensureJsonString(payload_dict.get("session_id")))
             hpc_site = HpcSiteName.from_json_value(payload_dict.get("hpc_site"))
         except Exception:
             return uncachable_json_response({"error": "Bad payload"}, status=400)
@@ -345,13 +345,13 @@ class SessionAllocator:
             print(f"Error retrieving user info: {user_info_result}")
             return uncachable_json_response({"error": "Could not get user information"}, status=500) #FIXME: 500?
         session_launcher = self.session_launchers[hpc_site]
-        session_result = await session_launcher.get_job_by_session_id(session_id=session_id, user_id=user_info_result.sub)
+        session_result = await session_launcher.get_compute_session_by_id(compute_session_id=compute_session_id, user_id=user_info_result.sub)
         if isinstance(session_result, Exception):
             return uncachable_json_response({"error": "Could not retrieve session"}, status=500)
         if session_result is None:
             return uncachable_json_response({"error": "Session not found"}, status=404)
 
-        session_url = self._make_session_url(session_id=session_id)
+        session_url = self._make_compute_session_url(compute_session_id=compute_session_id)
 
         #################################################################################
         # print(f">>>>>>>>>>>>>> Checking if tunnel socket exists on app.ilastik.org....")
@@ -361,7 +361,7 @@ class SessionAllocator:
         #         "-T",
         #         "-oBatchMode=yes",
         #         f"www-data@148.187.149.187",
-        #         "ls", f"/tmp/to-session-{session_id}"
+        #         "ls", f"/tmp/to-session-{compute_session_id}"
         #     ],
         # )
         # if tunnel_exists_check.returncode != 0:
@@ -392,7 +392,7 @@ class SessionAllocator:
         raw_payload = await request.content.read()
         try:
             payload_dict = ensureJsonObject(json.loads(raw_payload.decode('utf8')))
-            session_id = uuid.UUID(ensureJsonString(payload_dict.get("session_id")))
+            compute_session_id = uuid.UUID(ensureJsonString(payload_dict.get("session_id")))
             hpc_site = HpcSiteName.from_json_value(payload_dict.get("hpc_site"))
         except Exception:
             return web.json_response({"error": "Bad payload"}, status=400)
@@ -402,20 +402,20 @@ class SessionAllocator:
         if isinstance(user_info_result, Exception):
             print(f"Error retrieving user info: {user_info_result}")
             return uncachable_json_response({"error": "Could not get user information"}, status=500) #FIXME: 500?
-        session_result = await session_launcher.get_job_by_session_id(session_id=session_id, user_id=user_info_result.sub)
+        session_result = await session_launcher.get_compute_session_by_id(compute_session_id=compute_session_id, user_id=user_info_result.sub)
         if isinstance(session_result, Exception):
             return uncachable_json_response({"error": "Could not retrieve session"}, status=500)
         if session_result is None:
             return uncachable_json_response({"error": "Session not found"}, status=404)
         cancellation_result = await session_launcher.cancel(session_result)
         if isinstance(cancellation_result, Exception):
-            return uncachable_json_response({"error": f"Failed to cancel session {session_id}"}, status=500)
-        return uncachable_json_response({"session_id": str(session_id)}, status=200)
+            return uncachable_json_response({"error": f"Failed to cancel session {compute_session_id}"}, status=500)
+        return uncachable_json_response({"session_id": str(compute_session_id)}, status=200)
 
-    async def check_session_connection_state(self, job: SlurmJob) -> bool:
-        if job.is_done() or not Path(f"/tmp/to-session-{job.session_id}").exists():
+    async def check_session_connection_state(self, job: ComputeSession) -> bool:
+        if job.is_done() or not Path(f"/tmp/to-session-{job.compute_session_id}").exists():
             return False
-        session_url = self._make_session_url(session_id=job.session_id)
+        session_url = self._make_compute_session_url(compute_session_id=job.compute_session_id)
         ping_session_result = await self.http_client_session.get(session_url.concatpath("status").raw)
         return ping_session_result.ok
 
@@ -433,7 +433,7 @@ class SessionAllocator:
         if isinstance(user_info_result, Exception):
             print(f"Error retrieving user info: {user_info_result}")
             return uncachable_json_response({"error": "Could not get user information"}, status=500) #FIXME: 500?
-        jobs_result = await session_launcher.get_jobs(
+        jobs_result = await session_launcher.get_compute_sessions(
             user_id=user_info_result.sub, starttime=datetime.today().replace(day=1),
         )
         if isinstance(jobs_result, Exception):
@@ -443,7 +443,7 @@ class SessionAllocator:
             session_stati.append(
                 SessionStatus(
                     slurm_job=job,
-                    session_url=self._make_session_url(job.session_id),
+                    session_url=self._make_compute_session_url(job.compute_session_id),
                     connected=await self.check_session_connection_state(job),
                     hpc_site=hpc_site,
                 )

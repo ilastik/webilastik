@@ -38,7 +38,7 @@ from webilastik.utility.url import Protocol, Url
 from webilastik.server.tunnel import ReverseSshTunnel
 from webilastik.ui.applet import dummy_prompt
 from webilastik.libebrains.user_token import UserToken
-from webilastik.libebrains.slurm_job_launcher import Minutes
+from webilastik.libebrains.compute_session_launcher import Minutes
 from webilastik.libebrains import global_user_login
 from executor_getter import get_executor
 

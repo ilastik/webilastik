@@ -58,7 +58,7 @@ export function ensureHpcSiteName(value: string): HpcSiteName{
     return variant
 }
 
-export class SlurmJob{
+export class ComputeSession{
     public readonly job_id: number
     public readonly state: SlurmJobState
     public readonly start_time_utc_sec?: number
@@ -93,7 +93,7 @@ export class SlurmJob{
         return slurmJobDoneStates.find(st => st == this.state) !== undefined
     }
 
-    public static fromJsonValue(value: JsonValue): SlurmJob{
+    public static fromJsonValue(value: JsonValue): ComputeSession{
         const value_obj = ensureJsonObject(value)
         return new this({
             job_id: ensureJsonNumber(value_obj['job_id']),
@@ -108,13 +108,13 @@ export class SlurmJob{
 }
 
 export class SessionStatus{
-    public readonly slurm_job: SlurmJob
+    public readonly slurm_job: ComputeSession
     public readonly session_url: Url
     public readonly connected: boolean
     public readonly hpc_site: HpcSiteName
 
     constructor(params:{
-        slurm_job: SlurmJob,
+        slurm_job: ComputeSession,
         session_url: Url,
         connected: boolean,
         hpc_site: HpcSiteName
@@ -128,7 +128,7 @@ export class SessionStatus{
     public static fromJsonValue(value: JsonValue): SessionStatus{
         const value_obj = ensureJsonObject(value)
         return new this({
-            slurm_job: SlurmJob.fromJsonValue(value_obj['slurm_job']),
+            slurm_job: ComputeSession.fromJsonValue(value_obj['slurm_job']),
             session_url: Url.parse(ensureJsonString(value_obj['session_url'])),
             connected: ensureJsonBoolean(value_obj['connected']),
             hpc_site: ensureHpcSiteName(ensureJsonString(value_obj['hpc_site'])),
