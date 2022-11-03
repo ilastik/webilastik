@@ -132,7 +132,7 @@ export class SessionManagerWidget{
                     timeout_minutes: timeoutMinutes,
                     session_duration_minutes: sessionDurationMinutes,
                     onProgress: (message) => this.logMessage(message),
-                    onUsageError: (message) => this.logMessage(message),
+                    onUsageError: (message) => {new ErrorPopupWidget({message: message})},
                     autoCloseOnTimeout: true,
                     hpc_site: this.hpcSiteInput.value,
                 })
