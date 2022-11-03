@@ -405,7 +405,8 @@ class PrimitiveHint(Hint):
             py_hint=py_hint,
             py_fromJsonValue_code="\n".join([
                 f"if isinstance(value, {'type(None)' if self.hint_type in (None, type(None)) else self.hint_type.__name__}):",
-                    "    return value",
+                 "    return value",
+                 "if isinstance(value, int): return float(value);" if self.hint_type == float else "",
                 f"return MessageParsingError(f\"Could not parse {{json.dumps(value)}} as {py_hint}\")",
             ]),
             ts_fromJsonValue_code=ts_fromJsonValue_code,
