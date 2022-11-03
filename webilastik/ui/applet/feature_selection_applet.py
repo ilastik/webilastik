@@ -77,7 +77,6 @@ class WsFeatureSelectionApplet(WsApplet, FeatureSelectionApplet):
 
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
         if method_name == "add_feature_extractors":
-            # import pydevd; pydevd.settrace()
             params = AddFeatureExtractorsParamsMessage.from_json_value(arguments)
             if isinstance(params, MessageParsingError):
                 return UsageError(str(params)) #FIXME: this is a bug, not a usage error
