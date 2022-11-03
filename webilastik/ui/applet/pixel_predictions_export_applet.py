@@ -15,7 +15,7 @@ from webilastik.features.ilp_filter import IlpFilter
 from webilastik.operator import IN, Operator
 from webilastik.scheduling.job import Job, JobFailedCallback, JobSucceededCallback, PriorityExecutor, IN as JOB_IN, OUT as JOB_OUT
 from webilastik.serialization.json_serialization import JsonValue
-from webilastik.server.message_schema import PixelClassificationExportAppletMessage
+from webilastik.server.message_schema import PixelClassificationExportAppletStateMessage
 from webilastik.simple_segmenter import SimpleSegmenter
 from webilastik.ui.applet import AppletOutput, StatelesApplet, UserPrompt
 from webilastik.ui.applet.ws_applet import WsApplet
@@ -199,7 +199,7 @@ class WsPixelClassificationExportApplet(WsApplet, PixelClassificationExportApple
         with self._lock:
             classifier = self._in_operator()
             datasource_suggestions = self._in_datasource_suggestions()
-            return PixelClassificationExportAppletMessage(
+            return PixelClassificationExportAppletStateMessage(
                 jobs=tuple(job.to_message() for job in self._jobs.values()),
                 num_classes= classifier and classifier.num_classes,
                 datasource_suggestions=None if datasource_suggestions is None else tuple(ds.to_message() for ds in datasource_suggestions)

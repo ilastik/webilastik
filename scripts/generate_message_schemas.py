@@ -701,7 +701,7 @@ class LabelMessage(Message):
     annotations: Tuple[PixelAnnotationMessage, ...]
 
 @dataclass
-class BrushingAppletState(Message):
+class BrushingAppletStateMessage(Message):
     labels: Tuple[LabelMessage, ...]
 
 ##############################################3333
@@ -762,7 +762,34 @@ class JobMessage(Message):
     error_message: Optional[str]
 
 @dataclass
-class PixelClassificationExportAppletMessage(Message):
+class PixelClassificationExportAppletStateMessage(Message):
     jobs: Tuple[JobMessage, ...]
     num_classes: Optional[int]
     datasource_suggestions: Optional[Tuple[DataSourceMessage, ...]]
+
+#########################################################
+
+@dataclass
+class IlpFeatureExtractorMessage(Message):
+    ilp_scale: float
+    axis_2d: Optional[Literal["x", "y", "z"]]
+    class_name: Literal[
+        "Gaussian Smoothing",
+        "Laplacian of Gaussian",
+        "Gaussian Gradient Magnitude",
+        "Difference of Gaussians",
+        "Structure Tensor Eigenvalues",
+        "Hessian of Gaussian Eigenvalues"
+    ]
+
+@dataclass
+class FeatureSelectionAppletStateMessage(Message):
+    feature_extractors: Tuple[IlpFeatureExtractorMessage, ...]
+
+@dataclass
+class AddFeatureExtractorsParamsMessage(Message):
+    feature_extractors: Tuple[IlpFeatureExtractorMessage, ...]
+
+@dataclass
+class RemoveFeatureExtractorsParamsMessage(Message):
+    feature_extractors: Tuple[IlpFeatureExtractorMessage, ...]

@@ -1,8 +1,8 @@
 import json
 from typing import Iterable, Optional, Tuple, Sequence, Set
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonArray, ensureJsonObject, ensureJsonString
+from ndstructs.utils.json_serializable import JsonObject, JsonValue
 from webilastik.datasource import DataSource
-from webilastik.features.channelwise_fastfilters import DifferenceOfGaussians, GaussianGradientMagnitude, GaussianSmoothing, HessianOfGaussianEigenvalues, LaplacianOfGaussian, StructureTensorEigenvalues
+from webilastik.server.message_schema import AddFeatureExtractorsParamsMessage, FeatureSelectionAppletStateMessage, MessageParsingError, RemoveFeatureExtractorsParamsMessage
 
 from webilastik.ui.applet import Applet, AppletOutput, CascadeOk, CascadeResult, UserCancelled, UserPrompt, applet_output, cascade
 from webilastik.features.ilp_filter import IlpFilter
@@ -29,7 +29,7 @@ class FeatureSelectionApplet(Applet):
 
     @applet_output
     def feature_extractors(self) -> Sequence[IlpFilter]:
-        return sorted(self._feature_extractors, key=lambda fe: json.dumps(fe.to_json_value())) #FIXME
+        return sorted(self._feature_extractors, key=lambda fe: (fe.__class__.__name__, fe.ilp_scale)) #FIXME
 
     def _set_feature_extractors(self, user_prompt: UserPrompt, feature_extractors: Iterable[IlpFilter]) -> CascadeResult:
         candidate_extractors = set(feature_extractors)
@@ -71,14 +71,24 @@ class FeatureSelectionApplet(Applet):
 
 class WsFeatureSelectionApplet(WsApplet, FeatureSelectionApplet):
     def _get_json_state(self) -> JsonValue:
-        return {"feature_extractors": tuple(extractor.to_json_value() for extractor in self.feature_extractors())}
+        return FeatureSelectionAppletStateMessage(
+            feature_extractors=tuple(extractor.to_message() for extractor in self.feature_extractors())
+        ).to_json_value()
 
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
-        raw_feature_array = ensureJsonArray(arguments.get("feature_extractors"))
-        feature_extractors = [IlpFilter.from_json_value(raw_feature) for raw_feature in raw_feature_array]
-
         if method_name == "add_feature_extractors":
-            return UsageError.check(self.add_feature_extractors(user_prompt=user_prompt, feature_extractors=feature_extractors))
+            # import pydevd; pydevd.settrace()
+            params = AddFeatureExtractorsParamsMessage.from_json_value(arguments)
+            if isinstance(params, MessageParsingError):
+                return UsageError(str(params)) #FIXME: this is a bug, not a usage error
+            return UsageError.check(self.add_feature_extractors(
+                user_prompt=user_prompt, feature_extractors=[IlpFilter.from_message(m) for m in params.feature_extractors]
+            ))
         if method_name == "remove_feature_extractors":
-            return UsageError.check(self.remove_feature_extractors(user_prompt, feature_extractors))
+            params = RemoveFeatureExtractorsParamsMessage.from_json_value(arguments)
+            if isinstance(params, MessageParsingError):
+                return UsageError(str(params)) #FIXME: this is a bug, not a usage error
+            return UsageError.check(self.remove_feature_extractors(
+                user_prompt=user_prompt, feature_extractors=[IlpFilter.from_message(m) for m in params.feature_extractors]
+            ))
         raise ValueError(f"Invalid method name: '{method_name}'")

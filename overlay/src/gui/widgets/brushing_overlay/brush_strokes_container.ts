@@ -60,7 +60,7 @@ export class BrushingApplet extends Applet<State>{
         super({
             name: params.applet_name,
             deserializer: (value: JsonValue) => {
-                const state = schema.BrushingAppletState.fromJsonValue(value)
+                const state = schema.BrushingAppletStateMessage.fromJsonValue(value)
                 if(state instanceof Error){
                     throw `FIXME`
                 }

@@ -11,6 +11,7 @@ import {
     ColorMessage,
     DataSourceMessage,
     FailedViewMessage,
+    IlpFeatureExtractorMessage,
     Interval5DMessage,
     Point5DMessage,
     PredictionsViewMessage,
@@ -446,49 +447,33 @@ export class Session{
     }
 }
 
-const FeatureClassNames = [
-    "IlpGaussianSmoothing", "IlpGaussianGradientMagnitude", "IlpHessianOfGaussianEigenvalues", "IlpLaplacianOfGaussian", "IlpDifferenceOfGaussians", "IlpStructureTensorEigenvalues"
-] as const;
-export type FeatureClassName = (typeof FeatureClassNames)[number]
+export type FeatureClassName = IlpFeatureExtractorMessage["class_name"]
 
-export function ensureFeatureClassName(value: string): FeatureClassName{
-    const variant = FeatureClassNames.find(variant => variant === value)
-    if(variant === undefined){
-        throw Error(`Invalid feature class name: ${value}`)
-    }
-    return variant
-}
-
-export class IlpFeatureExtractor implements IJsonable{
+export class IlpFeatureExtractor{
     public readonly ilp_scale: number
-    public readonly axis_2d: string
+    public readonly axis_2d: "x" | "y" | "z" | undefined
     public readonly __class__: FeatureClassName
 
-    constructor(params: {ilp_scale: number, axis_2d: string, __class__: FeatureClassName}){
+    constructor(params: {ilp_scale: number, axis_2d: "x" | "y" | "z" | undefined, __class__: FeatureClassName}){
         this.ilp_scale = params.ilp_scale
         this.axis_2d = params.axis_2d
         this.__class__ = params.__class__
     }
 
-    public static fromJsonValue(value: JsonValue): IlpFeatureExtractor{
-        let value_obj = ensureJsonObject(value)
-        let feature_class_name = ensureFeatureClassName(ensureJsonString(value_obj["__class__"]))
-        let ilp_scale = ensureJsonNumber(value_obj["ilp_scale"])
-        let axis_2d = ensureJsonString(value_obj["axis_2d"])
-        return new IlpFeatureExtractor({ilp_scale, axis_2d, __class__: feature_class_name})
+    public static fromMessage(message: IlpFeatureExtractorMessage): IlpFeatureExtractor{
+        return new IlpFeatureExtractor({
+            ilp_scale: message.ilp_scale,
+            axis_2d: message.axis_2d || "z",
+            __class__: message.class_name
+        })
     }
 
-    public toJsonValue(): JsonValue{
-        return {
-            "ilp_scale": this.ilp_scale,
-            "axis_2d": this.axis_2d,
-            "__class__": this.__class__,
-        }
-    }
-
-    public static fromJsonArray(data: JsonValue): IlpFeatureExtractor[]{
-        const array = ensureJsonArray(data)
-        return array.map((v: JsonValue) => IlpFeatureExtractor.fromJsonValue(v))
+    public toMessage(): IlpFeatureExtractorMessage{
+        return new IlpFeatureExtractorMessage({
+            ilp_scale: this.ilp_scale,
+            axis_2d: this.axis_2d,
+            class_name: this.__class__,
+        })
     }
 
     public equals(other: IlpFeatureExtractor) : boolean{

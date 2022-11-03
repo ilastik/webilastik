@@ -41,7 +41,7 @@ class PresmoothedFilter(FeatureExtractor):
             sigma=math.sqrt(ilp_scale ** 2 - 1.0) if ilp_scale > 1.0 else ilp_scale,
         )
         self.ilp_scale = ilp_scale
-        self.axis_2d = axis_2d
+        self.axis_2d: Optional[Axis2D] = axis_2d
         super().__init__()
 
 class ChannelwiseFastFilter(JsonableFeatureExtractor):
