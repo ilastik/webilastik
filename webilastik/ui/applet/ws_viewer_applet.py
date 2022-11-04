@@ -265,7 +265,8 @@ class WsViewerApplet(WsApplet):
         super().__init__(name=name)
 
     def _get_json_state(self) -> JsonObject:
-        return self.state.to_message().to_json_value()
+        with self.lock:
+            return self.state.to_message().to_json_value()
         with self.lock:
             labels = self._in_labels() or ()
             return {
@@ -317,7 +318,7 @@ class WsViewerApplet(WsApplet):
             self.state = self.state.updated_with(
                 frontend_timestamp=self.state.frontend_timestamp,
                 prediction_views=new_prediction_views,
-                label_colors=[l.color for l in labels or ()]
+                label_colors=[label.color for label in (labels or ()) if len(label.annotations) > 0] #FIXME: likely not a good place to remove unused labels
             )
         self.on_async_change() #FIXME: this should probably be done at the workflow level, not at the applet level
         return CascadeOk()
