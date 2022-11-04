@@ -4,15 +4,23 @@ import { fetchJson, sleep } from "../util/misc"
 import { Path, Url } from "../util/parsed_url"
 import { DataType, Scale } from "../util/precomputed_chunks"
 import {
-    ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonObject,
+    ensureJsonArray, ensureJsonNumber, ensureJsonObject,
     ensureJsonString, ensureOptional, IJsonable, JsonableValue, JsonObject, JsonValue, toJsonValue
 } from "../util/serialization"
 import {
+    CheckLoginResultMessage,
+    CloseComputeSessionParamsMessage,
     ColorMessage,
+    ComputeSessionStatusMessage,
+    CreateComputeSessionParamsMessage,
     DataSourceMessage,
     FailedViewMessage,
+    GetAvailableHpcSitesResponseMessage,
+    GetComputeSessionStatusParamsMessage,
     IlpFeatureExtractorMessage,
     Interval5DMessage,
+    ListComputeSessionsParamsMessage,
+    ListComputeSessionsResponseMessage,
     Point5DMessage,
     PredictionsViewMessage,
     RawDataViewMessage,
@@ -21,131 +29,31 @@ import {
     UnsupportedDatasetViewMessage
 } from "./message_schema"
 
-export const slurmJobStates = [
-    "BOOT_FAIL", "CANCELLED", "COMPLETED", "DEADLINE", "FAILED", "NODE_FAIL", "OUT_OF_MEMORY",
-    "PENDING", "PREEMPTED", "RUNNING", "REQUEUED", "RESIZING", "REVOKED", "SUSPENDED", "TIMEOUT"
-] as const;
+export type HpcSiteName = ComputeSessionStatusMessage["hpc_site"] //FIXME?
 
-export const slurmJobRunnableStates = [
-    "PENDING", "RUNNING", "REQUEUED", "RESIZING", "SUSPENDED"
-] as const;
-
-export const slurmJobFailedStates = [
-    "BOOT_FAIL", "CANCELLED", "DEADLINE", "FAILED", "NODE_FAIL", "OUT_OF_MEMORY", "PREEMPTED", "REVOKED", "TIMEOUT"
-] as const;
-
-export const slurmJobDoneStates = [
-    "COMPLETED", ...slurmJobFailedStates
-] as const;
-
-export type SlurmJobState = typeof slurmJobStates[number]
-export function ensureSlurmJobState(value: string): SlurmJobState{
-    const variant = slurmJobStates.find(variant => variant === value)
-    if(variant === undefined){
-        throw Error(`Invalid slurm job state: ${value}`)
-    }
-    return variant
-}
-
-export const hpcSiteNames = ["CSCS", "JUSUF", "LOCAL"] as const;
-export type HpcSiteName = typeof hpcSiteNames[number]
-
-export function ensureHpcSiteName(value: string): HpcSiteName{
-    const variant = hpcSiteNames.find(variant => variant === value)
-    if(variant === undefined){
-        throw Error(`Invalid hpc site name: ${value}`)
-    }
-    return variant
-}
-
-export class ComputeSession{
-    public readonly job_id: number
-    public readonly state: SlurmJobState
-    public readonly start_time_utc_sec?: number
-    public readonly time_elapsed_sec: number
-    public readonly time_limit_minutes: number
-    public readonly num_nodes: number
-    public readonly session_id: string
-
-    constructor(params: {
-        job_id: number,
-        state: SlurmJobState
-        start_time_utc_sec?: number,
-        time_elapsed_sec: number,
-        time_limit_minutes: number,
-        num_nodes: number,
-        session_id: string,
-    }){
-        this.job_id = params.job_id
-        this.state = params.state
-        this.start_time_utc_sec = params.start_time_utc_sec
-        this.time_elapsed_sec = params.time_elapsed_sec
-        this.time_limit_minutes = params.time_limit_minutes
-        this.num_nodes = params.num_nodes
-        this.session_id = params.session_id
-    }
-
-    public is_failure(): boolean{
-        return slurmJobFailedStates.find(st => st == this.state) !== undefined
-    }
-
-    public is_done(): boolean{
-        return slurmJobDoneStates.find(st => st == this.state) !== undefined
-    }
-
-    public static fromJsonValue(value: JsonValue): ComputeSession{
-        const value_obj = ensureJsonObject(value)
-        return new this({
-            job_id: ensureJsonNumber(value_obj['job_id']),
-            state: ensureSlurmJobState(ensureJsonString(value_obj['state'])),
-            start_time_utc_sec: ensureOptional(ensureJsonNumber, value_obj['start_time_utc_sec']),
-            time_elapsed_sec: ensureJsonNumber(value_obj['time_elapsed_sec']),
-            time_limit_minutes: ensureJsonNumber(value_obj['time_limit_minutes']),
-            num_nodes: ensureJsonNumber(value_obj['num_nodes']),
-            session_id: ensureJsonString(value_obj['session_id']),
-        })
-    }
-}
-
-export class SessionStatus{
-    public readonly slurm_job: ComputeSession
-    public readonly session_url: Url
-    public readonly connected: boolean
-    public readonly hpc_site: HpcSiteName
-
-    constructor(params:{
-        slurm_job: ComputeSession,
-        session_url: Url,
-        connected: boolean,
-        hpc_site: HpcSiteName
-    }){
-        this.slurm_job = params.slurm_job
-        this.session_url = params.session_url
-        this.connected = params.connected
-        this.hpc_site = params.hpc_site
-    }
-
-    public static fromJsonValue(value: JsonValue): SessionStatus{
-        const value_obj = ensureJsonObject(value)
-        return new this({
-            slurm_job: ComputeSession.fromJsonValue(value_obj['slurm_job']),
-            session_url: Url.parse(ensureJsonString(value_obj['session_url'])),
-            connected: ensureJsonBoolean(value_obj['connected']),
-            hpc_site: ensureHpcSiteName(ensureJsonString(value_obj['hpc_site'])),
-        })
-    }
-}
+export const SESSION_DONE_STATES = [
+    "BOOT_FAIL",
+    "CANCELLED",
+    "DEADLINE",
+    "FAILED",
+    "NODE_FAIL",
+    "OUT_OF_MEMORY",
+    "PREEMPTED",
+    "REVOKED",
+    "TIMEOUT",
+    "COMPLETED",
+]; //FIXME: shouldn't this be autogenerated?
 
 export class Session{
     public readonly ilastikUrl: Url
-    public readonly sessionStatus: SessionStatus
+    public readonly sessionStatus: ComputeSessionStatusMessage
     private websocket: WebSocket
     private messageHandlers = new Array<(ev: MessageEvent) => void>();
     private readonly onUsageError: (message: string) => void
 
     protected constructor(params: {
         ilastikUrl: Url,
-        sessionStatus: SessionStatus,
+        sessionStatus: ComputeSessionStatusMessage,
         onUsageError: (message: string) => void,
     }){
         this.ilastikUrl = params.ilastikUrl
@@ -155,11 +63,11 @@ export class Session{
     }
 
     public get sessionUrl(): Url{
-        return this.sessionStatus.session_url
+        return Url.fromMessage(this.sessionStatus.session_url)
     }
 
     public get startTime(): Date | undefined{
-        const {start_time_utc_sec} = this.sessionStatus.slurm_job
+        const {start_time_utc_sec} = this.sessionStatus.compute_session
         if(start_time_utc_sec === undefined){
             return undefined
         }
@@ -167,11 +75,11 @@ export class Session{
     }
 
     public get timeLimitMinutes(): number{
-        return this.sessionStatus.slurm_job.time_limit_minutes
+        return this.sessionStatus.compute_session.time_limit_minutes
     }
 
     public get sessionId(): string{
-        return this.sessionStatus.slurm_job.session_id
+        return this.sessionStatus.compute_session.compute_session_id
     }
 
     private openWebsocket(): WebSocket{
@@ -265,57 +173,48 @@ export class Session{
         return atob(encoded.replace("-", "+").replace("_", "/"))
     }
 
-    public static async check_login({ilastikUrl}: {ilastikUrl: Url}): Promise<Error | boolean>{
-        let response = await fetch(ilastikUrl.joinPath("/api/check_login").raw, {
+    public static async check_login({ilastikUrl}: {ilastikUrl: Url}): Promise<CheckLoginResultMessage | Error>{
+        let response = await fetchJson(ilastikUrl.joinPath("/api/check_login").raw, {
             credentials: "include",
             cache: "no-store",
         });
-        if(response.ok){
-            return true
+        if(response instanceof Error){
+            return response
         }
-        if(response.status == 401){
-            return false
-        }
-        let contents = await response.text()
-        return new Error(`Checking loging faield with ${response.status}:\n${contents}`)
+        return CheckLoginResultMessage.fromJsonValue(response)
     }
 
-    public static async getStatus(params: {ilastikUrl: Url, sessionId: string, hpc_site: HpcSiteName}): Promise<SessionStatus | Error>{
+    public static async getStatus(params: {ilastikUrl: Url, rpcParams: GetComputeSessionStatusParamsMessage}): Promise<ComputeSessionStatusMessage | Error>{
         let result = await fetchJson(
             params.ilastikUrl.joinPath(`/api/get_session_status`).raw,
             {
                 cache: "no-store",
                 method: "POST",
-                body: JSON.stringify({
-                    session_id: params.sessionId,
-                    hpc_site: params.hpc_site,
-                })
+                body: JSON.stringify(params.rpcParams.toJsonValue())
             }
         )
         if(result instanceof Error){
             return result
         }
-        return SessionStatus.fromJsonValue(result)
+        return ComputeSessionStatusMessage.fromJsonValue(result)
     }
 
-    public static async listSessions(params: {ilastikUrl: Url, hpc_site: HpcSiteName}): Promise<SessionStatus[] | Error>{
+    public static async listSessions(params: {ilastikUrl: Url, rpcParams: ListComputeSessionsParamsMessage}): Promise<ListComputeSessionsResponseMessage | Error>{
         let payload_result = await fetchJson(
             params.ilastikUrl.joinPath("/api/list_sessions").raw,
             {
                 cache: "no-store",
                 method: "POST",
-                body: JSON.stringify({
-                    hpc_site: params.hpc_site
-                })
+                body: JSON.stringify(params.rpcParams.toJsonValue())
             },
         )
         if(payload_result instanceof Error){
             return payload_result
         }
-        return ensureJsonArray(payload_result).map(item => SessionStatus.fromJsonValue(item))
+        return ListComputeSessionsResponseMessage.fromJsonValue(payload_result)
     }
 
-    public static async getAvailableHpcSites(params: {ilastikUrl: Url}): Promise<HpcSiteName[] | Error>{
+    public static async getAvailableHpcSites(params: {ilastikUrl: Url}): Promise<GetAvailableHpcSitesResponseMessage | Error>{
         let payload_result = await fetchJson(
             params.ilastikUrl.joinPath("/api/get_available_hpc_sites").raw,
             {
@@ -326,7 +225,7 @@ export class Session{
         if(payload_result instanceof Error){
             return payload_result
         }
-        return ensureJsonArray(payload_result).map(item => ensureHpcSiteName(ensureJsonString(item)))
+        return GetAvailableHpcSitesResponseMessage.fromJsonValue(payload_result)
     }
 
     public static getEbrainsToken(): string | undefined{
@@ -336,23 +235,19 @@ export class Session{
 
     public static async create(params: {
         ilastikUrl: Url,
-        session_duration_minutes: number,
+        rpcParams: CreateComputeSessionParamsMessage,
         timeout_minutes: number,
-        hpc_site: HpcSiteName,
         onProgress?: (message: string) => void,
         onUsageError: (message: string) => void,
         autoCloseOnTimeout: boolean,
     }): Promise<Session | Error>{
         const onProgress = params.onProgress || (() => {})
-        const newSessionUrl = params.ilastikUrl.joinPath("/api/session")
+        const newSessionUrl = params.ilastikUrl.joinPath("/api/create_compute_session")
         onProgress("Requesting session...")
 
         let session_creation_response = await fetch(newSessionUrl.schemeless_raw, {
             method: "POST",
-            body: JSON.stringify({
-                session_duration_minutes: params.session_duration_minutes,
-                hpc_site: params.hpc_site
-            })
+            body: JSON.stringify(params.rpcParams.toJsonValue())
         })
         if(Math.floor(session_creation_response.status / 100) == 5){
             onProgress(`Server-side error when creating a session`)
@@ -361,13 +256,18 @@ export class Session{
         if(!session_creation_response.ok){
             return Error(`Requesting session failed (${session_creation_response.status}): ${await session_creation_response.text()}`)
         }
-        const sessionStatus = SessionStatus.fromJsonValue(await session_creation_response.json())
+        const sessionStatusMsg = ComputeSessionStatusMessage.fromJsonValue(await session_creation_response.json())
+        if(sessionStatusMsg instanceof Error){
+            return sessionStatusMsg
+        }
         onProgress(`Successfully requested a session! Waiting for it to be ready...`)
         return Session.load({
             ilastikUrl: params.ilastikUrl,
+            getStatusRpcParams: new GetComputeSessionStatusParamsMessage({
+                compute_session_id: sessionStatusMsg.compute_session.compute_session_id,
+                hpc_site: params.rpcParams.hpc_site,
+            }),
             timeout_minutes: params.timeout_minutes,
-            sessionId: sessionStatus.slurm_job.session_id,
-            hpc_site: params.hpc_site,
             onProgress,
             onUsageError: params.onUsageError,
             autoCloseOnTimeout: params.autoCloseOnTimeout,
@@ -376,9 +276,8 @@ export class Session{
 
     public static async load(params: {
         ilastikUrl: Url,
-        sessionId: string,
+        getStatusRpcParams: GetComputeSessionStatusParamsMessage,
         timeout_minutes: number,
-        hpc_site: HpcSiteName,
         onProgress?: (message: string) => void,
         onUsageError: (message: string) => void,
         autoCloseOnTimeout: boolean,
@@ -387,12 +286,12 @@ export class Session{
         const timeout_ms = params.timeout_minutes * 60 * 1000
         const onProgress = params.onProgress || (() => {})
         while(Date.now() - start_time_ms < timeout_ms){
-            let sessionStatus = await Session.getStatus({ilastikUrl: params.ilastikUrl, sessionId: params.sessionId, hpc_site: params.hpc_site})
+            let sessionStatus = await Session.getStatus({ilastikUrl: params.ilastikUrl, rpcParams: params.getStatusRpcParams})
             if(sessionStatus instanceof Error){
                 return sessionStatus
             }
-            if(sessionStatus.slurm_job.is_done()){
-                return Error(`Session ${params.sessionId} is already closed`)
+            if(SESSION_DONE_STATES.includes(sessionStatus.compute_session.state)){ //FIXME
+                return Error(`Session ${params.getStatusRpcParams.compute_session_id} is already closed`)
             }
             if(!sessionStatus.connected){
                 onProgress(`Session is not ready yet`)
@@ -416,28 +315,31 @@ export class Session{
                 websocket.addEventListener("open", resolveThenClean)
             })
         }
-        onProgress(`Timed out waiting for session ${params.sessionId}`)
+        onProgress(`Timed out waiting for session ${params.getStatusRpcParams.compute_session_id}`)
         if(params.autoCloseOnTimeout){
-            onProgress(`Cancelling session ${params.sessionId}`)
-            const cancellation_result = await Session.cancel({ilastikUrl: params.ilastikUrl, sessionId: params.sessionId, hpc_site: params.hpc_site})
+            onProgress(`Cancelling session ${params.getStatusRpcParams.compute_session_id}`)
+            const cancellation_result = await Session.cancel({
+                ilastikUrl: params.ilastikUrl,
+                rpcParams: new CloseComputeSessionParamsMessage({
+                    compute_session_id: params.getStatusRpcParams.compute_session_id,
+                    hpc_site: params.getStatusRpcParams.hpc_site,
+                })
+            })
             if(cancellation_result instanceof Error){
-                onProgress(`Could not cancel session ${params.sessionId}: ${cancellation_result.message}`)
+                onProgress(`Could not cancel session ${params.getStatusRpcParams.compute_session_id}: ${cancellation_result.message}`)
             }else{
-                onProgress(`Cancelled session ${params.sessionId}`)
+                onProgress(`Cancelled session ${params.getStatusRpcParams.compute_session_id}`)
             }
         }
         return Error(`Could not create a session: timeout`)
     }
 
-    public static async cancel(params: {ilastikUrl: Url, sessionId: string, hpc_site: HpcSiteName}): Promise<Error | undefined>{
+    public static async cancel(params: {ilastikUrl: Url, rpcParams: CloseComputeSessionParamsMessage}): Promise<Error | undefined>{
         let result = await fetchJson(
-            params.ilastikUrl.joinPath(`api/delete_session`).raw,
+            params.ilastikUrl.joinPath(`api/close_session`).raw,
             {
                 method: "POST",
-                body: JSON.stringify({
-                    session_id: params.sessionId,
-                    hpc_site: params.hpc_site,
-                })
+                body: JSON.stringify(params.rpcParams.toJsonValue())
             }
         )
         if(result instanceof Error){

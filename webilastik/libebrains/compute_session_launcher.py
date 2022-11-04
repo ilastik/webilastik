@@ -2,9 +2,8 @@
 
 from abc import abstractmethod
 import asyncio
-from enum import Enum
 from subprocess import Popen
-from typing import Dict, Iterable, NewType, List, Set, Tuple
+from typing import Dict, Iterable, Literal, NewType, List, Set, Tuple
 import uuid
 import datetime
 import textwrap
@@ -15,69 +14,72 @@ import getpass
 import sys
 import os
 
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
+from ndstructs.utils.json_serializable import ensureJsonObject, ensureJsonString
 from cryptography.fernet import Fernet
-from webilastik.libebrains.oidc_client import OidcClient
 
+from webilastik.libebrains.oidc_client import OidcClient
 from webilastik.libebrains.user_info import UserInfo
 from webilastik.libebrains.user_token import UserToken
+from webilastik.server.message_schema import ComputeSessionMessage
 
 _oidc_client = OidcClient.from_environment()
 
-class ComputeSessionState(Enum):
-    BOOT_FAIL = "BOOT_FAIL"
-    CANCELLED = "CANCELLED"
-    COMPLETED = "COMPLETED"
-    DEADLINE = "DEADLINE"
-    FAILED = "FAILED"
-    NODE_FAIL = "NODE_FAIL"
-    OUT_OF_MEMORY = "OUT_OF_MEMORY"
-    PENDING = "PENDING"
-    PREEMPTED = "PREEMPTED"
-    RUNNING = "RUNNING"
-    REQUEUED = "REQUEUED"
-    RESIZING = "RESIZING"
-    REVOKED = "REVOKED"
-    SUSPENDED = "SUSPENDED"
-    TIMEOUT = "TIMEOUT"
+ComputeSessionState = Literal[
+    "BOOT_FAIL",
+    "CANCELLED",
+    "COMPLETED",
+    "DEADLINE",
+    "FAILED",
+    "NODE_FAIL",
+    "OUT_OF_MEMORY",
+    "PENDING",
+    "PREEMPTED",
+    "RUNNING",
+    "REQUEUED",
+    "RESIZING",
+    "REVOKED",
+    "SUSPENDED",
+    "TIMEOUT",
+]
 
-    def is_failure(self) -> bool:
-        return self in FAILED_STATES
-
-    def is_done(self) -> bool:
-        return self in DONE_STATES
-
-    def to_json_value(self) -> str:
-        return self.value
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "ComputeSessionState":
-        value_str = ensureJsonString(value)
-        for state in ComputeSessionState:
-            if state.value == value_str:
-                return state
-        raise ValueError(f"Bad session state: {value_str}")
-
-FAILED_STATES = set([
-    ComputeSessionState.BOOT_FAIL,
-    ComputeSessionState.CANCELLED,
-    ComputeSessionState.DEADLINE,
-    ComputeSessionState.FAILED,
-    ComputeSessionState.NODE_FAIL,
-    ComputeSessionState.OUT_OF_MEMORY,
-    ComputeSessionState.PREEMPTED,
-    ComputeSessionState.REVOKED,
-    ComputeSessionState.TIMEOUT,
+COMPUTE_SESSION_STATES: Set[ComputeSessionState] = set([
+    "BOOT_FAIL",
+    "CANCELLED",
+    "COMPLETED",
+    "DEADLINE",
+    "FAILED",
+    "NODE_FAIL",
+    "OUT_OF_MEMORY",
+    "PENDING",
+    "PREEMPTED",
+    "RUNNING",
+    "REQUEUED",
+    "RESIZING",
+    "REVOKED",
+    "SUSPENDED",
+    "TIMEOUT",
 ])
 
-DONE_STATES = set([ComputeSessionState.COMPLETED]).union(FAILED_STATES)
+FAILED_STATES: Set[ComputeSessionState] = set([
+    "BOOT_FAIL",
+    "CANCELLED",
+    "DEADLINE",
+    "FAILED",
+    "NODE_FAIL",
+    "OUT_OF_MEMORY",
+    "PREEMPTED",
+    "REVOKED",
+    "TIMEOUT",
+])
 
-RUNNABLE_STATES = set([
-    ComputeSessionState.PENDING,
-    ComputeSessionState.RUNNING,
-    ComputeSessionState.REQUEUED,
-    ComputeSessionState.RESIZING,
-    ComputeSessionState.SUSPENDED,
+DONE_STATES: Set[ComputeSessionState] = set(["COMPLETED", *FAILED_STATES])
+
+RUNNABLE_STATES: Set[ComputeSessionState] = set([
+    "PENDING",
+    "RUNNING",
+    "REQUEUED",
+    "RESIZING",
+    "SUSPENDED",
 ])
 
 
@@ -119,9 +121,13 @@ class ComputeSession:
         except Exception as e:
             return Exception(f"Bad metadata json: {metadata_json}")
 
+        clean_raw_state = raw_state.split(" ")[0]
+        if clean_raw_state not in COMPUTE_SESSION_STATES:
+            return Exception(f"Bad job state: '{clean_raw_state}' derived from '{raw_state}'")
+
         return ComputeSession(
             native_compute_session_id=NativeComputeSessionId(int(raw_id)),
-            state=ComputeSessionState.from_json_value(raw_state.split(" ")[0]),
+            state=clean_raw_state,
             start_time_utc_sec=None if raw_start_time_utc_sec == "Unknown" else Seconds(int(raw_start_time_utc_sec)),
             time_elapsed_sec=Seconds(int(raw_elapsed)),
             time_limit_minutes=Minutes(int(raw_time_limit)),
@@ -155,7 +161,7 @@ class ComputeSession:
         compute_session_id: uuid.UUID,
     ) -> None:
         self.native_compute_session_id = native_compute_session_id
-        self.state = state
+        self.state: ComputeSessionState = state
         self.start_time_utc_sec = start_time_utc_sec
         self.time_elapsed_sec = time_elapsed_sec
         self.time_limit_minutes = time_limit_minutes
@@ -165,29 +171,27 @@ class ComputeSession:
         super().__init__()
 
 
-    def to_json_value(self) -> JsonObject:
-        return {
-            "job_id": self.native_compute_session_id,
-            "state": self.state.to_json_value(),
-            "start_time_utc_sec": self.start_time_utc_sec,
-            "time_elapsed_sec": self.time_elapsed_sec,
-            "time_limit_minutes": self.time_limit_minutes,
-            "num_nodes": self.num_nodes,
-            # "user_sub": self.uuid,
-            "session_id": str(self.compute_session_id),
-        }
+    def to_message(self) -> ComputeSessionMessage:
+        return ComputeSessionMessage(
+            start_time_utc_sec=self.start_time_utc_sec,
+            time_elapsed_sec=self.time_elapsed_sec,
+            time_limit_minutes=self.time_limit_minutes,
+            num_nodes=self.num_nodes,
+            compute_session_id=str(self.compute_session_id),
+            state=self.state,
+        )
 
     def is_running(self) -> bool:
-        return self.state == ComputeSessionState.RUNNING
+        return self.state == "RUNNING"
 
     def is_runnable(self) -> bool:
         return self.state in RUNNABLE_STATES
 
     def has_failed(self) -> bool:
-        return self.state.is_failure()
+        return self.state in FAILED_STATES
 
     def is_done(self) -> bool:
-        return self.state.is_done()
+        return self.state in DONE_STATES
 
     def belongs_to(self, user_info: UserInfo) -> bool:
         return self.user_id == user_info.sub
@@ -370,7 +374,7 @@ class SshJobLauncher:
         if native_compute_session_id is not None:
             sacct_params.append(f"--jobs={native_compute_session_id}")
         if state != None and len(state) > 0:
-            sacct_params.append(f"--state={','.join(s.value for s in state)}")
+            sacct_params.append(f"--state={','.join(state)}")
 
         output_result = await self.do_ssh(
             environment={"SLURM_TIME_FORMAT": r"%s"},
@@ -506,7 +510,7 @@ class LocalJobLauncher(SshJobLauncher):
         native_compute_session_id = NativeComputeSessionId(len(self.sessions))
         dummy_session = ComputeSession(
             native_compute_session_id=native_compute_session_id,
-            state=ComputeSessionState.RUNNING,
+            state="RUNNING",
             start_time_utc_sec=Seconds(int(datetime.datetime.now(datetime.timezone.utc).timestamp())),
             time_elapsed_sec=Seconds(1),
             num_nodes=1, #FIXME
@@ -520,7 +524,7 @@ class LocalJobLauncher(SshJobLauncher):
 
     async def cancel(self, compute_session: ComputeSession) -> "Exception | None":
         self.sessions[compute_session.native_compute_session_id][1].kill()
-        self.sessions[compute_session.native_compute_session_id][0].state = ComputeSessionState.CANCELLED
+        self.sessions[compute_session.native_compute_session_id][0].state = "CANCELLED"
         return None
 
     async def get_compute_sessions(
@@ -535,10 +539,10 @@ class LocalJobLauncher(SshJobLauncher):
     ) -> "List[ComputeSession] | Exception":
         compute_sessions: List[ComputeSession] = []
         for native_session_id, (compute_session, process) in self.sessions.items():
-            if not compute_session.state.is_done():
+            if not compute_session.state in DONE_STATES:
                 return_code = process.poll()
                 if return_code is not None:
-                    compute_session.state = ComputeSessionState.COMPLETED if return_code == 0 else ComputeSessionState.FAILED
+                    compute_session.state = "COMPLETED" if return_code == 0 else "FAILED"
 
             if native_compute_session_id and native_compute_session_id == native_session_id:
                 return [compute_session]

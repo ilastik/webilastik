@@ -45,13 +45,13 @@ export class OverlayControls{
         }
 
         let showSessionWidget = async () => {
-            let hpcSiteNames = await Session.getAvailableHpcSites({ilastikUrl})
-            if(hpcSiteNames instanceof Error){
-                new ErrorPopupWidget({message: "Could not retrieve HPC site names"})
+            let siteNamesResponse = await Session.getAvailableHpcSites({ilastikUrl})
+            if(siteNamesResponse instanceof Error){
+                new ErrorPopupWidget({message: `Could not retrieve HPC site names: ${siteNamesResponse.message}`})
                 return
             }
             new SessionManagerWidget({
-                parentElement: this.element, ilastikUrl, viewer_driver, workflow_container: this.element, hpcSiteNames
+                parentElement: this.element, ilastikUrl, viewer_driver, workflow_container: this.element, hpcSiteNames: siteNamesResponse.available_sites
             })
         };
         showSessionWidget();

@@ -19,6 +19,7 @@ _ = GENERATED_TS_FILE.write("""
       ensureJsonNumber,
       ensureJsonObject,
       ensureJsonString,
+      ensureJsonBoolean,
       ensureJsonUndefined,
     } from "../util/safe_serialization";
     import {
@@ -401,7 +402,7 @@ class PrimitiveHint(Hint):
         else:
             raise Exception(f"Should be unreachable")
         super().__init__(
-            ts_hint={int: "number", float: "number", str: "string", None: "undefined", type(None): "undefined"}[self.hint_type],
+            ts_hint={int: "number", float: "number", str: "string", bool: "boolean", None: "undefined", type(None): "undefined"}[self.hint_type],
             py_hint=py_hint,
             py_fromJsonValue_code="\n".join([
                 f"if isinstance(value, {'type(None)' if self.hint_type in (None, type(None)) else self.hint_type.__name__}):",
@@ -666,6 +667,11 @@ class PixelAnnotationMessage(Message):
 ######################################################################
 
 @dataclass
+class RpcErrorMessage(Message):
+    error: str
+
+#################################################################
+@dataclass
 class RecolorLabelParams(Message):
     label_name: str
     new_color: ColorMessage
@@ -793,3 +799,75 @@ class AddFeatureExtractorsParamsMessage(Message):
 @dataclass
 class RemoveFeatureExtractorsParamsMessage(Message):
     feature_extractors: Tuple[IlpFeatureExtractorMessage, ...]
+
+#################################################################
+
+
+@dataclass
+class ComputeSessionMessage(Message):
+    start_time_utc_sec: Optional[int]
+    time_elapsed_sec: int
+    time_limit_minutes: int
+    num_nodes: int
+    compute_session_id: str
+    state: Literal[
+        "BOOT_FAIL",
+        "CANCELLED",
+        "COMPLETED",
+        "DEADLINE",
+        "FAILED",
+        "NODE_FAIL",
+        "OUT_OF_MEMORY",
+        "PENDING",
+        "PREEMPTED",
+        "RUNNING",
+        "REQUEUED",
+        "RESIZING",
+        "REVOKED",
+        "SUSPENDED",
+        "TIMEOUT",
+    ]
+
+@dataclass
+class ComputeSessionStatusMessage(Message):
+    compute_session: ComputeSessionMessage
+    hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
+    session_url: UrlMessage
+    connected: bool
+
+@dataclass
+class CreateComputeSessionParamsMessage(Message):
+    session_duration_minutes: int
+    hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
+
+@dataclass
+class GetComputeSessionStatusParamsMessage(Message):
+    compute_session_id: str
+    hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
+
+@dataclass
+class CloseComputeSessionParamsMessage(Message):
+    compute_session_id: str
+    hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
+
+@dataclass
+class CloseComputeSessionResponseMessage(Message):
+    compute_session_id: str
+
+@dataclass
+class ListComputeSessionsParamsMessage(Message):
+    hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
+
+@dataclass
+class ListComputeSessionsResponseMessage(Message):
+    compute_sessions_stati: Tuple[ComputeSessionStatusMessage, ...]
+
+@dataclass
+class GetAvailableHpcSitesResponseMessage(Message):
+    available_sites: Tuple[Literal["LOCAL", "CSCS", "JUSUF"], ...]
+
+#############################################################3
+
+@dataclass
+class CheckLoginResultMessage(Message):
+    logged_in: bool
