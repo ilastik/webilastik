@@ -1,13 +1,14 @@
 import { vec3 } from "gl-matrix";
-import { Shape5D, PrecomputedChunksScaleDataSink } from "../../client/ilastik";
+import { Shape5D } from "../../client/ilastik";
 import { createElement, getNowString } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
-import { DataType, dataTypes, Scale } from "../../util/precomputed_chunks";
+import { DataType, dataTypes } from "../../util/precomputed_chunks";
 import { PathInput } from "./path_input";
 import { Shape5DInput } from "./shape5d_input";
 import { Vec3Input } from "./vec3_input";
 import { BucketFsInput } from "./bucket_fs_input";
 import { PopupSelect } from "./selector_widget";
+import { PrecomputedChunksScaleMessage, PrecomputedChunksScaleSinkMessage } from "../../client/message_schema";
 
 
 export class PrecomputedChunksScale_DataSink_Input{
@@ -15,7 +16,7 @@ export class PrecomputedChunksScale_DataSink_Input{
     private scaleKeyInput: PathInput;
     private fileSystemSelector: BucketFsInput;
     private dataTypeSelector: PopupSelect<DataType>;
-    private encoderSelector: PopupSelect<"raw" | "jpeg" | "compressed_segmentation">;
+    private encoderSelector: PopupSelect<"raw" | "jpeg">;
     private tileShapeInput: Shape5DInput;
     private sinkShapeInput: Shape5DInput;
     private resolutionInput: Vec3Input;
@@ -98,7 +99,7 @@ export class PrecomputedChunksScale_DataSink_Input{
 
         p = createElement({tagName: "p", parentElement})
         createElement({tagName: "label", parentElement: p, innerText: "Encoding: "})
-        this.encoderSelector = new PopupSelect<"raw" | "jpeg" | "compressed_segmentation">({
+        this.encoderSelector = new PopupSelect<"raw" | "jpeg">({
             popupTitle: "Select an encoding",
             parentElement: p,
             options: ["raw", "jpeg"], //FIXME?
@@ -110,8 +111,8 @@ export class PrecomputedChunksScale_DataSink_Input{
         }
     }
 
-    public get value(): PrecomputedChunksScaleDataSink | undefined{
-        let filesystem = this.fileSystemSelector.tryGetFileSystem()
+    public get value(): PrecomputedChunksScaleSinkMessage | undefined{
+        let filesystem = this.fileSystemSelector.value
         let infoPath = this.infoDirectoryPathInput.value
         let dtype = this.dataTypeSelector.value
         let scaleKey = this.scaleKeyInput.value
@@ -125,12 +126,12 @@ export class PrecomputedChunksScale_DataSink_Input{
             return undefined
         }
 
-        return new PrecomputedChunksScaleDataSink({
+        return new PrecomputedChunksScaleSinkMessage({
             filesystem,
-            info_dir: infoPath,
+            info_dir: infoPath.raw,
             dtype,
             num_channels: sinkShape.c,
-            scale: new Scale({
+            scale: new PrecomputedChunksScaleMessage({
                 key: scaleKey.raw,
                 size: [sinkShape.x, sinkShape.y, sinkShape.z],
                 resolution: [resolution[0], resolution[1], resolution[2]],

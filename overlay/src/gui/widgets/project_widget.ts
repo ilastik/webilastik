@@ -1,4 +1,5 @@
-import { BucketFs, Session } from "../../client/ilastik";
+import { Session } from "../../client/ilastik";
+import { BucketFSMessage, LoadProjectParamsMessage, SaveProjectParamsMessage } from "../../client/message_schema";
 import { createElement, createInput, getNowString } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
@@ -17,8 +18,8 @@ export class ProjectWidget{
             parentElement: form,
             hidePrefix: true,
             required: true,
-            value: new BucketFs({
-                bucket_name: "hbp-image-service", prefix: Path.parse("/")
+            value: new BucketFSMessage({
+                bucket_name: "hbp-image-service", prefix: "/"
             })
         })
 
@@ -36,7 +37,7 @@ export class ProjectWidget{
         form.addEventListener("submit", (ev: SubmitEvent): false => {
             ev.preventDefault()
 
-            let fs = bucketInput.tryGetFileSystem()
+            let fs = bucketInput.value
             let project_file_path = projectFilePathInput.value
             if(!fs || !project_file_path){
                 new ErrorPopupWidget({message: "Some inputs missing"})
@@ -47,7 +48,7 @@ export class ProjectWidget{
 
             if(ev.submitter == loadButton){
                 loadButton.value = "Loading project..."
-                params.session.loadProject({fs,  project_file_path}).then(result => {
+                params.session.loadProject(new LoadProjectParamsMessage({fs,  project_file_path: project_file_path.raw})).then(result => {
                     if(result instanceof Error){
                         new ErrorPopupWidget({message: result.message})
                     }
@@ -56,7 +57,7 @@ export class ProjectWidget{
                 })
             }else if(ev.submitter == saveButton){
                 saveButton.value = "Saving project..."
-                params.session.saveProject({fs,  project_file_path}).then(result => {
+                params.session.saveProject(new SaveProjectParamsMessage({fs,  project_file_path: project_file_path.raw})).then(result => {
                     if(result instanceof Error){
                         new ErrorPopupWidget({message: result.message})
                     }

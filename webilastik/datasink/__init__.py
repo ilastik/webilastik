@@ -9,6 +9,7 @@ import numpy as np
 from ndstructs.point5D import Shape5D, Interval5D
 from ndstructs.array5D import Array5D
 from webilastik.filesystem import JsonableFilesystem
+from webilastik.server.message_schema import PrecomputedChunksScaleSinkMessage
 from webilastik.utility.url import Url
 
 class DataSinkWriter(Protocol):
@@ -57,6 +58,11 @@ class DataSink(ABC):
         if class_name == PrecomputedChunksScaleSink.__name__:
             return PrecomputedChunksScaleSink.from_json_value(value)
         raise ValueError(f"Could not deserialize DataSink from {json.dumps(value)}")
+
+    @classmethod
+    def from_message(cls, message: PrecomputedChunksScaleSinkMessage) -> "DataSink":
+        from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksScaleSink
+        return PrecomputedChunksScaleSink.from_message(message)
 
 class FsDataSink(DataSink):
     def __init__(

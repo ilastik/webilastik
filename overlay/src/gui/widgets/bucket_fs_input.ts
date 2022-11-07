@@ -1,4 +1,4 @@
-import { BucketFs } from "../../client/ilastik";
+import { BucketFSMessage } from "../../client/message_schema";
 import { createElement, createInputParagraph } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
 import { PathInput } from "./path_input";
@@ -12,7 +12,7 @@ export class BucketFsInput{
         bucketName?: string,
         prefix?: Path,
         required?: boolean,
-        value?: BucketFs,
+        value?: BucketFSMessage,
         hidePrefix?: boolean,
     }){
         let required = params.required === undefined ? true : params.required;
@@ -30,23 +30,19 @@ export class BucketFsInput{
         }
     }
 
-    public tryGetFileSystem(): BucketFs | undefined{
+    public get value(): BucketFSMessage | undefined{
         let bucketName = this.bucketNameInput.value
         let prefix = this.prefixInput.value
         if(!bucketName || !prefix){
             return undefined
         }
-        return new BucketFs({bucket_name: bucketName, prefix})
+        return new BucketFSMessage({bucket_name: bucketName, prefix: prefix.raw})
     }
 
-    public get value(): BucketFs | undefined{
-        return this.tryGetFileSystem()
-    }
-
-    public set value(fs: BucketFs | undefined){
+    public set value(fs: BucketFSMessage | undefined){
         if(fs){
             this.bucketNameInput.value = fs.bucket_name
-            this.prefixInput.value = fs.prefix
+            this.prefixInput.value = Path.parse(fs.prefix)
         }else{
             this.bucketNameInput.value = ""
             this.prefixInput.value = undefined

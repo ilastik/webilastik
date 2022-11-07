@@ -16,6 +16,7 @@ from webilastik.filesystem import JsonableFilesystem
 
 from webilastik.filesystem.RemoteFile import RemoteFile
 from webilastik.libebrains.user_token import UserToken
+from webilastik.server.message_schema import BucketFSMessage
 from webilastik.ui.usage_error import UsageError
 from webilastik.utility.url import Protocol, Url
 from webilastik.libebrains import global_user_login
@@ -273,6 +274,19 @@ class BucketFs(JsonableFilesystem):
     def setinfo(self, path: str, info) -> None:
         raise NotImplementedError
         return super().setinfo(path, info)
+
+    @classmethod
+    def from_message(cls, message: BucketFSMessage) -> "BucketFs":
+        return BucketFs(
+            bucket_name=message.bucket_name,
+            prefix=PurePosixPath(message.prefix)
+        )
+
+    def to_message(self) -> BucketFSMessage:
+        return BucketFSMessage(
+            bucket_name=self.bucket_name,
+            prefix=self.prefix.as_posix(),
+        )
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "BucketFs":

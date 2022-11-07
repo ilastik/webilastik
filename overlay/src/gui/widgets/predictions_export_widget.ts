@@ -7,7 +7,7 @@ import { DataSource, Session } from '../../client/ilastik';
 import { CssClasses } from '../css_classes';
 import { ErrorPopupWidget } from './popup';
 import { PixelPredictionsExportParamsInput, SimpleSegmentationExportParamsInput } from './export_params_input';
-import { DataSourceMessage } from '../../client/message_schema';
+import { DataSourceMessage, StartExportJobParamsMessage, StartSimpleSegmentationExportJobParamsMessage } from '../../client/message_schema';
 
 const sink_creation_stati = ["pending", "running", "cancelled", "failed", "succeeded"] as const;
 export type SinkCreationStatus = typeof sink_creation_stati[number];
@@ -111,8 +111,9 @@ export class PredictionsExportWidget extends Applet<State>{
                     new ErrorPopupWidget({message: "Missing export parameters"})
                     return
                 }
-                //FIXME
-                this.doRPC("start_export_job", {datasource: payload.datasource.toMessage(), datasink: payload.datasink.toJsonValue()})
+                this.doRPC("start_export_job", new StartExportJobParamsMessage({
+                    datasource: payload.datasource.toMessage(), datasink: payload.datasink
+                }))
             }
         })
 
@@ -130,9 +131,9 @@ export class PredictionsExportWidget extends Applet<State>{
                     new ErrorPopupWidget({message: "Missing export parameters"})
                     return
                 }
-                this.doRPC("start_simple_segmentation_export_job", {
+                this.doRPC("start_simple_segmentation_export_job", new StartSimpleSegmentationExportJobParamsMessage({
                     datasource: payload.datasource.toMessage(), datasinks: payload.datasinks
-                })
+                }))
             }
         })
 

@@ -21,9 +21,11 @@ import {
     Interval5DMessage,
     ListComputeSessionsParamsMessage,
     ListComputeSessionsResponseMessage,
+    LoadProjectParamsMessage,
     Point5DMessage,
     PredictionsViewMessage,
     RawDataViewMessage,
+    SaveProjectParamsMessage,
     Shape5DMessage,
     StrippedPrecomputedViewMessage,
     UnsupportedDatasetViewMessage
@@ -131,7 +133,7 @@ export class Session{
         return true
     }
 
-    public async saveProject(params: {fs: FileSystem, project_file_path: Path}): Promise<Error | undefined>{
+    public async saveProject(params: SaveProjectParamsMessage): Promise<Error | undefined>{
         let response = await fetch(
             this.sessionUrl.joinPath("save_project").schemeless_raw,
             {
@@ -144,7 +146,7 @@ export class Session{
         return Error(`Could not save project: ${await response.text()}`)
     }
 
-    public async loadProject(params: {fs: FileSystem, project_file_path: Path}): Promise<Error | undefined>{
+    public async loadProject(params: LoadProjectParamsMessage): Promise<Error | undefined>{
         let response = await fetch(
             this.sessionUrl.joinPath("load_project").schemeless_raw,
             {
@@ -773,7 +775,7 @@ export class DataSource{
     }
 }
 
-export class FsDataSink{
+export abstract class FsDataSink{
     public readonly tile_shape: Shape5D
     public readonly interval: Interval5D
     public readonly dtype: DataType

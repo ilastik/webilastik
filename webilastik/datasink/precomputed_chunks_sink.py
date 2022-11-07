@@ -11,6 +11,11 @@ from webilastik.datasink import FsDataSink
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.filesystem import JsonableFilesystem
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale
+from webilastik.filesystem.bucket_fs import BucketFs
+from webilastik.filesystem.http_fs import HttpFs
+from webilastik.filesystem.osfs import OsFs
+from webilastik.filesystem.util import fs_from_message
+from webilastik.server.message_schema import PrecomputedChunksScaleSinkMessage
 from webilastik.utility.url import Url
 
 class PrecomputedChunksScaleSink(FsDataSink):
@@ -114,6 +119,26 @@ class PrecomputedChunksScaleSink(FsDataSink):
             scale=PrecomputedChunksScale.from_json_value(value_obj.get("scale")),
             dtype=np.dtype(ensureJsonString(value_obj.get("dtype"))),
             num_channels=ensureJsonInt(value_obj.get("num_channels"))
+        )
+
+    def to_message(self) -> PrecomputedChunksScaleSinkMessage:
+        assert isinstance(self.filesystem, (HttpFs, OsFs, BucketFs)) #FIXME
+        return PrecomputedChunksScaleSinkMessage(
+            filesystem=self.filesystem.to_message(),
+            info_dir=self.info_dir.as_posix(),
+            scale=self.scale.to_message(),
+            dtype=str(self.dtype), # type: ignore
+            num_channels=self.shape.c,
+        )
+
+    @classmethod
+    def from_message(cls, message: PrecomputedChunksScaleSinkMessage) -> "PrecomputedChunksScaleSink":
+        return PrecomputedChunksScaleSink(
+            filesystem=fs_from_message(message.filesystem),
+            dtype=np.dtype(message.dtype), #FIXME?
+            info_dir=PurePosixPath(message.info_dir),
+            num_channels=message.num_channels,
+            scale=PrecomputedChunksScale.from_message(message.scale),
         )
 
     def __getstate__(self) -> JsonObject:

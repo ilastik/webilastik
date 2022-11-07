@@ -28,8 +28,12 @@ from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonO
 from fs.errors import ResourceNotFound
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
+from webilastik.filesystem import JsonableFilesystem
 from webilastik.filesystem.bucket_fs import BucketFs
+from webilastik.filesystem.osfs import OsFs
+from webilastik.filesystem.util import fs_from_message
 from webilastik.scheduling.job import PriorityExecutor
+from webilastik.server.message_schema import MessageParsingError, SaveProjectParamsMessage
 from webilastik.server.session_allocator import uncachable_json_response
 from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError
@@ -81,11 +85,11 @@ class RPCPayload:
             "arguments": self.arguments,
         }
 
-def do_save_project(filesystem: BucketFs, file_path: PurePosixPath, workflow_contents: bytes):
+def do_save_project(filesystem: JsonableFilesystem, file_path: PurePosixPath, workflow_contents: bytes):
     with filesystem.openbin(file_path.as_posix(), "w") as f:
         f.write(workflow_contents)
 
-def do_load_project_bytes(filesystem: BucketFs, file_path: PurePosixPath) -> "bytes | ResourceNotFound":
+def do_load_project_bytes(filesystem: JsonableFilesystem, file_path: PurePosixPath) -> "bytes | ResourceNotFound":
     try:
         with filesystem.openbin(file_path.as_posix(), "r") as f:
             return f.read()
@@ -331,8 +335,13 @@ class WebIlastik:
 
     async def save_project(self, request: web.Request) -> web.Response:
         payload = await request.json()
-        filesystem = BucketFs.from_json_value(payload.get("fs"))
-        file_path = PurePosixPath(ensureJsonString(payload.get("project_file_path")))
+        params_result = SaveProjectParamsMessage.from_json_value(payload)
+        if isinstance(params_result, MessageParsingError):
+            return web.Response(status=400, text=f"Bad payload")
+        filesystem = fs_from_message(params_result.fs)
+        if isinstance(filesystem, OsFs):
+            return web.Response(status=400, text=f"OsFs not allowed for now")
+        file_path = PurePosixPath(params_result.project_file_path)
         if len(file_path.parts) == 0 or ".." in file_path.parts:
             return web.Response(status=400, text=f"Bad project file path: {file_path}")
 
@@ -347,8 +356,13 @@ class WebIlastik:
 
     async def load_project(self, request: web.Request) -> web.Response:
         payload = await request.json()
-        filesystem = BucketFs.from_json_value(payload.get("fs"))
-        file_path = PurePosixPath(ensureJsonString(payload.get("project_file_path")))
+        params_result = SaveProjectParamsMessage.from_json_value(payload)
+        if isinstance(params_result, MessageParsingError):
+            return web.Response(status=400, text=f"Bad payload")
+        filesystem = fs_from_message(params_result.fs)
+        if isinstance(filesystem, OsFs):
+            return web.Response(status=400, text=f"OsFs not allowed for now")
+        file_path = PurePosixPath(params_result.project_file_path)
         if len(file_path.parts) == 0 or ".." in file_path.parts:
             return web.Response(status=400, text=f"Bad project file path: {file_path}")
 

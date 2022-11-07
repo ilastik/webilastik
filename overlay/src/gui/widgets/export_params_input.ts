@@ -1,4 +1,6 @@
-import { DataSource, FsDataSink, Session } from "../../client/ilastik";
+import { DataSource, Session } from "../../client/ilastik";
+import { PrecomputedChunksScaleSinkMessage } from "../../client/message_schema";
+import { Path } from "../../util/parsed_url";
 import { DataSourceInput } from "./datasource_input";
 import { PrecomputedChunksScale_DataSink_Input } from "./precomputed_chunks_scale_datasink_input";
 
@@ -59,7 +61,7 @@ export class PixelPredictionsExportParamsInput{
         this.updateDatasink()
     }
 
-    public get value(): {datasource: DataSource, datasink: FsDataSink} | undefined{
+    public get value(): {datasource: DataSource, datasink: PrecomputedChunksScaleSinkMessage} | undefined{
         let datasource = this.datasourceInput.value
         let datasink = this.datasinkInput.value
         if(!datasource || !datasink){
@@ -126,17 +128,23 @@ export class SimpleSegmentationExportParamsInput{
         this.updateDatasink()
     }
 
-    public get value(): {datasource: DataSource, datasinks: Array<FsDataSink>} | undefined{
+    public get value(): {datasource: DataSource, datasinks: Array<PrecomputedChunksScaleSinkMessage>} | undefined{
 
         let datasource = this.datasourceInput.value
         let templateSink = this.templateDatasinkInput.value
         if(!datasource || !templateSink || !this.numberOfPixelClasses){
             return undefined
         }
-        let datasinks = new Array<FsDataSink>()
+        let datasinks = new Array<PrecomputedChunksScaleSinkMessage>()
         for(let i=0; i<this.numberOfPixelClasses; i++){
             datasinks.push(
-                templateSink.updatedWith({info_dir: templateSink.info_dir.joinPath(`class_${i}`)})
+                new PrecomputedChunksScaleSinkMessage({
+                    filesystem: templateSink.filesystem,
+                    info_dir: Path.parse(templateSink.info_dir).joinPath(`class_${i}`).raw,
+                    dtype: templateSink.dtype,
+                    num_channels: templateSink.num_channels,
+                    scale: templateSink.scale
+                })
             )
         }
         return {datasource, datasinks}

@@ -653,11 +653,46 @@ class Interval5DMessage(Message):
         )
 
 @dataclass
+class OsfsMessage(Message):
+    path: str
+
+@dataclass
+class HttpFsMessage(Message):
+    protocol: Literal["http", "https"]
+    hostname: str
+    port: Optional[int]
+    path: str
+    search: Optional[Mapping[str, str]]
+    # fragment: Optional[str]
+
+@dataclass
+class BucketFSMessage(Message):
+    bucket_name: str
+    prefix: str
+
+@dataclass
 class DataSourceMessage(Message):
     url: UrlMessage
     interval: Interval5DMessage
     tile_shape: Shape5DMessage
     spatial_resolution: Tuple[int, int, int]
+
+@dataclass
+class PrecomputedChunksScaleMessage(Message):
+    key: str #???????????????
+    size: Tuple[int, int, int]
+    resolution: Tuple[int, int, int]
+    voxel_offset: Tuple[int, int, int]
+    chunk_sizes: Tuple[Tuple[int, int, int], ...]
+    encoding: Literal["raw", "jpeg"]
+
+@dataclass
+class PrecomputedChunksScaleSinkMessage(Message):
+    filesystem: Union[OsfsMessage, HttpFsMessage, BucketFSMessage]
+    info_dir: str #??????????????
+    scale: PrecomputedChunksScaleMessage
+    dtype: Literal["uint8", "uint16", "uint32", "uint64", "float32"]
+    num_channels: int
 
 @dataclass
 class PixelAnnotationMessage(Message):
@@ -871,3 +906,28 @@ class GetAvailableHpcSitesResponseMessage(Message):
 @dataclass
 class CheckLoginResultMessage(Message):
     logged_in: bool
+
+#############################################3333
+
+@dataclass
+class StartExportJobParamsMessage(Message):
+    datasource: DataSourceMessage
+    datasink: PrecomputedChunksScaleSinkMessage
+
+@dataclass
+class StartSimpleSegmentationExportJobParamsMessage(Message):
+    datasource: DataSourceMessage
+    datasinks: Tuple[PrecomputedChunksScaleSinkMessage, ...]
+
+############################################
+
+@dataclass
+class LoadProjectParamsMessage(Message):
+    fs: Union[HttpFsMessage, BucketFSMessage, OsfsMessage]
+    project_file_path: str
+
+
+@dataclass
+class SaveProjectParamsMessage(Message):
+    fs: Union[HttpFsMessage, BucketFSMessage, OsfsMessage]
+    project_file_path: str
