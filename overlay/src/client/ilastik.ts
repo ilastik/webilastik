@@ -3,8 +3,7 @@ import { INativeView } from "../drivers/viewer_driver"
 import { fetchJson, sleep } from "../util/misc"
 import { Url } from "../util/parsed_url"
 import {
-    ensureJsonArray, ensureJsonObject,
-    ensureJsonString, JsonableValue, JsonValue, toJsonValue
+    ensureJsonObject, ensureJsonString, JsonableValue, JsonValue, toJsonValue
 } from "../util/serialization"
 import {
     CheckLoginResultMessage,
@@ -16,6 +15,8 @@ import {
     FailedViewMessage,
     GetAvailableHpcSitesResponseMessage,
     GetComputeSessionStatusParamsMessage,
+    GetDatasourcesFromUrlParamsMessage,
+    GetDatasourcesFromUrlResponseMessage,
     IlpFeatureExtractorMessage,
     Interval5DMessage,
     ListComputeSessionsParamsMessage,
@@ -348,6 +349,23 @@ export class Session{
         }
         return undefined
     }
+
+    public async getDatasourcesFromUrl(params: GetDatasourcesFromUrlParamsMessage): Promise<Array<DataSource> | Error>{
+        let result = await fetchJson(this.sessionUrl.joinPath("get_datasources_from_url").raw, {
+            method: "POST",
+            body: JSON.stringify(toJsonValue(params)),
+            cache: "no-store", //FIXME: why can't this be cached again? Nonces in URLs? Tokens in Filesystems?
+        })
+        if(result instanceof Error){
+            return result
+        }
+        const responseMessage =  GetDatasourcesFromUrlResponseMessage.fromJsonValue(result);
+        if(responseMessage instanceof Error){
+            return responseMessage
+        }
+        return responseMessage.datasources.map(msg => DataSource.fromMessage(msg))
+    }
+
 }
 
 export type FeatureClassName = IlpFeatureExtractorMessage["class_name"]
@@ -606,37 +624,6 @@ export class DataSource{
         return (
             this.url.equals(other.url) && vec3.equals(this.spatial_resolution, other.spatial_resolution)
         )
-    }
-
-    public static async getDatasourcesFromUrl(params: {datasource_url: Url, session: Session}): Promise<Array<DataSource> | Error>{
-        let url = params.session.sessionUrl.joinPath("get_datasources_from_url")
-            .updatedWith({
-                search: new Map([["url", Session.btoa(params.datasource_url.raw)]])
-            })
-        let response = await fetch(url.raw, {
-            method: "POST",
-            body: JSON.stringify({url: params.datasource_url.raw}),
-            cache: "no-store", //FIXME: why can't this be cached again? Nonces in URLs? Tokens in Filesystems?
-        })
-        if(!response.ok){
-            let error_message = (await response.json())["error"]
-            return Error(error_message)
-        }
-        let payload = ensureJsonObject(await response.json())
-        if("error" in payload){
-            return Error(ensureJsonString(payload.error))
-        }
-        //FIXME: maybe fix this array processing? This should probably be a Message itself
-        const out = new Array<DataSource>()
-        const rawArray = ensureJsonArray(payload);
-        for(let item of rawArray){
-            let datasourceResult = DataSourceMessage.fromJsonValue(item)
-            if(datasourceResult instanceof Error){
-                return datasourceResult
-            }
-            out.push(DataSource.fromMessage(datasourceResult))
-        }
-        return out
     }
 }
 

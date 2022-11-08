@@ -931,3 +931,13 @@ class LoadProjectParamsMessage(Message):
 class SaveProjectParamsMessage(Message):
     fs: Union[HttpFsMessage, BucketFSMessage, OsfsMessage]
     project_file_path: str
+
+#########################################
+
+@dataclass
+class GetDatasourcesFromUrlParamsMessage(Message):
+    url: UrlMessage
+
+@dataclass
+class GetDatasourcesFromUrlResponseMessage(Message):
+    datasources: Tuple[DataSourceMessage, ...]

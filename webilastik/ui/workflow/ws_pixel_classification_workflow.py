@@ -33,7 +33,7 @@ from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.filesystem.osfs import OsFs
 from webilastik.filesystem.util import fs_from_message
 from webilastik.scheduling.job import PriorityExecutor
-from webilastik.server.message_schema import MessageParsingError, SaveProjectParamsMessage
+from webilastik.server.message_schema import GetDatasourcesFromUrlParamsMessage, GetDatasourcesFromUrlResponseMessage, MessageParsingError, RpcErrorMessage, SaveProjectParamsMessage
 from webilastik.server.session_allocator import uncachable_json_response
 from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError
@@ -201,13 +201,10 @@ class WebIlastik:
         self.app.on_shutdown.append(self.close_websockets)
 
     async def get_datasources_from_url(self, request: web.Request) -> web.Response:
-        payload = await request.json()
-        raw_url = payload.get("url")
-        if raw_url is None:
-            return  uncachable_json_response({"error": "Missing 'url' key in payload"}, status=400)
-        url = Url.parse(raw_url)
-        if url is None:
-            return  uncachable_json_response({"error": "Bad url in payload"}, status=400)
+        params = GetDatasourcesFromUrlParamsMessage.from_json_value(await request.json())
+        if isinstance(params, MessageParsingError):
+            return  uncachable_json_response(RpcErrorMessage(error="bad payload").to_json_value(), status=400)
+        url = Url.from_message(params.url)
 
         selected_resolution: "Tuple[int, int, int] | None" = None
         stripped_precomputed_url_regex = re.compile(r"/stripped_precomputed/url=(?P<url>[^/]+)/resolution=(?P<resolution>\d+_\d+_\d+)")
@@ -218,21 +215,23 @@ class WebIlastik:
 
         datasources_result = try_get_datasources_from_url(url=url, allowed_protocols=("http", "https"))
         if isinstance(datasources_result, Exception):
-            return web.json_response({"error": str(datasources_result)}, status=400)
+            return uncachable_json_response(RpcErrorMessage(error=str(datasources_result)).to_json_value(), status=400)
         if isinstance(datasources_result, type(None)):
-            return uncachable_json_response({"error": f"Unsupported datasource type: {url}"}, status=400)
+            return uncachable_json_response(RpcErrorMessage(error=f"Unsupported datasource type: {url}").to_json_value(), status=400)
         if selected_resolution:
             datasources = [ds for ds in datasources_result if ds.spatial_resolution == selected_resolution]
             if len(datasources) != 1:
                 return uncachable_json_response(
-                    {"error": f"Expected single datasource, found these: {json.dumps([ds.to_json_value() for ds in datasources], indent=4)}"},
+                    RpcErrorMessage(
+                        error=f"Expected single datasource, found these: {json.dumps([ds.to_json_value() for ds in datasources], indent=4)}"
+                    ).to_json_value(),
                     status=400,
                 )
         else:
             datasources = datasources_result
 
         return uncachable_json_response(
-            {"datasources": tuple([ds.to_json_value() for ds in datasources])},
+            GetDatasourcesFromUrlResponseMessage(datasources=tuple([ds.to_message() for ds in datasources])).to_json_value(),
             status=200,
         )
 
