@@ -1,5 +1,6 @@
 import { IViewerDriver } from "../..";
 import { HpcSiteName, Session } from "../../client/ilastik";
+import { CreateComputeSessionParamsMessage, GetComputeSessionStatusParamsMessage } from "../../client/message_schema";
 import { createElement, createInput, createInputParagraph, secondsToTimeDeltaString } from "../../util/misc";
 import { Url } from "../../util/parsed_url";
 import { ReferencePixelClassificationWorkflowGui } from "../reference_pixel_classification_workflow";
@@ -87,7 +88,7 @@ export class SessionManagerWidget{
                     ilastikUrl,
                     hpc_site: this.hpcSiteInput.value,
                     onSessionClosed: (status) => {
-                        if(this.session && this.session.sessionUrl.equals(status.session_url)){
+                        if(this.session && this.session.sessionUrl.equals(Url.fromMessage(status.session_url))){
                             this.onLeaveSession()
                         }
                     }
@@ -130,11 +131,13 @@ export class SessionManagerWidget{
                 let sessionResult = await Session.create({
                     ilastikUrl,
                     timeout_minutes: timeoutMinutes,
-                    session_duration_minutes: sessionDurationMinutes,
+                    rpcParams: new CreateComputeSessionParamsMessage({
+                        hpc_site: this.hpcSiteInput.value,
+                        session_duration_minutes: sessionDurationMinutes,
+                    }),
                     onProgress: (message) => this.logMessage(message),
-                    onUsageError: (message) => this.logMessage(message),
+                    onUsageError: (message) => {new ErrorPopupWidget({message: message})},
                     autoCloseOnTimeout: true,
-                    hpc_site: this.hpcSiteInput.value,
                 })
                 this.onNewSession(sessionResult)
             }
@@ -165,12 +168,14 @@ export class SessionManagerWidget{
                 this.logMessage("Joining session....")
                 let sessionResult = await Session.load({
                     ilastikUrl,
-                    sessionId,
+                    getStatusRpcParams: new GetComputeSessionStatusParamsMessage({
+                        compute_session_id: sessionId,
+                        hpc_site: this.hpcSiteInput.value,
+                    }),
                     timeout_minutes: timeoutMinutes,
                     onUsageError: (message) => this.logMessage(message),
                     onProgress: (message) => this.logMessage(message),
                     autoCloseOnTimeout: false,
-                    hpc_site: this.hpcSiteInput.value,
                 })
                 this.onNewSession(sessionResult)
             }
@@ -263,12 +268,12 @@ export class SessionManagerWidget{
         if(ilastikUrl === undefined){
             return undefined
         }
-        let logInResult = await Session.check_login({ilastikUrl})
-        if(logInResult instanceof Error){
-            new ErrorPopupWidget({message: `Could not login: ${logInResult.message}`})
+        let response = await Session.check_login({ilastikUrl})
+        if(response instanceof Error){
+            new ErrorPopupWidget({message: `Could not login: ${response.message}`})
             return
         }
-        if(logInResult === true){
+        if(response.logged_in === true){
             return ilastikUrl
         }
 

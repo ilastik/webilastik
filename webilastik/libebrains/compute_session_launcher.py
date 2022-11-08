@@ -2,9 +2,8 @@
 
 from abc import abstractmethod
 import asyncio
-from enum import Enum
 from subprocess import Popen
-from typing import Dict, Iterable, NewType, List, Set, Tuple
+from typing import Dict, Iterable, Literal, NewType, List, Set, Tuple
 import uuid
 import datetime
 import textwrap
@@ -15,69 +14,72 @@ import getpass
 import sys
 import os
 
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
+from ndstructs.utils.json_serializable import ensureJsonObject, ensureJsonString
 from cryptography.fernet import Fernet
-from webilastik.libebrains.oidc_client import OidcClient
 
+from webilastik.libebrains.oidc_client import OidcClient
 from webilastik.libebrains.user_info import UserInfo
 from webilastik.libebrains.user_token import UserToken
+from webilastik.server.message_schema import ComputeSessionMessage
 
 _oidc_client = OidcClient.from_environment()
 
-class JobState(Enum):
-    BOOT_FAIL = "BOOT_FAIL"
-    CANCELLED = "CANCELLED"
-    COMPLETED = "COMPLETED"
-    DEADLINE = "DEADLINE"
-    FAILED = "FAILED"
-    NODE_FAIL = "NODE_FAIL"
-    OUT_OF_MEMORY = "OUT_OF_MEMORY"
-    PENDING = "PENDING"
-    PREEMPTED = "PREEMPTED"
-    RUNNING = "RUNNING"
-    REQUEUED = "REQUEUED"
-    RESIZING = "RESIZING"
-    REVOKED = "REVOKED"
-    SUSPENDED = "SUSPENDED"
-    TIMEOUT = "TIMEOUT"
+ComputeSessionState = Literal[
+    "BOOT_FAIL",
+    "CANCELLED",
+    "COMPLETED",
+    "DEADLINE",
+    "FAILED",
+    "NODE_FAIL",
+    "OUT_OF_MEMORY",
+    "PENDING",
+    "PREEMPTED",
+    "RUNNING",
+    "REQUEUED",
+    "RESIZING",
+    "REVOKED",
+    "SUSPENDED",
+    "TIMEOUT",
+]
 
-    def is_failure(self) -> bool:
-        return self in FAILED_STATES
-
-    def is_done(self) -> bool:
-        return self in DONE_STATES
-
-    def to_json_value(self) -> str:
-        return self.value
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "JobState":
-        value_str = ensureJsonString(value)
-        for state in JobState:
-            if state.value == value_str:
-                return state
-        raise ValueError(f"Bad job state: {value_str}")
-
-FAILED_STATES = set([
-    JobState.BOOT_FAIL,
-    JobState.CANCELLED,
-    JobState.DEADLINE,
-    JobState.FAILED,
-    JobState.NODE_FAIL,
-    JobState.OUT_OF_MEMORY,
-    JobState.PREEMPTED,
-    JobState.REVOKED,
-    JobState.TIMEOUT,
+COMPUTE_SESSION_STATES: Set[ComputeSessionState] = set([
+    "BOOT_FAIL",
+    "CANCELLED",
+    "COMPLETED",
+    "DEADLINE",
+    "FAILED",
+    "NODE_FAIL",
+    "OUT_OF_MEMORY",
+    "PENDING",
+    "PREEMPTED",
+    "RUNNING",
+    "REQUEUED",
+    "RESIZING",
+    "REVOKED",
+    "SUSPENDED",
+    "TIMEOUT",
 ])
 
-DONE_STATES = set([JobState.COMPLETED]).union(FAILED_STATES)
+FAILED_STATES: Set[ComputeSessionState] = set([
+    "BOOT_FAIL",
+    "CANCELLED",
+    "DEADLINE",
+    "FAILED",
+    "NODE_FAIL",
+    "OUT_OF_MEMORY",
+    "PREEMPTED",
+    "REVOKED",
+    "TIMEOUT",
+])
 
-RUNNABLE_STATES = set([
-    JobState.PENDING,
-    JobState.RUNNING,
-    JobState.REQUEUED,
-    JobState.RESIZING,
-    JobState.SUSPENDED,
+DONE_STATES: Set[ComputeSessionState] = set(["COMPLETED", *FAILED_STATES])
+
+RUNNABLE_STATES: Set[ComputeSessionState] = set([
+    "PENDING",
+    "RUNNING",
+    "REQUEUED",
+    "RESIZING",
+    "SUSPENDED",
 ])
 
 
@@ -85,14 +87,14 @@ Username = NewType("Username", str)
 Hostname = NewType("Hostname", str)
 Minutes = NewType("Minutes", int)
 Seconds = NewType("Seconds", int)
-SlurmJobId = NewType("SlurmJobId", int)
+NativeComputeSessionId = NewType("NativeComputeSessionId", int)
 NodeSeconds = NewType("NodeSeconds", int)
 
-class SlurmJob:
+class ComputeSession:
     SACCT_FORMAT_ITEMS = ["JobID", "JobName", "State", "ElapsedRaw", "TimelimitRaw", "Start", "AllocNodes"]
 
     @classmethod
-    def try_from_parsable2_raw_job_data(cls, parsable2_raw_job_data: str, fernet: Fernet) -> "SlurmJob | None | Exception":
+    def try_from_parsable2_raw_slurm_job_data(cls, parsable2_raw_job_data: str, fernet: Fernet) -> "ComputeSession | None | Exception":
         items = parsable2_raw_job_data.split("|")
         try:
             raw_id, job_name, raw_state, raw_elapsed, raw_time_limit, raw_start_time_utc_sec, raw_alloc_nodes = items
@@ -115,28 +117,32 @@ class SlurmJob:
         try:
             metadata_obj = ensureJsonObject(metadata)
             user_id = uuid.UUID(ensureJsonString(metadata_obj.get("uid")))
-            session_id = uuid.UUID(ensureJsonString(metadata_obj.get("sid")))
+            compute_session_id = uuid.UUID(ensureJsonString(metadata_obj.get("sid")))
         except Exception as e:
             return Exception(f"Bad metadata json: {metadata_json}")
 
-        return SlurmJob(
-            job_id=SlurmJobId(int(raw_id)),
-            state=JobState.from_json_value(raw_state.split(" ")[0]),
+        clean_raw_state = raw_state.split(" ")[0]
+        if clean_raw_state not in COMPUTE_SESSION_STATES:
+            return Exception(f"Bad job state: '{clean_raw_state}' derived from '{raw_state}'")
+
+        return ComputeSession(
+            native_compute_session_id=NativeComputeSessionId(int(raw_id)),
+            state=clean_raw_state,
             start_time_utc_sec=None if raw_start_time_utc_sec == "Unknown" else Seconds(int(raw_start_time_utc_sec)),
             time_elapsed_sec=Seconds(int(raw_elapsed)),
             time_limit_minutes=Minutes(int(raw_time_limit)),
             num_nodes=int(raw_alloc_nodes),
             user_id=user_id,
-            session_id=session_id,
+            compute_session_id=compute_session_id,
         )
 
     @classmethod
-    def make_job_name(
-        cls, *, user_id: uuid.UUID, session_id: uuid.UUID, fernet: Fernet
+    def make_session_name(
+        cls, *, user_id: uuid.UUID, compute_session_id: uuid.UUID, fernet: Fernet
     ) -> str:
         comment_data = {
             "uid": str(user_id),
-            "sid": str(session_id),
+            "sid": str(compute_session_id),
         }
         return fernet.encrypt(
             json.dumps(comment_data, separators=(',', ':')).encode('utf8'),
@@ -145,56 +151,54 @@ class SlurmJob:
     def __init__(
         self,
         *,
-        job_id: SlurmJobId,
-        state: JobState,
+        native_compute_session_id: NativeComputeSessionId,
+        state: ComputeSessionState,
         start_time_utc_sec: "Seconds | None",
         time_elapsed_sec: "Seconds",
         time_limit_minutes: "Minutes",
         num_nodes: int,
         user_id: uuid.UUID,
-        session_id: uuid.UUID,
+        compute_session_id: uuid.UUID,
     ) -> None:
-        self.job_id = job_id
-        self.state = state
+        self.native_compute_session_id = native_compute_session_id
+        self.state: ComputeSessionState = state
         self.start_time_utc_sec = start_time_utc_sec
         self.time_elapsed_sec = time_elapsed_sec
         self.time_limit_minutes = time_limit_minutes
         self.num_nodes = num_nodes
         self.user_id = user_id
-        self.session_id = session_id
+        self.compute_session_id = compute_session_id
         super().__init__()
 
 
-    def to_json_value(self) -> JsonObject:
-        return {
-            "job_id": self.job_id,
-            "state": self.state.to_json_value(),
-            "start_time_utc_sec": self.start_time_utc_sec,
-            "time_elapsed_sec": self.time_elapsed_sec,
-            "time_limit_minutes": self.time_limit_minutes,
-            "num_nodes": self.num_nodes,
-            # "user_sub": self.uuid,
-            "session_id": str(self.session_id),
-        }
+    def to_message(self) -> ComputeSessionMessage:
+        return ComputeSessionMessage(
+            start_time_utc_sec=self.start_time_utc_sec,
+            time_elapsed_sec=self.time_elapsed_sec,
+            time_limit_minutes=self.time_limit_minutes,
+            num_nodes=self.num_nodes,
+            compute_session_id=str(self.compute_session_id),
+            state=self.state,
+        )
 
     def is_running(self) -> bool:
-        return self.state == JobState.RUNNING
+        return self.state == "RUNNING"
 
     def is_runnable(self) -> bool:
         return self.state in RUNNABLE_STATES
 
     def has_failed(self) -> bool:
-        return self.state.is_failure()
+        return self.state in FAILED_STATES
 
     def is_done(self) -> bool:
-        return self.state.is_done()
+        return self.state in DONE_STATES
 
     def belongs_to(self, user_info: UserInfo) -> bool:
         return self.user_id == user_info.sub
 
     @classmethod
-    def compute_used_quota(cls, jobs: Iterable["SlurmJob"]) -> NodeSeconds:
-        return NodeSeconds(sum(job.time_elapsed_sec * job.num_nodes for job in jobs))
+    def compute_used_quota(cls, compute_sessions: Iterable["ComputeSession"]) -> NodeSeconds:
+        return NodeSeconds(sum(s.time_elapsed_sec * s.num_nodes for s in compute_sessions))
 
 class SshJobLauncher:
     JOB_NAME_PREFIX = "EBRAINS"
@@ -217,7 +221,7 @@ class SshJobLauncher:
         super().__init__()
 
     @classmethod
-    def make_job_name(cls, user_id: uuid.UUID) -> str:
+    def make_session_name(cls, user_id: uuid.UUID) -> str:
         return f"{cls.JOB_NAME_PREFIX}-{user_id}"
 
     async def do_ssh(
@@ -274,7 +278,7 @@ class SshJobLauncher:
         *,
         time: Minutes,
         ebrains_user_token: UserToken,
-        session_id: uuid.UUID,
+        compute_session_id: uuid.UUID,
     ) -> "str":
         pass
 
@@ -284,93 +288,93 @@ class SshJobLauncher:
         user_id: uuid.UUID,
         time: Minutes,
         ebrains_user_token: UserToken,
-        session_id: uuid.UUID,
+        compute_session_id: uuid.UUID,
         display_name: str = ""
-    ) -> "SlurmJob | Exception":
+    ) -> "ComputeSession | Exception":
         output_result = await self.do_ssh(
             command="sbatch",
             command_args=[
-                f"--job-name={SlurmJob.make_job_name(user_id=user_id, session_id=session_id, fernet=self.fernet)}",
+                f"--job-name={ComputeSession.make_session_name(user_id=user_id, compute_session_id=compute_session_id, fernet=self.fernet)}",
                 f"--time={time}",
                 f"--account={self.account}",
             ],
             stdin=self.get_sbatch_launch_script(
                 time=time,
                 ebrains_user_token=ebrains_user_token,
-                session_id=session_id,
+                compute_session_id=compute_session_id,
             ),
         )
         if isinstance(output_result, Exception):
             return output_result
 
-        job_id = SlurmJobId(int(output_result.split()[3]))
+        native_compute_session_id = NativeComputeSessionId(int(output_result.split()[3]))
 
         for _ in range(5):
             await asyncio.sleep(0.7)
-            job = await self.get_job_by_slurm_id(job_id=job_id)
-            if isinstance(job, (Exception, SlurmJob)):
+            job = await self.get_compute_session_by_native_id(native_compute_session_id=native_compute_session_id)
+            if isinstance(job, (Exception, ComputeSession)):
                 return job
-        return Exception(f"Could not retrieve job with id {job_id}")
+        return Exception(f"Could not retrieve job with id {native_compute_session_id}")
 
 
-    async def cancel(self, job: SlurmJob) -> "Exception | None":
-        result = await self.do_ssh(command="scancel", command_args=[str(job.job_id)])
+    async def cancel(self, compute_session: ComputeSession) -> "Exception | None":
+        result = await self.do_ssh(command="scancel", command_args=[str(compute_session.native_compute_session_id)])
         if isinstance(result, Exception):
             return result
         return None
 
-    async def get_current_job_for_user(self, user_info: UserInfo) -> "SlurmJob | None | Exception":
-        runnable_jobs_result = await self.get_jobs(state=RUNNABLE_STATES)
-        if isinstance(runnable_jobs_result, Exception):
-            return runnable_jobs_result
-        for job in runnable_jobs_result:
-            if job.belongs_to(user_info=user_info):
-                return job
+    async def get_current_compute_session_for_user(self, user_info: UserInfo) -> "ComputeSession | None | Exception":
+        runnable_compute_sessions = await self.get_compute_sessions(state=RUNNABLE_STATES)
+        if isinstance(runnable_compute_sessions, Exception):
+            return runnable_compute_sessions
+        for session in runnable_compute_sessions:
+            if session.belongs_to(user_info=user_info):
+                return session
         return None
 
-    async def get_job_by_slurm_id(self, job_id: SlurmJobId) -> "SlurmJob | None | Exception":
-        jobs_result = await self.get_jobs(job_id=job_id)
-        if isinstance(jobs_result, Exception):
-            return jobs_result
-        if len(jobs_result) == 0:
+    async def get_compute_session_by_native_id(self, native_compute_session_id: NativeComputeSessionId) -> "ComputeSession | None | Exception":
+        compe_sessions = await self.get_compute_sessions(native_compute_session_id=native_compute_session_id)
+        if isinstance(compe_sessions, Exception):
+            return compe_sessions
+        if len(compe_sessions) == 0:
             return None
-        return jobs_result[0]
+        return compe_sessions[0]
 
-    async def get_job_by_session_id(self, session_id: uuid.UUID, user_id: uuid.UUID) -> "SlurmJob | None | Exception":
-        jobs_result = await self.get_jobs(user_id=user_id)
-        if isinstance(jobs_result, Exception):
-            return jobs_result
-        for job in jobs_result:
-            if job.session_id == session_id:
-                return job
+    async def get_compute_session_by_id(self, compute_session_id: uuid.UUID, user_id: uuid.UUID) -> "ComputeSession | None | Exception":
+        compute_sessions_result = await self.get_compute_sessions(user_id=user_id)
+        if isinstance(compute_sessions_result, Exception):
+            return compute_sessions_result
+        for session in compute_sessions_result:
+            if session.compute_session_id == compute_session_id:
+                return session
         return None
 
-    async def get_jobs(
+    async def get_compute_sessions(
         self,
         *,
-        job_id: "SlurmJobId | None" = None,
-        state: "Set[JobState] | None" = None,
+        native_compute_session_id: "NativeComputeSessionId | None" = None,
+        state: "Set[ComputeSessionState] | None" = None,
         starttime: "datetime.datetime" = datetime.datetime(year=2020, month=1, day=1),
         endtime: "datetime.datetime | None" = None,
         user_id: "uuid.UUID | None" = None,
-        session_id: "uuid.UUID | None" = None,
-    ) -> "List[SlurmJob] | Exception":
+        compute_session_id: "uuid.UUID | None" = None,
+    ) -> "List[ComputeSession] | Exception":
         endtime = endtime or datetime.datetime.today() + datetime.timedelta(days=2) # definetely in the future
         sacct_params = [
             "--allocations", # don't show individual steps
             "--noheader",
             "--parsable2", #items separated with '|'. No trailing '|'
-            f"--format={','.join(SlurmJob.SACCT_FORMAT_ITEMS)}",
+            f"--format={','.join(ComputeSession.SACCT_FORMAT_ITEMS)}",
             f"--starttime={starttime.year:04d}-{starttime.month:02d}-{starttime.day:02d}",
             f"--endtime={endtime.year:04d}-{endtime.month:02d}-{endtime.day:02d}",
             f"--user={self.user}",
             f"--account={self.account}",
         ]
 
-        if job_id is not None:
-            sacct_params.append(f"--jobs={job_id}")
+        if native_compute_session_id is not None:
+            sacct_params.append(f"--jobs={native_compute_session_id}")
         if state != None and len(state) > 0:
-            sacct_params.append(f"--state={','.join(s.value for s in state)}")
+            sacct_params.append(f"--state={','.join(state)}")
 
         output_result = await self.do_ssh(
             environment={"SLURM_TIME_FORMAT": r"%s"},
@@ -379,16 +383,16 @@ class SshJobLauncher:
         )
         if isinstance(output_result, Exception):
             return output_result
-        jobs: List[SlurmJob] = []
+        jobs: List[ComputeSession] = []
         for line in output_result.split("\n")[:-1]: #skip empty newline
-            job_result = SlurmJob.try_from_parsable2_raw_job_data(line, fernet=self.fernet)
+            job_result = ComputeSession.try_from_parsable2_raw_slurm_job_data(line, fernet=self.fernet)
             if isinstance(job_result, Exception):
                 return job_result
             if job_result is None:
                 continue
             if user_id and job_result.user_id != user_id:
                 continue
-            if session_id and job_result.session_id == session_id:
+            if compute_session_id and job_result.compute_session_id == compute_session_id:
                 return [job_result]
             jobs.append(job_result)
         return jobs
@@ -406,16 +410,16 @@ class LocalJobLauncher(SshJobLauncher):
             account="dummy",
             fernet=fernet,
         )
-        self.jobs: Dict[SlurmJobId, Tuple[SlurmJob, Popen[bytes]]] = {}
+        self.sessions: Dict[NativeComputeSessionId, Tuple[ComputeSession, Popen[bytes]]] = {}
 
     def get_sbatch_launch_script(
         self,
         *,
         time: Minutes,
         ebrains_user_token: UserToken,
-        session_id: uuid.UUID,
+        compute_session_id: uuid.UUID,
     ) -> str:
-        working_dir = f"/tmp/{session_id}"
+        working_dir = f"/tmp/{compute_session_id}"
         webilastik_source_dir = Path(__file__).parent.parent.parent
         redis_pid_file = f"{working_dir}/redis.pid"
         redis_unix_socket_path = f"{working_dir}/redis.sock"
@@ -475,11 +479,11 @@ class LocalJobLauncher(SshJobLauncher):
             "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py \\
                 --max-duration-minutes={time} \\
                 --listen-socket="{working_dir}/to-master.sock" \\
-                --session-url=https://app.ilastik.org/session-{session_id} \\
+                --session-url=https://app.ilastik.org/session-{compute_session_id} \\
                 tunnel \\
                 --remote-username=www-data \\
                 --remote-host=app.ilastik.org \\
-                --remote-unix-socket="/tmp/to-session-{session_id}" \\
+                --remote-unix-socket="/tmp/to-session-{compute_session_id}" \\
 
             kill -2 $(cat {redis_pid_file})
             sleep 2
@@ -491,68 +495,68 @@ class LocalJobLauncher(SshJobLauncher):
         user_id: uuid.UUID,
         time: Minutes,
         ebrains_user_token: UserToken,
-        session_id: uuid.UUID,
+        compute_session_id: uuid.UUID,
         display_name: str = ""
-    ) -> "SlurmJob | Exception":
+    ) -> "ComputeSession | Exception":
         stdin_file = tempfile.TemporaryFile()
         _ = stdin_file.write(
             self.get_sbatch_launch_script(
-                time=time, ebrains_user_token=ebrains_user_token, session_id=session_id
+                time=time, ebrains_user_token=ebrains_user_token, compute_session_id=compute_session_id
             ).encode("utf8")
         )
         _ = stdin_file.seek(0)
 
         session_process = Popen(["bash"], stdin=stdin_file, start_new_session=True)
-        job_id = SlurmJobId(len(self.jobs))
-        dummy_slurm_job = SlurmJob(
-            job_id=job_id,
-            state=JobState.RUNNING,
+        native_compute_session_id = NativeComputeSessionId(len(self.sessions))
+        dummy_session = ComputeSession(
+            native_compute_session_id=native_compute_session_id,
+            state="RUNNING",
             start_time_utc_sec=Seconds(int(datetime.datetime.now(datetime.timezone.utc).timestamp())),
             time_elapsed_sec=Seconds(1),
             num_nodes=1, #FIXME
-            session_id=session_id,
+            compute_session_id=compute_session_id,
             time_limit_minutes=time,
             user_id=user_id,
         )
-        self.jobs[job_id] = (dummy_slurm_job, session_process)
+        self.sessions[native_compute_session_id] = (dummy_session, session_process)
 
-        return dummy_slurm_job
+        return dummy_session
 
-    async def cancel(self, job: SlurmJob) -> "Exception | None":
-        self.jobs[job.job_id][1].kill()
-        self.jobs[job.job_id][0].state = JobState.CANCELLED
+    async def cancel(self, compute_session: ComputeSession) -> "Exception | None":
+        self.sessions[compute_session.native_compute_session_id][1].kill()
+        self.sessions[compute_session.native_compute_session_id][0].state = "CANCELLED"
         return None
 
-    async def get_jobs(
+    async def get_compute_sessions(
         self,
         *,
-        job_id: "SlurmJobId | None" = None,
-        state: "Set[JobState] | None" = None,
+        native_compute_session_id: "NativeComputeSessionId | None" = None,
+        state: "Set[ComputeSessionState] | None" = None,
         starttime: "datetime.datetime" = datetime.datetime(year=2020, month=1, day=1),
         endtime: "datetime.datetime | None" = None,
         user_id: "uuid.UUID | None" = None,
-        session_id: "uuid.UUID | None" = None,
-    ) -> "List[SlurmJob] | Exception":
-        jobs: List[SlurmJob] = []
-        for job_item_id, (slurm_job_item, process) in self.jobs.items():
-            if not slurm_job_item.state.is_done():
+        compute_session_id: "uuid.UUID | None" = None,
+    ) -> "List[ComputeSession] | Exception":
+        compute_sessions: List[ComputeSession] = []
+        for native_session_id, (compute_session, process) in self.sessions.items():
+            if not compute_session.state in DONE_STATES:
                 return_code = process.poll()
                 if return_code is not None:
-                    slurm_job_item.state = JobState.COMPLETED if return_code == 0 else JobState.FAILED
+                    compute_session.state = "COMPLETED" if return_code == 0 else "FAILED"
 
-            if job_id and job_id == job_item_id:
-                return [slurm_job_item]
-            if session_id and slurm_job_item.session_id == session_id:
-                return [slurm_job_item]
-            if user_id and slurm_job_item.user_id != user_id:
+            if native_compute_session_id and native_compute_session_id == native_session_id:
+                return [compute_session]
+            if compute_session_id and compute_session.compute_session_id == compute_session_id:
+                return [compute_session]
+            if user_id and compute_session.user_id != user_id:
                 continue
-            if state and slurm_job_item.state not in state:
+            if state and compute_session.state not in state:
                 continue
-            if slurm_job_item.start_time_utc_sec and slurm_job_item.start_time_utc_sec < starttime.timestamp():
+            if compute_session.start_time_utc_sec and compute_session.start_time_utc_sec < starttime.timestamp():
                 continue
             #FIXME: endtime?
-            jobs.append(slurm_job_item)
-        return jobs
+            compute_sessions.append(compute_session)
+        return compute_sessions
 
 
 class JusufSshJobLauncher(SshJobLauncher):
@@ -569,9 +573,9 @@ class JusufSshJobLauncher(SshJobLauncher):
         *,
         time: Minutes,
         ebrains_user_token: UserToken,
-        session_id: uuid.UUID,
+        compute_session_id: uuid.UUID,
     ) -> str:
-        working_dir = f"$SCRATCH/{session_id}"
+        working_dir = f"$SCRATCH/{compute_session_id}"
         home="/p/home/jusers/webilastik/jusuf"
         webilastik_source_dir = f"{working_dir}/webilastik"
         conda_env_dir = f"{home}/miniconda3/envs/webilastik"
@@ -644,11 +648,11 @@ class JusufSshJobLauncher(SshJobLauncher):
                 "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py \\
                 --max-duration-minutes={time} \\
                 --listen-socket="{working_dir}/to-master.sock" \\
-                --session-url=https://app.ilastik.org/session-{session_id} \\
+                --session-url=https://app.ilastik.org/session-{compute_session_id} \\
                 tunnel \\
                 --remote-username=www-data \\
                 --remote-host=app.ilastik.org \\
-                --remote-unix-socket="/tmp/to-session-{session_id}" \\
+                --remote-unix-socket="/tmp/to-session-{compute_session_id}" \\
 
             kill -2 $(cat {redis_pid_file}) #FXME: this only works because it's a single node
             sleep 2
@@ -669,9 +673,9 @@ class CscsSshJobLauncher(SshJobLauncher):
         *,
         time: Minutes,
         ebrains_user_token: UserToken,
-        session_id: uuid.UUID,
+        compute_session_id: uuid.UUID,
     ) -> str:
-        working_dir = f"$SCRATCH/{session_id}"
+        working_dir = f"$SCRATCH/{compute_session_id}"
         home="/users/bp000188"
         webilastik_source_dir = f"{working_dir}/webilastik"
         conda_env_dir = f"{home}/miniconda3/envs/webilastik"
@@ -741,11 +745,11 @@ class CscsSshJobLauncher(SshJobLauncher):
                 "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py \\
                 --max-duration-minutes={time} \\
                 --listen-socket="{working_dir}/to-master.sock" \\
-                --session-url=https://app.ilastik.org/session-{session_id} \\
+                --session-url=https://app.ilastik.org/session-{compute_session_id} \\
                 tunnel \\
                 --remote-username=www-data \\
                 --remote-host=app.ilastik.org \\
-                --remote-unix-socket="/tmp/to-session-{session_id}" \\
+                --remote-unix-socket="/tmp/to-session-{compute_session_id}" \\
 
             kill -2 $(cat {redis_pid_file})
             sleep 2

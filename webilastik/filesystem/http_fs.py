@@ -1,8 +1,8 @@
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import io
-from typing import Collection, Dict, List, Any, Mapping, Optional, Tuple, Union
+from typing import Collection, Dict, List, Any, Mapping, Optional, Tuple, Union, Literal
 import requests
 from requests import HTTPError
 import sys
@@ -15,6 +15,7 @@ from fs.permissions import Permissions
 from fs.enums import ResourceType
 from requests.models import CaseInsensitiveDict
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
+from webilastik.server.message_schema import HttpFsMessage
 from webilastik.ui.usage_error import UsageError
 
 from .RemoteFile import RemoteFile
@@ -31,9 +32,9 @@ class HttpFs(JsonableFilesystem):
         super().__init__()
         self.read_url = read_url
         self.write_url = write_url or read_url
-
-        if not set([self.read_url.protocol, self.write_url.protocol]).issubset([Protocol.HTTP, Protocol.HTTPS]):
+        if self.read_url.protocol not in ("http", "https") or  self.write_url.protocol not in ("http", "https"):
             raise ValueError("Can only handle http procotols")
+        self.protocol: Literal["http", "https"] = self.read_url.protocol
         self.requests_verify: Union[str, bool] = os.environ.get("CA_CERT_PATH", True)
         if isinstance(self.requests_verify, str) and not Path(self.requests_verify).exists():
             raise ValueError(f"CA_CERT_PATH '{self.requests_verify}' not found")
@@ -44,7 +45,7 @@ class HttpFs(JsonableFilesystem):
 
     @classmethod
     def try_from_url(cls, url: Url) -> "HttpFs | UsageError":
-        if url.protocol not in (Protocol.HTTP, Protocol.HTTPS):
+        if url.protocol not in ("http", "https"):
             return UsageError(f"Bad url for HttpFs: {url}")
         return HttpFs(read_url=url)
 
@@ -54,6 +55,27 @@ class HttpFs(JsonableFilesystem):
             "write_url": self.write_url.raw,
             "__class__": self.__class__.__name__,
         }
+
+    def to_message(self) -> HttpFsMessage:
+        return HttpFsMessage(
+            protocol=self.protocol,
+            hostname=self.read_url.hostname,
+            path=self.read_url.path.as_posix(),
+            port=self.read_url.port,
+            search=self.read_url.search,
+        )
+
+    @classmethod
+    def from_message(cls, message: HttpFsMessage) -> "HttpFs":
+        return HttpFs(
+            read_url=Url(
+                protocol=message.protocol,
+                hostname=message.hostname,
+                path=PurePosixPath(message.path),
+                port=message.port,
+                search=message.search,
+            ),
+        )
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "HttpFs":

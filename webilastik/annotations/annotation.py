@@ -10,6 +10,9 @@ from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonA
 from webilastik.datasource import DataSource, DataRoi, FsDataSource
 from webilastik.features.feature_extractor import FeatureExtractor, FeatureData
 from executor_getter import get_executor
+from webilastik.server.message_schema import ColorMessage, MessageParsingError, PixelAnnotationMessage
+from webilastik.ui.datasource import try_get_datasources_from_url
+from webilastik.utility.url import Protocol, Url
 
 
 class Color:
@@ -36,12 +39,8 @@ class Color:
             b=np.uint8(ensureJsonInt(data_dict.get("b", 0))),
         )
 
-    def to_json_data(self) -> JsonObject:
-        return {
-            "r": int(self.r),
-            "g": int(self.g),
-            "b": int(self.b),
-        }
+    def to_message(self) -> ColorMessage:
+        return ColorMessage(r=int(self.r), g=int(self.g), b=int(self.b))
 
     @classmethod
     def from_channels(cls, channels: List[np.uint8], name: str = "") -> "Color":
@@ -186,6 +185,39 @@ class Annotation(ScalarData):
             scribblings.paint_point(point=voxel, value=True)
 
         return cls(scribblings._data, axiskeys=scribblings.axiskeys, raw_data=raw_data, location=start)
+
+    @classmethod
+    def from_message(
+        cls,
+        message: PixelAnnotationMessage,
+        allowed_protocols: Sequence[Protocol] = ("http", "https"),
+    ) -> "Annotation | MessageParsingError":
+        raw_data_result = FsDataSource.try_from_message(message.raw_data, allowed_protocols=allowed_protocols)
+        if isinstance(raw_data_result, MessageParsingError):
+            return raw_data_result
+
+        # FIXME: do sothing more efficient than this
+        return Annotation.from_voxels(
+            voxels=[Point5D(x=raw_point[0], y=raw_point[1], z=raw_point[2]) for raw_point in message.points],
+            raw_data=raw_data_result,
+        )
+
+    def to_message(self) -> PixelAnnotationMessage:
+        if not isinstance(self.raw_data, FsDataSource):
+            #FIXME: maybe create a FsDatasourceAnnotation so we don't have to raise here?
+            raise ValueError(f"Can't serialize annotation over {self.raw_data}")
+
+        return PixelAnnotationMessage(
+            raw_data=self.raw_data.to_message(),
+            points=self.to_raw_points(),
+        )
+
+    def to_raw_points(self) -> Tuple[Tuple[int, int, int], ...]:
+        return tuple(
+            (int(x) + self.location.x, int(y) + self.location.y, int(z) + self.location.z)
+            for x, y, z in zip(*self.raw("xyz").nonzero()) # type: ignore
+        )
+
 
     def to_points(self) -> Iterable[Point5D]:
         # FIXME: annotation should probably not be an Array6D

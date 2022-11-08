@@ -1,4 +1,4 @@
-export type JsonLeafValue = number | string | boolean | null
+export type JsonLeafValue = number | string | boolean | null | undefined
 
 export interface JsonObject{
     [key: string]: JsonValue
@@ -50,7 +50,7 @@ export interface IDeserializer<T>{
 ///////////////////////////////////////////
 
 export function isJsonLeafValue(value: JsonableValue): value is JsonLeafValue{
-    return typeof value == "number" || typeof value == "string" || typeof value == "boolean" || value === null
+    return typeof value == "number" || typeof value == "string" || typeof value == "boolean" || value === null || value === undefined
 }
 
 export function isJsonableArray(value: JsonableValue): value is JsonableArray{

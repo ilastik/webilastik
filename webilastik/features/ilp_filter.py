@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Optional
+from typing import Optional, Literal
 
 
 from ndstructs.array5D import Array5D
@@ -12,15 +12,24 @@ from webilastik.features.channelwise_fastfilters import (
 )
 from .feature_extractor import FeatureData, JsonableFeatureExtractor
 from webilastik.operator import Operator, OpRetriever
+from webilastik.server.message_schema import IlpFeatureExtractorMessage
 
+IlpFilterName = Literal[
+    "Gaussian Smoothing",
+    "Laplacian of Gaussian",
+    "Gaussian Gradient Magnitude",
+    "Difference of Gaussians",
+    "Structure Tensor Eigenvalues",
+    "Hessian of Gaussian Eigenvalues"
+]
 
-class IlpFilter(PresmoothedFilter, JsonableFeatureExtractor):
-    def to_json_value(self) -> JsonObject:
-        return {
-            "ilp_scale": self.ilp_scale,
-            "axis_2d": self.axis_2d,
-            "__class__": self.__class__.__name__,
-        }
+class IlpFilter(PresmoothedFilter):
+    def to_message(self) -> IlpFeatureExtractorMessage:
+        return IlpFeatureExtractorMessage(
+            ilp_scale=self.ilp_scale,
+            axis_2d=self.axis_2d,
+            class_name=self.ilp_name(),
+        )
 
     def is_applicable_to(self, datasource: DataSource) -> bool:
         return self.op.is_applicable_to(datasource)
@@ -30,29 +39,31 @@ class IlpFilter(PresmoothedFilter, JsonableFeatureExtractor):
         return self.op.channel_multiplier
 
     @classmethod
-    def from_json_value(cls, value: JsonValue) -> "IlpFilter":
-        value_obj = ensureJsonObject(value)
-        class_name = ensureJsonString(value_obj.get("__class__"))
-        ilp_scale = ensureJsonFloat(value_obj.get("ilp_scale"))
-        axis_2d = get_axis_2d(value_obj.get("axis_2d"))
+    def from_message(cls, value: IlpFeatureExtractorMessage) -> "IlpFilter":
+        class_name = value.class_name
 
-        if class_name == IlpGaussianSmoothing.__name__:
-            return IlpGaussianSmoothing(ilp_scale=ilp_scale, axis_2d=axis_2d)
-        if class_name == IlpLaplacianOfGaussian.__name__:
-            return IlpLaplacianOfGaussian(ilp_scale=ilp_scale, axis_2d=axis_2d)
-        if class_name == IlpGaussianGradientMagnitude.__name__:
-            return IlpGaussianGradientMagnitude(ilp_scale=ilp_scale, axis_2d=axis_2d)
-        if class_name == IlpDifferenceOfGaussians.__name__:
-            return IlpDifferenceOfGaussians(ilp_scale=ilp_scale, axis_2d=axis_2d)
-        if class_name == IlpStructureTensorEigenvalues.__name__:
-            return IlpStructureTensorEigenvalues(ilp_scale=ilp_scale, axis_2d=axis_2d)
-        if class_name == IlpHessianOfGaussianEigenvalues.__name__:
-            return IlpHessianOfGaussianEigenvalues(ilp_scale=ilp_scale, axis_2d=axis_2d)
-        raise Exception(f"Bad __class__ name: {class_name}")
+        if class_name == IlpGaussianSmoothing.ilp_name():
+            return IlpGaussianSmoothing(ilp_scale=value.ilp_scale, axis_2d=value.axis_2d)
+        if class_name == IlpLaplacianOfGaussian.ilp_name():
+            return IlpLaplacianOfGaussian(ilp_scale=value.ilp_scale, axis_2d=value.axis_2d)
+        if class_name == IlpGaussianGradientMagnitude.ilp_name():
+            return IlpGaussianGradientMagnitude(ilp_scale=value.ilp_scale, axis_2d=value.axis_2d)
+        if class_name == IlpDifferenceOfGaussians.ilp_name():
+            return IlpDifferenceOfGaussians(ilp_scale=value.ilp_scale, axis_2d=value.axis_2d)
+        if class_name == IlpStructureTensorEigenvalues.ilp_name():
+            return IlpStructureTensorEigenvalues(ilp_scale=value.ilp_scale, axis_2d=value.axis_2d)
+        if class_name == IlpHessianOfGaussianEigenvalues.ilp_name():
+            return IlpHessianOfGaussianEigenvalues(ilp_scale=value.ilp_scale, axis_2d=value.axis_2d)
+        raise Exception(f"Bad class_name for IlpFilter: {class_name}")
 
     @property
     @abstractmethod
     def op(self) -> ChannelwiseFastFilter:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def ilp_name(cls) -> IlpFilterName:
         pass
 
     def __call__(self, /, roi: DataRoi) -> FeatureData:
@@ -69,6 +80,10 @@ class IlpGaussianSmoothing(IlpFilter):
             axis_2d=axis_2d,
         )
 
+    @classmethod
+    def ilp_name(cls) -> Literal["Gaussian Smoothing"]:
+        return "Gaussian Smoothing"
+
     @property
     def op(self) -> GaussianSmoothing:
         return self._op
@@ -84,6 +99,10 @@ class IlpLaplacianOfGaussian(IlpFilter):
             axis_2d=axis_2d,
         )
 
+    @classmethod
+    def ilp_name(cls) -> Literal["Laplacian of Gaussian"]:
+        return "Laplacian of Gaussian"
+
     @property
     def op(self) -> LaplacianOfGaussian:
         return self._op
@@ -98,6 +117,10 @@ class IlpGaussianGradientMagnitude(IlpFilter):
             sigma=min(ilp_scale, 1.0),
             axis_2d=axis_2d,
         )
+
+    @classmethod
+    def ilp_name(cls) -> Literal["Gaussian Gradient Magnitude"]:
+        return "Gaussian Gradient Magnitude"
 
     @property
     def op(self) -> GaussianGradientMagnitude:
@@ -116,6 +139,10 @@ class IlpDifferenceOfGaussians(IlpFilter):
             axis_2d=axis_2d,
         )
 
+    @classmethod
+    def ilp_name(cls) -> Literal["Difference of Gaussians"]:
+        return "Difference of Gaussians"
+
     @property
     def op(self) -> DifferenceOfGaussians:
         return self._op
@@ -133,6 +160,10 @@ class IlpStructureTensorEigenvalues(IlpFilter):
             preprocessor=self.presmoother,
         )
 
+    @classmethod
+    def ilp_name(cls) -> Literal["Structure Tensor Eigenvalues"]:
+        return "Structure Tensor Eigenvalues"
+
     @property
     def op(self) -> StructureTensorEigenvalues:
         return self._op
@@ -145,6 +176,10 @@ class IlpHessianOfGaussianEigenvalues(IlpFilter):
             scale=min(ilp_scale, 1.0),
             axis_2d=axis_2d,
         )
+
+    @classmethod
+    def ilp_name(cls) -> Literal["Hessian of Gaussian Eigenvalues"]:
+        return "Hessian of Gaussian Eigenvalues"
 
     @property
     def op(self) -> HessianOfGaussianEigenvalues:

@@ -3,6 +3,7 @@ from fs.osfs import OSFS
 from ndstructs.utils.json_serializable import JsonValue, JsonObject, ensureJsonObject, ensureJsonString
 
 from webilastik.filesystem import JsonableFilesystem
+from webilastik.server.message_schema import OsfsMessage
 
 
 
@@ -15,6 +16,13 @@ class OsFs(OSFS, JsonableFilesystem):
 
     def __getstate__(self) -> JsonObject:
         return self.to_json_value()
+
+    def to_message(self) -> "OsfsMessage":
+        return OsfsMessage(path=self.root_path)
+
+    @classmethod
+    def from_message(cls, message: OsfsMessage) -> "OsFs":
+        return OsFs(message.path)
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "OsFs":

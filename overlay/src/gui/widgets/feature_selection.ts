@@ -1,8 +1,8 @@
 import { createElement, createInput } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
 import { Applet } from '../../client/applets/applet';
-import { Session, IlpFeatureExtractor, FeatureClassName } from '../../client/ilastik';
-import { ensureJsonObject } from '../../util/serialization';
+import { Session, IlpFeatureExtractor } from '../../client/ilastik';
+import { AddFeatureExtractorsParamsMessage, FeatureSelectionAppletStateMessage, IlpFeatureExtractorMessage, RemoveFeatureExtractorsParamsMessage } from '../../client/message_schema';
 
 // class FeatureCheckbox<FE extends FeatureExtractor>{
 //     constructor()
@@ -69,9 +69,12 @@ export class FeatureSelectionWidget extends Applet<{feature_extractors: IlpFeatu
             name,
             session,
             deserializer: (data) => {
-                let value_obj = ensureJsonObject(data)
+                let message = FeatureSelectionAppletStateMessage.fromJsonValue(data)
+                if(message instanceof Error){
+                    throw `FIXME!! ${message.message}`
+                }
                 return {
-                    feature_extractors: IlpFeatureExtractor.fromJsonArray(value_obj["feature_extractors"])
+                    feature_extractors: message.feature_extractors.map(msg => IlpFeatureExtractor.fromMessage(msg))
                 }
             },
             onNewState: (new_state) => this.onNewState(new_state)
@@ -80,32 +83,32 @@ export class FeatureSelectionWidget extends Applet<{feature_extractors: IlpFeatu
         this.element.classList.add("ItkFeatureSelectionWidget")
 
         const scales: Array<Scale> = [0.3, 0.7, 1.0, 1.6, 3.5, 5.0, 10.0]
-        const feature_extractor_creators = new Map<string, FeatureClassName>([
-            ["Gaussian Smoothing", 'IlpGaussianSmoothing'],
-            ["Laplacian Of Gaussian", "IlpLaplacianOfGaussian"],
-            ["Gaussian Gradient Magnitude", "IlpGaussianGradientMagnitude"],
-            ["Difference Of Gaussians", "IlpDifferenceOfGaussians"],
-            ["Structure Tensor Eigenvalues", "IlpStructureTensorEigenvalues"],
-            ["Hessian Of Gaussian Eigenvalues", "IlpHessianOfGaussianEigenvalues"]
-        ])
-
         const table = createElement({tagName: 'table', parentElement: this.element})
 
         let header_row = createElement({tagName: 'tr', parentElement: table})
         createElement({tagName: 'th', innerHTML: 'Feature / sigma', parentElement: header_row})
         scales.forEach(scale => createElement({tagName: "th", parentElement: header_row, innerHTML: scale.toFixed(1)}))
 
-        feature_extractor_creators.forEach((class_name, label) => {
+        let featureNames: Array<IlpFeatureExtractorMessage["class_name"]> = [
+            "Gaussian Smoothing",
+            "Laplacian of Gaussian",
+            "Gaussian Gradient Magnitude",
+            "Difference of Gaussians",
+            "Structure Tensor Eigenvalues",
+            "Hessian of Gaussian Eigenvalues",
+        ]
+
+        featureNames.forEach(feature_name => {
             let tr = createElement({tagName: "tr", parentElement: table})
-            createElement({tagName: "td", parentElement: tr, innerHTML: label})
+            createElement({tagName: "td", parentElement: tr, innerHTML: feature_name})
             scales.forEach(scale => {
                 let td = createElement({tagName: "td", parentElement: tr})
-                if(scale == 0.3 && class_name != "IlpGaussianSmoothing"){
+                if(scale == 0.3 && feature_name != "Gaussian Smoothing"){
                     return
                 }
                 this.checkboxes.push(new FeatureSelectionCheckbox({
                     parentElement: td,
-                    featureExtractor: new IlpFeatureExtractor({ilp_scale: scale, axis_2d: "z", __class__: class_name}),
+                    featureExtractor: new IlpFeatureExtractor({ilp_scale: scale, axis_2d: "z", __class__: feature_name}),
                     lastUpstreamState: false, // FIXME? Maybe initialize straight with the upstream state?
                 }))
             })
@@ -129,10 +132,24 @@ export class FeatureSelectionWidget extends Applet<{feature_extractors: IlpFeatu
                 }
             }
             if(extractors_to_add.length > 0){
-                this.doRPC("add_feature_extractors", {feature_extractors: extractors_to_add})
+                this.doRPC(
+                    "add_feature_extractors",
+                    new AddFeatureExtractorsParamsMessage({
+                        feature_extractors: extractors_to_add.map(e => new IlpFeatureExtractorMessage({
+                            axis_2d: "z" /*FIXME*/, class_name: e.__class__, ilp_scale: e.ilp_scale
+                        }))
+                    })
+                )
             }
             if(extractors_to_remove.length > 0){
-                this.doRPC("remove_feature_extractors", {feature_extractors: extractors_to_remove})
+                this.doRPC(
+                    "remove_feature_extractors",
+                    new RemoveFeatureExtractorsParamsMessage({
+                        feature_extractors: extractors_to_remove.map(e => new IlpFeatureExtractorMessage({
+                            axis_2d: "z" /*FIXME*/, class_name: e.__class__, ilp_scale: e.ilp_scale
+                        }))
+                    })
+                )
             }
         }})
     }

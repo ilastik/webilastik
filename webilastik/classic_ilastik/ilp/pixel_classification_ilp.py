@@ -364,7 +364,7 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
         cls,
         group: h5py.Group,
         ilp_fs: JsonableFilesystem,
-        allowed_protocols: Sequence[Protocol] = (Protocol.HTTP, Protocol.HTTPS)
+        allowed_protocols: Sequence[Protocol] = ("http", "https")
     ) -> "IlpPixelClassificationWorkflowGroup | Exception":
         workflowname = ensure_encoded_string(group, "workflowName")
         if workflowname != "Pixel Classification":

@@ -12,7 +12,7 @@ import numpy as np
 from webilastik.datasource import FsDataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale5D
 from webilastik.filesystem import JsonableFilesystem
-from webilastik.utility.url import DataScheme, Url
+from webilastik.utility.url import Url
 
 logger = logging.getLogger(__name__)
 
@@ -63,11 +63,11 @@ class PrecomputedChunksDataSource(FsDataSource):
     @property
     def url(self) -> Url:
         resolution_str = f"{self.spatial_resolution[0]}_{self.spatial_resolution[1]}_{self.spatial_resolution[2]}"
-        return super().url.updated_with(datascheme=DataScheme.PRECOMPUTED, hash_=f"resolution={resolution_str}")
+        return super().url.updated_with(datascheme="precomputed", hash_=f"resolution={resolution_str}")
 
     @classmethod
     def supports_url(cls, url: Url) -> bool:
-        return url.datascheme == DataScheme.PRECOMPUTED
+        return url.datascheme == "precomputed"
 
     @classmethod
     def from_url(cls, url: Url) -> "Sequence[PrecomputedChunksDataSource] | Exception":

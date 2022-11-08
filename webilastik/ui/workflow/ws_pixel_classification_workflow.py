@@ -28,8 +28,12 @@ from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonO
 from fs.errors import ResourceNotFound
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
+from webilastik.filesystem import JsonableFilesystem
 from webilastik.filesystem.bucket_fs import BucketFs
+from webilastik.filesystem.osfs import OsFs
+from webilastik.filesystem.util import fs_from_message
 from webilastik.scheduling.job import PriorityExecutor
+from webilastik.server.message_schema import GetDatasourcesFromUrlParamsMessage, GetDatasourcesFromUrlResponseMessage, MessageParsingError, RpcErrorMessage, SaveProjectParamsMessage
 from webilastik.server.session_allocator import uncachable_json_response
 from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError
@@ -38,7 +42,7 @@ from webilastik.utility.url import Protocol, Url
 from webilastik.server.tunnel import ReverseSshTunnel
 from webilastik.ui.applet import dummy_prompt
 from webilastik.libebrains.user_token import UserToken
-from webilastik.libebrains.slurm_job_launcher import Minutes
+from webilastik.libebrains.compute_session_launcher import Minutes
 from webilastik.libebrains import global_user_login
 from executor_getter import get_executor
 
@@ -81,11 +85,11 @@ class RPCPayload:
             "arguments": self.arguments,
         }
 
-def do_save_project(filesystem: BucketFs, file_path: PurePosixPath, workflow_contents: bytes):
+def do_save_project(filesystem: JsonableFilesystem, file_path: PurePosixPath, workflow_contents: bytes):
     with filesystem.openbin(file_path.as_posix(), "w") as f:
         f.write(workflow_contents)
 
-def do_load_project_bytes(filesystem: BucketFs, file_path: PurePosixPath) -> "bytes | ResourceNotFound":
+def do_load_project_bytes(filesystem: JsonableFilesystem, file_path: PurePosixPath) -> "bytes | ResourceNotFound":
     try:
         with filesystem.openbin(file_path.as_posix(), "r") as f:
             return f.read()
@@ -197,13 +201,10 @@ class WebIlastik:
         self.app.on_shutdown.append(self.close_websockets)
 
     async def get_datasources_from_url(self, request: web.Request) -> web.Response:
-        payload = await request.json()
-        raw_url = payload.get("url")
-        if raw_url is None:
-            return  uncachable_json_response({"error": "Missing 'url' key in payload"}, status=400)
-        url = Url.parse(raw_url)
-        if url is None:
-            return  uncachable_json_response({"error": "Bad url in payload"}, status=400)
+        params = GetDatasourcesFromUrlParamsMessage.from_json_value(await request.json())
+        if isinstance(params, MessageParsingError):
+            return  uncachable_json_response(RpcErrorMessage(error="bad payload").to_json_value(), status=400)
+        url = Url.from_message(params.url)
 
         selected_resolution: "Tuple[int, int, int] | None" = None
         stripped_precomputed_url_regex = re.compile(r"/stripped_precomputed/url=(?P<url>[^/]+)/resolution=(?P<resolution>\d+_\d+_\d+)")
@@ -212,23 +213,25 @@ class WebIlastik:
             url = Url.from_base64(match.group("url"))
             selected_resolution = tuple(int(axis) for axis in match.group("resolution").split("_"))
 
-        datasources_result = try_get_datasources_from_url(url=url, allowed_protocols=(Protocol.HTTP, Protocol.HTTPS))
+        datasources_result = try_get_datasources_from_url(url=url, allowed_protocols=("http", "https"))
         if isinstance(datasources_result, Exception):
-            return web.json_response({"error": str(datasources_result)}, status=400)
+            return uncachable_json_response(RpcErrorMessage(error=str(datasources_result)).to_json_value(), status=400)
         if isinstance(datasources_result, type(None)):
-            return uncachable_json_response({"error": f"Unsupported datasource type: {url}"}, status=400)
+            return uncachable_json_response(RpcErrorMessage(error=f"Unsupported datasource type: {url}").to_json_value(), status=400)
         if selected_resolution:
             datasources = [ds for ds in datasources_result if ds.spatial_resolution == selected_resolution]
             if len(datasources) != 1:
                 return uncachable_json_response(
-                    {"error": f"Expected single datasource, found these: {json.dumps([ds.to_json_value() for ds in datasources], indent=4)}"},
+                    RpcErrorMessage(
+                        error=f"Expected single datasource, found these: {json.dumps([ds.to_json_value() for ds in datasources], indent=4)}"
+                    ).to_json_value(),
                     status=400,
                 )
         else:
             datasources = datasources_result
 
         return uncachable_json_response(
-            {"datasources": tuple([ds.to_json_value() for ds in datasources])},
+            GetDatasourcesFromUrlResponseMessage(datasources=tuple([ds.to_message() for ds in datasources])).to_json_value(),
             status=200,
         )
 
@@ -331,8 +334,13 @@ class WebIlastik:
 
     async def save_project(self, request: web.Request) -> web.Response:
         payload = await request.json()
-        filesystem = BucketFs.from_json_value(payload.get("fs"))
-        file_path = PurePosixPath(ensureJsonString(payload.get("project_file_path")))
+        params_result = SaveProjectParamsMessage.from_json_value(payload)
+        if isinstance(params_result, MessageParsingError):
+            return web.Response(status=400, text=f"Bad payload")
+        filesystem = fs_from_message(params_result.fs)
+        if isinstance(filesystem, OsFs):
+            return web.Response(status=400, text=f"OsFs not allowed for now")
+        file_path = PurePosixPath(params_result.project_file_path)
         if len(file_path.parts) == 0 or ".." in file_path.parts:
             return web.Response(status=400, text=f"Bad project file path: {file_path}")
 
@@ -347,8 +355,13 @@ class WebIlastik:
 
     async def load_project(self, request: web.Request) -> web.Response:
         payload = await request.json()
-        filesystem = BucketFs.from_json_value(payload.get("fs"))
-        file_path = PurePosixPath(ensureJsonString(payload.get("project_file_path")))
+        params_result = SaveProjectParamsMessage.from_json_value(payload)
+        if isinstance(params_result, MessageParsingError):
+            return web.Response(status=400, text=f"Bad payload")
+        filesystem = fs_from_message(params_result.fs)
+        if isinstance(filesystem, OsFs):
+            return web.Response(status=400, text=f"OsFs not allowed for now")
+        file_path = PurePosixPath(params_result.project_file_path)
         if len(file_path.parts) == 0 or ".." in file_path.parts:
             return web.Response(status=400, text=f"Bad project file path: {file_path}")
 
@@ -364,7 +377,7 @@ class WebIlastik:
             on_async_change=lambda: self.enqueue_user_interaction(user_interaction=lambda: None), #FIXME?
             executor=self.executor,
             priority_executor=self.priority_executor,
-            allowed_protocols=(Protocol.HTTP, Protocol.HTTPS),
+            allowed_protocols=("http", "https"),
             session_url=self.session_url,
         )
         if isinstance(new_workflow_result, Exception):

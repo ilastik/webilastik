@@ -23,7 +23,7 @@ def _decode_datasource_url(encoded_url: str) -> "FsDataSource | web.Response":
         datasource_url = Url.from_base64(encoded_url)
     except Exception:
         return uncachable_json_response({"error": f"Bad raw_data encoded url: {encoded_url}"}, status=400)
-    datasources_result = try_get_datasources_from_url(url=datasource_url, allowed_protocols=(Protocol.HTTP, Protocol.HTTPS))
+    datasources_result = try_get_datasources_from_url(url=datasource_url, allowed_protocols=("http", "https"))
     if isinstance(datasources_result, Exception):
         return uncachable_json_response({"error": f"Could not open datasource at {datasource_url}"}, status=500)
     if isinstance(datasources_result, type(None)):
@@ -43,8 +43,8 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
             "generation": state.generation,
             "description": state.description,
             "live_update": state.live_update,
-            # vigra will output only as many channels as number of values in the samples, so empty labels are a problems
-            "channel_colors": tuple(color.to_json_data() for color, annotations in label_classes.items() if len(annotations) > 0),
+            # vigra will output only as many channels as number of values in the samples, so empty labels are a problem
+            "channel_colors": tuple(color.to_message().to_json_value() for color, annotations in label_classes.items() if len(annotations) > 0),
         }
 
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:

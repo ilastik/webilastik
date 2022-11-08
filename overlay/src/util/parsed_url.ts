@@ -1,4 +1,5 @@
-import { ensureJsonString, IJsonable, JsonValue } from "./serialization";
+import { UrlMessage } from "../client/message_schema";
+import { IJsonable } from "./serialization";
 
 export const data_schemes = ["precomputed"] as const;
 export type DataScheme = typeof data_schemes[number];
@@ -10,7 +11,7 @@ export function ensureDataScheme(value: string): DataScheme{
     return variant
 }
 
-export const protocols = ["http", "https", "ws", "wss"] as const;
+export const protocols = ["http", "https", "ws", "wss", "memory", "file"] as const;
 export type Protocol = typeof protocols[number];
 export function ensureProtocol(value: string): Protocol{
     const variant = protocols.find(variant => variant === value)
@@ -145,8 +146,35 @@ export class Url implements IJsonable{
         return this.toString()
     }
 
-    public static fromJsonValue(value: JsonValue): Url{
-        return Url.parse(ensureJsonString(value))
+    public static fromMessage(message: UrlMessage): Url{
+        return new Url({
+            datascheme: message.datascheme,
+            protocol: message.protocol,
+            hostname: message.hostname,
+            port: message.port,
+            path: Path.parse(message.path),
+
+
+        })
+    }
+
+    public toMessage(): UrlMessage{
+        if(this.protocol == "ws" || this.protocol == "wss"){
+            throw `FIXME!!!`
+        }
+        let searchObj: {[key: string]: string} = {}
+        for(let [key, value] of this.search){
+            searchObj[key] = value
+        }
+        return new UrlMessage({
+            datascheme: this.datascheme,
+            protocol: this.protocol,
+            hostname: this.hostname,
+            port: this.port,
+            path: this.path.raw,
+            search: searchObj,
+            fragment: this.hash,
+        })
     }
 
     public static readonly url_pattern = new RegExp(

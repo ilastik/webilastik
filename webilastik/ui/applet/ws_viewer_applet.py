@@ -1,8 +1,8 @@
 #pyright: strict
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from concurrent.futures import Executor
-from typing import Dict, Optional, Sequence, Tuple, Set, Callable, Any, Mapping
+from typing import Dict, Optional, Sequence, Tuple, Set, Callable, Any, Mapping, Union
 import re
 import json
 import threading
@@ -12,16 +12,20 @@ import asyncio
 
 from ndstructs.utils.json_serializable import JsonObject, ensureJsonArray, ensureJsonInt, ensureJsonObject, ensureJsonString
 from aiohttp import web
+from webilastik.annotations.annotation import Color
 
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.features.ilp_filter import IlpFilter
+from webilastik.server.message_schema import (
+    FailedViewMessage, MakeDataViewParams, MessageParsingError, PredictionsViewMessage, RawDataViewMessage, StrippedPrecomputedViewMessage, UnsupportedDatasetViewMessage, ViewerAppletStateMessage
+)
 from webilastik.server.session_allocator import uncachable_json_response
 from webilastik.ui.applet.brushing_applet import Label
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.usage_error import UsageError
 
-from webilastik.utility.url import DataScheme, Url, Protocol
+from webilastik.utility.url import Url, Protocol
 from webilastik.datasource import FsDataSource
 from webilastik.ui.applet import AppletOutput, CascadeError, CascadeOk, CascadeResult, UserPrompt, cascade
 from webilastik.ui.datasource import try_get_datasources_from_url
@@ -32,14 +36,6 @@ class View(ABC):
         self.url = url
         super().__init__()
 
-    @abstractmethod
-    def to_json_value(self) -> JsonObject:
-        return {
-            "name": self.name,
-            "url": self.url.raw,
-            "__class__": self.__class__.__name__,
-        }
-
 class DataView(View):
     pass
 
@@ -48,11 +44,12 @@ class RawDataView(DataView):
         self.datasources = datasources
         super().__init__(name=name, url=url)
 
-    def to_json_value(self) -> JsonObject:
-        return {
-            **super().to_json_value(),
-            "datasources": tuple([ds.to_json_value() for ds in self.datasources])
-        }
+    def to_message(self) -> RawDataViewMessage:
+        return RawDataViewMessage(
+            name=self.name,
+            url=self.url.to_message(),
+            datasources=tuple(ds.to_message() for ds in self.datasources)
+        )
 
     @classmethod
     def try_from_url(cls, name: str, url: Url, allowed_protocols: Sequence[Protocol]) -> "RawDataView | None | Exception":
@@ -69,15 +66,16 @@ class StrippedPrecomputedView(DataView):
         super().__init__(
             name=name,
             url=session_url.updated_with(
-                datascheme=DataScheme.PRECOMPUTED
+                datascheme="precomputed",
             ).concatpath(f"stripped_precomputed/url={all_scales_url.to_base64()}/resolution={resolution_str}"),
         )
 
-    def to_json_value(self) -> JsonObject:
-        return {
-            **super().to_json_value(),
-            "datasource": self.datasource.to_json_value(),
-        }
+    def to_message(self) -> StrippedPrecomputedViewMessage:
+        return StrippedPrecomputedViewMessage(
+            name=self.name,
+            url=self.url.to_message(),
+            datasource=self.datasource.to_message(),
+        )
 
     @classmethod
     def matches(cls, url: Url) -> bool:
@@ -124,16 +122,17 @@ class PredictionsView(View):
         super().__init__(
             name=name,
             url=session_url.updated_with(
-                datascheme=DataScheme.PRECOMPUTED # FIXME: this assumes neuroglancer as the viewer
+                datascheme="precomputed" # FIXME: this assumes neuroglancer as the viewer
             ).concatpath(f"predictions/raw_data={raw_data.url.to_base64()}/generation={classifier_generation}"),
         )
 
-    def to_json_value(self) -> JsonObject:
-        return {
-            **super().to_json_value(),
-            "raw_data": self.raw_data.to_json_value(),
-            "classifier_generation": self.classifier_generation,
-        }
+    def to_message(self) -> PredictionsViewMessage:
+        return PredictionsViewMessage(
+            name=self.name,
+            url=self.url.to_message(),
+            raw_data=self.raw_data.to_message(),
+            classifier_generation=self.classifier_generation,
+        )
 
     @classmethod
     def matches(cls, url: Url) -> "bool | Exception":
@@ -174,39 +173,48 @@ class PredictionsView(View):
             return e
 
 class UnsupportedDatasetView(DataView):
-    def to_json_value(self) -> JsonObject:
-        return super().to_json_value()
+    def to_message(self) -> UnsupportedDatasetViewMessage:
+        return UnsupportedDatasetViewMessage(
+            name=self.name,
+            url=self.url.to_message(),
+        )
 
 class FailedView(DataView):
     def __init__(self, name: str, url: Url, error_message: str) -> None:
         super().__init__(name, url)
         self.error_message: str = error_message
 
-    def to_json_value(self) -> JsonObject:
-        return {
-            **super().to_json_value(),
-            "error_message": self.error_message,
-        }
+    def to_message(self) -> FailedViewMessage:
+        return FailedViewMessage(
+            name=self.name,
+            url=self.url.to_message(),
+            error_message=self.error_message,
+        )
+
+DataViewUnion = Union[RawDataView, StrippedPrecomputedView, FailedView, UnsupportedDatasetView]
 
 @dataclass
 class ViewsState:
     frontend_timestamp: int
-    data_views: Mapping[Url, DataView]
+    data_views: Mapping[Url, DataViewUnion]
     prediction_views: Mapping[Url, PredictionsView]
+    label_colors: Sequence[Color]
 
-    def to_json_value(self) -> JsonObject:
-        return {
-            "frontend_timestamp": self.frontend_timestamp,
-            "data_views": tuple(view.to_json_value() for view in self.data_views.values()),
-            "prediction_views": tuple(view.to_json_value() for view in self.prediction_views.values()),
-        }
+    def to_message(self) -> ViewerAppletStateMessage:
+        return ViewerAppletStateMessage(
+            frontend_timestamp=self.frontend_timestamp,
+            data_views=tuple(view.to_message() for view in self.data_views.values()),
+            prediction_views=tuple(view.to_message() for view in self.prediction_views.values()),
+            label_colors=tuple(c.to_message() for c in self.label_colors)
+        )
 
     def updated_with(
         self,
         *,
         frontend_timestamp: int,
-        data_views: "None | Mapping[Url, DataView]" = None,
+        data_views: "None | Mapping[Url, DataViewUnion]" = None,
         prediction_views: "None | Mapping[Url, PredictionsView]" = None,
+        label_colors: "Sequence[Color] | None" = None,
     ) -> "ViewsState":
         if frontend_timestamp < self.frontend_timestamp:
             return self.updated_with(frontend_timestamp=self.frontend_timestamp)
@@ -214,13 +222,14 @@ class ViewsState:
             frontend_timestamp=frontend_timestamp,
             data_views=self.data_views if data_views is None else data_views,
             prediction_views=self.prediction_views if prediction_views is None else prediction_views,
+            label_colors=self.label_colors if label_colors is None else label_colors,
         )
 
     def with_extra_views(
         self,
         *,
         frontend_timestamp: int,
-        extra_data_views: "Mapping[Url, DataView]" = {},
+        extra_data_views: "Mapping[Url, DataViewUnion]" = {},
         extra_prediction_views: "Mapping[Url, PredictionsView]" = {},
     ) -> "ViewsState":
         return self.updated_with(
@@ -250,17 +259,19 @@ class WsViewerApplet(WsApplet):
         self.on_async_change = on_async_change
         self.lock = threading.Lock()
 
-        self.cached_views: Dict[Url, View] = {}
-        self.state: ViewsState = ViewsState(frontend_timestamp=0, data_views={}, prediction_views={})
+        self.cached_views: Dict[Url, Union[DataViewUnion, PredictionsView]] = {}
+        self.state: ViewsState = ViewsState(frontend_timestamp=0, data_views={}, prediction_views={}, label_colors=[])
         self.frontend_timestamp = 0
         super().__init__(name=name)
 
     def _get_json_state(self) -> JsonObject:
         with self.lock:
+            return self.state.to_message().to_json_value()
+        with self.lock:
             labels = self._in_labels() or ()
             return {
                 **self.state.to_json_value(),
-                "label_colors": tuple(label.color.to_json_data() for label in labels if len(label.annotations) > 0), # FIXME
+                "label_colors": tuple(label.color.to_message().to_json_value() for label in labels if len(label.annotations) > 0), # FIXME
             }
 
     def take_snapshot(self) -> ViewsState:
@@ -272,7 +283,7 @@ class WsViewerApplet(WsApplet):
             self.state = snapshot
 
     @cascade(refresh_self=True)
-    def _add_data_view(self, user_prompt: UserPrompt, view: DataView, frontend_timestamp: int) -> CascadeResult:
+    def _add_data_view(self, user_prompt: UserPrompt, view: DataViewUnion, frontend_timestamp: int) -> CascadeResult:
         with self.lock:
             self.state = self.state.with_extra_views(frontend_timestamp=frontend_timestamp, extra_data_views={view.url: view})
             if view.url not in self.cached_views or isinstance(self.cached_views[view.url], FailedView):
@@ -304,7 +315,11 @@ class WsViewerApplet(WsApplet):
                     )
                     new_prediction_views[predictions_view.url] = predictions_view
                     self.cached_views[predictions_view.url] = predictions_view
-            self.state = self.state.updated_with(frontend_timestamp=self.state.frontend_timestamp, prediction_views=new_prediction_views)
+            self.state = self.state.updated_with(
+                frontend_timestamp=self.state.frontend_timestamp,
+                prediction_views=new_prediction_views,
+                label_colors=[label.color for label in (labels or ()) if len(label.annotations) > 0] #FIXME: likely not a good place to remove unused labels
+            )
         self.on_async_change() #FIXME: this should probably be done at the workflow level, not at the applet level
         return CascadeOk()
 
@@ -317,7 +332,7 @@ class WsViewerApplet(WsApplet):
     @cascade(refresh_self=True)
     def set_data_views(self, user_prompt: UserPrompt, native_views: Mapping[str, Url], frontend_timestamp: int) -> CascadeResult:
         with self.lock:
-            new_data_views: Dict[Url, DataView] = {}
+            new_data_views: Dict[Url, DataViewUnion] = {}
             for view_name, view_url in native_views.items():
                 if  PredictionsView.matches(view_url):
                     continue
@@ -359,37 +374,33 @@ class WsViewerApplet(WsApplet):
 
     async def make_data_view(self, request: web.Request) -> web.Response:
         payload = await request.json()
-        view_name = ensureJsonString(payload.get("name"))
-        raw_url = ensureJsonString(payload.get("url"))
-        if raw_url is None:
-            return  uncachable_json_response({"error": "Missing 'url' key in payload"}, status=400)
-        url = Url.parse(raw_url)
-        if url is None:
-            return  uncachable_json_response({"error": "Bad url in payload"}, status=400)
-
+        params = MakeDataViewParams.from_json_value(payload)
+        if isinstance(params, MessageParsingError):
+            return  uncachable_json_response({"error": str(params)}, status=400)
+        url = Url.from_message(params.url)
         with self.lock:
             view = self.cached_views.get(url)
             if view:
-                return web.json_response(view.to_json_value(), status=200)
-            if url.datascheme == DataScheme.PRECOMPUTED:
+                return web.json_response(view.to_message().to_json_value(), status=200)
+            if url.datascheme == "precomputed":
                 for view in self.state.data_views.values():
                     if isinstance(view, RawDataView):
                         for ds in view.datasources:
                             if isinstance(ds, PrecomputedChunksDataSource) and ds.url == url:
-                                stripped_view = StrippedPrecomputedView(name=view_name, session_url=self.session_url, datasource=ds)
-                                return web.json_response(stripped_view.to_json_value(), status=200)
+                                stripped_view = StrippedPrecomputedView(name=params.view_name, session_url=self.session_url, datasource=ds)
+                                return web.json_response(stripped_view.to_message().to_json_value(), status=200)
                     if isinstance(view, StrippedPrecomputedView) and view.datasource.url == url:
-                        return web.json_response(view.to_json_value(), status=200)
+                        return web.json_response(view.to_message().to_json_value(), status=200)
         view = await asyncio.wrap_future(self.executor.submit(
             _try_open_data_view,
-            name=view_name, url=url, session_url=self.session_url, allowed_protocols=[Protocol.HTTPS, Protocol.HTTP]
+            name=params.view_name, url=url, session_url=self.session_url, allowed_protocols=["https", "http"]
         ))
-        return web.json_response(view.to_json_value(), status=200)
+        return web.json_response(view.to_message().to_json_value(), status=200)
 
 
 def _try_open_data_view(
-    *, name: str, url: Url, session_url: Url, allowed_protocols: Sequence[Protocol] = (Protocol.HTTPS, Protocol.HTTP)
-) -> "DataView":
+    *, name: str, url: Url, session_url: Url, allowed_protocols: Sequence[Protocol] = ("https", "http")
+) -> "DataViewUnion":
     stripped_view_result = StrippedPrecomputedView.try_from_url(name=name, url=url, session_url=session_url, allowed_protocols=allowed_protocols)
     if isinstance(stripped_view_result, Exception):
         return FailedView(name=name, url=url, error_message=str(stripped_view_result))

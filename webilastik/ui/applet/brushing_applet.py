@@ -2,11 +2,14 @@
 
 from typing import Dict, List, Sequence, Set, Tuple
 
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonString
+from webilastik.serialization.json_serialization import JsonObject, JsonValue
 import numpy as np
 
 from webilastik.datasource import DataSource
 from webilastik.annotations.annotation import Annotation, Color
+from webilastik.server.message_schema import (
+    AddPixelAnnotationParams, BrushingAppletStateMessage, CreateLabelParams, LabelMessage, MessageParsingError, RecolorLabelParams, RemoveLabelParams, RemovePixelAnnotationParams, RenameLabelParams
+)
 from webilastik.ui.applet import Applet, CascadeError, CascadeOk, CascadeResult, UserPrompt, applet_output, cascade
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.usage_error import UsageError
@@ -18,12 +21,12 @@ class Label:
         self.annotations = list(annotations)
         super().__init__()
 
-    def to_json_value(self) -> JsonObject:
-        return {
-            "name": self.name,
-            "color": self.color.to_json_data(),
-            "annotations": tuple(annotation.to_json_data() for annotation in self.annotations),
-        }
+    def to_messsage(self) -> LabelMessage:
+        return LabelMessage(
+            name=self.name,
+            color=self.color.to_message(),
+            annotations=tuple(annotation.to_message() for annotation in self.annotations),
+        )
 
     def clone(self) -> "Label":
         return Label(name=self.name, color=self.color, annotations=list(self.annotations))
@@ -152,49 +155,80 @@ class WsBrushingApplet(WsApplet, BrushingApplet):
         ])
 
     def _get_json_state(self) -> JsonValue:
-        return {
-            "labels": tuple(label.to_json_value() for label in self._labels),
-        }
+        return BrushingAppletStateMessage(
+            labels=tuple(label.to_messsage() for label in self._labels),
+        ).to_json_value() # FIXME: move to_json() outside
 
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> "UsageError | None":
         if method_name == "recolor_label":
+            recolor_label_params = RecolorLabelParams.from_json_value(arguments)
+            if isinstance(recolor_label_params, MessageParsingError):
+                return UsageError(str(recolor_label_params)) # FIXME: this would be a bug, not an usage error
             return UsageError.check(self.recolor_label(
                 user_prompt,
-                label_name=ensureJsonString(arguments.get("label_name")),
-                new_color=Color.from_json_data(arguments.get("new_color"))
+                label_name=recolor_label_params.label_name,
+                new_color=Color(
+                    r=np.uint8(recolor_label_params.new_color.r),
+                    g=np.uint8(recolor_label_params.new_color.g),
+                    b=np.uint8(recolor_label_params.new_color.b),
+                )
             ))
 
         if method_name == "rename_label":
+            rename_label_params = RenameLabelParams.from_json_value(arguments)
+            if isinstance(rename_label_params, MessageParsingError):
+                return UsageError(str(rename_label_params)) # FIXME: this would be a bug, not an usage error
             return UsageError.check(self.rename_label(
                 user_prompt,
-                old_name=ensureJsonString(arguments.get("old_name")),
-                new_name=ensureJsonString(arguments.get("new_name"))
+                old_name=rename_label_params.old_name,
+                new_name=rename_label_params.new_name,
             ))
 
         if method_name == "create_label":
+            create_label_params = CreateLabelParams.from_json_value(arguments)
+            if isinstance(create_label_params, MessageParsingError):
+                return UsageError(str(create_label_params)) # FIXME: this would be a bug, not an usage error
             return UsageError.check(self.create_label(
                 user_prompt=user_prompt,
-                label_name=ensureJsonString(arguments.get("label_name")),
-                color=Color.from_json_data(arguments.get("color")),
+                label_name=create_label_params.label_name,
+                color=Color(
+                    r=np.uint8(create_label_params.color.r),
+                    g=np.uint8(create_label_params.color.g),
+                    b=np.uint8(create_label_params.color.b),
+                ),
             ))
 
         if method_name == "remove_label":
+            remove_label_params = RemoveLabelParams.from_json_value(arguments)
+            if isinstance(remove_label_params, MessageParsingError):
+                return UsageError(str(remove_label_params)) # FIXME: this would be a bug, not an usage error
             return UsageError.check(self.remove_label(
                 user_prompt=user_prompt,
-                label_name=ensureJsonString(arguments.get("label_name")),
+                label_name=remove_label_params.label_name,
             ))
 
         if method_name == "add_annotation":
+            add_pixel_annotation_params = AddPixelAnnotationParams.from_json_value(arguments)
+            if isinstance(add_pixel_annotation_params, MessageParsingError):
+                return UsageError(str(add_pixel_annotation_params)) # FIXME: this would be a bug, not an usage error
+            annotation_result = Annotation.from_message(add_pixel_annotation_params.pixel_annotation)
+            if isinstance(annotation_result, Exception):
+                return UsageError(str(annotation_result)) # FIXME: this would be a bug, not an usage error
             return UsageError.check(self.add_annotation(
                 user_prompt,
-                label_name=ensureJsonString(arguments.get("label_name")),
-                annotation=Annotation.from_json_value(arguments.get("annotation")),
+                label_name=add_pixel_annotation_params.label_name,
+                annotation=annotation_result,
             ))
         if method_name == "remove_annotation":
+            remove_pixel_annotation_params = RemovePixelAnnotationParams.from_json_value(arguments)
+            if isinstance(remove_pixel_annotation_params, MessageParsingError):
+                return UsageError(str(remove_pixel_annotation_params)) # FIXME: this would be a bug, not an usage error
+            annotation_result = Annotation.from_message(remove_pixel_annotation_params.pixel_annotation)
+            if isinstance(annotation_result, Exception):
+                return UsageError(str(annotation_result)) # FIXME: this would be a bug, not an usage error
             return UsageError.check(self.remove_annotation(
                 user_prompt,
-                label_name=ensureJsonString(arguments.get("label_name")),
-                annotation=Annotation.from_json_value(arguments.get("annotation")),
+                label_name=remove_pixel_annotation_params.label_name,
+                annotation=annotation_result,
             ))
-
         raise ValueError(f"Invalid method name: '{method_name}'")

@@ -93,7 +93,7 @@ async def main():
                     applet_name="feature_selection_applet",
                     method_name="add_feature_extractors",
                     arguments={
-                        "feature_extractors": tuple(fe.to_json_value() for fe in get_sample_feature_extractors())
+                        "feature_extractors": tuple(fe.to_message().to_json_value() for fe in get_sample_feature_extractors())
                     }
                 ).to_json_value()
             )

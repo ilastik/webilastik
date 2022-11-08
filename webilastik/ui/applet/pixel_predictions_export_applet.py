@@ -14,6 +14,8 @@ from webilastik.datasource import DataRoi, DataSource, FsDataSource
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.operator import IN, Operator
 from webilastik.scheduling.job import Job, JobFailedCallback, JobSucceededCallback, PriorityExecutor, IN as JOB_IN, OUT as JOB_OUT
+from webilastik.serialization.json_serialization import JsonValue
+from webilastik.server.message_schema import MessageParsingError, PixelClassificationExportAppletStateMessage, StartExportJobParamsMessage, StartSimpleSegmentationExportJobParamsMessage
 from webilastik.simple_segmenter import SimpleSegmenter
 from webilastik.ui.applet import AppletOutput, StatelesApplet, UserPrompt
 from webilastik.ui.applet.ws_applet import WsApplet
@@ -182,23 +184,32 @@ class PixelClassificationExportApplet(StatelesApplet):
 class WsPixelClassificationExportApplet(WsApplet, PixelClassificationExportApplet):
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> "UsageError | None":
         if method_name == "start_export_job":
-            datasource = DataSource.from_json_value(arguments.get("datasource"))
-            datasink = DataSink.from_json_value(arguments.get("datasink"))
-            rpc_result = self.start_export_job(datasource=datasource, datasink=datasink)
+            params_result = StartExportJobParamsMessage.from_json_value(arguments)
+            if isinstance(params_result, MessageParsingError):
+                return UsageError(str(params_result)) #FIXME: this is a bug, not a usage error
+            datasource_result = FsDataSource.try_from_message(params_result.datasource)
+            if isinstance(datasource_result, MessageParsingError):
+                return UsageError(str(datasource_result)) #FIXME: this is a bug, not a usage error
+            rpc_result = self.start_export_job(datasource=datasource_result, datasink=DataSink.from_message(params_result.datasink))
         elif method_name == "start_simple_segmentation_export_job":
-            datasource = DataSource.from_json_value(arguments.get("datasource"))
-            datasinks = [DataSink.from_json_value(raw_sink) for raw_sink in ensureJsonArray(arguments.get("datasinks"))]
-            rpc_result = self.start_simple_segmentation_export_job(datasource=datasource, datasinks=datasinks)
+            params_result = StartSimpleSegmentationExportJobParamsMessage.from_json_value(arguments)
+            if isinstance(params_result, MessageParsingError):
+                return UsageError(str(params_result)) #FIXME: this is a bug, not a usage error
+            datasource_result = FsDataSource.try_from_message(params_result.datasource)
+            if isinstance(datasource_result, MessageParsingError):
+                return UsageError(str(datasource_result)) #FIXME: this is a bug, not a usage error
+            datasinks = [DataSink.from_message(msg) for msg in params_result.datasinks]
+            rpc_result = self.start_simple_segmentation_export_job(datasource=datasource_result, datasinks=datasinks)
         else:
-            raise ValueError(f"Invalid method name: '{method_name}'")
+            raise ValueError(f"Invalid method name: '{method_name}'") #FIXME: return error
         return rpc_result
 
-    def _get_json_state(self) -> JsonObject:
+    def _get_json_state(self) -> JsonValue:
         with self._lock:
             classifier = self._in_operator()
             datasource_suggestions = self._in_datasource_suggestions()
-            return {
-                "jobs": tuple(job.to_json_value() for job in self._jobs.values()),
-                "num_classes":  classifier and classifier.num_classes,
-                "datasource_suggestions": None if datasource_suggestions is None else tuple(ds.to_json_value() for ds in datasource_suggestions)
-            }
+            return PixelClassificationExportAppletStateMessage(
+                jobs=tuple(job.to_message() for job in self._jobs.values()),
+                num_classes= classifier and classifier.num_classes,
+                datasource_suggestions=None if datasource_suggestions is None else tuple(ds.to_message() for ds in datasource_suggestions)
+            ).to_json_value()

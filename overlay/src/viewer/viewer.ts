@@ -1,13 +1,13 @@
 // import { vec3 } from "gl-matrix";
 import { quat, vec3 } from "gl-matrix";
 import { Applet } from "../client/applets/applet";
-import { DataSource, PredictionsView, Session, View, DataView, RawDataView, StrippedPrecomputedView } from "../client/ilastik";
+import { DataSource, PredictionsView, Session, View, DataView, RawDataView, StrippedPrecomputedView, DataViewUnion, Color } from "../client/ilastik";
+import { ViewerAppletStateMessage } from "../client/message_schema";
 import { INativeView, IViewerDriver, IViewportDriver } from "../drivers/viewer_driver";
 import { ErrorPopupWidget } from "../gui/widgets/popup";
 import { HashMap } from "../util/hashmap";
 import { createInput, removeElement } from "../util/misc";
 import { Url } from "../util/parsed_url";
-import { ensureJsonArray, ensureJsonNumber, ensureJsonObject, JsonValue } from "../util/serialization";
 
 
 export class ViewerAppletState{
@@ -25,29 +25,23 @@ export class ViewerAppletState{
         this.label_colors = params.label_colors
     }
 
-    public static fromJsonValue(value: JsonValue): ViewerAppletState{
-        const value_obj = ensureJsonObject(value)
-        let data_views = new HashMap<Url, DataView, string>();
-        for(let view of ensureJsonArray(value_obj["data_views"]).map(raw_view => DataView.fromJsonValue(raw_view))){
-            data_views.set(view.url, view)
+    public static fromMessage(message: ViewerAppletStateMessage): ViewerAppletState{
+        let data_views = new HashMap<Url, DataViewUnion, string>();
+        for(let rawViewMsg of message.data_views){
+            const dataView = DataView.fromMessage(rawViewMsg)
+            data_views.set(dataView.url, dataView)
         }
 
-        let prediction_views = new HashMap<Url, PredictionsView, string>()
-        for(let view of ensureJsonArray(value_obj["prediction_views"]).map(raw_view => PredictionsView.fromJsonValue(raw_view))){
-            prediction_views.set(view.url, view)
+        let prediction_views = new HashMap<Url, PredictionsView, string>();
+        for(let predViewMsg of message.prediction_views){
+            const predView = PredictionsView.fromMessage(predViewMsg)
+            prediction_views.set(predView.url, predView)
         }
 
         return new ViewerAppletState({
             data_views,
             prediction_views,
-            label_colors: ensureJsonArray(value_obj["label_colors"]).map(raw_color => {
-                const color_obj = ensureJsonObject(raw_color)
-                return {
-                    r: ensureJsonNumber(color_obj["r"]),
-                    g: ensureJsonNumber(color_obj["g"]),
-                    b: ensureJsonNumber(color_obj["b"]),
-                }
-            })
+            label_colors: message.label_colors.map(color_msg => Color.fromMessage(color_msg))
         })
     }
 }
@@ -68,7 +62,13 @@ export class Viewer extends Applet<ViewerAppletState>{
         super({
             name: params.name,
             session: params.ilastik_session,
-            deserializer: ViewerAppletState.fromJsonValue,
+            deserializer: value => {
+                let stateMessage = ViewerAppletStateMessage.fromJsonValue(value)
+                if(stateMessage instanceof Error){
+                    throw `FIXME!`
+                }
+                return ViewerAppletState.fromMessage(stateMessage)
+            },
             onNewState: (newState) => this.onNewState(newState)
         })
         this.driver = params.driver

@@ -15,6 +15,7 @@ from ndstructs.array5D import Array5D
 
 from webilastik.datasource import DataSource
 from webilastik.filesystem import JsonableFilesystem
+from webilastik.server.message_schema import PrecomputedChunksScaleMessage
 
 class PrecomputedChunksEncoder(ABC):
     @abstractmethod
@@ -35,6 +36,17 @@ class PrecomputedChunksEncoder(ABC):
     def to_json_value(self) -> JsonValue:
         pass
 
+    @abstractmethod
+    def to_message(self) -> Literal["raw", "jpeg"]:
+        pass
+
+    @classmethod
+    def from_message(cls, message: Literal["raw", "jpeg"]) -> "PrecomputedChunksEncoder":
+        if message == "raw":
+            return RawEncoder()
+        if message == "jpeg":
+            return JpegEncoder()
+
     @classmethod
     def from_json_value(cls, data: JsonValue) -> "PrecomputedChunksEncoder":
         label = ensureJsonString(data)
@@ -45,6 +57,9 @@ class PrecomputedChunksEncoder(ABC):
         raise ValueError(f"Bad encoding value: {label}")
 
 class RawEncoder(PrecomputedChunksEncoder):
+    def to_message(self) -> Literal["raw"]:
+        return "raw"
+
     def to_json_value(self) -> JsonValue:
         return "raw"
 
@@ -67,6 +82,9 @@ class RawEncoder(PrecomputedChunksEncoder):
         return data.raw("xyzc").tobytes("F")
 
 class JpegEncoder(PrecomputedChunksEncoder):
+    def to_message(self) -> Literal["jpeg"]:
+        return "jpeg"
+
     def to_json_value(self) -> JsonValue:
         return "jpeg"
 
@@ -148,6 +166,27 @@ class PrecomputedChunksScale:
                 for v in ensureJsonArray(value_obj.get("chunk_sizes"))
             ]),
             encoding=PrecomputedChunksEncoder.from_json_value(value_obj.get("encoding")),
+        )
+
+    @classmethod
+    def from_message(cls, message: PrecomputedChunksScaleMessage) -> "PrecomputedChunksScale":
+        return PrecomputedChunksScale(
+            key=PurePosixPath(message.key),
+            size=message.size,
+            resolution=message.resolution,
+            voxel_offset=message.voxel_offset,
+            chunk_sizes=message.chunk_sizes,
+            encoding=PrecomputedChunksEncoder.from_message(message.encoding),
+        )
+
+    def to_message(self) -> PrecomputedChunksScaleMessage:
+        return PrecomputedChunksScaleMessage(
+            chunk_sizes=self.chunk_sizes,
+            encoding=self.encoding.to_message(),
+            key=self.key.as_posix(),
+            resolution=self.resolution,
+            size=self.size,
+            voxel_offset=self.voxel_offset,
         )
 
     def __eq__(self, other: object) -> bool:

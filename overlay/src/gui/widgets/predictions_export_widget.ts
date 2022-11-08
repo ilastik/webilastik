@@ -7,6 +7,7 @@ import { DataSource, Session } from '../../client/ilastik';
 import { CssClasses } from '../css_classes';
 import { ErrorPopupWidget } from './popup';
 import { PixelPredictionsExportParamsInput, SimpleSegmentationExportParamsInput } from './export_params_input';
+import { DataSourceMessage, StartExportJobParamsMessage, StartSimpleSegmentationExportJobParamsMessage } from '../../client/message_schema';
 
 const sink_creation_stati = ["pending", "running", "cancelled", "failed", "succeeded"] as const;
 export type SinkCreationStatus = typeof sink_creation_stati[number];
@@ -69,7 +70,13 @@ function stateFromJsonValue(data: JsonValue): State{
     return {
         jobs: Job.fromJsonArray(ensureJsonArray(data_obj["jobs"])),
         num_classes: ensureOptional(ensureJsonNumber, data_obj["num_classes"]),
-        datasource_suggestions: ensureJsonArray(data_obj["datasource_suggestions"]).map(raw => DataSource.fromJsonValue(raw))
+        datasource_suggestions: ensureJsonArray(data_obj["datasource_suggestions"]).map(raw => {
+            const msg = DataSourceMessage.fromJsonValue(raw)
+            if(msg instanceof Error){
+                throw `FIXME!!!`
+            }
+            return DataSource.fromMessage(msg)
+        })
     }
 }
 
@@ -104,7 +111,9 @@ export class PredictionsExportWidget extends Applet<State>{
                     new ErrorPopupWidget({message: "Missing export parameters"})
                     return
                 }
-                this.doRPC("start_export_job", payload)
+                this.doRPC("start_export_job", new StartExportJobParamsMessage({
+                    datasource: payload.datasource.toMessage(), datasink: payload.datasink
+                }))
             }
         })
 
@@ -122,7 +131,9 @@ export class PredictionsExportWidget extends Applet<State>{
                     new ErrorPopupWidget({message: "Missing export parameters"})
                     return
                 }
-                this.doRPC("start_simple_segmentation_export_job", payload)
+                this.doRPC("start_simple_segmentation_export_job", new StartSimpleSegmentationExportJobParamsMessage({
+                    datasource: payload.datasource.toMessage(), datasinks: payload.datasinks
+                }))
             }
         })
 

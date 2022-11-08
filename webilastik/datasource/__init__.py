@@ -1,9 +1,11 @@
+#pyright: strict
+
 import json
 import enum
 from abc import abstractmethod, ABC
 from enum import IntEnum
 from pathlib import PurePosixPath
-from typing import Any, Callable, ClassVar, Optional, Tuple, Union, Iterator, Dict
+from typing import Any, Callable, ClassVar, Optional, Tuple, Union, Iterator, Dict, Sequence
 from typing_extensions import Final
 
 import numpy as np
@@ -12,8 +14,13 @@ from ndstructs.point5D import Shape5D, Interval5D, Point5D, SPAN
 from ndstructs.array5D import Array5D, SPAN_OVERRIDE, All
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 from webilastik.filesystem import JsonableFilesystem
+from webilastik.server.message_schema import DataSourceMessage, Interval5DMessage, MessageParsingError, Shape5DMessage
 from webilastik.utility.url import Url
+from webilastik.utility.url import Url, Protocol
 from global_cache import global_cache
+
+
+
 
 @enum.unique
 class AddressMode(IntEnum):
@@ -274,3 +281,63 @@ class FsDataSource(DataSource):
             "spatial_resolution": self.spatial_resolution,
             "url": self.url.raw,
         }
+
+    def to_message(self) -> DataSourceMessage:
+        return DataSourceMessage(
+            interval=Interval5DMessage.from_interval5d(self.interval),
+            spatial_resolution=self.spatial_resolution,
+            tile_shape=Shape5DMessage.from_shape5d(self.tile_shape),
+            url=self.url.to_message(),
+        )
+
+    @staticmethod
+    def try_from_message(
+        message: DataSourceMessage,
+        allowed_protocols: Sequence[Protocol] = ("http", "https"),
+    ) -> "FsDataSource | MessageParsingError":
+        url = Url.from_message(message.url)
+        fs_ds_result =  FsDataSource.try_get_datasources_from_url(url=url, allowed_protocols=allowed_protocols)
+        if isinstance(fs_ds_result, Exception):
+            return MessageParsingError(str(fs_ds_result))
+        if fs_ds_result is None:
+            return MessageParsingError(f"Could not open url {url}")
+        if len(fs_ds_result) != 1:
+            return MessageParsingError(f"Expected a single datasource from {url.raw}, found {len(fs_ds_result)}")
+        return fs_ds_result[0]
+
+    _datasource_cache: ClassVar[Dict[Url, Sequence['FsDataSource']]] = {}
+
+    @staticmethod
+    def try_get_datasources_from_url(
+        *,
+        url: Url,
+        allowed_protocols: Sequence[Protocol] = ("http", "https")
+    ) -> "Sequence[FsDataSource] | None | Exception":
+        if url.protocol not in allowed_protocols:
+            return Exception(f"Disallowed protocol: {url.protocol} in {url}")
+
+        cached_datasources = FsDataSource._datasource_cache.get(url)
+        if cached_datasources is not None:
+            return cached_datasources
+
+        hashless_url = url.updated_with(hash_="")
+        cached_datasources = FsDataSource._datasource_cache.get(hashless_url)
+        for ds in cached_datasources or ():
+            if ds.url == url:
+                out = [ds]
+                FsDataSource._datasource_cache[hashless_url] = out
+                return out
+
+        from webilastik.datasource.skimage_datasource import SkimageDataSource
+        from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
+
+
+        if SkimageDataSource.supports_url(url):
+            datasources = SkimageDataSource.from_url(url)
+        if PrecomputedChunksDataSource.supports_url(url):
+            datasources = PrecomputedChunksDataSource.from_url(url)
+        else:
+            return None
+        if not isinstance(datasources, Exception):
+            FsDataSource._datasource_cache[url] = datasources
+        return datasources

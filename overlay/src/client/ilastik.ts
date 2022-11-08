@@ -1,138 +1,61 @@
 import { vec3 } from "gl-matrix"
 import { INativeView } from "../drivers/viewer_driver"
 import { fetchJson, sleep } from "../util/misc"
-import { Path, Url } from "../util/parsed_url"
-import { DataType, ensureDataType, Scale } from "../util/precomputed_chunks"
+import { Url } from "../util/parsed_url"
 import {
-    ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonNumberPair, ensureJsonNumberTripplet, ensureJsonObject,
-    ensureJsonString, ensureOptional, IJsonable, IJsonableObject, JsonObject, JsonValue, toJsonValue
+    ensureJsonObject, ensureJsonString, JsonableValue, JsonValue, toJsonValue
 } from "../util/serialization"
+import {
+    CheckLoginResultMessage,
+    CloseComputeSessionParamsMessage,
+    ColorMessage,
+    ComputeSessionStatusMessage,
+    CreateComputeSessionParamsMessage,
+    DataSourceMessage,
+    FailedViewMessage,
+    GetAvailableHpcSitesResponseMessage,
+    GetComputeSessionStatusParamsMessage,
+    GetDatasourcesFromUrlParamsMessage,
+    GetDatasourcesFromUrlResponseMessage,
+    IlpFeatureExtractorMessage,
+    Interval5DMessage,
+    ListComputeSessionsParamsMessage,
+    ListComputeSessionsResponseMessage,
+    LoadProjectParamsMessage,
+    Point5DMessage,
+    PredictionsViewMessage,
+    RawDataViewMessage,
+    SaveProjectParamsMessage,
+    Shape5DMessage,
+    StrippedPrecomputedViewMessage,
+    UnsupportedDatasetViewMessage
+} from "./message_schema"
 
-export const slurmJobStates = [
-    "BOOT_FAIL", "CANCELLED", "COMPLETED", "DEADLINE", "FAILED", "NODE_FAIL", "OUT_OF_MEMORY",
-    "PENDING", "PREEMPTED", "RUNNING", "REQUEUED", "RESIZING", "REVOKED", "SUSPENDED", "TIMEOUT"
-] as const;
+export type HpcSiteName = ComputeSessionStatusMessage["hpc_site"] //FIXME?
 
-export const slurmJobRunnableStates = [
-    "PENDING", "RUNNING", "REQUEUED", "RESIZING", "SUSPENDED"
-] as const;
-
-export const slurmJobFailedStates = [
-    "BOOT_FAIL", "CANCELLED", "DEADLINE", "FAILED", "NODE_FAIL", "OUT_OF_MEMORY", "PREEMPTED", "REVOKED", "TIMEOUT"
-] as const;
-
-export const slurmJobDoneStates = [
-    "COMPLETED", ...slurmJobFailedStates
-] as const;
-
-export type SlurmJobState = typeof slurmJobStates[number]
-export function ensureSlurmJobState(value: string): SlurmJobState{
-    const variant = slurmJobStates.find(variant => variant === value)
-    if(variant === undefined){
-        throw Error(`Invalid slurm job state: ${value}`)
-    }
-    return variant
-}
-
-export const hpcSiteNames = ["CSCS", "JUSUF", "LOCAL"] as const;
-export type HpcSiteName = typeof hpcSiteNames[number]
-
-export function ensureHpcSiteName(value: string): HpcSiteName{
-    const variant = hpcSiteNames.find(variant => variant === value)
-    if(variant === undefined){
-        throw Error(`Invalid hpc site name: ${value}`)
-    }
-    return variant
-}
-
-export class SlurmJob{
-    public readonly job_id: number
-    public readonly state: SlurmJobState
-    public readonly start_time_utc_sec?: number
-    public readonly time_elapsed_sec: number
-    public readonly time_limit_minutes: number
-    public readonly num_nodes: number
-    public readonly session_id: string
-
-    constructor(params: {
-        job_id: number,
-        state: SlurmJobState
-        start_time_utc_sec?: number,
-        time_elapsed_sec: number,
-        time_limit_minutes: number,
-        num_nodes: number,
-        session_id: string,
-    }){
-        this.job_id = params.job_id
-        this.state = params.state
-        this.start_time_utc_sec = params.start_time_utc_sec
-        this.time_elapsed_sec = params.time_elapsed_sec
-        this.time_limit_minutes = params.time_limit_minutes
-        this.num_nodes = params.num_nodes
-        this.session_id = params.session_id
-    }
-
-    public is_failure(): boolean{
-        return slurmJobFailedStates.find(st => st == this.state) !== undefined
-    }
-
-    public is_done(): boolean{
-        return slurmJobDoneStates.find(st => st == this.state) !== undefined
-    }
-
-    public static fromJsonValue(value: JsonValue): SlurmJob{
-        const value_obj = ensureJsonObject(value)
-        return new this({
-            job_id: ensureJsonNumber(value_obj['job_id']),
-            state: ensureSlurmJobState(ensureJsonString(value_obj['state'])),
-            start_time_utc_sec: ensureOptional(ensureJsonNumber, value_obj['start_time_utc_sec']),
-            time_elapsed_sec: ensureJsonNumber(value_obj['time_elapsed_sec']),
-            time_limit_minutes: ensureJsonNumber(value_obj['time_limit_minutes']),
-            num_nodes: ensureJsonNumber(value_obj['num_nodes']),
-            session_id: ensureJsonString(value_obj['session_id']),
-        })
-    }
-}
-
-export class SessionStatus{
-    public readonly slurm_job: SlurmJob
-    public readonly session_url: Url
-    public readonly connected: boolean
-    public readonly hpc_site: HpcSiteName
-
-    constructor(params:{
-        slurm_job: SlurmJob,
-        session_url: Url,
-        connected: boolean,
-        hpc_site: HpcSiteName
-    }){
-        this.slurm_job = params.slurm_job
-        this.session_url = params.session_url
-        this.connected = params.connected
-        this.hpc_site = params.hpc_site
-    }
-
-    public static fromJsonValue(value: JsonValue): SessionStatus{
-        const value_obj = ensureJsonObject(value)
-        return new this({
-            slurm_job: SlurmJob.fromJsonValue(value_obj['slurm_job']),
-            session_url: Url.parse(ensureJsonString(value_obj['session_url'])),
-            connected: ensureJsonBoolean(value_obj['connected']),
-            hpc_site: ensureHpcSiteName(ensureJsonString(value_obj['hpc_site'])),
-        })
-    }
-}
+export const SESSION_DONE_STATES = [
+    "BOOT_FAIL",
+    "CANCELLED",
+    "DEADLINE",
+    "FAILED",
+    "NODE_FAIL",
+    "OUT_OF_MEMORY",
+    "PREEMPTED",
+    "REVOKED",
+    "TIMEOUT",
+    "COMPLETED",
+]; //FIXME: shouldn't this be autogenerated?
 
 export class Session{
     public readonly ilastikUrl: Url
-    public readonly sessionStatus: SessionStatus
+    public readonly sessionStatus: ComputeSessionStatusMessage
     private websocket: WebSocket
     private messageHandlers = new Array<(ev: MessageEvent) => void>();
     private readonly onUsageError: (message: string) => void
 
     protected constructor(params: {
         ilastikUrl: Url,
-        sessionStatus: SessionStatus,
+        sessionStatus: ComputeSessionStatusMessage,
         onUsageError: (message: string) => void,
     }){
         this.ilastikUrl = params.ilastikUrl
@@ -142,11 +65,11 @@ export class Session{
     }
 
     public get sessionUrl(): Url{
-        return this.sessionStatus.session_url
+        return Url.fromMessage(this.sessionStatus.session_url)
     }
 
     public get startTime(): Date | undefined{
-        const {start_time_utc_sec} = this.sessionStatus.slurm_job
+        const {start_time_utc_sec} = this.sessionStatus.compute_session
         if(start_time_utc_sec === undefined){
             return undefined
         }
@@ -154,11 +77,11 @@ export class Session{
     }
 
     public get timeLimitMinutes(): number{
-        return this.sessionStatus.slurm_job.time_limit_minutes
+        return this.sessionStatus.compute_session.time_limit_minutes
     }
 
     public get sessionId(): string{
-        return this.sessionStatus.slurm_job.session_id
+        return this.sessionStatus.compute_session.compute_session_id
     }
 
     private openWebsocket(): WebSocket{
@@ -210,7 +133,7 @@ export class Session{
         return true
     }
 
-    public async saveProject(params: {fs: FileSystem, project_file_path: Path}): Promise<Error | undefined>{
+    public async saveProject(params: SaveProjectParamsMessage): Promise<Error | undefined>{
         let response = await fetch(
             this.sessionUrl.joinPath("save_project").schemeless_raw,
             {
@@ -223,7 +146,7 @@ export class Session{
         return Error(`Could not save project: ${await response.text()}`)
     }
 
-    public async loadProject(params: {fs: FileSystem, project_file_path: Path}): Promise<Error | undefined>{
+    public async loadProject(params: LoadProjectParamsMessage): Promise<Error | undefined>{
         let response = await fetch(
             this.sessionUrl.joinPath("load_project").schemeless_raw,
             {
@@ -236,7 +159,7 @@ export class Session{
         return Error(`Could not load project: ${await response.text()}`)
     }
 
-    public doRPC(params: {applet_name: string, method_name: string, method_arguments: IJsonableObject}){
+    public doRPC(params: {applet_name: string, method_name: string, method_arguments: JsonableValue}){
         return this.websocket.send(JSON.stringify({
             applet_name: params.applet_name,
             method_name: params.method_name,
@@ -252,57 +175,48 @@ export class Session{
         return atob(encoded.replace("-", "+").replace("_", "/"))
     }
 
-    public static async check_login({ilastikUrl}: {ilastikUrl: Url}): Promise<Error | boolean>{
-        let response = await fetch(ilastikUrl.joinPath("/api/check_login").raw, {
+    public static async check_login({ilastikUrl}: {ilastikUrl: Url}): Promise<CheckLoginResultMessage | Error>{
+        let response = await fetchJson(ilastikUrl.joinPath("/api/check_login").raw, {
             credentials: "include",
             cache: "no-store",
         });
-        if(response.ok){
-            return true
+        if(response instanceof Error){
+            return response
         }
-        if(response.status == 401){
-            return false
-        }
-        let contents = await response.text()
-        return new Error(`Checking loging faield with ${response.status}:\n${contents}`)
+        return CheckLoginResultMessage.fromJsonValue(response)
     }
 
-    public static async getStatus(params: {ilastikUrl: Url, sessionId: string, hpc_site: HpcSiteName}): Promise<SessionStatus | Error>{
+    public static async getStatus(params: {ilastikUrl: Url, rpcParams: GetComputeSessionStatusParamsMessage}): Promise<ComputeSessionStatusMessage | Error>{
         let result = await fetchJson(
             params.ilastikUrl.joinPath(`/api/get_session_status`).raw,
             {
                 cache: "no-store",
                 method: "POST",
-                body: JSON.stringify({
-                    session_id: params.sessionId,
-                    hpc_site: params.hpc_site,
-                })
+                body: JSON.stringify(params.rpcParams.toJsonValue())
             }
         )
         if(result instanceof Error){
             return result
         }
-        return SessionStatus.fromJsonValue(result)
+        return ComputeSessionStatusMessage.fromJsonValue(result)
     }
 
-    public static async listSessions(params: {ilastikUrl: Url, hpc_site: HpcSiteName}): Promise<SessionStatus[] | Error>{
+    public static async listSessions(params: {ilastikUrl: Url, rpcParams: ListComputeSessionsParamsMessage}): Promise<ListComputeSessionsResponseMessage | Error>{
         let payload_result = await fetchJson(
             params.ilastikUrl.joinPath("/api/list_sessions").raw,
             {
                 cache: "no-store",
                 method: "POST",
-                body: JSON.stringify({
-                    hpc_site: params.hpc_site
-                })
+                body: JSON.stringify(params.rpcParams.toJsonValue())
             },
         )
         if(payload_result instanceof Error){
             return payload_result
         }
-        return ensureJsonArray(payload_result).map(item => SessionStatus.fromJsonValue(item))
+        return ListComputeSessionsResponseMessage.fromJsonValue(payload_result)
     }
 
-    public static async getAvailableHpcSites(params: {ilastikUrl: Url}): Promise<HpcSiteName[] | Error>{
+    public static async getAvailableHpcSites(params: {ilastikUrl: Url}): Promise<GetAvailableHpcSitesResponseMessage | Error>{
         let payload_result = await fetchJson(
             params.ilastikUrl.joinPath("/api/get_available_hpc_sites").raw,
             {
@@ -313,7 +227,7 @@ export class Session{
         if(payload_result instanceof Error){
             return payload_result
         }
-        return ensureJsonArray(payload_result).map(item => ensureHpcSiteName(ensureJsonString(item)))
+        return GetAvailableHpcSitesResponseMessage.fromJsonValue(payload_result)
     }
 
     public static getEbrainsToken(): string | undefined{
@@ -323,23 +237,19 @@ export class Session{
 
     public static async create(params: {
         ilastikUrl: Url,
-        session_duration_minutes: number,
+        rpcParams: CreateComputeSessionParamsMessage,
         timeout_minutes: number,
-        hpc_site: HpcSiteName,
         onProgress?: (message: string) => void,
         onUsageError: (message: string) => void,
         autoCloseOnTimeout: boolean,
     }): Promise<Session | Error>{
         const onProgress = params.onProgress || (() => {})
-        const newSessionUrl = params.ilastikUrl.joinPath("/api/session")
+        const newSessionUrl = params.ilastikUrl.joinPath("/api/create_compute_session")
         onProgress("Requesting session...")
 
         let session_creation_response = await fetch(newSessionUrl.schemeless_raw, {
             method: "POST",
-            body: JSON.stringify({
-                session_duration_minutes: params.session_duration_minutes,
-                hpc_site: params.hpc_site
-            })
+            body: JSON.stringify(params.rpcParams.toJsonValue())
         })
         if(Math.floor(session_creation_response.status / 100) == 5){
             onProgress(`Server-side error when creating a session`)
@@ -348,13 +258,18 @@ export class Session{
         if(!session_creation_response.ok){
             return Error(`Requesting session failed (${session_creation_response.status}): ${await session_creation_response.text()}`)
         }
-        const sessionStatus = SessionStatus.fromJsonValue(await session_creation_response.json())
+        const sessionStatusMsg = ComputeSessionStatusMessage.fromJsonValue(await session_creation_response.json())
+        if(sessionStatusMsg instanceof Error){
+            return sessionStatusMsg
+        }
         onProgress(`Successfully requested a session! Waiting for it to be ready...`)
         return Session.load({
             ilastikUrl: params.ilastikUrl,
+            getStatusRpcParams: new GetComputeSessionStatusParamsMessage({
+                compute_session_id: sessionStatusMsg.compute_session.compute_session_id,
+                hpc_site: params.rpcParams.hpc_site,
+            }),
             timeout_minutes: params.timeout_minutes,
-            sessionId: sessionStatus.slurm_job.session_id,
-            hpc_site: params.hpc_site,
             onProgress,
             onUsageError: params.onUsageError,
             autoCloseOnTimeout: params.autoCloseOnTimeout,
@@ -363,9 +278,8 @@ export class Session{
 
     public static async load(params: {
         ilastikUrl: Url,
-        sessionId: string,
+        getStatusRpcParams: GetComputeSessionStatusParamsMessage,
         timeout_minutes: number,
-        hpc_site: HpcSiteName,
         onProgress?: (message: string) => void,
         onUsageError: (message: string) => void,
         autoCloseOnTimeout: boolean,
@@ -374,12 +288,12 @@ export class Session{
         const timeout_ms = params.timeout_minutes * 60 * 1000
         const onProgress = params.onProgress || (() => {})
         while(Date.now() - start_time_ms < timeout_ms){
-            let sessionStatus = await Session.getStatus({ilastikUrl: params.ilastikUrl, sessionId: params.sessionId, hpc_site: params.hpc_site})
+            let sessionStatus = await Session.getStatus({ilastikUrl: params.ilastikUrl, rpcParams: params.getStatusRpcParams})
             if(sessionStatus instanceof Error){
                 return sessionStatus
             }
-            if(sessionStatus.slurm_job.is_done()){
-                return Error(`Session ${params.sessionId} is already closed`)
+            if(SESSION_DONE_STATES.includes(sessionStatus.compute_session.state)){ //FIXME
+                return Error(`Session ${params.getStatusRpcParams.compute_session_id} is already closed`)
             }
             if(!sessionStatus.connected){
                 onProgress(`Session is not ready yet`)
@@ -403,28 +317,31 @@ export class Session{
                 websocket.addEventListener("open", resolveThenClean)
             })
         }
-        onProgress(`Timed out waiting for session ${params.sessionId}`)
+        onProgress(`Timed out waiting for session ${params.getStatusRpcParams.compute_session_id}`)
         if(params.autoCloseOnTimeout){
-            onProgress(`Cancelling session ${params.sessionId}`)
-            const cancellation_result = await Session.cancel({ilastikUrl: params.ilastikUrl, sessionId: params.sessionId, hpc_site: params.hpc_site})
+            onProgress(`Cancelling session ${params.getStatusRpcParams.compute_session_id}`)
+            const cancellation_result = await Session.cancel({
+                ilastikUrl: params.ilastikUrl,
+                rpcParams: new CloseComputeSessionParamsMessage({
+                    compute_session_id: params.getStatusRpcParams.compute_session_id,
+                    hpc_site: params.getStatusRpcParams.hpc_site,
+                })
+            })
             if(cancellation_result instanceof Error){
-                onProgress(`Could not cancel session ${params.sessionId}: ${cancellation_result.message}`)
+                onProgress(`Could not cancel session ${params.getStatusRpcParams.compute_session_id}: ${cancellation_result.message}`)
             }else{
-                onProgress(`Cancelled session ${params.sessionId}`)
+                onProgress(`Cancelled session ${params.getStatusRpcParams.compute_session_id}`)
             }
         }
         return Error(`Could not create a session: timeout`)
     }
 
-    public static async cancel(params: {ilastikUrl: Url, sessionId: string, hpc_site: HpcSiteName}): Promise<Error | undefined>{
+    public static async cancel(params: {ilastikUrl: Url, rpcParams: CloseComputeSessionParamsMessage}): Promise<Error | undefined>{
         let result = await fetchJson(
-            params.ilastikUrl.joinPath(`api/delete_session`).raw,
+            params.ilastikUrl.joinPath(`api/close_session`).raw,
             {
                 method: "POST",
-                body: JSON.stringify({
-                    session_id: params.sessionId,
-                    hpc_site: params.hpc_site,
-                })
+                body: JSON.stringify(params.rpcParams.toJsonValue())
             }
         )
         if(result instanceof Error){
@@ -432,51 +349,52 @@ export class Session{
         }
         return undefined
     }
-}
 
-const FeatureClassNames = [
-    "IlpGaussianSmoothing", "IlpGaussianGradientMagnitude", "IlpHessianOfGaussianEigenvalues", "IlpLaplacianOfGaussian", "IlpDifferenceOfGaussians", "IlpStructureTensorEigenvalues"
-] as const;
-export type FeatureClassName = (typeof FeatureClassNames)[number]
-
-export function ensureFeatureClassName(value: string): FeatureClassName{
-    const variant = FeatureClassNames.find(variant => variant === value)
-    if(variant === undefined){
-        throw Error(`Invalid feature class name: ${value}`)
+    public async getDatasourcesFromUrl(params: GetDatasourcesFromUrlParamsMessage): Promise<Array<DataSource> | Error>{
+        let result = await fetchJson(this.sessionUrl.joinPath("get_datasources_from_url").raw, {
+            method: "POST",
+            body: JSON.stringify(toJsonValue(params)),
+            cache: "no-store", //FIXME: why can't this be cached again? Nonces in URLs? Tokens in Filesystems?
+        })
+        if(result instanceof Error){
+            return result
+        }
+        const responseMessage =  GetDatasourcesFromUrlResponseMessage.fromJsonValue(result);
+        if(responseMessage instanceof Error){
+            return responseMessage
+        }
+        return responseMessage.datasources.map(msg => DataSource.fromMessage(msg))
     }
-    return variant
+
 }
 
-export class IlpFeatureExtractor implements IJsonable{
+export type FeatureClassName = IlpFeatureExtractorMessage["class_name"]
+
+export class IlpFeatureExtractor{
     public readonly ilp_scale: number
-    public readonly axis_2d: string
+    public readonly axis_2d: "x" | "y" | "z" | undefined
     public readonly __class__: FeatureClassName
 
-    constructor(params: {ilp_scale: number, axis_2d: string, __class__: FeatureClassName}){
+    constructor(params: {ilp_scale: number, axis_2d: "x" | "y" | "z" | undefined, __class__: FeatureClassName}){
         this.ilp_scale = params.ilp_scale
         this.axis_2d = params.axis_2d
         this.__class__ = params.__class__
     }
 
-    public static fromJsonValue(value: JsonValue): IlpFeatureExtractor{
-        let value_obj = ensureJsonObject(value)
-        let feature_class_name = ensureFeatureClassName(ensureJsonString(value_obj["__class__"]))
-        let ilp_scale = ensureJsonNumber(value_obj["ilp_scale"])
-        let axis_2d = ensureJsonString(value_obj["axis_2d"])
-        return new IlpFeatureExtractor({ilp_scale, axis_2d, __class__: feature_class_name})
+    public static fromMessage(message: IlpFeatureExtractorMessage): IlpFeatureExtractor{
+        return new IlpFeatureExtractor({
+            ilp_scale: message.ilp_scale,
+            axis_2d: message.axis_2d || "z",
+            __class__: message.class_name
+        })
     }
 
-    public toJsonValue(): JsonValue{
-        return {
-            "ilp_scale": this.ilp_scale,
-            "axis_2d": this.axis_2d,
-            "__class__": this.__class__,
-        }
-    }
-
-    public static fromJsonArray(data: JsonValue): IlpFeatureExtractor[]{
-        const array = ensureJsonArray(data)
-        return array.map((v: JsonValue) => IlpFeatureExtractor.fromJsonValue(v))
+    public toMessage(): IlpFeatureExtractorMessage{
+        return new IlpFeatureExtractorMessage({
+            ilp_scale: this.ilp_scale,
+            axis_2d: this.axis_2d,
+            class_name: this.__class__,
+        })
     }
 
     public equals(other: IlpFeatureExtractor) : boolean{
@@ -509,21 +427,20 @@ export class Color{
         return new Color({r: channels[0], g: channels[1], b: channels[2]})
     }
 
-    public static fromJsonValue(value: JsonValue){
-        let color_object = ensureJsonObject(value)
+    public static fromMessage(message: ColorMessage): Color{
         return new Color({
-            r: ensureJsonNumber(color_object["r"]),
-            g: ensureJsonNumber(color_object["g"]),
-            b: ensureJsonNumber(color_object["b"]),
+            r: message.r,
+            g: message.g,
+            b: message.b,
         })
     }
 
-    public toJsonValue(): JsonObject{
-        return {
+    public toMessage(): ColorMessage{
+        return new ColorMessage({
             r: this.r,
             g: this.g,
             b: this.b,
-        }
+        })
     }
 
     public equals(other: Color): boolean{
@@ -532,22 +449,6 @@ export class Color{
 
     public inverse(): Color{
         return new Color({r: 255 - this.r, g: 255 - this.g, b: 255 - this.b})
-    }
-}
-
-export class Annotation{
-    public constructor(
-        public readonly voxels: Array<{x:number, y:number, z:number}>,
-        public readonly color: Color,
-        public readonly raw_data: DataSource
-    ){
-    }
-    public static fromJsonData(data: any): Annotation{
-        return new Annotation(
-            data["voxels"],
-            Color.fromJsonValue(data["color"]),
-            DataSource.fromJsonValue(data["raw_data"])
-        )
     }
 }
 
@@ -564,19 +465,18 @@ export class Point5D{
         this.x = x; this.y = y; this.z = z; this.t = t; this.c = c;
     }
 
-    public static fromJsonData(data: JsonValue){
-        let value_obj = ensureJsonObject(data)
+    public static fromMessage(message: Point5DMessage): Point5D{
         return new this({
-            x: ensureOptional(ensureJsonNumber, value_obj.x) || 0,
-            y: ensureOptional(ensureJsonNumber, value_obj.y) || 0,
-            z: ensureOptional(ensureJsonNumber, value_obj.z) || 0,
-            t: ensureOptional(ensureJsonNumber, value_obj.t) || 0,
-            c: ensureOptional(ensureJsonNumber, value_obj.c) || 0,
+            x: message.x,
+            y: message.y,
+            z: message.z,
+            t: message.t,
+            c: message.c,
         })
     }
 
-    public toJsonValue(): JsonValue {
-        return {x: this.x, y: this.y, z: this.z, t: this.t, c: this.c}
+    public toMessage(): Point5DMessage {
+        return new Point5DMessage({x: this.x, y: this.y, z: this.z, t: this.t, c: this.c})
     }
 }
 
@@ -587,6 +487,20 @@ export class Shape5D extends Point5D{
         super({x, y, z, t, c})
     }
 
+    public static fromMessage(message: Shape5DMessage): Shape5D{
+        return new this({
+            x: message.x,
+            y: message.y,
+            z: message.z,
+            t: message.t,
+            c: message.c,
+        })
+    }
+
+    public toMessage(): Shape5DMessage {
+        return new Shape5DMessage({x: this.x, y: this.y, z: this.z, t: this.t, c: this.c})
+    }
+
     public updated(params: {x?: number, y?: number, z?: number, t?: number, c?: number}): Shape5D{
         return new Shape5D({
             x: params.x !== undefined ? params.x : this.x,
@@ -594,17 +508,6 @@ export class Shape5D extends Point5D{
             z: params.z !== undefined ? params.z : this.z,
             t: params.t !== undefined ? params.t : this.t,
             c: params.c !== undefined ? params.c : this.c,
-        })
-    }
-
-    public static fromJsonData(data: JsonValue){
-        let value_obj = ensureJsonObject(data)
-        return new this({
-            x: ensureOptional(ensureJsonNumber, value_obj.x) || 1,
-            y: ensureOptional(ensureJsonNumber, value_obj.y) || 1,
-            z: ensureOptional(ensureJsonNumber, value_obj.z) || 1,
-            t: ensureOptional(ensureJsonNumber, value_obj.t) || 1,
-            c: ensureOptional(ensureJsonNumber, value_obj.c) || 1,
         })
     }
 
@@ -648,199 +551,65 @@ export class Interval5D{
         this.stop = new Point5D({x: x[1], y: y[1], z: z[1], t: t[1], c: c[1]})
     }
 
-    public static fromJsonData(data: any){
-        let value_obj = ensureJsonObject(data)
+    public static fromMessage(message: Interval5DMessage){
         return new this({
-            x: ensureJsonNumberPair(value_obj.x),
-            y: ensureJsonNumberPair(value_obj.y),
-            z: ensureJsonNumberPair(value_obj.z),
-            t: ensureJsonNumberPair(value_obj.t),
-            c: ensureJsonNumberPair(value_obj.c),
+            x: [message.start.x, message.stop.x],
+            y: [message.start.y, message.stop.y],
+            z: [message.start.z, message.stop.z],
+            t: [message.start.t, message.stop.t],
+            c: [message.start.c, message.stop.c],
         })
     }
 
-    public toJsonValue(): JsonObject{
-        return {"start": this.start.toJsonValue(), "stop": this.stop.toJsonValue()}
-    }
-}
-
-export abstract class FileSystem implements IJsonable{
-    public abstract getDisplayString(): string;
-    public abstract toJsonValue(): JsonObject
-    public static fromJsonValue(value: JsonValue): FileSystem{
-        const value_obj = ensureJsonObject(value)
-        const class_name = ensureJsonString(value_obj["__class__"])
-        if(class_name == "HttpFs"){
-            return HttpFs.fromJsonValue(value)
-        }
-        if(class_name == "BucketFs"){
-            return BucketFs.fromJsonValue(value)
-        }
-        throw Error(`Could not deserialize FileSystem from ${JSON.stringify(value)}`)
-    }
-    public abstract equals(other: FileSystem): boolean;
-    public abstract getUrl(): Url;
-
-    public static fromUrl(url: Url): FileSystem{
-        if(url.hostname == "data-proxy.ebrains.eu"){
-            return BucketFs.fromDataProxyUrl(url)
-        }else{
-            return new HttpFs({read_url: url})
-        }
-    }
-}
-
-export class HttpFs extends FileSystem{
-    public readonly read_url: Url
-    public constructor({read_url}: {read_url: Url}){
-        super()
-        this.read_url = read_url.updatedWith({datascheme: undefined})
-    }
-
-    public getDisplayString(): string{
-        return this.read_url.raw
-    }
-
-    public toJsonValue(): JsonObject{
-        return {
-            __class__: "HttpFs",
-            read_url: this.read_url.schemeless_raw,
-        }
-    }
-
-    public static fromJsonValue(data: JsonValue) : HttpFs{
-        const data_obj = ensureJsonObject(data)
-        return new HttpFs({
-            read_url: Url.parse(ensureJsonString(data_obj["read_url"]))
-        })
-    }
-
-    public equals(other: FileSystem): boolean{
-        return other instanceof HttpFs && this.read_url.equals(other.read_url)
-    }
-
-    public getUrl(): Url{
-        return this.read_url
-    }
-}
-
-export class BucketFs extends FileSystem{
-    public static readonly API_URL = Url.parse("https://data-proxy.ebrains.eu/api/buckets")
-    public readonly bucket_name: string
-    public readonly prefix: Path
-
-    constructor(params: {bucket_name: string, prefix: Path}){
-        super()
-        this.bucket_name = params.bucket_name
-        this.prefix = params.prefix
-    }
-
-    public equals(other: FileSystem): boolean {
-        return (
-            other instanceof BucketFs &&
-            other.bucket_name == this.bucket_name &&
-            other.prefix.equals(this.prefix)
-        )
-    }
-
-    public getUrl(): Url {
-        return BucketFs.API_URL.joinPath(`${this.bucket_name}/${this.prefix}`)
-    }
-
-    public getDisplayString(): string {
-        return this.getUrl().toString()
-    }
-
-    public static fromJsonValue(value: JsonValue): BucketFs {
-        const valueObj = ensureJsonObject(value)
-        return new this({
-            bucket_name: ensureJsonString(valueObj.bucket_name),
-            prefix: Path.parse(ensureJsonString(valueObj.prefix)),
-        })
-    }
-
-    public toJsonValue(): JsonObject {
-        return {
-            bucket_name: this.bucket_name,
-            prefix: this.prefix.toString(),
-            __class__: "BucketFs"
-        }
-    }
-
-    public static fromDataProxyUrl(url: Url): BucketFs{
-        if(!url.schemeless_raw.startsWith(BucketFs.API_URL.schemeless_raw)){
-            throw `Expected data-proxy url, got this: ${url.toString()}`
-        }
-
-        return new BucketFs({
-            bucket_name: url.path.components[2],
-            prefix: new Path({components: url.path.components.slice(3)}),
+    public toMessage(): Interval5DMessage{
+        return new Interval5DMessage({
+            start: this.start.toMessage(), stop: this.stop.toMessage(),
         })
     }
 }
 
-export abstract class DataSource implements IJsonable{
-    public readonly filesystem: FileSystem
-    public readonly path: Path
-    public readonly spatial_resolution: vec3
-    public readonly shape: Shape5D
-    public readonly tile_shape: Shape5D
+export class DataSource{
     public readonly url: Url
-    public readonly dtype: DataType
+    public readonly interval: Interval5D
+    public readonly tile_shape: Shape5D
+    public readonly spatial_resolution: [number, number, number]
 
     constructor(params: {
-        filesystem: FileSystem, path: Path, shape: Shape5D, spatial_resolution?: vec3, tile_shape: Shape5D, url: Url, dtype: DataType
+        url: Url,
+        interval: Interval5D,
+        tile_shape: Shape5D,
+        spatial_resolution: [number, number, number]
     }){
-        this.filesystem = params.filesystem
-        this.path = params.path
-        this.spatial_resolution = params.spatial_resolution || vec3.fromValues(1,1,1)
-        this.shape = params.shape
-        this.tile_shape = params.tile_shape
         this.url = params.url
-        this.dtype = params.dtype
+        this.interval = params.interval
+        this.tile_shape = params.tile_shape
+        this.spatial_resolution = params.spatial_resolution
+    }
+
+    public get shape(): Shape5D{
+        return this.interval.shape
     }
 
     public get hashValue(): string{
-        return JSON.stringify(this.toJsonValue())
+        return this.url.raw
     }
 
-    public static fromJsonValue(data: JsonValue) : DataSource{
-        const data_obj = ensureJsonObject(data)
-        const class_name = ensureJsonString(data_obj["__class__"])
-        switch(class_name){
-            case "PrecomputedChunksDataSource":
-                return PrecomputedChunksDataSource.fromJsonValue(data)
-            case "SkimageDataSource":
-                return SkimageDataSource.fromJsonValue(data)
-            default:
-                throw Error(`Could not create datasource of type ${class_name}`)
-        }
+    public static fromMessage(message: DataSourceMessage) : DataSource{
+        return new DataSource({
+            url: Url.fromMessage(message.url),
+            interval: Interval5D.fromMessage(message.interval),
+            tile_shape: Shape5D.fromMessage(message.tile_shape),
+            spatial_resolution: message.spatial_resolution,
+        })
     }
 
-    public static extractBasicData(json_object: JsonObject): ConstructorParameters<typeof DataSource>[0]{
-        const spatial_resolution = json_object["spatial_resolution"]
-        return {
-            filesystem: FileSystem.fromJsonValue(json_object["filesystem"]),
-            path: Path.parse(ensureJsonString(json_object["path"])),
-            spatial_resolution: spatial_resolution === undefined ? vec3.fromValues(1,1,1) : ensureJsonNumberTripplet(spatial_resolution),
-            shape: Shape5D.fromJsonData(json_object["shape"]),
-            tile_shape: Shape5D.fromJsonData(json_object["tile_shape"]),
-            url: Url.parse(ensureJsonString(json_object["url"])),
-            dtype: ensureDataType(ensureJsonString(json_object["dtype"]))
-        }
-    }
-
-    public toJsonValue(): JsonObject{
-        return {
-            filesystem: this.filesystem.toJsonValue(),
-            path: this.path.raw,
-            spatial_resolution: [this.spatial_resolution[0], this.spatial_resolution[1], this.spatial_resolution[2]],
-            shape: this.shape.toJsonValue(),
-            tile_shape: this.tile_shape.toJsonValue(),
-            url: this.url.raw,
-            dtype: this.dtype,
-            ...this.doToJsonValue()
-        }
+    public toMessage(): DataSourceMessage{
+        return new DataSourceMessage({
+            url: this.url.toMessage(),
+            interval: this.interval.toMessage(),
+            tile_shape: this.tile_shape.toMessage(),
+            spatial_resolution: this.spatial_resolution,
+        })
     }
 
     public get resolutionString(): string{
@@ -848,173 +617,20 @@ export abstract class DataSource implements IJsonable{
     }
 
     public getDisplayString() : string{
-        return `${this.filesystem.getUrl().joinPath(this.path.raw)} (${this.resolutionString})`
+        return `${this.url.raw} (${this.resolutionString})`
     }
-
-    protected abstract doToJsonValue() : JsonObject & {__class__: string}
 
     public equals(other: DataSource): boolean{
         return (
-            this.constructor.name == other.constructor.name &&
-            this.filesystem.equals(other.filesystem) &&
-            this.path.equals(other.path) &&
-            vec3.equals(this.spatial_resolution, other.spatial_resolution)
+            this.url.equals(other.url) && vec3.equals(this.spatial_resolution, other.spatial_resolution)
         )
     }
-
-    public static async getDatasourcesFromUrl(params: {datasource_url: Url, session: Session}): Promise<Array<DataSource> | Error>{
-        let url = params.session.sessionUrl.joinPath("get_datasources_from_url")
-            .updatedWith({
-                search: new Map([["url", Session.btoa(params.datasource_url.raw)]])
-            })
-        let response = await fetch(url.raw, {
-            method: "POST",
-            body: JSON.stringify({url: params.datasource_url.raw}),
-            cache: "no-store", //FIXME: why can't this be cached again? Nonces in URLs? Tokens in Filesystems?
-        })
-        if(!response.ok){
-            let error_message = (await response.json())["error"]
-            return Error(error_message)
-        }
-        let payload = ensureJsonObject(await response.json())
-        if("error" in payload){
-            return Error(ensureJsonString(payload.error))
-        }
-        return ensureJsonArray(payload["datasources"]).map(rds => DataSource.fromJsonValue(rds))
-    }
 }
 
-// Represents a single scale from precomputed chunks
-export class PrecomputedChunksDataSource extends DataSource{
-    public readonly scale: Scale
-    constructor(params: {
-        filesystem: FileSystem, path: Path, shape: Shape5D, spatial_resolution?: vec3, tile_shape: Shape5D, url: Url, scale: Scale, dtype: DataType
-    }){
-        super(params)
-        this.scale = params.scale
-    }
-
-    public static fromJsonValue(data: JsonValue) : PrecomputedChunksDataSource{
-        const data_obj = ensureJsonObject(data)
-        return new PrecomputedChunksDataSource({
-            ...DataSource.extractBasicData(data_obj),
-            scale: Scale.fromJsonValue(data_obj["scale"]),
-        })
-    }
-
-    protected doToJsonValue() : JsonObject & {__class__: string}{
-        return {
-            __class__: "PrecomputedChunksDataSource",
-            scale: this.scale.toJsonValue(),
-        }
-    }
-}
-
-export class SkimageDataSource extends DataSource{
-    public static fromJsonValue(data: JsonValue) : SkimageDataSource{
-        const data_obj = ensureJsonObject(data)
-        return new SkimageDataSource({
-            ...DataSource.extractBasicData(data_obj),
-        })
-    }
-
-    protected doToJsonValue() : JsonObject & {__class__: string}{
-        return { __class__: "SkimageDataSource"}
-    }
-}
-
-export class FsDataSink{
-    public readonly tile_shape: Shape5D
-    public readonly interval: Interval5D
-    public readonly dtype: DataType
-    public readonly shape: any
-    public readonly location: any
-    public readonly filesystem: FileSystem
-    public readonly path: Path
-
-    constructor (params: {
-        filesystem: FileSystem,
-        path: Path,
-        tile_shape: Shape5D,
-        interval: Interval5D,
-        dtype: DataType,
-    }){
-        this.filesystem = params.filesystem
-        this.path = params.path
-        this.tile_shape = params.tile_shape
-        this.interval = params.interval
-        this.dtype = params.dtype
-        this.shape = this.interval.shape
-        this.location = params.interval.start
-    }
-
-    public toJsonValue(): JsonObject{
-        return {
-            filesystem: this.filesystem.toJsonValue(),
-            path: this.path.toString(),
-            tile_shape: this.tile_shape.toJsonValue(),
-            interval: this.interval.toJsonValue(),
-            dtype: this.dtype.toString(),
-        }
-    }
-
-    public static fromJsonValue(value: JsonValue): "DataSink"{
-        let valueObj = ensureJsonObject(value)
-        let className = valueObj.__class__
-        if(className == "PrecomputedChunksScaleDataSink"){
-            return PrecomputedChunksScaleDataSink.fromJsonValue(value)
-        }
-        throw Error(`Unrecognized DataSink class name: ${className}`)
-    }
-}
-
-export class PrecomputedChunksScaleDataSink extends FsDataSink{
-    public readonly info_dir: Path
-    public readonly scale: Scale
-
-    constructor(params: {
-        filesystem: FileSystem,
-        info_dir: Path,
-        scale: Scale,
-        dtype: DataType,
-        num_channels: number,
-    }){
-        let shape = new Shape5D({x: params.scale.size[0], y: params.scale.size[1], z: params.scale.size[2], c: params.num_channels})
-        let location = new Point5D({x: params.scale.voxel_offset[0], y: params.scale.voxel_offset[1], z: params.scale.voxel_offset[2]})
-        let interval = shape.toInterval5D({offset: location})
-        let chunk_sizes_5d = params.scale.chunk_sizes.map(cs => new Shape5D({x: cs[0], y: cs[1], z: cs[2], c: params.num_channels}))
-
-        super({
-            filesystem: params.filesystem,
-            path: params.info_dir,
-            tile_shape: chunk_sizes_5d[0], //FIXME?
-            interval: interval,
-            dtype: params.dtype,
-        })
-        this.info_dir = params.info_dir
-        this.scale = params.scale
-    }
-
-    public toJsonValue(): JsonObject {
-        return {
-            ...super.toJsonValue(),
-            __class__: "PrecomputedChunksScaleSink",
-            info_dir: this.info_dir.raw,
-            scale: this.scale.toJsonValue(),
-            num_channels: this.shape.c,
-        }
-    }
-
-    public updatedWith(params: {filesystem?: FileSystem, info_dir?: Path}): PrecomputedChunksScaleDataSink{
-        return new PrecomputedChunksScaleDataSink({
-            filesystem: params.filesystem || this.filesystem,
-            info_dir: params.info_dir || this.info_dir,
-            scale: this.scale,
-            dtype: this.dtype,
-            num_channels: this.shape.c,
-        })
-    }
-}
+export type DataViewMessageUnion = RawDataViewMessage | StrippedPrecomputedViewMessage | UnsupportedDatasetViewMessage | FailedViewMessage
+export type ViewMessageUnion = DataViewMessageUnion | PredictionsViewMessage
+export type DataViewUnion = RawDataView | StrippedPrecomputedView | UnsupportedDatasetView | FailedView
+export type ViewUnion = DataViewUnion | PredictionsView
 
 export abstract class View{
     public readonly name: string;
@@ -1032,39 +648,64 @@ export abstract class View{
         }
     }
 
-    public static fromJsonValue(value: JsonValue): View{
-        const value_obj = ensureJsonObject(value)
-        const label = ensureJsonString(value_obj["__class__"])
-        if(label == "RawDataView"){
-            return RawDataView.fromJsonValue(value)
+    public static fromMessage(message: ViewMessageUnion): ViewUnion{
+        if(message instanceof PredictionsViewMessage){
+            return PredictionsView.fromMessage(message)
         }
-        if(label == "PredictionsView"){
-            return PredictionsView.fromJsonValue(value)
-        }
-        if(label == "StrippedPrecomputedView"){
-            return StrippedPrecomputedView.fromJsonValue(value)
-        }
-        if(label == "UnsupportedDatasetView"){
-            return UnsupportedDatasetView.fromJsonValue(value)
-        }
-        if(label == "FailedView"){
-            return FailedView.fromJsonValue(value)
-        }
-        throw Error(`Could not deserialize View: ${JSON.stringify(value)}`)
+        return DataView.fromMessage(message)
     }
 }
 
-export abstract class DataView extends View{
-    public static fromJsonValue(value: JsonValue): DataView{
-        let view = View.fromJsonValue(value)
-        if(view instanceof DataView){
-            return view
-        }else{
-            throw Error(`Expected an instance of DataView, found ${JSON.stringify(value)}`)
-        }
+export function parseAsView(value: JsonValue): ViewUnion | Error{
+    const predictionsViewMessage = PredictionsViewMessage.fromJsonValue(value)
+    if(!(predictionsViewMessage instanceof Error)){
+        return PredictionsView.fromMessage(predictionsViewMessage)
+    }
+    return parseAsDataViewUnion(value)
+}
+
+export function parseAsDataViewUnion(value: JsonValue): DataViewUnion | Error{
+    //FIXME: this should probably be autogenerated
+    const rawDataViewMessage = RawDataViewMessage.fromJsonValue(value)
+    if(!(rawDataViewMessage instanceof Error)){
+        return RawDataView.fromMessage(rawDataViewMessage)
     }
 
-    public static async makeDataView(params: {name: string, url: Url, session: Session}): Promise<DataView | Error>{
+    const strippedPrecompViewMessage = StrippedPrecomputedViewMessage.fromJsonValue(value)
+    if(!(strippedPrecompViewMessage instanceof Error)){
+        return StrippedPrecomputedView.fromMessage(strippedPrecompViewMessage)
+    }
+
+    const failedViewMessage = FailedViewMessage.fromJsonValue(value)
+    if(!(failedViewMessage instanceof Error)){
+        return FailedView.fromMessage(failedViewMessage)
+    }
+
+    const unsupportedDatasetViewMessage = UnsupportedDatasetViewMessage.fromJsonValue(value)
+    if(!(unsupportedDatasetViewMessage instanceof Error)){
+        return UnsupportedDatasetView.fromMessage(unsupportedDatasetViewMessage)
+    }
+    return Error(`Could not parse ${JSON.stringify(value)}`)
+}
+
+export abstract class DataView extends View{
+    public static fromMessage(message: DataViewMessageUnion): DataViewUnion{
+        if(message instanceof RawDataViewMessage){
+            return RawDataView.fromMessage(message)
+        }
+        if(message instanceof StrippedPrecomputedViewMessage){
+            return StrippedPrecomputedView.fromMessage(message)
+        }
+        if(message instanceof UnsupportedDatasetViewMessage){
+            return UnsupportedDatasetView.fromMessage(message)
+        }
+        if(message instanceof FailedViewMessage){
+            return FailedView.fromMessage(message)
+        }
+        throw `Should be unreachable`
+    }
+
+    public static async makeDataView(params: {name: string, url: Url, session: Session}): Promise<DataViewUnion | Error>{
         let result = await fetchJson(
             params.session.sessionUrl.joinPath("make_data_view").raw,
             {
@@ -1077,7 +718,7 @@ export abstract class DataView extends View{
         if(result instanceof Error){
             return result
         }
-        return DataView.fromJsonValue(result)
+        return parseAsDataViewUnion(result)
     }
 
     public abstract getDatasources(): Array<DataSource> | undefined;
@@ -1090,12 +731,11 @@ export class RawDataView extends DataView{
         this.datasources = params.datasources
     }
 
-    public static fromJsonValue(value: JsonValue): RawDataView {
-        const value_obj = ensureJsonObject(value)
+    public static fromMessage(message: RawDataViewMessage): RawDataView {
         return new RawDataView({
-            name: ensureJsonString(value_obj["name"]),
-            url: Url.parse(ensureJsonString(value_obj["url"])),
-            datasources: ensureJsonArray(value_obj["datasources"]).map(raw_ds => DataSource.fromJsonValue(raw_ds))
+            datasources: message.datasources.map(ds_msg => DataSource.fromMessage(ds_msg)),
+            name: message.name,
+            url: Url.fromMessage(message.url)
         })
     }
 
@@ -1111,12 +751,11 @@ export class StrippedPrecomputedView extends DataView{
         this.datasource = params.datasource
     }
 
-    public static fromJsonValue(value: JsonValue): StrippedPrecomputedView {
-        const value_obj = ensureJsonObject(value)
+    public static fromMessage(message: StrippedPrecomputedViewMessage): StrippedPrecomputedView {
         return new StrippedPrecomputedView({
-            name: ensureJsonString(value_obj["name"]),
-            url: Url.parse(ensureJsonString(value_obj["url"])),
-            datasource: DataSource.fromJsonValue(value_obj["datasource"]),
+            datasource: DataSource.fromMessage(message.datasource),
+            name: message.name,
+            url: Url.fromMessage(message.url)
         })
     }
 
@@ -1134,24 +773,22 @@ export class PredictionsView extends View{
         this.classifier_generation = params.classifier_generation
     }
 
-    public static fromJsonValue(value: JsonValue): PredictionsView {
-        const value_obj = ensureJsonObject(value)
+    public static fromMessage(message: PredictionsViewMessage): PredictionsView {
         return new PredictionsView({
-            name: ensureJsonString(value_obj["name"]),
-            url: Url.parse(ensureJsonString(value_obj["url"])),
-            raw_data: DataSource.fromJsonValue(value_obj["raw_data"]),
-            classifier_generation: ensureJsonNumber(value_obj["classifier_generation"]),
+            classifier_generation: message.classifier_generation,
+            name: message.name,
+            raw_data: DataSource.fromMessage(message.raw_data),
+            url: Url.fromMessage(message.url)
         })
     }
 
 }
 
 export class UnsupportedDatasetView extends DataView{
-    public static fromJsonValue(value: JsonValue): UnsupportedDatasetView {
-        const value_obj = ensureJsonObject(value)
+    public static fromMessage(message: UnsupportedDatasetViewMessage): UnsupportedDatasetView {
         return new UnsupportedDatasetView({
-            name: ensureJsonString(value_obj["name"]),
-            url: Url.parse(ensureJsonString(value_obj["url"])),
+            name: message.name,
+            url: Url.fromMessage(message.url)
         })
     }
 
@@ -1167,12 +804,11 @@ export class FailedView extends DataView{
         this.error_message = params.error_message
     }
 
-    public static fromJsonValue(value: JsonValue): FailedView {
-        const value_obj = ensureJsonObject(value)
+    public static fromMessage(message: FailedViewMessage): FailedView {
         return new FailedView({
-            name: ensureJsonString(value_obj["name"]),
-            url: Url.parse(ensureJsonString(value_obj["url"])),
-            error_message: ensureJsonString(value_obj["error_message"]),
+            error_message: message.error_message,
+            name: message.name,
+            url: Url.fromMessage(message.url)
         })
     }
 

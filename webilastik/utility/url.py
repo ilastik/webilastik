@@ -4,40 +4,14 @@ from base64 import b64decode, b64encode
 import re
 from pathlib import PurePosixPath
 import enum
-from typing import Optional, List, Dict, Mapping, Union
+from typing import Literal, Optional, List, Dict, Mapping, Union
 from urllib.parse import parse_qs, urlencode, quote_plus, quote
 
 from ndstructs.utils.json_serializable import JsonValue, ensureJsonString
+from webilastik.server import message_schema
 
-
-class DataScheme(enum.Enum):
-    PRECOMPUTED = "precomputed"
-
-    def __str__(self) -> str:
-        return self.value
-
-    @classmethod
-    def from_str(cls, value: str) -> "DataScheme":
-        for scheme in DataScheme:
-            if scheme.value == value:
-                return scheme
-        raise ValueError(f"Bad data scheme: {value}")
-
-class Protocol(enum.Enum):
-    HTTP = "http"
-    HTTPS = "https"
-    FILE = "file"
-    MEMORY = "memory"
-
-    def __str__(self) -> str:
-        return self.value
-
-    @classmethod
-    def from_str(cls, value: str) -> "Protocol":
-        for protocol in Protocol:
-            if protocol.value == value.lower():
-                return protocol
-        raise ValueError(f"Bad protocol: {value}")
+DataScheme = Literal["precomputed"]
+Protocol = Literal["http", "https", "file", "memory"]
 
 class SearchQuotingMethod(enum.Enum):
     QUOTE = 0
@@ -51,6 +25,9 @@ def parse_params(params: "str | None") -> Dict[str, str]:
         return {k: v[-1] if v else "" for k,v in parsed_params.items()}
 
 class Url:
+    datascheme: Optional[DataScheme]
+    protocol: Protocol
+
     hostname_pattern = r"[0-9a-z\-\.]*"
 
     url_pattern = re.compile(
@@ -82,7 +59,7 @@ class Url:
         return self.raw
 
     def to_ilp_info_filePath(self) -> str:
-        if self.protocol == Protocol.FILE:
+        if self.protocol == "file":
             return f"{self.datascheme or ''}" + self.path.as_posix()
         else:
             return self.raw
@@ -99,20 +76,26 @@ class Url:
         match = Url.url_pattern.fullmatch(url)
         if match is None:
             return None
+
         raw_datascheme = match.group("datascheme")
+        if raw_datascheme != None and raw_datascheme != "precomputed":
+            return None #FIXME: shouold return an error...
+        raw_protocol = match.group("protocol")
+        if raw_protocol != "http" and raw_protocol != "https" and raw_protocol != "file" and raw_protocol != "memory":
+            return None
         raw_port = match.group("port")
         raw_search = match.group("search")
         search = parse_params(raw_search)
 
         return Url(
-            datascheme=None if raw_datascheme is None else DataScheme.from_str(raw_datascheme),
-            protocol=Protocol.from_str(match.group("protocol")),
+            datascheme=raw_datascheme,
+            protocol=raw_protocol,
             hostname=match.group("hostname"),
             port=None if raw_port is None else int(raw_port),
             path=PurePosixPath(match.group("path")),
             search=search,
             hash_=match.group("hash_")
-        );
+        )
 
     @staticmethod
     def parse_or_raise(url: str) -> "Url":
@@ -121,11 +104,34 @@ class Url:
             raise ValueError("Could not parse {str} as an Url")
         return parsed
 
+    @classmethod
+    def from_message(cls, url_message: message_schema.UrlMessage) -> 'Url':
+        return Url(
+            datascheme=url_message.datascheme,
+            protocol=url_message.protocol,
+            hostname=url_message.hostname,
+            port=url_message.port,
+            path=PurePosixPath(url_message.path),
+            search=url_message.search,
+            hash_=url_message.fragment,
+        )
+
+    def to_message(self) -> message_schema.UrlMessage:
+        return message_schema.UrlMessage(
+            datascheme=self.datascheme,
+            protocol=self.protocol,
+            hostname=self.hostname,
+            port=self.port,
+            path=self.path.as_posix(),
+            search=self.search,
+            fragment=self.hash_,
+        )
+
     def __init__(
         self,
         *,
-        datascheme: Optional[DataScheme] = None,
-        protocol: Protocol,
+        datascheme: Optional[Literal["precomputed"]] = None,
+        protocol: Literal["http", "https", "file", "memory"],
         hostname: str,
         port: Optional[int] = None,
         path: PurePosixPath,
@@ -171,7 +177,7 @@ class Url:
             self.raw = self.schemeless_raw
             self.double_protocol_raw = self.raw
 
-        if hostname == "" and protocol not in (Protocol.FILE, Protocol.MEMORY):
+        if hostname == "" and protocol != "file" and protocol != "memory":
             raise ValueError(f"Missing hostname in {self.raw}")
         super().__init__()
 

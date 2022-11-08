@@ -6,3 +6,5 @@ node_modules/
 package.json
 package-lock.json
 tests/tmp/
+overlay/src/client/message_schema.ts
+webilastik/server/message_schema.py

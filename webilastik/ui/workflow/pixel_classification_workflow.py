@@ -105,7 +105,7 @@ class PixelClassificationWorkflow:
         priority_executor: PriorityExecutor,
         allowed_protocols: "Sequence[Protocol] | None" = None,
     ) -> "PixelClassificationWorkflow | Exception":
-        allowed_protocols = allowed_protocols or (Protocol.HTTP, Protocol.HTTPS)
+        allowed_protocols = allowed_protocols or ("http", "https")
         with h5py.File(ilp_path, "r") as f:
             parsing_result = IlpPixelClassificationWorkflowGroup.parse(
                 group=f,
@@ -194,7 +194,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
 
         self.viewer_applet = WsViewerApplet(
             name="viewer_applet",
-            allowed_protocols=set([Protocol.HTTP, Protocol.HTTPS]),
+            allowed_protocols=set(["http", "https"]),
             executor=priority_executor,
             generational_classifier=self.pixel_classifier_applet.generational_pixel_classifier,
             labels=self.brushing_applet.labels,
@@ -226,7 +226,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         allowed_protocols: "Sequence[Protocol] | None" = None,
         session_url: Url,
     ) -> "WsPixelClassificationWorkflow | Exception":
-        allowed_protocols = allowed_protocols or (Protocol.HTTP, Protocol.HTTPS)
+        allowed_protocols = allowed_protocols or ("http", "https")
         with h5py.File(ilp_path, "r") as f:
             parsing_result = IlpPixelClassificationWorkflowGroup.parse(
                 group=f,
