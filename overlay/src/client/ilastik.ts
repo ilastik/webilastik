@@ -1,11 +1,10 @@
 import { vec3 } from "gl-matrix"
 import { INativeView } from "../drivers/viewer_driver"
 import { fetchJson, sleep } from "../util/misc"
-import { Path, Url } from "../util/parsed_url"
-import { DataType, Scale } from "../util/precomputed_chunks"
+import { Url } from "../util/parsed_url"
 import {
-    ensureJsonArray, ensureJsonNumber, ensureJsonObject,
-    ensureJsonString, ensureOptional, IJsonable, JsonableValue, JsonObject, JsonValue, toJsonValue
+    ensureJsonArray, ensureJsonObject,
+    ensureJsonString, JsonableValue, JsonValue, toJsonValue
 } from "../util/serialization"
 import {
     CheckLoginResultMessage,
@@ -461,10 +460,6 @@ export class Point5D{
     public toMessage(): Point5DMessage {
         return new Point5DMessage({x: this.x, y: this.y, z: this.z, t: this.t, c: this.c})
     }
-
-    public toJsonValue(): JsonValue {
-        return {x: this.x, y: this.y, z: this.z, t: this.t, c: this.c}
-    }
 }
 
 export class Shape5D extends Point5D{
@@ -495,17 +490,6 @@ export class Shape5D extends Point5D{
             z: params.z !== undefined ? params.z : this.z,
             t: params.t !== undefined ? params.t : this.t,
             c: params.c !== undefined ? params.c : this.c,
-        })
-    }
-
-    public static fromJsonData(data: JsonValue){
-        let value_obj = ensureJsonObject(data)
-        return new this({
-            x: ensureOptional(ensureJsonNumber, value_obj.x) || 1,
-            y: ensureOptional(ensureJsonNumber, value_obj.y) || 1,
-            z: ensureOptional(ensureJsonNumber, value_obj.z) || 1,
-            t: ensureOptional(ensureJsonNumber, value_obj.t) || 1,
-            c: ensureOptional(ensureJsonNumber, value_obj.c) || 1,
         })
     }
 
@@ -562,125 +546,6 @@ export class Interval5D{
     public toMessage(): Interval5DMessage{
         return new Interval5DMessage({
             start: this.start.toMessage(), stop: this.stop.toMessage(),
-        })
-    }
-
-    public toJsonValue(): JsonObject{
-        return {"start": this.start.toJsonValue(), "stop": this.stop.toJsonValue()}
-    }
-}
-
-export abstract class FileSystem implements IJsonable{
-    public abstract getDisplayString(): string;
-    public abstract toJsonValue(): JsonObject
-    public static fromJsonValue(value: JsonValue): FileSystem{
-        const value_obj = ensureJsonObject(value)
-        const class_name = ensureJsonString(value_obj["__class__"])
-        if(class_name == "HttpFs"){
-            return HttpFs.fromJsonValue(value)
-        }
-        if(class_name == "BucketFs"){
-            return BucketFs.fromJsonValue(value)
-        }
-        throw Error(`Could not deserialize FileSystem from ${JSON.stringify(value)}`)
-    }
-    public abstract equals(other: FileSystem): boolean;
-    public abstract getUrl(): Url;
-
-    public static fromUrl(url: Url): FileSystem{
-        if(url.hostname == "data-proxy.ebrains.eu"){
-            return BucketFs.fromDataProxyUrl(url)
-        }else{
-            return new HttpFs({read_url: url})
-        }
-    }
-}
-
-export class HttpFs extends FileSystem{
-    public readonly read_url: Url
-    public constructor({read_url}: {read_url: Url}){
-        super()
-        this.read_url = read_url.updatedWith({datascheme: undefined})
-    }
-
-    public getDisplayString(): string{
-        return this.read_url.raw
-    }
-
-    public toJsonValue(): JsonObject{
-        return {
-            __class__: "HttpFs",
-            read_url: this.read_url.schemeless_raw,
-        }
-    }
-
-    public static fromJsonValue(data: JsonValue) : HttpFs{
-        const data_obj = ensureJsonObject(data)
-        return new HttpFs({
-            read_url: Url.parse(ensureJsonString(data_obj["read_url"]))
-        })
-    }
-
-    public equals(other: FileSystem): boolean{
-        return other instanceof HttpFs && this.read_url.equals(other.read_url)
-    }
-
-    public getUrl(): Url{
-        return this.read_url
-    }
-}
-
-export class BucketFs extends FileSystem{
-    public static readonly API_URL = Url.parse("https://data-proxy.ebrains.eu/api/buckets")
-    public readonly bucket_name: string
-    public readonly prefix: Path
-
-    constructor(params: {bucket_name: string, prefix: Path}){
-        super()
-        this.bucket_name = params.bucket_name
-        this.prefix = params.prefix
-    }
-
-    public equals(other: FileSystem): boolean {
-        return (
-            other instanceof BucketFs &&
-            other.bucket_name == this.bucket_name &&
-            other.prefix.equals(this.prefix)
-        )
-    }
-
-    public getUrl(): Url {
-        return BucketFs.API_URL.joinPath(`${this.bucket_name}/${this.prefix}`)
-    }
-
-    public getDisplayString(): string {
-        return this.getUrl().toString()
-    }
-
-    public static fromJsonValue(value: JsonValue): BucketFs {
-        const valueObj = ensureJsonObject(value)
-        return new this({
-            bucket_name: ensureJsonString(valueObj.bucket_name),
-            prefix: Path.parse(ensureJsonString(valueObj.prefix)),
-        })
-    }
-
-    public toJsonValue(): JsonObject {
-        return {
-            bucket_name: this.bucket_name,
-            prefix: this.prefix.toString(),
-            __class__: "BucketFs"
-        }
-    }
-
-    public static fromDataProxyUrl(url: Url): BucketFs{
-        if(!url.schemeless_raw.startsWith(BucketFs.API_URL.schemeless_raw)){
-            throw `Expected data-proxy url, got this: ${url.toString()}`
-        }
-
-        return new BucketFs({
-            bucket_name: url.path.components[2],
-            prefix: new Path({components: url.path.components.slice(3)}),
         })
     }
 }
@@ -772,99 +637,6 @@ export class DataSource{
             out.push(DataSource.fromMessage(datasourceResult))
         }
         return out
-    }
-}
-
-export abstract class FsDataSink{
-    public readonly tile_shape: Shape5D
-    public readonly interval: Interval5D
-    public readonly dtype: DataType
-    public readonly shape: any
-    public readonly location: any
-    public readonly filesystem: FileSystem
-    public readonly path: Path
-
-    constructor (params: {
-        filesystem: FileSystem,
-        path: Path,
-        tile_shape: Shape5D,
-        interval: Interval5D,
-        dtype: DataType,
-    }){
-        this.filesystem = params.filesystem
-        this.path = params.path
-        this.tile_shape = params.tile_shape
-        this.interval = params.interval
-        this.dtype = params.dtype
-        this.shape = this.interval.shape
-        this.location = params.interval.start
-    }
-
-    public toJsonValue(): JsonObject{
-        return {
-            filesystem: this.filesystem.toJsonValue(),
-            path: this.path.toString(),
-            tile_shape: this.tile_shape.toJsonValue(),
-            interval: this.interval.toJsonValue(),
-            dtype: this.dtype.toString(),
-        }
-    }
-
-    public static fromJsonValue(value: JsonValue): "DataSink"{
-        let valueObj = ensureJsonObject(value)
-        let className = valueObj.__class__
-        if(className == "PrecomputedChunksScaleDataSink"){
-            return PrecomputedChunksScaleDataSink.fromJsonValue(value)
-        }
-        throw Error(`Unrecognized DataSink class name: ${className}`)
-    }
-}
-
-export class PrecomputedChunksScaleDataSink extends FsDataSink{
-    public readonly info_dir: Path
-    public readonly scale: Scale
-
-    constructor(params: {
-        filesystem: FileSystem,
-        info_dir: Path,
-        scale: Scale,
-        dtype: DataType,
-        num_channels: number,
-    }){
-        let shape = new Shape5D({x: params.scale.size[0], y: params.scale.size[1], z: params.scale.size[2], c: params.num_channels})
-        let location = new Point5D({x: params.scale.voxel_offset[0], y: params.scale.voxel_offset[1], z: params.scale.voxel_offset[2]})
-        let interval = shape.toInterval5D({offset: location})
-        let chunk_sizes_5d = params.scale.chunk_sizes.map(cs => new Shape5D({x: cs[0], y: cs[1], z: cs[2], c: params.num_channels}))
-
-        super({
-            filesystem: params.filesystem,
-            path: params.info_dir,
-            tile_shape: chunk_sizes_5d[0], //FIXME?
-            interval: interval,
-            dtype: params.dtype,
-        })
-        this.info_dir = params.info_dir
-        this.scale = params.scale
-    }
-
-    public toJsonValue(): JsonObject {
-        return {
-            ...super.toJsonValue(),
-            __class__: "PrecomputedChunksScaleSink",
-            info_dir: this.info_dir.raw,
-            scale: this.scale.toJsonValue(),
-            num_channels: this.shape.c,
-        }
-    }
-
-    public updatedWith(params: {filesystem?: FileSystem, info_dir?: Path}): PrecomputedChunksScaleDataSink{
-        return new PrecomputedChunksScaleDataSink({
-            filesystem: params.filesystem || this.filesystem,
-            info_dir: params.info_dir || this.info_dir,
-            scale: this.scale,
-            dtype: this.dtype,
-            num_channels: this.shape.c,
-        })
     }
 }
 
