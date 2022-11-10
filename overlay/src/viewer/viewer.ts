@@ -2,7 +2,7 @@
 import { quat, vec3 } from "gl-matrix";
 import { Applet } from "../client/applets/applet";
 import { DataSource, PredictionsView, Session, View, DataView, RawDataView, StrippedPrecomputedView, DataViewUnion, Color } from "../client/ilastik";
-import { ViewerAppletStateMessage } from "../client/message_schema";
+import { MakeDataViewParams, ViewerAppletStateMessage } from "../client/message_schema";
 import { INativeView, IViewerDriver, IViewportDriver } from "../drivers/viewer_driver";
 import { ErrorPopupWidget } from "../gui/widgets/popup";
 import { HashMap } from "../util/hashmap";
@@ -201,7 +201,7 @@ export class Viewer extends Applet<ViewerAppletState>{
 
     public async openDataViewFromDataSource(datasource: DataSource){
         let name = datasource.url.path.name + " " + datasource.resolutionString
-        let dataViewResult = await DataView.makeDataView({name, url: datasource.url, session: this.session})
+        let dataViewResult = await this.session.makeDataView(new MakeDataViewParams({view_name: name, url: datasource.url.toMessage()}))
         if(dataViewResult instanceof Error){
             new ErrorPopupWidget({message: `Could not create a view for ${datasource.url}: ${dataViewResult.message}`})
             return

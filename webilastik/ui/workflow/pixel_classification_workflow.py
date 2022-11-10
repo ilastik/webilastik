@@ -85,6 +85,7 @@ class PixelClassificationWorkflow:
             datasource_suggestions=self.brushing_applet.datasources.transformed_with(
                 lambda datasources: tuple(ds for ds in datasources if isinstance(ds, FsDataSource))
             ),
+            populated_labels=self.brushing_applet.labels.transformed_with(lambda labels: [l for l in labels if len(l.annotations) > 0]),
             on_async_change=on_async_change,
         )
 

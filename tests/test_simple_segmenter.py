@@ -6,8 +6,6 @@ from webilastik.simple_segmenter import SimpleSegmenter
 
 
 def test_simple_segmenter():
-    segmenter = SimpleSegmenter()
-
     input_data = ArrayDataSource(
         data=Array5D(np.asarray([
            [[ 0.1,  0.1,   0.0,  1.0],
@@ -58,6 +56,9 @@ def test_simple_segmenter():
         ]), axiskeys="cyx")
     ]
 
-    segmentations = segmenter(input_data.roi)
+    segmentations = [SimpleSegmenter(channel_index=i)(input_data.roi) for i in range(input_data.shape.c)]
     for seg, expected_seg in zip(segmentations, expected_segmentation):
         assert np.all(seg.raw("cyx") == expected_seg.raw("cyx"))
+
+if __name__ == "__main__":
+    test_simple_segmenter()

@@ -12,15 +12,15 @@ import { PrecomputedChunksScaleMessage, PrecomputedChunksScaleSinkMessage } from
 
 
 export class PrecomputedChunksScale_DataSink_Input{
-    private infoDirectoryPathInput: PathInput;
-    private scaleKeyInput: PathInput;
-    private fileSystemSelector: BucketFsInput;
-    private dataTypeSelector: PopupSelect<DataType>;
-    private encoderSelector: PopupSelect<"raw" | "jpeg">;
-    private tileShapeInput: Shape5DInput;
-    private sinkShapeInput: Shape5DInput;
-    private resolutionInput: Vec3Input;
-    private voxelOffsetInput: Vec3Input;
+    public readonly infoDirectoryPathInput: PathInput;
+    public readonly scaleKeyInput: PathInput;
+    public readonly fileSystemSelector: BucketFsInput;
+    public readonly dataTypeSelector: PopupSelect<DataType>;
+    public readonly encoderSelector: PopupSelect<"raw" | "jpeg">;
+    public readonly tileShapeInput: Shape5DInput;
+    public readonly sinkShapeInput: Shape5DInput;
+    public readonly resolutionInput: Vec3Input;
+    public readonly voxelOffsetInput: Vec3Input;
 
     constructor(params: {
         parentElement: HTMLElement,
@@ -35,6 +35,7 @@ export class PrecomputedChunksScale_DataSink_Input{
         disableTileShape?: boolean,
         disableEncoding?: boolean,
         disableDataType?: boolean,
+        disableResolution?: boolean,
     }){
         let parentElement = params.parentElement
         this.fileSystemSelector = BucketFsInput.createLabeledFieldset({
@@ -87,6 +88,7 @@ export class PrecomputedChunksScale_DataSink_Input{
             value: params.resolution,
             min: {x: 1, y:1, z:1},
             step: {x: 1, y:1, z:1},
+            disabled: params.disableResolution,
         })
 
         this.voxelOffsetInput = Vec3Input.createLabeledFieldset({
@@ -140,26 +142,6 @@ export class PrecomputedChunksScale_DataSink_Input{
                 encoding,
             })
         })
-    }
-
-    public setParameters(params: {
-        shape?: Shape5D,
-        tileShape?: Shape5D,
-        resolution?: vec3,
-        voxelOffset?: vec3,
-    }){
-        if(params.shape){
-            this.sinkShapeInput.value = params.shape
-        }
-        if(params.tileShape){
-            this.tileShapeInput.value = params.tileShape
-        }
-        if(params.resolution){
-            this.resolutionInput.value = params.resolution
-        }
-        if(params.voxelOffset){
-            this.resolutionInput.value = params.voxelOffset
-        }
     }
 
     public static createLabeled(

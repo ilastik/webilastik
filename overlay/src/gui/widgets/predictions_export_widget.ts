@@ -1,13 +1,14 @@
-import { ensureJsonArray, ensureOptional } from '../../util/serialization';
 import { Applet } from '../../client/applets/applet';
-import { ensureJsonNumber, ensureJsonObject, ensureJsonString, JsonValue } from '../../util/serialization';
-import { createElement, createInputParagraph, createTable } from '../../util/misc';
+import { JsonValue } from '../../util/serialization';
+import { assertUnreachable, createElement, createInputParagraph, createTable } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
-import { DataSource, Session } from '../../client/ilastik';
+import { Color, DataSource, Session } from '../../client/ilastik';
 import { CssClasses } from '../css_classes';
 import { ErrorPopupWidget } from './popup';
-import { PixelPredictionsExportParamsInput, SimpleSegmentationExportParamsInput } from './export_params_input';
-import { DataSourceMessage, StartExportJobParamsMessage, StartSimpleSegmentationExportJobParamsMessage } from '../../client/message_schema';
+import { JobMessage, LabelHeaderMessage, PixelClassificationExportAppletStateMessage, StartExportJobParamsMessage, StartSimpleSegmentationExportJobParamsMessage } from '../../client/message_schema';
+import { PopupSelect } from './selector_widget';
+import { DataSourceInput } from './datasource_input';
+import { PrecomputedChunksScale_DataSink_Input } from './precomputed_chunks_scale_datasink_input';
 
 const sink_creation_stati = ["pending", "running", "cancelled", "failed", "succeeded"] as const;
 export type SinkCreationStatus = typeof sink_creation_stati[number];
@@ -19,72 +20,49 @@ export function ensureSinkCreationStatus(value: string): SinkCreationStatus{
     return variant
 }
 
-export class Job{
-    public readonly name: string
-    public readonly uuid: string
-    public readonly num_args?: number
-    public readonly num_completed_steps: number
-    public readonly status: string
+class LabelHeader{
+    constructor(public readonly name: string, public readonly color: Color){
+    }
+    public static fromMessage(message: LabelHeaderMessage): LabelHeader{
+        return new LabelHeader(message.name, Color.fromMessage(message.color))
+    }
+    public toMessage(): LabelHeaderMessage{
+        return new LabelHeaderMessage({name: this.name, color: this.color.toMessage()})
+    }
+}
 
-    public constructor(params: {
-        name: string,
-        uuid: string,
-        num_args?: number,
-        num_completed_steps: number,
-        status: string,
+class PixelClassificationExportAppletState{
+    jobs: Array<JobMessage>
+    populated_labels: LabelHeader[] | undefined
+    datasource_suggestions: DataSource[]
+
+    constructor(params: {
+        jobs: Array<JobMessage>
+        populated_labels: LabelHeaderMessage[] | undefined
+        datasource_suggestions: DataSource[]
     }){
-        this.name = params.name
-        this.uuid = params.uuid
-        this.num_args = params.num_args
-        this.num_completed_steps = params.num_completed_steps
-        this.status = params.status
+        this.jobs = params.jobs
+        this.populated_labels = params.populated_labels?.map(msg => LabelHeader.fromMessage(msg))
+        this.datasource_suggestions = params.datasource_suggestions
     }
 
-    public static fromJsonValue(data: JsonValue): Job{
-        let data_obj = ensureJsonObject(data)
-        let num_args = data_obj["num_args"]
-
-        return new Job({
-            name: ensureJsonString(data_obj["name"]),
-            uuid: ensureJsonString(data_obj["uuid"]),
-            num_args: num_args === undefined || num_args === null ? undefined : ensureJsonNumber(num_args),
-            num_completed_steps: ensureJsonNumber(data_obj["num_completed_steps"]),
-            status: ensureJsonString(data_obj["status"]),
-        })
-    }
-
-    public static fromJsonArray(data: JsonValue): Array<Job>{
-        let data_array = ensureJsonArray(data)
-        return data_array.map(element => this.fromJsonValue(element))
-    }
-}
-
-type State = {
-    jobs: Array<Job>,
-    num_classes: number | undefined,
-    datasource_suggestions: DataSource[],
-}
-
-function stateFromJsonValue(data: JsonValue): State{
-    let data_obj = ensureJsonObject(data)
-    return {
-        jobs: Job.fromJsonArray(ensureJsonArray(data_obj["jobs"])),
-        num_classes: ensureOptional(ensureJsonNumber, data_obj["num_classes"]),
-        datasource_suggestions: ensureJsonArray(data_obj["datasource_suggestions"]).map(raw => {
-            const msg = DataSourceMessage.fromJsonValue(raw)
-            if(msg instanceof Error){
-                throw `FIXME!!!`
-            }
-            return DataSource.fromMessage(msg)
+    public static fromMessage(message: PixelClassificationExportAppletStateMessage): PixelClassificationExportAppletState{
+        return new this({
+            jobs: message.jobs,
+            datasource_suggestions: (message.datasource_suggestions || []).map(msg => DataSource.fromMessage(msg)), //FIXME?
+            populated_labels: message.populated_labels
         })
     }
 }
 
-export class PredictionsExportWidget extends Applet<State>{
+export class PredictionsExportWidget extends Applet<PixelClassificationExportAppletState>{
     public readonly element: HTMLElement;
     jobsDisplay: HTMLDivElement;
-    predictionsExportParamsInput: PixelPredictionsExportParamsInput;
-    simpleSegmentationExportParamsInput: SimpleSegmentationExportParamsInput;
+    exportModeSelector: PopupSelect<"pixel probabilities" | "simple segmentation">;
+    datasinkInput: PrecomputedChunksScale_DataSink_Input;
+    datasourceInput: DataSourceInput;
+    labelSelectorContainer: HTMLParagraphElement;
+    labelToExportSelector: PopupSelect<LabelHeader> | undefined;
 
     public constructor({name, parentElement, session, help}: {
         name: string, parentElement: HTMLElement, session: Session, help: string[]
@@ -92,65 +70,154 @@ export class PredictionsExportWidget extends Applet<State>{
         super({
             name,
             session,
-            deserializer: stateFromJsonValue,
+            deserializer: (data: JsonValue) => {
+                const message = PixelClassificationExportAppletStateMessage.fromJsonValue(data)
+                if(message instanceof Error){
+                    throw `FIXME!!: ${message.message}`
+                }
+                return PixelClassificationExportAppletState.fromMessage(message)
+            },
             onNewState: (new_state) => this.onNewState(new_state)
         })
+
         this.element = new CollapsableWidget({display_name: "Export Predictions", parentElement, help}).element
         this.element.classList.add("ItkPredictionsExportApplet")
 
-        let predictionsExportControls = createElement({tagName: "details", parentElement: this.element})
-        createElement({tagName: "summary", parentElement: predictionsExportControls, innerText: "Export Prediction Map"})
-        this.predictionsExportParamsInput = new PixelPredictionsExportParamsInput({
-            parentElement: predictionsExportControls,
-            session
+        const exportModeContainer = createElement({tagName: "p", parentElement: this.element})
+        createElement({tagName: "label", parentElement: exportModeContainer, innerText: "Export mode: "})
+        this.exportModeSelector = new PopupSelect<"pixel probabilities" | "simple segmentation">({
+            popupTitle: "Select an export mode",
+            parentElement: exportModeContainer,
+            options: ["pixel probabilities", "simple segmentation"], //FIXME?
+            optionRenderer: (args) => createElement({tagName: "span", parentElement: args.parentElement, innerText: args.option}),
+            onChange: () => this.refreshInputs(),
         })
-        createInputParagraph({
-            inputType: "button", value: "Create Prediction Map Export Job", parentElement: predictionsExportControls, onClick: () => {
-                let payload = this.predictionsExportParamsInput.value
-                if(!payload){
-                    new ErrorPopupWidget({message: "Missing export parameters"})
-                    return
+
+        const datasourceFieldset = createElement({tagName: "fieldset", parentElement: this.element})
+        createElement({tagName: "legend", parentElement: datasourceFieldset, innerText: "Input Data:"})
+        this.datasourceInput = new DataSourceInput({
+            parentElement: datasourceFieldset,
+            session,
+            onChanged: (ds: DataSource | undefined) => {
+                if(!ds){
+                    this.datasinkInput.sinkShapeInput.xInput.value = undefined
+                    this.datasinkInput.sinkShapeInput.yInput.value = undefined
+                    this.datasinkInput.sinkShapeInput.zInput.value = undefined
+                    this.datasinkInput.sinkShapeInput.tInput.value = undefined
+
+                    this.datasinkInput.tileShapeInput.xInput.value = undefined
+                    this.datasinkInput.tileShapeInput.yInput.value = undefined
+                    this.datasinkInput.tileShapeInput.zInput.value = undefined
+                    this.datasinkInput.tileShapeInput.tInput.value = undefined
+                }else{
+                    this.datasinkInput.sinkShapeInput.xInput.value = ds.shape.x
+                    this.datasinkInput.sinkShapeInput.yInput.value = ds.shape.y
+                    this.datasinkInput.sinkShapeInput.zInput.value = ds.shape.z
+                    this.datasinkInput.sinkShapeInput.tInput.value = ds.shape.t
+
+                    this.datasinkInput.tileShapeInput.xInput.value = ds.tile_shape.x
+                    this.datasinkInput.tileShapeInput.yInput.value = ds.tile_shape.y
+                    this.datasinkInput.tileShapeInput.zInput.value = ds.tile_shape.z
+                    this.datasinkInput.tileShapeInput.tInput.value = ds.tile_shape.t
                 }
-                this.doRPC("start_export_job", new StartExportJobParamsMessage({
-                    datasource: payload.datasource.toMessage(), datasink: payload.datasink
-                }))
+                this.datasinkInput.resolutionInput.value = ds?.spatial_resolution
             }
         })
 
-
-        let simpleSegmentationExportControls = createElement({tagName: "details", parentElement: this.element})
-        createElement({tagName: "summary", parentElement: simpleSegmentationExportControls, innerText: "Export Simple Segmentation"})
-        this.simpleSegmentationExportParamsInput = new SimpleSegmentationExportParamsInput({
-            parentElement: simpleSegmentationExportControls,
-            session
+        const datasinkFieldset = createElement({tagName: "fieldset", parentElement: this.element})
+        createElement({tagName: "legend", parentElement: datasinkFieldset, innerText: "Output: "})
+        this.datasinkInput = new PrecomputedChunksScale_DataSink_Input({
+            parentElement: datasinkFieldset,
+            disableDataType: true,
+            disableShape: true,
+            disableTileShape: true,
+            disableEncoding: true,
+            disableResolution: true,
         })
+
+        this.labelSelectorContainer = createElement({tagName: "p", parentElement: this.element});
+
         createInputParagraph({
-            inputType: "button", value: "Create Simple Segmentation Export Job", parentElement: simpleSegmentationExportControls, onClick: () => {
-                let payload = this.simpleSegmentationExportParamsInput.value
-                if(!payload){
+            inputType: "button", value: "Start Export Job", parentElement: this.element, onClick: () => {
+                const datasource = this.datasourceInput.value
+                const datasink = this.datasinkInput.value
+                if(!datasource || !datasink){
                     new ErrorPopupWidget({message: "Missing export parameters"})
                     return
                 }
-                this.doRPC("start_simple_segmentation_export_job", new StartSimpleSegmentationExportJobParamsMessage({
-                    datasource: payload.datasource.toMessage(), datasinks: payload.datasinks
-                }))
+                if(this.exportModeSelector.value == "pixel probabilities"){
+                    this.doRPC("start_export_job", new StartExportJobParamsMessage({
+                        datasource: datasource.toMessage(), datasink: datasink
+                    }))
+                }else if(this.exportModeSelector.value == "simple segmentation"){
+                    const label_header = this.labelToExportSelector?.value;
+                    if(!label_header){
+                        new ErrorPopupWidget({message: "Missing export parameters"})
+                        return
+                    }
+                    this.doRPC("start_simple_segmentation_export_job", new StartSimpleSegmentationExportJobParamsMessage({
+                        datasource: datasource.toMessage(), datasink: datasink, label_header: label_header.toMessage()
+                    }))
+                }else{
+                    assertUnreachable(this.exportModeSelector.value)
+                }
             }
         })
 
         this.jobsDisplay = createElement({tagName: "div", parentElement: this.element});
+        this.refreshInputs()
     }
 
-    protected onNewState(new_state: State){
-        this.jobsDisplay.innerHTML = ""
+    private refreshInputs = () => {
+        const exportMode = this.exportModeSelector.value
+        if(exportMode == 'pixel probabilities'){
+            this.datasinkInput.dataTypeSelector.value = "float32"
+            this.datasinkInput.tileShapeInput.cInput.value = this.labelToExportSelector?.options.length
+            this.datasinkInput.sinkShapeInput.cInput.value = this.labelToExportSelector?.options.length
+            this.labelSelectorContainer.style.display = "none"
+        }else if (exportMode == "simple segmentation"){
+            this.datasinkInput.dataTypeSelector.value = "uint8"
+            this.datasinkInput.tileShapeInput.cInput.value = 3
+            this.datasinkInput.sinkShapeInput.cInput.value = 3
+            this.labelSelectorContainer.style.display = "block"
+        }else{
+            assertUnreachable(exportMode)
+        }
+    }
 
-        this.predictionsExportParamsInput.setParams({
-            datasourceSuggestions: new_state.datasource_suggestions,
-            numberOfPixelClasses: new_state.num_classes,
-        })
-        this.simpleSegmentationExportParamsInput.setParams({
-            datasourceSuggestions: new_state.datasource_suggestions,
-            numberOfPixelClasses: new_state.num_classes,
-        })
+    protected onNewState(new_state: PixelClassificationExportAppletState){
+        this.jobsDisplay.innerHTML = ""
+        this.datasourceInput.setSuggestions(new_state.datasource_suggestions)
+
+        let previousLabelSelection = this.labelToExportSelector?.value;
+        this.labelSelectorContainer.innerHTML = ""
+        createElement({tagName: "label", parentElement: this.labelSelectorContainer, innerText: "Select a label to segment: "})
+        if(new_state.populated_labels){
+            this.labelToExportSelector = new PopupSelect<LabelHeader>({
+                parentElement: this.labelSelectorContainer,
+                popupTitle: "Select a label to segment",
+                options: new_state.populated_labels,
+                comparator: (label1, label2) => label1.name == label2.name,
+                optionRenderer: (args) => {
+                    createElement({tagName: "span", parentElement: args.parentElement, innerText: args.option.name + " "})
+                    createElement({tagName: "span", parentElement: args.parentElement, innerText: "🖌️", inlineCss: {
+                        backgroundColor: args.option.color.hexCode,
+                        padding: "2px",
+                        border: "solid 1px black"
+                    }})
+                },
+            })
+            if(previousLabelSelection){
+                for(let labelHeader of new_state.populated_labels){
+                    if(labelHeader.name == previousLabelSelection.name || labelHeader.color.equals(previousLabelSelection.color)){
+                        this.labelToExportSelector.value = labelHeader
+                        break
+                    }
+                }
+            }
+        }else{
+            createElement({tagName: "span", parentElement: this.labelSelectorContainer, innerText: "No populated labels"})
+        }
 
         if(new_state.jobs.length > 0){
             createTable({
@@ -165,5 +232,7 @@ export class PredictionsExportWidget extends Applet<State>{
                 }))
             })
         }
+
+        this.refreshInputs()
     }
 }

@@ -145,6 +145,7 @@ export class SelectorWidget<T>{
 
 export class PopupSelect<T>{
     private _value: T
+    private _options: Array<T>
     private readonly element: HTMLSpanElement
     private optionRenderer: (params: {option: T, parentElement: HTMLElement}) => void
 
@@ -160,6 +161,7 @@ export class PopupSelect<T>{
         disabled?: boolean,
     }){
         this._value = params.options[0]
+        this._options = params.options
         this.optionRenderer = params.optionRenderer
 
         this.element = createElement({
@@ -199,6 +201,10 @@ export class PopupSelect<T>{
         this.element.innerHTML = ""
         this.optionRenderer({option: val, parentElement: this.element})
         createElement({tagName: "span", parentElement: this.element, innerText: "▼"})
+    }
+
+    public get options(): Array<T>{
+        return this._options.slice()
     }
 
     public destroy(){

@@ -160,25 +160,18 @@ def test_pixel_classification_workflow():
 
 ##################################333
 
-    simple_segmentation_datasinks = [
-        create_precomputed_chunks_sink(
-            shape=raw_data_source.shape.updated(c=3),
-            dtype=np.dtype("uint8"),
-            chunk_size=raw_data_source.tile_shape.updated(c=3),
-            fs=output_fs
-        ),
-        create_precomputed_chunks_sink(
-            shape=raw_data_source.shape.updated(c=3),
-            dtype=np.dtype("uint8"),
-            chunk_size=raw_data_source.tile_shape.updated(c=3),
-            fs=output_fs
-        ),
-    ]
+    simple_segmentation_datasink = create_precomputed_chunks_sink(
+        shape=raw_data_source.shape.updated(c=3),
+        dtype=np.dtype("uint8"),
+        chunk_size=raw_data_source.tile_shape.updated(c=3),
+        fs=output_fs
+    )
 
     print(f"Sending simple segmentation job request??????")
     result = workflow.export_applet.start_simple_segmentation_export_job(
         datasource=raw_data_source,
-        datasinks=simple_segmentation_datasinks,
+        datasink=simple_segmentation_datasink,
+        label_name=pixel_annotations[1].name,
     )
 
     print(f"---> Job successfully scheduled? Waiting for a while")
@@ -187,7 +180,7 @@ def test_pixel_classification_workflow():
 
     segmentation_output_1 = PrecomputedChunksDataSource(
         filesystem=output_fs,
-        path=simple_segmentation_datasinks[1].path,
+        path=simple_segmentation_datasink.path,
         resolution=(1,1,1)
     )
     for tile in segmentation_output_1.roi.get_datasource_tiles():

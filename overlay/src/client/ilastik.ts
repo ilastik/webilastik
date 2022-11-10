@@ -22,6 +22,7 @@ import {
     ListComputeSessionsParamsMessage,
     ListComputeSessionsResponseMessage,
     LoadProjectParamsMessage,
+    MakeDataViewParams,
     Point5DMessage,
     PredictionsViewMessage,
     RawDataViewMessage,
@@ -366,6 +367,20 @@ export class Session{
         return responseMessage.datasources.map(msg => DataSource.fromMessage(msg))
     }
 
+    public async makeDataView(params: MakeDataViewParams): Promise<DataViewUnion | Error>{
+        let result = await fetchJson(
+            this.sessionUrl.joinPath("make_data_view").raw,
+            {
+                method: "POST",
+                body: JSON.stringify(params.toJsonValue()),
+            }
+        )
+        if(result instanceof Error){
+            return result
+        }
+        return parseAsDataViewUnion(result)
+    }
+
 }
 
 export type FeatureClassName = IlpFeatureExtractorMessage["class_name"]
@@ -703,22 +718,6 @@ export abstract class DataView extends View{
             return FailedView.fromMessage(message)
         }
         throw `Should be unreachable`
-    }
-
-    public static async makeDataView(params: {name: string, url: Url, session: Session}): Promise<DataViewUnion | Error>{
-        let result = await fetchJson(
-            params.session.sessionUrl.joinPath("make_data_view").raw,
-            {
-                method: "POST",
-                body: JSON.stringify({
-                    name: params.name, url: params.url.toString()
-                }),
-            }
-        )
-        if(result instanceof Error){
-            return result
-        }
-        return parseAsDataViewUnion(result)
     }
 
     public abstract getDatasources(): Array<DataSource> | undefined;

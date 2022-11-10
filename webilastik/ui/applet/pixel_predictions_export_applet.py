@@ -20,6 +20,7 @@ from webilastik.simple_segmenter import SimpleSegmenter
 from webilastik.ui.applet import AppletOutput, StatelesApplet, UserPrompt
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.usage_error import UsageError
+from webilastik.ui.applet.brushing_applet import Label
 
 @typing.final
 class ExportTask(Generic[IN]):
@@ -33,30 +34,9 @@ class ExportTask(Generic[IN]):
         print(f"Writing tile {tile}")
         self.sink_writer.write(tile)
 
-@typing.final
-class ExportAsSimpleSegmentationTask:
-    def __init__(self, operator: Operator[DataRoi, Array5D], sink_writers: Sequence[DataSinkWriter]):
-        self.operator = SimpleSegmenter(preprocessor=operator)
-        self.sink_writers = sink_writers
-
-    def __call__(self, step_arg: DataRoi):
-        segmentations = self.operator(step_arg)
-        for segmentation, sink in zip(segmentations, self.sink_writers):
-            sink.write(segmentation)
-
 # this needs to be top-level becase process pools can't handle local functions
 def _create_datasink(ds: DataSink) -> "DataSinkWriter | Exception":
     return ds.create()
-
-def _create_datasinks(datasinks: Sequence[DataSink]) -> "Exception | Sequence[DataSinkWriter]":
-    out: List[DataSinkWriter] = []
-    for sink in datasinks:
-        result = sink.create()
-        if isinstance(result, Exception):
-            raise result
-        out.append(result)
-    return out
-
 
 class PixelClassificationExportApplet(StatelesApplet):
     def __init__(
@@ -66,12 +46,14 @@ class PixelClassificationExportApplet(StatelesApplet):
         on_async_change: Callable[[], Any],
         priority_executor: PriorityExecutor,
         operator: "AppletOutput[VigraPixelClassifier[IlpFilter] | None]",
+        populated_labels: "AppletOutput[Sequence[Label] | None]",
         datasource_suggestions: "AppletOutput[Sequence[FsDataSource] | None]"
     ):
         self.on_async_change = on_async_change
         self.priority_executor = priority_executor
 
         self._in_operator = operator
+        self._in_populated_labels = populated_labels
         self._in_datasource_suggestions = datasource_suggestions
 
         self._jobs: Dict[uuid.UUID, Job[Any, Any]] = {}
@@ -117,24 +99,17 @@ class PixelClassificationExportApplet(StatelesApplet):
         self.priority_executor.submit_job(job)
         return job
 
-    def start_export_job(self, *, datasource: DataSource, datasink: DataSink) -> "UsageError | None":
-        classifier = self._in_operator()
-        if classifier is None:
-            return UsageError("Upstream not ready yet")
-        expected_shape = datasource.shape.updated(c=classifier.num_classes)
-        if datasink.shape != expected_shape:
-            return UsageError(f"Bad sink shape. Expected {expected_shape} but got {datasink.shape}")
-        if datasink.dtype != np.dtype("float32"):
-            return UsageError("Data sink should have dtype of float32 for this kind of export")
+    def _do_start_export_job(
+        self, *, job_name: str, operator: Operator[DataRoi, Array5D], datasource: DataSource, datasink: DataSink
+    ):
 
-
-        def launch_export_job(job_id: uuid.UUID, result: "Exception | DataSinkWriter"):
+        def on_datasink_ready(job_id: uuid.UUID, result: "Exception | DataSinkWriter"):
             if isinstance(result, BaseException):
                 raise result #FIXME?
             self._remove_job(job_id)
             _ = self._create_job(
-                name=f"Export Job",
-                target=ExportTask(operator=classifier, sink_writer=result),
+                name=job_name,
+                target=ExportTask(operator=operator, sink_writer=result),
                 args=datasource.roi.get_datasource_tiles(), #FIXME: use sink tile_size
                 num_args=datasource.roi.get_num_tiles(tile_shape=datasource.tile_shape),
             )
@@ -144,40 +119,39 @@ class PixelClassificationExportApplet(StatelesApplet):
             target=_create_datasink,
             args=[datasink],
             num_args=1,
-            on_success=launch_export_job,
+            on_success=on_datasink_ready,
             # on_failure=lambda exception: self._remove_job(sink_creation_job.uuid)
         )
 
-    def start_simple_segmentation_export_job(self, *, datasource: DataSource, datasinks: Sequence[DataSink]) -> "UsageError | None":
+    def start_export_job(self, *, datasource: DataSource, datasink: DataSink) -> "UsageError | None":
         classifier = self._in_operator()
         if classifier is None:
             return UsageError("Upstream not ready yet")
-        if len(datasinks) != classifier.num_classes:
-            return UsageError(f"Wrong number of datasinks. Expected {classifier.num_classes} but got {len(datasinks)}")
+        expected_shape = datasource.shape.updated(c=classifier.num_classes)
+        if datasink.shape != expected_shape:
+            return UsageError(f"Bad sink shape. Expected {expected_shape} but got {datasink.shape}")
+        if datasink.dtype != np.dtype("float32"):
+            return UsageError("Data sink should have dtype of float32 for this kind of export")
+        return self._do_start_export_job(job_name="Export Job", operator=classifier, datasource=datasource, datasink=datasink)
+
+    def start_simple_segmentation_export_job(self, *, datasource: DataSource, datasink: DataSink, label_name: str) -> "UsageError | None":
+        with self._lock:
+            label_name_indices: Dict[str, int] = {label.name: idx for idx, label in enumerate(self._in_populated_labels() or [])}
+            classifier = self._in_operator()
+        if label_name not in label_name_indices:
+            return UsageError(f"Bad label name: {label_name}")
+        if classifier is None:
+            return UsageError("Applets upstream are not ready yet")
         expected_shape = datasource.shape.updated(c=3)
-        if any(sink.shape != expected_shape for sink in datasinks):
-            return UsageError("All data sinks should have 3 channels for this kind of export")
-        if any(sink.dtype != np.dtype("uint8") for sink in datasinks):
-            return UsageError("All data sinks should have dtype of uint8 for this kind of export")
-
-
-
-        def launch_export_job(job_id: uuid.UUID, result: "Exception | Sequence[DataSinkWriter]"):
-            if isinstance(result, Exception):
-                raise result
-            self._remove_job(job_id)
-            _ = self._create_job(
-                name=f"Simple Segmentation Export Job",
-                target=ExportAsSimpleSegmentationTask(operator=classifier, sink_writers=result),
-                args=datasource.roi.get_datasource_tiles(), #FIXME: use sink tile_size
-                num_args=datasource.roi.get_num_tiles(tile_shape=datasource.tile_shape),
-            )
-        _ = self._create_job(
-            name=f"Creating datasinks",
-            target=_create_datasinks,
-            args=[datasinks],
-            num_args=1, #FIXME: maybe one per datasink?
-            on_success=launch_export_job,
+        if datasink.shape != expected_shape:
+            return UsageError("Data sink should have 3 channels for this kind of export")
+        if datasink.dtype != np.dtype("uint8"):
+            return UsageError("Data sink should have dtype of 'uint8' for this kind of export")
+        return self._do_start_export_job(
+            job_name="Simple Segmentation Export Job",
+            operator=SimpleSegmenter(channel_index=label_name_indices[label_name], preprocessor=classifier),
+            datasource=datasource,
+            datasink=datasink,
         )
 
 
@@ -198,18 +172,18 @@ class WsPixelClassificationExportApplet(WsApplet, PixelClassificationExportApple
             datasource_result = FsDataSource.try_from_message(params_result.datasource)
             if isinstance(datasource_result, MessageParsingError):
                 return UsageError(str(datasource_result)) #FIXME: this is a bug, not a usage error
-            datasinks = [DataSink.from_message(msg) for msg in params_result.datasinks]
-            rpc_result = self.start_simple_segmentation_export_job(datasource=datasource_result, datasinks=datasinks)
+            datasink = DataSink.from_message(params_result.datasink)
+            rpc_result = self.start_simple_segmentation_export_job(datasource=datasource_result, datasink=datasink, label_name=params_result.label_header.name)
         else:
             raise ValueError(f"Invalid method name: '{method_name}'") #FIXME: return error
         return rpc_result
 
     def _get_json_state(self) -> JsonValue:
         with self._lock:
-            classifier = self._in_operator()
+            labels = self._in_populated_labels()
             datasource_suggestions = self._in_datasource_suggestions()
             return PixelClassificationExportAppletStateMessage(
                 jobs=tuple(job.to_message() for job in self._jobs.values()),
-                num_classes= classifier and classifier.num_classes,
+                populated_labels=None if not labels else tuple(l.to_header_message() for l in labels),
                 datasource_suggestions=None if datasource_suggestions is None else tuple(ds.to_message() for ds in datasource_suggestions)
             ).to_json_value()
