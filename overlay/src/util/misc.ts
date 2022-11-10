@@ -450,3 +450,7 @@ export async function fetchJson(...params: Parameters<typeof fetch>): Promise<Js
         return Error(`${e}`)
     }
 }
+
+export function assertUnreachable(_x: never): never {
+    throw new Error("Didn't expect to get here");
+}

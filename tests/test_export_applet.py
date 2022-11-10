@@ -9,9 +9,18 @@ from webilastik.datasource import FsDataSource
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet import StatelesApplet, applet_output
+from webilastik.ui.applet.brushing_applet import Label
 from webilastik.ui.applet.pixel_predictions_export_applet import PixelClassificationExportApplet
 
-from tests import create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_classifier
+from tests import create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations, get_sample_c_cells_pixel_classifier
+
+class DummyBrushingApplet(StatelesApplet):
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
+
+    @applet_output
+    def labels(self) -> Sequence[Label]:
+        return get_sample_c_cells_pixel_annotations()
 
 class DummyPixelClassificationApplet(StatelesApplet):
     def __init__(self, name: str) -> None:
@@ -39,6 +48,7 @@ if __name__ == "__main__":
         on_async_change=lambda: print(f"something_changed"),
         priority_executor=priority_executor,
         operator=pixel_classifier_applet.classifier,
+        populated_labels=DummyBrushingApplet("brushing_applet").labels,
         datasource_suggestions=DummyDatasourceApplet(name="datasource propvider applet").datasources,
     )
 

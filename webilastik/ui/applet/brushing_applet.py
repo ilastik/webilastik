@@ -8,7 +8,7 @@ import numpy as np
 from webilastik.datasource import DataSource
 from webilastik.annotations.annotation import Annotation, Color
 from webilastik.server.message_schema import (
-    AddPixelAnnotationParams, BrushingAppletStateMessage, CreateLabelParams, LabelMessage, MessageParsingError, RecolorLabelParams, RemoveLabelParams, RemovePixelAnnotationParams, RenameLabelParams
+    AddPixelAnnotationParams, BrushingAppletStateMessage, CreateLabelParams, LabelHeaderMessage, LabelMessage, MessageParsingError, RecolorLabelParams, RemoveLabelParams, RemovePixelAnnotationParams, RenameLabelParams
 )
 from webilastik.ui.applet import Applet, CascadeError, CascadeOk, CascadeResult, UserPrompt, applet_output, cascade
 from webilastik.ui.applet.ws_applet import WsApplet
@@ -26,6 +26,12 @@ class Label:
             name=self.name,
             color=self.color.to_message(),
             annotations=tuple(annotation.to_message() for annotation in self.annotations),
+        )
+
+    def to_header_message(self) -> LabelHeaderMessage:
+        return LabelHeaderMessage(
+            name=self.name,
+            color=self.color.to_message()
         )
 
     def clone(self) -> "Label":

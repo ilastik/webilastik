@@ -601,6 +601,11 @@ class ColorMessage(Message):
     b: int
 
 @dataclass
+class LabelHeaderMessage(Message):
+    name: str
+    color: ColorMessage
+
+@dataclass
 class UrlMessage(Message):
     datascheme: Optional[Literal["precomputed"]]
     protocol: Literal["http", "https", "file", "memory"]
@@ -805,7 +810,7 @@ class JobMessage(Message):
 @dataclass
 class PixelClassificationExportAppletStateMessage(Message):
     jobs: Tuple[JobMessage, ...]
-    num_classes: Optional[int]
+    populated_labels: Optional[Tuple[LabelHeaderMessage, ...]]
     datasource_suggestions: Optional[Tuple[DataSourceMessage, ...]]
 
 #########################################################
@@ -917,7 +922,8 @@ class StartExportJobParamsMessage(Message):
 @dataclass
 class StartSimpleSegmentationExportJobParamsMessage(Message):
     datasource: DataSourceMessage
-    datasinks: Tuple[PrecomputedChunksScaleSinkMessage, ...]
+    datasink: PrecomputedChunksScaleSinkMessage
+    label_header: LabelHeaderMessage
 
 ############################################
 
