@@ -169,6 +169,11 @@
     flex-grow: 1; /*make input stretch to occupy all remaining space*/
 }
 
+.ItkInvalidTextInput{
+    border: solid 1px red;
+    background-color: lightpink;
+}
+
 .ItkInputParagraph input[type=number]{
     width: 4em;
 }
