@@ -1,12 +1,12 @@
 import { Applet } from '../../client/applets/applet';
 import { JsonValue } from '../../util/serialization';
-import { assertUnreachable, createElement, createInputParagraph, createTable } from '../../util/misc';
+import { assertUnreachable, createElement, createInput, createInputParagraph, createTable } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
 import { Color, DataSource, Session } from '../../client/ilastik';
 import { CssClasses } from '../css_classes';
-import { ErrorPopupWidget } from './popup';
+import { ErrorPopupWidget, InputPopupWidget } from './popup';
 import { JobMessage, LabelHeaderMessage, PixelClassificationExportAppletStateMessage, StartExportJobParamsMessage, StartSimpleSegmentationExportJobParamsMessage } from '../../client/message_schema';
-import { PopupSelect } from './selector_widget';
+import { PopupSelect, SelectorWidget } from './selector_widget';
 import { DataSourceInput } from './datasource_input';
 import { PrecomputedChunksScale_DataSink_Input } from './precomputed_chunks_scale_datasink_input';
 
@@ -63,6 +63,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
     datasourceInput: DataSourceInput;
     labelSelectorContainer: HTMLParagraphElement;
     labelToExportSelector: PopupSelect<LabelHeader> | undefined;
+    inputSuggestionsButtonContainer: HTMLSpanElement;
 
     public constructor({name, parentElement, session, help}: {
         name: string, parentElement: HTMLElement, session: Session, help: string[]
@@ -123,6 +124,8 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                 this.datasinkInput.resolutionInput.value = ds?.spatial_resolution
             }
         })
+        this.inputSuggestionsButtonContainer = createElement({tagName: "span", parentElement: datasourceFieldset})
+
 
         const datasinkFieldset = createElement({tagName: "fieldset", parentElement: this.element})
         createElement({tagName: "legend", parentElement: datasinkFieldset, innerText: "Output: "})
@@ -187,7 +190,27 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
 
     protected onNewState(new_state: PixelClassificationExportAppletState){
         this.jobsDisplay.innerHTML = ""
-        this.datasourceInput.setSuggestions(new_state.datasource_suggestions)
+
+        this.inputSuggestionsButtonContainer.innerHTML = ""
+        createInput({
+            inputType: "button",
+            parentElement: this.inputSuggestionsButtonContainer,
+            value: "Use an Annotated Dataset",
+            disabled: new_state.datasource_suggestions.length == 0,
+            onClick: () => new InputPopupWidget<DataSource>({
+                title: "Pick an annotated dataset as input",
+                inputWidgetFactory: (parentElement) => {
+                    return new SelectorWidget({
+                        parentElement: parentElement,
+                        options: new_state.datasource_suggestions,
+                        optionRenderer: (args) => createElement({tagName: "span", parentElement: args.parentElement, innerText: args.option.getDisplayString()}),
+                    })
+                },
+                onConfirm: (ds) => {
+                    this.datasourceInput.value = ds
+                },
+            })
+        })
 
         let previousLabelSelection = this.labelToExportSelector?.value;
         this.labelSelectorContainer.innerHTML = ""

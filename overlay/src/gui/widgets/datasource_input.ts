@@ -11,7 +11,6 @@ export class DataSourceInput{
     public readonly element: HTMLDivElement;
     private readonly session: Session;
     private readonly urlInput: UrlInput;
-    private readonly suggestionsButtonContainer: HTMLDivElement
     public readonly checkButton: HTMLInputElement;
     private readonly onChanged: ((newValue: DataSource | undefined) => void) | undefined;
     private statusMessageContainer: HTMLParagraphElement;
@@ -31,34 +30,22 @@ export class DataSourceInput{
         let p = createElement({tagName: "p", parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph]})
         this.urlInput = UrlInput.createLabeled({label: "Url: ", parentElement: p})
         this.urlInput.input.addEventListener("keyup", (ev) => {
+            this.checkButton.disabled = this.urlInput.value === undefined;
             if(ev.key === 'Enter'){
                 this.checkUrl()
             }
         })
         this.urlInput.input.addEventListener("focusout", () => this.checkUrl())
-        this.checkButton = createInput({inputType: "button", value: "check", parentElement: p, onClick: () => this.checkUrl})
+        this.checkButton = createInput({inputType: "button", value: "check", parentElement: p, onClick: () => this.checkUrl()})
 
         this.statusMessageContainer = createElement({tagName: "p", parentElement: this.element, cssClasses: [CssClasses.InfoText]})
-        this.suggestionsButtonContainer = createElement({tagName: "div", parentElement: this.element})
-    }
-
-    public setSuggestions(suggestions: DataSource[] | undefined){
-        this.suggestionsButtonContainer.innerHTML = ""
-        if(!suggestions || suggestions.length == 0){
-            return
-        }
-        createInput({
-            inputType: "button", parentElement: this.suggestionsButtonContainer, value: "Suggestions...", onClick: () => {
-                this.popupSuggestions(suggestions)
-            }
-        })
     }
 
     private async checkUrl(){
         let previousValue = this.value
 
         let url = this.urlInput.value
-        if(url == undefined){
+        if(url === undefined){
             if(previousValue !== undefined && this.onChanged){
                 this.onChanged(undefined)
             }
