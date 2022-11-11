@@ -5,7 +5,13 @@ import { CollapsableWidget } from './collapsable_applet_gui';
 import { Color, DataSource, Session } from '../../client/ilastik';
 import { CssClasses } from '../css_classes';
 import { ErrorPopupWidget, InputPopupWidget } from './popup';
-import { JobMessage, LabelHeaderMessage, PixelClassificationExportAppletStateMessage, StartExportJobParamsMessage, StartSimpleSegmentationExportJobParamsMessage } from '../../client/message_schema';
+import {
+    JobMessage,
+    LabelHeaderMessage,
+    PixelClassificationExportAppletStateMessage,
+    StartPixelProbabilitiesExportJobParamsMessage,
+    StartSimpleSegmentationExportJobParamsMessage
+} from '../../client/message_schema';
 import { PopupSelect, SelectorWidget } from './selector_widget';
 import { DataSourceInput } from './datasource_input';
 import { PrecomputedChunksScale_DataSink_Input } from './precomputed_chunks_scale_datasink_input';
@@ -149,7 +155,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                     return
                 }
                 if(this.exportModeSelector.value == "pixel probabilities"){
-                    this.doRPC("start_export_job", new StartExportJobParamsMessage({
+                    this.doRPC("launch_pixel_probabilities_export_job", new StartPixelProbabilitiesExportJobParamsMessage({
                         datasource: datasource.toMessage(), datasink: datasink
                     }))
                 }else if(this.exportModeSelector.value == "simple segmentation"){
@@ -158,7 +164,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                         new ErrorPopupWidget({message: "Missing export parameters"})
                         return
                     }
-                    this.doRPC("start_simple_segmentation_export_job", new StartSimpleSegmentationExportJobParamsMessage({
+                    this.doRPC("launch_simple_segmentation_export_job", new StartSimpleSegmentationExportJobParamsMessage({
                         datasource: datasource.toMessage(), datasink: datasink, label_header: label_header.toMessage()
                     }))
                 }else{

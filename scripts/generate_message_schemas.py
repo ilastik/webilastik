@@ -915,7 +915,7 @@ class CheckLoginResultMessage(Message):
 #############################################3333
 
 @dataclass
-class StartExportJobParamsMessage(Message):
+class StartPixelProbabilitiesExportJobParamsMessage(Message):
     datasource: DataSourceMessage
     datasink: PrecomputedChunksScaleSinkMessage
 
