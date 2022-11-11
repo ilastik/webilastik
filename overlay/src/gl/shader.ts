@@ -49,6 +49,9 @@ export class UniformLocation{
 
 export class ShaderProgram{
     public readonly glprogram: WebGLProgram
+    public readonly vertexShader: VertexShader;
+    public readonly fragmentShader: FragmentShader;
+
     constructor(
         public readonly gl: WebGL2RenderingContext,
         vertexShader: VertexShader,
@@ -65,6 +68,8 @@ export class ShaderProgram{
             throw error_log
         }
         this.glprogram = program;
+        this.vertexShader = vertexShader
+        this.fragmentShader = fragmentShader
     }
 
     public getAttribLocation(name: string) : AttributeLocation{
@@ -75,16 +80,16 @@ export class ShaderProgram{
         return new UniformLocation(name, this.gl.getUniformLocation(this.glprogram, name))
     }
 
-    public uniform3fv(name: string, value: vec3){
-        this.gl.uniform3fv(this.getUniformLocation(name).raw, value);
+    public uniform3fv(location: UniformLocation, value: vec3){
+        this.gl.uniform3fv(location.raw, value);
     }
 
-    public uniformMatrix4fv(name: string, value: mat4){
-        this.gl.uniformMatrix4fv(this.getUniformLocation(name).raw, false, value);
+    public uniformMatrix4fv(location: UniformLocation, value: mat4){
+        this.gl.uniformMatrix4fv(location.raw, false, value);
     }
 
-    public uniformMatrix3fv(name: string, value: mat3){
-        this.gl.uniformMatrix3fv(this.getUniformLocation(name).raw, false, value);
+    public uniformMatrix3fv(location: UniformLocation, value: mat3){
+        this.gl.uniformMatrix3fv(location.raw, false, value);
     }
 
 

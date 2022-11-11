@@ -3,9 +3,8 @@ import { BrushStroke } from "../../..";
 import { Color } from "../../../client/ilastik";
 import { VertexArrayObject, BufferUsageHint } from "../../../gl/buffer";
 import { RenderParams } from "../../../gl/gl";
-import { ShaderProgram, VertexShader, FragmentShader } from "../../../gl/shader";
+import { ShaderProgram, VertexShader, FragmentShader, UniformLocation, AttributeLocation } from "../../../gl/shader";
 import { TriangleArray } from "../../../gl/vertex_primitives";
-import { show_if_changed } from "../../../util/misc";
 import { BrushRenderer } from "./brush_renderer"
 import { Camera } from "./camera"
 
@@ -107,6 +106,12 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
     readonly box : Cube
     readonly vao: VertexArrayObject
     readonly debugColors: boolean
+    private readonly u_voxel_to_world__location: UniformLocation;
+    private readonly u_world_to_clip__location: UniformLocation;
+    private readonly u_clip_to_world__location: UniformLocation;
+    private readonly a_offset_vx__location: AttributeLocation;
+    private readonly u_brush_resolution__location: UniformLocation;
+    private readonly color__location: UniformLocation | undefined;
 
     constructor({gl, debugColors=false, highlightCrossSection, onlyCrossSection}: {
         gl: WebGL2RenderingContext, debugColors?: boolean, highlightCrossSection: boolean, onlyCrossSection: boolean
@@ -192,6 +197,14 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
         this.debugColors = debugColors
         this.box = new Cube()
         this.vao = new VertexArrayObject(gl) //FIXME: cleanup the vao and box buffer (but vao autodelets on GC anyway...)
+
+        this.u_voxel_to_world__location = this.getUniformLocation("u_voxel_to_world")
+        this.u_world_to_clip__location = this.getUniformLocation("u_world_to_clip")
+        this.u_clip_to_world__location = this.getUniformLocation("u_clip_to_world")
+        this.a_offset_vx__location = this.getAttribLocation("a_offset_vx")
+        this.u_brush_resolution__location = this.getUniformLocation("u_brush_resolution")
+        this.color__location = debugColors ? undefined : this.getUniformLocation("color")
+
     }
 
     public destroy(){
@@ -218,24 +231,23 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
         })
 
         let u_voxel_to_world = mat4.clone(voxelToWorld);
-        this.uniformMatrix4fv("u_voxel_to_world", u_voxel_to_world);
+        this.uniformMatrix4fv(this.u_voxel_to_world__location, u_voxel_to_world);
 
-        show_if_changed("u_voxel_to_world", mat4.str(u_voxel_to_world))
+        // show_if_changed("u_voxel_to_world", mat4.str(u_voxel_to_world))
 
         let u_world_to_clip = mat4.clone(camera.world_to_clip);
-        this.uniformMatrix4fv("u_world_to_clip", u_world_to_clip);
+        this.uniformMatrix4fv(this.u_world_to_clip__location, u_world_to_clip);
 
         let u_clip_to_world = mat3.create(); mat3.fromMat4(u_clip_to_world, camera.clip_to_world)
-        this.uniformMatrix3fv("u_clip_to_world", u_clip_to_world)
+        this.uniformMatrix3fv(this.u_clip_to_world__location, u_clip_to_world)
 
-        let a_offset_vx_location = this.getAttribLocation("a_offset_vx");
         for(let [color, annotations] of brush_strokes){
             for(let brush_stroke of annotations){
-                if(!this.debugColors){
-                    this.uniform3fv("color", color.vec3f)
+                if(this.color__location !== undefined){
+                    this.uniform3fv(this.color__location, color.vec3f)
                 }
-                this.uniform3fv("u_brush_resolution", brush_stroke.resolution)
-                brush_stroke.positions_buffer.useAsInstacedAttribute({vao: this.vao, location: a_offset_vx_location, attributeDivisor: 1})
+                this.uniform3fv(this.u_brush_resolution__location, brush_stroke.resolution)
+                brush_stroke.positions_buffer.useAsInstacedAttribute({vao: this.vao, location: this.a_offset_vx__location, attributeDivisor: 1})
                 this.gl.drawArraysInstanced( //instance-draw a bunch of cubes, one cube for each voxel in the brush stroke
                 /*mode=*/this.box.getDrawingMode(),
                 /*first=*/0,
