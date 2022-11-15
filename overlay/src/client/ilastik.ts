@@ -480,6 +480,10 @@ export class Point5D{
         this.x = x; this.y = y; this.z = z; this.t = t; this.c = c;
     }
 
+    public static fromVec3(value: vec3){
+        return new Point5D({x: value[0], y: value[1], z: value[2]})
+    }
+
     public static fromMessage(message: Point5DMessage): Point5D{
         return new this({
             x: message.x,
@@ -492,6 +496,16 @@ export class Point5D{
 
     public toMessage(): Point5DMessage {
         return new Point5DMessage({x: this.x, y: this.y, z: this.z, t: this.t, c: this.c})
+    }
+
+    public plus(other: Point5D): Point5D{
+        return new Point5D({
+            x: this.x + other.x,
+            y: this.y + other.y,
+            z: this.z + other.z,
+            t: this.t + other.t,
+            c: this.c + other.c,
+        })
     }
 }
 
@@ -564,6 +578,16 @@ export class Interval5D{
         })
         this.start = new Point5D({x: x[0], y: y[0], z: z[0], t: t[0], c: c[0]})
         this.stop = new Point5D({x: x[1], y: y[1], z: z[1], t: t[1], c: c[1]})
+    }
+
+    public static fromStartStop(params: {start: Point5D, stop: Point5D}): Interval5D{
+        return new Interval5D({
+            x: [params.start.x, params.stop.x],
+            y: [params.start.y, params.stop.y],
+            z: [params.start.z, params.stop.z],
+            t: [params.start.t, params.stop.t],
+            c: [params.start.c, params.stop.c],
+        })
     }
 
     public static fromMessage(message: Interval5DMessage){
