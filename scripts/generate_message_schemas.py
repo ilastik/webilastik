@@ -48,7 +48,7 @@ _ = GENERATED_PY_FILE.write(textwrap.dedent(f"""
 
     from ndstructs.point5D import Point5D, Shape5D, Interval5D
 
-    class Message:
+    class DataTransferObject:
         pass
 
     class MessageParsingError(Exception):
@@ -283,12 +283,12 @@ class LiteralHint(Hint):
 
 
 class MessageSchemaHint(Hint):
-    message_generator_type: Type['Message']
+    message_generator_type: Type['DataTransferObject']
     field_annotations: Mapping[str, Hint]
 
     @staticmethod
     def is_message_schema_hint(hint: Any) -> bool:
-        return hint.__class__ == type and issubclass(hint, Message)
+        return hint.__class__ == type and issubclass(hint, DataTransferObject)
 
     def __init__(self, hint: Any) -> None:
         assert MessageSchemaHint.is_message_schema_hint(hint)
@@ -340,7 +340,7 @@ class MessageSchemaHint(Hint):
         #     print("all right... lets see")
 
         self.ts_class_code = "\n".join([
-           f"// Automatically generated via {Message.__qualname__} for {self.message_generator_type.__qualname__}",
+           f"// Automatically generated via {DataTransferObject.__qualname__} for {self.message_generator_type.__qualname__}",
             "// Do not edit!",
            f"export class {self.message_generator_type.__name__} {{",
 
@@ -366,7 +366,7 @@ class MessageSchemaHint(Hint):
         ])
 
         self.py_class_code: str = "\n".join([
-           f"# Automatically generated via {Message.__qualname__} for {self.message_generator_type.__qualname__}",
+           f"# Automatically generated via {DataTransferObject.__qualname__} for {self.message_generator_type.__qualname__}",
             "# Do not edit!",
             inspect.getsource(self.message_generator_type),
             "    def to_json_value(self) -> JsonObject:",
@@ -590,28 +590,28 @@ class UnionHint(Hint):
 ##############################################################################
 
 
-class Message:
+class DataTransferObject:
     def __init_subclass__(cls):
         super().__init_subclass__()
         _ = Hint.parse(cls)
 
 # @dataclass
-# class DataType(Message):
+# class DataType(DataTransferObject):
 #     type_name: Literal["uint8", "uint16", "uint32", "uint64", "float32"]
 
 @dataclass
-class ColorMessage(Message):
+class ColorDto(DataTransferObject):
     r: int
     g: int
     b: int
 
 @dataclass
-class LabelHeaderMessage(Message):
+class LabelHeaderDto(DataTransferObject):
     name: str
-    color: ColorMessage
+    color: ColorDto
 
 @dataclass
-class UrlMessage(Message):
+class UrlDto(DataTransferObject):
     datascheme: Optional[Literal["precomputed"]]
     protocol: Literal["http", "https", "file", "memory"]
     hostname: str
@@ -621,7 +621,7 @@ class UrlMessage(Message):
     fragment: Optional[str]
 
 @dataclass
-class Point5DMessage(Message):
+class Point5DDto(DataTransferObject):
     x: int
     y: int
     z: int
@@ -629,39 +629,39 @@ class Point5DMessage(Message):
     c: int
 
     @classmethod
-    def from_point5d(cls, point: Point5D) -> "Point5DMessage":
-        return Point5DMessage(x=point.x, y=point.y, z=point.z, t=point.t, c=point.c)
+    def from_point5d(cls, point: Point5D) -> "Point5DDto":
+        return Point5DDto(x=point.x, y=point.y, z=point.z, t=point.t, c=point.c)
     def to_point5d(self) -> Point5D:
         return Point5D(x=self.x, y=self.y, z=self.z, t=self.t, c=self.c)
 
 @dataclass
-class Shape5DMessage(Point5DMessage):
+class Shape5DDto(Point5DDto):
     @classmethod
-    def from_shape5d(cls, shape: Shape5D) -> "Shape5DMessage":
-        return Shape5DMessage(x=shape.x,y=shape.y,z=shape.z,t=shape.t,c=shape.c)
+    def from_shape5d(cls, shape: Shape5D) -> "Shape5DDto":
+        return Shape5DDto(x=shape.x,y=shape.y,z=shape.z,t=shape.t,c=shape.c)
     def to_shape5d(self) -> Shape5D:
         return Shape5D(x=self.x, y=self.y, z=self.z, t=self.t, c=self.c)
 
 @dataclass
-class Interval5DMessage(Message):
-    start: Point5DMessage
-    stop: Point5DMessage
+class Interval5DDto(DataTransferObject):
+    start: Point5DDto
+    stop: Point5DDto
 
     @classmethod
-    def from_interval5d(cls, interval: Interval5D) -> 'Interval5DMessage':
-        return Interval5DMessage(
-            start=Point5DMessage.from_point5d(interval.start),
-            stop=Point5DMessage.from_point5d(interval.stop)
+    def from_interval5d(cls, interval: Interval5D) -> 'Interval5DDto':
+        return Interval5DDto(
+            start=Point5DDto.from_point5d(interval.start),
+            stop=Point5DDto.from_point5d(interval.stop)
         )
     def to_interval5d(self) -> Interval5D:
         return Interval5D.create_from_start_stop(start=self.start.to_point5d(), stop=self.stop.to_point5d())
 
 @dataclass
-class OsfsMessage(Message):
+class OsfsDto(DataTransferObject):
     path: str
 
 @dataclass
-class HttpFsMessage(Message):
+class HttpFsDto(DataTransferObject):
     protocol: Literal["http", "https"]
     hostname: str
     port: Optional[int]
@@ -670,39 +670,39 @@ class HttpFsMessage(Message):
     # fragment: Optional[str]
 
 @dataclass
-class BucketFSMessage(Message):
+class BucketFSDto(DataTransferObject):
     bucket_name: str
     prefix: str
 
 @dataclass
-class DataSourceMessage(Message):
-    url: UrlMessage
-    interval: Interval5DMessage
-    tile_shape: Shape5DMessage
+class DataSourceDto(DataTransferObject):
+    url: UrlDto
+    interval: Interval5DDto
+    tile_shape: Shape5DDto
     spatial_resolution: Tuple[int, int, int]
 
 @dataclass
-class N5DataSourceMessage(Message):
-    filesystem: Union[OsfsMessage, HttpFsMessage, BucketFSMessage]
+class N5DataSourceDto(DataTransferObject):
+    filesystem: Union[OsfsDto, HttpFsDto, BucketFSDto]
     path: str
-    location: Point5DMessage
+    location: Point5DDto
     spatial_resolution: Tuple[int, int, int]
 
 ##################################################333
 
 @dataclass
-class DataSinkMessage(Message):
-    tile_shape: Shape5DMessage
-    interval: Interval5DMessage
+class DataSinkDto(DataTransferObject):
+    tile_shape: Shape5DDto
+    interval: Interval5DDto
     dtype: Literal["uint8", "uint16", "uint32", "uint64", "float32"]
 
 @dataclass
-class FsDataSinkMessage(DataSinkMessage):
-    filesystem: Union[OsfsMessage, HttpFsMessage, BucketFSMessage]
+class FsDataSinkDto(DataSinkDto):
+    filesystem: Union[OsfsDto, HttpFsDto, BucketFSDto]
     path: str #FIXME?
 
 @dataclass
-class PrecomputedChunksSinkMessage(FsDataSinkMessage):
+class PrecomputedChunksSinkDto(FsDataSinkDto):
     scale_key: str #fixme?
     resolution: Tuple[int, int, int]
     encoding: Literal["raw", "jpeg"]
@@ -710,106 +710,106 @@ class PrecomputedChunksSinkMessage(FsDataSinkMessage):
 #################################################################
 
 @dataclass
-class PixelAnnotationMessage(Message):
-    raw_data: DataSourceMessage
+class PixelAnnotationDto(DataTransferObject):
+    raw_data: DataSourceDto
     points: Tuple[Tuple[int, int, int], ...]
 
 ######################################################################
 
 @dataclass
-class RpcErrorMessage(Message):
+class RpcErrorDto(DataTransferObject):
     error: str
 
 #################################################################
 @dataclass
-class RecolorLabelParams(Message):
+class RecolorLabelParams(DataTransferObject):
     label_name: str
-    new_color: ColorMessage
+    new_color: ColorDto
 
 @dataclass
-class RenameLabelParams(Message):
+class RenameLabelParams(DataTransferObject):
     old_name: str
     new_name: str
 
 @dataclass
-class CreateLabelParams(Message):
+class CreateLabelParams(DataTransferObject):
     label_name: str
-    color: ColorMessage
+    color: ColorDto
 
 @dataclass
-class RemoveLabelParams(Message):
+class RemoveLabelParams(DataTransferObject):
     label_name: str
 
 @dataclass
-class AddPixelAnnotationParams(Message):
+class AddPixelAnnotationParams(DataTransferObject):
     label_name: str
-    pixel_annotation: PixelAnnotationMessage
+    pixel_annotation: PixelAnnotationDto
 
 @dataclass
-class RemovePixelAnnotationParams(Message):
+class RemovePixelAnnotationParams(DataTransferObject):
     label_name: str
-    pixel_annotation: PixelAnnotationMessage
+    pixel_annotation: PixelAnnotationDto
 
 @dataclass
-class LabelMessage(Message):
+class LabelDto(DataTransferObject):
     name: str
-    color: ColorMessage
-    annotations: Tuple[PixelAnnotationMessage, ...]
+    color: ColorDto
+    annotations: Tuple[PixelAnnotationDto, ...]
 
 @dataclass
-class BrushingAppletStateMessage(Message):
-    labels: Tuple[LabelMessage, ...]
+class BrushingAppletStateDto(DataTransferObject):
+    labels: Tuple[LabelDto, ...]
 
 ##############################################3333
 
 @dataclass
-class ViewMessage(Message):
+class ViewDto(DataTransferObject):
     name: str
-    url: UrlMessage
+    url: UrlDto
 
 @dataclass
-class DataView(ViewMessage):
+class DataView(ViewDto):
     pass
 
 @dataclass
-class RawDataViewMessage(ViewMessage):
-    datasources: Tuple[DataSourceMessage, ...]
+class RawDataViewDto(ViewDto):
+    datasources: Tuple[DataSourceDto, ...]
 
 @dataclass
-class StrippedPrecomputedViewMessage(ViewMessage):
-    datasource: DataSourceMessage
+class StrippedPrecomputedViewDto(ViewDto):
+    datasource: DataSourceDto
 
 @dataclass
-class PredictionsViewMessage(ViewMessage):
-    raw_data: DataSourceMessage
+class PredictionsViewDto(ViewDto):
+    raw_data: DataSourceDto
     classifier_generation: int
 
 @dataclass
-class FailedViewMessage(ViewMessage):
+class FailedViewDto(ViewDto):
     error_message: str
 
 @dataclass
-class UnsupportedDatasetViewMessage(ViewMessage):
+class UnsupportedDatasetViewDto(ViewDto):
     pass
 
-DataViewUnion = Union[RawDataViewMessage, StrippedPrecomputedViewMessage, FailedViewMessage, UnsupportedDatasetViewMessage]
+DataViewUnion = Union[RawDataViewDto, StrippedPrecomputedViewDto, FailedViewDto, UnsupportedDatasetViewDto]
 
 @dataclass
-class ViewerAppletStateMessage(Message):
+class ViewerAppletStateDto(DataTransferObject):
     frontend_timestamp: int
-    data_views: Tuple[Union[RawDataViewMessage, StrippedPrecomputedViewMessage, FailedViewMessage, UnsupportedDatasetViewMessage], ...]
-    prediction_views: Tuple[PredictionsViewMessage, ...]
-    label_colors: Tuple[ColorMessage, ...]
+    data_views: Tuple[Union[RawDataViewDto, StrippedPrecomputedViewDto, FailedViewDto, UnsupportedDatasetViewDto], ...]
+    prediction_views: Tuple[PredictionsViewDto, ...]
+    label_colors: Tuple[ColorDto, ...]
 
 @dataclass
-class MakeDataViewParams(Message):
+class MakeDataViewParams(DataTransferObject):
     view_name: str
-    url: UrlMessage
+    url: UrlDto
 
 ##################################################3
 
 @dataclass
-class JobMessage(Message):
+class JobDto(DataTransferObject):
     name: str
     num_args: Optional[int]
     uuid: str
@@ -818,25 +818,25 @@ class JobMessage(Message):
     error_message: Optional[str]
 
 @dataclass
-class ExportJobMessage(JobMessage):
-    datasink: PrecomputedChunksSinkMessage
+class ExportJobDto(JobDto):
+    datasink: PrecomputedChunksSinkDto
 
 @dataclass
-class OpenDatasinkJobMessage(JobMessage):
-    datasink: PrecomputedChunksSinkMessage
+class OpenDatasinkJobDto(JobDto):
+    datasink: PrecomputedChunksSinkDto
 
 @dataclass
-class PixelClassificationExportAppletStateMessage(Message):
-    jobs: Tuple[Union[ExportJobMessage, OpenDatasinkJobMessage], ...]
-    populated_labels: Optional[Tuple[LabelHeaderMessage, ...]]
-    datasource_suggestions: Optional[Tuple[DataSourceMessage, ...]]
+class PixelClassificationExportAppletStateDto(DataTransferObject):
+    jobs: Tuple[Union[ExportJobDto, OpenDatasinkJobDto], ...]
+    populated_labels: Optional[Tuple[LabelHeaderDto, ...]]
+    datasource_suggestions: Optional[Tuple[DataSourceDto, ...]]
 
 
 
 #########################################################
 
 @dataclass
-class IlpFeatureExtractorMessage(Message):
+class IlpFeatureExtractorDto(DataTransferObject):
     ilp_scale: float
     axis_2d: Optional[Literal["x", "y", "z"]]
     class_name: Literal[
@@ -849,22 +849,22 @@ class IlpFeatureExtractorMessage(Message):
     ]
 
 @dataclass
-class FeatureSelectionAppletStateMessage(Message):
-    feature_extractors: Tuple[IlpFeatureExtractorMessage, ...]
+class FeatureSelectionAppletStateDto(DataTransferObject):
+    feature_extractors: Tuple[IlpFeatureExtractorDto, ...]
 
 @dataclass
-class AddFeatureExtractorsParamsMessage(Message):
-    feature_extractors: Tuple[IlpFeatureExtractorMessage, ...]
+class AddFeatureExtractorsParamsDto(DataTransferObject):
+    feature_extractors: Tuple[IlpFeatureExtractorDto, ...]
 
 @dataclass
-class RemoveFeatureExtractorsParamsMessage(Message):
-    feature_extractors: Tuple[IlpFeatureExtractorMessage, ...]
+class RemoveFeatureExtractorsParamsDto(DataTransferObject):
+    feature_extractors: Tuple[IlpFeatureExtractorDto, ...]
 
 #################################################################
 
 
 @dataclass
-class ComputeSessionMessage(Message):
+class ComputeSessionDto(DataTransferObject):
     start_time_utc_sec: Optional[int]
     time_elapsed_sec: int
     time_limit_minutes: int
@@ -889,82 +889,82 @@ class ComputeSessionMessage(Message):
     ]
 
 @dataclass
-class ComputeSessionStatusMessage(Message):
-    compute_session: ComputeSessionMessage
+class ComputeSessionStatusDto(DataTransferObject):
+    compute_session: ComputeSessionDto
     hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
-    session_url: UrlMessage
+    session_url: UrlDto
     connected: bool
 
 @dataclass
-class CreateComputeSessionParamsMessage(Message):
+class CreateComputeSessionParamsDto(DataTransferObject):
     session_duration_minutes: int
     hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
 
 @dataclass
-class GetComputeSessionStatusParamsMessage(Message):
+class GetComputeSessionStatusParamsDto(DataTransferObject):
     compute_session_id: str
     hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
 
 @dataclass
-class CloseComputeSessionParamsMessage(Message):
+class CloseComputeSessionParamsDto(DataTransferObject):
     compute_session_id: str
     hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
 
 @dataclass
-class CloseComputeSessionResponseMessage(Message):
+class CloseComputeSessionResponseDto(DataTransferObject):
     compute_session_id: str
 
 @dataclass
-class ListComputeSessionsParamsMessage(Message):
+class ListComputeSessionsParamsDto(DataTransferObject):
     hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
 
 @dataclass
-class ListComputeSessionsResponseMessage(Message):
-    compute_sessions_stati: Tuple[ComputeSessionStatusMessage, ...]
+class ListComputeSessionsResponseDto(DataTransferObject):
+    compute_sessions_stati: Tuple[ComputeSessionStatusDto, ...]
 
 @dataclass
-class GetAvailableHpcSitesResponseMessage(Message):
+class GetAvailableHpcSitesResponseDto(DataTransferObject):
     available_sites: Tuple[Literal["LOCAL", "CSCS", "JUSUF"], ...]
 
 #############################################################3
 
 @dataclass
-class CheckLoginResultMessage(Message):
+class CheckLoginResultDto(DataTransferObject):
     logged_in: bool
 
 #############################################3333
 
 @dataclass
-class StartPixelProbabilitiesExportJobParamsMessage(Message):
-    datasource: DataSourceMessage
-    datasink: PrecomputedChunksSinkMessage
+class StartPixelProbabilitiesExportJobParamsDto(DataTransferObject):
+    datasource: DataSourceDto
+    datasink: PrecomputedChunksSinkDto
 
 @dataclass
-class StartSimpleSegmentationExportJobParamsMessage(Message):
-    datasource: DataSourceMessage
-    datasink: PrecomputedChunksSinkMessage
-    label_header: LabelHeaderMessage
+class StartSimpleSegmentationExportJobParamsDto(DataTransferObject):
+    datasource: DataSourceDto
+    datasink: PrecomputedChunksSinkDto
+    label_header: LabelHeaderDto
 
 ############################################
 
 @dataclass
-class LoadProjectParamsMessage(Message):
-    fs: Union[HttpFsMessage, BucketFSMessage]
+class LoadProjectParamsDto(DataTransferObject):
+    fs: Union[HttpFsDto, BucketFSDto]
     project_file_path: str
 
 
 @dataclass
-class SaveProjectParamsMessage(Message):
-    fs: Union[HttpFsMessage, BucketFSMessage]
+class SaveProjectParamsDto(DataTransferObject):
+    fs: Union[HttpFsDto, BucketFSDto]
     project_file_path: str
 
 #########################################
 
 @dataclass
-class GetDatasourcesFromUrlParamsMessage(Message):
-    url: UrlMessage
+class GetDatasourcesFromUrlParamsDto(DataTransferObject):
+    url: UrlDto
 
 @dataclass
-class GetDatasourcesFromUrlResponseMessage(Message):
-    datasources: Tuple[DataSourceMessage, ...]
+class GetDatasourcesFromUrlResponseDto(DataTransferObject):
+    datasources: Tuple[DataSourceDto, ...]
 

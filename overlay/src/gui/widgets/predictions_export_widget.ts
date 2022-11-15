@@ -6,13 +6,13 @@ import { BucketFs, Color, DataSource, Filesystem, FsDataSink, Session } from '..
 import { CssClasses } from '../css_classes';
 import { ErrorPopupWidget, InputPopupWidget } from './popup';
 import {
-    ExportJobMessage,
-    LabelHeaderMessage,
-    OpenDatasinkJobMessage,
-    PixelClassificationExportAppletStateMessage,
-    PrecomputedChunksSinkMessage,
-    StartPixelProbabilitiesExportJobParamsMessage,
-    StartSimpleSegmentationExportJobParamsMessage
+    ExportJobDto,
+    LabelHeaderDto,
+    OpenDatasinkJobDto,
+    PixelClassificationExportAppletStateDto,
+    PrecomputedChunksSinkDto,
+    StartPixelProbabilitiesExportJobParamsDto,
+    StartSimpleSegmentationExportJobParamsDto
 } from '../../client/message_schema';
 import { PopupSelect, SelectorWidget } from './selector_widget';
 import { DataSourceInput } from './datasource_input';
@@ -32,33 +32,33 @@ export function ensureSinkCreationStatus(value: string): SinkCreationStatus{
 class LabelHeader{
     constructor(public readonly name: string, public readonly color: Color){
     }
-    public static fromMessage(message: LabelHeaderMessage): LabelHeader{
-        return new LabelHeader(message.name, Color.fromMessage(message.color))
+    public static fromDto(message: LabelHeaderDto): LabelHeader{
+        return new LabelHeader(message.name, Color.fromDto(message.color))
     }
-    public toMessage(): LabelHeaderMessage{
-        return new LabelHeaderMessage({name: this.name, color: this.color.toMessage()})
+    public toDto(): LabelHeaderDto{
+        return new LabelHeaderDto({name: this.name, color: this.color.toDto()})
     }
 }
 
 class PixelClassificationExportAppletState{
-    jobs: Array<ExportJobMessage | OpenDatasinkJobMessage>
+    jobs: Array<ExportJobDto | OpenDatasinkJobDto>
     populated_labels: LabelHeader[] | undefined
     datasource_suggestions: DataSource[]
 
     constructor(params: {
-        jobs: Array<ExportJobMessage | OpenDatasinkJobMessage>
-        populated_labels: LabelHeaderMessage[] | undefined
+        jobs: Array<ExportJobDto | OpenDatasinkJobDto>
+        populated_labels: LabelHeaderDto[] | undefined
         datasource_suggestions: DataSource[]
     }){
         this.jobs = params.jobs
-        this.populated_labels = params.populated_labels?.map(msg => LabelHeader.fromMessage(msg))
+        this.populated_labels = params.populated_labels?.map(msg => LabelHeader.fromDto(msg))
         this.datasource_suggestions = params.datasource_suggestions
     }
 
-    public static fromMessage(message: PixelClassificationExportAppletStateMessage): PixelClassificationExportAppletState{
+    public static fromDto(message: PixelClassificationExportAppletStateDto): PixelClassificationExportAppletState{
         return new this({
             jobs: message.jobs,
-            datasource_suggestions: (message.datasource_suggestions || []).map(msg => DataSource.fromMessage(msg)), //FIXME?
+            datasource_suggestions: (message.datasource_suggestions || []).map(msg => DataSource.fromDto(msg)), //FIXME?
             populated_labels: message.populated_labels
         })
     }
@@ -82,11 +82,11 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
             name,
             session,
             deserializer: (data: JsonValue) => {
-                const message = PixelClassificationExportAppletStateMessage.fromJsonValue(data)
+                const message = PixelClassificationExportAppletStateDto.fromJsonValue(data)
                 if(message instanceof Error){
                     throw `FIXME!!: ${message.message}`
                 }
-                return PixelClassificationExportAppletState.fromMessage(message)
+                return PixelClassificationExportAppletState.fromDto(message)
             },
             onNewState: (new_state) => this.onNewState(new_state)
         })
@@ -159,8 +159,8 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                     return
                 }
                 if(this.exportModeSelector.value == "pixel probabilities"){
-                    this.doRPC("launch_pixel_probabilities_export_job", new StartPixelProbabilitiesExportJobParamsMessage({
-                        datasource: datasource.toMessage(), datasink: datasink
+                    this.doRPC("launch_pixel_probabilities_export_job", new StartPixelProbabilitiesExportJobParamsDto({
+                        datasource: datasource.toDto(), datasink: datasink
                     }))
                 }else if(this.exportModeSelector.value == "simple segmentation"){
                     const label_header = this.labelToExportSelector?.value;
@@ -168,8 +168,8 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                         new ErrorPopupWidget({message: "Missing export parameters"})
                         return
                     }
-                    this.doRPC("launch_simple_segmentation_export_job", new StartSimpleSegmentationExportJobParamsMessage({
-                        datasource: datasource.toMessage(), datasink: datasink, label_header: label_header.toMessage()
+                    this.doRPC("launch_simple_segmentation_export_job", new StartSimpleSegmentationExportJobParamsDto({
+                        datasource: datasource.toDto(), datasink: datasink, label_header: label_header.toDto()
                     }))
                 }else{
                     assertUnreachable(this.exportModeSelector.value)
@@ -260,13 +260,13 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                 headers: {name: "Name", status: "Status", progress: "Progress"},
                 rows: new_state.jobs.map(job => {
                     let progressColumnContents: HTMLElement | string = job.num_args === undefined ? "unknwown" : `${Math.round(job.num_completed_steps / job.num_args * 100)}%`
-                    if(job.status == 'succeeded' && job instanceof ExportJobMessage){
+                    if(job.status == 'succeeded' && job instanceof ExportJobDto){
                         progressColumnContents = createElement({tagName: "span", parentElement: undefined})
-                        const outputFs = Filesystem.fromMessage(job.datasink.filesystem);
+                        const outputFs = Filesystem.fromDto(job.datasink.filesystem);
                         if(outputFs instanceof BucketFs){
                             const dataProxyLink = createElement({tagName: "a", parentElement: progressColumnContents, innerText: "Open in Data Proxy"})
                             let dataProxyPrefixParam = job.datasink.path.replace(/^\//, "")
-                            if(job.datasink instanceof PrecomputedChunksSinkMessage){
+                            if(job.datasink instanceof PrecomputedChunksSinkDto){
                                 dataProxyPrefixParam += "/"
                             }
                             dataProxyLink.href = `https://data-proxy.ebrains.eu/${outputFs.bucket_name}?prefix=${dataProxyPrefixParam}`
@@ -274,7 +274,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                             dataProxyLink.rel = "noopener noreferrer"
                         }
                         createInput({inputType: "button", parentElement: progressColumnContents, value: "Open in Viewer", onClick: () => {
-                            this.viewer.openDataViewFromDataSource(FsDataSink.fromMessage(job.datasink).toDataSource())
+                            this.viewer.openDataViewFromDataSource(FsDataSink.fromDto(job.datasink).toDataSource())
                         }})
                     }
                     return{

@@ -16,7 +16,7 @@ from webilastik.filesystem import Filesystem
 
 from webilastik.filesystem.RemoteFile import RemoteFile
 from webilastik.libebrains.user_token import UserToken
-from webilastik.server.message_schema import BucketFSMessage
+from webilastik.server.message_schema import BucketFSDto
 from webilastik.ui.usage_error import UsageError
 from webilastik.utility.url import Protocol, Url
 from webilastik.libebrains import global_user_login
@@ -276,23 +276,23 @@ class BucketFs(Filesystem):
         return super().setinfo(path, info)
 
     @classmethod
-    def from_message(cls, message: BucketFSMessage) -> "BucketFs":
+    def from_message(cls, message: BucketFSDto) -> "BucketFs":
         return BucketFs(
             bucket_name=message.bucket_name,
             prefix=PurePosixPath(message.prefix)
         )
 
-    def to_message(self) -> BucketFSMessage:
-        return BucketFSMessage(
+    def to_message(self) -> BucketFSDto:
+        return BucketFSDto(
             bucket_name=self.bucket_name,
             prefix=self.prefix.as_posix(),
         )
 
-    def __setstate__(self, message: BucketFSMessage):
+    def __setstate__(self, message: BucketFSDto):
         self.__init__(
             bucket_name=message.bucket_name,
             prefix=PurePosixPath(message.prefix)
         )
 
-    def __getstate__(self) -> BucketFSMessage:
+    def __getstate__(self) -> BucketFSDto:
         return self.to_message()

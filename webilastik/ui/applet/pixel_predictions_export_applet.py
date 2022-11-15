@@ -19,10 +19,10 @@ from webilastik.scheduling.job import Job, JobSucceededCallback, PriorityExecuto
 from webilastik.serialization.json_serialization import JsonValue
 from webilastik.server.message_schema import (
     MessageParsingError,
-    PixelClassificationExportAppletStateMessage,
-    StartPixelProbabilitiesExportJobParamsMessage,
-    StartSimpleSegmentationExportJobParamsMessage,
-    ExportJobMessage,
+    PixelClassificationExportAppletStateDto,
+    StartPixelProbabilitiesExportJobParamsDto,
+    StartSimpleSegmentationExportJobParamsDto,
+    ExportJobDto,
 )
 from webilastik.simple_segmenter import SimpleSegmenter
 from webilastik.ui.applet import AppletOutput, StatelesApplet, UserPrompt
@@ -68,10 +68,10 @@ class _ExportJob(Job[DataRoi, None]):
         )
         self.sink_writer = sink_writer
 
-    def to_message(self) -> ExportJobMessage:
+    def to_message(self) -> ExportJobDto:
         error_message: "str | None" = None
         with self.job_lock:
-            return ExportJobMessage(
+            return ExportJobDto(
                 name=self.name,
                 num_args=self.num_args,
                 uuid=str(self.uuid),
@@ -97,10 +97,10 @@ class _OpenDatasinkJob(Job[DataSink, "IDataSinkWriter | Exception"]):
         )
         self.datasink = datasink
 
-    def to_message(self) -> ExportJobMessage:
+    def to_message(self) -> ExportJobDto:
         error_message: "str | None" = None
         with self.job_lock:
-            return ExportJobMessage(
+            return ExportJobDto(
                 name=self.name,
                 num_args=self.num_args,
                 uuid=str(self.uuid),
@@ -208,7 +208,7 @@ class PixelClassificationExportApplet(StatelesApplet):
 class WsPixelClassificationExportApplet(WsApplet, PixelClassificationExportApplet):
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> "UsageError | None":
         if method_name == "launch_pixel_probabilities_export_job":
-            params_result = StartPixelProbabilitiesExportJobParamsMessage.from_json_value(arguments)
+            params_result = StartPixelProbabilitiesExportJobParamsDto.from_json_value(arguments)
             if isinstance(params_result, MessageParsingError):
                 return UsageError(str(params_result)) #FIXME: this is a bug, not a usage error
             datasource_result = FsDataSource.try_from_message(params_result.datasource)
@@ -218,7 +218,7 @@ class WsPixelClassificationExportApplet(WsApplet, PixelClassificationExportApple
                 datasource=datasource_result, datasink=PrecomputedChunksSink.from_message(params_result.datasink)
             )
         elif method_name == "launch_simple_segmentation_export_job":
-            params_result = StartSimpleSegmentationExportJobParamsMessage.from_json_value(arguments)
+            params_result = StartSimpleSegmentationExportJobParamsDto.from_json_value(arguments)
             if isinstance(params_result, MessageParsingError):
                 return UsageError(str(params_result)) #FIXME: this is a bug, not a usage error
             datasource_result = FsDataSource.try_from_message(params_result.datasource)
@@ -234,7 +234,7 @@ class WsPixelClassificationExportApplet(WsApplet, PixelClassificationExportApple
         with self._lock:
             labels = self._in_populated_labels()
             datasource_suggestions = self._in_datasource_suggestions()
-            return PixelClassificationExportAppletStateMessage(
+            return PixelClassificationExportAppletStateDto(
                 jobs=tuple(job.to_message() for job in self._jobs.values()),
                 populated_labels=None if not labels else tuple(l.to_header_message() for l in labels),
                 datasource_suggestions=None if datasource_suggestions is None else tuple(ds.to_message() for ds in datasource_suggestions)

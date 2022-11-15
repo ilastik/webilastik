@@ -1,5 +1,5 @@
 import { DataSource, Session } from "../../client/ilastik";
-import { GetDatasourcesFromUrlParamsMessage } from "../../client/message_schema";
+import { GetDatasourcesFromUrlParamsDto } from "../../client/message_schema";
 import { createElement, createInput } from "../../util/misc";
 import { CssClasses } from "../css_classes";
 import { ErrorPopupWidget, InputPopupWidget } from "./popup";
@@ -51,7 +51,7 @@ export class DataSourceInput{
             }
             return
         }
-        let datasources_result = await this.session.getDatasourcesFromUrl(new GetDatasourcesFromUrlParamsMessage({url: url.toMessage()}))
+        let datasources_result = await this.session.getDatasourcesFromUrl(new GetDatasourcesFromUrlParamsDto({url: url.toDto()}))
         if(datasources_result instanceof Error){
             new ErrorPopupWidget({message: `Error retrieving datasources: ${datasources_result}`})
             return

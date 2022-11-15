@@ -20,7 +20,7 @@ from cryptography.fernet import Fernet
 from webilastik.libebrains.oidc_client import OidcClient
 from webilastik.libebrains.user_info import UserInfo
 from webilastik.libebrains.user_token import UserToken
-from webilastik.server.message_schema import ComputeSessionMessage
+from webilastik.server.message_schema import ComputeSessionDto
 
 _oidc_client = OidcClient.from_environment()
 
@@ -171,8 +171,8 @@ class ComputeSession:
         super().__init__()
 
 
-    def to_message(self) -> ComputeSessionMessage:
-        return ComputeSessionMessage(
+    def to_message(self) -> ComputeSessionDto:
+        return ComputeSessionDto(
             start_time_utc_sec=self.start_time_utc_sec,
             time_elapsed_sec=self.time_elapsed_sec,
             time_limit_minutes=self.time_limit_minutes,

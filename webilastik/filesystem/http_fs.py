@@ -15,7 +15,7 @@ from fs.permissions import Permissions
 from fs.enums import ResourceType
 from requests.models import CaseInsensitiveDict
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
-from webilastik.server.message_schema import HttpFsMessage
+from webilastik.server.message_schema import HttpFsDto
 from webilastik.ui.usage_error import UsageError
 
 from .RemoteFile import RemoteFile
@@ -56,8 +56,8 @@ class HttpFs(Filesystem):
             "__class__": self.__class__.__name__,
         }
 
-    def to_message(self) -> HttpFsMessage:
-        return HttpFsMessage(
+    def to_message(self) -> HttpFsDto:
+        return HttpFsDto(
             protocol=self.protocol,
             hostname=self.read_url.hostname,
             path=self.read_url.path.as_posix(),
@@ -66,7 +66,7 @@ class HttpFs(Filesystem):
         )
 
     @classmethod
-    def from_message(cls, message: HttpFsMessage) -> "HttpFs":
+    def from_message(cls, message: HttpFsDto) -> "HttpFs":
         return HttpFs(
             read_url=Url(
                 protocol=message.protocol,

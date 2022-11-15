@@ -1,4 +1,4 @@
-import { BucketFSMessage } from "../../client/message_schema";
+import { BucketFSDto } from "../../client/message_schema";
 import { createElement, createInputParagraph } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
 import { PathInput } from "./path_input";
@@ -12,7 +12,7 @@ export class BucketFsInput{
         bucketName?: string,
         prefix?: Path,
         required?: boolean,
-        value?: BucketFSMessage,
+        value?: BucketFSDto,
         hidePrefix?: boolean,
     }){
         let required = params.required === undefined ? true : params.required;
@@ -30,16 +30,16 @@ export class BucketFsInput{
         }
     }
 
-    public get value(): BucketFSMessage | undefined{
+    public get value(): BucketFSDto | undefined{
         let bucketName = this.bucketNameInput.value
         let prefix = this.prefixInput.value
         if(!bucketName || !prefix){
             return undefined
         }
-        return new BucketFSMessage({bucket_name: bucketName, prefix: prefix.raw})
+        return new BucketFSDto({bucket_name: bucketName, prefix: prefix.raw})
     }
 
-    public set value(fs: BucketFSMessage | undefined){
+    public set value(fs: BucketFSDto | undefined){
         if(fs){
             this.bucketNameInput.value = fs.bucket_name
             this.prefixInput.value = Path.parse(fs.prefix)

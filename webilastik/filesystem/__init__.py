@@ -3,26 +3,26 @@ import json
 
 from ndstructs.utils.json_serializable import IJsonable, JsonValue, ensureJsonObject, ensureJsonString
 from fs.base import FS
-from webilastik.server.message_schema import BucketFSMessage, HttpFsMessage, OsfsMessage
+from webilastik.server.message_schema import BucketFSDto, HttpFsDto, OsfsDto
 from webilastik.utility.url import Url
 
 class Filesystem(FS):
     @staticmethod
-    def create_from_message(message: "OsfsMessage | HttpFsMessage | BucketFSMessage") -> "Filesystem":
+    def create_from_message(message: "OsfsDto | HttpFsDto | BucketFSDto") -> "Filesystem":
         from .http_fs import HttpFs
         from .osfs import OsFs
         from .bucket_fs import BucketFs
 
         # FIXME: Maybe register these via __init_subclass__?
-        if isinstance(message, HttpFsMessage):
+        if isinstance(message, HttpFsDto):
             return HttpFs.from_message(message)
-        if isinstance(message, OsfsMessage):
+        if isinstance(message, OsfsDto):
             return OsFs.from_message(message)
-        if isinstance(message, BucketFSMessage):
+        if isinstance(message, BucketFSDto):
             return BucketFs.from_message(message)
 
     @abstractmethod
-    def to_message(self) -> "OsfsMessage | HttpFsMessage | BucketFSMessage":
+    def to_message(self) -> "OsfsDto | HttpFsDto | BucketFSDto":
         pass
 
     @staticmethod

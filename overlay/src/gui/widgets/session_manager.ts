@@ -1,6 +1,6 @@
 import { IViewerDriver } from "../..";
 import { HpcSiteName, Session } from "../../client/ilastik";
-import { CreateComputeSessionParamsMessage, GetComputeSessionStatusParamsMessage } from "../../client/message_schema";
+import { CreateComputeSessionParamsDto, GetComputeSessionStatusParamsDto } from "../../client/message_schema";
 import { createElement, createInput, createInputParagraph, secondsToTimeDeltaString } from "../../util/misc";
 import { Url } from "../../util/parsed_url";
 import { ReferencePixelClassificationWorkflowGui } from "../reference_pixel_classification_workflow";
@@ -88,7 +88,7 @@ export class SessionManagerWidget{
                     ilastikUrl,
                     hpc_site: this.hpcSiteInput.value,
                     onSessionClosed: (status) => {
-                        if(this.session && this.session.sessionUrl.equals(Url.fromMessage(status.session_url))){
+                        if(this.session && this.session.sessionUrl.equals(Url.fromDto(status.session_url))){
                             this.onLeaveSession()
                         }
                     }
@@ -131,7 +131,7 @@ export class SessionManagerWidget{
                 let sessionResult = await Session.create({
                     ilastikUrl,
                     timeout_minutes: timeoutMinutes,
-                    rpcParams: new CreateComputeSessionParamsMessage({
+                    rpcParams: new CreateComputeSessionParamsDto({
                         hpc_site: this.hpcSiteInput.value,
                         session_duration_minutes: sessionDurationMinutes,
                     }),
@@ -168,7 +168,7 @@ export class SessionManagerWidget{
                 this.logMessage("Joining session....")
                 let sessionResult = await Session.load({
                     ilastikUrl,
-                    getStatusRpcParams: new GetComputeSessionStatusParamsMessage({
+                    getStatusRpcParams: new GetComputeSessionStatusParamsDto({
                         compute_session_id: sessionId,
                         hpc_site: this.hpcSiteInput.value,
                     }),

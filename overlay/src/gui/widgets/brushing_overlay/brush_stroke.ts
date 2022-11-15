@@ -1,6 +1,6 @@
 import { quat, vec3 } from "gl-matrix";
 import { Color, DataSource } from "../../../client/ilastik";
-import { PixelAnnotationMessage } from "../../../client/message_schema";
+import { PixelAnnotationDto } from "../../../client/message_schema";
 import { VecAttributeBuffer, BufferUsageHint } from "../../../gl/buffer";
 import { VertexArray } from "../../../gl/vertex_primitives";
 // import { vec3ToString } from "./utils";
@@ -85,16 +85,16 @@ export class BrushStroke extends VertexArray{
         this.positions_buffer.destroy()
     }
 
-    public toMessage(): PixelAnnotationMessage{
+    public toDto(): PixelAnnotationDto{
         let raw_voxels: Array<[number, number, number]> = []
         for(let i=0; i<this.num_points; i++){
             let vert = this.getVertRef(i)
             raw_voxels.push([vert[0], vert[1], vert[2]])
         }
 
-        return new PixelAnnotationMessage({
+        return new PixelAnnotationDto({
             points: raw_voxels,
-            raw_data: this.annotated_data_source.toMessage(),
+            raw_data: this.annotated_data_source.toDto(),
             // "camera_orientation": [
                 // this.camera_orientation[0], this.camera_orientation[1], this.camera_orientation[2], this.camera_orientation[3],
             // ],
@@ -102,7 +102,7 @@ export class BrushStroke extends VertexArray{
         })
     }
 
-    public static fromMessage(gl: WebGL2RenderingContext, message: PixelAnnotationMessage): BrushStroke{
+    public static fromDto(gl: WebGL2RenderingContext, message: PixelAnnotationDto): BrushStroke{
         //FIXME: better error checking
         let camera_orientation: quat;
         // if("camera_orientation" in message){
@@ -113,7 +113,7 @@ export class BrushStroke extends VertexArray{
         // }else{
             camera_orientation = quat.create()
         // }
-        let annotated_data_source = DataSource.fromMessage(message.raw_data)
+        let annotated_data_source = DataSource.fromDto(message.raw_data)
         return new BrushStroke({
             gl, points_vx: message.points, camera_orientation, annotated_data_source
         })

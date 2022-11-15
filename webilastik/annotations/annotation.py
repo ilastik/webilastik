@@ -8,7 +8,7 @@ from ndstructs.array5D import Array5D, All, ScalarData, StaticLine
 from webilastik.datasource import DataSource, DataRoi, FsDataSource
 from webilastik.features.feature_extractor import FeatureExtractor, FeatureData
 from executor_getter import get_executor
-from webilastik.server.message_schema import ColorMessage, MessageParsingError, PixelAnnotationMessage
+from webilastik.server.message_schema import ColorDto, MessageParsingError, PixelAnnotationDto
 from webilastik.utility.url import Protocol
 
 
@@ -27,8 +27,8 @@ class Color:
         self.hex_code = f"#{r:02X}{g:02X}{b:02X}"
         super().__init__()
 
-    def to_message(self) -> ColorMessage:
-        return ColorMessage(r=int(self.r), g=int(self.g), b=int(self.b))
+    def to_message(self) -> ColorDto:
+        return ColorDto(r=int(self.r), g=int(self.g), b=int(self.b))
 
     @classmethod
     def from_channels(cls, channels: List[np.uint8], name: str = "") -> "Color":
@@ -167,7 +167,7 @@ class Annotation(ScalarData):
     @classmethod
     def from_message(
         cls,
-        message: PixelAnnotationMessage,
+        message: PixelAnnotationDto,
         allowed_protocols: Sequence[Protocol] = ("http", "https"),
     ) -> "Annotation | MessageParsingError":
         raw_data_result = FsDataSource.try_from_message(message.raw_data, allowed_protocols=allowed_protocols)
@@ -180,12 +180,12 @@ class Annotation(ScalarData):
             raw_data=raw_data_result,
         )
 
-    def to_message(self) -> PixelAnnotationMessage:
+    def to_message(self) -> PixelAnnotationDto:
         if not isinstance(self.raw_data, FsDataSource):
             #FIXME: maybe create a FsDatasourceAnnotation so we don't have to raise here?
             raise ValueError(f"Can't serialize annotation over {self.raw_data}")
 
-        return PixelAnnotationMessage(
+        return PixelAnnotationDto(
             raw_data=self.raw_data.to_message(),
             points=self.to_raw_points(),
         )

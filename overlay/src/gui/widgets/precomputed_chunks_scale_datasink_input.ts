@@ -8,7 +8,7 @@ import { Shape5DInput } from "./shape5d_input";
 import { Vec3Input } from "./vec3_input";
 import { BucketFsInput } from "./bucket_fs_input";
 import { PopupSelect } from "./selector_widget";
-import { PrecomputedChunksSinkMessage } from "../../client/message_schema";
+import { PrecomputedChunksSinkDto } from "../../client/message_schema";
 
 
 export class PrecomputedChunksScale_DataSink_Input{
@@ -113,7 +113,7 @@ export class PrecomputedChunksScale_DataSink_Input{
         }
     }
 
-    public get value(): PrecomputedChunksSinkMessage | undefined{
+    public get value(): PrecomputedChunksSinkDto | undefined{
         let filesystem = this.fileSystemSelector.value
         let infoPath = this.infoDirectoryPathInput.value
         let dtype = this.dataTypeSelector.value
@@ -130,7 +130,7 @@ export class PrecomputedChunksScale_DataSink_Input{
 
         const sinkIntervalStart = Point5D.fromVec3(voxelOffset)
 
-        return new PrecomputedChunksSinkMessage({
+        return new PrecomputedChunksSinkDto({
             filesystem,
             path: infoPath.raw,
             dtype,
@@ -138,10 +138,10 @@ export class PrecomputedChunksScale_DataSink_Input{
             interval: Interval5D.fromStartStop({
                 start: sinkIntervalStart,
                 stop: sinkIntervalStart.plus(sinkShape),
-            }).toMessage(),
+            }).toDto(),
             resolution: [resolution[0], resolution[1], resolution[2]],
             scale_key: scaleKey.raw,
-            tile_shape: tileShape.toMessage(),
+            tile_shape: tileShape.toDto(),
         })
     }
 

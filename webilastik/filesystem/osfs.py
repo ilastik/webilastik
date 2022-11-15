@@ -3,7 +3,7 @@ import os
 from fs.osfs import OSFS
 
 from webilastik.filesystem import Filesystem
-from webilastik.server.message_schema import OsfsMessage
+from webilastik.server.message_schema import OsfsDto
 
 
 
@@ -16,15 +16,15 @@ class OsFs(OSFS, Filesystem):
             expand_vars=False
         )
 
-    def __getstate__(self) -> OsfsMessage:
+    def __getstate__(self) -> OsfsDto:
         return self.to_message()
 
-    def to_message(self) -> OsfsMessage:
-        return OsfsMessage(path=self.root_path)
+    def to_message(self) -> OsfsDto:
+        return OsfsDto(path=self.root_path)
 
     @staticmethod
-    def from_message(message: OsfsMessage) -> "OsFs":
+    def from_message(message: OsfsDto) -> "OsFs":
         return OsFs(message.path)
 
-    def __setstate__(self, message: OsfsMessage):
+    def __setstate__(self, message: OsfsDto):
         self.__init__(message.path)

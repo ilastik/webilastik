@@ -18,7 +18,7 @@ from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.server.message_schema import (
-    FailedViewMessage, MakeDataViewParams, MessageParsingError, PredictionsViewMessage, RawDataViewMessage, StrippedPrecomputedViewMessage, UnsupportedDatasetViewMessage, ViewerAppletStateMessage
+    FailedViewDto, MakeDataViewParams, MessageParsingError, PredictionsViewDto, RawDataViewDto, StrippedPrecomputedViewDto, UnsupportedDatasetViewDto, ViewerAppletStateDto
 )
 from webilastik.server.session_allocator import uncachable_json_response
 from webilastik.ui.applet.brushing_applet import Label
@@ -44,8 +44,8 @@ class RawDataView(DataView):
         self.datasources = datasources
         super().__init__(name=name, url=url)
 
-    def to_message(self) -> RawDataViewMessage:
-        return RawDataViewMessage(
+    def to_message(self) -> RawDataViewDto:
+        return RawDataViewDto(
             name=self.name,
             url=self.url.to_message(),
             datasources=tuple(ds.to_message() for ds in self.datasources)
@@ -70,8 +70,8 @@ class StrippedPrecomputedView(DataView):
             ).concatpath(f"stripped_precomputed/url={all_scales_url.to_base64()}/resolution={resolution_str}"),
         )
 
-    def to_message(self) -> StrippedPrecomputedViewMessage:
-        return StrippedPrecomputedViewMessage(
+    def to_message(self) -> StrippedPrecomputedViewDto:
+        return StrippedPrecomputedViewDto(
             name=self.name,
             url=self.url.to_message(),
             datasource=self.datasource.to_message(),
@@ -126,8 +126,8 @@ class PredictionsView(View):
             ).concatpath(f"predictions/raw_data={raw_data.url.to_base64()}/generation={classifier_generation}"),
         )
 
-    def to_message(self) -> PredictionsViewMessage:
-        return PredictionsViewMessage(
+    def to_message(self) -> PredictionsViewDto:
+        return PredictionsViewDto(
             name=self.name,
             url=self.url.to_message(),
             raw_data=self.raw_data.to_message(),
@@ -173,8 +173,8 @@ class PredictionsView(View):
             return e
 
 class UnsupportedDatasetView(DataView):
-    def to_message(self) -> UnsupportedDatasetViewMessage:
-        return UnsupportedDatasetViewMessage(
+    def to_message(self) -> UnsupportedDatasetViewDto:
+        return UnsupportedDatasetViewDto(
             name=self.name,
             url=self.url.to_message(),
         )
@@ -184,8 +184,8 @@ class FailedView(DataView):
         super().__init__(name, url)
         self.error_message: str = error_message
 
-    def to_message(self) -> FailedViewMessage:
-        return FailedViewMessage(
+    def to_message(self) -> FailedViewDto:
+        return FailedViewDto(
             name=self.name,
             url=self.url.to_message(),
             error_message=self.error_message,
@@ -200,8 +200,8 @@ class ViewsState:
     prediction_views: Mapping[Url, PredictionsView]
     label_colors: Sequence[Color]
 
-    def to_message(self) -> ViewerAppletStateMessage:
-        return ViewerAppletStateMessage(
+    def to_message(self) -> ViewerAppletStateDto:
+        return ViewerAppletStateDto(
             frontend_timestamp=self.frontend_timestamp,
             data_views=tuple(view.to_message() for view in self.data_views.values()),
             prediction_views=tuple(view.to_message() for view in self.prediction_views.values()),

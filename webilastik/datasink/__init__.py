@@ -7,7 +7,7 @@ import numpy as np
 from ndstructs.point5D import Shape5D, Interval5D
 from ndstructs.array5D import Array5D
 from webilastik.filesystem import Filesystem
-from webilastik.server.message_schema import PrecomputedChunksSinkMessage
+from webilastik.server.message_schema import PrecomputedChunksSinkDto
 from webilastik.utility.url import Url
 
 class IDataSinkWriter(Protocol):
@@ -40,12 +40,12 @@ class DataSink(ABC):
         pass
 
     @classmethod
-    def create_from_message(cls, message: PrecomputedChunksSinkMessage) -> "DataSink": #FIXME: add other sinks
+    def create_from_message(cls, message: PrecomputedChunksSinkDto) -> "DataSink": #FIXME: add other sinks
         from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
         return PrecomputedChunksSink.from_message(message)
 
     @abstractmethod
-    def to_message(self) -> PrecomputedChunksSinkMessage: #FIXME: add other sinks
+    def to_message(self) -> PrecomputedChunksSinkDto: #FIXME: add other sinks
         pass
 
 class FsDataSink(DataSink):

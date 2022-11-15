@@ -8,7 +8,7 @@ import numpy as np
 from webilastik.datasource import DataSource
 from webilastik.annotations.annotation import Annotation, Color
 from webilastik.server.message_schema import (
-    AddPixelAnnotationParams, BrushingAppletStateMessage, CreateLabelParams, LabelHeaderMessage, LabelMessage, MessageParsingError, RecolorLabelParams, RemoveLabelParams, RemovePixelAnnotationParams, RenameLabelParams
+    AddPixelAnnotationParams, BrushingAppletStateDto, CreateLabelParams, LabelHeaderDto, LabelDto, MessageParsingError, RecolorLabelParams, RemoveLabelParams, RemovePixelAnnotationParams, RenameLabelParams
 )
 from webilastik.ui.applet import Applet, CascadeError, CascadeOk, CascadeResult, UserPrompt, applet_output, cascade
 from webilastik.ui.applet.ws_applet import WsApplet
@@ -21,15 +21,15 @@ class Label:
         self.annotations = list(annotations)
         super().__init__()
 
-    def to_messsage(self) -> LabelMessage:
-        return LabelMessage(
+    def to_messsage(self) -> LabelDto:
+        return LabelDto(
             name=self.name,
             color=self.color.to_message(),
             annotations=tuple(annotation.to_message() for annotation in self.annotations),
         )
 
-    def to_header_message(self) -> LabelHeaderMessage:
-        return LabelHeaderMessage(
+    def to_header_message(self) -> LabelHeaderDto:
+        return LabelHeaderDto(
             name=self.name,
             color=self.color.to_message()
         )
@@ -161,7 +161,7 @@ class WsBrushingApplet(WsApplet, BrushingApplet):
         ])
 
     def _get_json_state(self) -> JsonValue:
-        return BrushingAppletStateMessage(
+        return BrushingAppletStateDto(
             labels=tuple(label.to_messsage() for label in self._labels),
         ).to_json_value() # FIXME: move to_json() outside
 

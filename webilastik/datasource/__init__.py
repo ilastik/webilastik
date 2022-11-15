@@ -12,7 +12,7 @@ import numpy as np
 from ndstructs.point5D import Shape5D, Interval5D, Point5D, SPAN
 from ndstructs.array5D import Array5D, SPAN_OVERRIDE, All
 from webilastik.filesystem import Filesystem
-from webilastik.server.message_schema import DataSourceMessage, Interval5DMessage, MessageParsingError, Shape5DMessage
+from webilastik.server.message_schema import DataSourceDto, Interval5DDto, MessageParsingError, Shape5DDto
 from webilastik.utility.url import Url
 from webilastik.utility.url import Url, Protocol
 from global_cache import global_cache
@@ -253,17 +253,17 @@ class FsDataSource(DataSource):
             self.url == other.url
         )
 
-    def to_message(self) -> DataSourceMessage:
-        return DataSourceMessage(
-            interval=Interval5DMessage.from_interval5d(self.interval),
+    def to_message(self) -> DataSourceDto:
+        return DataSourceDto(
+            interval=Interval5DDto.from_interval5d(self.interval),
             spatial_resolution=self.spatial_resolution,
-            tile_shape=Shape5DMessage.from_shape5d(self.tile_shape),
+            tile_shape=Shape5DDto.from_shape5d(self.tile_shape),
             url=self.url.to_message(),
         )
 
     @staticmethod
     def try_from_message(
-        message: DataSourceMessage,
+        message: DataSourceDto,
         allowed_protocols: Sequence[Protocol] = ("http", "https"),
     ) -> "FsDataSource | MessageParsingError":
         url = Url.from_message(message.url)

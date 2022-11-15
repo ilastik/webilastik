@@ -2,7 +2,7 @@
 import { quat, vec3 } from "gl-matrix";
 import { Applet } from "../client/applets/applet";
 import { DataSource, PredictionsView, Session, View, DataView, RawDataView, StrippedPrecomputedView, DataViewUnion, Color } from "../client/ilastik";
-import { MakeDataViewParams, ViewerAppletStateMessage } from "../client/message_schema";
+import { MakeDataViewParams, ViewerAppletStateDto } from "../client/message_schema";
 import { INativeView, IViewerDriver, IViewportDriver } from "../drivers/viewer_driver";
 import { ErrorPopupWidget } from "../gui/widgets/popup";
 import { HashMap } from "../util/hashmap";
@@ -25,23 +25,23 @@ export class ViewerAppletState{
         this.label_colors = params.label_colors
     }
 
-    public static fromMessage(message: ViewerAppletStateMessage): ViewerAppletState{
+    public static fromDto(message: ViewerAppletStateDto): ViewerAppletState{
         let data_views = new HashMap<Url, DataViewUnion, string>();
         for(let rawViewMsg of message.data_views){
-            const dataView = DataView.fromMessage(rawViewMsg)
+            const dataView = DataView.fromDto(rawViewMsg)
             data_views.set(dataView.url, dataView)
         }
 
         let prediction_views = new HashMap<Url, PredictionsView, string>();
         for(let predViewMsg of message.prediction_views){
-            const predView = PredictionsView.fromMessage(predViewMsg)
+            const predView = PredictionsView.fromDto(predViewMsg)
             prediction_views.set(predView.url, predView)
         }
 
         return new ViewerAppletState({
             data_views,
             prediction_views,
-            label_colors: message.label_colors.map(color_msg => Color.fromMessage(color_msg))
+            label_colors: message.label_colors.map(color_msg => Color.fromDto(color_msg))
         })
     }
 }
@@ -63,11 +63,11 @@ export class Viewer extends Applet<ViewerAppletState>{
             name: params.name,
             session: params.ilastik_session,
             deserializer: value => {
-                let stateMessage = ViewerAppletStateMessage.fromJsonValue(value)
-                if(stateMessage instanceof Error){
+                let stateDto = ViewerAppletStateDto.fromJsonValue(value)
+                if(stateDto instanceof Error){
                     throw `FIXME!`
                 }
-                return ViewerAppletState.fromMessage(stateMessage)
+                return ViewerAppletState.fromDto(stateDto)
             },
             onNewState: (newState) => this.onNewState(newState)
         })
@@ -201,7 +201,7 @@ export class Viewer extends Applet<ViewerAppletState>{
 
     public async openDataViewFromDataSource(datasource: DataSource){
         let name = datasource.url.path.name + " " + datasource.resolutionString
-        let dataViewResult = await this.session.makeDataView(new MakeDataViewParams({view_name: name, url: datasource.url.toMessage()}))
+        let dataViewResult = await this.session.makeDataView(new MakeDataViewParams({view_name: name, url: datasource.url.toDto()}))
         if(dataViewResult instanceof Error){
             new ErrorPopupWidget({message: `Could not create a view for ${datasource.url}: ${dataViewResult.message}`})
             return

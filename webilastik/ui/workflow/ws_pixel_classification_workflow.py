@@ -32,7 +32,7 @@ from webilastik.filesystem import Filesystem
 from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.filesystem.osfs import OsFs
 from webilastik.scheduling.job import PriorityExecutor
-from webilastik.server.message_schema import GetDatasourcesFromUrlParamsMessage, GetDatasourcesFromUrlResponseMessage, MessageParsingError, RpcErrorMessage, SaveProjectParamsMessage
+from webilastik.server.message_schema import GetDatasourcesFromUrlParamsDto, GetDatasourcesFromUrlResponseDto, MessageParsingError, RpcErrorDto, SaveProjectParamsDto
 from webilastik.server.session_allocator import uncachable_json_response
 from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError
@@ -200,9 +200,9 @@ class WebIlastik:
         self.app.on_shutdown.append(self.close_websockets)
 
     async def get_datasources_from_url(self, request: web.Request) -> web.Response:
-        params = GetDatasourcesFromUrlParamsMessage.from_json_value(await request.json())
+        params = GetDatasourcesFromUrlParamsDto.from_json_value(await request.json())
         if isinstance(params, MessageParsingError):
-            return  uncachable_json_response(RpcErrorMessage(error="bad payload").to_json_value(), status=400)
+            return  uncachable_json_response(RpcErrorDto(error="bad payload").to_json_value(), status=400)
         url = Url.from_message(params.url)
 
         selected_resolution: "Tuple[int, int, int] | None" = None
@@ -214,14 +214,14 @@ class WebIlastik:
 
         datasources_result = try_get_datasources_from_url(url=url, allowed_protocols=("http", "https"))
         if isinstance(datasources_result, Exception):
-            return uncachable_json_response(RpcErrorMessage(error=str(datasources_result)).to_json_value(), status=400)
+            return uncachable_json_response(RpcErrorDto(error=str(datasources_result)).to_json_value(), status=400)
         if isinstance(datasources_result, type(None)):
-            return uncachable_json_response(RpcErrorMessage(error=f"Unsupported datasource type: {url}").to_json_value(), status=400)
+            return uncachable_json_response(RpcErrorDto(error=f"Unsupported datasource type: {url}").to_json_value(), status=400)
         if selected_resolution:
             datasources = [ds for ds in datasources_result if ds.spatial_resolution == selected_resolution]
             if len(datasources) != 1:
                 return uncachable_json_response(
-                    RpcErrorMessage(
+                    RpcErrorDto(
                         error=f"Expected single datasource, found these: {json.dumps([ds.to_message().to_json_value() for ds in datasources], indent=4)}"
                     ).to_json_value(),
                     status=400,
@@ -230,7 +230,7 @@ class WebIlastik:
             datasources = datasources_result
 
         return uncachable_json_response(
-            GetDatasourcesFromUrlResponseMessage(datasources=tuple([ds.to_message() for ds in datasources])).to_json_value(),
+            GetDatasourcesFromUrlResponseDto(datasources=tuple([ds.to_message() for ds in datasources])).to_json_value(),
             status=200,
         )
 
@@ -333,7 +333,7 @@ class WebIlastik:
 
     async def save_project(self, request: web.Request) -> web.Response:
         payload = await request.json()
-        params_result = SaveProjectParamsMessage.from_json_value(payload)
+        params_result = SaveProjectParamsDto.from_json_value(payload)
         if isinstance(params_result, MessageParsingError):
             return web.Response(status=400, text=f"Bad payload")
         filesystem = Filesystem.create_from_message(params_result.fs)
@@ -354,7 +354,7 @@ class WebIlastik:
 
     async def load_project(self, request: web.Request) -> web.Response:
         payload = await request.json()
-        params_result = SaveProjectParamsMessage.from_json_value(payload)
+        params_result = SaveProjectParamsDto.from_json_value(payload)
         if isinstance(params_result, MessageParsingError):
             return web.Response(status=400, text=f"Bad payload")
         filesystem = Filesystem.create_from_message(params_result.fs)

@@ -13,7 +13,7 @@ from webilastik.filesystem import Filesystem
 from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.filesystem.http_fs import HttpFs
 from webilastik.filesystem.osfs import OsFs
-from webilastik.server.message_schema import Interval5DMessage, PrecomputedChunksSinkMessage, Shape5DMessage
+from webilastik.server.message_schema import Interval5DDto, PrecomputedChunksSinkDto, Shape5DDto
 from webilastik.utility.url import Url
 
 class PrecomputedChunksWriter(IDataSinkWriter):
@@ -128,22 +128,22 @@ class PrecomputedChunksSink(FsDataSink):
             resolution=self.resolution,
         )
 
-    def to_message(self) -> PrecomputedChunksSinkMessage:
+    def to_message(self) -> PrecomputedChunksSinkDto:
         assert isinstance(self.filesystem, (HttpFs, OsFs, BucketFs)) #FIXME
         type_name: Literal["uint8", "uint16", "uint32", "uint64", "float32"] = str(self.dtype) #type: ignore #FIXME
-        return PrecomputedChunksSinkMessage(
+        return PrecomputedChunksSinkDto(
             filesystem=self.filesystem.to_message(),
             path=self.path.as_posix(),
             dtype=type_name,
-            tile_shape=Shape5DMessage.from_shape5d(self.tile_shape),
+            tile_shape=Shape5DDto.from_shape5d(self.tile_shape),
             encoding=self.encoding.to_message(),
-            interval=Interval5DMessage.from_interval5d(self.interval),
+            interval=Interval5DDto.from_interval5d(self.interval),
             resolution=self.resolution,
             scale_key=self.scale_key.as_posix(),
         )
 
     @classmethod
-    def from_message(cls, message: PrecomputedChunksSinkMessage) -> "PrecomputedChunksSink":
+    def from_message(cls, message: PrecomputedChunksSinkDto) -> "PrecomputedChunksSink":
         return PrecomputedChunksSink(
             filesystem=Filesystem.create_from_message(message.filesystem),
             path=PurePosixPath(message.path),
@@ -155,10 +155,10 @@ class PrecomputedChunksSink(FsDataSink):
             resolution=message.resolution,
         )
 
-    def __getstate__(self) -> PrecomputedChunksSinkMessage:
+    def __getstate__(self) -> PrecomputedChunksSinkDto:
         return self.to_message()
 
-    def __setstate__(self, message: PrecomputedChunksSinkMessage):
+    def __setstate__(self, message: PrecomputedChunksSinkDto):
         self.__init__(
             filesystem=Filesystem.create_from_message(message.filesystem),
             path=PurePosixPath(message.path),

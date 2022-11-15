@@ -1,4 +1,4 @@
-import { UrlMessage } from "../client/message_schema";
+import { UrlDto } from "../client/message_schema";
 import { IJsonable } from "./serialization";
 
 export const data_schemes = ["precomputed"] as const;
@@ -146,7 +146,7 @@ export class Url implements IJsonable{
         return this.toString()
     }
 
-    public static fromMessage(message: UrlMessage): Url{
+    public static fromDto(message: UrlDto): Url{
         return new Url({
             datascheme: message.datascheme,
             protocol: message.protocol,
@@ -158,7 +158,7 @@ export class Url implements IJsonable{
         })
     }
 
-    public toMessage(): UrlMessage{
+    public toDto(): UrlDto{
         if(this.protocol == "ws" || this.protocol == "wss"){
             throw `FIXME!!!`
         }
@@ -166,7 +166,7 @@ export class Url implements IJsonable{
         for(let [key, value] of this.search){
             searchObj[key] = value
         }
-        return new UrlMessage({
+        return new UrlDto({
             datascheme: this.datascheme,
             protocol: this.protocol,
             hostname: this.hostname,

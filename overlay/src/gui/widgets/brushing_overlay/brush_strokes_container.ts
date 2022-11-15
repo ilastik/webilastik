@@ -28,10 +28,10 @@ class Label{
         this.annotations = params.annotations
     }
 
-    public static fromMessage(gl: WebGL2RenderingContext, message: schema.LabelMessage): Label{
+    public static fromDto(gl: WebGL2RenderingContext, message: schema.LabelDto): Label{
         return new Label({
-            annotations: message.annotations.map(a => BrushStroke.fromMessage(gl, a)),
-            color: Color.fromMessage(message.color),
+            annotations: message.annotations.map(a => BrushStroke.fromDto(gl, a)),
+            color: Color.fromDto(message.color),
             name: message.name,
         })
     }
@@ -60,11 +60,11 @@ export class BrushingApplet extends Applet<State>{
         super({
             name: params.applet_name,
             deserializer: (value: JsonValue) => {
-                const state = schema.BrushingAppletStateMessage.fromJsonValue(value)
+                const state = schema.BrushingAppletStateDto.fromJsonValue(value)
                 if(state instanceof Error){
                     throw `FIXME`
                 }
-                return {labels: state.labels.map(l => Label.fromMessage(params.gl, l))}
+                return {labels: state.labels.map(l => Label.fromDto(params.gl, l))}
             },
             session: params.session,
             onNewState: (new_state) => this.onNewState(new_state)
@@ -96,7 +96,7 @@ export class BrushingApplet extends Applet<State>{
                 }else {
                     this.doRPC("create_label",  new schema.CreateLabelParams({
                         label_name: labelNameInput.value,
-                        color: colorPicker.value.toMessage()
+                        color: colorPicker.value.toDto()
                     }))
                     popup.destroy()
                 }
@@ -143,7 +143,7 @@ export class BrushingApplet extends Applet<State>{
         //Mask communication delay by updating GUI immediately
         this.onNewState(newState)
         this.doRPC("add_annotation", new schema.AddPixelAnnotationParams({
-            label_name: currentLabelWidget.name, pixel_annotation: brushStroke.toMessage()
+            label_name: currentLabelWidget.name, pixel_annotation: brushStroke.toDto()
         }))
     }
 
@@ -172,11 +172,11 @@ export class BrushingApplet extends Applet<State>{
                 },
                 onBrushStrokeDeleteClicked: (_color, brushStroke) => this.doRPC(
                     "remove_annotation", new schema.RemovePixelAnnotationParams({
-                        label_name: name, pixel_annotation: brushStroke.toMessage()
+                        label_name: name, pixel_annotation: brushStroke.toDto()
                     })
                 ),
                 onColorChange: (newColor: Color) => {
-                    this.doRPC("recolor_label", new schema.RecolorLabelParams({label_name: name, new_color: newColor.toMessage()}))
+                    this.doRPC("recolor_label", new schema.RecolorLabelParams({label_name: name, new_color: newColor.toDto()}))
                     return true
                 },
                 onNameChange: (newName: string) => {

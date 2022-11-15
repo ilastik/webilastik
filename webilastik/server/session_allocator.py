@@ -20,17 +20,17 @@ from webilastik.libebrains.compute_session_launcher import CscsSshJobLauncher, J
 from webilastik.libebrains.user_token import UserToken
 from webilastik.libebrains.oidc_client import OidcClient, Scope
 from webilastik.server.message_schema import (
-    CheckLoginResultMessage,
-    CloseComputeSessionParamsMessage,
-    CloseComputeSessionResponseMessage,
-    ComputeSessionStatusMessage,
-    CreateComputeSessionParamsMessage,
-    GetAvailableHpcSitesResponseMessage,
-    GetComputeSessionStatusParamsMessage,
-    ListComputeSessionsParamsMessage,
-    ListComputeSessionsResponseMessage,
+    CheckLoginResultDto,
+    CloseComputeSessionParamsDto,
+    CloseComputeSessionResponseDto,
+    ComputeSessionStatusDto,
+    CreateComputeSessionParamsDto,
+    GetAvailableHpcSitesResponseDto,
+    GetComputeSessionStatusParamsDto,
+    ListComputeSessionsParamsDto,
+    ListComputeSessionsResponseDto,
     MessageParsingError,
-    RpcErrorMessage,
+    RpcErrorDto,
 )
 from webilastik.utility.url import Url
 
@@ -176,10 +176,10 @@ class SessionAllocator:
     async def get_ebrains_token(self, request: web.Request) -> web.Response:
         origin = request.headers.get("Origin")
         if origin != "https://app.ilastik.org":
-            return uncachable_json_response(RpcErrorMessage(error=f"Bad origin: {origin}").to_json_value(), status=400)
+            return uncachable_json_response(RpcErrorDto(error=f"Bad origin: {origin}").to_json_value(), status=400)
         ebrains_login = await EbrainsLogin.from_cookie(request, http_client_session=self.http_client_session, oidc_client=self.oidc_client)
         if ebrains_login is None:
-            return uncachable_json_response(RpcErrorMessage(error=f"Not logged in").to_json_value(), status=400)
+            return uncachable_json_response(RpcErrorDto(error=f"Not logged in").to_json_value(), status=400)
         response = web.json_response({UserToken.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME.lower(): ebrains_login.user_token.access_token})
         ebrains_login.set_cookie(response)
         return response
@@ -209,11 +209,11 @@ class SessionAllocator:
         ebrains_login = await EbrainsLogin.from_cookie(request, http_client_session=self.http_client_session, oidc_client=self.oidc_client)
         if ebrains_login is None:
             return uncachable_json_response(
-                CheckLoginResultMessage(logged_in=False).to_json_value(),
+                CheckLoginResultDto(logged_in=False).to_json_value(),
                 status=200
             )
         response = uncachable_json_response(
-            CheckLoginResultMessage(logged_in=True).to_json_value(),\
+            CheckLoginResultDto(logged_in=True).to_json_value(),\
             status=200
         )
         ebrains_login.set_cookie(response=response)
@@ -240,14 +240,14 @@ class SessionAllocator:
     async def create_compute_session(self, ebrains_login: EbrainsLogin, request: web.Request) -> web.Response:
         raw_payload = await request.content.read()
         json_payload = json.loads(raw_payload.decode('utf8'))
-        params = CreateComputeSessionParamsMessage.from_json_value(json_payload)
+        params = CreateComputeSessionParamsDto.from_json_value(json_payload)
         if isinstance(params, MessageParsingError) or params.hpc_site not in self.session_launchers:
-            return uncachable_json_response(RpcErrorMessage(error="Bad payload").to_json_value(), status=400)
+            return uncachable_json_response(RpcErrorDto(error="Bad payload").to_json_value(), status=400)
 
         user_info = await ebrains_login.user_token.get_userinfo(self.http_client_session)
         if isinstance(user_info, Exception):
             return uncachable_json_response(
-                RpcErrorMessage(error= "Could not retrieve user info").to_json_value(),
+                RpcErrorDto(error= "Could not retrieve user info").to_json_value(),
                 status=400
             )
 
@@ -263,13 +263,13 @@ class SessionAllocator:
             if isinstance(this_months_jobs_result, Exception):
                 print(f"Could not get session information:\n{this_months_jobs_result}\n", file=sys.stderr)
                 return uncachable_json_response(
-                    RpcErrorMessage(error= "Could not get session information").to_json_value(),
+                    RpcErrorDto(error= "Could not get session information").to_json_value(),
                     status=500
                 )
             for job in this_months_jobs_result:
                 if job.is_runnable():
                     return uncachable_json_response(
-                        RpcErrorMessage(error= f"Already running a session ({job.compute_session_id})").to_json_value(),
+                        RpcErrorDto(error= f"Already running a session ({job.compute_session_id})").to_json_value(),
                         status=400
                     )
             used_quota_node_sec = ComputeSession.compute_used_quota(this_months_jobs_result)
@@ -277,7 +277,7 @@ class SessionAllocator:
             available_quota_node_min = (monthly_quota_node_sec - used_quota_node_sec) / 60
             if available_quota_node_min < params.session_duration_minutes:
                 return uncachable_json_response(
-                    RpcErrorMessage(error=f". Requested {params.session_duration_minutes}min, only {available_quota_node_min}min available").to_json_value(),
+                    RpcErrorDto(error=f". Requested {params.session_duration_minutes}min, only {available_quota_node_min}min available").to_json_value(),
                     status=400
                 )
 
@@ -301,7 +301,7 @@ class SessionAllocator:
             # print(f"<<<<<<<<<<<<< Hopefully it worked? sesion id is {compute_session_id}")
             # if _tunnel_process.returncode != 0 or not Path(f"/tmp/to-session-{compute_session_id}").exists():
             #     return uncachable_json_response(
-            #         RpcErrorMessage(error="Could not forward ports i think").to_json_value(),
+            #         RpcErrorDto(error="Could not forward ports i think").to_json_value(),
             #         status=500
             #     )
 
@@ -317,12 +317,12 @@ class SessionAllocator:
             if isinstance(session_result, Exception):
                 print(f"Could not create compute session:\n{session_result}", file=sys.stderr)
                 return uncachable_json_response(
-                    RpcErrorMessage(error="Could not create compute session").to_json_value(),
+                    RpcErrorDto(error="Could not create compute session").to_json_value(),
                     status=500
                 )
 
             return uncachable_json_response(
-                ComputeSessionStatusMessage(
+                ComputeSessionStatusDto(
                     compute_session=session_result.to_message(),
                     session_url=self._make_compute_session_url(compute_session_id).to_message(),
                     connected=False,
@@ -335,27 +335,27 @@ class SessionAllocator:
     async def get_session_status(self, ebrains_login: EbrainsLogin, request: web.Request) -> web.Response:
         raw_payload = await request.content.read()
         json_payload = json.loads(raw_payload.decode('utf8'))
-        params = GetComputeSessionStatusParamsMessage.from_json_value(json_payload)
+        params = GetComputeSessionStatusParamsDto.from_json_value(json_payload)
         if isinstance(params, MessageParsingError) or params.hpc_site not in self.session_launchers:
-            return uncachable_json_response(RpcErrorMessage(error="Bad payload").to_json_value(), status=400)
+            return uncachable_json_response(RpcErrorDto(error="Bad payload").to_json_value(), status=400)
         user_info_result = await ebrains_login.user_token.get_userinfo(self.http_client_session)
         compute_session_id = uuid.UUID(params.compute_session_id) #FIXME: check parsing error?
         if isinstance(user_info_result, Exception):
             print(f"Error retrieving user info: {user_info_result}")
             return uncachable_json_response(
-                RpcErrorMessage(error="Could not get user information").to_json_value(),
+                RpcErrorDto(error="Could not get user information").to_json_value(),
                 status=500  #FIXME: 500?
             )
         session_launcher = self.session_launchers[params.hpc_site]
         session_result = await session_launcher.get_compute_session_by_id(compute_session_id=compute_session_id, user_id=user_info_result.sub)
         if isinstance(session_result, Exception):
             return uncachable_json_response(
-                RpcErrorMessage(error="Could not retrieve session").to_json_value(),
+                RpcErrorDto(error="Could not retrieve session").to_json_value(),
                 status=500
             )
         if session_result is None:
             return uncachable_json_response(
-                RpcErrorMessage(error="Session not found").to_json_value(),
+                RpcErrorDto(error="Session not found").to_json_value(),
                 status=404
             )
 
@@ -376,7 +376,7 @@ class SessionAllocator:
         # if tunnel_exists_check.returncode != 0:
         #     print(f"Tunnel was not ready in web server")
         #     return uncachable_json_response(
-        #         ComputeSessionStatusMessage(
+        #         ComputeSessionStatusDto(
         #             compute_session=session_result.to_message(),
         #             session_url=session_url.to_message(),
         #             connected=False,
@@ -387,7 +387,7 @@ class SessionAllocator:
         ##################################################################################
 
         return uncachable_json_response(
-            ComputeSessionStatusMessage(
+            ComputeSessionStatusDto(
                 compute_session=session_result.to_message(),
                 hpc_site=params.hpc_site,
                 session_url=session_url.to_message(),
@@ -400,10 +400,10 @@ class SessionAllocator:
     async def close_session(self, ebrains_login: EbrainsLogin, request: web.Request) -> web.Response:
         raw_payload = await request.content.read()
         json_payload = json.loads(raw_payload.decode('utf8'))
-        params = CloseComputeSessionParamsMessage.from_json_value(json_payload)
+        params = CloseComputeSessionParamsDto.from_json_value(json_payload)
         if isinstance(params, MessageParsingError) or params.hpc_site not in self.session_launchers:
             return uncachable_json_response(
-                RpcErrorMessage(error= "Bad payload").to_json_value(),
+                RpcErrorDto(error= "Bad payload").to_json_value(),
                 status=400
             )
         compute_session_id = uuid.UUID(params.compute_session_id) #FIXME: check parsing error?
@@ -413,28 +413,28 @@ class SessionAllocator:
         if isinstance(user_info_result, Exception):
             print(f"Error retrieving user info: {user_info_result}")
             return uncachable_json_response(
-                RpcErrorMessage(error="Could not get user information").to_json_value(),
+                RpcErrorDto(error="Could not get user information").to_json_value(),
                 status=500  #FIXME: 500?
             )
         session_result = await session_launcher.get_compute_session_by_id(compute_session_id=compute_session_id, user_id=user_info_result.sub)
         if isinstance(session_result, Exception):
             return uncachable_json_response(
-                RpcErrorMessage(error="Could not retrieve session").to_json_value(),
+                RpcErrorDto(error="Could not retrieve session").to_json_value(),
                 status=500
             )
         if session_result is None:
             return uncachable_json_response(
-                RpcErrorMessage(error="Session not found").to_json_value(),
+                RpcErrorDto(error="Session not found").to_json_value(),
                 status=404
             )
         cancellation_result = await session_launcher.cancel(session_result)
         if isinstance(cancellation_result, Exception):
             return uncachable_json_response(
-                RpcErrorMessage(error=f"Failed to cancel session {compute_session_id}").to_json_value(),
+                RpcErrorDto(error=f"Failed to cancel session {compute_session_id}").to_json_value(),
                 status=500
             )
         return uncachable_json_response(
-            CloseComputeSessionResponseMessage(compute_session_id=str(compute_session_id)).to_json_value(),
+            CloseComputeSessionResponseDto(compute_session_id=str(compute_session_id)).to_json_value(),
             status=200
         )
 
@@ -448,10 +448,10 @@ class SessionAllocator:
     @require_ebrains_login
     async def list_sessions(self, ebrains_login: EbrainsLogin, request: web.Request) -> web.Response:
         json_payload = json.loads((await request.content.read()))
-        params = ListComputeSessionsParamsMessage.from_json_value(json_payload)
+        params = ListComputeSessionsParamsDto.from_json_value(json_payload)
         if isinstance(params, MessageParsingError) or params.hpc_site not in self.session_launchers:
             return uncachable_json_response(
-                RpcErrorMessage(error= "Bad payload").to_json_value(),
+                RpcErrorDto(error= "Bad payload").to_json_value(),
                 status=400
             )
         session_launcher = self.session_launchers[params.hpc_site]
@@ -459,16 +459,16 @@ class SessionAllocator:
         user_info_result = await ebrains_login.user_token.get_userinfo(self.http_client_session)
         if isinstance(user_info_result, Exception):
             print(f"Error retrieving user info: {user_info_result}")
-            return uncachable_json_response(RpcErrorMessage(error="Could not get user information").to_json_value(), status=500) #FIXME: 500?
+            return uncachable_json_response(RpcErrorDto(error="Could not get user information").to_json_value(), status=500) #FIXME: 500?
         compute_sessions_result = await session_launcher.get_compute_sessions(
             user_id=user_info_result.sub, starttime=datetime.today().replace(day=1),
         )
         if isinstance(compute_sessions_result, Exception):
-            return uncachable_json_response(RpcErrorMessage(error="Could not retrieve sessions").to_json_value(), status=500)
-        session_stati: List[ComputeSessionStatusMessage] = []
+            return uncachable_json_response(RpcErrorDto(error="Could not retrieve sessions").to_json_value(), status=500)
+        session_stati: List[ComputeSessionStatusDto] = []
         for comp_session in compute_sessions_result:
             session_stati.append(
-                ComputeSessionStatusMessage(
+                ComputeSessionStatusDto(
                     compute_session=comp_session.to_message(),
                     session_url=self._make_compute_session_url(comp_session.compute_session_id).to_message(),
                     connected=await self.check_session_connection_state(comp_session),
@@ -477,13 +477,13 @@ class SessionAllocator:
             )
 
         return uncachable_json_response(
-            ListComputeSessionsResponseMessage(compute_sessions_stati=tuple(ss for ss in session_stati)).to_json_value(),
+            ListComputeSessionsResponseDto(compute_sessions_stati=tuple(ss for ss in session_stati)).to_json_value(),
             status=200
         )
 
     async def get_available_hpc_sites(self, request: web.Request) -> web.Response:
         return uncachable_json_response(
-            GetAvailableHpcSitesResponseMessage(
+            GetAvailableHpcSitesResponseDto(
                 available_sites=tuple(launcher_site for launcher_site in self.session_launchers.keys()),
             ).to_json_value(),
             status=200
