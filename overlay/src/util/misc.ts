@@ -42,10 +42,9 @@ export type InlineCss = Partial<Omit<
     "getPropertyPriority" | "getPropertyValue" | "item" | "removeProperty" | "setProperty"
 >>
 
-export function createElement<K extends keyof HTMLElementTagNameMap>({tagName, parentElement, prepend=false, innerHTML, innerText, cssClasses, inlineCss={}, onClick}:{
+export function createElement<K extends keyof HTMLElementTagNameMap>({tagName, parentElement, innerHTML, innerText, cssClasses, inlineCss={}, onClick}:{
     tagName: K,
-    parentElement:HTMLElement,
-    prepend?: boolean,
+    parentElement:HTMLElement | undefined,
     innerHTML?:string,
     innerText?:string,
     cssClasses?:Array<string>,
@@ -54,9 +53,7 @@ export function createElement<K extends keyof HTMLElementTagNameMap>({tagName, p
 }): HTMLElementTagNameMap[K]{
 
     const element = document.createElement(tagName);
-    if(prepend){
-        parentElement.prepend(element)
-    }else{
+    if(parentElement !== undefined){
         parentElement.appendChild(element)
     }
     if(innerHTML !== undefined){
@@ -360,7 +357,7 @@ export function createTable<T extends {[key: string]: string}>(
         parentElement: HTMLElement,
         title?: {label: string} | {header: string},
         headers: T,
-        rows: Array<{[Property in keyof T]: string}>,
+        rows: Array<{[Property in keyof T]: string | HTMLElement}>,
         cssClasses?: Array<string>,
     }
 ): HTMLTableElement{
@@ -382,7 +379,12 @@ export function createTable<T extends {[key: string]: string}>(
     for(let row of params.rows){
         let tr = createElement({tagName: "tr", parentElement: body})
         for(let key in row){
-            createElement({tagName: "td", parentElement: tr, innerHTML: row[key]})
+            const value = row[key]
+            if(typeof(value) == "string"){
+                createElement({tagName: "td", parentElement: tr, innerText: value})
+            }else{
+                tr.appendChild(value)
+            }
         }
     }
 

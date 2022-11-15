@@ -2,19 +2,22 @@ import { Applet } from '../../client/applets/applet';
 import { JsonValue } from '../../util/serialization';
 import { assertUnreachable, createElement, createInput, createInputParagraph, createTable } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
-import { Color, DataSource, Session } from '../../client/ilastik';
+import { BucketFs, Color, DataSource, Filesystem, FsDataSink, Session } from '../../client/ilastik';
 import { CssClasses } from '../css_classes';
 import { ErrorPopupWidget, InputPopupWidget } from './popup';
 import {
-    JobMessage,
+    ExportJobMessage,
     LabelHeaderMessage,
+    OpenDatasinkJobMessage,
     PixelClassificationExportAppletStateMessage,
+    PrecomputedChunksSinkMessage,
     StartPixelProbabilitiesExportJobParamsMessage,
     StartSimpleSegmentationExportJobParamsMessage
 } from '../../client/message_schema';
 import { PopupSelect, SelectorWidget } from './selector_widget';
 import { DataSourceInput } from './datasource_input';
 import { PrecomputedChunksScale_DataSink_Input } from './precomputed_chunks_scale_datasink_input';
+import { Viewer } from '../../viewer/viewer';
 
 const sink_creation_stati = ["pending", "running", "cancelled", "failed", "succeeded"] as const;
 export type SinkCreationStatus = typeof sink_creation_stati[number];
@@ -38,12 +41,12 @@ class LabelHeader{
 }
 
 class PixelClassificationExportAppletState{
-    jobs: Array<JobMessage>
+    jobs: Array<ExportJobMessage | OpenDatasinkJobMessage>
     populated_labels: LabelHeader[] | undefined
     datasource_suggestions: DataSource[]
 
     constructor(params: {
-        jobs: Array<JobMessage>
+        jobs: Array<ExportJobMessage | OpenDatasinkJobMessage>
         populated_labels: LabelHeaderMessage[] | undefined
         datasource_suggestions: DataSource[]
     }){
@@ -63,16 +66,17 @@ class PixelClassificationExportAppletState{
 
 export class PredictionsExportWidget extends Applet<PixelClassificationExportAppletState>{
     public readonly element: HTMLElement;
-    jobsDisplay: HTMLDivElement;
-    exportModeSelector: PopupSelect<"pixel probabilities" | "simple segmentation">;
-    datasinkInput: PrecomputedChunksScale_DataSink_Input;
-    datasourceInput: DataSourceInput;
-    labelSelectorContainer: HTMLParagraphElement;
-    labelToExportSelector: PopupSelect<LabelHeader> | undefined;
-    inputSuggestionsButtonContainer: HTMLSpanElement;
+    private jobsDisplay: HTMLDivElement;
+    private exportModeSelector: PopupSelect<"pixel probabilities" | "simple segmentation">;
+    private datasinkInput: PrecomputedChunksScale_DataSink_Input;
+    private datasourceInput: DataSourceInput;
+    private labelSelectorContainer: HTMLParagraphElement;
+    private labelToExportSelector: PopupSelect<LabelHeader> | undefined;
+    private inputSuggestionsButtonContainer: HTMLSpanElement;
+    private viewer: Viewer
 
-    public constructor({name, parentElement, session, help}: {
-        name: string, parentElement: HTMLElement, session: Session, help: string[]
+    public constructor({name, parentElement, session, help, viewer}: {
+        name: string, parentElement: HTMLElement, session: Session, help: string[], viewer: Viewer
     }){
         super({
             name,
@@ -86,7 +90,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
             },
             onNewState: (new_state) => this.onNewState(new_state)
         })
-
+        this.viewer = viewer
         this.element = new CollapsableWidget({display_name: "Export Predictions", parentElement, help}).element
         this.element.classList.add("ItkPredictionsExportApplet")
 
@@ -254,11 +258,31 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                 cssClasses: [CssClasses.ItkTable],
                 title: {header: "Jobs:"},
                 headers: {name: "Name", status: "Status", progress: "Progress"},
-                rows: new_state.jobs.map(job => ({
-                    name: job.name,
-                    status: job.status,
-                    progress: job.num_args === undefined ? "unknwown" : `${Math.round(job.num_completed_steps / job.num_args * 100)}%`
-                }))
+                rows: new_state.jobs.map(job => {
+                    let progressColumnContents: HTMLElement | string = job.num_args === undefined ? "unknwown" : `${Math.round(job.num_completed_steps / job.num_args * 100)}%`
+                    if(job.status == 'succeeded' && job instanceof ExportJobMessage){
+                        progressColumnContents = createElement({tagName: "span", parentElement: undefined})
+                        const outputFs = Filesystem.fromMessage(job.datasink.filesystem);
+                        if(outputFs instanceof BucketFs){
+                            const dataProxyLink = createElement({tagName: "a", parentElement: progressColumnContents, innerText: "Open in Data Proxy"})
+                            let dataProxyPrefixParam = job.datasink.path.replace(/^\//, "")
+                            if(job.datasink instanceof PrecomputedChunksSinkMessage){
+                                dataProxyPrefixParam += "/"
+                            }
+                            dataProxyLink.href = `https://data-proxy.ebrains.eu/${outputFs.bucket_name}?prefix=${dataProxyPrefixParam}`
+                            dataProxyLink.target = "_blank"
+                            dataProxyLink.rel = "noopener noreferrer"
+                        }
+                        createInput({inputType: "button", parentElement: progressColumnContents, value: "Open in Viewer", onClick: () => {
+                            this.viewer.openDataViewFromDataSource(FsDataSink.fromMessage(job.datasink).toDataSource())
+                        }})
+                    }
+                    return{
+                        name: job.name,
+                        status: job.status,
+                        progress: progressColumnContents
+                    }
+                })
             })
         }
 

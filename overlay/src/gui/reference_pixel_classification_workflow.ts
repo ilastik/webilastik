@@ -68,6 +68,7 @@ export class ReferencePixelClassificationWorkflowGui{
             name: "export_applet",
             parentElement: this.element,
             session: this.session,
+            viewer: this.viewer,
             help: [
                 `Once you trained your pixel classifier with the previous applets, you can apply it to other datasets
                 or even the same dataset that was used to do the training on.`,

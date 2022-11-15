@@ -1,11 +1,13 @@
 import { vec3 } from "gl-matrix"
 import { INativeView } from "../drivers/viewer_driver"
-import { fetchJson, sleep } from "../util/misc"
-import { Url } from "../util/parsed_url"
+import { assertUnreachable, fetchJson, sleep } from "../util/misc"
+import { Path, Url } from "../util/parsed_url"
+import { DataType } from "../util/precomputed_chunks"
 import {
     ensureJsonObject, ensureJsonString, JsonableValue, JsonValue, toJsonValue
 } from "../util/serialization"
 import {
+    BucketFSMessage,
     CheckLoginResultMessage,
     CloseComputeSessionParamsMessage,
     ColorMessage,
@@ -17,13 +19,16 @@ import {
     GetComputeSessionStatusParamsMessage,
     GetDatasourcesFromUrlParamsMessage,
     GetDatasourcesFromUrlResponseMessage,
+    HttpFsMessage,
     IlpFeatureExtractorMessage,
     Interval5DMessage,
     ListComputeSessionsParamsMessage,
     ListComputeSessionsResponseMessage,
     LoadProjectParamsMessage,
     MakeDataViewParams,
+    OsfsMessage,
     Point5DMessage,
+    PrecomputedChunksSinkMessage,
     PredictionsViewMessage,
     RawDataViewMessage,
     SaveProjectParamsMessage,
@@ -665,6 +670,162 @@ export class DataSource{
         )
     }
 }
+
+export abstract class Filesystem{
+    public constructor(public readonly url: Url){}
+
+    public static fromMessage(message: BucketFSMessage | HttpFsMessage | OsfsMessage): Filesystem{
+        if(message instanceof BucketFSMessage){
+            return BucketFs.fromMessage(message)
+        }
+        if(message instanceof HttpFsMessage){
+            return HttpFs.fromMessage(message)
+        }
+        if(message instanceof OsfsMessage){
+            return OsFs.fromMessage(message)
+        }
+        assertUnreachable(message)
+    }
+}
+
+export class OsFs extends Filesystem{
+    public constructor(public readonly path: Path){
+        super(new Url({
+            protocol: "file",
+            hostname: "localhost", //FIXME?
+            path: path,
+        }))
+    }
+
+    public static fromMessage(message: OsfsMessage): OsFs {
+        return new OsFs(Path.parse(message.path))
+    }
+}
+
+export class HttpFs extends Filesystem{
+    public constructor(params: {
+        protocol: "http" | "https",
+        hostname: string,
+        port?: number,
+        path: Path,
+        search?: Map<string, string>
+    }){
+        super(new Url({
+            protocol: params.protocol,
+            hostname: params.hostname,
+            port: params.port,
+            path: params.path,
+            search: params.search
+        }))
+    }
+    public static fromMessage(message: HttpFsMessage): HttpFs {
+        const search = new Map<string, string>();
+        for(let key in message.search){
+            search.set(key, message.search[key])
+        }
+        return new HttpFs({
+            protocol: message.protocol,
+            hostname: message.hostname,
+            path: Path.parse(message.path),
+            port: message.port,
+            search,
+        })
+    }
+}
+
+export class BucketFs extends Filesystem{
+    public readonly bucket_name: string
+    public readonly prefix: Path
+
+    public constructor(params: {
+        bucket_name: string,
+        prefix: Path,
+    }){
+        super(new Url({
+            protocol: "https",
+            hostname: "data-proxy.ebrains.eu",
+            path: Path.parse(`/api/v1/buckets/${params.bucket_name}`).joinPath(params.prefix.raw),
+        }))
+        this.bucket_name = params.bucket_name
+        this.prefix = params.prefix
+    }
+    public static fromMessage(message: BucketFSMessage): BucketFs{
+        return new BucketFs({bucket_name: message.bucket_name, prefix: Path.parse(message.prefix)})
+    }
+}
+
+export abstract class FsDataSink{
+    public readonly filesystem: Filesystem
+    public readonly path: Path
+    public readonly tile_shape: Shape5D
+    public readonly interval: Interval5D
+    public readonly dtype: DataType
+
+    public constructor(params: {
+        filesystem: Filesystem,
+        path: Path,
+        dtype: DataType,
+        tile_shape: Shape5D,
+        interval: Interval5D,
+    }){
+        this.tile_shape = params.tile_shape
+        this.interval = params.interval
+        this.dtype = params.dtype
+        this.filesystem = params.filesystem
+        this.path = params.path
+    }
+
+    public static fromMessage(message: PrecomputedChunksSinkMessage): FsDataSink{
+        return PrecomputedChunksSink.fromMessage(message)
+    }
+
+    public abstract toDataSource(): DataSource;
+}
+
+export class PrecomputedChunksSink extends FsDataSink{
+    public readonly scale_key: Path
+    public readonly resolution: [number, number, number]
+    public readonly encoding: string
+
+    public constructor(params: ConstructorParameters<typeof FsDataSink>[0] & {
+        scale_key: Path,
+        resolution: [number, number, number],
+        encoding: "raw" | "jpeg",
+    }){
+        super(params)
+        this.scale_key = params.scale_key
+        this.resolution = params.resolution
+        this.encoding = params.encoding
+    }
+
+    public static fromMessage(message: PrecomputedChunksSinkMessage): PrecomputedChunksSink{
+        return new PrecomputedChunksSink({
+            filesystem: Filesystem.fromMessage(message.filesystem),
+            path: Path.parse(message.path),
+            dtype: message.dtype,
+            tile_shape: Shape5D.fromMessage(message.tile_shape),
+            interval: Interval5D.fromMessage(message.interval),
+            scale_key: Path.parse(message.scale_key),
+            resolution: message.resolution,
+            encoding: message.encoding,
+        })
+    }
+
+    public toDataSource(): DataSource{
+        //FIXME: stop using URLs; have datasources encode al the stuff they need in properties
+        const datasourceUrl = this.filesystem.url.joinPath(this.path).updatedWith({
+            datascheme: "precomputed",
+            hash: `resolution=${this.resolution[0]}_${this.resolution[1]}_${this.resolution[2]}`
+        })
+        return new DataSource({
+            url: datasourceUrl,
+            interval: this.interval,
+            spatial_resolution: this.resolution,
+            tile_shape: this.tile_shape,
+        })
+    }
+}
+
 
 export type DataViewMessageUnion = RawDataViewMessage | StrippedPrecomputedViewMessage | UnsupportedDatasetViewMessage | FailedViewMessage
 export type ViewMessageUnion = DataViewMessageUnion | PredictionsViewMessage

@@ -23,7 +23,7 @@ from webilastik.features.ilp_filter import (
     IlpLaplacianOfGaussian, IlpStructureTensorEigenvalues
 )
 from webilastik.features.ilp_filter import IlpFilter
-from webilastik.filesystem import JsonableFilesystem
+from webilastik.filesystem import Filesystem
 from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.utility.url import Protocol, Url
 
@@ -412,7 +412,7 @@ class IlpDatasetInfo:
     def try_to_datasource(
         self,
         *,
-        ilp_fs: JsonableFilesystem,
+        ilp_fs: Filesystem,
         ilp_path: PurePosixPath,
         allowed_protocols: Sequence[Protocol] = ("http", "https")
     ) -> "FsDataSource | Exception":
@@ -500,7 +500,7 @@ class IlpInputDataGroup:
         self,
         *,
         role_name: str,
-        ilp_fs: JsonableFilesystem,
+        ilp_fs: Filesystem,
         ilp_path: PurePosixPath,
         allowed_protocols: Sequence[Protocol] = ("http", "https")
     ) -> "Dict[int, 'FsDataSource | None'] | Exception":

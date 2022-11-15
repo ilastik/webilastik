@@ -1,13 +1,14 @@
 #pyright: strict
 
 import inspect
+import itertools
 from abc import ABC, abstractmethod
 from typing import Any, ClassVar, Dict, Literal, Optional, Sequence, Type, Tuple, Union, Mapping
 from pathlib import Path
 from dataclasses import dataclass
 import textwrap
 
-from ndstructs.point5D import Interval5D, Point5D, Shape5D, itertools
+from ndstructs.point5D import Interval5D, Point5D, Shape5D
 
 
 GENERATED_TS_FILE_PATH = Path(__file__).parent.parent / "overlay/src/client/message_schema.ts"
@@ -594,6 +595,10 @@ class Message:
         super().__init_subclass__()
         _ = Hint.parse(cls)
 
+# @dataclass
+# class DataType(Message):
+#     type_name: Literal["uint8", "uint16", "uint32", "uint64", "float32"]
+
 @dataclass
 class ColorMessage(Message):
     r: int
@@ -625,25 +630,17 @@ class Point5DMessage(Message):
 
     @classmethod
     def from_point5d(cls, point: Point5D) -> "Point5DMessage":
-        return Point5DMessage(
-            x=point.x,
-            y=point.y,
-            z=point.z,
-            t=point.t,
-            c=point.c,
-        )
+        return Point5DMessage(x=point.x, y=point.y, z=point.z, t=point.t, c=point.c)
+    def to_point5d(self) -> Point5D:
+        return Point5D(x=self.x, y=self.y, z=self.z, t=self.t, c=self.c)
 
 @dataclass
 class Shape5DMessage(Point5DMessage):
     @classmethod
     def from_shape5d(cls, shape: Shape5D) -> "Shape5DMessage":
-        return Shape5DMessage(
-            x=shape.x,
-            y=shape.y,
-            z=shape.z,
-            t=shape.t,
-            c=shape.c,
-        )
+        return Shape5DMessage(x=shape.x,y=shape.y,z=shape.z,t=shape.t,c=shape.c)
+    def to_shape5d(self) -> Shape5D:
+        return Shape5D(x=self.x, y=self.y, z=self.z, t=self.t, c=self.c)
 
 @dataclass
 class Interval5DMessage(Message):
@@ -656,6 +653,8 @@ class Interval5DMessage(Message):
             start=Point5DMessage.from_point5d(interval.start),
             stop=Point5DMessage.from_point5d(interval.stop)
         )
+    def to_interval5d(self) -> Interval5D:
+        return Interval5D.create_from_start_stop(start=self.start.to_point5d(), stop=self.stop.to_point5d())
 
 @dataclass
 class OsfsMessage(Message):
@@ -683,21 +682,32 @@ class DataSourceMessage(Message):
     spatial_resolution: Tuple[int, int, int]
 
 @dataclass
-class PrecomputedChunksScaleMessage(Message):
-    key: str #???????????????
-    size: Tuple[int, int, int]
-    resolution: Tuple[int, int, int]
-    voxel_offset: Tuple[int, int, int]
-    chunk_sizes: Tuple[Tuple[int, int, int], ...]
-    encoding: Literal["raw", "jpeg"]
+class N5DataSourceMessage(Message):
+    filesystem: Union[OsfsMessage, HttpFsMessage, BucketFSMessage]
+    path: str
+    location: Point5DMessage
+    spatial_resolution: Tuple[int, int, int]
+
+##################################################333
 
 @dataclass
-class PrecomputedChunksScaleSinkMessage(Message):
-    filesystem: Union[OsfsMessage, HttpFsMessage, BucketFSMessage]
-    info_dir: str #??????????????
-    scale: PrecomputedChunksScaleMessage
+class DataSinkMessage(Message):
+    tile_shape: Shape5DMessage
+    interval: Interval5DMessage
     dtype: Literal["uint8", "uint16", "uint32", "uint64", "float32"]
-    num_channels: int
+
+@dataclass
+class FsDataSinkMessage(DataSinkMessage):
+    filesystem: Union[OsfsMessage, HttpFsMessage, BucketFSMessage]
+    path: str #FIXME?
+
+@dataclass
+class PrecomputedChunksSinkMessage(FsDataSinkMessage):
+    scale_key: str #fixme?
+    resolution: Tuple[int, int, int]
+    encoding: Literal["raw", "jpeg"]
+
+#################################################################
 
 @dataclass
 class PixelAnnotationMessage(Message):
@@ -808,10 +818,20 @@ class JobMessage(Message):
     error_message: Optional[str]
 
 @dataclass
+class ExportJobMessage(JobMessage):
+    datasink: PrecomputedChunksSinkMessage
+
+@dataclass
+class OpenDatasinkJobMessage(JobMessage):
+    datasink: PrecomputedChunksSinkMessage
+
+@dataclass
 class PixelClassificationExportAppletStateMessage(Message):
-    jobs: Tuple[JobMessage, ...]
+    jobs: Tuple[Union[ExportJobMessage, OpenDatasinkJobMessage], ...]
     populated_labels: Optional[Tuple[LabelHeaderMessage, ...]]
     datasource_suggestions: Optional[Tuple[DataSourceMessage, ...]]
+
+
 
 #########################################################
 
@@ -917,25 +937,25 @@ class CheckLoginResultMessage(Message):
 @dataclass
 class StartPixelProbabilitiesExportJobParamsMessage(Message):
     datasource: DataSourceMessage
-    datasink: PrecomputedChunksScaleSinkMessage
+    datasink: PrecomputedChunksSinkMessage
 
 @dataclass
 class StartSimpleSegmentationExportJobParamsMessage(Message):
     datasource: DataSourceMessage
-    datasink: PrecomputedChunksScaleSinkMessage
+    datasink: PrecomputedChunksSinkMessage
     label_header: LabelHeaderMessage
 
 ############################################
 
 @dataclass
 class LoadProjectParamsMessage(Message):
-    fs: Union[HttpFsMessage, BucketFSMessage, OsfsMessage]
+    fs: Union[HttpFsMessage, BucketFSMessage]
     project_file_path: str
 
 
 @dataclass
 class SaveProjectParamsMessage(Message):
-    fs: Union[HttpFsMessage, BucketFSMessage, OsfsMessage]
+    fs: Union[HttpFsMessage, BucketFSMessage]
     project_file_path: str
 
 #########################################
@@ -947,3 +967,4 @@ class GetDatasourcesFromUrlParamsMessage(Message):
 @dataclass
 class GetDatasourcesFromUrlResponseMessage(Message):
     datasources: Tuple[DataSourceMessage, ...]
+

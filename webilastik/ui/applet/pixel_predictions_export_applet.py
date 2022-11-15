@@ -1,27 +1,28 @@
+# pyright: strict
+
 from dataclasses import dataclass
 import threading
-from typing import Any, Callable, Dict, Generic, Iterable, List, Sequence
-from concurrent.futures import Executor, Future
-import typing
+from typing import Any, Callable, Dict, Generic, Iterable, Sequence
 import uuid
 
 import numpy as np
 from ndstructs.array5D import Array5D
-from ndstructs.point5D import operator
-from ndstructs.utils.json_serializable import JsonObject, ensureJsonArray
+from ndstructs.utils.json_serializable import JsonObject
 
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
-from webilastik.datasink import DataSink, DataSinkWriter
+from webilastik.datasink import DataSink, IDataSinkWriter
+from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
 from webilastik.datasource import DataRoi, DataSource, FsDataSource
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.operator import IN, Operator
-from webilastik.scheduling.job import Job, JobFailedCallback, JobProgressCallback, JobSucceededCallback, PriorityExecutor, IN as JOB_IN, OUT as JOB_OUT
+from webilastik.scheduling.job import Job, JobSucceededCallback, PriorityExecutor
 from webilastik.serialization.json_serialization import JsonValue
 from webilastik.server.message_schema import (
     MessageParsingError,
     PixelClassificationExportAppletStateMessage,
     StartPixelProbabilitiesExportJobParamsMessage,
     StartSimpleSegmentationExportJobParamsMessage,
+    ExportJobMessage,
 )
 from webilastik.simple_segmenter import SimpleSegmenter
 from webilastik.ui.applet import AppletOutput, StatelesApplet, UserPrompt
@@ -32,7 +33,7 @@ from webilastik.ui.applet.brushing_applet import Label
 @dataclass
 class _ExportTask(Generic[IN]):
     operator: Operator[IN, Array5D]
-    sink_writer: DataSinkWriter
+    sink_writer: IDataSinkWriter
 
     def __call__(self, step_arg: IN):
         tile = self.operator(step_arg)
@@ -41,8 +42,8 @@ class _ExportTask(Generic[IN]):
 
 
 # this needs to be top-level becase process pools can't handle local functions
-def _create_datasink(ds: DataSink) -> "DataSinkWriter | Exception":
-    return ds.create()
+def _open_datasink(ds: DataSink) -> "IDataSinkWriter | Exception":
+    return ds.open()
 
 
 class _ExportJob(Job[DataRoi, None]):
@@ -52,7 +53,7 @@ class _ExportJob(Job[DataRoi, None]):
         name: str,
         on_changed: Callable[[], None],
         operator: Operator[DataRoi, Array5D],
-        sink_writer: DataSinkWriter,
+        sink_writer: IDataSinkWriter,
         args: Iterable[DataRoi],
         num_args: "int | None" = None,
     ):
@@ -65,33 +66,49 @@ class _ExportJob(Job[DataRoi, None]):
             args=args,
             num_args=num_args
         )
+        self.sink_writer = sink_writer
 
-    # def to_message(self) -> ExportJobMessage:
-    #     error_message: "str | None" = None
-    #     with self.job_lock:
-    #         return ExportJobMessage(
-    #             name=self.name,
-    #             num_args=self.num_args,
-    #             uuid=str(self.uuid),
-    #             status=self._status,
-    #             num_completed_steps=self.num_completed_steps,
-    #             error_message=error_message
-    #         )
+    def to_message(self) -> ExportJobMessage:
+        error_message: "str | None" = None
+        with self.job_lock:
+            return ExportJobMessage(
+                name=self.name,
+                num_args=self.num_args,
+                uuid=str(self.uuid),
+                status=self._status,
+                num_completed_steps=self.num_completed_steps,
+                error_message=error_message,
+                datasink=self.sink_writer.data_sink.to_message()
+            )
 
-class _OpenDatasinkJob(Job[DataSink, "DataSinkWriter | Exception"]):
+class _OpenDatasinkJob(Job[DataSink, "IDataSinkWriter | Exception"]):
     def __init__(
         self,
         *,
-        on_complete: JobSucceededCallback["DataSinkWriter | Exception"],
+        on_complete: JobSucceededCallback["IDataSinkWriter | Exception"],
         datasink: DataSink,
     ):
         super().__init__(
             name="Creating datasink",
-            target=_create_datasink,
+            target=_open_datasink,
             on_success=on_complete,
             args=[datasink],
             num_args=1
         )
+        self.datasink = datasink
+
+    def to_message(self) -> ExportJobMessage:
+        error_message: "str | None" = None
+        with self.job_lock:
+            return ExportJobMessage(
+                name=self.name,
+                num_args=self.num_args,
+                uuid=str(self.uuid),
+                status=self._status,
+                num_completed_steps=self.num_completed_steps,
+                error_message=error_message,
+                datasink=self.datasink.to_message()
+            )
 
 class PixelClassificationExportApplet(StatelesApplet):
     def __init__(
@@ -124,8 +141,8 @@ class PixelClassificationExportApplet(StatelesApplet):
         with self._lock:
             self._jobs[job.uuid] = job
 
-    def _launch_open_datasink_job(self, *, datasink: DataSink, on_complete: Callable[["DataSinkWriter | Exception"], None]):
-        def clean_datasink_job_then_run_on_complete(job_id: uuid.UUID, result: "DataSinkWriter | Exception"):
+    def _launch_open_datasink_job(self, *, datasink: DataSink, on_complete: Callable[["IDataSinkWriter | Exception"], None]):
+        def clean_datasink_job_then_run_on_complete(job_id: uuid.UUID, result: "IDataSinkWriter | Exception"):
             if not isinstance(result, Exception):
                 self._remove_job(job_id)
             on_complete(result)
@@ -139,7 +156,7 @@ class PixelClassificationExportApplet(StatelesApplet):
         self, *, job_name: str, operator: Operator[DataRoi, Array5D], datasource: DataSource, datasink: DataSink
     ):
 
-        def on_datasink_ready(result: "Exception | DataSinkWriter"):
+        def on_datasink_ready(result: "Exception | IDataSinkWriter"):
             if isinstance(result, BaseException):
                 raise result #FIXME?
             self._launch_job(_ExportJob(
@@ -197,7 +214,9 @@ class WsPixelClassificationExportApplet(WsApplet, PixelClassificationExportApple
             datasource_result = FsDataSource.try_from_message(params_result.datasource)
             if isinstance(datasource_result, MessageParsingError):
                 return UsageError(str(datasource_result)) #FIXME: this is a bug, not a usage error
-            rpc_result = self.launch_pixel_probabilities_export_job(datasource=datasource_result, datasink=DataSink.from_message(params_result.datasink))
+            rpc_result = self.launch_pixel_probabilities_export_job(
+                datasource=datasource_result, datasink=PrecomputedChunksSink.from_message(params_result.datasink)
+            )
         elif method_name == "launch_simple_segmentation_export_job":
             params_result = StartSimpleSegmentationExportJobParamsMessage.from_json_value(arguments)
             if isinstance(params_result, MessageParsingError):
@@ -205,7 +224,7 @@ class WsPixelClassificationExportApplet(WsApplet, PixelClassificationExportApple
             datasource_result = FsDataSource.try_from_message(params_result.datasource)
             if isinstance(datasource_result, MessageParsingError):
                 return UsageError(str(datasource_result)) #FIXME: this is a bug, not a usage error
-            datasink = DataSink.from_message(params_result.datasink)
+            datasink = DataSink.create_from_message(params_result.datasink)
             rpc_result = self.launch_simple_segmentation_export_job(datasource=datasource_result, datasink=datasink, label_name=params_result.label_header.name)
         else:
             raise ValueError(f"Invalid method name: '{method_name}'") #FIXME: return error

@@ -1,20 +1,36 @@
 from typing import Set
 from pathlib import PurePosixPath
 import json
-from webilastik.filesystem import JsonableFilesystem
+from webilastik.filesystem import Filesystem
 
 from ndstructs.array5D import Array5D
 
 from webilastik.datasource.n5_attributes import N5DatasetAttributes
 from webilastik.datasource.n5_datasource import N5Block
-from webilastik.datasink import DataSink, DataSinkWriter
+from webilastik.datasink import DataSink, IDataSinkWriter
 
-class N5DatasetSink(DataSink):
-    # @privatemethod
+class N5Writer(IDataSinkWriter):
+    def __init__(self, data_sink: "N5DataSink") -> None:
+        super().__init__()
+        self._data_sink = data_sink
+
+    @property
+    def data_sink(self) -> "N5DataSink":
+        return self._data_sink
+
+    def write(self, data: Array5D) -> None:
+        tile = N5Block.fromArray5D(data)
+        tile_path = self._data_sink.full_path / self._data_sink.attributes.get_tile_path(data.interval)
+        with self._data_sink.filesystem.openbin(tile_path.as_posix(), "w") as f:
+            _ = f.write(tile.to_n5_bytes(
+                axiskeys=self._data_sink.attributes.c_axiskeys, compression=self._data_sink.attributes.compression
+            ))
+
+class N5DataSink(DataSink):
     def __init__(
         self,
         *,
-        filesystem: JsonableFilesystem,
+        filesystem: Filesystem,
         outer_path: PurePosixPath,
         inner_path: PurePosixPath,
         attributes: N5DatasetAttributes
@@ -30,7 +46,7 @@ class N5DatasetSink(DataSink):
         self.attributes = attributes
         self.filesystem = filesystem
 
-    def create(self) -> "Exception | DataSinkWriter":
+    def open(self) -> "Exception | N5Writer":
         _ = self.filesystem.makedirs(self.full_path.as_posix(), recreate=True)
 
         with self.filesystem.openbin(self.outer_path.joinpath("attributes.json").as_posix(), "w") as f:
@@ -48,10 +64,6 @@ class N5DatasetSink(DataSink):
                 _ = self.filesystem.makedirs(dir_path.as_posix())
                 created_dirs.add(dir_path)
 
-        return self #FIXME? maybe a different class?
+        return N5Writer(self)
 
-    def write(self, data: Array5D) -> None:
-        tile = N5Block.fromArray5D(data)
-        tile_path = self.full_path / self.attributes.get_tile_path(data.interval)
-        with self.filesystem.openbin(tile_path.as_posix(), "w") as f:
-            _ = f.write(tile.to_n5_bytes(axiskeys=self.attributes.c_axiskeys, compression=self.attributes.compression))
+

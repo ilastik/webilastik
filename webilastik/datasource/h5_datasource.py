@@ -7,12 +7,11 @@ from numpy import ndarray
 from ndstructs.array5D import Array5D
 
 from webilastik.datasource import FsDataSource, guess_axiskeys
-from webilastik.filesystem import JsonableFilesystem
+from webilastik.filesystem import Filesystem
 from webilastik.utility.url import Url
 
 import h5py
 from ndstructs.point5D import Interval5D, Point5D, Shape5D
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonIntTripplet, ensureJsonObject, ensureJsonString, ensureOptional
 
 class H5DataSource(FsDataSource):
     _dataset: h5py.Dataset
@@ -22,7 +21,7 @@ class H5DataSource(FsDataSource):
         outer_path: PurePosixPath,
         inner_path: PurePosixPath,
         location: Point5D = Point5D.zero(),
-        filesystem: JsonableFilesystem,
+        filesystem: Filesystem,
         spatial_resolution: Optional[Tuple[int, int, int]] = None
     ):
         self.outer_path = outer_path
@@ -65,20 +64,6 @@ class H5DataSource(FsDataSource):
     def __eq__(self, other: object) -> bool:
         return super().__eq__(other)
 
-    def to_json_value(self) -> JsonObject:
-        return {**super().to_json_value(), "outer_path": self.outer_path.as_posix(), "inner_path": self.inner_path.as_posix()}
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "H5DataSource":
-        value_obj = ensureJsonObject(value)
-        return H5DataSource(
-            outer_path=PurePosixPath(ensureJsonString(value_obj.get("outer_path"))),
-            inner_path=PurePosixPath(ensureJsonString(value_obj.get("inner_path"))),
-            filesystem=JsonableFilesystem.from_json_value(value_obj.get("filesystem")),
-            location=ensureOptional(Point5D.from_json_value, value_obj.get("location")) or Point5D.zero(),
-            spatial_resolution=ensureJsonIntTripplet(value_obj.get("spatial_resolution"))
-        )
-
     def _get_tile(self, tile: Interval5D) -> Array5D:
         slices = tile.translated(-self.location).to_slices(self.axiskeys)
         raw = self._dataset[slices]
@@ -102,5 +87,3 @@ class H5DataSource(FsDataSource):
             return "".join(tag["key"] for tag in tag_dict["axes"])
 
         return guess_axiskeys(dataset.shape)
-
-FsDataSource.datasource_from_json_constructors[H5DataSource.__name__] = H5DataSource.from_json_value

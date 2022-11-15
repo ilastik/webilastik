@@ -2,8 +2,7 @@ from typing import Any, Optional, Tuple
 from pathlib import PurePosixPath
 import enum
 import json
-from webilastik.filesystem import JsonableFilesystem
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonIntTripplet, ensureJsonObject, ensureJsonString, ensureOptional
+from webilastik.filesystem import Filesystem
 
 import numpy as np
 from fs.errors import ResourceNotFound
@@ -70,7 +69,7 @@ class N5DataSource(FsDataSource):
     def __init__(
         self,
         *,
-        filesystem: JsonableFilesystem,
+        filesystem: Filesystem,
         path: PurePosixPath,
         location: Optional[Point5D] = None,
         spatial_resolution: Optional[Tuple[int, int, int]] = None,
@@ -87,20 +86,6 @@ class N5DataSource(FsDataSource):
             interval=self.attributes.interval,
             dtype=self.attributes.dataType,
             spatial_resolution=spatial_resolution,
-        )
-
-    def to_json_value(self) -> JsonObject:
-        return super().to_json_value()
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "N5DataSource":
-        value_obj = ensureJsonObject(value)
-        raw_location = value_obj.get("location")
-        return N5DataSource(
-            path=PurePosixPath(ensureJsonString(value_obj.get("path"))),
-            filesystem=JsonableFilesystem.from_json_value(value_obj.get("filesystem")),
-            location=raw_location if raw_location is None else Point5D.from_json_value(raw_location),
-            spatial_resolution=ensureOptional(ensureJsonIntTripplet, value_obj.get("spatial_resolution")),
         )
 
     def __hash__(self) -> int:
@@ -124,16 +109,3 @@ class N5DataSource(FsDataSource):
         except ResourceNotFound:
             tile_5d = self._allocate(interval=tile, fill_value=0)
         return tile_5d
-
-    def __getstate__(self) -> JsonObject:
-        return self.to_json_value()
-
-    def __setstate__(self, data: JsonValue):
-        data_obj = ensureJsonObject(data)
-        self.__init__(
-            path=PurePosixPath(ensureJsonString(data_obj.get("path"))),
-            location=Interval5D.from_json_value(data_obj.get("interval")).start,
-            filesystem=JsonableFilesystem.from_json_value(data_obj.get("filesystem"))
-        )
-
-FsDataSource.datasource_from_json_constructors[N5DataSource.__name__] = N5DataSource.from_json_value

@@ -19,7 +19,7 @@ from webilastik.server.message_schema import HttpFsMessage
 from webilastik.ui.usage_error import UsageError
 
 from .RemoteFile import RemoteFile
-from webilastik.filesystem import JsonableFilesystem
+from webilastik.filesystem import Filesystem
 from webilastik.utility.url import Url, Protocol
 
 
@@ -27,7 +27,7 @@ def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
 
-class HttpFs(JsonableFilesystem):
+class HttpFs(Filesystem):
     def __init__(self, read_url: Url, write_url: Optional[Url] = None, headers: Optional[Mapping[str, str]] = None):
         super().__init__()
         self.read_url = read_url

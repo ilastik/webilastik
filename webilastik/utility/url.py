@@ -7,7 +7,6 @@ import enum
 from typing import Literal, Optional, List, Dict, Mapping, Union
 from urllib.parse import parse_qs, urlencode, quote_plus, quote
 
-from ndstructs.utils.json_serializable import JsonValue, ensureJsonString
 from webilastik.server import message_schema
 
 DataScheme = Literal["precomputed"]
@@ -55,21 +54,11 @@ class Url:
         re.IGNORECASE
     )
 
-    def to_json_value(self) -> JsonValue:
-        return self.raw
-
     def to_ilp_info_filePath(self) -> str:
         if self.protocol == "file":
             return f"{self.datascheme or ''}" + self.path.as_posix()
         else:
             return self.raw
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "Url":
-        url = Url.parse(ensureJsonString(value))
-        if url is not None:
-            return url
-        raise ValueError(f"Bad url: {value}")
 
     @staticmethod
     def parse(url: str) -> Optional["Url"]:

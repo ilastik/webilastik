@@ -39,7 +39,7 @@ from webilastik.features.ilp_filter import IlpFilter
 from webilastik.datasource import DataSource, FsDataSource
 from webilastik.annotations import Annotation
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier, dump_to_temp_file, vigra_forest_to_h5_bytes
-from webilastik.filesystem import JsonableFilesystem
+from webilastik.filesystem import Filesystem
 from webilastik.ui.applet.brushing_applet import Label
 from webilastik.utility.url import Protocol
 
@@ -363,7 +363,7 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
     def parse(
         cls,
         group: h5py.Group,
-        ilp_fs: JsonableFilesystem,
+        ilp_fs: Filesystem,
         allowed_protocols: Sequence[Protocol] = ("http", "https")
     ) -> "IlpPixelClassificationWorkflowGroup | Exception":
         workflowname = ensure_encoded_string(group, "workflowName")

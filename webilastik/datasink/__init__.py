@@ -1,18 +1,19 @@
 from abc import ABC, abstractmethod
-import json
 from pathlib import PurePosixPath
-from typing import Any, Protocol
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
+from typing import Any, Optional, Protocol, Tuple
 
 import numpy as np
 
 from ndstructs.point5D import Shape5D, Interval5D
 from ndstructs.array5D import Array5D
-from webilastik.filesystem import JsonableFilesystem
-from webilastik.server.message_schema import PrecomputedChunksScaleSinkMessage
+from webilastik.filesystem import Filesystem
+from webilastik.server.message_schema import PrecomputedChunksSinkMessage
 from webilastik.utility.url import Url
 
-class DataSinkWriter(Protocol):
+class IDataSinkWriter(Protocol):
+    @property
+    def data_sink(self) -> "DataSink":
+        ...
     def write(self, data: Array5D):
         ...
 
@@ -23,71 +24,52 @@ class DataSink(ABC):
         tile_shape: Shape5D,
         interval: Interval5D,
         dtype: "np.dtype[Any]", #FIXME: remove Any
+        resolution: Optional[Tuple[int, int, int]] = None,
     ):
         self.tile_shape = tile_shape
         self.interval = interval
         self.dtype = dtype
+        self.resolution = resolution
 
         self.shape = self.interval.shape
         self.location = interval.start
         super().__init__()
 
     @abstractmethod
-    def create(self) -> "Exception | DataSinkWriter":
+    def open(self) -> "Exception | IDataSinkWriter":
         pass
+
+    @classmethod
+    def create_from_message(cls, message: PrecomputedChunksSinkMessage) -> "DataSink": #FIXME: add other sinks
+        from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
+        return PrecomputedChunksSink.from_message(message)
 
     @abstractmethod
-    def write(self, data: Array5D) -> None:
+    def to_message(self) -> PrecomputedChunksSinkMessage: #FIXME: add other sinks
         pass
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": self.__class__.__name__,
-            "tile_shape": self.tile_shape.to_json_value(),
-            "interval": self.interval.to_json_value(),
-            "shape": self.shape.to_json_value(),
-            "dtype": str(self.dtype.name),
-        }
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "DataSink":
-        value_obj = ensureJsonObject(value)
-        class_name = ensureJsonString(value_obj.get("__class__"))
-
-        from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksScaleSink
-        if class_name == PrecomputedChunksScaleSink.__name__:
-            return PrecomputedChunksScaleSink.from_json_value(value)
-        raise ValueError(f"Could not deserialize DataSink from {json.dumps(value)}")
-
-    @classmethod
-    def from_message(cls, message: PrecomputedChunksScaleSinkMessage) -> "DataSink":
-        from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksScaleSink
-        return PrecomputedChunksScaleSink.from_message(message)
 
 class FsDataSink(DataSink):
     def __init__(
         self,
         *,
-        filesystem: JsonableFilesystem,
+        filesystem: Filesystem,
         path: PurePosixPath,
         tile_shape: Shape5D,
         interval: Interval5D,
         dtype: "np.dtype[Any]",
+        resolution: Optional[Tuple[int, int, int]] = None
     ):
         self.filesystem = filesystem
         self.path = path
-        super().__init__(tile_shape=tile_shape, interval=interval, dtype=dtype)
+        super().__init__(
+            tile_shape=tile_shape,
+            interval=interval,
+            dtype=dtype,
+            resolution=resolution,
+        )
 
     @property
     def url(self) -> Url:
         url = Url.parse(self.filesystem.geturl(self.path.as_posix()))
         assert url is not None
         return url
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            **super().to_json_value(),
-            "filesystem": self.filesystem.to_json_value(),
-            "path": self.path.as_posix(),
-            "url": self.url.raw,
-        }

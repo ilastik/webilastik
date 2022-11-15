@@ -12,7 +12,7 @@ from fs.errors import ResourceNotFound
 from fs.permissions import Permissions
 from fs.enums import ResourceType
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonInt, ensureJsonObject, ensureJsonString, ensureJsonArray
-from webilastik.filesystem import JsonableFilesystem
+from webilastik.filesystem import Filesystem
 
 from webilastik.filesystem.RemoteFile import RemoteFile
 from webilastik.libebrains.user_token import UserToken
@@ -110,7 +110,7 @@ class DataProxySession:
     def delete(self, url: Url) -> "requests.Response | Exception":
         return self._do_request("delete", url)
 
-class BucketFs(JsonableFilesystem):
+class BucketFs(Filesystem):
     API_URL = Url(protocol="https", hostname="data-proxy.ebrains.eu", path=PurePosixPath("/api/v1/buckets"))
 
     def __init__(self, bucket_name: str, prefix: PurePosixPath):
@@ -288,30 +288,11 @@ class BucketFs(JsonableFilesystem):
             prefix=self.prefix.as_posix(),
         )
 
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "BucketFs":
-        value_obj = ensureJsonObject(value)
-        bucket_fs_result = BucketFs.try_create(
-            bucket_name=ensureJsonString(value_obj.get("bucket_name")),
-            prefix=PurePosixPath(ensureJsonString(value_obj.get("prefix"))),
-        )
-        if isinstance(bucket_fs_result, Exception):
-            raise bucket_fs_result #FIXME
-        return bucket_fs_result
-
-    def __setstate__(self, value_obj: Dict[str, Any]):
+    def __setstate__(self, message: BucketFSMessage):
         self.__init__(
-            bucket_name=ensureJsonString(value_obj.get("bucket_name")),
-            prefix=PurePosixPath(ensureJsonString(value_obj.get("prefix"))),
+            bucket_name=message.bucket_name,
+            prefix=PurePosixPath(message.prefix)
         )
 
-    def to_json_value(self) -> JsonObject:
-        out: Dict[str, JsonValue] = {
-            "__class__": self.__class__.__name__,
-            "bucket_name": self.bucket_name,
-            "prefix": self.prefix.as_posix(),
-        }
-        return out
-
-    def __getstate__(self) -> JsonObject:
-        return self.to_json_value()
+    def __getstate__(self) -> BucketFSMessage:
+        return self.to_message()

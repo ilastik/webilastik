@@ -28,10 +28,9 @@ from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonO
 from fs.errors import ResourceNotFound
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
-from webilastik.filesystem import JsonableFilesystem
+from webilastik.filesystem import Filesystem
 from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.filesystem.osfs import OsFs
-from webilastik.filesystem.util import fs_from_message
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.server.message_schema import GetDatasourcesFromUrlParamsMessage, GetDatasourcesFromUrlResponseMessage, MessageParsingError, RpcErrorMessage, SaveProjectParamsMessage
 from webilastik.server.session_allocator import uncachable_json_response
@@ -85,11 +84,11 @@ class RPCPayload:
             "arguments": self.arguments,
         }
 
-def do_save_project(filesystem: JsonableFilesystem, file_path: PurePosixPath, workflow_contents: bytes):
+def do_save_project(filesystem: Filesystem, file_path: PurePosixPath, workflow_contents: bytes):
     with filesystem.openbin(file_path.as_posix(), "w") as f:
         f.write(workflow_contents)
 
-def do_load_project_bytes(filesystem: JsonableFilesystem, file_path: PurePosixPath) -> "bytes | ResourceNotFound":
+def do_load_project_bytes(filesystem: Filesystem, file_path: PurePosixPath) -> "bytes | ResourceNotFound":
     try:
         with filesystem.openbin(file_path.as_posix(), "r") as f:
             return f.read()
@@ -223,7 +222,7 @@ class WebIlastik:
             if len(datasources) != 1:
                 return uncachable_json_response(
                     RpcErrorMessage(
-                        error=f"Expected single datasource, found these: {json.dumps([ds.to_json_value() for ds in datasources], indent=4)}"
+                        error=f"Expected single datasource, found these: {json.dumps([ds.to_message().to_json_value() for ds in datasources], indent=4)}"
                     ).to_json_value(),
                     status=400,
                 )
@@ -337,7 +336,7 @@ class WebIlastik:
         params_result = SaveProjectParamsMessage.from_json_value(payload)
         if isinstance(params_result, MessageParsingError):
             return web.Response(status=400, text=f"Bad payload")
-        filesystem = fs_from_message(params_result.fs)
+        filesystem = Filesystem.create_from_message(params_result.fs)
         if isinstance(filesystem, OsFs):
             return web.Response(status=400, text=f"OsFs not allowed for now")
         file_path = PurePosixPath(params_result.project_file_path)
@@ -358,7 +357,7 @@ class WebIlastik:
         params_result = SaveProjectParamsMessage.from_json_value(payload)
         if isinstance(params_result, MessageParsingError):
             return web.Response(status=400, text=f"Bad payload")
-        filesystem = fs_from_message(params_result.fs)
+        filesystem = Filesystem.create_from_message(params_result.fs)
         if isinstance(filesystem, OsFs):
             return web.Response(status=400, text=f"OsFs not allowed for now")
         file_path = PurePosixPath(params_result.project_file_path)

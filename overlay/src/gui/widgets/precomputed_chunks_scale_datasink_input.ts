@@ -1,5 +1,5 @@
 import { vec3 } from "gl-matrix";
-import { Shape5D } from "../../client/ilastik";
+import { Interval5D, Point5D, Shape5D } from "../../client/ilastik";
 import { createElement, getNowString } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
 import { DataType, dataTypes } from "../../util/precomputed_chunks";
@@ -8,7 +8,7 @@ import { Shape5DInput } from "./shape5d_input";
 import { Vec3Input } from "./vec3_input";
 import { BucketFsInput } from "./bucket_fs_input";
 import { PopupSelect } from "./selector_widget";
-import { PrecomputedChunksScaleMessage, PrecomputedChunksScaleSinkMessage } from "../../client/message_schema";
+import { PrecomputedChunksSinkMessage } from "../../client/message_schema";
 
 
 export class PrecomputedChunksScale_DataSink_Input{
@@ -113,7 +113,7 @@ export class PrecomputedChunksScale_DataSink_Input{
         }
     }
 
-    public get value(): PrecomputedChunksScaleSinkMessage | undefined{
+    public get value(): PrecomputedChunksSinkMessage | undefined{
         let filesystem = this.fileSystemSelector.value
         let infoPath = this.infoDirectoryPathInput.value
         let dtype = this.dataTypeSelector.value
@@ -128,19 +128,20 @@ export class PrecomputedChunksScale_DataSink_Input{
             return undefined
         }
 
-        return new PrecomputedChunksScaleSinkMessage({
+        const sinkIntervalStart = Point5D.fromVec3(voxelOffset)
+
+        return new PrecomputedChunksSinkMessage({
             filesystem,
-            info_dir: infoPath.raw,
+            path: infoPath.raw,
             dtype,
-            num_channels: sinkShape.c,
-            scale: new PrecomputedChunksScaleMessage({
-                key: scaleKey.raw,
-                size: [sinkShape.x, sinkShape.y, sinkShape.z],
-                resolution: [resolution[0], resolution[1], resolution[2]],
-                voxel_offset: [voxelOffset[0], voxelOffset[1], voxelOffset[2]],
-                chunk_sizes: [[tileShape.x, tileShape.y, tileShape.z]],
-                encoding,
-            })
+            encoding,
+            interval: Interval5D.fromStartStop({
+                start: sinkIntervalStart,
+                stop: sinkIntervalStart.plus(sinkShape),
+            }).toMessage(),
+            resolution: [resolution[0], resolution[1], resolution[2]],
+            scale_key: scaleKey.raw,
+            tile_shape: tileShape.toMessage(),
         })
     }
 

@@ -14,8 +14,7 @@ from ndstructs.point5D import Point5D, Shape5D, Interval5D
 from ndstructs.array5D import Array5D
 
 from webilastik.datasource import DataSource
-from webilastik.filesystem import JsonableFilesystem
-from webilastik.server.message_schema import PrecomputedChunksScaleMessage
+from webilastik.filesystem import Filesystem
 
 class PrecomputedChunksEncoder(ABC):
     @abstractmethod
@@ -168,27 +167,6 @@ class PrecomputedChunksScale:
             encoding=PrecomputedChunksEncoder.from_json_value(value_obj.get("encoding")),
         )
 
-    @classmethod
-    def from_message(cls, message: PrecomputedChunksScaleMessage) -> "PrecomputedChunksScale":
-        return PrecomputedChunksScale(
-            key=PurePosixPath(message.key),
-            size=message.size,
-            resolution=message.resolution,
-            voxel_offset=message.voxel_offset,
-            chunk_sizes=message.chunk_sizes,
-            encoding=PrecomputedChunksEncoder.from_message(message.encoding),
-        )
-
-    def to_message(self) -> PrecomputedChunksScaleMessage:
-        return PrecomputedChunksScaleMessage(
-            chunk_sizes=self.chunk_sizes,
-            encoding=self.encoding.to_message(),
-            key=self.key.as_posix(),
-            resolution=self.resolution,
-            size=self.size,
-            voxel_offset=self.voxel_offset,
-        )
-
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, PrecomputedChunksScale):
             return False
@@ -273,8 +251,6 @@ class PrecomputedChunksInfo:
             PrecomputedChunksScale5D.from_raw_scale(scale, num_channels=num_channels) for scale in scales
         ]
 
-        if self.type_ != "image":
-            raise NotImplementedError(f"Don't know how to interpret type '{self.type_}'")
         if num_channels <= 0:
             raise ValueError("num_channels must be greater than 0", self.__dict__)
         if len(scales) == 0:
@@ -329,7 +305,7 @@ class PrecomputedChunksInfo:
         )
 
     @classmethod
-    def tryLoad(cls, filesystem: JsonableFilesystem, path: PurePosixPath) ->"PrecomputedChunksInfo | Exception":
+    def tryLoad(cls, filesystem: Filesystem, path: PurePosixPath) ->"PrecomputedChunksInfo | Exception":
         url = filesystem.geturl(path.as_posix())
         if not filesystem.exists(path.as_posix()):
             return FileNotFoundError(f"Could not find info file at {url}")
