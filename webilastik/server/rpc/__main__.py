@@ -297,6 +297,8 @@ class DtoHint(Hint):
                 "from collections.abc import Mapping",
                 "if not isinstance(value, Mapping):",
                 f"    return MessageParsingError(f\"Could not parse {{json.dumps(value)}} as {self.message_generator_type.__name__}\")",
+                f"if value.get('__class__') != '{self.message_generator_type.__name__}':",
+                f"    return MessageParsingError(f\"Could not parse {{json.dumps(value)}} as {self.message_generator_type.__name__}\")",
                 *list(itertools.chain(*(
                     [
                         f"tmp_{field_name} =  {hint.py_fromJsonValue_function.name}(value.get('{field_name}'))",
@@ -314,6 +316,9 @@ class DtoHint(Hint):
                 "if(valueObject instanceof Error){",
                 "    return valueObject;",
                 "}",
+               f"if (valueObject['__class__'] != '{self.message_generator_type.__name__}') {{",
+               f"    return Error(`Could not deserialize ${{JSON.stringify(valueObject)}} as a {self.message_generator_type.__name__}`);",
+               f"}}",
                 *list(itertools.chain(*(
                     [
                     f"const temp_{field_name} = {hint.ts_fromJsonValue_function.name}(valueObject.{field_name})",
@@ -346,6 +351,7 @@ class DtoHint(Hint):
 
             "    public toJsonValue(): JsonObject{",
             "        return {",
+           f"            __class__: '{self.message_generator_type.__name__}',",
         *[f"            {field_name}: " + hint.to_ts_toJsonValue_expr(f"this.{field_name}") + "," for field_name, hint in self.field_annotations.items()],
             "        }",
             "    }",
@@ -360,6 +366,7 @@ class DtoHint(Hint):
         self.py_json_methods: str = "\n".join([
             "    def to_json_value(self) -> JsonObject:",
             "        return {",
+           f"            '__class__': '{self.message_generator_type.__name__}',",
         *[f"            '{field_name}': {hint.make_py_to_json_expr('self.' + field_name)}," for field_name, hint in self.field_annotations.items()],
             "        }",
             "",
