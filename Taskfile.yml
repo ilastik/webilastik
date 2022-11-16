@@ -108,7 +108,7 @@ tasks:
       - "{{.OVERLAY_DIR}}/src/**/*"
       - "{{.OVERLAY_DIR}}/tsconfig.json"
       - "{{.OVERLAY_DIR}}/service_worker_tsconfig.json"
-    generates: ["{{.OVERLAY_BUNDLE_PATH}}", "{{.OVERLAY_DIR}}/build/service_worker.js*"]
+    generates: ["{{.OVERLAY_BUNDLE_PATH}}", "{{.OVERLAY_BUNDLE_PATH}}.map", "{{.OVERLAY_DIR}}/build/service_worker.js*"]
     cmds:
       - rm -rf node_modules
       - npm ci
@@ -124,6 +124,7 @@ tasks:
       - "{{.PROJECT_ROOT}}/caching/**/*.py"
       - "{{.PROJECT_ROOT}}/executor_getters/**/*.py"
       - "{{.OVERLAY_BUNDLE_PATH}}"
+      - "{{.OVERLAY_BUNDLE_PATH}}.map"
       - "{{.OVERLAY_DIR}}/build/service_worker.js*"
       - "{{.NEUROGLANCER_BUNDLE_PATH}}"
     generates:
@@ -210,6 +211,7 @@ tasks:
       - echo 2>&1 '[INFO] Copying overlay bundle to public dir'
       - mkdir -p {{.DEB_TREE_PATH}}/opt/webilastik/public/js/
       - cp {{.OVERLAY_BUNDLE_PATH}} {{.DEB_TREE_PATH}}/opt/webilastik/public/js/
+      - cp {{.OVERLAY_BUNDLE_PATH}}.map {{.DEB_TREE_PATH}}/opt/webilastik/public/js/
       - cp {{.OVERLAY_DIR}}/build/service_worker.js* {{.DEB_TREE_PATH}}/opt/webilastik/public/js
 
       - echo 2>&1 '[INFO] Copying nehuba to public dir'
