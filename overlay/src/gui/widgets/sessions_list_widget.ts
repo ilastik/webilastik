@@ -1,5 +1,5 @@
 import { HpcSiteName, Session, SESSION_DONE_STATES } from "../../client/ilastik";
-import { CloseComputeSessionParamsDto, ComputeSessionStatusDto, ListComputeSessionsParamsDto } from "../../client/message_schema";
+import { CloseComputeSessionParamsDto, ComputeSessionStatusDto, ListComputeSessionsParamsDto } from "../../client/dto";
 import { createElement, createImage, createInput, removeElement, secondsToTimeDeltaString } from "../../util/misc";
 import { Url } from "../../util/parsed_url";
 import { ErrorPopupWidget, PopupWidget } from "./popup";

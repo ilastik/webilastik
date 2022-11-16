@@ -1,5 +1,5 @@
 import { DataSource, Session } from "../../client/ilastik";
-import { GetDatasourcesFromUrlParamsDto } from "../../client/message_schema";
+import { GetDatasourcesFromUrlParamsDto } from "../../client/dto";
 import { createElement, createInput } from "../../util/misc";
 import { CssClasses } from "../css_classes";
 import { ErrorPopupWidget, InputPopupWidget } from "./popup";

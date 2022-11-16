@@ -15,7 +15,7 @@ from fs.permissions import Permissions
 from fs.enums import ResourceType
 from requests.models import CaseInsensitiveDict
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
-from webilastik.server.message_schema import HttpFsDto
+from webilastik.server.rpc.dto import HttpFsDto
 from webilastik.ui.usage_error import UsageError
 
 from .RemoteFile import RemoteFile

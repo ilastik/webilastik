@@ -20,7 +20,7 @@ from cryptography.fernet import Fernet
 from webilastik.libebrains.oidc_client import OidcClient
 from webilastik.libebrains.user_info import UserInfo
 from webilastik.libebrains.user_token import UserToken
-from webilastik.server.message_schema import ComputeSessionDto
+from webilastik.server.rpc.dto import ComputeSessionDto
 
 _oidc_client = OidcClient.from_environment()
 

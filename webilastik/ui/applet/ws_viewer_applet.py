@@ -17,7 +17,7 @@ from webilastik.annotations.annotation import Color
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.features.ilp_filter import IlpFilter
-from webilastik.server.message_schema import (
+from webilastik.server.rpc.dto import (
     FailedViewDto, MakeDataViewParams, MessageParsingError, PredictionsViewDto, RawDataViewDto, StrippedPrecomputedViewDto, UnsupportedDatasetViewDto, ViewerAppletStateDto
 )
 from webilastik.server.session_allocator import uncachable_json_response

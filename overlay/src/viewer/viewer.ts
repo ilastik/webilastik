@@ -2,7 +2,7 @@
 import { quat, vec3 } from "gl-matrix";
 import { Applet } from "../client/applets/applet";
 import { DataSource, PredictionsView, Session, View, DataView, RawDataView, StrippedPrecomputedView, DataViewUnion, Color } from "../client/ilastik";
-import { MakeDataViewParams, ViewerAppletStateDto } from "../client/message_schema";
+import { MakeDataViewParams, ViewerAppletStateDto } from "../client/dto";
 import { INativeView, IViewerDriver, IViewportDriver } from "../drivers/viewer_driver";
 import { ErrorPopupWidget } from "../gui/widgets/popup";
 import { HashMap } from "../util/hashmap";

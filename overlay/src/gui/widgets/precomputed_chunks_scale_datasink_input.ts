@@ -8,7 +8,7 @@ import { Shape5DInput } from "./shape5d_input";
 import { Vec3Input } from "./vec3_input";
 import { BucketFsInput } from "./bucket_fs_input";
 import { PopupSelect } from "./selector_widget";
-import { PrecomputedChunksSinkDto } from "../../client/message_schema";
+import { PrecomputedChunksSinkDto } from "../../client/dto";
 
 
 export class PrecomputedChunksScale_DataSink_Input{

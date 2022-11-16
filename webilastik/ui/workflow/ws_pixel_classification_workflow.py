@@ -32,7 +32,7 @@ from webilastik.filesystem import Filesystem
 from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.filesystem.osfs import OsFs
 from webilastik.scheduling.job import PriorityExecutor
-from webilastik.server.message_schema import GetDatasourcesFromUrlParamsDto, GetDatasourcesFromUrlResponseDto, MessageParsingError, RpcErrorDto, SaveProjectParamsDto
+from webilastik.server.rpc.dto import GetDatasourcesFromUrlParamsDto, GetDatasourcesFromUrlResponseDto, MessageParsingError, RpcErrorDto, SaveProjectParamsDto
 from webilastik.server.session_allocator import uncachable_json_response
 from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError

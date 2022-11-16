@@ -16,7 +16,7 @@ from webilastik.filesystem import Filesystem
 
 from webilastik.filesystem.RemoteFile import RemoteFile
 from webilastik.libebrains.user_token import UserToken
-from webilastik.server.message_schema import BucketFSDto
+from webilastik.server.rpc.dto import BucketFSDto
 from webilastik.ui.usage_error import UsageError
 from webilastik.utility.url import Protocol, Url
 from webilastik.libebrains import global_user_login

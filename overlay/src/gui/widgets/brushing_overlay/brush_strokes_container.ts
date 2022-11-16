@@ -1,7 +1,7 @@
 import { vec3 } from "gl-matrix";
 import { Applet } from "../../../client/applets/applet";
 import { Color, DataSource, Session } from "../../../client/ilastik";
-import * as schema from "../../../client/message_schema";
+import * as schema from "../../../client/dto";
 import { HashMap } from "../../../util/hashmap";
 import { createElement, createInput, createInputParagraph, InlineCss, removeElement, vecToString } from "../../../util/misc";
 import { JsonValue } from "../../../util/serialization";

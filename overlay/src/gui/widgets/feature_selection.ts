@@ -2,7 +2,7 @@ import { createElement, createInput } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
 import { Applet } from '../../client/applets/applet';
 import { Session, IlpFeatureExtractor } from '../../client/ilastik';
-import { AddFeatureExtractorsParamsDto, FeatureSelectionAppletStateDto, IlpFeatureExtractorDto, RemoveFeatureExtractorsParamsDto } from '../../client/message_schema';
+import { AddFeatureExtractorsParamsDto, FeatureSelectionAppletStateDto, IlpFeatureExtractorDto, RemoveFeatureExtractorsParamsDto } from '../../client/dto';
 
 // class FeatureCheckbox<FE extends FeatureExtractor>{
 //     constructor()

@@ -1,6 +1,6 @@
 import { quat, vec3 } from "gl-matrix";
 import { Color, DataSource } from "../../../client/ilastik";
-import { PixelAnnotationDto } from "../../../client/message_schema";
+import { PixelAnnotationDto } from "../../../client/dto";
 import { VecAttributeBuffer, BufferUsageHint } from "../../../gl/buffer";
 import { VertexArray } from "../../../gl/vertex_primitives";
 // import { vec3ToString } from "./utils";

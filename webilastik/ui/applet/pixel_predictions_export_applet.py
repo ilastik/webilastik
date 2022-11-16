@@ -17,7 +17,7 @@ from webilastik.features.ilp_filter import IlpFilter
 from webilastik.operator import IN, Operator
 from webilastik.scheduling.job import Job, JobSucceededCallback, PriorityExecutor
 from webilastik.serialization.json_serialization import JsonValue
-from webilastik.server.message_schema import (
+from webilastik.server.rpc.dto import (
     MessageParsingError,
     PixelClassificationExportAppletStateDto,
     StartPixelProbabilitiesExportJobParamsDto,

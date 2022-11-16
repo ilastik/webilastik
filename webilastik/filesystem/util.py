@@ -3,7 +3,7 @@
 from typing import Union
 
 from webilastik.filesystem.bucket_fs import BucketFs
-from webilastik.server.message_schema import BucketFSDto, HttpFsDto#, OsfsDto
+from webilastik.server.rpc.dto import BucketFSDto, HttpFsDto#, OsfsDto
 # from webilastik.filesystem.osfs import OsFs
 from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.filesystem.http_fs import HttpFs

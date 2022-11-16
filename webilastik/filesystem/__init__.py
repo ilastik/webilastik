@@ -3,7 +3,7 @@ import json
 
 from ndstructs.utils.json_serializable import IJsonable, JsonValue, ensureJsonObject, ensureJsonString
 from fs.base import FS
-from webilastik.server.message_schema import BucketFSDto, HttpFsDto, OsfsDto
+from webilastik.server.rpc.dto import BucketFSDto, HttpFsDto, OsfsDto
 from webilastik.utility.url import Url
 
 class Filesystem(FS):

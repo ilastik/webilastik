@@ -12,7 +12,7 @@ import numpy as np
 from ndstructs.point5D import Shape5D, Interval5D, Point5D, SPAN
 from ndstructs.array5D import Array5D, SPAN_OVERRIDE, All
 from webilastik.filesystem import Filesystem
-from webilastik.server.message_schema import DataSourceDto, Interval5DDto, MessageParsingError, Shape5DDto
+from webilastik.server.rpc.dto import DataSourceDto, Interval5DDto, MessageParsingError, Shape5DDto
 from webilastik.utility.url import Url
 from webilastik.utility.url import Url, Protocol
 from global_cache import global_cache

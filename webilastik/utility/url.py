@@ -7,7 +7,7 @@ import enum
 from typing import Literal, Optional, List, Dict, Mapping, Union
 from urllib.parse import parse_qs, urlencode, quote_plus, quote
 
-from webilastik.server import message_schema
+from webilastik.server.rpc import dto
 
 DataScheme = Literal["precomputed"]
 Protocol = Literal["http", "https", "file", "memory"]
@@ -94,7 +94,7 @@ class Url:
         return parsed
 
     @classmethod
-    def from_message(cls, url_message: message_schema.UrlDto) -> 'Url':
+    def from_message(cls, url_message: dto.UrlDto) -> 'Url':
         return Url(
             datascheme=url_message.datascheme,
             protocol=url_message.protocol,
@@ -105,8 +105,8 @@ class Url:
             hash_=url_message.fragment,
         )
 
-    def to_message(self) -> message_schema.UrlDto:
-        return message_schema.UrlDto(
+    def to_message(self) -> dto.UrlDto:
+        return dto.UrlDto(
             datascheme=self.datascheme,
             protocol=self.protocol,
             hostname=self.hostname,

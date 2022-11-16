@@ -13,7 +13,7 @@ from webilastik.filesystem import Filesystem
 from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.filesystem.http_fs import HttpFs
 from webilastik.filesystem.osfs import OsFs
-from webilastik.server.message_schema import Interval5DDto, PrecomputedChunksSinkDto, Shape5DDto
+from webilastik.server.rpc.dto import Interval5DDto, PrecomputedChunksSinkDto, Shape5DDto
 from webilastik.utility.url import Url
 
 class PrecomputedChunksWriter(IDataSinkWriter):

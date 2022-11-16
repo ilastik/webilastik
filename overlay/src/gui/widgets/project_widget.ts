@@ -1,5 +1,5 @@
 import { Session } from "../../client/ilastik";
-import { BucketFSDto, LoadProjectParamsDto, SaveProjectParamsDto } from "../../client/message_schema";
+import { BucketFSDto, LoadProjectParamsDto, SaveProjectParamsDto } from "../../client/dto";
 import { createElement, createInput, getNowString } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";

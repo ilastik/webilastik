@@ -3,7 +3,7 @@ import os
 from fs.osfs import OSFS
 
 from webilastik.filesystem import Filesystem
-from webilastik.server.message_schema import OsfsDto
+from webilastik.server.rpc.dto import OsfsDto
 
 
 

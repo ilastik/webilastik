@@ -12,7 +12,7 @@ from webilastik.features.channelwise_fastfilters import (
 )
 from .feature_extractor import FeatureData, JsonableFeatureExtractor
 from webilastik.operator import Operator, OpRetriever
-from webilastik.server.message_schema import IlpFeatureExtractorDto
+from webilastik.server.rpc.dto import IlpFeatureExtractorDto
 
 IlpFilterName = Literal[
     "Gaussian Smoothing",

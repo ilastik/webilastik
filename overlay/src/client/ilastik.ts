@@ -35,7 +35,7 @@ import {
     Shape5DDto,
     StrippedPrecomputedViewDto,
     UnsupportedDatasetViewDto
-} from "./message_schema"
+} from "./dto"
 
 export type HpcSiteName = ComputeSessionStatusDto["hpc_site"] //FIXME?
 

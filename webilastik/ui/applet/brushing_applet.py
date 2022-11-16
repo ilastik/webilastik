@@ -7,7 +7,7 @@ import numpy as np
 
 from webilastik.datasource import DataSource
 from webilastik.annotations.annotation import Annotation, Color
-from webilastik.server.message_schema import (
+from webilastik.server.rpc.dto import (
     AddPixelAnnotationParams, BrushingAppletStateDto, CreateLabelParams, LabelHeaderDto, LabelDto, MessageParsingError, RecolorLabelParams, RemoveLabelParams, RemovePixelAnnotationParams, RenameLabelParams
 )
 from webilastik.ui.applet import Applet, CascadeError, CascadeOk, CascadeResult, UserPrompt, applet_output, cascade

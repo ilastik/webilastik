@@ -2,7 +2,7 @@ import json
 from typing import Iterable, Optional, Tuple, Sequence, Set
 from ndstructs.utils.json_serializable import JsonObject, JsonValue
 from webilastik.datasource import DataSource
-from webilastik.server.message_schema import AddFeatureExtractorsParamsDto, FeatureSelectionAppletStateDto, MessageParsingError, RemoveFeatureExtractorsParamsDto
+from webilastik.server.rpc.dto import AddFeatureExtractorsParamsDto, FeatureSelectionAppletStateDto, MessageParsingError, RemoveFeatureExtractorsParamsDto
 
 from webilastik.ui.applet import Applet, AppletOutput, CascadeOk, CascadeResult, UserCancelled, UserPrompt, applet_output, cascade
 from webilastik.features.ilp_filter import IlpFilter

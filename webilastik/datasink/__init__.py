@@ -7,7 +7,7 @@ import numpy as np
 from ndstructs.point5D import Shape5D, Interval5D
 from ndstructs.array5D import Array5D
 from webilastik.filesystem import Filesystem
-from webilastik.server.message_schema import PrecomputedChunksSinkDto
+from webilastik.server.rpc.dto import PrecomputedChunksSinkDto
 from webilastik.utility.url import Url
 
 class IDataSinkWriter(Protocol):

@@ -24,14 +24,10 @@ vars:
 
 tasks:
   generate-message-schemas:
-    sources: ["{{.PROJECT_ROOT}}/scripts/generate_message_schemas.py"]
-    generates:
-      - "{{.PROJECT_ROOT}}/webilastik/server/message_schema.py"
-      - "{{.PROJECT_ROOT}}/overlay/src/client/message_schema.ts"
     cmds:
-      - python {{.PROJECT_ROOT}}/scripts/generate_message_schemas.py
-      - deno fmt --options-line-width=120 {{.PROJECT_ROOT}}/overlay/src/client/message_schema.ts
-      - black {{.PROJECT_ROOT}}/webilastik/server/message_schema.py
+      - python -m webilastik.server.rpc
+      - deno fmt --options-line-width=120 {{.PROJECT_ROOT}}/overlay/src/client/dto.ts
+      - black {{.PROJECT_ROOT}}/webilastik/server/rpc/dto.py
 
   check:
     deps: [generate-message-schemas]

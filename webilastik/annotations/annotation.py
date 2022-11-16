@@ -8,7 +8,7 @@ from ndstructs.array5D import Array5D, All, ScalarData, StaticLine
 from webilastik.datasource import DataSource, DataRoi, FsDataSource
 from webilastik.features.feature_extractor import FeatureExtractor, FeatureData
 from executor_getter import get_executor
-from webilastik.server.message_schema import ColorDto, MessageParsingError, PixelAnnotationDto
+from webilastik.server.rpc.dto import ColorDto, MessageParsingError, PixelAnnotationDto
 from webilastik.utility.url import Protocol
 
 

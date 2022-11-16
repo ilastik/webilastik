@@ -1,4 +1,4 @@
-import { BucketFSDto } from "../../client/message_schema";
+import { BucketFSDto } from "../../client/dto";
 import { createElement, createInputParagraph } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
 import { PathInput } from "./path_input";

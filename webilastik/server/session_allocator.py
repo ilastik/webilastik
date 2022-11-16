@@ -19,7 +19,7 @@ from ndstructs.utils.json_serializable import JsonValue
 from webilastik.libebrains.compute_session_launcher import CscsSshJobLauncher, JusufSshJobLauncher, LocalJobLauncher, Minutes, NodeSeconds, ComputeSession, SshJobLauncher
 from webilastik.libebrains.user_token import UserToken
 from webilastik.libebrains.oidc_client import OidcClient, Scope
-from webilastik.server.message_schema import (
+from webilastik.server.rpc.dto import (
     CheckLoginResultDto,
     CloseComputeSessionParamsDto,
     CloseComputeSessionResponseDto,

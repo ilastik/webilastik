@@ -13,7 +13,7 @@ import {
     PrecomputedChunksSinkDto,
     StartPixelProbabilitiesExportJobParamsDto,
     StartSimpleSegmentationExportJobParamsDto
-} from '../../client/message_schema';
+} from '../../client/dto';
 import { PopupSelect, SelectorWidget } from './selector_widget';
 import { DataSourceInput } from './datasource_input';
 import { PrecomputedChunksScale_DataSink_Input } from './precomputed_chunks_scale_datasink_input';

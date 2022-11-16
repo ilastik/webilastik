@@ -1,4 +1,4 @@
-import { UrlDto } from "../client/message_schema";
+import { UrlDto } from "../client/dto";
 import { IJsonable } from "./serialization";
 
 export const data_schemes = ["precomputed"] as const;

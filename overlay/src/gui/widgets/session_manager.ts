@@ -1,6 +1,6 @@
 import { IViewerDriver } from "../..";
 import { HpcSiteName, Session } from "../../client/ilastik";
-import { CreateComputeSessionParamsDto, GetComputeSessionStatusParamsDto } from "../../client/message_schema";
+import { CreateComputeSessionParamsDto, GetComputeSessionStatusParamsDto } from "../../client/dto";
 import { createElement, createInput, createInputParagraph, secondsToTimeDeltaString } from "../../util/misc";
 import { Url } from "../../util/parsed_url";
 import { ReferencePixelClassificationWorkflowGui } from "../reference_pixel_classification_workflow";
