@@ -17,13 +17,13 @@ class OsFs(OSFS, Filesystem):
         )
 
     def __getstate__(self) -> OsfsDto:
-        return self.to_message()
+        return self.to_dto()
 
-    def to_message(self) -> OsfsDto:
+    def to_dto(self) -> OsfsDto:
         return OsfsDto(path=self.root_path)
 
     @staticmethod
-    def from_message(message: OsfsDto) -> "OsFs":
+    def from_dto(message: OsfsDto) -> "OsFs":
         return OsFs(message.path)
 
     def __setstate__(self, message: OsfsDto):

@@ -15,14 +15,14 @@ class Filesystem(FS):
 
         # FIXME: Maybe register these via __init_subclass__?
         if isinstance(message, HttpFsDto):
-            return HttpFs.from_message(message)
+            return HttpFs.from_dto(message)
         if isinstance(message, OsfsDto):
-            return OsFs.from_message(message)
+            return OsFs.from_dto(message)
         if isinstance(message, BucketFSDto):
-            return BucketFs.from_message(message)
+            return BucketFs.from_dto(message)
 
     @abstractmethod
-    def to_message(self) -> "OsfsDto | HttpFsDto | BucketFSDto":
+    def to_dto(self) -> "OsfsDto | HttpFsDto | BucketFSDto":
         pass
 
     @staticmethod

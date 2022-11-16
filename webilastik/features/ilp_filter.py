@@ -24,7 +24,7 @@ IlpFilterName = Literal[
 ]
 
 class IlpFilter(PresmoothedFilter):
-    def to_message(self) -> IlpFeatureExtractorDto:
+    def to_dto(self) -> IlpFeatureExtractorDto:
         return IlpFeatureExtractorDto(
             ilp_scale=self.ilp_scale,
             axis_2d=self.axis_2d,
@@ -39,7 +39,7 @@ class IlpFilter(PresmoothedFilter):
         return self.op.channel_multiplier
 
     @classmethod
-    def from_message(cls, value: IlpFeatureExtractorDto) -> "IlpFilter":
+    def from_dto(cls, value: IlpFeatureExtractorDto) -> "IlpFilter":
         class_name = value.class_name
 
         if class_name == IlpGaussianSmoothing.ilp_name():

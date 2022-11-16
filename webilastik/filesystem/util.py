@@ -11,7 +11,7 @@ from webilastik.filesystem.http_fs import HttpFs
 
 def fs_from_message(message: Union[HttpFsDto, BucketFSDto]) -> Union[BucketFs, HttpFs]: #Union[OsFs, BucketFs, HttpFs]:
     # if isinstance(message, OsfsDto):
-    #     return OsFs.from_message(message)
+    #     return OsFs.from_dto(message)
     if isinstance(message, BucketFSDto):
-        return BucketFs.from_message(message)
-    return HttpFs.from_message(message)
+        return BucketFs.from_dto(message)
+    return HttpFs.from_dto(message)

@@ -276,13 +276,13 @@ class BucketFs(Filesystem):
         return super().setinfo(path, info)
 
     @classmethod
-    def from_message(cls, message: BucketFSDto) -> "BucketFs":
+    def from_dto(cls, message: BucketFSDto) -> "BucketFs":
         return BucketFs(
             bucket_name=message.bucket_name,
             prefix=PurePosixPath(message.prefix)
         )
 
-    def to_message(self) -> BucketFSDto:
+    def to_dto(self) -> BucketFSDto:
         return BucketFSDto(
             bucket_name=self.bucket_name,
             prefix=self.prefix.as_posix(),
@@ -295,4 +295,4 @@ class BucketFs(Filesystem):
         )
 
     def __getstate__(self) -> BucketFSDto:
-        return self.to_message()
+        return self.to_dto()

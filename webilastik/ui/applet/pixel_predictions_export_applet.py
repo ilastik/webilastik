@@ -68,7 +68,7 @@ class _ExportJob(Job[DataRoi, None]):
         )
         self.sink_writer = sink_writer
 
-    def to_message(self) -> ExportJobDto:
+    def to_dto(self) -> ExportJobDto:
         error_message: "str | None" = None
         with self.job_lock:
             return ExportJobDto(
@@ -78,7 +78,7 @@ class _ExportJob(Job[DataRoi, None]):
                 status=self._status,
                 num_completed_steps=self.num_completed_steps,
                 error_message=error_message,
-                datasink=self.sink_writer.data_sink.to_message()
+                datasink=self.sink_writer.data_sink.to_dto()
             )
 
 class _OpenDatasinkJob(Job[DataSink, "IDataSinkWriter | Exception"]):
@@ -97,7 +97,7 @@ class _OpenDatasinkJob(Job[DataSink, "IDataSinkWriter | Exception"]):
         )
         self.datasink = datasink
 
-    def to_message(self) -> ExportJobDto:
+    def to_dto(self) -> ExportJobDto:
         error_message: "str | None" = None
         with self.job_lock:
             return ExportJobDto(
@@ -107,7 +107,7 @@ class _OpenDatasinkJob(Job[DataSink, "IDataSinkWriter | Exception"]):
                 status=self._status,
                 num_completed_steps=self.num_completed_steps,
                 error_message=error_message,
-                datasink=self.datasink.to_message()
+                datasink=self.datasink.to_dto()
             )
 
 class PixelClassificationExportApplet(StatelesApplet):
@@ -215,7 +215,7 @@ class WsPixelClassificationExportApplet(WsApplet, PixelClassificationExportApple
             if isinstance(datasource_result, MessageParsingError):
                 return UsageError(str(datasource_result)) #FIXME: this is a bug, not a usage error
             rpc_result = self.launch_pixel_probabilities_export_job(
-                datasource=datasource_result, datasink=PrecomputedChunksSink.from_message(params_result.datasink)
+                datasource=datasource_result, datasink=PrecomputedChunksSink.from_dto(params_result.datasink)
             )
         elif method_name == "launch_simple_segmentation_export_job":
             params_result = StartSimpleSegmentationExportJobParamsDto.from_json_value(arguments)
@@ -235,7 +235,7 @@ class WsPixelClassificationExportApplet(WsApplet, PixelClassificationExportApple
             labels = self._in_populated_labels()
             datasource_suggestions = self._in_datasource_suggestions()
             return PixelClassificationExportAppletStateDto(
-                jobs=tuple(job.to_message() for job in self._jobs.values()),
+                jobs=tuple(job.to_dto() for job in self._jobs.values()),
                 populated_labels=None if not labels else tuple(l.to_header_message() for l in labels),
-                datasource_suggestions=None if datasource_suggestions is None else tuple(ds.to_message() for ds in datasource_suggestions)
+                datasource_suggestions=None if datasource_suggestions is None else tuple(ds.to_dto() for ds in datasource_suggestions)
             ).to_json_value()

@@ -36,11 +36,11 @@ class PrecomputedChunksEncoder(ABC):
         pass
 
     @abstractmethod
-    def to_message(self) -> Literal["raw", "jpeg"]:
+    def to_dto(self) -> Literal["raw", "jpeg"]:
         pass
 
     @classmethod
-    def from_message(cls, message: Literal["raw", "jpeg"]) -> "PrecomputedChunksEncoder":
+    def from_dto(cls, message: Literal["raw", "jpeg"]) -> "PrecomputedChunksEncoder":
         if message == "raw":
             return RawEncoder()
         if message == "jpeg":
@@ -56,7 +56,7 @@ class PrecomputedChunksEncoder(ABC):
         raise ValueError(f"Bad encoding value: {label}")
 
 class RawEncoder(PrecomputedChunksEncoder):
-    def to_message(self) -> Literal["raw"]:
+    def to_dto(self) -> Literal["raw"]:
         return "raw"
 
     def to_json_value(self) -> JsonValue:
@@ -81,7 +81,7 @@ class RawEncoder(PrecomputedChunksEncoder):
         return data.raw("xyzc").tobytes("F")
 
 class JpegEncoder(PrecomputedChunksEncoder):
-    def to_message(self) -> Literal["jpeg"]:
+    def to_dto(self) -> Literal["jpeg"]:
         return "jpeg"
 
     def to_json_value(self) -> JsonValue:

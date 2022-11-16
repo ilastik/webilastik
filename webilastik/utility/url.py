@@ -94,7 +94,7 @@ class Url:
         return parsed
 
     @classmethod
-    def from_message(cls, url_message: dto.UrlDto) -> 'Url':
+    def from_dto(cls, url_message: dto.UrlDto) -> 'Url':
         return Url(
             datascheme=url_message.datascheme,
             protocol=url_message.protocol,
@@ -105,7 +105,7 @@ class Url:
             hash_=url_message.fragment,
         )
 
-    def to_message(self) -> dto.UrlDto:
+    def to_dto(self) -> dto.UrlDto:
         return dto.UrlDto(
             datascheme=self.datascheme,
             protocol=self.protocol,

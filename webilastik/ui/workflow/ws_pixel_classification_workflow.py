@@ -203,7 +203,7 @@ class WebIlastik:
         params = GetDatasourcesFromUrlParamsDto.from_json_value(await request.json())
         if isinstance(params, MessageParsingError):
             return  uncachable_json_response(RpcErrorDto(error="bad payload").to_json_value(), status=400)
-        url = Url.from_message(params.url)
+        url = Url.from_dto(params.url)
 
         selected_resolution: "Tuple[int, int, int] | None" = None
         stripped_precomputed_url_regex = re.compile(r"/stripped_precomputed/url=(?P<url>[^/]+)/resolution=(?P<resolution>\d+_\d+_\d+)")
@@ -222,7 +222,7 @@ class WebIlastik:
             if len(datasources) != 1:
                 return uncachable_json_response(
                     RpcErrorDto(
-                        error=f"Expected single datasource, found these: {json.dumps([ds.to_message().to_json_value() for ds in datasources], indent=4)}"
+                        error=f"Expected single datasource, found these: {json.dumps([ds.to_dto().to_json_value() for ds in datasources], indent=4)}"
                     ).to_json_value(),
                     status=400,
                 )
@@ -230,7 +230,7 @@ class WebIlastik:
             datasources = datasources_result
 
         return uncachable_json_response(
-            GetDatasourcesFromUrlResponseDto(datasources=tuple([ds.to_message() for ds in datasources])).to_json_value(),
+            GetDatasourcesFromUrlResponseDto(datasources=tuple([ds.to_dto() for ds in datasources])).to_json_value(),
             status=200,
         )
 

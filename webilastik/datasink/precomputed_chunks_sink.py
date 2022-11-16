@@ -128,22 +128,22 @@ class PrecomputedChunksSink(FsDataSink):
             resolution=self.resolution,
         )
 
-    def to_message(self) -> PrecomputedChunksSinkDto:
+    def to_dto(self) -> PrecomputedChunksSinkDto:
         assert isinstance(self.filesystem, (HttpFs, OsFs, BucketFs)) #FIXME
         type_name: Literal["uint8", "uint16", "uint32", "uint64", "float32"] = str(self.dtype) #type: ignore #FIXME
         return PrecomputedChunksSinkDto(
-            filesystem=self.filesystem.to_message(),
+            filesystem=self.filesystem.to_dto(),
             path=self.path.as_posix(),
             dtype=type_name,
             tile_shape=Shape5DDto.from_shape5d(self.tile_shape),
-            encoding=self.encoding.to_message(),
+            encoding=self.encoding.to_dto(),
             interval=Interval5DDto.from_interval5d(self.interval),
             resolution=self.resolution,
             scale_key=self.scale_key.as_posix(),
         )
 
     @classmethod
-    def from_message(cls, message: PrecomputedChunksSinkDto) -> "PrecomputedChunksSink":
+    def from_dto(cls, message: PrecomputedChunksSinkDto) -> "PrecomputedChunksSink":
         return PrecomputedChunksSink(
             filesystem=Filesystem.create_from_message(message.filesystem),
             path=PurePosixPath(message.path),
@@ -151,12 +151,12 @@ class PrecomputedChunksSink(FsDataSink):
             dtype=np.dtype(message.dtype), #FIXME?
             interval=message.interval.to_interval5d(),
             tile_shape=message.tile_shape.to_shape5d(),
-            encoding=PrecomputedChunksEncoder.from_message(message.encoding),
+            encoding=PrecomputedChunksEncoder.from_dto(message.encoding),
             resolution=message.resolution,
         )
 
     def __getstate__(self) -> PrecomputedChunksSinkDto:
-        return self.to_message()
+        return self.to_dto()
 
     def __setstate__(self, message: PrecomputedChunksSinkDto):
         self.__init__(
@@ -166,6 +166,6 @@ class PrecomputedChunksSink(FsDataSink):
             dtype=np.dtype(message.dtype), #FIXME?
             interval=message.interval.to_interval5d(),
             tile_shape=message.tile_shape.to_shape5d(),
-            encoding=PrecomputedChunksEncoder.from_message(message.encoding),
+            encoding=PrecomputedChunksEncoder.from_dto(message.encoding),
             resolution=message.resolution,
         )

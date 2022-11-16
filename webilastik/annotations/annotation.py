@@ -27,7 +27,7 @@ class Color:
         self.hex_code = f"#{r:02X}{g:02X}{b:02X}"
         super().__init__()
 
-    def to_message(self) -> ColorDto:
+    def to_dto(self) -> ColorDto:
         return ColorDto(r=int(self.r), g=int(self.g), b=int(self.b))
 
     @classmethod
@@ -165,7 +165,7 @@ class Annotation(ScalarData):
         return cls(scribblings._data, axiskeys=scribblings.axiskeys, raw_data=raw_data, location=start)
 
     @classmethod
-    def from_message(
+    def from_dto(
         cls,
         message: PixelAnnotationDto,
         allowed_protocols: Sequence[Protocol] = ("http", "https"),
@@ -180,13 +180,13 @@ class Annotation(ScalarData):
             raw_data=raw_data_result,
         )
 
-    def to_message(self) -> PixelAnnotationDto:
+    def to_dto(self) -> PixelAnnotationDto:
         if not isinstance(self.raw_data, FsDataSource):
             #FIXME: maybe create a FsDatasourceAnnotation so we don't have to raise here?
             raise ValueError(f"Can't serialize annotation over {self.raw_data}")
 
         return PixelAnnotationDto(
-            raw_data=self.raw_data.to_message(),
+            raw_data=self.raw_data.to_dto(),
             points=self.to_raw_points(),
         )
 

@@ -253,12 +253,12 @@ class FsDataSource(DataSource):
             self.url == other.url
         )
 
-    def to_message(self) -> DataSourceDto:
+    def to_dto(self) -> DataSourceDto:
         return DataSourceDto(
             interval=Interval5DDto.from_interval5d(self.interval),
             spatial_resolution=self.spatial_resolution,
             tile_shape=Shape5DDto.from_shape5d(self.tile_shape),
-            url=self.url.to_message(),
+            url=self.url.to_dto(),
         )
 
     @staticmethod
@@ -266,7 +266,7 @@ class FsDataSource(DataSource):
         message: DataSourceDto,
         allowed_protocols: Sequence[Protocol] = ("http", "https"),
     ) -> "FsDataSource | MessageParsingError":
-        url = Url.from_message(message.url)
+        url = Url.from_dto(message.url)
         fs_ds_result =  FsDataSource.try_get_datasources_from_url(url=url, allowed_protocols=allowed_protocols)
         if isinstance(fs_ds_result, Exception):
             return MessageParsingError(str(fs_ds_result))

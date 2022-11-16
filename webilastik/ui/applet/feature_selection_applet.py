@@ -72,7 +72,7 @@ class FeatureSelectionApplet(Applet):
 class WsFeatureSelectionApplet(WsApplet, FeatureSelectionApplet):
     def _get_json_state(self) -> JsonValue:
         return FeatureSelectionAppletStateDto(
-            feature_extractors=tuple(extractor.to_message() for extractor in self.feature_extractors())
+            feature_extractors=tuple(extractor.to_dto() for extractor in self.feature_extractors())
         ).to_json_value()
 
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
@@ -81,13 +81,13 @@ class WsFeatureSelectionApplet(WsApplet, FeatureSelectionApplet):
             if isinstance(params, MessageParsingError):
                 return UsageError(str(params)) #FIXME: this is a bug, not a usage error
             return UsageError.check(self.add_feature_extractors(
-                user_prompt=user_prompt, feature_extractors=[IlpFilter.from_message(m) for m in params.feature_extractors]
+                user_prompt=user_prompt, feature_extractors=[IlpFilter.from_dto(m) for m in params.feature_extractors]
             ))
         if method_name == "remove_feature_extractors":
             params = RemoveFeatureExtractorsParamsDto.from_json_value(arguments)
             if isinstance(params, MessageParsingError):
                 return UsageError(str(params)) #FIXME: this is a bug, not a usage error
             return UsageError.check(self.remove_feature_extractors(
-                user_prompt=user_prompt, feature_extractors=[IlpFilter.from_message(m) for m in params.feature_extractors]
+                user_prompt=user_prompt, feature_extractors=[IlpFilter.from_dto(m) for m in params.feature_extractors]
             ))
         raise ValueError(f"Invalid method name: '{method_name}'")

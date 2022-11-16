@@ -56,7 +56,7 @@ class HttpFs(Filesystem):
             "__class__": self.__class__.__name__,
         }
 
-    def to_message(self) -> HttpFsDto:
+    def to_dto(self) -> HttpFsDto:
         return HttpFsDto(
             protocol=self.protocol,
             hostname=self.read_url.hostname,
@@ -66,7 +66,7 @@ class HttpFs(Filesystem):
         )
 
     @classmethod
-    def from_message(cls, message: HttpFsDto) -> "HttpFs":
+    def from_dto(cls, message: HttpFsDto) -> "HttpFs":
         return HttpFs(
             read_url=Url(
                 protocol=message.protocol,

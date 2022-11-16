@@ -171,7 +171,7 @@ class ComputeSession:
         super().__init__()
 
 
-    def to_message(self) -> ComputeSessionDto:
+    def to_dto(self) -> ComputeSessionDto:
         return ComputeSessionDto(
             start_time_utc_sec=self.start_time_utc_sec,
             time_elapsed_sec=self.time_elapsed_sec,

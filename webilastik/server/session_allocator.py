@@ -323,8 +323,8 @@ class SessionAllocator:
 
             return uncachable_json_response(
                 ComputeSessionStatusDto(
-                    compute_session=session_result.to_message(),
-                    session_url=self._make_compute_session_url(compute_session_id).to_message(),
+                    compute_session=session_result.to_dto(),
+                    session_url=self._make_compute_session_url(compute_session_id).to_dto(),
                     connected=False,
                     hpc_site=params.hpc_site,
                 ).to_json_value(),
@@ -377,8 +377,8 @@ class SessionAllocator:
         #     print(f"Tunnel was not ready in web server")
         #     return uncachable_json_response(
         #         ComputeSessionStatusDto(
-        #             compute_session=session_result.to_message(),
-        #             session_url=session_url.to_message(),
+        #             compute_session=session_result.to_dto(),
+        #             session_url=session_url.to_dto(),
         #             connected=False,
         #             hpc_site=params.hpc_site
         #         ).to_json_value(),
@@ -388,9 +388,9 @@ class SessionAllocator:
 
         return uncachable_json_response(
             ComputeSessionStatusDto(
-                compute_session=session_result.to_message(),
+                compute_session=session_result.to_dto(),
                 hpc_site=params.hpc_site,
-                session_url=session_url.to_message(),
+                session_url=session_url.to_dto(),
                 connected=await self.check_session_connection_state(session_result),
             ).to_json_value(),
             status=200
@@ -469,8 +469,8 @@ class SessionAllocator:
         for comp_session in compute_sessions_result:
             session_stati.append(
                 ComputeSessionStatusDto(
-                    compute_session=comp_session.to_message(),
-                    session_url=self._make_compute_session_url(comp_session.compute_session_id).to_message(),
+                    compute_session=comp_session.to_dto(),
+                    session_url=self._make_compute_session_url(comp_session.compute_session_id).to_dto(),
                     connected=await self.check_session_connection_state(comp_session),
                     hpc_site=params.hpc_site,
                 )
