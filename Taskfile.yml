@@ -229,7 +229,7 @@ tasks:
       - dpkg-deb --build -z2 {{.DEB_TREE_PATH}} {{.DEB_PKG_PATH}}
 
   start-local-server:
-    deps: [create-deb-tree]
+    deps: [stop-local-server, create-deb-tree]
     cmds: #this assumes an nginx like the one in webilastik.conf running already
       - echo "Ensuring that app.ilastik.org points to localhost"
       - getent hosts app.ilastik.org | awk '{ print $1 }' | grep -qE '^(127\.0\.0\.1|::1)$'
