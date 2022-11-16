@@ -1,4 +1,4 @@
-from typing import Optional, Sequence, Tuple, Any
+from typing import Optional, Sequence, Tuple
 from pathlib import PurePosixPath
 import json
 import logging
@@ -7,10 +7,9 @@ from ndstructs.point5D import Point5D, Shape5D, Interval5D
 from ndstructs.array5D import Array5D
 from ndstructs.utils.json_serializable import ensureJsonIntTripplet
 from fs.errors import ResourceNotFound
-import numpy as np
 
 from webilastik.datasource import FsDataSource
-from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale5D
+from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo
 from webilastik.filesystem import Filesystem
 from webilastik.utility.url import Url
 
@@ -25,7 +24,6 @@ class PrecomputedChunksDataSource(FsDataSource):
         resolution: Tuple[int, int, int],
         location: Optional[Point5D] = None,
         chunk_size: Optional[Shape5D] = None,
-        scale_and_dtype: "Tuple[PrecomputedChunksScale5D, np.dtype[Any]] | None" = None,
     ):
         self.path = path
         self.filesystem = filesystem
