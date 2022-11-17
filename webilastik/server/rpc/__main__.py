@@ -343,10 +343,10 @@ class DtoHint(Hint):
 
         *[f"    public {field_name}: {hint.ts_hint};" for field_name, hint in self.field_annotations.items()],
 
-            "    constructor(params: {",
+            "    constructor(_params: {",
         *[f'        {field_name}: {hint.ts_hint},' for field_name, hint in self.field_annotations.items()],
             "    }) {",
-        *[f'        this.{field_name} = params.{field_name};' for field_name in self.field_annotations.keys()],
+        *[f'        this.{field_name} = _params.{field_name};' for field_name in self.field_annotations.keys()],
             "    }",
 
             "    public toJsonValue(): JsonObject{",
