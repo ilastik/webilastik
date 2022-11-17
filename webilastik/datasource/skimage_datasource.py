@@ -11,6 +11,7 @@ from ndstructs.point5D import Interval5D, Point5D, Shape5D
 from webilastik.datasource import FsDataSource
 from webilastik.filesystem import Filesystem
 from webilastik.utility.url import Url
+from webilastik.server.rpc.dto import Interval5DDto, Shape5DDto, SkimageDataSourceDto, dtype_to_dto
 
 class SkimageDataSource(FsDataSource):
     """A naive implementation of DataSource that can read images using skimage"""
@@ -52,6 +53,27 @@ class SkimageDataSource(FsDataSource):
     @classmethod
     def supports_url(cls, url: Url) -> bool:
         return url.datascheme == None and url.path.suffix in (".png", ".jpg", ".jpeg", ".bmp", ".gif")
+
+    @staticmethod
+    def from_dto(dto: SkimageDataSourceDto) -> "SkimageDataSource":
+        return SkimageDataSource(
+            filesystem=Filesystem.create_from_message(dto.filesystem),
+            path=PurePosixPath(dto.path),
+            location=dto.interval.to_interval5d().start,
+            tile_shape=dto.tile_shape.to_shape5d(),
+            spatial_resolution=dto.spatial_resolution,
+        )
+
+    def to_dto(self) -> SkimageDataSourceDto:
+        return SkimageDataSourceDto(
+            url=self.url.to_dto(),
+            filesystem=self.filesystem.to_dto(),
+            path=self.path.as_posix(),
+            interval=Interval5DDto.from_interval5d(self.interval),
+            spatial_resolution=self.spatial_resolution,
+            tile_shape=Shape5DDto.from_shape5d(self.tile_shape),
+            dtype=dtype_to_dto(self.dtype),
+        )
 
     @classmethod
     def from_url(cls, url: Url) -> "Sequence[SkimageDataSource] | Exception":

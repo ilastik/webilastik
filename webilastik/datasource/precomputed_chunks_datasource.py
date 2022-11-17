@@ -3,6 +3,8 @@ from pathlib import PurePosixPath
 import json
 import logging
 
+from webilastik.server.rpc.dto import Interval5DDto, PrecomputedChunksDataSourceDto, Shape5DDto, dtype_to_dto
+
 from ndstructs.point5D import Point5D, Shape5D, Interval5D
 from ndstructs.array5D import Array5D
 from ndstructs.utils.json_serializable import ensureJsonIntTripplet
@@ -52,6 +54,26 @@ class PrecomputedChunksDataSource(FsDataSource):
             dtype=info.data_type,
             interval=self.scale.shape.to_interval5d(location or self.scale.location),
             spatial_resolution=self.scale.resolution, #FIXME: maybe delete this altogether?
+        )
+
+    def to_dto(self) -> PrecomputedChunksDataSourceDto:
+        return PrecomputedChunksDataSourceDto(
+            url=self.url.to_dto(),
+            filesystem=self.filesystem.to_dto(),
+            path=self.path.as_posix(),
+            interval=Interval5DDto.from_interval5d(self.interval),
+            spatial_resolution=self.spatial_resolution,
+            tile_shape=Shape5DDto.from_shape5d(self.tile_shape),
+            dtype=dtype_to_dto(self.dtype),
+        )
+
+    @staticmethod
+    def from_dto(dto: PrecomputedChunksDataSourceDto) -> "PrecomputedChunksDataSource":
+        return PrecomputedChunksDataSource(
+            filesystem=Filesystem.create_from_message(dto.filesystem),
+            path=PurePosixPath(dto.path),
+            resolution=dto.spatial_resolution,
+            chunk_size=dto.tile_shape.to_shape5d(),
         )
 
     @property

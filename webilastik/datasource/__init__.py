@@ -12,12 +12,10 @@ import numpy as np
 from ndstructs.point5D import Shape5D, Interval5D, Point5D, SPAN
 from ndstructs.array5D import Array5D, SPAN_OVERRIDE, All
 from webilastik.filesystem import Filesystem
-from webilastik.server.rpc.dto import DataSourceDto, Interval5DDto, MessageParsingError, Shape5DDto
+from webilastik.server.rpc.dto import FsDataSourceDto, MessageParsingError, PrecomputedChunksDataSourceDto, SkimageDataSourceDto
 from webilastik.utility.url import Url
 from webilastik.utility.url import Url, Protocol
 from global_cache import global_cache
-
-
 
 
 @enum.unique
@@ -253,28 +251,24 @@ class FsDataSource(DataSource):
             self.url == other.url
         )
 
-    def to_dto(self) -> DataSourceDto:
-        return DataSourceDto(
-            interval=Interval5DDto.from_interval5d(self.interval),
-            spatial_resolution=self.spatial_resolution,
-            tile_shape=Shape5DDto.from_shape5d(self.tile_shape),
-            url=self.url.to_dto(),
-        )
+    @abstractmethod
+    def to_dto(self) -> FsDataSourceDto:
+        pass
 
     @staticmethod
     def try_from_message(
-        message: DataSourceDto,
+        message: FsDataSourceDto,
         allowed_protocols: Sequence[Protocol] = ("http", "https"),
     ) -> "FsDataSource | MessageParsingError":
-        url = Url.from_dto(message.url)
-        fs_ds_result =  FsDataSource.try_get_datasources_from_url(url=url, allowed_protocols=allowed_protocols)
-        if isinstance(fs_ds_result, Exception):
-            return MessageParsingError(str(fs_ds_result))
-        if fs_ds_result is None:
-            return MessageParsingError(f"Could not open url {url}")
-        if len(fs_ds_result) != 1:
-            return MessageParsingError(f"Expected a single datasource from {url.raw}, found {len(fs_ds_result)}")
-        return fs_ds_result[0]
+        from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
+        from webilastik.datasource.n5_datasource import N5DataSource
+        from webilastik.datasource.skimage_datasource import SkimageDataSource
+
+        if isinstance(message, PrecomputedChunksDataSourceDto):
+            return PrecomputedChunksDataSource.from_dto(message)
+        if isinstance(message, SkimageDataSourceDto):
+            return SkimageDataSource.from_dto(message)
+        return N5DataSource.from_dto(message)
 
     _datasource_cache: ClassVar[Dict[Url, Sequence['FsDataSource']]] = {}
 

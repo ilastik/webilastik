@@ -11,6 +11,7 @@ from ndstructs.array5D import Array5D
 
 from webilastik.datasource.n5_attributes import N5Compressor, N5DatasetAttributes
 from webilastik.datasource import FsDataSource
+from webilastik.server.rpc.dto import Interval5DDto, N5DataSourceDto, Shape5DDto, dtype_to_dto
 
 class N5Block(Array5D):
     class Modes(enum.IntEnum):
@@ -86,6 +87,25 @@ class N5DataSource(FsDataSource):
             interval=self.attributes.interval,
             dtype=self.attributes.dataType,
             spatial_resolution=spatial_resolution,
+        )
+
+    @staticmethod
+    def from_dto(dto: N5DataSourceDto) -> "N5DataSource":
+        return N5DataSource(
+            filesystem=Filesystem.create_from_message(dto.filesystem),
+            path=PurePosixPath(dto.path),
+            spatial_resolution=dto.spatial_resolution,
+        )
+
+    def to_dto(self) -> N5DataSourceDto:
+        return N5DataSourceDto(
+            url=self.url.to_dto(),
+            filesystem=self.filesystem.to_dto(),
+            path=self.path.as_posix(),
+            interval=Interval5DDto.from_interval5d(self.interval),
+            spatial_resolution=self.spatial_resolution,
+            tile_shape=Shape5DDto.from_shape5d(self.tile_shape),
+            dtype=dtype_to_dto(self.dtype),
         )
 
     def __hash__(self) -> int:

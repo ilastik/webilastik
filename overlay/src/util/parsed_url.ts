@@ -85,6 +85,12 @@ export class Path{
     public toJsonValue(): string{
         return this.toString()
     }
+    public static fromDto(dto: string): Path{
+        return Path.parse(dto)
+    }
+    public toDto(): string{
+        return this.raw
+    }
 }
 
 export class Url implements IJsonable{

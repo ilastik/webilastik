@@ -1,9 +1,11 @@
 #pyright: strict
 
-from typing import Literal, Optional, Tuple, Union, Mapping
+from typing import Literal, Optional, Tuple, Union, Mapping, Any, cast
 from dataclasses import dataclass
 
 from ndstructs.point5D import Interval5D, Point5D, Shape5D
+import numpy as np
+
 from webilastik.server.rpc import DataTransferObject
 
 # @dataclass
@@ -87,19 +89,45 @@ class BucketFSDto(DataTransferObject):
     bucket_name: str
     prefix: str
 
+FsDto = Union[OsfsDto, HttpFsDto, BucketFSDto]
+
+DtypeDto = Literal["uint8", "uint16", "uint32", "uint64", "float32"]
+
+def dtype_to_dto(dtype: "np.dtype[Any]") -> DtypeDto:
+    return cast(DtypeDto, str(dtype))
+
 @dataclass
-class DataSourceDto(DataTransferObject):
+class PrecomputedChunksDataSourceDto(DataTransferObject):
     url: UrlDto
+    filesystem: FsDto
+    path: str
     interval: Interval5DDto
     tile_shape: Shape5DDto
     spatial_resolution: Tuple[int, int, int]
+    dtype: DtypeDto
 
 @dataclass
 class N5DataSourceDto(DataTransferObject):
-    filesystem: Union[OsfsDto, HttpFsDto, BucketFSDto]
+    url: UrlDto
+    filesystem: FsDto
     path: str
-    location: Point5DDto
+    interval: Interval5DDto
+    tile_shape: Shape5DDto
     spatial_resolution: Tuple[int, int, int]
+    dtype: DtypeDto
+
+@dataclass
+class SkimageDataSourceDto(DataTransferObject):
+    url: UrlDto
+    filesystem: FsDto
+    path: str
+    interval: Interval5DDto
+    tile_shape: Shape5DDto
+    spatial_resolution: Tuple[int, int, int]
+    dtype: DtypeDto
+
+
+FsDataSourceDto = Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto]
 
 ##################################################333
 
@@ -124,7 +152,7 @@ class PrecomputedChunksSinkDto(FsDataSinkDto):
 
 @dataclass
 class PixelAnnotationDto(DataTransferObject):
-    raw_data: DataSourceDto
+    raw_data: FsDataSourceDto
     points: Tuple[Tuple[int, int, int], ...]
 
 ######################################################################
@@ -186,15 +214,15 @@ class DataView(ViewDto):
 
 @dataclass
 class RawDataViewDto(ViewDto):
-    datasources: Tuple[DataSourceDto, ...]
+    datasources: Tuple[FsDataSourceDto, ...]
 
 @dataclass
 class StrippedPrecomputedViewDto(ViewDto):
-    datasource: DataSourceDto
+    datasource: FsDataSourceDto
 
 @dataclass
 class PredictionsViewDto(ViewDto):
-    raw_data: DataSourceDto
+    raw_data: FsDataSourceDto
     classifier_generation: int
 
 @dataclass
@@ -242,7 +270,7 @@ class OpenDatasinkJobDto(JobDto):
 class PixelClassificationExportAppletStateDto(DataTransferObject):
     jobs: Tuple[Union[ExportJobDto, OpenDatasinkJobDto], ...]
     populated_labels: Optional[Tuple[LabelHeaderDto, ...]]
-    datasource_suggestions: Optional[Tuple[DataSourceDto, ...]]
+    datasource_suggestions: Optional[Tuple[FsDataSourceDto, ...]]
 
 
 
@@ -349,12 +377,12 @@ class CheckLoginResultDto(DataTransferObject):
 
 @dataclass
 class StartPixelProbabilitiesExportJobParamsDto(DataTransferObject):
-    datasource: DataSourceDto
+    datasource: FsDataSourceDto
     datasink: PrecomputedChunksSinkDto
 
 @dataclass
 class StartSimpleSegmentationExportJobParamsDto(DataTransferObject):
-    datasource: DataSourceDto
+    datasource: FsDataSourceDto
     datasink: PrecomputedChunksSinkDto
     label_header: LabelHeaderDto
 
@@ -379,5 +407,5 @@ class GetDatasourcesFromUrlParamsDto(DataTransferObject):
 
 @dataclass
 class GetDatasourcesFromUrlResponseDto(DataTransferObject):
-    datasources: Tuple[DataSourceDto, ...]
+    datasources: Tuple[FsDataSourceDto, ...]
 

@@ -2,7 +2,7 @@ import { vec3 } from "gl-matrix"
 import { INativeView } from "../drivers/viewer_driver"
 import { assertUnreachable, fetchJson, sleep } from "../util/misc"
 import { Path, Url } from "../util/parsed_url"
-import { DataType } from "../util/precomputed_chunks"
+import { DataType, ensureDataType } from "../util/precomputed_chunks"
 import {
     ensureJsonObject, ensureJsonString, JsonableValue, JsonValue, toJsonValue
 } from "../util/serialization"
@@ -13,7 +13,7 @@ import {
     ColorDto,
     ComputeSessionStatusDto,
     CreateComputeSessionParamsDto,
-    DataSourceDto,
+    PrecomputedChunksDataSourceDto,
     FailedViewDto,
     GetAvailableHpcSitesResponseDto,
     GetComputeSessionStatusParamsDto,
@@ -614,20 +614,29 @@ export class Interval5D{
 
 export class DataSource{
     public readonly url: Url
+    public readonly filesystem: Filesystem
+    public readonly path: Path
     public readonly interval: Interval5D
     public readonly tile_shape: Shape5D
     public readonly spatial_resolution: [number, number, number]
+    public readonly dtype: DataType
 
     constructor(params: {
         url: Url,
+        filesystem: Filesystem,
+        path: Path,
         interval: Interval5D,
         tile_shape: Shape5D,
-        spatial_resolution: [number, number, number]
+        spatial_resolution: [number, number, number],
+        dtype: DataType,
     }){
-        this.url = params.url
-        this.interval = params.interval
-        this.tile_shape = params.tile_shape
-        this.spatial_resolution = params.spatial_resolution
+        this.url = params.url;
+        this.filesystem = params.filesystem;
+        this.path = params.path;
+        this.interval = params.interval;
+        this.tile_shape = params.tile_shape;
+        this.spatial_resolution = params.spatial_resolution;
+        this.dtype = params.dtype;
     }
 
     public get shape(): Shape5D{
@@ -638,21 +647,27 @@ export class DataSource{
         return this.url.raw
     }
 
-    public static fromDto(message: DataSourceDto) : DataSource{
+    public static fromDto(dto: PrecomputedChunksDataSourceDto) : DataSource{
         return new DataSource({
-            url: Url.fromDto(message.url),
-            interval: Interval5D.fromDto(message.interval),
-            tile_shape: Shape5D.fromDto(message.tile_shape),
-            spatial_resolution: message.spatial_resolution,
+            filesystem: Filesystem.fromDto(dto.filesystem),
+            path: Path.fromDto(dto.path),
+            url: Url.fromDto(dto.url),
+            interval: Interval5D.fromDto(dto.interval),
+            tile_shape: Shape5D.fromDto(dto.tile_shape),
+            spatial_resolution: dto.spatial_resolution,
+            dtype: ensureDataType(dto.dtype), //FIXME?
         })
     }
 
-    public toDto(): DataSourceDto{
-        return new DataSourceDto({
+    public toDto(): PrecomputedChunksDataSourceDto{
+        return new PrecomputedChunksDataSourceDto({
+            filesystem: this.filesystem.toDto(),
+            path: this.path.toDto(),
             url: this.url.toDto(),
             interval: this.interval.toDto(),
             tile_shape: this.tile_shape.toDto(),
             spatial_resolution: this.spatial_resolution,
+            dtype: this.dtype,
         })
     }
 
@@ -686,6 +701,8 @@ export abstract class Filesystem{
         }
         assertUnreachable(message)
     }
+
+    public abstract toDto(): OsfsDto | HttpFsDto | BucketFSDto;
 }
 
 export class OsFs extends Filesystem{
@@ -700,9 +717,13 @@ export class OsFs extends Filesystem{
     public static fromDto(message: OsfsDto): OsFs {
         return new OsFs(Path.parse(message.path))
     }
+    public toDto(): OsfsDto {
+        return new OsfsDto({path: this.url.path.raw})
+    }
 }
 
 export class HttpFs extends Filesystem{
+    public readonly protocol: "http" | "https"
     public constructor(params: {
         protocol: "http" | "https",
         hostname: string,
@@ -717,6 +738,7 @@ export class HttpFs extends Filesystem{
             path: params.path,
             search: params.search
         }))
+        this.protocol = params.protocol
     }
     public static fromDto(message: HttpFsDto): HttpFs {
         const search = new Map<string, string>();
@@ -730,6 +752,20 @@ export class HttpFs extends Filesystem{
             port: message.port,
             search,
         })
+    }
+    public toDto(): HttpFsDto {
+        let search: {[key: string]: string} = {}
+        for(let [key, value] of this.url.search){
+            search[key] = value
+        }
+        return new HttpFsDto({
+            protocol: this.protocol,
+            hostname: this.url.hostname,
+            path: this.url.path.toDto(),
+            port: this.url.port,
+            search
+        })
+
     }
 }
 
@@ -751,6 +787,12 @@ export class BucketFs extends Filesystem{
     }
     public static fromDto(message: BucketFSDto): BucketFs{
         return new BucketFs({bucket_name: message.bucket_name, prefix: Path.parse(message.prefix)})
+    }
+    public toDto(): BucketFSDto{
+        return new BucketFSDto({
+            bucket_name: this.bucket_name,
+            prefix: this.prefix.toDto(),
+        })
     }
 }
 
@@ -819,9 +861,12 @@ export class PrecomputedChunksSink extends FsDataSink{
         })
         return new DataSource({
             url: datasourceUrl,
+            filesystem: this.filesystem,
+            path: this.path,
             interval: this.interval,
             spatial_resolution: this.resolution,
             tile_shape: this.tile_shape,
+            dtype: this.dtype,
         })
     }
 }
