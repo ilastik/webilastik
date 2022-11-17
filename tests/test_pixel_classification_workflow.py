@@ -140,7 +140,7 @@ def test_pixel_classification_workflow():
     )
 
     print(f"Sending predictions job request??????")
-    result = workflow.export_applet.start_export_job(
+    result = workflow.export_applet.launch_pixel_probabilities_export_job(
         datasource=raw_data_source,
         datasink=predictions_export_datasink
     )
@@ -168,7 +168,7 @@ def test_pixel_classification_workflow():
     )
 
     print(f"Sending simple segmentation job request??????")
-    result = workflow.export_applet.start_simple_segmentation_export_job(
+    result = workflow.export_applet.launch_simple_segmentation_export_job(
         datasource=raw_data_source,
         datasink=simple_segmentation_datasink,
         label_name=pixel_annotations[1].name,

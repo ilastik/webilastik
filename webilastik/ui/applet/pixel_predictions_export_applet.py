@@ -11,7 +11,6 @@ from ndstructs.utils.json_serializable import JsonObject
 
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.datasink import DataSink, IDataSinkWriter
-from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
 from webilastik.datasource import DataRoi, DataSource, FsDataSource
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.operator import IN, Operator
@@ -215,7 +214,7 @@ class WsPixelClassificationExportApplet(WsApplet, PixelClassificationExportApple
             if isinstance(datasource_result, MessageParsingError):
                 return UsageError(str(datasource_result)) #FIXME: this is a bug, not a usage error
             rpc_result = self.launch_pixel_probabilities_export_job(
-                datasource=datasource_result, datasink=PrecomputedChunksSink.from_dto(params_result.datasink)
+                datasource=datasource_result, datasink=DataSink.create_from_message(params_result.datasink)
             )
         elif method_name == "launch_simple_segmentation_export_job":
             params_result = StartSimpleSegmentationExportJobParamsDto.from_json_value(arguments)

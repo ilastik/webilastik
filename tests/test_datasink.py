@@ -6,8 +6,8 @@ import numpy as np
 from ndstructs.point5D import Point5D, Shape5D
 from ndstructs.array5D import Array5D
 
-from webilastik.datasink.n5_dataset_sink import N5DatasetSink
-from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksScaleSink
+from webilastik.datasink.n5_dataset_sink import N5DataSink
+from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
 from webilastik.datasource import DataRoi
 from webilastik.datasource.array_datasource import ArrayDataSource
 from webilastik.datasource.n5_datasource import N5DataSource
@@ -37,20 +37,17 @@ def test_n5_attributes():
 
 def test_n5_datasink():
     tmp_path = create_tmp_dir(prefix="test_n5_datasink")
-    sink = N5DatasetSink(
+    sink = N5DataSink(
         filesystem=OsFs(tmp_path.as_posix()),
         outer_path=PurePosixPath("test_n5_datasink.n5"),
         inner_path=PurePosixPath("/data"),
-        attributes=N5DatasetAttributes(
-            dimensions=datasource.shape,
-            blockSize=Shape5D(x=10, y=10),
-            c_axiskeys=data.axiskeys, #FIXME: double check this
-            dataType=datasource.dtype,
-            compression=RawCompressor(),
-            location=Point5D.zero(x=7, y=13)
-        )
+        c_axiskeys=data.axiskeys, #FIXME: double check this
+        compressor=RawCompressor(),
+        dtype=datasource.dtype,
+        interval=datasource.interval,
+        tile_shape=Shape5D(x=10, y=10),
     )
-    sink_writer = sink.create()
+    sink_writer = sink.open()
     assert not isinstance(sink_writer, Exception)
     for tile in DataRoi(datasource).split(sink.tile_shape):
         sink_writer.write(tile.retrieve().translated(Point5D.zero(x=7, y=13)))
@@ -66,15 +63,17 @@ def test_distributed_n5_datasink():
     outer_path = PurePosixPath("test_distributed_n5_datasink.n5")
     inner_path = PurePosixPath("/data")
     full_path = PurePosixPath("test_distributed_n5_datasink.n5/data")
-    attributes = N5DatasetAttributes(
-        dimensions=datasource.shape,
-        blockSize=datasource.tile_shape,
+    sink = N5DataSink(
+        filesystem=filesystem,
+        outer_path=outer_path,
+        inner_path=inner_path,
         c_axiskeys=data.axiskeys, #FIXME: double check this
-        dataType=datasource.dtype,
-        compression=RawCompressor()
+        compressor=RawCompressor(),
+        dtype=datasource.dtype,
+        interval=datasource.interval,
+        tile_shape=datasource.tile_shape,
     )
-    sink = N5DatasetSink(outer_path=outer_path, inner_path=inner_path, filesystem=filesystem, attributes=attributes)
-    sink_writer = sink.create()
+    sink_writer = sink.open()
     assert not isinstance(sink_writer, Exception)
     sink_writers = [sink_writer] * 4
 
@@ -92,19 +91,22 @@ def test_writing_to_precomputed_chunks():
     sink_path = PurePosixPath("mytest.precomputed")
     filesystem = OsFs(tmp_path.as_posix())
 
-    datasink = PrecomputedChunksScaleSink(
+    datasink = PrecomputedChunksSink(
         filesystem=filesystem,
-        info_dir=sink_path,
-        scale=scale,
+        path=sink_path,
+        encoding=RawEncoder(),
+        interval=datasource.interval,
+        resolution=datasource.spatial_resolution,
+        scale_key=PurePosixPath("my_test_data"),
+        tile_shape=datasource.tile_shape,
         dtype=datasource.dtype,
-        num_channels=datasource.shape.c,
     )
-    creation_result = datasink.create()
+    creation_result = datasink.open()
     if isinstance(creation_result, Exception):
         raise creation_result
 
     for tile in datasource.roi.get_datasource_tiles():
-        datasink.write(tile.retrieve())
+        creation_result.write(tile.retrieve())
 
     precomp_datasource = PrecomputedChunksDataSource(path=sink_path, filesystem=filesystem, resolution=scale.resolution)
     reloaded_data = precomp_datasource.retrieve()
@@ -121,19 +123,22 @@ def test_writing_to_offset_precomputed_chunks():
 
     print(f"\n\n will write to '{filesystem.geturl(sink_path.as_posix())}' ")
 
-    datasink = PrecomputedChunksScaleSink(
+    datasink = PrecomputedChunksSink(
         filesystem=filesystem,
-        info_dir=sink_path,
-        scale=scale,
-        num_channels=datasource.shape.c,
+        path=sink_path,
         dtype=datasource.dtype,
+        encoding=RawEncoder(),
+        interval=datasource.interval,
+        resolution=datasource.spatial_resolution,
+        scale_key=PurePosixPath("my_test_data"),
+        tile_shape=datasource.tile_shape,
     )
-    creation_result = datasink.create()
+    creation_result = datasink.open()
     if isinstance(creation_result, Exception):
         raise creation_result
 
     for tile in datasource.roi.get_datasource_tiles():
-        datasink.write(tile.retrieve())
+        creation_result.write(tile.retrieve())
 
     precomp_datasource = PrecomputedChunksDataSource(path=sink_path, filesystem=filesystem, resolution=scale.resolution)
 

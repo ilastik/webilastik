@@ -54,7 +54,7 @@ if __name__ == "__main__":
 
     datasource = get_sample_c_cells_datasource()
 
-    result = export_applet.start_export_job(
+    result = export_applet.launch_pixel_probabilities_export_job(
         datasource=get_sample_c_cells_datasource(),
         datasink=create_precomputed_chunks_sink(
             shape=datasource.shape.updated(c=2),

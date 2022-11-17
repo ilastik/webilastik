@@ -403,12 +403,12 @@ class CheckLoginResultDto(DataTransferObject):
 @dataclass
 class StartPixelProbabilitiesExportJobParamsDto(DataTransferObject):
     datasource: FsDataSourceDto
-    datasink: PrecomputedChunksSinkDto
+    datasink: DataSinkDto
 
 @dataclass
 class StartSimpleSegmentationExportJobParamsDto(DataTransferObject):
     datasource: FsDataSourceDto
-    datasink: PrecomputedChunksSinkDto
+    datasink: DataSinkDto
     label_header: LabelHeaderDto
 
 ############################################

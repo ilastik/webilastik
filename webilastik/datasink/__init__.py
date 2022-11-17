@@ -40,9 +40,12 @@ class DataSink(ABC):
         pass
 
     @classmethod
-    def create_from_message(cls, message: PrecomputedChunksSinkDto) -> "DataSink": #FIXME: add other sinks
-        from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
-        return PrecomputedChunksSink.from_dto(message)
+    def create_from_message(cls, message: DataSinkDto) -> "DataSink": #FIXME: add other sinks
+        if isinstance(message, PrecomputedChunksSinkDto):
+            from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
+            return PrecomputedChunksSink.from_dto(message)
+        from webilastik.datasink.n5_dataset_sink import N5DataSink
+        return N5DataSink.from_dto(message)
 
     @abstractmethod
     def to_dto(self) -> DataSinkDto: #FIXME: add other sinks

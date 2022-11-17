@@ -13,7 +13,7 @@ from ndstructs.point5D import Shape5D, Interval5D, Point5D
 from ndstructs.array5D import Array5D
 
 from webilastik.datasource import DataRoi
-from webilastik.datasink.n5_dataset_sink import N5DatasetSink
+from webilastik.datasink.n5_dataset_sink import N5DataSink
 from webilastik.datasource.n5_datasource import N5DataSource
 from webilastik.datasource.n5_attributes import N5Compressor, N5DatasetAttributes, RawCompressor
 from webilastik.datasource import DataSource
@@ -73,19 +73,17 @@ def create_n5(
     array: Array5D, *, axiskeys: Optional[str] = None, chunk_size: Shape5D, compression: N5Compressor = RawCompressor()
 ):
     path = PurePosixPath(tempfile.mkstemp()[1] + ".n5")
-    sink = N5DatasetSink(
+    sink = N5DataSink(
         outer_path=path,
         inner_path=PurePosixPath("/data"),
         filesystem=OsFs("/"),
-        attributes=N5DatasetAttributes(
-            dimensions=array.shape,
-            blockSize=chunk_size,
-            c_axiskeys=axiskeys or array.axiskeys,
-            dataType=array.dtype,
-            compression=compression,
-        )
+        tile_shape=chunk_size,
+        c_axiskeys=axiskeys or array.axiskeys,
+        compressor=compression,
+        dtype=array.dtype,
+        interval=array.interval,
     )
-    sink_writer = sink.create()
+    sink_writer = sink.open()
     assert not isinstance(sink_writer, Exception)
 
     for tile in array.split(chunk_size):
@@ -170,24 +168,24 @@ def test_n5_datasource():
     ds2 = pickle.loads(pickle.dumps(ds))
     assert ds2.retrieve(x=(0, 3), y=(0, 2)) == expected_raw_piece
 
-def test_h5_datasource():
-    data_2d = Array5D(np.arange(100).reshape(10, 10), axiskeys="yx")
-    h5_path = create_h5(data_2d, axiskeys_style="vigra", chunk_shape=Shape5D(x=3, y=3))
-    ds = H5DataSource(outer_path=h5_path, inner_path=PurePosixPath("/data"), filesystem=OsFs("/"))
-    assert ds.shape == data_2d.shape
-    assert ds.tile_shape == Shape5D(x=3, y=3)
+# def test_h5_datasource():
+#     data_2d = Array5D(np.arange(100).reshape(10, 10), axiskeys="yx")
+#     h5_path = create_h5(data_2d, axiskeys_style="vigra", chunk_shape=Shape5D(x=3, y=3))
+#     ds = H5DataSource(outer_path=h5_path, inner_path=PurePosixPath("/data"), filesystem=OsFs("/"))
+#     assert ds.shape == data_2d.shape
+#     assert ds.tile_shape == Shape5D(x=3, y=3)
 
-    slc = ds.interval.updated(x=(0, 3), y=(0, 2))
-    assert (ds.retrieve(slc).raw("yx") == data_2d.cut(slc).raw("yx")).all()
+#     slc = ds.interval.updated(x=(0, 3), y=(0, 2))
+#     assert (ds.retrieve(slc).raw("yx") == data_2d.cut(slc).raw("yx")).all()
 
-    data_3d = Array5D(np.arange(10 * 10 * 10).reshape(10, 10, 10), axiskeys="zyx")
-    h5_path = create_h5(data_3d, axiskeys_style="vigra", chunk_shape=Shape5D(x=3, y=3))
-    ds = H5DataSource(outer_path=h5_path, inner_path=PurePosixPath("/data"), filesystem=OsFs("/"))
-    assert ds.shape == data_3d.shape
-    assert ds.tile_shape == Shape5D(x=3, y=3)
+#     data_3d = Array5D(np.arange(10 * 10 * 10).reshape(10, 10, 10), axiskeys="zyx")
+#     h5_path = create_h5(data_3d, axiskeys_style="vigra", chunk_shape=Shape5D(x=3, y=3))
+#     ds = H5DataSource(outer_path=h5_path, inner_path=PurePosixPath("/data"), filesystem=OsFs("/"))
+#     assert ds.shape == data_3d.shape
+#     assert ds.tile_shape == Shape5D(x=3, y=3)
 
-    slc = ds.interval.updated(x=(0, 3), y=(0, 2), z=3)
-    assert (ds.retrieve(slc).raw("yxz") == data_3d.cut(slc).raw("yxz")).all()
+#     slc = ds.interval.updated(x=(0, 3), y=(0, 2), z=3)
+#     assert (ds.retrieve(slc).raw("yxz") == data_3d.cut(slc).raw("yxz")).all()
 
 
 
@@ -289,117 +287,117 @@ def test_neighboring_tiles():
     assert len(fifties_neighbor_data) == 0
 
 
-def test_sequence_datasource():
-    # fmt: off
-    img1_data = Array5D(np.asarray([
-       [[100, 101, 102, 103, 104],
-        [105, 106, 107, 108, 109],
-        [110, 111, 112, 113, 114],
-        [115, 116, 117, 118, 119]],
+# def test_sequence_datasource():
+#     # fmt: off
+#     img1_data = Array5D(np.asarray([
+#        [[100, 101, 102, 103, 104],
+#         [105, 106, 107, 108, 109],
+#         [110, 111, 112, 113, 114],
+#         [115, 116, 117, 118, 119]],
 
-       [[120, 121, 122, 123, 124],
-        [125, 126, 127, 128, 129],
-        [130, 131, 132, 133, 134],
-        [135, 136, 137, 138, 139]],
+#        [[120, 121, 122, 123, 124],
+#         [125, 126, 127, 128, 129],
+#         [130, 131, 132, 133, 134],
+#         [135, 136, 137, 138, 139]],
 
-       [[140, 141, 142, 143, 144],
-        [145, 146, 147, 148, 149],
-        [150, 151, 152, 153, 154],
-        [155, 156, 157, 158, 159]]
-    ]), axiskeys="cyx")
+#        [[140, 141, 142, 143, 144],
+#         [145, 146, 147, 148, 149],
+#         [150, 151, 152, 153, 154],
+#         [155, 156, 157, 158, 159]]
+#     ]), axiskeys="cyx")
 
-    img2_data = Array5D(np.asarray([
-       [[200, 201, 202, 203, 204],
-        [205, 206, 207, 208, 209],
-        [210, 211, 212, 213, 214],
-        [215, 216, 217, 218, 219]],
+#     img2_data = Array5D(np.asarray([
+#        [[200, 201, 202, 203, 204],
+#         [205, 206, 207, 208, 209],
+#         [210, 211, 212, 213, 214],
+#         [215, 216, 217, 218, 219]],
 
-       [[220, 221, 222, 223, 224],
-        [225, 226, 227, 228, 229],
-        [230, 231, 232, 233, 234],
-        [235, 236, 237, 238, 239]],
+#        [[220, 221, 222, 223, 224],
+#         [225, 226, 227, 228, 229],
+#         [230, 231, 232, 233, 234],
+#         [235, 236, 237, 238, 239]],
 
-       [[240, 241, 242, 243, 244],
-        [245, 246, 247, 248, 249],
-        [250, 251, 252, 253, 254],
-        [255, 256, 257, 258, 259]]
-    ]), axiskeys="cyx")
+#        [[240, 241, 242, 243, 244],
+#         [245, 246, 247, 248, 249],
+#         [250, 251, 252, 253, 254],
+#         [255, 256, 257, 258, 259]]
+#     ]), axiskeys="cyx")
 
-    img3_data = Array5D(np.asarray([
-       [[300, 301, 302, 303, 304],
-        [305, 306, 307, 308, 309],
-        [310, 311, 312, 313, 314],
-        [315, 316, 317, 318, 319]],
+#     img3_data = Array5D(np.asarray([
+#        [[300, 301, 302, 303, 304],
+#         [305, 306, 307, 308, 309],
+#         [310, 311, 312, 313, 314],
+#         [315, 316, 317, 318, 319]],
 
-       [[320, 321, 322, 323, 324],
-        [325, 326, 327, 328, 329],
-        [330, 331, 332, 333, 334],
-        [335, 336, 337, 338, 339]],
+#        [[320, 321, 322, 323, 324],
+#         [325, 326, 327, 328, 329],
+#         [330, 331, 332, 333, 334],
+#         [335, 336, 337, 338, 339]],
 
-       [[340, 341, 342, 343, 344],
-        [345, 346, 347, 348, 349],
-        [350, 351, 352, 353, 354],
-        [355, 356, 357, 358, 359]]
-    ]), axiskeys="cyx")
+#        [[340, 341, 342, 343, 344],
+#         [345, 346, 347, 348, 349],
+#         [350, 351, 352, 353, 354],
+#         [355, 356, 357, 358, 359]]
+#     ]), axiskeys="cyx")
 
-    expected_x_2_4__y_1_3 = Array5D(np.asarray([
-      [[[107, 108],
-        [112, 113]],
+#     expected_x_2_4__y_1_3 = Array5D(np.asarray([
+#       [[[107, 108],
+#         [112, 113]],
 
-       [[127, 128],
-        [132, 133]],
+#        [[127, 128],
+#         [132, 133]],
 
-       [[147, 148],
-        [152, 153]]],
-
-
-      [[[207, 208],
-        [212, 213]],
-
-       [[227, 228],
-        [232, 233]],
-
-       [[247, 248],
-        [252, 253]]],
+#        [[147, 148],
+#         [152, 153]]],
 
 
-      [[[307, 308],
-        [312, 313]],
+#       [[[207, 208],
+#         [212, 213]],
 
-       [[327, 328],
-        [332, 333]],
+#        [[227, 228],
+#         [232, 233]],
 
-       [[347, 348],
-        [352, 353]]],
-    ]), axiskeys="zcyx")
-    # fmt: on
-    slice_x_2_4__y_1_3 = {"x": (2, 4), "y": (1, 3)}
+#        [[247, 248],
+#         [252, 253]]],
 
-    h5_outer_paths = [
-        # create_n5(img1_data, axiskeys="cyx"),
-        create_h5(img1_data, axiskeys_style="dims", axiskeys="cyx"),
-        # create_n5(img2_data, axiskeys="cyx"),
-        create_h5(img2_data, axiskeys_style="dims", axiskeys="cyx"),
-        # create_n5(img3_data, axiskeys="cyx"),
-        create_h5(img3_data, axiskeys_style="dims", axiskeys="cyx"),
-    ]
 
-    def stack_h5s(stack_axis: str) -> List[H5DataSource]:
-        offset = Point5D.zero()
-        stack: List[H5DataSource] = []
-        for outer_path in h5_outer_paths:
-            stack.append(H5DataSource(outer_path=outer_path, inner_path=PurePosixPath("/data"), filesystem=OsFs("/"), location=offset))
-            offset += Point5D.zero(**{stack_axis: stack[-1].shape[stack_axis]})
-        return stack
+#       [[[307, 308],
+#         [312, 313]],
 
-    seq_ds = SequenceDataSource(datasources=stack_h5s("z"), stack_axis="z")
-    assert seq_ds.shape == Shape5D(x=5, y=4, c=3, z=3)
-    data = seq_ds.retrieve(**slice_x_2_4__y_1_3)
-    assert (expected_x_2_4__y_1_3.raw("xyzc") == data.raw("xyzc")).all()
+#        [[327, 328],
+#         [332, 333]],
 
-    seq_ds = SequenceDataSource(datasources=stack_h5s("z"), stack_axis="z")
-    data = seq_ds.retrieve(**slice_x_2_4__y_1_3)
-    assert (expected_x_2_4__y_1_3.raw("xyzc") == data.raw("xyzc")).all()
+#        [[347, 348],
+#         [352, 353]]],
+#     ]), axiskeys="zcyx")
+#     # fmt: on
+#     slice_x_2_4__y_1_3 = {"x": (2, 4), "y": (1, 3)}
+
+#     h5_outer_paths = [
+#         # create_n5(img1_data, axiskeys="cyx"),
+#         create_h5(img1_data, axiskeys_style="dims", axiskeys="cyx"),
+#         # create_n5(img2_data, axiskeys="cyx"),
+#         create_h5(img2_data, axiskeys_style="dims", axiskeys="cyx"),
+#         # create_n5(img3_data, axiskeys="cyx"),
+#         create_h5(img3_data, axiskeys_style="dims", axiskeys="cyx"),
+#     ]
+
+#     def stack_h5s(stack_axis: str) -> List[H5DataSource]:
+#         offset = Point5D.zero()
+#         stack: List[H5DataSource] = []
+#         for outer_path in h5_outer_paths:
+#             stack.append(H5DataSource(outer_path=outer_path, inner_path=PurePosixPath("/data"), filesystem=OsFs("/"), location=offset))
+#             offset += Point5D.zero(**{stack_axis: stack[-1].shape[stack_axis]})
+#         return stack
+
+#     seq_ds = SequenceDataSource(datasources=stack_h5s("z"), stack_axis="z")
+#     assert seq_ds.shape == Shape5D(x=5, y=4, c=3, z=3)
+#     data = seq_ds.retrieve(**slice_x_2_4__y_1_3)
+#     assert (expected_x_2_4__y_1_3.raw("xyzc") == data.raw("xyzc")).all()
+
+#     seq_ds = SequenceDataSource(datasources=stack_h5s("z"), stack_axis="z")
+#     data = seq_ds.retrieve(**slice_x_2_4__y_1_3)
+#     assert (expected_x_2_4__y_1_3.raw("xyzc") == data.raw("xyzc")).all()
 
 
 # def test_relabeling_datasource():
