@@ -24,6 +24,11 @@ vars:
 
 tasks:
   generate-message-schemas:
+    sources:
+      - "{{.PROJECT_ROOT}}/webilastik/server/rpc/dto.template.py"
+      - "{{.PROJECT_ROOT}}/webilastik/server/rpc/__main__.py"
+      - "{{.PROJECT_ROOT}}/webilastik/server/rpc/__init__.py"
+    generates: ["{{.PROJECT_ROOT}}/webilastik/server/rpc/dto.py", "{{.PROJECT_ROOT}}/overlay/src/client/dto.ts"]
     cmds:
       - python -m webilastik.server.rpc
       - deno fmt --options-line-width=120 {{.PROJECT_ROOT}}/overlay/src/client/dto.ts
