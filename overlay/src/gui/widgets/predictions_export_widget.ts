@@ -263,7 +263,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                     if(job.status == 'succeeded' && job instanceof ExportJobDto){
                         progressColumnContents = createElement({tagName: "span", parentElement: undefined})
                         const outputFs = Filesystem.fromDto(job.datasink.filesystem);
-                        if(outputFs instanceof BucketFs){
+                        if(outputFs instanceof BucketFs && job.datasink instanceof PrecomputedChunksSinkDto){ //FIXME
                             const dataProxyLink = createElement({tagName: "a", parentElement: progressColumnContents, innerText: "Open in Data Proxy"})
                             let dataProxyPrefixParam = job.datasink.path.replace(/^\//, "")
                             if(job.datasink instanceof PrecomputedChunksSinkDto){

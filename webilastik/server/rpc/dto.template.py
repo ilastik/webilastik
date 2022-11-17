@@ -132,21 +132,46 @@ FsDataSourceDto = Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, Skimage
 ##################################################333
 
 @dataclass
-class DataSinkDto(DataTransferObject):
-    tile_shape: Shape5DDto
-    interval: Interval5DDto
-    dtype: Literal["uint8", "uint16", "uint32", "uint64", "float32"]
-
-@dataclass
-class FsDataSinkDto(DataSinkDto):
+class PrecomputedChunksSinkDto(DataTransferObject):
     filesystem: Union[OsfsDto, HttpFsDto, BucketFSDto]
     path: str #FIXME?
-
-@dataclass
-class PrecomputedChunksSinkDto(FsDataSinkDto):
+    tile_shape: Shape5DDto
+    interval: Interval5DDto
+    dtype: DtypeDto
     scale_key: str #fixme?
     resolution: Tuple[int, int, int]
     encoding: Literal["raw", "jpeg"]
+
+@dataclass
+class N5GzipCompressorDto(DataTransferObject):
+    level: int
+
+@dataclass
+class N5Bzip2CompressorDto(DataTransferObject):
+    blockSize: int
+
+@dataclass
+class N5XzCompressorDto(DataTransferObject):
+    preset: int
+
+@dataclass
+class N5RawCompressorDto(DataTransferObject):
+    pass
+
+N5CompressorDto = Union[N5GzipCompressorDto, N5Bzip2CompressorDto, N5XzCompressorDto, N5RawCompressorDto]
+
+@dataclass
+class N5DataSinkDto(DataTransferObject):
+    filesystem: FsDto
+    outer_path: str
+    inner_path: str
+    interval: Interval5DDto
+    tile_shape: Shape5DDto
+    c_axiskeys: str
+    dtype: DtypeDto
+    compressor: N5CompressorDto
+
+DataSinkDto = Union[PrecomputedChunksSinkDto, N5DataSinkDto]
 
 #################################################################
 
@@ -260,11 +285,11 @@ class JobDto(DataTransferObject):
 
 @dataclass
 class ExportJobDto(JobDto):
-    datasink: PrecomputedChunksSinkDto
+    datasink: DataSinkDto
 
 @dataclass
 class OpenDatasinkJobDto(JobDto):
-    datasink: PrecomputedChunksSinkDto
+    datasink: DataSinkDto
 
 @dataclass
 class PixelClassificationExportAppletStateDto(DataTransferObject):

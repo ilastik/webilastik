@@ -34,7 +34,8 @@ import {
     SaveProjectParamsDto,
     Shape5DDto,
     StrippedPrecomputedViewDto,
-    UnsupportedDatasetViewDto
+    UnsupportedDatasetViewDto,
+    N5DataSinkDto
 } from "./dto"
 
 export type HpcSiteName = ComputeSessionStatusDto["hpc_site"] //FIXME?
@@ -817,8 +818,11 @@ export abstract class FsDataSink{
         this.path = params.path
     }
 
-    public static fromDto(message: PrecomputedChunksSinkDto): FsDataSink{
-        return PrecomputedChunksSink.fromDto(message)
+    public static fromDto(message: PrecomputedChunksSinkDto | N5DataSinkDto): FsDataSink{
+        if(message instanceof PrecomputedChunksSinkDto){
+            return PrecomputedChunksSink.fromDto(message)
+        }
+        throw `FIXME:N5 datasource not supported yet`
     }
 
     public abstract toDataSource(): DataSource;
@@ -870,7 +874,6 @@ export class PrecomputedChunksSink extends FsDataSink{
         })
     }
 }
-
 
 export type DataViewMessageUnion = RawDataViewDto | StrippedPrecomputedViewDto | UnsupportedDatasetViewDto | FailedViewDto
 export type ViewMessageUnion = DataViewMessageUnion | PredictionsViewDto
