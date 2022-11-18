@@ -1,7 +1,7 @@
 // import { vec3 } from "gl-matrix";
 import { quat, vec3 } from "gl-matrix";
 import { Applet } from "../client/applets/applet";
-import { DataSource, PredictionsView, Session, View, DataView, RawDataView, StrippedPrecomputedView, DataViewUnion, Color } from "../client/ilastik";
+import { FsDataSource, PredictionsView, Session, View, DataView, RawDataView, StrippedPrecomputedView, DataViewUnion, Color } from "../client/ilastik";
 import { MakeDataViewParams, ViewerAppletStateDto } from "../client/dto";
 import { INativeView, IViewerDriver, IViewportDriver } from "../drivers/viewer_driver";
 import { ErrorPopupWidget } from "../gui/widgets/popup";
@@ -148,7 +148,7 @@ export class Viewer extends Applet<ViewerAppletState>{
             }
             for(let [nativeUrl, nativeView] of nativeViewsMap.entries()){
                 let dataView = newState.data_views.get(nativeUrl);
-                let datasourceInView: DataSource;
+                let datasourceInView: FsDataSource;
                 if(dataView instanceof RawDataView && dataView.datasources.length == 1){
                     datasourceInView = dataView.datasources[0]
                 }else if(dataView instanceof StrippedPrecomputedView){
@@ -199,7 +199,7 @@ export class Viewer extends Applet<ViewerAppletState>{
         this.driver.refreshView({native_view: view.toNative()})
     }
 
-    public async openDataViewFromDataSource(datasource: DataSource){
+    public async openDataViewFromDataSource(datasource: FsDataSource){
         let name = datasource.url.path.name + " " + datasource.resolutionString
         let dataViewResult = await this.session.makeDataView(new MakeDataViewParams({view_name: name, url: datasource.url.toDto()}))
         if(dataViewResult instanceof Error){

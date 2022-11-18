@@ -2,7 +2,7 @@ import { Applet } from '../../client/applets/applet';
 import { JsonValue } from '../../util/serialization';
 import { assertUnreachable, createElement, createInput, createInputParagraph, createTable } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
-import { BucketFs, Color, DataSource, Filesystem, FsDataSink, Session } from '../../client/ilastik';
+import { BucketFs, Color, FsDataSource, Filesystem, FsDataSink, Session } from '../../client/ilastik';
 import { CssClasses } from '../css_classes';
 import { ErrorPopupWidget, InputPopupWidget } from './popup';
 import {
@@ -43,12 +43,12 @@ class LabelHeader{
 class PixelClassificationExportAppletState{
     jobs: Array<ExportJobDto | OpenDatasinkJobDto>
     populated_labels: LabelHeader[] | undefined
-    datasource_suggestions: DataSource[]
+    datasource_suggestions: FsDataSource[]
 
     constructor(params: {
         jobs: Array<ExportJobDto | OpenDatasinkJobDto>
         populated_labels: LabelHeaderDto[] | undefined
-        datasource_suggestions: DataSource[]
+        datasource_suggestions: FsDataSource[]
     }){
         this.jobs = params.jobs
         this.populated_labels = params.populated_labels?.map(msg => LabelHeader.fromDto(msg))
@@ -58,7 +58,7 @@ class PixelClassificationExportAppletState{
     public static fromDto(message: PixelClassificationExportAppletStateDto): PixelClassificationExportAppletState{
         return new this({
             jobs: message.jobs,
-            datasource_suggestions: (message.datasource_suggestions || []).map(msg => DataSource.fromDto(msg)), //FIXME?
+            datasource_suggestions: (message.datasource_suggestions || []).map(msg => FsDataSource.fromDto(msg)), //FIXME?
             populated_labels: message.populated_labels
         })
     }
@@ -109,7 +109,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
         this.datasourceInput = new DataSourceInput({
             parentElement: datasourceFieldset,
             session,
-            onChanged: (ds: DataSource | undefined) => {
+            onChanged: (ds: FsDataSource | undefined) => {
                 if(!ds){
                     this.datasinkInput.sinkShapeInput.xInput.value = undefined
                     this.datasinkInput.sinkShapeInput.yInput.value = undefined
@@ -207,7 +207,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
             parentElement: this.inputSuggestionsButtonContainer,
             value: "Use an Annotated Dataset",
             disabled: new_state.datasource_suggestions.length == 0,
-            onClick: () => new InputPopupWidget<DataSource>({
+            onClick: () => new InputPopupWidget<FsDataSource>({
                 title: "Pick an annotated dataset as input",
                 inputWidgetFactory: (parentElement) => {
                     return new SelectorWidget({

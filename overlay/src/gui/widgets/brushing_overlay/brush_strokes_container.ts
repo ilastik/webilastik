@@ -1,6 +1,6 @@
 import { vec3 } from "gl-matrix";
 import { Applet } from "../../../client/applets/applet";
-import { Color, DataSource, Session } from "../../../client/ilastik";
+import { Color, FsDataSource, Session } from "../../../client/ilastik";
 import * as schema from "../../../client/dto";
 import { HashMap } from "../../../util/hashmap";
 import { createElement, createInput, createInputParagraph, InlineCss, removeElement, vecToString } from "../../../util/misc";
@@ -45,7 +45,7 @@ export class BrushingApplet extends Applet<State>{
     private labelWidgets = new Map<string, LabelWidget>()
     private labelSelectorContainer: HTMLSpanElement;
     private labelSelector: PopupSelect<{name: string, color: Color}> | undefined
-    private onDataSourceClicked?: (datasource: DataSource) => void
+    private onDataSourceClicked?: (datasource: FsDataSource) => void
     private onLabelSelected?: () => void;
 
 
@@ -53,7 +53,7 @@ export class BrushingApplet extends Applet<State>{
         session: Session,
         applet_name: string,
         parentElement: HTMLElement,
-        onDataSourceClicked?: (datasource: DataSource) => void,
+        onDataSourceClicked?: (datasource: FsDataSource) => void,
         onLabelSelected?: () => void;
         gl: WebGL2RenderingContext
     }){
@@ -119,7 +119,7 @@ export class BrushingApplet extends Applet<State>{
         return this.currentLabelWidget?.color
     }
 
-    public getBrushStrokes(datasource: DataSource | undefined): Array<[Color, BrushStroke[]]>{
+    public getBrushStrokes(datasource: FsDataSource | undefined): Array<[Color, BrushStroke[]]>{
         return Array.from(this.labelWidgets.values()).map(widget => [widget.color, widget.getBrushStrokes(datasource)])
     }
 
@@ -242,7 +242,7 @@ class LabelWidget{
     public readonly element: HTMLDivElement;
     private colorPicker: ColorPicker;
     private nameInput: HTMLInputElement;
-    private brushStrokesTables: HashMap<DataSource, BrushStokeTable, string>;
+    private brushStrokesTables: HashMap<FsDataSource, BrushStokeTable, string>;
 
     constructor(params: {
         name: string,
@@ -254,7 +254,7 @@ class LabelWidget{
         onBrushStrokeDeleteClicked: (color: Color, stroke: BrushStroke) => void,
         onColorChange: (newColor: Color) => void,
         onNameChange: (newName: string) => void,
-        onDataSourceClicked?: (datasource: DataSource) => void,
+        onDataSourceClicked?: (datasource: FsDataSource) => void,
     }){
         this.element = createElement({tagName: "div", parentElement: params.parentElement, cssClasses: ["ItkLabelWidget"]});
 
@@ -271,7 +271,7 @@ class LabelWidget{
             inputType: "button", parentElement: labelControlsContainer, value: "Delete Label", onClick: () => params.onLabelDeleteClicked(this.name)
         })
 
-        let strokesPerDataSource = new HashMap<DataSource, BrushStroke[], string>();
+        let strokesPerDataSource = new HashMap<FsDataSource, BrushStroke[], string>();
         let brushStrokes = params.brushStrokes.slice()
         brushStrokes.sort((a, b) => a.annotated_data_source.getDisplayString().localeCompare(b.annotated_data_source.getDisplayString()))
         for(let stroke of brushStrokes){
@@ -326,7 +326,7 @@ class LabelWidget{
         return this.colorPicker.value
     }
 
-    public getBrushStrokes(datasource: DataSource | undefined): Array<BrushStroke>{
+    public getBrushStrokes(datasource: FsDataSource | undefined): Array<BrushStroke>{
         if(datasource === undefined){
             let out = new Array<BrushStroke>()
             for(let strokesTable of this.brushStrokesTables.values()){

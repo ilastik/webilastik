@@ -357,7 +357,7 @@ export class Session{
         return undefined
     }
 
-    public async getDatasourcesFromUrl(params: GetDatasourcesFromUrlParamsDto): Promise<Array<DataSource> | Error>{
+    public async getDatasourcesFromUrl(params: GetDatasourcesFromUrlParamsDto): Promise<Array<FsDataSource> | Error>{
         let result = await fetchJson(this.sessionUrl.joinPath("get_datasources_from_url").raw, {
             method: "POST",
             body: JSON.stringify(toJsonValue(params)),
@@ -370,7 +370,7 @@ export class Session{
         if(responseDto instanceof Error){
             return responseDto
         }
-        return responseDto.datasources.map(msg => DataSource.fromDto(msg))
+        return responseDto.datasources.map(msg => FsDataSource.fromDto(msg))
     }
 
     public async makeDataView(params: MakeDataViewParams): Promise<DataViewUnion | Error>{
@@ -613,7 +613,7 @@ export class Interval5D{
     }
 }
 
-export class DataSource{
+export class FsDataSource{
     public readonly url: Url
     public readonly filesystem: Filesystem
     public readonly path: Path
@@ -648,8 +648,8 @@ export class DataSource{
         return this.url.raw
     }
 
-    public static fromDto(dto: PrecomputedChunksDataSourceDto) : DataSource{
-        return new DataSource({
+    public static fromDto(dto: PrecomputedChunksDataSourceDto) : FsDataSource{
+        return new FsDataSource({
             filesystem: Filesystem.fromDto(dto.filesystem),
             path: Path.fromDto(dto.path),
             url: Url.fromDto(dto.url),
@@ -680,7 +680,7 @@ export class DataSource{
         return `${this.url.raw} (${this.resolutionString})`
     }
 
-    public equals(other: DataSource): boolean{
+    public equals(other: FsDataSource): boolean{
         return (
             this.url.equals(other.url) && vec3.equals(this.spatial_resolution, other.spatial_resolution)
         )
@@ -825,7 +825,7 @@ export abstract class FsDataSink{
         throw `FIXME:N5 datasource not supported yet`
     }
 
-    public abstract toDataSource(): DataSource;
+    public abstract toDataSource(): FsDataSource;
 }
 
 export class PrecomputedChunksSink extends FsDataSink{
@@ -857,13 +857,13 @@ export class PrecomputedChunksSink extends FsDataSink{
         })
     }
 
-    public toDataSource(): DataSource{
+    public toDataSource(): FsDataSource{
         //FIXME: stop using URLs; have datasources encode al the stuff they need in properties
         const datasourceUrl = this.filesystem.url.joinPath(this.path).updatedWith({
             datascheme: "precomputed",
             hash: `resolution=${this.resolution[0]}_${this.resolution[1]}_${this.resolution[2]}`
         })
-        return new DataSource({
+        return new FsDataSource({
             url: datasourceUrl,
             filesystem: this.filesystem,
             path: this.path,
@@ -953,53 +953,53 @@ export abstract class DataView extends View{
         throw `Should be unreachable`
     }
 
-    public abstract getDatasources(): Array<DataSource> | undefined;
+    public abstract getDatasources(): Array<FsDataSource> | undefined;
 }
 
 export class RawDataView extends DataView{
-    public readonly datasources: DataSource[]
-    constructor(params: {name: string, url: Url, datasources: Array<DataSource>}){
+    public readonly datasources: FsDataSource[]
+    constructor(params: {name: string, url: Url, datasources: Array<FsDataSource>}){
         super(params)
         this.datasources = params.datasources
     }
 
     public static fromDto(message: RawDataViewDto): RawDataView {
         return new RawDataView({
-            datasources: message.datasources.map(ds_msg => DataSource.fromDto(ds_msg)),
+            datasources: message.datasources.map(ds_msg => FsDataSource.fromDto(ds_msg)),
             name: message.name,
             url: Url.fromDto(message.url)
         })
     }
 
-    public getDatasources(): Array<DataSource> | undefined{
+    public getDatasources(): Array<FsDataSource> | undefined{
         return this.datasources.slice()
     }
 }
 
 export class StrippedPrecomputedView extends DataView{
-    public readonly datasource: DataSource
-    constructor(params: {name: string, url: Url, datasource: DataSource}){
+    public readonly datasource: FsDataSource
+    constructor(params: {name: string, url: Url, datasource: FsDataSource}){
         super(params)
         this.datasource = params.datasource
     }
 
     public static fromDto(message: StrippedPrecomputedViewDto): StrippedPrecomputedView {
         return new StrippedPrecomputedView({
-            datasource: DataSource.fromDto(message.datasource),
+            datasource: FsDataSource.fromDto(message.datasource),
             name: message.name,
             url: Url.fromDto(message.url)
         })
     }
 
-    public getDatasources(): Array<DataSource>{
+    public getDatasources(): Array<FsDataSource>{
         return [this.datasource]
     }
 }
 
 export class PredictionsView extends View{
-    public readonly raw_data: DataSource
+    public readonly raw_data: FsDataSource
     public readonly classifier_generation: number
-    constructor(params: {name: string, url: Url, raw_data: DataSource, classifier_generation: number}){
+    constructor(params: {name: string, url: Url, raw_data: FsDataSource, classifier_generation: number}){
         super(params)
         this.raw_data = params.raw_data
         this.classifier_generation = params.classifier_generation
@@ -1009,7 +1009,7 @@ export class PredictionsView extends View{
         return new PredictionsView({
             classifier_generation: message.classifier_generation,
             name: message.name,
-            raw_data: DataSource.fromDto(message.raw_data),
+            raw_data: FsDataSource.fromDto(message.raw_data),
             url: Url.fromDto(message.url)
         })
     }

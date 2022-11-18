@@ -1,6 +1,6 @@
 import { quat, vec3 } from "gl-matrix"
 import { BrushStroke } from "../../.."
-import { Color, DataSource, FailedView, PredictionsView, RawDataView, Session, StrippedPrecomputedView, UnsupportedDatasetView } from "../../../client/ilastik"
+import { Color, FsDataSource, FailedView, PredictionsView, RawDataView, Session, StrippedPrecomputedView, UnsupportedDatasetView } from "../../../client/ilastik"
 import { createElement, createInput, removeElement } from "../../../util/misc"
 import { CollapsableWidget } from "../collapsable_applet_gui"
 import { PopupSelect } from "../selector_widget"
@@ -108,7 +108,7 @@ export class BrushingWidget{
         this.overlay = undefined
     }
 
-    public showTrainingUi(trainingDatasource: DataSource){
+    public showTrainingUi(trainingDatasource: FsDataSource){
         this.trainingWidget.style.display = "block"
         this.canvas.style.display = "block"
         let overlay = this.overlay = new BrushingOverlay({
@@ -197,7 +197,7 @@ export class BrushingWidget{
         this.showStatus(`Viewing multi-resolution datasource`)
 
         createElement({tagName: "label", innerHTML: "Select a voxel size to annotate on:", parentElement: this.resolutionSelectionContainer});
-        new PopupSelect<DataSource>({
+        new PopupSelect<FsDataSource>({
             popupTitle: "Select a voxel size to annotate on",
             parentElement: this.resolutionSelectionContainer,
             options: view.datasources,
@@ -215,7 +215,7 @@ export class BrushingWidget{
         })
     }
 
-    private startTraining(datasource: DataSource){
+    private startTraining(datasource: FsDataSource){
         this.resetWidgets()
         this.showTrainingUi(datasource)
         this.showStatus(`Now training on ${datasource.getDisplayString()}`)

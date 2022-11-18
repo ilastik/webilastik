@@ -1,5 +1,5 @@
 import { quat, vec3 } from "gl-matrix";
-import { Color, DataSource } from "../../../client/ilastik";
+import { Color, FsDataSource } from "../../../client/ilastik";
 import { PixelAnnotationDto } from "../../../client/dto";
 import { VecAttributeBuffer, BufferUsageHint } from "../../../gl/buffer";
 import { VertexArray } from "../../../gl/vertex_primitives";
@@ -9,13 +9,13 @@ export class BrushStroke extends VertexArray{
     public readonly camera_orientation: quat
     public num_points : number
     public readonly positions_buffer: VecAttributeBuffer<3, Float32Array>
-    public readonly annotated_data_source: DataSource;
+    public readonly annotated_data_source: FsDataSource;
 
     private constructor({gl, points_vx, camera_orientation, annotated_data_source}: {
         gl: WebGL2RenderingContext,
         points_vx: vec3[], // points in "voxel-space" (i.e. cooridnates are pixel indices into the image array)
         camera_orientation: quat,
-        annotated_data_source: DataSource,
+        annotated_data_source: FsDataSource,
     }){
         let data = new Float32Array(1024 * 3) // 1024 vec3's
         super(data)
@@ -30,7 +30,7 @@ export class BrushStroke extends VertexArray{
         gl: WebGL2RenderingContext,
         start_postition_uvw: vec3,
         camera_orientation: quat,
-        annotated_data_source: DataSource,
+        annotated_data_source: FsDataSource,
     }): BrushStroke{
         const stroke = new BrushStroke({gl, points_vx: [], camera_orientation, annotated_data_source})
         stroke.try_add_point_uvw(start_postition_uvw)
@@ -113,7 +113,7 @@ export class BrushStroke extends VertexArray{
         // }else{
             camera_orientation = quat.create()
         // }
-        let annotated_data_source = DataSource.fromDto(message.raw_data)
+        let annotated_data_source = FsDataSource.fromDto(message.raw_data)
         return new BrushStroke({
             gl, points_vx: message.points, camera_orientation, annotated_data_source
         })

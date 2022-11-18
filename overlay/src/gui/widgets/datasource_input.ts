@@ -1,4 +1,4 @@
-import { DataSource, Session } from "../../client/ilastik";
+import { FsDataSource, Session } from "../../client/ilastik";
 import { GetDatasourcesFromUrlParamsDto } from "../../client/dto";
 import { createElement, createInput } from "../../util/misc";
 import { CssClasses } from "../css_classes";
@@ -12,15 +12,15 @@ export class DataSourceInput{
     private readonly session: Session;
     private readonly urlInput: UrlInput;
     public readonly checkButton: HTMLInputElement;
-    private readonly onChanged: ((newValue: DataSource | undefined) => void) | undefined;
+    private readonly onChanged: ((newValue: FsDataSource | undefined) => void) | undefined;
     private statusMessageContainer: HTMLParagraphElement;
-    private _value: DataSource | undefined;
+    private _value: FsDataSource | undefined;
 
     constructor(params: {
         parentElement: HTMLElement,
         session: Session,
-        value?: DataSource,
-        onChanged?: (newValue: DataSource | undefined) => void,
+        value?: FsDataSource,
+        onChanged?: (newValue: FsDataSource | undefined) => void,
     }){
         this.session = params.session
         this._value = params.value
@@ -63,8 +63,8 @@ export class DataSourceInput{
         this.popupSuggestions(datasources_result)
     }
 
-    protected popupSuggestions(suggestions: DataSource[]){
-        new InputPopupWidget<DataSource>({
+    protected popupSuggestions(suggestions: FsDataSource[]){
+        new InputPopupWidget<FsDataSource>({
             title: "Select a Data Source",
             inputWidgetFactory: (parentElement) => {
                 return new SelectorWidget({
@@ -79,11 +79,11 @@ export class DataSourceInput{
         })
     }
 
-    public get value(): DataSource | undefined{
+    public get value(): FsDataSource | undefined{
         return this._value
     }
 
-    public set value(value: DataSource | undefined){
+    public set value(value: FsDataSource | undefined){
         this._value = value
 
         this.urlInput.value = undefined
