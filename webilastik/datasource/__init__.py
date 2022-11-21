@@ -12,7 +12,7 @@ import numpy as np
 from ndstructs.point5D import Shape5D, Interval5D, Point5D, SPAN
 from ndstructs.array5D import Array5D, SPAN_OVERRIDE, All
 from webilastik.filesystem import Filesystem
-from webilastik.server.rpc.dto import FsDataSourceDto, MessageParsingError, PrecomputedChunksDataSourceDto, SkimageDataSourceDto
+from webilastik.server.rpc.dto import FsDataSourceDto, PrecomputedChunksDataSourceDto, SkimageDataSourceDto
 from webilastik.utility.url import Url
 from webilastik.utility.url import Url, Protocol
 from global_cache import global_cache
@@ -259,7 +259,7 @@ class FsDataSource(DataSource):
     def try_from_message(
         message: FsDataSourceDto,
         allowed_protocols: Sequence[Protocol] = ("http", "https"),
-    ) -> "FsDataSource | MessageParsingError":
+    ) -> "FsDataSource":
         from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
         from webilastik.datasource.n5_datasource import N5DataSource
         from webilastik.datasource.skimage_datasource import SkimageDataSource
