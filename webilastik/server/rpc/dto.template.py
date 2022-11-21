@@ -432,5 +432,14 @@ class GetDatasourcesFromUrlParamsDto(DataTransferObject):
 
 @dataclass
 class GetDatasourcesFromUrlResponseDto(DataTransferObject):
-    datasources: Tuple[FsDataSourceDto, ...]
+    datasources: Optional[Tuple[FsDataSourceDto, ...]]
 
+
+@dataclass
+class CheckDatasourceCompatibilityParams(DataTransferObject):
+    datasources: Tuple[FsDataSourceDto, ...]
+    # classifier_generation: int
+
+@dataclass
+class CheckDatasourceCompatibilityResponse(DataTransferObject):
+    compatible: Tuple[bool, ...]

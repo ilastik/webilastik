@@ -185,6 +185,10 @@ class WebIlastik:
                 self.get_datasources_from_url
             ),
             web.post(
+                "/check_datasource_compatibility",
+                lambda request: self.workflow.pixel_classifier_applet.check_datasource_compatibility(request)
+            ),
+            web.post(
                 "/save_project",
                 self.save_project
             ),

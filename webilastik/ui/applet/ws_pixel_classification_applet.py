@@ -9,6 +9,8 @@ from webilastik import datasource
 from webilastik.classifiers.pixel_classifier import PixelClassifier
 
 from webilastik.datasource import DataRoi, FsDataSource
+from webilastik.server.rpc import MessageParsingError
+from webilastik.server.rpc.dto import CheckDatasourceCompatibilityParams, CheckDatasourceCompatibilityResponse, RpcErrorDto
 from webilastik.ui.applet import CascadeError, UserPrompt
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
 from webilastik.ui.applet.ws_applet import WsApplet
@@ -56,6 +58,22 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
             return None
 
         raise ValueError(f"Invalid method name: '{method_name}'")
+
+    async def check_datasource_compatibility(self, request: web.Request) -> web.Response:
+        params = CheckDatasourceCompatibilityParams.from_json_value(await request.json())
+        if isinstance(params, MessageParsingError):
+            return  uncachable_json_response(RpcErrorDto(error="bad payload").to_json_value(), status=400)
+        datasources = [FsDataSource.try_from_message(dto) for dto in params.datasources]
+        with self.lock:
+            classifier = self.pixel_classifier()
+        if classifier is None:
+            return uncachable_json_response("Request is for stale classifier", status=410)
+        return uncachable_json_response(
+            CheckDatasourceCompatibilityResponse(
+                compatible=tuple(classifier.is_applicable_to(ds) for ds in datasources)
+            ).to_json_value(),
+            status=200,
+        )
 
     async def predictions_precomputed_chunks_info(self, request: web.Request) -> web.Response:
         classifier = self._state.classifier
