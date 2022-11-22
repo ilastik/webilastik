@@ -62,8 +62,9 @@ class Layer{
         return this.managedLayer.name
     }
 
-    public get visible(): boolean{
-        return this.managedLayer.visible
+    public get hidden(): boolean{
+        //a layer might be hidden but not really "visible", because it can be behind other opaque layers
+        return !this.managedLayer.visible
     }
 
     public get fragmentShader(): string{
@@ -213,7 +214,7 @@ export class NeuroglancerDriver implements IViewerDriver{
 
     public getDataViewOnDisplay(): INativeView | undefined{
         return this.getImageLayers()
-            .filter(layer => layer.visible)
+            .filter(layer => !layer.hidden)
             .map(layer => ({
                 name: layer.name,
                 url: layer.sourceUrl,
