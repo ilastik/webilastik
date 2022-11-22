@@ -144,6 +144,15 @@ export class Url implements IJsonable{
         }
     }
 
+    public toBase64(): string{
+        return btoa(this.raw.toString()).replace("+", "-").replace("/", "_")
+    }
+
+    public static fromBase64(encoded: String): Url{
+        const decoded = atob(encoded.replace("-", "+").replace("_", "/"))
+        return Url.parse(decoded)
+    }
+
     public toJsonValue(): string{
         return this.raw
     }
