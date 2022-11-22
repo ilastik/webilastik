@@ -42,22 +42,11 @@ export interface IViewerDriver{
      */
     closeView: (params: {native_view: INativeView}) => void;
 
-    /**
-     * Registers a calback that should be called every time the viewer:
-     *  -> opens or closes a data source;
-     *  -> displays or hides a data source;
-     *  -> reconfigures the visible viewports
-     *
-     * The callback should be called essentially every time the folloing methods would change their results:
-     *      this.getViewportDrivers
-     *      this.getDataViewOnDisplay
-     *      this.getOpenDataViews
-     *
-     * Note that the handler is _not_ to be called every time the user scrolls, pans or rotates the view
-     *
-     * @param handler - a callback thta is to be called every time the visible viewports change
-     */
-    onViewportsChanged: (handler: () => void) => void;
+
+    addViewportsChangedHandler: (handler: () => void) => void;
+    removeViewportsChangedHandler: (handler: () => void) => void;
+    addDataChangedHandler: (handler: () => void) => void;
+    removeDataChangedHandler: (handler: () => void) => void;
 
     /**
      * Gets the IDataView being displayed, if any. This is usually somethingl like the "active tab" of a viewer

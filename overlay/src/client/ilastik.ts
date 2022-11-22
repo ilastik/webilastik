@@ -1,10 +1,9 @@
 import { vec3 } from "gl-matrix"
-import { INativeView } from "../drivers/viewer_driver"
 import { assertUnreachable, fetchJson, sleep } from "../util/misc"
 import { Path, Url } from "../util/parsed_url"
 import { DataType, ensureDataType } from "../util/precomputed_chunks"
 import {
-    ensureJsonObject, ensureJsonString, JsonableValue, JsonValue, toJsonValue
+    ensureJsonObject, ensureJsonString, JsonableValue, toJsonValue
 } from "../util/serialization"
 import {
     BucketFSDto,
@@ -14,7 +13,6 @@ import {
     ComputeSessionStatusDto,
     CreateComputeSessionParamsDto,
     PrecomputedChunksDataSourceDto,
-    FailedViewDto,
     GetAvailableHpcSitesResponseDto,
     GetComputeSessionStatusParamsDto,
     GetDatasourcesFromUrlParamsDto,
@@ -25,16 +23,11 @@ import {
     ListComputeSessionsParamsDto,
     ListComputeSessionsResponseDto,
     LoadProjectParamsDto,
-    MakeDataViewParams,
     OsfsDto,
     Point5DDto,
     PrecomputedChunksSinkDto,
-    PredictionsViewDto,
-    RawDataViewDto,
     SaveProjectParamsDto,
     Shape5DDto,
-    StrippedPrecomputedViewDto,
-    UnsupportedDatasetViewDto,
     N5DataSinkDto
 } from "./dto"
 
@@ -357,7 +350,7 @@ export class Session{
         return undefined
     }
 
-    public async getDatasourcesFromUrl(params: GetDatasourcesFromUrlParamsDto): Promise<Array<FsDataSource> | Error>{
+    public async getDatasourcesFromUrl(params: GetDatasourcesFromUrlParamsDto): Promise<Array<FsDataSource> | undefined | Error>{
         let result = await fetchJson(this.sessionUrl.joinPath("get_datasources_from_url").raw, {
             method: "POST",
             body: JSON.stringify(toJsonValue(params)),
@@ -370,23 +363,11 @@ export class Session{
         if(responseDto instanceof Error){
             return responseDto
         }
+        if(responseDto.datasources === undefined){
+            return undefined
+        }
         return responseDto.datasources.map(msg => FsDataSource.fromDto(msg))
     }
-
-    public async makeDataView(params: MakeDataViewParams): Promise<DataViewUnion | Error>{
-        let result = await fetchJson(
-            this.sessionUrl.joinPath("make_data_view").raw,
-            {
-                method: "POST",
-                body: JSON.stringify(params.toJsonValue()),
-            }
-        )
-        if(result instanceof Error){
-            return result
-        }
-        return parseAsDataViewUnion(result)
-    }
-
 }
 
 export type FeatureClassName = IlpFeatureExtractorDto["class_name"]
@@ -613,7 +594,7 @@ export class Interval5D{
     }
 }
 
-export class FsDataSource{
+export abstract class FsDataSource{
     public readonly url: Url
     public readonly filesystem: Filesystem
     public readonly path: Path
@@ -649,7 +630,29 @@ export class FsDataSource{
     }
 
     public static fromDto(dto: PrecomputedChunksDataSourceDto) : FsDataSource{
-        return new FsDataSource({
+        return PrecomputedChunksDataSource.fromDto(dto)
+    }
+
+    public abstract toDto(): PrecomputedChunksDataSourceDto;
+
+    public get resolutionString(): string{
+        return `${this.spatial_resolution[0]} x ${this.spatial_resolution[1]} x ${this.spatial_resolution[2]}nm`
+    }
+
+    public getDisplayString() : string{
+        return `${this.url.raw} (${this.resolutionString})`
+    }
+
+    public equals(other: FsDataSource): boolean{
+        return (
+            this.url.equals(other.url) && vec3.equals(this.spatial_resolution, other.spatial_resolution)
+        )
+    }
+}
+
+export class PrecomputedChunksDataSource extends FsDataSource{
+    public static fromDto(dto: PrecomputedChunksDataSourceDto) : PrecomputedChunksDataSource{
+        return new PrecomputedChunksDataSource({
             filesystem: Filesystem.fromDto(dto.filesystem),
             path: Path.fromDto(dto.path),
             url: Url.fromDto(dto.url),
@@ -670,20 +673,6 @@ export class FsDataSource{
             spatial_resolution: this.spatial_resolution,
             dtype: this.dtype,
         })
-    }
-
-    public get resolutionString(): string{
-        return `${this.spatial_resolution[0]} x ${this.spatial_resolution[1]} x ${this.spatial_resolution[2]}nm`
-    }
-
-    public getDisplayString() : string{
-        return `${this.url.raw} (${this.resolutionString})`
-    }
-
-    public equals(other: FsDataSource): boolean{
-        return (
-            this.url.equals(other.url) && vec3.equals(this.spatial_resolution, other.spatial_resolution)
-        )
     }
 }
 
@@ -857,13 +846,13 @@ export class PrecomputedChunksSink extends FsDataSink{
         })
     }
 
-    public toDataSource(): FsDataSource{
+    public toDataSource(): PrecomputedChunksDataSource{
         //FIXME: stop using URLs; have datasources encode al the stuff they need in properties
         const datasourceUrl = this.filesystem.url.joinPath(this.path).updatedWith({
             datascheme: "precomputed",
             hash: `resolution=${this.resolution[0]}_${this.resolution[1]}_${this.resolution[2]}`
         })
-        return new FsDataSource({
+        return new PrecomputedChunksDataSource({
             url: datasourceUrl,
             filesystem: this.filesystem,
             path: this.path,
@@ -872,179 +861,5 @@ export class PrecomputedChunksSink extends FsDataSink{
             tile_shape: this.tile_shape,
             dtype: this.dtype,
         })
-    }
-}
-
-export type DataViewMessageUnion = RawDataViewDto | StrippedPrecomputedViewDto | UnsupportedDatasetViewDto | FailedViewDto
-export type ViewMessageUnion = DataViewMessageUnion | PredictionsViewDto
-export type DataViewUnion = RawDataView | StrippedPrecomputedView | UnsupportedDatasetView | FailedView
-export type ViewUnion = DataViewUnion | PredictionsView
-
-export abstract class View{
-    public readonly name: string;
-    public readonly url: Url;
-
-    constructor(params: {name: string, url: Url}){
-        this.name = params.name
-        this.url = params.url
-    }
-
-    public toNative(name?: string): INativeView{
-        return {
-            name: name || this.name,
-            url: this.url.updatedWith({search: new Map(), hash: ""}).raw
-        }
-    }
-
-    public static fromDto(message: ViewMessageUnion): ViewUnion{
-        if(message instanceof PredictionsViewDto){
-            return PredictionsView.fromDto(message)
-        }
-        return DataView.fromDto(message)
-    }
-}
-
-export function parseAsView(value: JsonValue): ViewUnion | Error{
-    const predictionsViewDto = PredictionsViewDto.fromJsonValue(value)
-    if(!(predictionsViewDto instanceof Error)){
-        return PredictionsView.fromDto(predictionsViewDto)
-    }
-    return parseAsDataViewUnion(value)
-}
-
-export function parseAsDataViewUnion(value: JsonValue): DataViewUnion | Error{
-    //FIXME: this should probably be autogenerated
-    const rawDataViewDto = RawDataViewDto.fromJsonValue(value)
-    if(!(rawDataViewDto instanceof Error)){
-        return RawDataView.fromDto(rawDataViewDto)
-    }
-
-    const strippedPrecompViewDto = StrippedPrecomputedViewDto.fromJsonValue(value)
-    if(!(strippedPrecompViewDto instanceof Error)){
-        return StrippedPrecomputedView.fromDto(strippedPrecompViewDto)
-    }
-
-    const failedViewDto = FailedViewDto.fromJsonValue(value)
-    if(!(failedViewDto instanceof Error)){
-        return FailedView.fromDto(failedViewDto)
-    }
-
-    const unsupportedDatasetViewDto = UnsupportedDatasetViewDto.fromJsonValue(value)
-    if(!(unsupportedDatasetViewDto instanceof Error)){
-        return UnsupportedDatasetView.fromDto(unsupportedDatasetViewDto)
-    }
-    return Error(`Could not parse ${JSON.stringify(value)}`)
-}
-
-export abstract class DataView extends View{
-    public static fromDto(message: DataViewMessageUnion): DataViewUnion{
-        if(message instanceof RawDataViewDto){
-            return RawDataView.fromDto(message)
-        }
-        if(message instanceof StrippedPrecomputedViewDto){
-            return StrippedPrecomputedView.fromDto(message)
-        }
-        if(message instanceof UnsupportedDatasetViewDto){
-            return UnsupportedDatasetView.fromDto(message)
-        }
-        if(message instanceof FailedViewDto){
-            return FailedView.fromDto(message)
-        }
-        throw `Should be unreachable`
-    }
-
-    public abstract getDatasources(): Array<FsDataSource> | undefined;
-}
-
-export class RawDataView extends DataView{
-    public readonly datasources: FsDataSource[]
-    constructor(params: {name: string, url: Url, datasources: Array<FsDataSource>}){
-        super(params)
-        this.datasources = params.datasources
-    }
-
-    public static fromDto(message: RawDataViewDto): RawDataView {
-        return new RawDataView({
-            datasources: message.datasources.map(ds_msg => FsDataSource.fromDto(ds_msg)),
-            name: message.name,
-            url: Url.fromDto(message.url)
-        })
-    }
-
-    public getDatasources(): Array<FsDataSource> | undefined{
-        return this.datasources.slice()
-    }
-}
-
-export class StrippedPrecomputedView extends DataView{
-    public readonly datasource: FsDataSource
-    constructor(params: {name: string, url: Url, datasource: FsDataSource}){
-        super(params)
-        this.datasource = params.datasource
-    }
-
-    public static fromDto(message: StrippedPrecomputedViewDto): StrippedPrecomputedView {
-        return new StrippedPrecomputedView({
-            datasource: FsDataSource.fromDto(message.datasource),
-            name: message.name,
-            url: Url.fromDto(message.url)
-        })
-    }
-
-    public getDatasources(): Array<FsDataSource>{
-        return [this.datasource]
-    }
-}
-
-export class PredictionsView extends View{
-    public readonly raw_data: FsDataSource
-    public readonly classifier_generation: number
-    constructor(params: {name: string, url: Url, raw_data: FsDataSource, classifier_generation: number}){
-        super(params)
-        this.raw_data = params.raw_data
-        this.classifier_generation = params.classifier_generation
-    }
-
-    public static fromDto(message: PredictionsViewDto): PredictionsView {
-        return new PredictionsView({
-            classifier_generation: message.classifier_generation,
-            name: message.name,
-            raw_data: FsDataSource.fromDto(message.raw_data),
-            url: Url.fromDto(message.url)
-        })
-    }
-
-}
-
-export class UnsupportedDatasetView extends DataView{
-    public static fromDto(message: UnsupportedDatasetViewDto): UnsupportedDatasetView {
-        return new UnsupportedDatasetView({
-            name: message.name,
-            url: Url.fromDto(message.url)
-        })
-    }
-
-    public getDatasources(): undefined{
-        return undefined
-    }
-}
-
-export class FailedView extends DataView{
-    public readonly error_message: string
-    constructor(params: {name: string, url: Url, error_message: string}){
-        super(params)
-        this.error_message = params.error_message
-    }
-
-    public static fromDto(message: FailedViewDto): FailedView {
-        return new FailedView({
-            error_message: message.error_message,
-            name: message.name,
-            url: Url.fromDto(message.url)
-        })
-    }
-
-    public getDatasources(): undefined{
-        return undefined
     }
 }

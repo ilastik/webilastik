@@ -56,7 +56,7 @@ export class DataSourceInput{
             new ErrorPopupWidget({message: `Error retrieving datasources: ${datasources_result}`})
             return
         }
-        if(datasources_result.length == 0){
+        if(datasources_result === undefined || datasources_result.length == 0){
             new ErrorPopupWidget({message: `No datasources fond with given URL: ${url}`})
             return
         }

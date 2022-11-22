@@ -1,89 +1,31 @@
 // import { vec3 } from "gl-matrix";
 import { quat, vec3 } from "gl-matrix";
-import { Applet } from "../client/applets/applet";
-import { FsDataSource, PredictionsView, Session, View, DataView, RawDataView, StrippedPrecomputedView, DataViewUnion, Color } from "../client/ilastik";
-import { MakeDataViewParams, ViewerAppletStateDto } from "../client/dto";
-import { INativeView, IViewerDriver, IViewportDriver } from "../drivers/viewer_driver";
+import { FsDataSource, Session } from "../client/ilastik";
+import { IViewerDriver, IViewportDriver } from "../drivers/viewer_driver";
 import { ErrorPopupWidget } from "../gui/widgets/popup";
 import { HashMap } from "../util/hashmap";
 import { createInput, removeElement } from "../util/misc";
 import { Url } from "../util/parsed_url";
+import { View, PredictionsView, DataView, FailedView, ViewUnion } from "./view";
 
 
-export class ViewerAppletState{
-    public readonly data_views: HashMap<Url, DataView, string>
-    public readonly prediction_views: HashMap<Url, PredictionsView, string>
-    public readonly label_colors: Array<{r: number, g: number, b: number}>
-
-    constructor(params: {
-        data_views: HashMap<Url, DataView, string>,
-        prediction_views: HashMap<Url, PredictionsView, string>,
-        label_colors: Array<{r: number, g: number, b: number}>,
-    }){
-        this.data_views = params.data_views
-        this.prediction_views = params.prediction_views
-        this.label_colors = params.label_colors
-    }
-
-    public static fromDto(message: ViewerAppletStateDto): ViewerAppletState{
-        let data_views = new HashMap<Url, DataViewUnion, string>();
-        for(let rawViewMsg of message.data_views){
-            const dataView = DataView.fromDto(rawViewMsg)
-            data_views.set(dataView.url, dataView)
-        }
-
-        let prediction_views = new HashMap<Url, PredictionsView, string>();
-        for(let predViewMsg of message.prediction_views){
-            const predView = PredictionsView.fromDto(predViewMsg)
-            prediction_views.set(predView.url, predView)
-        }
-
-        return new ViewerAppletState({
-            data_views,
-            prediction_views,
-            label_colors: message.label_colors.map(color_msg => Color.fromDto(color_msg))
-        })
-    }
-}
-
-export class Viewer extends Applet<ViewerAppletState>{
+export class Viewer{
     public readonly driver: IViewerDriver;
-    private onViewportsChangedHandlers = new Array<() => void>();
-    private state: ViewerAppletState = new ViewerAppletState({
-        data_views: new HashMap(), prediction_views: new HashMap(), label_colors: []
-    })
-    recenterButton: HTMLInputElement;
+    public readonly session: Session;
+
+    private readonly cached_views = new HashMap<Url, ViewUnion, string>();
+    private views = new HashMap<Url, ViewUnion, string>();
+    private dataViewsGeneration = 0;
+    private recenterButton: HTMLInputElement;
+    private onViewportsChangedHandlers: Array<() => void> = []
+    private onDataChangedHandlers: Array<() => void> = []
 
     public constructor(params: {
-        name: string,
         driver: IViewerDriver,
-        ilastik_session: Session
+        session: Session,
     }){
-        super({
-            name: params.name,
-            session: params.ilastik_session,
-            deserializer: value => {
-                let stateDto = ViewerAppletStateDto.fromJsonValue(value)
-                if(stateDto instanceof Error){
-                    throw `FIXME!`
-                }
-                return ViewerAppletState.fromDto(stateDto)
-            },
-            onNewState: (newState) => this.onNewState(newState)
-        })
+        this.session = params.session
         this.driver = params.driver
-        const onViewportsChangedHandler = async () => {
-            for(let handler of this.onViewportsChangedHandlers){
-                // call handlers so they can react to e.g. layers hiding/showing
-                handler() //FIXME
-            }
-            let nativeViews = this.driver.getOpenDataViews().map(nv => ({name: nv.name, url: Url.parse(nv.url)}))
-            this.setDataViews(nativeViews)
-        }
-        this.driver.onViewportsChanged(onViewportsChangedHandler)
-        this.setDataViews(
-            this.driver.getOpenDataViews().map(nv => ({name: nv.name, url: Url.parse(nv.url)}))
-        )
         this.recenterButton = createInput({
             inputType: "button",
             parentElement: document.body,
@@ -99,11 +41,17 @@ export class Viewer extends Applet<ViewerAppletState>{
                 })
             }
         })
+
+        this.addDataChangedHandler(this.synchronizeWithNativeViews)
+        this.synchronizeWithNativeViews()
     }
 
     public getVolume(): vec3{
         let max = vec3.fromValues(0,0,0)
-        for(let dv of this.state.data_views.values()){
+        for(let dv of this.views.values()){
+            if(dv instanceof PredictionsView){ //FIXME: would be better if we didn't need this knowledge
+                continue
+            }
             for(let datasource of (dv.getDatasources() || [])){
                 vec3.max(max, max, vec3.fromValues(datasource.shape.x, datasource.shape.y, datasource.shape.z))
             }
@@ -111,72 +59,30 @@ export class Viewer extends Applet<ViewerAppletState>{
         return max
     }
 
-    public setDataViews(nativeViews: Array<{name: string, url: Url}>){
-        for(let nv of nativeViews){
-            if(!this.state.data_views.has(nv.url) && !this.state.prediction_views.has(nv.url)){
-                this.doRPC("set_data_views", {frontend_timestamp: new Date().getTime(), native_views: nativeViews})
-                return
-            }
-        }
-    }
-
-
-
-    private async onNewState(newState: ViewerAppletState){
-        let oldState = this.state
-        this.state = newState
-
-        let nativeViewsMap = new HashMap<Url, INativeView, string>()
-        for(let nativeView of this.driver.getOpenDataViews()){
-            nativeViewsMap.set(Url.parse(nativeView.url), nativeView);
-        }
-
-        // Close all stale Predictions native views
-        for(let [nativeViewUrl, nativeView] of nativeViewsMap.entries()){
-            if(oldState.prediction_views.has(nativeViewUrl) && !newState.prediction_views.has(nativeViewUrl)){
-                console.log(`Removing stale predictions: ${nativeViewUrl}`)
-                this.driver.closeView({native_view: nativeView})
-            }
-        }
-
-        let channel_colors: vec3[] = newState.label_colors.map(c => vec3.fromValues(c.r, c.g, c.b))
-
-        // open all missing PredictionView's
-        for(let predictionView of newState.prediction_views.values()){
-            if(nativeViewsMap.has(predictionView.url)){
+    public synchronizeWithNativeViews = async () => {
+        let nativeViews = this.driver.getOpenDataViews().map(nv => ({name: nv.name, url: Url.parse(nv.url)}))
+        const new_views = new HashMap<Url, ViewUnion, string>();
+        const dataViewsGeneration = this.dataViewsGeneration = this.dataViewsGeneration + 1;
+        for(const {name, url} of nativeViews){
+            const cached_view = this.cached_views.get(url)
+            if(cached_view !== undefined){
+                new_views.set(url, cached_view)
                 continue
             }
-            for(let [nativeUrl, nativeView] of nativeViewsMap.entries()){
-                let dataView = newState.data_views.get(nativeUrl);
-                let datasourceInView: FsDataSource;
-                if(dataView instanceof RawDataView && dataView.datasources.length == 1){
-                    datasourceInView = dataView.datasources[0]
-                }else if(dataView instanceof StrippedPrecomputedView){
-                    datasourceInView = dataView.datasource
-                }else{
-                    continue
-                }
-                if(datasourceInView.equals(predictionView.raw_data)){
-                    this.driver.refreshView({native_view: predictionView.toNative(`Predicting on ${nativeView.name}`), channel_colors: channel_colors})
-                    break
-                }
+            const dataView = await View.tryOpen({name: name, url: url, session: this.session})
+            if(!this.cached_views.has(dataView.url) || this.cached_views.get(dataView.url) instanceof FailedView){
+                this.cached_views.set(dataView.url, dataView)
             }
+            if(this.dataViewsGeneration != dataViewsGeneration){
+                return
+            }
+            new_views.set(dataView.url, dataView)
         }
-
-        for(let handler of this.onViewportsChangedHandlers){
-            // call handlers so they can react the actual Views coming down from upstream
-            handler() //FIXME
-        }
+        this.views = new_views;
     }
 
-    public getViews(): Array<View>{
-        return [...this.state.data_views.values(), ...this.state.prediction_views.values()]
-    }
-
-    public findView(view: View) : View | undefined{
-        //FIXME: is this safe? think auto-context
-        //also, training on raw data that has a single scale?
-        return this.state.data_views.get(view.url) || this.state.prediction_views.get(view.url)
+    public getViews(): Array<ViewUnion>{
+        return [...this.views.values()]
     }
 
     public closeView(view: View){
@@ -191,17 +97,27 @@ export class Viewer extends Applet<ViewerAppletState>{
         return this.driver.getTrackedElement()
     }
 
-    public onViewportsChanged(handler: () => void){
+    public addViewportsChangedHandler(handler: () => void){
         this.onViewportsChangedHandlers.push(handler)
+        this.driver.addViewportsChangedHandler(handler)
     }
 
-    public openDataView(view: DataView){
-        this.driver.refreshView({native_view: view.toNative()})
+    public addDataChangedHandler(handler: () => void){
+        this.onDataChangedHandlers.push(handler)
+        this.driver.addDataChangedHandler(handler)
+    }
+
+    public openDataView(view: ViewUnion){
+        this.cached_views.set(view.url, view)
+        this.driver.refreshView({
+            native_view: view.toNative(),
+            channel_colors: view instanceof PredictionsView ? view.channel_colors.map(c => c.vec3i) : undefined
+        })
     }
 
     public async openDataViewFromDataSource(datasource: FsDataSource){
         let name = datasource.url.path.name + " " + datasource.resolutionString
-        let dataViewResult = await this.session.makeDataView(new MakeDataViewParams({view_name: name, url: datasource.url.toDto()}))
+        const dataViewResult = await DataView.tryOpen({name, session: this.session, url: datasource.url})
         if(dataViewResult instanceof Error){
             new ErrorPopupWidget({message: `Could not create a view for ${datasource.url}: ${dataViewResult.message}`})
             return
@@ -209,17 +125,18 @@ export class Viewer extends Applet<ViewerAppletState>{
         this.openDataView(dataViewResult)
     }
 
-    public getActiveView(): View | undefined{
+    public getActiveView(): ViewUnion | undefined{
         const native_view = this.driver.getDataViewOnDisplay()
         if(native_view === undefined){
             return undefined
         }
         let viewUrl = Url.parse(native_view.url)
-        return this.state.data_views.get(viewUrl) || this.state.prediction_views.get(viewUrl)
+        return this.views.get(viewUrl)
     }
 
     public destroy(){
         removeElement(this.recenterButton)
-        //FIXME: unregister events from native viewer using the driver
+        this.onViewportsChangedHandlers.forEach(handler => this.driver.removeViewportsChangedHandler(handler))
+        this.onDataChangedHandlers.forEach(handler => this.driver.removeDataChangedHandler(handler))
     }
 }

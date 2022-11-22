@@ -88,26 +88,30 @@ const defaultShader = 'void main() {\n  emitGrayscale(toNormalized(getDataValue(
 
 export class NeuroglancerDriver implements IViewerDriver{
     private generation = 0
+
     constructor(public readonly viewer: any){
-        const guessShader = async () => {
-            const generation = this.generation += 1
-            for(let layer of this.getImageLayers()){
-                if(layer.fragmentShader != defaultShader){
-                    continue
-                }
-                let numChannels = await layer.getNumChannels()
-                if(generation != this.generation){
-                    return
-                }
-                if(numChannels == 3){
-                    layer.fragmentShader = this.makePredictionsShader([
-                        vec3.fromValues(255, 0, 0), vec3.fromValues(0, 255, 0), vec3.fromValues(0, 0, 255)
-                    ])
-                }
+        this.guessShader()
+        this.addDataChangedHandler(() => console.log("driver: Layers changed!"))
+        this.addViewportsChangedHandler(() => console.log("driver: Viewports changed!"))
+        this.addDataChangedHandler(this.guessShader)
+    }
+
+    private guessShader = async () => {
+        const generation = this.generation += 1
+        for(let layer of this.getImageLayers()){
+            if(layer.fragmentShader != defaultShader){
+                continue
+            }
+            let numChannels = await layer.getNumChannels()
+            if(generation != this.generation){
+                return
+            }
+            if(numChannels == 3){
+                layer.fragmentShader = this.makePredictionsShader([
+                    vec3.fromValues(255, 0, 0), vec3.fromValues(0, 255, 0), vec3.fromValues(0, 0, 255)
+                ])
             }
         }
-        guessShader()
-        this.viewer.layerManager.layersChanged.add(guessShader);
     }
     getTrackedElement() : HTMLElement{
         return document.querySelector("canvas")! //FIXME: double-check selector
@@ -133,11 +137,21 @@ export class NeuroglancerDriver implements IViewerDriver{
         }
         return [new NeuroglancerViewportDriver(this, panels[0], orientation_offsets.get(layout.replace("-3d", ""))!)]
     }
-    onViewportsChanged(handler: () => void){
-        this.viewer.display.changed.add(() => {
-            handler()
-        })
+
+    public addViewportsChangedHandler(handler: () => void){
+        this.viewer.display.changed.add(handler)
     }
+    public removeViewportsChangedHandler(handler: () => void){
+        this.viewer.display.changed.remove(handler)
+    }
+
+    public addDataChangedHandler(handler: () => void){
+        this.viewer.layerManager.layersChanged.add(handler)
+    }
+    public removeDataChangedHandler(handler: () => void){
+        this.viewer.layerManager.layersChanged.remove(handler)
+    }
+
     refreshView(params: {native_view: INativeView, similar_url_hint?: string, channel_colors?: vec3[]}){
         let shader: string | undefined = undefined;
         let similar_url_hint = params.similar_url_hint && Url.parse(params.similar_url_hint).double_protocol_raw
