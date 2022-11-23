@@ -42,7 +42,7 @@ export class Viewer{
             }
         })
 
-        this.addDataChangedHandler(this.synchronizeWithNativeViews)
+        this.driver.addDataChangedHandler(this.synchronizeWithNativeViews)
         this.synchronizeWithNativeViews()
     }
 
@@ -79,6 +79,9 @@ export class Viewer{
             new_views.set(dataView.url, dataView)
         }
         this.views = new_views;
+        for(const handler of this.onDataChangedHandlers){
+            handler()
+        }
     }
 
     public getViews(): Array<ViewUnion>{
@@ -104,7 +107,6 @@ export class Viewer{
 
     public addDataChangedHandler(handler: () => void){
         this.onDataChangedHandlers.push(handler)
-        this.driver.addDataChangedHandler(handler)
     }
 
     public openDataView(view: ViewUnion){
@@ -137,6 +139,6 @@ export class Viewer{
     public destroy(){
         removeElement(this.recenterButton)
         this.onViewportsChangedHandlers.forEach(handler => this.driver.removeViewportsChangedHandler(handler))
-        this.onDataChangedHandlers.forEach(handler => this.driver.removeDataChangedHandler(handler))
+        this.driver.removeDataChangedHandler(this.synchronizeWithNativeViews)
     }
 }
