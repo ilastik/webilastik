@@ -44,11 +44,7 @@ def test_bucket_read_write():
             raw_data_source.roi.get_datasource_tiles()
         ))
 
-    data_proxy_source = PrecomputedChunksDataSource(
-        path=precomp_path,
-        filesystem=bucket_fs,
-        resolution=(raw_data_source.spatial_resolution)
-    )
+    data_proxy_source = sink.to_datasource()
 
     retrieved_data = data_proxy_source.retrieve()
     assert np.all(retrieved_data.raw("yxc") == raw_data_source.retrieve().raw("yxc"))

@@ -87,7 +87,6 @@ def test_distributed_n5_datasink():
 def test_writing_to_precomputed_chunks():
     tmp_path = create_tmp_dir(prefix="test_writing_to_precomputed_chunks")
     datasource = ArrayDataSource(data=data, tile_shape=Shape5D(x=10, y=10))
-    scale = PrecomputedChunksScale.from_datasource(datasource=datasource, key=PurePosixPath("my_test_data"), encoding=RawEncoder())
     sink_path = PurePosixPath("mytest.precomputed")
     filesystem = OsFs(tmp_path.as_posix())
 
@@ -108,7 +107,7 @@ def test_writing_to_precomputed_chunks():
     for tile in datasource.roi.get_datasource_tiles():
         creation_result.write(tile.retrieve())
 
-    precomp_datasource = PrecomputedChunksDataSource(path=sink_path, filesystem=filesystem, resolution=scale.resolution)
+    precomp_datasource = datasink.to_datasource()
     reloaded_data = precomp_datasource.retrieve()
     assert reloaded_data == data
 
@@ -117,7 +116,6 @@ def test_writing_to_offset_precomputed_chunks():
     tmp_path = create_tmp_dir(prefix="test_writing_to_offset_precomputed_chunks")
     data_at_1000_1000 = data.translated(Point5D(x=1000, y=1000) - data.location)
     datasource = ArrayDataSource(data=data_at_1000_1000, tile_shape=Shape5D(x=10, y=10))
-    scale = PrecomputedChunksScale.from_datasource(datasource=datasource, key=PurePosixPath("my_test_data"), encoding=RawEncoder())
     sink_path = PurePosixPath("mytest.precomputed")
     filesystem = OsFs(tmp_path.as_posix())
 
@@ -140,7 +138,7 @@ def test_writing_to_offset_precomputed_chunks():
     for tile in datasource.roi.get_datasource_tiles():
         creation_result.write(tile.retrieve())
 
-    precomp_datasource = PrecomputedChunksDataSource(path=sink_path, filesystem=filesystem, resolution=scale.resolution)
+    precomp_datasource = datasink.to_datasource()
 
     reloaded_data = precomp_datasource.retrieve(interval=data_at_1000_1000.interval)
     assert (reloaded_data.raw("xyz") == data.raw("xyz")).all()

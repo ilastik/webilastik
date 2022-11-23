@@ -278,19 +278,22 @@ class PrecomputedChunksInfo:
             ])
         )
 
-    def stripped(self, resolution: Tuple[int, int, int]) -> "PrecomputedChunksInfo":
+    def stripped(self, resolution: Tuple[int, int, int]) -> "PrecomputedChunksInfo | Exception":
+        scale = self.get_scale_5d(resolution=resolution)
+        if isinstance(scale, Exception):
+            return scale
         return PrecomputedChunksInfo(
             type_=self.type_,
             data_type=self.data_type,
             num_channels=self.num_channels,
-            scales=tuple([self.get_scale_5d(resolution=resolution)])
+            scales=tuple([scale])
         )
 
-    def get_scale_5d(self, resolution: Tuple[int, int, int]) -> PrecomputedChunksScale5D:
+    def get_scale_5d(self, resolution: Tuple[int, int, int]) -> "PrecomputedChunksScale5D | Exception":
         for scale in self.scales_5d:
             if scale.resolution == resolution:
                 return scale
-        raise ValueError(f"Scale with resolution {resolution} not found")
+        return ValueError(f"Scale with resolution {resolution} not found")
 
     def contains(self, scale: PrecomputedChunksScale) -> bool:
         return any(scale == s for s in self.scales)

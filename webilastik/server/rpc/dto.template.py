@@ -101,10 +101,12 @@ class PrecomputedChunksDataSourceDto(DataTransferObject):
     url: UrlDto
     filesystem: FsDto
     path: str
+    scale_key: str
     interval: Interval5DDto
     tile_shape: Shape5DDto
     spatial_resolution: Tuple[int, int, int]
     dtype: DtypeDto
+    encoder: Literal["raw", "jpeg"]
 
 @dataclass
 class N5DataSourceDto(DataTransferObject):

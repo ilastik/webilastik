@@ -125,7 +125,12 @@ class PrecomputedChunksSink(FsDataSink):
         return PrecomputedChunksDataSource(
             filesystem=self.filesystem,
             path=self.path,
-            resolution=self.resolution,
+            tile_shape=self.tile_shape,
+            dtype=self.dtype,
+            encoding=self.encoding,
+            interval=self.interval,
+            scale_key=self.scale_key,
+            spatial_resolution=self.resolution,
         )
 
     def to_dto(self) -> PrecomputedChunksSinkDto:

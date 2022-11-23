@@ -28,7 +28,9 @@ import {
     PrecomputedChunksSinkDto,
     SaveProjectParamsDto,
     Shape5DDto,
-    N5DataSinkDto
+    N5DataSinkDto,
+    N5DataSourceDto,
+    SkimageDataSourceDto
 } from "./dto"
 
 export type HpcSiteName = ComputeSessionStatusDto["hpc_site"] //FIXME?
@@ -629,8 +631,11 @@ export abstract class FsDataSource{
         return this.url.raw
     }
 
-    public static fromDto(dto: PrecomputedChunksDataSourceDto) : FsDataSource{
-        return PrecomputedChunksDataSource.fromDto(dto)
+    public static fromDto(dto: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto) : FsDataSource{
+        if(dto instanceof PrecomputedChunksDataSourceDto){
+            return PrecomputedChunksDataSource.fromDto(dto)
+        }
+        throw `FIXME: Other datasources not implemented yet`
     }
 
     public abstract toDto(): PrecomputedChunksDataSourceDto;
@@ -651,6 +656,18 @@ export abstract class FsDataSource{
 }
 
 export class PrecomputedChunksDataSource extends FsDataSource{
+    public readonly encoder: "jpeg" | "raw"
+    public readonly scale_key: Path
+
+    public constructor(params: ConstructorParameters<typeof FsDataSource>[0] & {
+        encoder: "jpeg" | "raw",
+        scale_key: Path,
+    }){
+        super(params)
+        this.encoder = params.encoder
+        this.scale_key = params.scale_key
+    }
+
     public static fromDto(dto: PrecomputedChunksDataSourceDto) : PrecomputedChunksDataSource{
         return new PrecomputedChunksDataSource({
             filesystem: Filesystem.fromDto(dto.filesystem),
@@ -660,6 +677,8 @@ export class PrecomputedChunksDataSource extends FsDataSource{
             tile_shape: Shape5D.fromDto(dto.tile_shape),
             spatial_resolution: dto.spatial_resolution,
             dtype: ensureDataType(dto.dtype), //FIXME?
+            encoder: dto.encoder,
+            scale_key: Path.parse(dto.scale_key)
         })
     }
 
@@ -672,6 +691,8 @@ export class PrecomputedChunksDataSource extends FsDataSource{
             tile_shape: this.tile_shape.toDto(),
             spatial_resolution: this.spatial_resolution,
             dtype: this.dtype,
+            encoder: this.encoder,
+            scale_key: this.scale_key.raw,
         })
     }
 }
@@ -820,7 +841,7 @@ export abstract class FsDataSink{
 export class PrecomputedChunksSink extends FsDataSink{
     public readonly scale_key: Path
     public readonly resolution: [number, number, number]
-    public readonly encoding: string
+    public readonly encoding: "raw" | "jpeg"
 
     public constructor(params: ConstructorParameters<typeof FsDataSink>[0] & {
         scale_key: Path,
@@ -860,6 +881,8 @@ export class PrecomputedChunksSink extends FsDataSink{
             spatial_resolution: this.resolution,
             tile_shape: this.tile_shape,
             dtype: this.dtype,
+            encoder: this.encoding,
+            scale_key: this.scale_key,
         })
     }
 }

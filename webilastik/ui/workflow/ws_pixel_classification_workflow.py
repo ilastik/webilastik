@@ -220,7 +220,7 @@ class WebIlastik:
         if isinstance(datasources_result, Exception):
             return uncachable_json_response(RpcErrorDto(error=str(datasources_result)).to_json_value(), status=400)
         if isinstance(datasources_result, type(None)):
-            return uncachable_json_response(RpcErrorDto(error=f"Unsupported datasource type: {url}").to_json_value(), status=400)
+            return uncachable_json_response(GetDatasourcesFromUrlResponseDto(datasources=None).to_json_value(), status=400)
         if selected_resolution:
             datasources = [ds for ds in datasources_result if ds.spatial_resolution == selected_resolution]
             if len(datasources) != 1:
@@ -428,6 +428,8 @@ class WebIlastik:
                     return web.Response(status=response.status, text=response_text)
                 info = PrecomputedChunksInfo.from_json_value(json.loads(response_text))
                 stripped_info = info.stripped(resolution=resolution)
+                if isinstance(stripped_info, Exception):
+                    return uncachable_json_response(str(stripped_info), status=400)
                 return web.json_response(stripped_info.to_json_value())
         raise Exception(f"Should be unreachable") #FIMXE
 

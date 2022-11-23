@@ -206,19 +206,11 @@ async def main():
             await asyncio.sleep(15)
             print(f"Done waiting. Checking outputs")
 
-            predictions_output = PrecomputedChunksDataSource(
-                filesystem=hbp_image_service_bucket_fs,
-                path=predictions_export_datasink.path,
-                resolution=(1,1,1)
-            )
+            predictions_output = predictions_export_datasink.to_datasource()
             for tile in predictions_output.roi.get_datasource_tiles():
                 tile.retrieve().as_uint8(normalized=True)#.show_channels()
 
-            segmentation_output_1 = PrecomputedChunksDataSource(
-                filesystem=hbp_image_service_bucket_fs,
-                path=simple_segmentation_datasink.path,
-                resolution=(1,1,1)
-            )
+            segmentation_output_1 = simple_segmentation_datasink.to_datasource()
             for tile in segmentation_output_1.roi.get_datasource_tiles():
                 tile.retrieve()#.show_images()
 

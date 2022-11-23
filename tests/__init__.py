@@ -65,7 +65,7 @@ def get_test_output_bucket_fs() -> BucketFs:
 
 def create_precomputed_chunks_sink(
     *, shape: Shape5D, dtype: "np.dtype[Any]", chunk_size: Shape5D, fs: "OsFs | HttpFs | BucketFs | None" = None
-) -> FsDataSink:
+) -> PrecomputedChunksSink:
     return PrecomputedChunksSink(
         filesystem=fs or get_test_output_bucket_fs(),
         path=PurePosixPath(f"{uuid.uuid4()}.precomputed"),
