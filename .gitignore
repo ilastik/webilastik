@@ -6,5 +6,3 @@ node_modules/
 package.json
 package-lock.json
 tests/tmp/
-overlay/src/client/dto.ts
-webilastik/server/rpc/dto.py
