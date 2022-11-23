@@ -21,6 +21,7 @@ from webilastik.libebrains.oidc_client import OidcClient
 from webilastik.libebrains.user_info import UserInfo
 from webilastik.libebrains.user_token import UserToken
 from webilastik.server.rpc.dto import ComputeSessionDto
+from webilastik.utility import ComputeNodes, Minutes, NodeSeconds, Seconds
 
 _oidc_client = OidcClient.from_environment()
 
@@ -85,10 +86,7 @@ RUNNABLE_STATES: Set[ComputeSessionState] = set([
 
 Username = NewType("Username", str)
 Hostname = NewType("Hostname", str)
-Minutes = NewType("Minutes", int)
-Seconds = NewType("Seconds", int)
 NativeComputeSessionId = NewType("NativeComputeSessionId", int)
-NodeSeconds = NewType("NodeSeconds", int)
 
 class ComputeSession:
     SACCT_FORMAT_ITEMS = ["JobID", "JobName", "State", "ElapsedRaw", "TimelimitRaw", "Start", "AllocNodes"]
@@ -125,13 +123,25 @@ class ComputeSession:
         if clean_raw_state not in COMPUTE_SESSION_STATES:
             return Exception(f"Bad job state: '{clean_raw_state}' derived from '{raw_state}'")
 
+        start_time_utc_sec = None if raw_start_time_utc_sec == "Unknown" else Seconds.try_from_str(raw_start_time_utc_sec)
+        if isinstance(start_time_utc_sec, Exception):
+            return Exception(f"Bad job start time: {raw_start_time_utc_sec}")
+
+        time_limit_minutes = Minutes.try_from_str(raw_time_limit)
+        if isinstance(time_limit_minutes, Exception):
+            return Exception(f"Bad job time limit: {raw_time_limit}")
+
+        num_nodes = ComputeNodes.try_from_str(raw_alloc_nodes)
+        if isinstance(num_nodes, Exception):
+            return Exception(f"Caould not parse numbe rof allocated compute nodes for job: {raw_alloc_nodes}")
+
         return ComputeSession(
             native_compute_session_id=NativeComputeSessionId(int(raw_id)),
             state=clean_raw_state,
-            start_time_utc_sec=None if raw_start_time_utc_sec == "Unknown" else Seconds(int(raw_start_time_utc_sec)),
+            start_time_utc_sec=start_time_utc_sec,
             time_elapsed_sec=Seconds(int(raw_elapsed)),
-            time_limit_minutes=Minutes(int(raw_time_limit)),
-            num_nodes=int(raw_alloc_nodes),
+            time_limit_minutes=time_limit_minutes,
+            num_nodes=num_nodes,
             user_id=user_id,
             compute_session_id=compute_session_id,
         )
@@ -154,9 +164,9 @@ class ComputeSession:
         native_compute_session_id: NativeComputeSessionId,
         state: ComputeSessionState,
         start_time_utc_sec: "Seconds | None",
-        time_elapsed_sec: "Seconds",
-        time_limit_minutes: "Minutes",
-        num_nodes: int,
+        time_elapsed_sec: Seconds,
+        time_limit_minutes: Minutes,
+        num_nodes: ComputeNodes,
         user_id: uuid.UUID,
         compute_session_id: uuid.UUID,
     ) -> None:
@@ -173,10 +183,10 @@ class ComputeSession:
 
     def to_dto(self) -> ComputeSessionDto:
         return ComputeSessionDto(
-            start_time_utc_sec=self.start_time_utc_sec,
-            time_elapsed_sec=self.time_elapsed_sec,
-            time_limit_minutes=self.time_limit_minutes,
-            num_nodes=self.num_nodes,
+            start_time_utc_sec=self.start_time_utc_sec and self.start_time_utc_sec.to_int(),
+            time_elapsed_sec=self.time_elapsed_sec.to_int(),
+            time_limit_minutes=self.time_limit_minutes.to_int(),
+            num_nodes=self.num_nodes.to_int(),
             compute_session_id=str(self.compute_session_id),
             state=self.state,
         )
@@ -198,7 +208,10 @@ class ComputeSession:
 
     @classmethod
     def compute_used_quota(cls, compute_sessions: Iterable["ComputeSession"]) -> NodeSeconds:
-        return NodeSeconds(sum(s.time_elapsed_sec * s.num_nodes for s in compute_sessions))
+        out: NodeSeconds = NodeSeconds(0)
+        for s in compute_sessions:
+            out += s.time_elapsed_sec * s.num_nodes
+        return out
 
 class SshJobLauncher:
     JOB_NAME_PREFIX = "EBRAINS"
@@ -295,7 +308,7 @@ class SshJobLauncher:
             command="sbatch",
             command_args=[
                 f"--job-name={ComputeSession.make_session_name(user_id=user_id, compute_session_id=compute_session_id, fernet=self.fernet)}",
-                f"--time={time}",
+                f"--time={time.to_int()}",
                 f"--account={self.account}",
             ],
             stdin=self.get_sbatch_launch_script(
@@ -513,7 +526,7 @@ class LocalJobLauncher(SshJobLauncher):
             state="RUNNING",
             start_time_utc_sec=Seconds(int(datetime.datetime.now(datetime.timezone.utc).timestamp())),
             time_elapsed_sec=Seconds(1),
-            num_nodes=1, #FIXME
+            num_nodes=ComputeNodes(1), #FIXME
             compute_session_id=compute_session_id,
             time_limit_minutes=time,
             user_id=user_id,
@@ -552,7 +565,7 @@ class LocalJobLauncher(SshJobLauncher):
                 continue
             if state and compute_session.state not in state:
                 continue
-            if compute_session.start_time_utc_sec and compute_session.start_time_utc_sec < starttime.timestamp():
+            if compute_session.start_time_utc_sec and compute_session.start_time_utc_sec.to_float() < starttime.timestamp(): #FIXME: use datetime instead of Seconds
                 continue
             #FIXME: endtime?
             compute_sessions.append(compute_session)

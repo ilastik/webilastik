@@ -16,7 +16,7 @@ from aiohttp.client import ClientSession
 from cryptography.fernet import Fernet
 from ndstructs.utils.json_serializable import JsonValue
 
-from webilastik.libebrains.compute_session_launcher import CscsSshJobLauncher, JusufSshJobLauncher, LocalJobLauncher, Minutes, NodeSeconds, ComputeSession, SshJobLauncher
+from webilastik.libebrains.compute_session_launcher import CscsSshJobLauncher, JusufSshJobLauncher, LocalJobLauncher, Minutes, ComputeSession, SshJobLauncher
 from webilastik.libebrains.user_token import UserToken
 from webilastik.libebrains.oidc_client import OidcClient, Scope
 from webilastik.server.rpc.dto import (
@@ -32,6 +32,7 @@ from webilastik.server.rpc.dto import (
     MessageParsingError,
     RpcErrorDto,
 )
+from webilastik.utility import ComputeNodes, NodeHours
 from webilastik.utility.url import Url
 
 
@@ -243,6 +244,7 @@ class SessionAllocator:
         params = CreateComputeSessionParamsDto.from_json_value(json_payload)
         if isinstance(params, MessageParsingError) or params.hpc_site not in self.session_launchers:
             return uncachable_json_response(RpcErrorDto(error="Bad payload").to_json_value(), status=400)
+        requested_session_resources = Minutes(params.session_duration_minutes) * ComputeNodes(1) #FIXME: allow setting num compute modes
 
         user_info = await ebrains_login.user_token.get_userinfo(self.http_client_session)
         if isinstance(user_info, Exception):
@@ -272,12 +274,12 @@ class SessionAllocator:
                         RpcErrorDto(error= f"Already running a session ({job.compute_session_id})").to_json_value(),
                         status=400
                     )
-            used_quota_node_sec = ComputeSession.compute_used_quota(this_months_jobs_result)
-            monthly_quota_node_sec: NodeSeconds = NodeSeconds(30 * 60 * 60) #FIXME
-            available_quota_node_min = (monthly_quota_node_sec - used_quota_node_sec) / 60
-            if available_quota_node_min < params.session_duration_minutes:
+            used_quota = ComputeSession.compute_used_quota(this_months_jobs_result)
+            monthly_quota = NodeHours(30) #FIXME: 30 is a totally arbitrary, hard-coded value
+            available_quota = (monthly_quota.to_node_seconds() - used_quota)
+            if available_quota.to_node_minutes() < requested_session_resources:
                 return uncachable_json_response(
-                    RpcErrorDto(error=f". Requested {params.session_duration_minutes}min, only {available_quota_node_min}min available").to_json_value(),
+                    RpcErrorDto(error=f". Requested {requested_session_resources}node*min, only {available_quota.to_node_minutes()}node*min available").to_json_value(),
                     status=400
                 )
 
