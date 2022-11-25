@@ -301,10 +301,13 @@ tasks:
 
   deploy-to-hpcs:
     vars:
-      UPDATE_ALL_BRANCHES: "git pull origin master:master && git pull origin experimental:experimental"
+      JUSUF_GIT_DIR: /p/home/jusers/webilastik/jusuf/webilastik.git
+      CSCS_GIT_DIR: /users/bp000188/source/webilastik.git
     cmds:
-      - echo "cd /p/home/jusers/webilastik/jusuf/webilastik.git && {{.UPDATE_ALL_BRANCHES}}" | ssh webilastik@jusuf.fz-juelich.de
-      - echo "cd ~/source/webilastik/ && {{.UPDATE_ALL_BRANCHES}}" | ssh bp000188@ela.cscs.ch -oCheckHostIP=no -oBatchMode=yes ssh bp000188@daint.cscs.ch
+      # - (git remote | grep jusuf) || git remote add jusuf webilastik@jusuf.fz-juelich.de:{{.JUSUF_GIT_DIR}}
+      # - (git remote | grep cscs) ||  git remote add cscs bp000188@ela.cscs.ch:{{.CSCS_GIT_DIR}}
+      - echo "cd {{.JUSUF_GIT_DIR}} && git fetch" | ssh webilastik@jusuf.fz-juelich.de
+      - echo "cd {{.CSCS_GIT_DIR}} && git fetch" | ssh bp000188@ela.cscs.ch -oCheckHostIP=no -oBatchMode=yes ssh bp000188@daint.cscs.ch
 
   send-deb-package-to-web-server:
     deps: [create-deb-package]
