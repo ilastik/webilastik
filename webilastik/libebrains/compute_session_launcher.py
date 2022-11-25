@@ -669,7 +669,7 @@ class JusufSshJobLauncher(SshJobLauncher):
             mkdir {working_dir}
             cd {working_dir}
             # FIXME: download from github when possible
-            git clone --depth 1 --branch experimental {home}/webilastik.git {webilastik_source_dir}
+            git clone --depth 1 --branch master {home}/webilastik.git {webilastik_source_dir}
 
             # prevent numpy from spawning its own threads
             export OPENBLAS_NUM_THREADS=1
@@ -753,7 +753,7 @@ class CscsSshJobLauncher(SshJobLauncher):
             session_allocator_username=session_allocator_username,
             session_allocator_socket_path=session_allocator_socket_path,
         )
-        home="/users/bp000188"
+        home=f"/users/{self.user}"
         webilastik_source_dir = f"{working_dir}/webilastik"
         conda_env_dir = f"{home}/miniconda3/envs/webilastik"
         redis_pid_file = f"{working_dir}/redis.pid"
@@ -775,7 +775,7 @@ class CscsSshJobLauncher(SshJobLauncher):
 
             mkdir {working_dir}
             cd {working_dir}
-            git clone --depth 1 --branch experimental https://github.com/ilastik/webilastik {webilastik_source_dir}
+            git clone --depth 1 --branch master {home}/source/webilastik {webilastik_source_dir}
 
             # prevent numpy from spawning its own threads
             export OPENBLAS_NUM_THREADS=1
