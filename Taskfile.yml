@@ -299,9 +299,12 @@ tasks:
         ps -ef | grep ws_pixel_classification_workflow.py | awk '{print $2}' | sudo xargs kill -9 || true;
         ps -ef | ag ssh.*batchmode | awk '{print $2}' | sudo xargs kill -9 || true;
 
-  deploy-to-jusuf:
+  deploy-to-hpcs:
+    vars:
+      UPDATE_ALL_BRANCHES: "git pull origin master:master && git pull origin experimental:experimental"
     cmds:
-      - ssh webilastik@jusuf.fz-juelich.de bash -c "set -xeu; cd /p/home/jusers/webilastik/jusuf/webilastik.git && git pull"
+      - echo "cd /p/home/jusers/webilastik/jusuf/webilastik.git && {{.UPDATE_ALL_BRANCHES}}" | ssh webilastik@jusuf.fz-juelich.de
+      - echo "cd ~/source/webilastik/ && {{.UPDATE_ALL_BRANCHES}}" | ssh bp000188@ela.cscs.ch -oCheckHostIP=no -oBatchMode=yes ssh bp000188@daint.cscs.ch
 
   send-deb-package-to-web-server:
     deps: [create-deb-package]
@@ -321,7 +324,7 @@ tasks:
       - ssh ubuntu@148.187.149.187 "sudo apt-get --assume-yes remove webilastik && sudo apt-get --assume-yes install {{.REMOTE_PACKAGE_PATH}}"
 
   deploy:
-    deps: [deploy-to-jusuf, deploy-to-webilastik-server]
+    deps: [deploy-to-hpcs, deploy-to-webilastik-server]
 
   clean:
     deps: [stop-local-server]
