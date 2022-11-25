@@ -1,10 +1,11 @@
 # pyright: reportUnusedImport=false
 from traceback import StackSummary
 import traceback
-from typing import Callable, Generic, Iterable, TypeVar
+from typing import Callable, Generic, Iterable, NewType, TypeVar
 import threading
 import os
 import sys
+from typing_extensions import Protocol, Self
 
 from ndstructs.utils.json_serializable import JsonObject, JsonValue
 import datetime
@@ -14,25 +15,6 @@ def get_now_string() -> str:
     return f"{now.year:02}y{now.month:02}m{now.day:02}d__{now.hour:02}h{now.minute:02}m{now.second:02}s"
 
 T = TypeVar("T")
-
-class Absent:
-    pass
-
-    def __eq__(self, __o: object) -> bool:
-        return isinstance(__o, Absent)
-
-    @staticmethod
-    def coalesce(value: "T | Absent", default: T) -> T:
-        return default if isinstance(value, Absent) else value
-
-    @staticmethod
-    def tryGetFromObject(key: str, json_object: JsonObject, parser: Callable[[JsonValue], T]) -> "T | None | Absent":
-        if key in json_object:
-            value = json_object[key]
-            if value is None:
-                return value
-            return parser(json_object[key])
-        return Absent()
 
 A = TypeVar("A", covariant=True)
 
@@ -119,3 +101,76 @@ def get_env_var_or_exit(
         print(f"Environment variable {var_name} not set", file=sys.stderr)
         exit(1)
     return value
+
+
+Username = NewType("Username", str)
+Hostname = NewType("Hostname", str)
+
+class NewTypeNumber:
+    def __init__(self, value: float) -> None:
+        super().__init__()
+        self._value = value
+
+    def __add__(self, other: Self) -> Self:
+        return self.__class__(self._value + other._value)
+
+    def __sub__(self, other: Self) -> Self:
+        return self.__class__(self._value - other._value)
+
+    def __gt__(self, other: Self) -> bool:
+        return self._value > other._value
+
+    def __lt__(self, other: Self) -> bool:
+        return self._value < other._value
+
+    def __eq__(self, o: object) -> bool:
+        return isinstance(o, self.__class__) and self._value == o._value
+
+    def __str__(self) -> str:
+        return str(self._value)
+
+    def to_float(self) -> float:
+        return self._value
+
+    def to_int(self) -> int:
+        return int(self._value)
+
+    @classmethod
+    def try_from_str(cls, value: str) -> "Self | ValueError":
+        try:
+            return cls(float(value))
+        except ValueError as e:
+            return e
+
+class Minutes(NewTypeNumber):
+    def to_seconds(self) -> "Seconds":
+        return Seconds(self._value * 60)
+
+    def __mul__(self, nodes: "ComputeNodes") -> "NodeMinutes":
+        return NodeMinutes(self._value * nodes._value)
+
+class Seconds(NewTypeNumber):
+    def __mul__(self, other: "ComputeNodes") -> "NodeSeconds":
+        return NodeSeconds(self._value * other._value)
+
+class ComputeNodes(NewTypeNumber):
+    def __mul__(self, other: "Seconds") -> "NodeSeconds":
+        return NodeSeconds(self._value * other._value)
+
+class NodeSeconds(NewTypeNumber):
+    def to_node_minutes(self) -> "NodeMinutes":
+        return NodeMinutes(self._value / 60)
+
+    def to_node_hours(self) -> "NodeHours":
+        return NodeHours(self._value / 3600)
+
+class NodeMinutes(NewTypeNumber):
+    pass
+
+class NodeHours(NewTypeNumber):
+    def to_node_seconds(self) -> "NodeSeconds":
+        return NodeSeconds(self._value * 3600)
+
+    def to_node_minutes(self) -> "NodeMinutes":
+        return NodeMinutes(self._value * 60)
+

@@ -1,7 +1,7 @@
 import { vec3 } from "gl-matrix";
 import { Applet } from "../../../client/applets/applet";
-import { Color, DataSource, Session } from "../../../client/ilastik";
-import * as schema from "../../../client/message_schema";
+import { Color, FsDataSource, Session } from "../../../client/ilastik";
+import * as schema from "../../../client/dto";
 import { HashMap } from "../../../util/hashmap";
 import { createElement, createInput, createInputParagraph, InlineCss, removeElement, vecToString } from "../../../util/misc";
 import { JsonValue } from "../../../util/serialization";
@@ -28,10 +28,10 @@ class Label{
         this.annotations = params.annotations
     }
 
-    public static fromMessage(gl: WebGL2RenderingContext, message: schema.LabelMessage): Label{
+    public static fromDto(gl: WebGL2RenderingContext, message: schema.LabelDto): Label{
         return new Label({
-            annotations: message.annotations.map(a => BrushStroke.fromMessage(gl, a)),
-            color: Color.fromMessage(message.color),
+            annotations: message.annotations.map(a => BrushStroke.fromDto(gl, a)),
+            color: Color.fromDto(message.color),
             name: message.name,
         })
     }
@@ -45,7 +45,7 @@ export class BrushingApplet extends Applet<State>{
     private labelWidgets = new Map<string, LabelWidget>()
     private labelSelectorContainer: HTMLSpanElement;
     private labelSelector: PopupSelect<{name: string, color: Color}> | undefined
-    private onDataSourceClicked?: (datasource: DataSource) => void
+    private onDataSourceClicked?: (datasource: FsDataSource) => void
     private onLabelSelected?: () => void;
 
 
@@ -53,18 +53,18 @@ export class BrushingApplet extends Applet<State>{
         session: Session,
         applet_name: string,
         parentElement: HTMLElement,
-        onDataSourceClicked?: (datasource: DataSource) => void,
+        onDataSourceClicked?: (datasource: FsDataSource) => void,
         onLabelSelected?: () => void;
         gl: WebGL2RenderingContext
     }){
         super({
             name: params.applet_name,
             deserializer: (value: JsonValue) => {
-                const state = schema.BrushingAppletStateMessage.fromJsonValue(value)
+                const state = schema.BrushingAppletStateDto.fromJsonValue(value)
                 if(state instanceof Error){
                     throw `FIXME`
                 }
-                return {labels: state.labels.map(l => Label.fromMessage(params.gl, l))}
+                return {labels: state.labels.map(l => Label.fromDto(params.gl, l))}
             },
             session: params.session,
             onNewState: (new_state) => this.onNewState(new_state)
@@ -96,7 +96,7 @@ export class BrushingApplet extends Applet<State>{
                 }else {
                     this.doRPC("create_label",  new schema.CreateLabelParams({
                         label_name: labelNameInput.value,
-                        color: colorPicker.value.toMessage()
+                        color: colorPicker.value.toDto()
                     }))
                     popup.destroy()
                 }
@@ -119,7 +119,7 @@ export class BrushingApplet extends Applet<State>{
         return this.currentLabelWidget?.color
     }
 
-    public getBrushStrokes(datasource: DataSource | undefined): Array<[Color, BrushStroke[]]>{
+    public getBrushStrokes(datasource: FsDataSource | undefined): Array<[Color, BrushStroke[]]>{
         return Array.from(this.labelWidgets.values()).map(widget => [widget.color, widget.getBrushStrokes(datasource)])
     }
 
@@ -143,7 +143,7 @@ export class BrushingApplet extends Applet<State>{
         //Mask communication delay by updating GUI immediately
         this.onNewState(newState)
         this.doRPC("add_annotation", new schema.AddPixelAnnotationParams({
-            label_name: currentLabelWidget.name, pixel_annotation: brushStroke.toMessage()
+            label_name: currentLabelWidget.name, pixel_annotation: brushStroke.toDto()
         }))
     }
 
@@ -172,11 +172,11 @@ export class BrushingApplet extends Applet<State>{
                 },
                 onBrushStrokeDeleteClicked: (_color, brushStroke) => this.doRPC(
                     "remove_annotation", new schema.RemovePixelAnnotationParams({
-                        label_name: name, pixel_annotation: brushStroke.toMessage()
+                        label_name: name, pixel_annotation: brushStroke.toDto()
                     })
                 ),
                 onColorChange: (newColor: Color) => {
-                    this.doRPC("recolor_label", new schema.RecolorLabelParams({label_name: name, new_color: newColor.toMessage()}))
+                    this.doRPC("recolor_label", new schema.RecolorLabelParams({label_name: name, new_color: newColor.toDto()}))
                     return true
                 },
                 onNameChange: (newName: string) => {
@@ -242,7 +242,7 @@ class LabelWidget{
     public readonly element: HTMLDivElement;
     private colorPicker: ColorPicker;
     private nameInput: HTMLInputElement;
-    private brushStrokesTables: HashMap<DataSource, BrushStokeTable, string>;
+    private brushStrokesTables: HashMap<FsDataSource, BrushStokeTable, string>;
 
     constructor(params: {
         name: string,
@@ -254,7 +254,7 @@ class LabelWidget{
         onBrushStrokeDeleteClicked: (color: Color, stroke: BrushStroke) => void,
         onColorChange: (newColor: Color) => void,
         onNameChange: (newName: string) => void,
-        onDataSourceClicked?: (datasource: DataSource) => void,
+        onDataSourceClicked?: (datasource: FsDataSource) => void,
     }){
         this.element = createElement({tagName: "div", parentElement: params.parentElement, cssClasses: ["ItkLabelWidget"]});
 
@@ -271,7 +271,7 @@ class LabelWidget{
             inputType: "button", parentElement: labelControlsContainer, value: "Delete Label", onClick: () => params.onLabelDeleteClicked(this.name)
         })
 
-        let strokesPerDataSource = new HashMap<DataSource, BrushStroke[], string>();
+        let strokesPerDataSource = new HashMap<FsDataSource, BrushStroke[], string>();
         let brushStrokes = params.brushStrokes.slice()
         brushStrokes.sort((a, b) => a.annotated_data_source.getDisplayString().localeCompare(b.annotated_data_source.getDisplayString()))
         for(let stroke of brushStrokes){
@@ -326,7 +326,7 @@ class LabelWidget{
         return this.colorPicker.value
     }
 
-    public getBrushStrokes(datasource: DataSource | undefined): Array<BrushStroke>{
+    public getBrushStrokes(datasource: FsDataSource | undefined): Array<BrushStroke>{
         if(datasource === undefined){
             let out = new Array<BrushStroke>()
             for(let strokesTable of this.brushStrokesTables.values()){

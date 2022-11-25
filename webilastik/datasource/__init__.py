@@ -1,25 +1,21 @@
 #pyright: strict
 
-import json
 import enum
 from abc import abstractmethod, ABC
 from enum import IntEnum
 from pathlib import PurePosixPath
-from typing import Any, Callable, ClassVar, Optional, Tuple, Union, Iterator, Dict, Sequence
+from typing import Any, ClassVar, Optional, Tuple, Union, Iterator, Dict, Sequence
 from typing_extensions import Final
 
 import numpy as np
 
 from ndstructs.point5D import Shape5D, Interval5D, Point5D, SPAN
 from ndstructs.array5D import Array5D, SPAN_OVERRIDE, All
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
-from webilastik.filesystem import JsonableFilesystem
-from webilastik.server.message_schema import DataSourceMessage, Interval5DMessage, MessageParsingError, Shape5DMessage
+from webilastik.filesystem import Filesystem
+from webilastik.server.rpc.dto import FsDataSourceDto, PrecomputedChunksDataSourceDto, SkimageDataSourceDto
 from webilastik.utility.url import Url
 from webilastik.utility.url import Url, Protocol
 from global_cache import global_cache
-
-
 
 
 @enum.unique
@@ -31,8 +27,6 @@ def guess_axiskeys(raw_shape: Tuple[int, ...]) -> str:
     return guesses[len(raw_shape)]
 
 
-DATASOURCE_FROM_JSON_CONSTRUCTOR = Callable[[JsonValue], "DataSource"]
-
 class DataSource(ABC):
     tile_shape: Final[Shape5D]
     dtype: "Final[np.dtype[Any]]" #FIXME
@@ -41,8 +35,6 @@ class DataSource(ABC):
     location: Final[Point5D]
     spatial_resolution: Final[Tuple[int, int, int]]
     roi: Final["DataRoi"]
-
-    datasource_from_json_constructors: ClassVar[Dict[str, DATASOURCE_FROM_JSON_CONSTRUCTOR]] = {}
 
     def __init__(
         self,
@@ -63,15 +55,6 @@ class DataSource(ABC):
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} {self.interval}>"
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "DataSource":
-        json_obj = ensureJsonObject(value)
-        datasource_name = ensureJsonString(json_obj.get("__class__"))
-        for name, constructor in cls.datasource_from_json_constructors.items():
-            if name == datasource_name:
-                return constructor(value)
-        raise ValueError(f"Can't deserialize {json.dumps(value)}")
 
     @abstractmethod
     def __hash__(self) -> int:
@@ -238,7 +221,7 @@ class FsDataSource(DataSource):
         self,
         *,
         c_axiskeys_on_disk: str,
-        filesystem: JsonableFilesystem,
+        filesystem: Filesystem,
         path: PurePosixPath,
         tile_shape: Shape5D,
         dtype: "np.dtype[Any]",
@@ -264,46 +247,28 @@ class FsDataSource(DataSource):
     def __eq__(self, other: object) -> bool:
         return (
             super().__eq__(other) and
-            isinstance(other, self.__class__) and
+            isinstance(other, FsDataSource) and
             self.url == other.url
         )
 
     @abstractmethod
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": self.__class__.__name__,
-            "filesystem": self.filesystem.to_json_value(),
-            "path": self.path.as_posix(),
-            "tile_shape": self.tile_shape.to_json_value(),
-            "dtype": str(self.dtype.name),
-            "interval": self.interval.to_json_value(),
-            "shape": self.shape.to_json_value(),
-            "spatial_resolution": self.spatial_resolution,
-            "url": self.url.raw,
-        }
-
-    def to_message(self) -> DataSourceMessage:
-        return DataSourceMessage(
-            interval=Interval5DMessage.from_interval5d(self.interval),
-            spatial_resolution=self.spatial_resolution,
-            tile_shape=Shape5DMessage.from_shape5d(self.tile_shape),
-            url=self.url.to_message(),
-        )
+    def to_dto(self) -> FsDataSourceDto:
+        pass
 
     @staticmethod
     def try_from_message(
-        message: DataSourceMessage,
+        message: FsDataSourceDto,
         allowed_protocols: Sequence[Protocol] = ("http", "https"),
-    ) -> "FsDataSource | MessageParsingError":
-        url = Url.from_message(message.url)
-        fs_ds_result =  FsDataSource.try_get_datasources_from_url(url=url, allowed_protocols=allowed_protocols)
-        if isinstance(fs_ds_result, Exception):
-            return MessageParsingError(str(fs_ds_result))
-        if fs_ds_result is None:
-            return MessageParsingError(f"Could not open url {url}")
-        if len(fs_ds_result) != 1:
-            return MessageParsingError(f"Expected a single datasource from {url.raw}, found {len(fs_ds_result)}")
-        return fs_ds_result[0]
+    ) -> "FsDataSource":
+        from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
+        from webilastik.datasource.n5_datasource import N5DataSource
+        from webilastik.datasource.skimage_datasource import SkimageDataSource
+
+        if isinstance(message, PrecomputedChunksDataSourceDto):
+            return PrecomputedChunksDataSource.from_dto(message)
+        if isinstance(message, SkimageDataSourceDto):
+            return SkimageDataSource.from_dto(message)
+        return N5DataSource.from_dto(message)
 
     _datasource_cache: ClassVar[Dict[Url, Sequence['FsDataSource']]] = {}
 

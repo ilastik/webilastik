@@ -14,6 +14,7 @@ from ndstructs.utils.json_serializable import (
     JsonValue, JsonObject, ensureJsonObject, ensureJsonInt, ensureJsonIntArray, ensureJsonStringArray, ensureJsonString
 )
 from webilastik.datasource import guess_axiskeys
+from webilastik.server.rpc.dto import N5Bzip2CompressorDto, N5CompressorDto, N5GzipCompressorDto, N5XzCompressorDto, N5RawCompressorDto
 
 Compressor = TypeVar("Compressor", bound="N5Compressor")
 
@@ -43,6 +44,20 @@ class N5Compressor(ABC):
         return {"type": self.get_label()}
 
     @abstractmethod
+    def to_dto(self) -> N5CompressorDto:
+        pass
+
+    @staticmethod
+    def create_from_dto(dto: N5CompressorDto) -> "N5Compressor":
+        if isinstance(dto, N5GzipCompressorDto):
+            return GzipCompressor.from_dto(dto)
+        if isinstance(dto, N5Bzip2CompressorDto):
+            return Bzip2Compressor.from_dto(dto)
+        if isinstance(dto, N5XzCompressorDto):
+            return XzCompressor.from_dto(dto)
+        return RawCompressor.from_dto(dto)
+
+    @abstractmethod
     def compress(self, raw: bytes) -> bytes:
         pass
 
@@ -50,16 +65,13 @@ class N5Compressor(ABC):
     def decompress(self, compressed: bytes) -> bytes:
         pass
 
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, self.__class__):
-            return False
-        return self.to_json_data() == other.to_json_data()
-
-
 class GzipCompressor(N5Compressor):
     def __init__(self, level: int = 1):
         self.level = level
         super().__init__()
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, GzipCompressor) and self.level == other.level
 
     @classmethod
     def get_label(cls) -> str:
@@ -77,6 +89,13 @@ class GzipCompressor(N5Compressor):
             "level": self.level
         }
 
+    def to_dto(self) -> N5GzipCompressorDto:
+        return N5GzipCompressorDto(level=self.level)
+
+    @staticmethod
+    def from_dto(dto: N5GzipCompressorDto) -> "GzipCompressor":
+        return GzipCompressor(level=dto.level)
+
     def compress(self, raw: bytes) -> bytes:
         return gzip.compress(raw, compresslevel=self.level)
 
@@ -88,6 +107,9 @@ class Bzip2Compressor(N5Compressor):
     def __init__(self, blockSize: int = 9):
         self.blockSize = blockSize
         super().__init__()
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, Bzip2Compressor) and self.blockSize == other.blockSize
 
     @classmethod
     def get_label(cls) -> str:
@@ -105,6 +127,13 @@ class Bzip2Compressor(N5Compressor):
             "blockSize": self.blockSize
         }
 
+    def to_dto(self) -> N5Bzip2CompressorDto:
+        return N5Bzip2CompressorDto(blockSize=self.blockSize)
+
+    @staticmethod
+    def from_dto(dto: N5Bzip2CompressorDto) -> "Bzip2Compressor":
+        return Bzip2Compressor(blockSize=dto.blockSize)
+
     def compress(self, raw: bytes) -> bytes:
         return bz2.compress(raw, self.blockSize)
 
@@ -116,6 +145,9 @@ class XzCompressor(N5Compressor):
     def __init__(self, preset: int = 6):
         self.preset = preset
         super().__init__()
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, XzCompressor) and self.preset == other.preset
 
     @classmethod
     def get_label(cls) -> str:
@@ -133,6 +165,13 @@ class XzCompressor(N5Compressor):
             "preset": self.preset
         }
 
+    def to_dto(self) -> N5XzCompressorDto:
+        return N5XzCompressorDto(preset=self.preset)
+
+    @staticmethod
+    def from_dto(dto: N5XzCompressorDto) -> "XzCompressor":
+        return XzCompressor(preset=dto.preset)
+
     def compress(self, raw: bytes) -> bytes:
         return lzma.compress(raw, preset=self.preset)
 
@@ -141,6 +180,9 @@ class XzCompressor(N5Compressor):
 
 
 class RawCompressor(N5Compressor):
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, RawCompressor)
+
     @classmethod
     def get_label(cls) -> str:
         return "raw"
@@ -151,6 +193,13 @@ class RawCompressor(N5Compressor):
 
     def to_json_data(self) -> JsonObject:
         return super().to_json_data()
+
+    def to_dto(self) -> N5RawCompressorDto:
+        return N5RawCompressorDto()
+
+    @staticmethod
+    def from_dto(dto: N5RawCompressorDto) -> "RawCompressor":
+        return RawCompressor()
 
     def compress(self, raw: bytes) -> bytes:
         return raw

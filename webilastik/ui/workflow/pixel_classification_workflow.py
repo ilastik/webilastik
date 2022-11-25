@@ -15,7 +15,7 @@ from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 
 from webilastik.datasource import FsDataSource
 from webilastik.features.ilp_filter import IlpFilter
-from webilastik.filesystem import JsonableFilesystem
+from webilastik.filesystem import Filesystem
 from webilastik.filesystem.osfs import OsFs
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet.brushing_applet import Label, WsBrushingApplet
@@ -160,7 +160,7 @@ class PixelClassificationWorkflow:
     def get_ilp_contents(self) -> bytes:
         return self.to_ilp_workflow_group().to_h5_file_bytes()
 
-    def save_project(self, fs: JsonableFilesystem, path: PurePosixPath) -> int:
+    def save_project(self, fs: Filesystem, path: PurePosixPath) -> int:
         with fs.openbin(path.as_posix(), "w") as f:
             return f.write(self.get_ilp_contents())
 

@@ -24,14 +24,15 @@ vars:
 
 tasks:
   generate-message-schemas:
-    sources: ["{{.PROJECT_ROOT}}/scripts/generate_message_schemas.py"]
-    generates:
-      - "{{.PROJECT_ROOT}}/webilastik/server/message_schema.py"
-      - "{{.PROJECT_ROOT}}/overlay/src/client/message_schema.ts"
+    sources:
+      - "{{.PROJECT_ROOT}}/webilastik/server/rpc/dto.template.py"
+      - "{{.PROJECT_ROOT}}/webilastik/server/rpc/__main__.py"
+      - "{{.PROJECT_ROOT}}/webilastik/server/rpc/__init__.py"
+    generates: ["{{.PROJECT_ROOT}}/webilastik/server/rpc/dto.py", "{{.PROJECT_ROOT}}/overlay/src/client/dto.ts"]
     cmds:
-      - python {{.PROJECT_ROOT}}/scripts/generate_message_schemas.py
-      - deno fmt --options-line-width=120 {{.PROJECT_ROOT}}/overlay/src/client/message_schema.ts
-      - black {{.PROJECT_ROOT}}/webilastik/server/message_schema.py
+      - python -m webilastik.server.rpc
+      - deno fmt --options-line-width=120 {{.PROJECT_ROOT}}/overlay/src/client/dto.ts
+      - black {{.PROJECT_ROOT}}/webilastik/server/rpc/dto.py
 
   check:
     deps: [generate-message-schemas]
@@ -112,7 +113,7 @@ tasks:
       - "{{.OVERLAY_DIR}}/src/**/*"
       - "{{.OVERLAY_DIR}}/tsconfig.json"
       - "{{.OVERLAY_DIR}}/service_worker_tsconfig.json"
-    generates: ["{{.OVERLAY_BUNDLE_PATH}}", "{{.OVERLAY_DIR}}/build/service_worker.js*"]
+    generates: ["{{.OVERLAY_BUNDLE_PATH}}", "{{.OVERLAY_BUNDLE_PATH}}.map", "{{.OVERLAY_DIR}}/build/service_worker.js*"]
     cmds:
       - rm -rf node_modules
       - npm ci
@@ -128,20 +129,11 @@ tasks:
       - "{{.PROJECT_ROOT}}/caching/**/*.py"
       - "{{.PROJECT_ROOT}}/executor_getters/**/*.py"
       - "{{.OVERLAY_BUNDLE_PATH}}"
+      - "{{.OVERLAY_BUNDLE_PATH}}.map"
       - "{{.OVERLAY_DIR}}/build/service_worker.js*"
       - "{{.NEUROGLANCER_BUNDLE_PATH}}"
     generates:
       - "{{.DEB_TREE_PATH}}/**/*"
-    preconditions:
-      - test -n "$EBRAINS_CLIENT_ID"
-      - test -n "$EBRAINS_CLIENT_SECRET"
-      - test -n "$WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY"
-      - |
-        python3 <<CHECK_FERNET_KEY
-        import os;
-        from cryptography.fernet import Fernet;
-        Fernet(key=os.environ["WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY"].encode())
-        CHECK_FERNET_KEY
     vars:
       CONTROL_FILE_CONTENTS: |-
           Package: webilastik
@@ -153,6 +145,19 @@ tasks:
           Maintainer: ilastik Team <team@ilastik.org>
           Description: Webilastik
            Server and frontend for the web version of ilastik
+      SERVER_SYSTEMD_ENV_CONFS:
+        sh: |-
+          python3 <<SERVER_CONFIG
+          from webilastik.config import SessionAllocatorConfig
+          from webilastik.utility.url import Url
+          print(
+            SessionAllocatorConfig.from_env(
+              allow_local_fs=False,
+              allow_local_compute_sessions=False,
+              external_url=Url.parse_or_raise('https://app.ilastik.org/')
+            ).to_systemd_environment_confs()
+          )
+          SERVER_CONFIG
       SERVICE_FILE_CONTENTS: |-
         [Unit]
         Description=Webilastik session allocator server
@@ -167,13 +172,10 @@ tasks:
         # FIXME/BUG: aiohttp must be told where certs are when running from packed environment
         Environment=SSL_CERT_DIR=/etc/ssl/certs/
         Environment=REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
-        Environment=WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY={{.WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY}}
-        Environment=EBRAINS_CLIENT_ID={{.EBRAINS_CLIENT_ID}}
-        Environment=EBRAINS_CLIENT_SECRET={{.EBRAINS_CLIENT_SECRET}}
+        {{.SERVER_SYSTEMD_ENV_CONFS}}
 
         Environment=PYTHONPATH=/opt/webilastik/
-        ExecStart=/opt/webilastik/conda_env/bin/python3 -B /opt/webilastik/webilastik/server/session_allocator.py \
-            --external-url=https://app.ilastik.org/
+        ExecStart=/opt/webilastik/conda_env/bin/python3 -B /opt/webilastik/webilastik/server/session_allocator.py
 
         TimeoutStopSec=30
         KillMode=mixed
@@ -214,6 +216,7 @@ tasks:
       - echo 2>&1 '[INFO] Copying overlay bundle to public dir'
       - mkdir -p {{.DEB_TREE_PATH}}/opt/webilastik/public/js/
       - cp {{.OVERLAY_BUNDLE_PATH}} {{.DEB_TREE_PATH}}/opt/webilastik/public/js/
+      - cp {{.OVERLAY_BUNDLE_PATH}}.map {{.DEB_TREE_PATH}}/opt/webilastik/public/js/
       - cp {{.OVERLAY_DIR}}/build/service_worker.js* {{.DEB_TREE_PATH}}/opt/webilastik/public/js
 
       - echo 2>&1 '[INFO] Copying nehuba to public dir'
@@ -231,7 +234,21 @@ tasks:
       - dpkg-deb --build -z2 {{.DEB_TREE_PATH}} {{.DEB_PKG_PATH}}
 
   start-local-server:
-    deps: [create-deb-tree]
+    deps: [stop-local-server, create-deb-tree]
+    vars:
+      SERVER_SYSTEMD_ENV_CONFS:
+        sh: |-
+          python3 <<SERVER_CONFIG
+          from webilastik.config import SessionAllocatorConfig
+          from webilastik.utility.url import Url
+          print(
+            SessionAllocatorConfig.from_env(
+              allow_local_fs=True,
+              allow_local_compute_sessions=True,
+              external_url=Url.parse_or_raise('https://app.ilastik.org/')
+            ).to_systemd_environment_confs()
+          )
+          SERVER_CONFIG
     cmds: #this assumes an nginx like the one in webilastik.conf running already
       - echo "Ensuring that app.ilastik.org points to localhost"
       - getent hosts app.ilastik.org | awk '{ print $1 }' | grep -qE '^(127\.0\.0\.1|::1)$'
@@ -263,7 +280,8 @@ tasks:
         TTYPath=$(tty)
         StandardOutput=tty
         StandardError=inherit
-        Environment=WEBILASTIK_ALLOW_LOCAL_SESSIONS=1
+
+        {{.SERVER_SYSTEMD_ENV_CONFS}}
 
         ' > {{.WEBILASTIK_DEV_UNIT_CONFIG_DIR}}/output_to_tty.conf"
 
@@ -281,9 +299,12 @@ tasks:
         ps -ef | grep ws_pixel_classification_workflow.py | awk '{print $2}' | sudo xargs kill -9 || true;
         ps -ef | ag ssh.*batchmode | awk '{print $2}' | sudo xargs kill -9 || true;
 
-  deploy-to-jusuf:
+  deploy-to-hpcs:
+    vars:
+      UPDATE_ALL_BRANCHES: "git pull origin master:master && git pull origin experimental:experimental"
     cmds:
-      - ssh webilastik@jusuf.fz-juelich.de bash -c "set -xeu; cd /p/home/jusers/webilastik/jusuf/webilastik.git && git pull"
+      - echo "cd /p/home/jusers/webilastik/jusuf/webilastik.git && {{.UPDATE_ALL_BRANCHES}}" | ssh webilastik@jusuf.fz-juelich.de
+      - echo "cd ~/source/webilastik/ && {{.UPDATE_ALL_BRANCHES}}" | ssh bp000188@ela.cscs.ch -oCheckHostIP=no -oBatchMode=yes ssh bp000188@daint.cscs.ch
 
   send-deb-package-to-web-server:
     deps: [create-deb-package]
@@ -303,7 +324,7 @@ tasks:
       - ssh ubuntu@148.187.149.187 "sudo apt-get --assume-yes remove webilastik && sudo apt-get --assume-yes install {{.REMOTE_PACKAGE_PATH}}"
 
   deploy:
-    deps: [deploy-to-jusuf, deploy-to-webilastik-server]
+    deps: [deploy-to-hpcs, deploy-to-webilastik-server]
 
   clean:
     deps: [stop-local-server]

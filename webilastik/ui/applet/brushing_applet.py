@@ -7,8 +7,8 @@ import numpy as np
 
 from webilastik.datasource import DataSource
 from webilastik.annotations.annotation import Annotation, Color
-from webilastik.server.message_schema import (
-    AddPixelAnnotationParams, BrushingAppletStateMessage, CreateLabelParams, LabelHeaderMessage, LabelMessage, MessageParsingError, RecolorLabelParams, RemoveLabelParams, RemovePixelAnnotationParams, RenameLabelParams
+from webilastik.server.rpc.dto import (
+    AddPixelAnnotationParams, BrushingAppletStateDto, CreateLabelParams, LabelHeaderDto, LabelDto, MessageParsingError, RecolorLabelParams, RemoveLabelParams, RemovePixelAnnotationParams, RenameLabelParams
 )
 from webilastik.ui.applet import Applet, CascadeError, CascadeOk, CascadeResult, UserPrompt, applet_output, cascade
 from webilastik.ui.applet.ws_applet import WsApplet
@@ -21,17 +21,17 @@ class Label:
         self.annotations = list(annotations)
         super().__init__()
 
-    def to_messsage(self) -> LabelMessage:
-        return LabelMessage(
+    def to_messsage(self) -> LabelDto:
+        return LabelDto(
             name=self.name,
-            color=self.color.to_message(),
-            annotations=tuple(annotation.to_message() for annotation in self.annotations),
+            color=self.color.to_dto(),
+            annotations=tuple(annotation.to_dto() for annotation in self.annotations),
         )
 
-    def to_header_message(self) -> LabelHeaderMessage:
-        return LabelHeaderMessage(
+    def to_header_message(self) -> LabelHeaderDto:
+        return LabelHeaderDto(
             name=self.name,
-            color=self.color.to_message()
+            color=self.color.to_dto()
         )
 
     def clone(self) -> "Label":
@@ -161,7 +161,7 @@ class WsBrushingApplet(WsApplet, BrushingApplet):
         ])
 
     def _get_json_state(self) -> JsonValue:
-        return BrushingAppletStateMessage(
+        return BrushingAppletStateDto(
             labels=tuple(label.to_messsage() for label in self._labels),
         ).to_json_value() # FIXME: move to_json() outside
 
@@ -217,7 +217,7 @@ class WsBrushingApplet(WsApplet, BrushingApplet):
             add_pixel_annotation_params = AddPixelAnnotationParams.from_json_value(arguments)
             if isinstance(add_pixel_annotation_params, MessageParsingError):
                 return UsageError(str(add_pixel_annotation_params)) # FIXME: this would be a bug, not an usage error
-            annotation_result = Annotation.from_message(add_pixel_annotation_params.pixel_annotation)
+            annotation_result = Annotation.from_dto(add_pixel_annotation_params.pixel_annotation)
             if isinstance(annotation_result, Exception):
                 return UsageError(str(annotation_result)) # FIXME: this would be a bug, not an usage error
             return UsageError.check(self.add_annotation(
@@ -229,7 +229,7 @@ class WsBrushingApplet(WsApplet, BrushingApplet):
             remove_pixel_annotation_params = RemovePixelAnnotationParams.from_json_value(arguments)
             if isinstance(remove_pixel_annotation_params, MessageParsingError):
                 return UsageError(str(remove_pixel_annotation_params)) # FIXME: this would be a bug, not an usage error
-            annotation_result = Annotation.from_message(remove_pixel_annotation_params.pixel_annotation)
+            annotation_result = Annotation.from_dto(remove_pixel_annotation_params.pixel_annotation)
             if isinstance(annotation_result, Exception):
                 return UsageError(str(annotation_result)) # FIXME: this would be a bug, not an usage error
             return UsageError.check(self.remove_annotation(

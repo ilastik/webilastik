@@ -3,36 +3,30 @@ import json
 
 from ndstructs.utils.json_serializable import IJsonable, JsonValue, ensureJsonObject, ensureJsonString
 from fs.base import FS
+from webilastik.server.rpc.dto import BucketFSDto, HttpFsDto, OsfsDto
 from webilastik.utility.url import Url
 
-class JsonableFilesystem(FS, IJsonable):
-    @classmethod
-    @abstractmethod
-    def from_json_value(cls, value: JsonValue) -> "JsonableFilesystem":
-        from .http_fs import HttpFs, SwiftTempUrlFs
+class Filesystem(FS):
+    @staticmethod
+    def create_from_message(message: "OsfsDto | HttpFsDto | BucketFSDto") -> "Filesystem":
+        from .http_fs import HttpFs
         from .osfs import OsFs
         from .bucket_fs import BucketFs
 
         # FIXME: Maybe register these via __init_subclass__?
-        value_obj = ensureJsonObject(value)
-        fs_class_name = ensureJsonString(value_obj.get("__class__"))
-        if fs_class_name == HttpFs.__name__:
-            return HttpFs.from_json_value(value)
-        if fs_class_name == SwiftTempUrlFs.__name__:
-            return SwiftTempUrlFs.from_json_value(value)
-        if fs_class_name == OsFs.__name__:
-            return OsFs.from_json_value(value)
-        if fs_class_name == BucketFs.__name__:
-            return BucketFs.from_json_value(value)
-
-        raise ValueError(f"Could not deserialize filesystem from:\n{json.dumps(value, indent=4)}")
+        if isinstance(message, HttpFsDto):
+            return HttpFs.from_dto(message)
+        if isinstance(message, OsfsDto):
+            return OsFs.from_dto(message)
+        if isinstance(message, BucketFSDto):
+            return BucketFs.from_dto(message)
 
     @abstractmethod
-    def to_json_value(self) -> JsonValue:
+    def to_dto(self) -> "OsfsDto | HttpFsDto | BucketFSDto":
         pass
 
     @staticmethod
-    def from_url(url: Url) -> "JsonableFilesystem | Exception":
+    def from_url(url: Url) -> "Filesystem | Exception":
         from webilastik.filesystem.osfs import OsFs
         from webilastik.filesystem.bucket_fs import BucketFs
         from webilastik.filesystem.http_fs import HttpFs

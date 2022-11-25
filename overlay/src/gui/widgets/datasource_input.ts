@@ -1,5 +1,5 @@
-import { DataSource, Session } from "../../client/ilastik";
-import { GetDatasourcesFromUrlParamsMessage } from "../../client/message_schema";
+import { FsDataSource, Session } from "../../client/ilastik";
+import { GetDatasourcesFromUrlParamsDto } from "../../client/dto";
 import { createElement, createInput } from "../../util/misc";
 import { CssClasses } from "../css_classes";
 import { ErrorPopupWidget, InputPopupWidget } from "./popup";
@@ -11,17 +11,16 @@ export class DataSourceInput{
     public readonly element: HTMLDivElement;
     private readonly session: Session;
     private readonly urlInput: UrlInput;
-    private readonly suggestionsButtonContainer: HTMLDivElement
     public readonly checkButton: HTMLInputElement;
-    private readonly onChanged: ((newValue: DataSource | undefined) => void) | undefined;
+    private readonly onChanged: ((newValue: FsDataSource | undefined) => void) | undefined;
     private statusMessageContainer: HTMLParagraphElement;
-    private _value: DataSource | undefined;
+    private _value: FsDataSource | undefined;
 
     constructor(params: {
         parentElement: HTMLElement,
         session: Session,
-        value?: DataSource,
-        onChanged?: (newValue: DataSource | undefined) => void,
+        value?: FsDataSource,
+        onChanged?: (newValue: FsDataSource | undefined) => void,
     }){
         this.session = params.session
         this._value = params.value
@@ -31,53 +30,41 @@ export class DataSourceInput{
         let p = createElement({tagName: "p", parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph]})
         this.urlInput = UrlInput.createLabeled({label: "Url: ", parentElement: p})
         this.urlInput.input.addEventListener("keyup", (ev) => {
+            this.checkButton.disabled = this.urlInput.value === undefined;
             if(ev.key === 'Enter'){
                 this.checkUrl()
             }
         })
         this.urlInput.input.addEventListener("focusout", () => this.checkUrl())
-        this.checkButton = createInput({inputType: "button", value: "check", parentElement: p, onClick: () => this.checkUrl})
+        this.checkButton = createInput({inputType: "button", value: "check", parentElement: p, onClick: () => this.checkUrl()})
 
         this.statusMessageContainer = createElement({tagName: "p", parentElement: this.element, cssClasses: [CssClasses.InfoText]})
-        this.suggestionsButtonContainer = createElement({tagName: "div", parentElement: this.element})
-    }
-
-    public setSuggestions(suggestions: DataSource[] | undefined){
-        this.suggestionsButtonContainer.innerHTML = ""
-        if(!suggestions || suggestions.length == 0){
-            return
-        }
-        createInput({
-            inputType: "button", parentElement: this.suggestionsButtonContainer, value: "Suggestions...", onClick: () => {
-                this.popupSuggestions(suggestions)
-            }
-        })
     }
 
     private async checkUrl(){
         let previousValue = this.value
 
         let url = this.urlInput.value
-        if(url == undefined){
+        if(url === undefined){
             if(previousValue !== undefined && this.onChanged){
                 this.onChanged(undefined)
             }
             return
         }
-        let datasources_result = await this.session.getDatasourcesFromUrl(new GetDatasourcesFromUrlParamsMessage({url: url.toMessage()}))
+        let datasources_result = await this.session.getDatasourcesFromUrl(new GetDatasourcesFromUrlParamsDto({url: url.toDto()}))
         if(datasources_result instanceof Error){
             new ErrorPopupWidget({message: `Error retrieving datasources: ${datasources_result}`})
             return
         }
-        if(datasources_result.length == 0){
+        if(datasources_result === undefined || datasources_result.length == 0){
             new ErrorPopupWidget({message: `No datasources fond with given URL: ${url}`})
             return
         }
         this.popupSuggestions(datasources_result)
     }
 
-    protected popupSuggestions(suggestions: DataSource[]){
-        new InputPopupWidget<DataSource>({
+    protected popupSuggestions(suggestions: FsDataSource[]){
+        new InputPopupWidget<FsDataSource>({
             title: "Select a Data Source",
             inputWidgetFactory: (parentElement) => {
                 return new SelectorWidget({
@@ -92,11 +79,11 @@ export class DataSourceInput{
         })
     }
 
-    public get value(): DataSource | undefined{
+    public get value(): FsDataSource | undefined{
         return this._value
     }
 
-    public set value(value: DataSource | undefined){
+    public set value(value: FsDataSource | undefined){
         this._value = value
 
         this.urlInput.value = undefined

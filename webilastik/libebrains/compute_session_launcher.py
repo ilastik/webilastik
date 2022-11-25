@@ -16,13 +16,14 @@ import os
 
 from ndstructs.utils.json_serializable import ensureJsonObject, ensureJsonString
 from cryptography.fernet import Fernet
+from webilastik.config import WorkflowConfig
 
 from webilastik.libebrains.oidc_client import OidcClient
 from webilastik.libebrains.user_info import UserInfo
 from webilastik.libebrains.user_token import UserToken
-from webilastik.server.message_schema import ComputeSessionMessage
-
-_oidc_client = OidcClient.from_environment()
+from webilastik.server.rpc.dto import ComputeSessionDto
+from webilastik.utility import ComputeNodes, Hostname, Minutes, NodeSeconds, Seconds, Username
+from webilastik.utility.url import Url
 
 ComputeSessionState = Literal[
     "BOOT_FAIL",
@@ -82,13 +83,7 @@ RUNNABLE_STATES: Set[ComputeSessionState] = set([
     "SUSPENDED",
 ])
 
-
-Username = NewType("Username", str)
-Hostname = NewType("Hostname", str)
-Minutes = NewType("Minutes", int)
-Seconds = NewType("Seconds", int)
 NativeComputeSessionId = NewType("NativeComputeSessionId", int)
-NodeSeconds = NewType("NodeSeconds", int)
 
 class ComputeSession:
     SACCT_FORMAT_ITEMS = ["JobID", "JobName", "State", "ElapsedRaw", "TimelimitRaw", "Start", "AllocNodes"]
@@ -125,13 +120,25 @@ class ComputeSession:
         if clean_raw_state not in COMPUTE_SESSION_STATES:
             return Exception(f"Bad job state: '{clean_raw_state}' derived from '{raw_state}'")
 
+        start_time_utc_sec = None if raw_start_time_utc_sec == "Unknown" else Seconds.try_from_str(raw_start_time_utc_sec)
+        if isinstance(start_time_utc_sec, Exception):
+            return Exception(f"Bad job start time: {raw_start_time_utc_sec}")
+
+        time_limit_minutes = Minutes.try_from_str(raw_time_limit)
+        if isinstance(time_limit_minutes, Exception):
+            return Exception(f"Bad job time limit: {raw_time_limit}")
+
+        num_nodes = ComputeNodes.try_from_str(raw_alloc_nodes)
+        if isinstance(num_nodes, Exception):
+            return Exception(f"Caould not parse numbe rof allocated compute nodes for job: {raw_alloc_nodes}")
+
         return ComputeSession(
             native_compute_session_id=NativeComputeSessionId(int(raw_id)),
             state=clean_raw_state,
-            start_time_utc_sec=None if raw_start_time_utc_sec == "Unknown" else Seconds(int(raw_start_time_utc_sec)),
+            start_time_utc_sec=start_time_utc_sec,
             time_elapsed_sec=Seconds(int(raw_elapsed)),
-            time_limit_minutes=Minutes(int(raw_time_limit)),
-            num_nodes=int(raw_alloc_nodes),
+            time_limit_minutes=time_limit_minutes,
+            num_nodes=num_nodes,
             user_id=user_id,
             compute_session_id=compute_session_id,
         )
@@ -154,9 +161,9 @@ class ComputeSession:
         native_compute_session_id: NativeComputeSessionId,
         state: ComputeSessionState,
         start_time_utc_sec: "Seconds | None",
-        time_elapsed_sec: "Seconds",
-        time_limit_minutes: "Minutes",
-        num_nodes: int,
+        time_elapsed_sec: Seconds,
+        time_limit_minutes: Minutes,
+        num_nodes: ComputeNodes,
         user_id: uuid.UUID,
         compute_session_id: uuid.UUID,
     ) -> None:
@@ -171,12 +178,12 @@ class ComputeSession:
         super().__init__()
 
 
-    def to_message(self) -> ComputeSessionMessage:
-        return ComputeSessionMessage(
-            start_time_utc_sec=self.start_time_utc_sec,
-            time_elapsed_sec=self.time_elapsed_sec,
-            time_limit_minutes=self.time_limit_minutes,
-            num_nodes=self.num_nodes,
+    def to_dto(self) -> ComputeSessionDto:
+        return ComputeSessionDto(
+            start_time_utc_sec=self.start_time_utc_sec and self.start_time_utc_sec.to_int(),
+            time_elapsed_sec=self.time_elapsed_sec.to_int(),
+            time_limit_minutes=self.time_limit_minutes.to_int(),
+            num_nodes=self.num_nodes.to_int(),
             compute_session_id=str(self.compute_session_id),
             state=self.state,
         )
@@ -198,7 +205,10 @@ class ComputeSession:
 
     @classmethod
     def compute_used_quota(cls, compute_sessions: Iterable["ComputeSession"]) -> NodeSeconds:
-        return NodeSeconds(sum(s.time_elapsed_sec * s.num_nodes for s in compute_sessions))
+        out: NodeSeconds = NodeSeconds(0)
+        for s in compute_sessions:
+            out += s.time_elapsed_sec * s.num_nodes
+        return out
 
 class SshJobLauncher:
     JOB_NAME_PREFIX = "EBRAINS"
@@ -276,9 +286,15 @@ class SshJobLauncher:
     def get_sbatch_launch_script(
         self,
         *,
-        time: Minutes,
-        ebrains_user_token: UserToken,
         compute_session_id: uuid.UUID,
+        allow_local_fs: bool,
+        ebrains_oidc_client: OidcClient,
+        ebrains_user_token: UserToken,
+        max_duration_minutes: Minutes,
+        session_url: Url,
+        session_allocator_host: Hostname,
+        session_allocator_username: Username,
+        session_allocator_socket_path: Path
     ) -> "str":
         pass
 
@@ -286,22 +302,33 @@ class SshJobLauncher:
         self,
         *,
         user_id: uuid.UUID,
-        time: Minutes,
-        ebrains_user_token: UserToken,
         compute_session_id: uuid.UUID,
-        display_name: str = ""
+        allow_local_fs: bool,
+        ebrains_oidc_client: OidcClient,
+        ebrains_user_token: UserToken,
+        max_duration_minutes: Minutes,
+        session_url: Url,
+        session_allocator_host: Hostname,
+        session_allocator_username: Username,
+        session_allocator_socket_path: Path
     ) -> "ComputeSession | Exception":
         output_result = await self.do_ssh(
             command="sbatch",
             command_args=[
                 f"--job-name={ComputeSession.make_session_name(user_id=user_id, compute_session_id=compute_session_id, fernet=self.fernet)}",
-                f"--time={time}",
+                f"--time={max_duration_minutes.to_int()}",
                 f"--account={self.account}",
             ],
             stdin=self.get_sbatch_launch_script(
-                time=time,
-                ebrains_user_token=ebrains_user_token,
                 compute_session_id=compute_session_id,
+                allow_local_fs=allow_local_fs,
+                ebrains_oidc_client=ebrains_oidc_client,
+                ebrains_user_token=ebrains_user_token,
+                max_duration_minutes=max_duration_minutes,
+                session_url=session_url,
+                session_allocator_host=session_allocator_host,
+                session_allocator_username=session_allocator_username,
+                session_allocator_socket_path=session_allocator_socket_path,
             ),
         )
         if isinstance(output_result, Exception):
@@ -415,23 +442,38 @@ class LocalJobLauncher(SshJobLauncher):
     def get_sbatch_launch_script(
         self,
         *,
-        time: Minutes,
-        ebrains_user_token: UserToken,
         compute_session_id: uuid.UUID,
+        allow_local_fs: bool,
+        ebrains_oidc_client: OidcClient,
+        ebrains_user_token: UserToken,
+        max_duration_minutes: Minutes,
+        session_url: Url,
+        session_allocator_host: Hostname,
+        session_allocator_username: Username,
+        session_allocator_socket_path: Path
     ) -> str:
-        working_dir = f"/tmp/{compute_session_id}"
+        working_dir = Path(f"/tmp/{compute_session_id}")
+        job_config = WorkflowConfig(
+            allow_local_fs=allow_local_fs,
+            ebrains_oidc_client=ebrains_oidc_client,
+            ebrains_user_token=ebrains_user_token,
+            max_duration_minutes=max_duration_minutes,
+            listen_socket=working_dir / "to-master.sock",
+            session_url=session_url,
+            session_allocator_host=session_allocator_host,
+            session_allocator_username=session_allocator_username,
+            session_allocator_socket_path=session_allocator_socket_path,
+        )
         webilastik_source_dir = Path(__file__).parent.parent.parent
         redis_pid_file = f"{working_dir}/redis.pid"
         redis_unix_socket_path = f"{working_dir}/redis.sock"
         conda_env_dir = Path(os.path.realpath(sys.executable)).parent.parent
 
-        return textwrap.dedent(f"""
+        out = textwrap.dedent(textwrap.indent(f"""
             #!/bin/bash -l
 
-            export {UserToken.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME}="{ebrains_user_token.access_token}"
-            export {UserToken.EBRAINS_USER_REFRESH_TOKEN_ENV_VAR_NAME}="{ebrains_user_token.refresh_token}"
-            export EBRAINS_CLIENT_ID="{_oidc_client.client_id}"
-            export EBRAINS_CLIENT_SECRET="{_oidc_client.client_secret}"
+            {job_config.to_bash_exports()}
+
             set -xeu
             set -o pipefail
 
@@ -476,32 +518,40 @@ class LocalJobLauncher(SshJobLauncher):
             export PYTHONPATH
             export REDIS_UNIX_SOCKET_PATH="{redis_unix_socket_path}"
 
-            "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py \\
-                --max-duration-minutes={time} \\
-                --listen-socket="{working_dir}/to-master.sock" \\
-                --session-url=https://app.ilastik.org/session-{compute_session_id} \\
-                tunnel \\
-                --remote-username=www-data \\
-                --remote-host=app.ilastik.org \\
-                --remote-unix-socket="/tmp/to-session-{compute_session_id}" \\
+            "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py
 
             kill -2 $(cat {redis_pid_file})
             sleep 2
-        """)
+        """, prefix="            ", predicate=lambda line: line[0] != " "))
+        # print(out)
+        return out
 
     async def launch(
         self,
         *,
         user_id: uuid.UUID,
-        time: Minutes,
-        ebrains_user_token: UserToken,
         compute_session_id: uuid.UUID,
-        display_name: str = ""
+        allow_local_fs: bool,
+        ebrains_oidc_client: OidcClient,
+        ebrains_user_token: UserToken,
+        max_duration_minutes: Minutes,
+        session_url: Url,
+        session_allocator_host: Hostname,
+        session_allocator_username: Username,
+        session_allocator_socket_path: Path
     ) -> "ComputeSession | Exception":
         stdin_file = tempfile.TemporaryFile()
         _ = stdin_file.write(
             self.get_sbatch_launch_script(
-                time=time, ebrains_user_token=ebrains_user_token, compute_session_id=compute_session_id
+                compute_session_id=compute_session_id,
+                allow_local_fs=allow_local_fs,
+                ebrains_oidc_client=ebrains_oidc_client,
+                ebrains_user_token=ebrains_user_token,
+                max_duration_minutes=max_duration_minutes,
+                session_url=session_url,
+                session_allocator_host=session_allocator_host,
+                session_allocator_username=session_allocator_username,
+                session_allocator_socket_path=session_allocator_socket_path,
             ).encode("utf8")
         )
         _ = stdin_file.seek(0)
@@ -513,9 +563,9 @@ class LocalJobLauncher(SshJobLauncher):
             state="RUNNING",
             start_time_utc_sec=Seconds(int(datetime.datetime.now(datetime.timezone.utc).timestamp())),
             time_elapsed_sec=Seconds(1),
-            num_nodes=1, #FIXME
+            num_nodes=ComputeNodes(1), #FIXME
             compute_session_id=compute_session_id,
-            time_limit_minutes=time,
+            time_limit_minutes=max_duration_minutes,
             user_id=user_id,
         )
         self.sessions[native_compute_session_id] = (dummy_session, session_process)
@@ -552,7 +602,7 @@ class LocalJobLauncher(SshJobLauncher):
                 continue
             if state and compute_session.state not in state:
                 continue
-            if compute_session.start_time_utc_sec and compute_session.start_time_utc_sec < starttime.timestamp():
+            if compute_session.start_time_utc_sec and compute_session.start_time_utc_sec.to_float() < starttime.timestamp(): #FIXME: use datetime instead of Seconds
                 continue
             #FIXME: endtime?
             compute_sessions.append(compute_session)
@@ -571,32 +621,47 @@ class JusufSshJobLauncher(SshJobLauncher):
     def get_sbatch_launch_script(
         self,
         *,
-        time: Minutes,
-        ebrains_user_token: UserToken,
         compute_session_id: uuid.UUID,
+        allow_local_fs: bool,
+        ebrains_oidc_client: OidcClient,
+        ebrains_user_token: UserToken,
+        max_duration_minutes: Minutes,
+        session_url: Url,
+        session_allocator_host: Hostname,
+        session_allocator_username: Username,
+        session_allocator_socket_path: Path
     ) -> str:
-        working_dir = f"$SCRATCH/{compute_session_id}"
+        working_dir = Path(f"$SCRATCH/{compute_session_id}")
+        job_config = WorkflowConfig(
+            allow_local_fs=allow_local_fs,
+            ebrains_oidc_client=ebrains_oidc_client,
+            ebrains_user_token=ebrains_user_token,
+            max_duration_minutes=max_duration_minutes,
+            listen_socket=working_dir / "to-master.sock",
+            session_url=session_url,
+            session_allocator_host=session_allocator_host,
+            session_allocator_username=session_allocator_username,
+            session_allocator_socket_path=session_allocator_socket_path,
+        )
         home="/p/home/jusers/webilastik/jusuf"
         webilastik_source_dir = f"{working_dir}/webilastik"
         conda_env_dir = f"{home}/miniconda3/envs/webilastik"
         redis_pid_file = f"{working_dir}/redis.pid"
         redis_unix_socket_path = f"{working_dir}/redis.sock"
 
-        return textwrap.dedent(f"""\
+        out = textwrap.dedent(textwrap.indent(f"""\
             #!/bin/bash -l
             #SBATCH --nodes=1
             #SBATCH --ntasks=2
             #SBATCH --partition=batch
             #SBATCH --hint=nomultithread
 
-            export {UserToken.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME}="{ebrains_user_token.access_token}"
-            export {UserToken.EBRAINS_USER_REFRESH_TOKEN_ENV_VAR_NAME}="{ebrains_user_token.refresh_token}"
-            export EBRAINS_CLIENT_ID="{_oidc_client.client_id}"
-            export EBRAINS_CLIENT_SECRET="{_oidc_client.client_secret}"
+            jutil env activate -p {self.account}
+            {job_config.to_bash_exports()}
+
             set -xeu
             set -o pipefail
 
-            jutil env activate -p icei-hbp-2022-0010
             module load git
             module load GCC/11.2.0
             module load OpenMPI/4.1.2
@@ -604,7 +669,7 @@ class JusufSshJobLauncher(SshJobLauncher):
             mkdir {working_dir}
             cd {working_dir}
             # FIXME: download from github when possible
-            git clone --depth 1 --branch experimental {home}/webilastik.git {webilastik_source_dir}
+            git clone --depth 1 --branch master {home}/webilastik.git {webilastik_source_dir}
 
             # prevent numpy from spawning its own threads
             export OPENBLAS_NUM_THREADS=1
@@ -646,17 +711,12 @@ class JusufSshJobLauncher(SshJobLauncher):
 
             srun -n 1 --overlap -u --cpus-per-task 120 \\
                 "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py \\
-                --max-duration-minutes={time} \\
-                --listen-socket="{working_dir}/to-master.sock" \\
-                --session-url=https://app.ilastik.org/session-{compute_session_id} \\
-                tunnel \\
-                --remote-username=www-data \\
-                --remote-host=app.ilastik.org \\
-                --remote-unix-socket="/tmp/to-session-{compute_session_id}" \\
 
             kill -2 $(cat {redis_pid_file}) #FXME: this only works because it's a single node
             sleep 2
-        """)
+        """, prefix="            ", predicate=lambda line: line[0] != " "))
+        # print(out)
+        return out
 
 class CscsSshJobLauncher(SshJobLauncher):
     def __init__(self, fernet: Fernet):
@@ -671,19 +731,36 @@ class CscsSshJobLauncher(SshJobLauncher):
     def get_sbatch_launch_script(
         self,
         *,
-        time: Minutes,
-        ebrains_user_token: UserToken,
         compute_session_id: uuid.UUID,
+        allow_local_fs: bool,
+        ebrains_oidc_client: OidcClient,
+        ebrains_user_token: UserToken,
+        max_duration_minutes: Minutes,
+        session_url: Url,
+        session_allocator_host: Hostname,
+        session_allocator_username: Username,
+        session_allocator_socket_path: Path
     ) -> str:
-        working_dir = f"$SCRATCH/{compute_session_id}"
-        home="/users/bp000188"
+        working_dir = Path(f"$SCRATCH/{compute_session_id}")
+        job_config = WorkflowConfig(
+            allow_local_fs=allow_local_fs,
+            ebrains_oidc_client=ebrains_oidc_client,
+            ebrains_user_token=ebrains_user_token,
+            max_duration_minutes=max_duration_minutes,
+            listen_socket=working_dir / "to-master.sock",
+            session_url=session_url,
+            session_allocator_host=session_allocator_host,
+            session_allocator_username=session_allocator_username,
+            session_allocator_socket_path=session_allocator_socket_path,
+        )
+        home=f"/users/{self.user}"
         webilastik_source_dir = f"{working_dir}/webilastik"
         conda_env_dir = f"{home}/miniconda3/envs/webilastik"
         redis_pid_file = f"{working_dir}/redis.pid"
         redis_port = "6379"
         num_nodes = 10
 
-        out =  textwrap.dedent(f"""\
+        out =  textwrap.dedent(textwrap.indent(f"""\
             #!/bin/bash
             #SBATCH --nodes={num_nodes}
             #SBATCH --ntasks-per-node=2
@@ -691,16 +768,14 @@ class CscsSshJobLauncher(SshJobLauncher):
             #SBATCH --hint=nomultithread
             #SBATCH --constraint=mc
 
-            export {UserToken.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME}="{ebrains_user_token.access_token}"
-            export {UserToken.EBRAINS_USER_REFRESH_TOKEN_ENV_VAR_NAME}="{ebrains_user_token.refresh_token}"
-            export EBRAINS_CLIENT_ID="{_oidc_client.client_id}"
-            export EBRAINS_CLIENT_SECRET="{_oidc_client.client_secret}"
+            {job_config.to_bash_exports()}
+
             set -xeu
             set -o pipefail
 
             mkdir {working_dir}
             cd {working_dir}
-            git clone --depth 1 --branch experimental https://github.com/ilastik/webilastik {webilastik_source_dir}
+            git clone --depth 1 --branch master {home}/source/webilastik {webilastik_source_dir}
 
             # prevent numpy from spawning its own threads
             export OPENBLAS_NUM_THREADS=1
@@ -743,16 +818,9 @@ class CscsSshJobLauncher(SshJobLauncher):
 
             srun -N {num_nodes - 1} \\
                 "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py \\
-                --max-duration-minutes={time} \\
-                --listen-socket="{working_dir}/to-master.sock" \\
-                --session-url=https://app.ilastik.org/session-{compute_session_id} \\
-                tunnel \\
-                --remote-username=www-data \\
-                --remote-host=app.ilastik.org \\
-                --remote-unix-socket="/tmp/to-session-{compute_session_id}" \\
 
             kill -2 $(cat {redis_pid_file})
             sleep 2
-        """)
+        """, prefix="            ", predicate=lambda line: line[0] != " "))
         # print(out)
         return out

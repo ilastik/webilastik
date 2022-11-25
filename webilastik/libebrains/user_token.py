@@ -13,9 +13,6 @@ from webilastik.ui.usage_error import UsageError
 from webilastik.utility.url import Url
 
 class UserToken:
-    EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME = "EBRAINS_USER_ACCESS_TOKEN"
-    EBRAINS_USER_REFRESH_TOKEN_ENV_VAR_NAME = "EBRAINS_USER_REFRESH_TOKEN"
-
     def __init__(
         self,
         *,
@@ -83,27 +80,6 @@ class UserToken:
 
         data = ensureJsonObject(resp.json())
         return UserToken.from_json_value(data)
-
-    @classmethod
-    def from_environment(cls) -> "UserToken | UsageError":
-        access_token = os.environ.get(cls.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME)
-        refresh_token = os.environ.get(cls.EBRAINS_USER_REFRESH_TOKEN_ENV_VAR_NAME)
-        if access_token is None or refresh_token is None:
-            print(f"Environment variables '{cls.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME}' and '{cls.EBRAINS_USER_REFRESH_TOKEN_ENV_VAR_NAME}' must be set")
-            return UsageError(
-                f"Environment variables '{cls.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME}' and '{cls.EBRAINS_USER_REFRESH_TOKEN_ENV_VAR_NAME}' must be set"
-            )
-        try:
-            return UserToken(access_token=access_token, refresh_token=refresh_token)
-        except Exception as e:
-            return UsageError(str(e))
-
-    @classmethod
-    def from_environment_or_raise(cls) -> "UserToken":
-        token_result = cls.from_environment()
-        if isinstance(token_result, Exception):
-            raise token_result
-        return token_result
 
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "UserToken":

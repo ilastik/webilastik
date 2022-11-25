@@ -1,35 +1,29 @@
-
 from fs.osfs import OSFS
-from ndstructs.utils.json_serializable import JsonValue, JsonObject, ensureJsonObject, ensureJsonString
 
-from webilastik.filesystem import JsonableFilesystem
-from webilastik.server.message_schema import OsfsMessage
+from webilastik.filesystem import Filesystem
+from webilastik.server.rpc.dto import OsfsDto
+from webilastik.config import WorkflowConfig
 
 
 
-class OsFs(OSFS, JsonableFilesystem):
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": self.__class__.__name__,
-            "path": self.desc(""),
-        }
+class OsFs(OSFS, Filesystem):
+    def __init__(self, root_path: str) -> None:
+        if(not WorkflowConfig.get().allow_local_fs): #FIXME: move this to from_dto so we can return Exception?
+            raise Exception("Not allowed to open local filesystem")
+        super().__init__(
+            root_path,
+            expand_vars=False
+        )
 
-    def __getstate__(self) -> JsonObject:
-        return self.to_json_value()
+    def __getstate__(self) -> OsfsDto:
+        return self.to_dto()
 
-    def to_message(self) -> "OsfsMessage":
-        return OsfsMessage(path=self.root_path)
+    def to_dto(self) -> OsfsDto:
+        return OsfsDto(path=self.root_path)
 
-    @classmethod
-    def from_message(cls, message: OsfsMessage) -> "OsFs":
+    @staticmethod
+    def from_dto(message: OsfsDto) -> "OsFs":
         return OsFs(message.path)
 
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "OsFs":
-        value_obj = ensureJsonObject(value)
-        return OsFs(ensureJsonString(value_obj.get("path")))
-
-    def __setstate__(self, value: JsonObject):
-        self.__init__(
-            ensureJsonString(value.get("path"))
-        )
+    def __setstate__(self, message: OsfsDto):
+        self.__init__(message.path)

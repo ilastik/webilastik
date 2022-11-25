@@ -17,8 +17,8 @@ from webilastik.annotations.annotation import Color
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.features.ilp_filter import IlpFilter
-from webilastik.server.message_schema import (
-    FailedViewMessage, MakeDataViewParams, MessageParsingError, PredictionsViewMessage, RawDataViewMessage, StrippedPrecomputedViewMessage, UnsupportedDatasetViewMessage, ViewerAppletStateMessage
+from webilastik.server.rpc.dto import (
+    FailedViewDto, MakeDataViewParams, MessageParsingError, PredictionsViewDto, RawDataViewDto, StrippedPrecomputedViewDto, UnsupportedDatasetViewDto, ViewerAppletStateDto
 )
 from webilastik.server.session_allocator import uncachable_json_response
 from webilastik.ui.applet.brushing_applet import Label
@@ -44,11 +44,11 @@ class RawDataView(DataView):
         self.datasources = datasources
         super().__init__(name=name, url=url)
 
-    def to_message(self) -> RawDataViewMessage:
-        return RawDataViewMessage(
+    def to_dto(self) -> RawDataViewDto:
+        return RawDataViewDto(
             name=self.name,
-            url=self.url.to_message(),
-            datasources=tuple(ds.to_message() for ds in self.datasources)
+            url=self.url.to_dto(),
+            datasources=tuple(ds.to_dto() for ds in self.datasources)
         )
 
     @classmethod
@@ -70,11 +70,11 @@ class StrippedPrecomputedView(DataView):
             ).concatpath(f"stripped_precomputed/url={all_scales_url.to_base64()}/resolution={resolution_str}"),
         )
 
-    def to_message(self) -> StrippedPrecomputedViewMessage:
-        return StrippedPrecomputedViewMessage(
+    def to_dto(self) -> StrippedPrecomputedViewDto:
+        return StrippedPrecomputedViewDto(
             name=self.name,
-            url=self.url.to_message(),
-            datasource=self.datasource.to_message(),
+            url=self.url.to_dto(),
+            datasource=self.datasource.to_dto(),
         )
 
     @classmethod
@@ -126,11 +126,11 @@ class PredictionsView(View):
             ).concatpath(f"predictions/raw_data={raw_data.url.to_base64()}/generation={classifier_generation}"),
         )
 
-    def to_message(self) -> PredictionsViewMessage:
-        return PredictionsViewMessage(
+    def to_dto(self) -> PredictionsViewDto:
+        return PredictionsViewDto(
             name=self.name,
-            url=self.url.to_message(),
-            raw_data=self.raw_data.to_message(),
+            url=self.url.to_dto(),
+            raw_data=self.raw_data.to_dto(),
             classifier_generation=self.classifier_generation,
         )
 
@@ -173,10 +173,10 @@ class PredictionsView(View):
             return e
 
 class UnsupportedDatasetView(DataView):
-    def to_message(self) -> UnsupportedDatasetViewMessage:
-        return UnsupportedDatasetViewMessage(
+    def to_dto(self) -> UnsupportedDatasetViewDto:
+        return UnsupportedDatasetViewDto(
             name=self.name,
-            url=self.url.to_message(),
+            url=self.url.to_dto(),
         )
 
 class FailedView(DataView):
@@ -184,10 +184,10 @@ class FailedView(DataView):
         super().__init__(name, url)
         self.error_message: str = error_message
 
-    def to_message(self) -> FailedViewMessage:
-        return FailedViewMessage(
+    def to_dto(self) -> FailedViewDto:
+        return FailedViewDto(
             name=self.name,
-            url=self.url.to_message(),
+            url=self.url.to_dto(),
             error_message=self.error_message,
         )
 
@@ -200,12 +200,12 @@ class ViewsState:
     prediction_views: Mapping[Url, PredictionsView]
     label_colors: Sequence[Color]
 
-    def to_message(self) -> ViewerAppletStateMessage:
-        return ViewerAppletStateMessage(
+    def to_dto(self) -> ViewerAppletStateDto:
+        return ViewerAppletStateDto(
             frontend_timestamp=self.frontend_timestamp,
-            data_views=tuple(view.to_message() for view in self.data_views.values()),
-            prediction_views=tuple(view.to_message() for view in self.prediction_views.values()),
-            label_colors=tuple(c.to_message() for c in self.label_colors)
+            data_views=tuple(view.to_dto() for view in self.data_views.values()),
+            prediction_views=tuple(view.to_dto() for view in self.prediction_views.values()),
+            label_colors=tuple(c.to_dto() for c in self.label_colors)
         )
 
     def updated_with(
@@ -266,12 +266,12 @@ class WsViewerApplet(WsApplet):
 
     def _get_json_state(self) -> JsonObject:
         with self.lock:
-            return self.state.to_message().to_json_value()
+            return self.state.to_dto().to_json_value()
         with self.lock:
             labels = self._in_labels() or ()
             return {
                 **self.state.to_json_value(),
-                "label_colors": tuple(label.color.to_message().to_json_value() for label in labels if len(label.annotations) > 0), # FIXME
+                "label_colors": tuple(label.color.to_dto().to_json_value() for label in labels if len(label.annotations) > 0), # FIXME
             }
 
     def take_snapshot(self) -> ViewsState:
@@ -377,25 +377,25 @@ class WsViewerApplet(WsApplet):
         params = MakeDataViewParams.from_json_value(payload)
         if isinstance(params, MessageParsingError):
             return  uncachable_json_response({"error": str(params)}, status=400)
-        url = Url.from_message(params.url)
+        url = Url.from_dto(params.url)
         with self.lock:
             view = self.cached_views.get(url)
             if view:
-                return web.json_response(view.to_message().to_json_value(), status=200)
+                return web.json_response(view.to_dto().to_json_value(), status=200)
             if url.datascheme == "precomputed":
                 for view in self.state.data_views.values():
                     if isinstance(view, RawDataView):
                         for ds in view.datasources:
                             if isinstance(ds, PrecomputedChunksDataSource) and ds.url == url:
                                 stripped_view = StrippedPrecomputedView(name=params.view_name, session_url=self.session_url, datasource=ds)
-                                return web.json_response(stripped_view.to_message().to_json_value(), status=200)
+                                return web.json_response(stripped_view.to_dto().to_json_value(), status=200)
                     if isinstance(view, StrippedPrecomputedView) and view.datasource.url == url:
-                        return web.json_response(view.to_message().to_json_value(), status=200)
+                        return web.json_response(view.to_dto().to_json_value(), status=200)
         view = await asyncio.wrap_future(self.executor.submit(
             _try_open_data_view,
             name=params.view_name, url=url, session_url=self.session_url, allowed_protocols=["https", "http"]
         ))
-        return web.json_response(view.to_message().to_json_value(), status=200)
+        return web.json_response(view.to_dto().to_json_value(), status=200)
 
 
 def _try_open_data_view(

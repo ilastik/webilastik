@@ -17,8 +17,8 @@ import numpy as np
 
 from webilastik.annotations.annotation import Annotation
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
-from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksScaleSink
-from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale, RawEncoder
+from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
+from webilastik.datasource.precomputed_chunks_info import RawEncoder
 from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.features.ilp_filter import IlpGaussianSmoothing
 from webilastik.filesystem.osfs import OsFs
@@ -78,24 +78,18 @@ assert not isinstance(classifier, Exception)
 # we will output to neuroglancer's Precomputed Chunks format
 # https://github.com/google/neuroglancer/tree/master/src/neuroglancer/datasource/precomputed
 output_interval: Interval5D = classifier.get_expected_roi(data_source.roi)
-predictions_data_sink = PrecomputedChunksScaleSink(
+predictions_data_sink = PrecomputedChunksSink(
     filesystem=OsFs("/tmp"),
+    path=PurePosixPath("my_exported_data"),
     dtype=np.dtype("float32"),
-    info_dir=PurePosixPath("my_exported_data"),
-    num_channels=classifier.num_classes,
-    scale=PrecomputedChunksScale(
-        key=PurePosixPath("1_1_1"),
-        size=(output_interval.shape.x, output_interval.shape.y, output_interval.shape.z),
-        resolution=(1,1,1),
-        voxel_offset=(output_interval.start.x, output_interval.start.y, output_interval.start.z),
-        chunk_sizes=(
-            (data_source.tile_shape.x, data_source.tile_shape.y, data_source.tile_shape.z),
-        ),
-        encoding=RawEncoder()
-    )
+    encoding=RawEncoder(),
+    interval=output_interval,
+    resolution=(1,1,1),
+    scale_key=PurePosixPath("1_1_1"),
+    tile_shape=data_source.tile_shape,
 )
  #creates info file on disk plus the "my_exported_data" dir, making us ready to write
-sink_writer = predictions_data_sink.create()
+sink_writer = predictions_data_sink.open()
 assert not isinstance(sink_writer, Exception)
 
 # predict on independent tiles. You could run this with e.g. concurrent.futures.Executor

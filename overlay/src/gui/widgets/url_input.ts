@@ -1,5 +1,6 @@
 import { createElement, createInput } from "../../util/misc";
 import { Url } from "../../util/parsed_url";
+import { CssClasses } from "../css_classes";
 
 export class UrlInput{
     public readonly input: HTMLInputElement;
@@ -7,6 +8,16 @@ export class UrlInput{
     constructor(params: {parentElement: HTMLElement, disabled?: boolean}){
         let disabled = params.disabled === undefined ? false : params.disabled
         this.input = createInput({inputType: "url", parentElement: params.parentElement, disabled})
+        this.input.addEventListener("keyup", () => this.validateInput())
+        this.input.addEventListener("focusout", () => this.validateInput())
+
+    }
+
+    private validateInput = () => {
+        this.input.classList.remove(CssClasses.ItkInvalidTextInput)
+        if(this.input.value.trim() !== "" && this.value === undefined){
+            this.input.classList.add(CssClasses.ItkInvalidTextInput)
+        }
     }
 
     public get value(): Url | undefined{

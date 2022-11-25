@@ -1,18 +1,15 @@
 from functools import partial
-from typing import List, Sequence, Mapping, Tuple, Dict, Iterable, Sequence, Any, Optional
-import itertools
+from typing import List, Sequence, Tuple, Dict, Iterable, Sequence, Any
 
 import numpy as np
-from ndstructs.point5D import Interval5D, Point5D, Shape5D
+from ndstructs.point5D import Interval5D, Point5D
 from ndstructs.array5D import Array5D, All, ScalarData, StaticLine
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonArray, ensureJsonInt, ensureJsonObject, ensureJsonString
 
 from webilastik.datasource import DataSource, DataRoi, FsDataSource
 from webilastik.features.feature_extractor import FeatureExtractor, FeatureData
 from executor_getter import get_executor
-from webilastik.server.message_schema import ColorMessage, MessageParsingError, PixelAnnotationMessage
-from webilastik.ui.datasource import try_get_datasources_from_url
-from webilastik.utility.url import Protocol, Url
+from webilastik.server.rpc.dto import ColorDto, MessageParsingError, PixelAnnotationDto
+from webilastik.utility.url import Protocol
 
 
 class Color:
@@ -30,17 +27,8 @@ class Color:
         self.hex_code = f"#{r:02X}{g:02X}{b:02X}"
         super().__init__()
 
-    @classmethod
-    def from_json_data(cls, data: JsonValue) -> "Color":
-        data_dict = ensureJsonObject(data)
-        return Color(
-            r=np.uint8(ensureJsonInt(data_dict.get("r", 0))),
-            g=np.uint8(ensureJsonInt(data_dict.get("g", 0))),
-            b=np.uint8(ensureJsonInt(data_dict.get("b", 0))),
-        )
-
-    def to_message(self) -> ColorMessage:
-        return ColorMessage(r=int(self.r), g=int(self.g), b=int(self.b))
+    def to_dto(self) -> ColorDto:
+        return ColorDto(r=int(self.r), g=int(self.g), b=int(self.b))
 
     @classmethod
     def from_channels(cls, channels: List[np.uint8], name: str = "") -> "Color":
@@ -163,16 +151,6 @@ class Annotation(ScalarData):
         return not np.any(self._data)
 
     @classmethod
-    def from_json_value(cls, data: JsonValue) -> "Annotation":
-        data_dict = ensureJsonObject(data)
-        raw_voxels = ensureJsonArray(data_dict.get("voxels"))
-        voxels : Sequence[Point5D] = [Point5D.from_json_value(raw_voxel) for raw_voxel in raw_voxels]
-
-        raw_data = DataSource.from_json_value(data_dict.get("raw_data"))
-
-        return cls.from_voxels(voxels=voxels, raw_data=raw_data)
-
-    @classmethod
     def from_voxels(cls, voxels: Sequence[Point5D], raw_data: DataSource) -> "Annotation":
         start = Point5D.min_coords(voxels)
         stop = Point5D.max_coords(voxels) + 1  # +1 because slice.stop is exclusive, but max_point isinclusive
@@ -187,9 +165,9 @@ class Annotation(ScalarData):
         return cls(scribblings._data, axiskeys=scribblings.axiskeys, raw_data=raw_data, location=start)
 
     @classmethod
-    def from_message(
+    def from_dto(
         cls,
-        message: PixelAnnotationMessage,
+        message: PixelAnnotationDto,
         allowed_protocols: Sequence[Protocol] = ("http", "https"),
     ) -> "Annotation | MessageParsingError":
         raw_data_result = FsDataSource.try_from_message(message.raw_data, allowed_protocols=allowed_protocols)
@@ -202,13 +180,13 @@ class Annotation(ScalarData):
             raw_data=raw_data_result,
         )
 
-    def to_message(self) -> PixelAnnotationMessage:
+    def to_dto(self) -> PixelAnnotationDto:
         if not isinstance(self.raw_data, FsDataSource):
             #FIXME: maybe create a FsDatasourceAnnotation so we don't have to raise here?
             raise ValueError(f"Can't serialize annotation over {self.raw_data}")
 
-        return PixelAnnotationMessage(
-            raw_data=self.raw_data.to_message(),
+        return PixelAnnotationDto(
+            raw_data=self.raw_data.to_dto(),
             points=self.to_raw_points(),
         )
 
@@ -223,16 +201,6 @@ class Annotation(ScalarData):
         # FIXME: annotation should probably not be an Array6D
         for x, y, z in zip(*self.raw("xyz").nonzero()): # type: ignore
             yield Point5D(x=x, y=y, z=z) + self.location
-
-    def to_json_data(self) -> JsonObject:
-        if not isinstance(self.raw_data, FsDataSource):
-            #FIXME: maybe create a FsDatasourceAnnotation so we don't have to raise here?
-            raise ValueError(f"Can't serialize annotation over {self.raw_data}")
-
-        return {
-            "raw_data": self.raw_data.to_json_value(),
-            "voxels": tuple(vx.to_json_value() for vx in self.to_points()),
-        }
 
     def get_feature_samples(self, feature_extractor: FeatureExtractor) -> FeatureSamples:
         interval_under_annotation = self.interval.updated(c=self.raw_data.interval.c)

@@ -2,7 +2,7 @@ import { createElement, createInput } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
 import { Applet } from '../../client/applets/applet';
 import { Session, IlpFeatureExtractor } from '../../client/ilastik';
-import { AddFeatureExtractorsParamsMessage, FeatureSelectionAppletStateMessage, IlpFeatureExtractorMessage, RemoveFeatureExtractorsParamsMessage } from '../../client/message_schema';
+import { AddFeatureExtractorsParamsDto, FeatureSelectionAppletStateDto, IlpFeatureExtractorDto, RemoveFeatureExtractorsParamsDto } from '../../client/dto';
 
 // class FeatureCheckbox<FE extends FeatureExtractor>{
 //     constructor()
@@ -69,12 +69,12 @@ export class FeatureSelectionWidget extends Applet<{feature_extractors: IlpFeatu
             name,
             session,
             deserializer: (data) => {
-                let message = FeatureSelectionAppletStateMessage.fromJsonValue(data)
+                let message = FeatureSelectionAppletStateDto.fromJsonValue(data)
                 if(message instanceof Error){
                     throw `FIXME!! ${message.message}`
                 }
                 return {
-                    feature_extractors: message.feature_extractors.map(msg => IlpFeatureExtractor.fromMessage(msg))
+                    feature_extractors: message.feature_extractors.map(msg => IlpFeatureExtractor.fromDto(msg))
                 }
             },
             onNewState: (new_state) => this.onNewState(new_state)
@@ -89,7 +89,7 @@ export class FeatureSelectionWidget extends Applet<{feature_extractors: IlpFeatu
         createElement({tagName: 'th', innerHTML: 'Feature / sigma', parentElement: header_row})
         scales.forEach(scale => createElement({tagName: "th", parentElement: header_row, innerHTML: scale.toFixed(1)}))
 
-        let featureNames: Array<IlpFeatureExtractorMessage["class_name"]> = [
+        let featureNames: Array<IlpFeatureExtractorDto["class_name"]> = [
             "Gaussian Smoothing",
             "Laplacian of Gaussian",
             "Gaussian Gradient Magnitude",
@@ -134,8 +134,8 @@ export class FeatureSelectionWidget extends Applet<{feature_extractors: IlpFeatu
             if(extractors_to_add.length > 0){
                 this.doRPC(
                     "add_feature_extractors",
-                    new AddFeatureExtractorsParamsMessage({
-                        feature_extractors: extractors_to_add.map(e => new IlpFeatureExtractorMessage({
+                    new AddFeatureExtractorsParamsDto({
+                        feature_extractors: extractors_to_add.map(e => new IlpFeatureExtractorDto({
                             axis_2d: "z" /*FIXME*/, class_name: e.__class__, ilp_scale: e.ilp_scale
                         }))
                     })
@@ -144,8 +144,8 @@ export class FeatureSelectionWidget extends Applet<{feature_extractors: IlpFeatu
             if(extractors_to_remove.length > 0){
                 this.doRPC(
                     "remove_feature_extractors",
-                    new RemoveFeatureExtractorsParamsMessage({
-                        feature_extractors: extractors_to_remove.map(e => new IlpFeatureExtractorMessage({
+                    new RemoveFeatureExtractorsParamsDto({
+                        feature_extractors: extractors_to_remove.map(e => new IlpFeatureExtractorDto({
                             axis_2d: "z" /*FIXME*/, class_name: e.__class__, ilp_scale: e.ilp_scale
                         }))
                     })

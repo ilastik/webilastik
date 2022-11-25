@@ -1,57 +1,55 @@
 #pyright: strict
 
-import inspect
+import itertools
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar, Dict, Literal, Optional, Sequence, Type, Tuple, Union, Mapping
+from typing import Any, ClassVar, Dict, Literal, Sequence, Type, Union, Mapping
 from pathlib import Path
-from dataclasses import dataclass
 import textwrap
+import ast
+import sys
 
-from ndstructs.point5D import Interval5D, Point5D, Shape5D, itertools
+from webilastik.server.rpc import DataTransferObject
 
+PROJECT_DIR = Path(__file__).parent.parent.parent.parent
 
-GENERATED_TS_FILE_PATH = Path(__file__).parent.parent / "overlay/src/client/message_schema.ts"
+GENERATED_TS_FILE_PATH = PROJECT_DIR / "overlay/src/client/dto.ts"
 GENERATED_TS_FILE_PATH.unlink(missing_ok=True)
 GENERATED_TS_FILE = open(GENERATED_TS_FILE_PATH, "w")
 _ = GENERATED_TS_FILE.write("""
     import {
-      ensureJsonArray,
-      ensureJsonNumber,
-      ensureJsonObject,
-      ensureJsonString,
-      ensureJsonBoolean,
-      ensureJsonUndefined,
+        ensureJsonArray,
+        ensureJsonNumber,
+        ensureJsonObject,
+        ensureJsonString,
+        ensureJsonBoolean,
+        ensureJsonUndefined,
     } from "../util/safe_serialization";
     import {
-      JsonObject,
-      JsonValue,
-      toJsonValue,
+        JsonObject,
+        JsonValue,
+        toJsonValue,
     } from "../util/serialization"
 \n""")
 
-GENERATED_PY_FILE_PATH = Path(__file__).parent.parent / "webilastik/server/message_schema.py"
+GENERATED_PY_FILE_PATH = Path(__file__).parent / "dto.py"
 GENERATED_PY_FILE_PATH.unlink(missing_ok=True)
 GENERATED_PY_FILE = open(GENERATED_PY_FILE_PATH, "w")
 _ = GENERATED_PY_FILE.write(textwrap.dedent(f"""
     # pyright: strict
 
-    # Automatically generated via {Path(__file__).name}. Do not edit!
+    # Automatically generated via {__file__}.
+    # Edit the template file instead of this one!
 
-    from dataclasses import dataclass
-    from typing import Tuple, Optional, Union, List, Literal, Dict, Mapping
     import json
+    from typing import List, Dict
+
+    from ndstructs.point5D import Point5D, Shape5D, Interval5D
 
     from webilastik.serialization.json_serialization import (
         JsonObject, JsonValue, convert_to_json_value
     )
+    from webilastik.server.rpc import DataTransferObject, MessageParsingError
 
-    from ndstructs.point5D import Point5D, Shape5D, Interval5D
-
-    class Message:
-        pass
-
-    class MessageParsingError(Exception):
-        pass
 """))
 
 
@@ -100,13 +98,8 @@ class Hint(ABC):
         if raw_hint in cls.hint_cache:
             return cls.hint_cache[raw_hint]
 
-        if MessageSchemaHint.is_message_schema_hint(raw_hint):
-            hint =  MessageSchemaHint(raw_hint)
-            _ = GENERATED_TS_FILE.write(hint.ts_class_code)
-            _ = GENERATED_TS_FILE.write("\n")
-
-            _ = GENERATED_PY_FILE.write(hint.py_class_code)
-            _ = GENERATED_PY_FILE.write("\n")
+        if DtoHint.is_dto_hint(raw_hint):
+            hint =  DtoHint(raw_hint)
         elif PrimitiveHint.is_primitive(raw_hint):
             hint =  PrimitiveHint(raw_hint)
         elif NTuple.is_n_tuple(raw_hint):
@@ -170,13 +163,13 @@ class MappingHint(Hint):
             py_fromJsonValue_code="\n".join([
                 "from collections.abc import Mapping as AbcMapping",
                 "if not isinstance(value, AbcMapping):",
-               f"    return MessageParsingError(f\"Could not parse {{json.dumps(value)}} as a {py_hint}\")",
-               f"out: Dict[{self.value_hint.py_hint}, {self.value_hint.py_hint}] = {{}}",
+            f"    return MessageParsingError(f\"Could not parse {{json.dumps(value)}} as a {py_hint}\")",
+            f"out: Dict[{self.value_hint.py_hint}, {self.value_hint.py_hint}] = {{}}",
                 "for key, val in value.items():",
-               f"    parsed_key = {self.key_hint.py_fromJsonValue_function.name}(key)",
+            f"    parsed_key = {self.key_hint.py_fromJsonValue_function.name}(key)",
                 "    if isinstance(parsed_key, MessageParsingError):",
                 "        return parsed_key",
-               f"    parsed_val = {self.value_hint.py_fromJsonValue_function.name}(val)",
+            f"    parsed_val = {self.value_hint.py_fromJsonValue_function.name}(val)",
                 "    if isinstance(parsed_val, MessageParsingError):",
                 "        return parsed_val",
                 "    out[parsed_key] = parsed_val",
@@ -185,16 +178,16 @@ class MappingHint(Hint):
             ts_fromJsonValue_code="\n".join([
                 "const valueObj = ensureJsonObject(value);"
                 "if(valueObj instanceof Error){",
-               f"    return valueObj",
+            f"    return valueObj",
                 "}",
-               f"const out: {ts_hint} = {{}}",
+            f"const out: {ts_hint} = {{}}",
                 "for(let key in valueObj){",
-               f"    const parsed_key = {self.key_hint.ts_fromJsonValue_function.name}(key)",
+            f"    const parsed_key = {self.key_hint.ts_fromJsonValue_function.name}(key)",
                 "    if(parsed_key instanceof Error){",
                 "        return parsed_key",
                 "    }",
                 "    const val = valueObj[key]",
-               f"    const parsed_val = {self.value_hint.ts_fromJsonValue_function.name}(val)",
+            f"    const parsed_val = {self.value_hint.ts_fromJsonValue_function.name}(val)",
                 "    if(parsed_val instanceof Error){",
                 "        return parsed_val",
                 "    }",
@@ -220,10 +213,10 @@ class MappingHint(Hint):
         return "\n".join([
             f"((value: {self.ts_hint}): JsonObject => {{",
             f"    const out: {{ [key: {self.key_hint.ts_hint}]: {self.value_hint.ts_hint} }} = {{}};"
-             "    for(let key in value){"
-             "        out[key] = value[key];"
-             "    }"
-             "    return out;"
+            "    for(let key in value){"
+            "        out[key] = value[key];"
+            "    }"
+            "    return out;"
             f"}})({value_expr})",
         ])
 
@@ -281,16 +274,16 @@ class LiteralHint(Hint):
         return value_expr
 
 
-class MessageSchemaHint(Hint):
-    message_generator_type: Type['Message']
+class DtoHint(Hint):
+    message_generator_type: Type['DataTransferObject']
     field_annotations: Mapping[str, Hint]
 
     @staticmethod
-    def is_message_schema_hint(hint: Any) -> bool:
-        return hint.__class__ == type and issubclass(hint, Message)
+    def is_dto_hint(hint: Any) -> bool:
+        return hint.__class__ == type and issubclass(hint, DataTransferObject)
 
     def __init__(self, hint: Any) -> None:
-        assert MessageSchemaHint.is_message_schema_hint(hint)
+        assert DtoHint.is_dto_hint(hint)
         self.message_generator_type = hint
         self.field_annotations = {
             field_name: Hint.parse(raw_hint)
@@ -303,6 +296,8 @@ class MessageSchemaHint(Hint):
             py_fromJsonValue_code="\n".join([
                 "from collections.abc import Mapping",
                 "if not isinstance(value, Mapping):",
+                f"    return MessageParsingError(f\"Could not parse {{json.dumps(value)}} as {self.message_generator_type.__name__}\")",
+                f"if value.get('__class__') != '{self.message_generator_type.__name__}':",
                 f"    return MessageParsingError(f\"Could not parse {{json.dumps(value)}} as {self.message_generator_type.__name__}\")",
                 *list(itertools.chain(*(
                     [
@@ -321,16 +316,19 @@ class MessageSchemaHint(Hint):
                 "if(valueObject instanceof Error){",
                 "    return valueObject;",
                 "}",
+               f"if (valueObject['__class__'] != '{self.message_generator_type.__name__}') {{",
+               f"    return Error(`Could not deserialize ${{JSON.stringify(valueObject)}} as a {self.message_generator_type.__name__}`);",
+               f"}}",
                 *list(itertools.chain(*(
                     [
-                      f"const temp_{field_name} = {hint.ts_fromJsonValue_function.name}(valueObject.{field_name})",
-                      f"if(temp_{field_name} instanceof Error){{ return temp_{field_name}; }}",
+                    f"const temp_{field_name} = {hint.ts_fromJsonValue_function.name}(valueObject.{field_name})",
+                    f"if(temp_{field_name} instanceof Error){{ return temp_{field_name}; }}",
                     ]
                     for field_name, hint in self.field_annotations.items()
                 ))),
-               f"return new {self.message_generator_type.__name__}({{",
-             *[f"    {field_name}: temp_{field_name}," for field_name in self.field_annotations.keys()],
-               f"}})",
+            f"return new {self.message_generator_type.__name__}({{",
+            *[f"    {field_name}: temp_{field_name}," for field_name in self.field_annotations.keys()],
+            f"}})",
             ])
         )
 
@@ -339,43 +337,42 @@ class MessageSchemaHint(Hint):
         #     print("all right... lets see")
 
         self.ts_class_code = "\n".join([
-           f"// Automatically generated via {Message.__qualname__} for {self.message_generator_type.__qualname__}",
+        f"// Automatically generated via {DataTransferObject.__qualname__} for {self.message_generator_type.__qualname__}",
             "// Do not edit!",
-           f"export class {self.message_generator_type.__name__} {{",
+        f"export class {self.message_generator_type.__name__} {{",
 
-         *[f"    public {field_name}: {hint.ts_hint};" for field_name, hint in self.field_annotations.items()],
+        *[f"    public {field_name}: {hint.ts_hint};" for field_name, hint in self.field_annotations.items()],
 
-            "    constructor(params: {",
-         *[f'        {field_name}: {hint.ts_hint},' for field_name, hint in self.field_annotations.items()],
+            "    constructor(_params: {",
+        *[f'        {field_name}: {hint.ts_hint},' for field_name, hint in self.field_annotations.items()],
             "    }) {",
-         *[f'        this.{field_name} = params.{field_name};' for field_name in self.field_annotations.keys()],
+        *[f'        this.{field_name} = _params.{field_name};' for field_name in self.field_annotations.keys()],
             "    }",
 
             "    public toJsonValue(): JsonObject{",
             "        return {",
-         *[f"            {field_name}: " + hint.to_ts_toJsonValue_expr(f"this.{field_name}") + "," for field_name, hint in self.field_annotations.items()],
+           f"            __class__: '{self.message_generator_type.__name__}',",
+        *[f"            {field_name}: " + hint.to_ts_toJsonValue_expr(f"this.{field_name}") + "," for field_name, hint in self.field_annotations.items()],
             "        }",
             "    }",
 
-           f"    public static fromJsonValue(value: JsonValue): {self.ts_hint} | Error{{",
-           f"        return {self.ts_fromJsonValue_function.name}(value)"
-           f"    }}",
+        f"    public static fromJsonValue(value: JsonValue): {self.ts_hint} | Error{{",
+        f"        return {self.ts_fromJsonValue_function.name}(value)"
+        f"    }}",
 
-          f"}}"
+        f"}}"
         ])
 
-        self.py_class_code: str = "\n".join([
-           f"# Automatically generated via {Message.__qualname__} for {self.message_generator_type.__qualname__}",
-            "# Do not edit!",
-            inspect.getsource(self.message_generator_type),
+        self.py_json_methods: str = "\n".join([
             "    def to_json_value(self) -> JsonObject:",
             "        return {",
-         *[f"            '{field_name}': {hint.make_py_to_json_expr('self.' + field_name)}," for field_name, hint in self.field_annotations.items()],
+           f"            '__class__': '{self.message_generator_type.__name__}',",
+        *[f"            '{field_name}': {hint.make_py_to_json_expr('self.' + field_name)}," for field_name, hint in self.field_annotations.items()],
             "        }",
             "",
             "    @classmethod",
-           f"    def from_json_value(cls, value: JsonValue) -> '{self.py_hint} | MessageParsingError':",
-           f"        return {self.py_fromJsonValue_function.name}(value)",
+        f"    def from_json_value(cls, value: JsonValue) -> '{self.py_hint} | MessageParsingError':",
+        f"        return {self.py_fromJsonValue_function.name}(value)",
         ])
 
     def make_py_to_json_expr(self, value_expr: str) -> str:
@@ -406,8 +403,8 @@ class PrimitiveHint(Hint):
             py_hint=py_hint,
             py_fromJsonValue_code="\n".join([
                 f"if isinstance(value, {'type(None)' if self.hint_type in (None, type(None)) else self.hint_type.__name__}):",
-                 "    return value",
-                 "if isinstance(value, int): return float(value);" if self.hint_type == float else "",
+                "    return value",
+                "if isinstance(value, int): return float(value);" if self.hint_type == float else "",
                 f"return MessageParsingError(f\"Could not parse {{json.dumps(value)}} as {py_hint}\")",
             ]),
             ts_fromJsonValue_code=ts_fromJsonValue_code,
@@ -503,24 +500,24 @@ class VarLenTuple(TupleHint):
             py_hint=py_hint,
             ts_hint=ts_hint,
             py_fromJsonValue_code="\n".join([
-                 "if not isinstance(value, (list, tuple)):",
+                "if not isinstance(value, (list, tuple)):",
                 f"    return MessageParsingError(f\"Could not parse {py_hint} from {{json.dumps(value)}}\")",
                 f"items: List[{self.element_type.py_hint}] = []",
                 f"for item in value:",
                 f"    parsed = {self.element_type.py_fromJsonValue_function.name}(item)",
                 f"    if isinstance(parsed, MessageParsingError):",
-                 "        return parsed",
-                 "    items.append(parsed)",
-                 "return tuple(items) ",
+                "        return parsed",
+                "    items.append(parsed)",
+                "return tuple(items) ",
             ]),
             ts_fromJsonValue_code="\n".join([
                 "const arr = ensureJsonArray(value);",
                 "if(arr instanceof Error){"
                 "    return arr",
                 "}",
-               f"const out: {ts_hint} = []",
+            f"const out: {ts_hint} = []",
                 "for(let item of arr){",
-               f"    let parsed_item = {self.element_type.ts_fromJsonValue_function.name}(item);",
+            f"    let parsed_item = {self.element_type.ts_fromJsonValue_function.name}(item);",
                 "    if(parsed_item instanceof Error){"
                 "        return parsed_item;"
                 "    }",
@@ -586,364 +583,30 @@ class UnionHint(Hint):
     def to_ts_toJsonValue_expr(self, value_expr: str) -> str:
         return f"toJsonValue({value_expr})"
 
-##############################################################################
 
+source = open(Path(__file__).parent / "dto.template.py").read()
+exec(source)
+root = ast.parse(source)
 
-class Message:
-    def __init_subclass__(cls):
-        super().__init_subclass__()
-        _ = Hint.parse(cls)
+for item in root.body:
+    if not isinstance(item, ast.ClassDef):
+        _ = GENERATED_PY_FILE.write((ast.get_source_segment(source, item) or "") + "\n\n")
+        continue
 
-@dataclass
-class ColorMessage(Message):
-    r: int
-    g: int
-    b: int
+    klass: Type[Any] = sys.modules[__name__].__dict__[item.name]
+    if not issubclass(klass, DataTransferObject):
+        continue
 
-@dataclass
-class LabelHeaderMessage(Message):
-    name: str
-    color: ColorMessage
+    hint = Hint.parse(klass)
+    assert isinstance(hint, DtoHint)
+    for decorator in item.decorator_list:
+        _ = GENERATED_PY_FILE.write(f"@" + (ast.get_source_segment(source, decorator) or "") + "\n")
+    _ = GENERATED_PY_FILE.write(ast.get_source_segment(source, item) or "")
+    _ = GENERATED_PY_FILE.write("\n\n")
 
-@dataclass
-class UrlMessage(Message):
-    datascheme: Optional[Literal["precomputed"]]
-    protocol: Literal["http", "https", "file", "memory"]
-    hostname: str
-    port: Optional[int]
-    path: str
-    search: Optional[Mapping[str, str]]
-    fragment: Optional[str]
+    _ = GENERATED_PY_FILE.write(hint.py_json_methods)
+    _ = GENERATED_PY_FILE.write("\n\n")
 
-@dataclass
-class Point5DMessage(Message):
-    x: int
-    y: int
-    z: int
-    t: int
-    c: int
+    _ = GENERATED_TS_FILE.write(hint.ts_class_code)
+    _ = GENERATED_TS_FILE.write("\n\n")
 
-    @classmethod
-    def from_point5d(cls, point: Point5D) -> "Point5DMessage":
-        return Point5DMessage(
-            x=point.x,
-            y=point.y,
-            z=point.z,
-            t=point.t,
-            c=point.c,
-        )
-
-@dataclass
-class Shape5DMessage(Point5DMessage):
-    @classmethod
-    def from_shape5d(cls, shape: Shape5D) -> "Shape5DMessage":
-        return Shape5DMessage(
-            x=shape.x,
-            y=shape.y,
-            z=shape.z,
-            t=shape.t,
-            c=shape.c,
-        )
-
-@dataclass
-class Interval5DMessage(Message):
-    start: Point5DMessage
-    stop: Point5DMessage
-
-    @classmethod
-    def from_interval5d(cls, interval: Interval5D) -> 'Interval5DMessage':
-        return Interval5DMessage(
-            start=Point5DMessage.from_point5d(interval.start),
-            stop=Point5DMessage.from_point5d(interval.stop)
-        )
-
-@dataclass
-class OsfsMessage(Message):
-    path: str
-
-@dataclass
-class HttpFsMessage(Message):
-    protocol: Literal["http", "https"]
-    hostname: str
-    port: Optional[int]
-    path: str
-    search: Optional[Mapping[str, str]]
-    # fragment: Optional[str]
-
-@dataclass
-class BucketFSMessage(Message):
-    bucket_name: str
-    prefix: str
-
-@dataclass
-class DataSourceMessage(Message):
-    url: UrlMessage
-    interval: Interval5DMessage
-    tile_shape: Shape5DMessage
-    spatial_resolution: Tuple[int, int, int]
-
-@dataclass
-class PrecomputedChunksScaleMessage(Message):
-    key: str #???????????????
-    size: Tuple[int, int, int]
-    resolution: Tuple[int, int, int]
-    voxel_offset: Tuple[int, int, int]
-    chunk_sizes: Tuple[Tuple[int, int, int], ...]
-    encoding: Literal["raw", "jpeg"]
-
-@dataclass
-class PrecomputedChunksScaleSinkMessage(Message):
-    filesystem: Union[OsfsMessage, HttpFsMessage, BucketFSMessage]
-    info_dir: str #??????????????
-    scale: PrecomputedChunksScaleMessage
-    dtype: Literal["uint8", "uint16", "uint32", "uint64", "float32"]
-    num_channels: int
-
-@dataclass
-class PixelAnnotationMessage(Message):
-    raw_data: DataSourceMessage
-    points: Tuple[Tuple[int, int, int], ...]
-
-######################################################################
-
-@dataclass
-class RpcErrorMessage(Message):
-    error: str
-
-#################################################################
-@dataclass
-class RecolorLabelParams(Message):
-    label_name: str
-    new_color: ColorMessage
-
-@dataclass
-class RenameLabelParams(Message):
-    old_name: str
-    new_name: str
-
-@dataclass
-class CreateLabelParams(Message):
-    label_name: str
-    color: ColorMessage
-
-@dataclass
-class RemoveLabelParams(Message):
-    label_name: str
-
-@dataclass
-class AddPixelAnnotationParams(Message):
-    label_name: str
-    pixel_annotation: PixelAnnotationMessage
-
-@dataclass
-class RemovePixelAnnotationParams(Message):
-    label_name: str
-    pixel_annotation: PixelAnnotationMessage
-
-@dataclass
-class LabelMessage(Message):
-    name: str
-    color: ColorMessage
-    annotations: Tuple[PixelAnnotationMessage, ...]
-
-@dataclass
-class BrushingAppletStateMessage(Message):
-    labels: Tuple[LabelMessage, ...]
-
-##############################################3333
-
-@dataclass
-class ViewMessage(Message):
-    name: str
-    url: UrlMessage
-
-@dataclass
-class DataView(ViewMessage):
-    pass
-
-@dataclass
-class RawDataViewMessage(ViewMessage):
-    datasources: Tuple[DataSourceMessage, ...]
-
-@dataclass
-class StrippedPrecomputedViewMessage(ViewMessage):
-    datasource: DataSourceMessage
-
-@dataclass
-class PredictionsViewMessage(ViewMessage):
-    raw_data: DataSourceMessage
-    classifier_generation: int
-
-@dataclass
-class FailedViewMessage(ViewMessage):
-    error_message: str
-
-@dataclass
-class UnsupportedDatasetViewMessage(ViewMessage):
-    pass
-
-DataViewUnion = Union[RawDataViewMessage, StrippedPrecomputedViewMessage, FailedViewMessage, UnsupportedDatasetViewMessage]
-
-@dataclass
-class ViewerAppletStateMessage(Message):
-    frontend_timestamp: int
-    data_views: Tuple[Union[RawDataViewMessage, StrippedPrecomputedViewMessage, FailedViewMessage, UnsupportedDatasetViewMessage], ...]
-    prediction_views: Tuple[PredictionsViewMessage, ...]
-    label_colors: Tuple[ColorMessage, ...]
-
-@dataclass
-class MakeDataViewParams(Message):
-    view_name: str
-    url: UrlMessage
-
-##################################################3
-
-@dataclass
-class JobMessage(Message):
-    name: str
-    num_args: Optional[int]
-    uuid: str
-    status: Literal["pending", "running", "cancelled", "failed", "succeeded"]
-    num_completed_steps: int
-    error_message: Optional[str]
-
-@dataclass
-class PixelClassificationExportAppletStateMessage(Message):
-    jobs: Tuple[JobMessage, ...]
-    populated_labels: Optional[Tuple[LabelHeaderMessage, ...]]
-    datasource_suggestions: Optional[Tuple[DataSourceMessage, ...]]
-
-#########################################################
-
-@dataclass
-class IlpFeatureExtractorMessage(Message):
-    ilp_scale: float
-    axis_2d: Optional[Literal["x", "y", "z"]]
-    class_name: Literal[
-        "Gaussian Smoothing",
-        "Laplacian of Gaussian",
-        "Gaussian Gradient Magnitude",
-        "Difference of Gaussians",
-        "Structure Tensor Eigenvalues",
-        "Hessian of Gaussian Eigenvalues"
-    ]
-
-@dataclass
-class FeatureSelectionAppletStateMessage(Message):
-    feature_extractors: Tuple[IlpFeatureExtractorMessage, ...]
-
-@dataclass
-class AddFeatureExtractorsParamsMessage(Message):
-    feature_extractors: Tuple[IlpFeatureExtractorMessage, ...]
-
-@dataclass
-class RemoveFeatureExtractorsParamsMessage(Message):
-    feature_extractors: Tuple[IlpFeatureExtractorMessage, ...]
-
-#################################################################
-
-
-@dataclass
-class ComputeSessionMessage(Message):
-    start_time_utc_sec: Optional[int]
-    time_elapsed_sec: int
-    time_limit_minutes: int
-    num_nodes: int
-    compute_session_id: str
-    state: Literal[
-        "BOOT_FAIL",
-        "CANCELLED",
-        "COMPLETED",
-        "DEADLINE",
-        "FAILED",
-        "NODE_FAIL",
-        "OUT_OF_MEMORY",
-        "PENDING",
-        "PREEMPTED",
-        "RUNNING",
-        "REQUEUED",
-        "RESIZING",
-        "REVOKED",
-        "SUSPENDED",
-        "TIMEOUT",
-    ]
-
-@dataclass
-class ComputeSessionStatusMessage(Message):
-    compute_session: ComputeSessionMessage
-    hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
-    session_url: UrlMessage
-    connected: bool
-
-@dataclass
-class CreateComputeSessionParamsMessage(Message):
-    session_duration_minutes: int
-    hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
-
-@dataclass
-class GetComputeSessionStatusParamsMessage(Message):
-    compute_session_id: str
-    hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
-
-@dataclass
-class CloseComputeSessionParamsMessage(Message):
-    compute_session_id: str
-    hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
-
-@dataclass
-class CloseComputeSessionResponseMessage(Message):
-    compute_session_id: str
-
-@dataclass
-class ListComputeSessionsParamsMessage(Message):
-    hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
-
-@dataclass
-class ListComputeSessionsResponseMessage(Message):
-    compute_sessions_stati: Tuple[ComputeSessionStatusMessage, ...]
-
-@dataclass
-class GetAvailableHpcSitesResponseMessage(Message):
-    available_sites: Tuple[Literal["LOCAL", "CSCS", "JUSUF"], ...]
-
-#############################################################3
-
-@dataclass
-class CheckLoginResultMessage(Message):
-    logged_in: bool
-
-#############################################3333
-
-@dataclass
-class StartExportJobParamsMessage(Message):
-    datasource: DataSourceMessage
-    datasink: PrecomputedChunksScaleSinkMessage
-
-@dataclass
-class StartSimpleSegmentationExportJobParamsMessage(Message):
-    datasource: DataSourceMessage
-    datasink: PrecomputedChunksScaleSinkMessage
-    label_header: LabelHeaderMessage
-
-############################################
-
-@dataclass
-class LoadProjectParamsMessage(Message):
-    fs: Union[HttpFsMessage, BucketFSMessage, OsfsMessage]
-    project_file_path: str
-
-
-@dataclass
-class SaveProjectParamsMessage(Message):
-    fs: Union[HttpFsMessage, BucketFSMessage, OsfsMessage]
-    project_file_path: str
-
-#########################################
-
-@dataclass
-class GetDatasourcesFromUrlParamsMessage(Message):
-    url: UrlMessage
-
-@dataclass
-class GetDatasourcesFromUrlResponseMessage(Message):
-    datasources: Tuple[DataSourceMessage, ...]

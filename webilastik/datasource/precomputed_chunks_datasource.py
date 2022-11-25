@@ -3,16 +3,19 @@ from pathlib import PurePosixPath
 import json
 import logging
 
-from ndstructs.point5D import Point5D, Shape5D, Interval5D
-from ndstructs.array5D import Array5D
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonIntTripplet, ensureJsonObject, ensureJsonString
-from fs.errors import ResourceNotFound
 import numpy as np
 
+from ndstructs.point5D import Shape5D, Interval5D
+from ndstructs.array5D import Array5D
+from ndstructs.utils.json_serializable import ensureJsonIntTripplet
+from fs.errors import ResourceNotFound
+
 from webilastik.datasource import FsDataSource
-from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale5D
-from webilastik.filesystem import JsonableFilesystem
+from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksEncoder, PrecomputedChunksInfo
+from webilastik.filesystem import Filesystem
 from webilastik.utility.url import Url
+from webilastik.server.rpc.dto import Interval5DDto, PrecomputedChunksDataSourceDto, Shape5DDto, dtype_to_dto
+
 
 logger = logging.getLogger(__name__)
 
@@ -20,35 +23,18 @@ class PrecomputedChunksDataSource(FsDataSource):
     def __init__(
         self,
         *,
+        filesystem: Filesystem,
         path: PurePosixPath,
-        resolution: Tuple[int, int, int],
-        location: Optional[Point5D] = None,
-        chunk_size: Optional[Shape5D] = None,
-        filesystem: JsonableFilesystem,
-        scale_and_dtype: "Tuple[PrecomputedChunksScale5D, np.dtype[Any]] | None" = None,
+        scale_key: PurePosixPath,
+        tile_shape: Shape5D,
+        interval: Interval5D,
+        dtype: "np.dtype[Any]",
+        spatial_resolution: Tuple[int, int, int],
+        encoding: PrecomputedChunksEncoder,
     ):
-        self.path = path
-        self.filesystem = filesystem
-        if scale_and_dtype is None:
-            with self.filesystem.openbin(path.joinpath("info").as_posix(), "r") as f:
-                info_json = f.read().decode("utf8")
-            print(f"Got this info from a precomputed chunks:")
-            print(info_json)
-            info = PrecomputedChunksInfo.from_json_value(json.loads(info_json))
-            self.scale = info.get_scale_5d(resolution=resolution)
-            dtype = info.data_type
-        else:
-            self.scale, dtype = scale_and_dtype
-
-        if chunk_size:
-            if chunk_size not in self.scale.chunk_sizes_5d:
-                raise ValueError(f"Bad chunk size: {chunk_size}. Available are: {self.scale.chunk_sizes}")
-            tile_shape = chunk_size
-        else:
-            tile_shape = self.scale.chunk_sizes_5d[0]
-
-        base_url = Url.parse(filesystem.geturl(path.as_posix()))
-        assert base_url is not None
+        self.encoding = encoding
+        self.scale_key = scale_key
+        self.scale_path = path / PurePosixPath("/").joinpath(self.scale_key).as_posix().lstrip("/")
         super().__init__(
             # "The (...) data (...) chunk is stored directly in little-endian binary format in [x, y, z, channel] Fortran order"
             c_axiskeys_on_disk="xyzc"[::-1],
@@ -56,8 +42,73 @@ class PrecomputedChunksDataSource(FsDataSource):
             path=path,
             tile_shape=tile_shape,
             dtype=dtype,
-            interval=self.scale.shape.to_interval5d(location or self.scale.location),
-            spatial_resolution=self.scale.resolution, #FIXME: maybe delete this altogether?
+            interval=interval,
+            spatial_resolution=spatial_resolution, #FIXME: maybe delete this altogether?
+        )
+
+    @classmethod
+    def try_load(
+        cls,
+        *,
+        filesystem: Filesystem,
+        path: PurePosixPath,
+        spatial_resolution: Tuple[int, int, int],
+        chunk_size: Optional[Shape5D] = None,
+    ) -> "PrecomputedChunksDataSource | Exception":
+        try:
+            print("Opening precomputed chunks info.....")
+            with filesystem.openbin(path.joinpath("info").as_posix(), "r") as f:
+                info_json = f.read().decode("utf8")
+        except Exception as e:
+            return e
+
+        info = PrecomputedChunksInfo.from_json_value(json.loads(info_json))
+        scale = info.get_scale_5d(resolution=spatial_resolution)
+        if isinstance(scale, Exception):
+            return scale
+        if chunk_size:
+            if chunk_size not in scale.chunk_sizes_5d:
+                return ValueError(f"Bad chunk size: {chunk_size}. Available are: {scale.chunk_sizes}")
+            tile_shape = chunk_size
+        else:
+            tile_shape = scale.chunk_sizes_5d[0]
+
+        return PrecomputedChunksDataSource(
+            dtype=info.data_type,
+            encoding=scale.encoding,
+            filesystem=filesystem,
+            path=path,
+            interval=scale.interval,
+            scale_key=scale.key,
+            spatial_resolution=spatial_resolution,
+            tile_shape=tile_shape,
+        )
+
+
+    def to_dto(self) -> PrecomputedChunksDataSourceDto:
+        return PrecomputedChunksDataSourceDto(
+            url=self.url.to_dto(),
+            filesystem=self.filesystem.to_dto(),
+            path=self.path.as_posix(),
+            scale_key=self.scale_key.as_posix(),
+            interval=Interval5DDto.from_interval5d(self.interval),
+            spatial_resolution=self.spatial_resolution,
+            tile_shape=Shape5DDto.from_shape5d(self.tile_shape),
+            dtype=dtype_to_dto(self.dtype),
+            encoder=self.encoding.to_dto(),
+        )
+
+    @staticmethod
+    def from_dto(dto: PrecomputedChunksDataSourceDto) -> "PrecomputedChunksDataSource":
+        return PrecomputedChunksDataSource(
+            filesystem=Filesystem.create_from_message(dto.filesystem),
+            path=PurePosixPath(dto.path),
+            scale_key=PurePosixPath(dto.scale_key),
+            dtype=np.dtype(dto.dtype),
+            interval=dto.interval.to_interval5d(),
+            encoding=PrecomputedChunksEncoder.from_dto(dto.encoder),
+            spatial_resolution=dto.spatial_resolution,
+            tile_shape=dto.tile_shape.to_shape5d(),
         )
 
     @property
@@ -74,7 +125,7 @@ class PrecomputedChunksDataSource(FsDataSource):
         if not cls.supports_url(url):
             return Exception(f"Unsupported url: {url}")
         fs_url = url.parent.schemeless().hashless()
-        fs_result = JsonableFilesystem.from_url(url=fs_url)
+        fs_result = Filesystem.from_url(url=fs_url)
         if isinstance(fs_result, Exception):
             return fs_result
         fs = fs_result
@@ -88,8 +139,17 @@ class PrecomputedChunksDataSource(FsDataSource):
         resolution_str = url.get_hash_params().get("resolution")
         if resolution_str is None:
             return [
-                PrecomputedChunksDataSource(filesystem=fs_result, path=path, resolution=scale.resolution)
-                for scale in info.scales
+                PrecomputedChunksDataSource(
+                    filesystem=fs_result,
+                    path=path,
+                    scale_key=scale.key,
+                    encoding=scale.encoding,
+                    dtype=info.data_type,
+                    interval=scale.interval,
+                    spatial_resolution=scale.resolution,
+                    tile_shape=scale.chunk_sizes_5d[0],
+                )
+                for scale in info.scales_5d
             ]
         try:
             resolution_tripplet = ensureJsonIntTripplet(tuple(int(axis) for axis in resolution_str.split("_")))
@@ -98,70 +158,41 @@ class PrecomputedChunksDataSource(FsDataSource):
         resolution_options = [scale.resolution for scale in info.scales]
         if resolution_tripplet not in resolution_options:
             return Exception(f"Bad 'resolution' tripplet in url: {url}. Options are {resolution_options}")
-        return [PrecomputedChunksDataSource(filesystem=fs, path=path, resolution=resolution_tripplet)]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            **super().to_json_value(),
-            "scale": self.scale.to_json_value(),
-        }
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "PrecomputedChunksDataSource":
-        value_obj = ensureJsonObject(value)
-        raw_location = value_obj.get("location")
-        raw_chunk_size = value_obj.get("chunk_size")
-        raw_scale = ensureJsonObject(value_obj.get("scale"))
-        shape = Shape5D.from_json_value(value_obj.get("shape"))
-        scale = PrecomputedChunksScale5D.from_json_value(
-            {**raw_scale, "num_channels": shape.c}
-        )
-        dtype = np.dtype(ensureJsonString(value_obj.get("dtype")))
-        return PrecomputedChunksDataSource(
-            path=PurePosixPath(ensureJsonString(value_obj.get("path"))),
-            resolution=ensureJsonIntTripplet(value_obj.get("spatial_resolution")), # FIXME? change to just resolution?
-            location=None if raw_location is None else Point5D.from_json_value(raw_location),
-            chunk_size=None if raw_chunk_size is None else Shape5D.from_json_value(raw_chunk_size),
-            filesystem=JsonableFilesystem.from_json_value(value_obj.get("filesystem")),
-            scale_and_dtype=(scale, dtype),
-        )
+        scale_result = info.get_scale_5d(resolution_tripplet)
+        if isinstance(scale_result, Exception):
+            return scale_result
+        return [
+            PrecomputedChunksDataSource(
+                filesystem=fs,
+                path=path,
+                interval=scale_result.interval,
+                dtype=info.data_type,
+                encoding=scale_result.encoding,
+                scale_key=scale_result.key,
+                spatial_resolution=resolution_tripplet,
+                tile_shape=scale_result.chunk_sizes_5d[0],
+            )
+        ]
 
     def __hash__(self) -> int:
-        return hash((self.url, self.scale.key, self.location))
+        return hash((self.url, self.scale_key, self.interval))
 
     def __eq__(self, other: object) -> bool:
         return (
             isinstance(other, PrecomputedChunksDataSource) and
-            self.url == other.url and
-            self.scale.key == other.scale.key and
-            self.location == other.location
+            super().__eq__(other) and
+            self.encoding == other.encoding and
+            self.scale_key == other.scale_key
         )
 
     def _get_tile(self, tile: Interval5D) -> Array5D:
-        if self.location != self.scale.voxel_offset:
-            tile = tile.translated(-self.location).translated(self.scale.location)
-        tile_path = self.path / self.scale.get_tile_path(tile)
+        assert tile.is_tile(tile_shape=self.tile_shape, full_interval=self.interval, clamped=True), f"Bad tile: {tile}"
+        tile_path = self.scale_path / f"{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_{tile.z[0]}-{tile.z[1]}"
         try:
             with self.filesystem.openbin(tile_path.as_posix()) as f:
                 raw_tile_bytes = f.read()
-            tile_5d = self.scale.encoding.decode(roi=tile, dtype=self.dtype, raw_chunk=raw_tile_bytes)
+            tile_5d = self.encoding.decode(roi=tile, dtype=self.dtype, raw_chunk=raw_tile_bytes)
         except ResourceNotFound:
             logger.warn(f"tile {tile} not found. Returning zeros")
             tile_5d = Array5D.allocate(interval=tile, dtype=self.dtype, value=0)
         return tile_5d
-
-    def __getstate__(self) -> JsonObject:
-        return self.to_json_value()
-
-    def __setstate__(self, data: JsonValue):
-        ds = PrecomputedChunksDataSource.from_json_value(data)
-        return self.__init__(
-            path=ds.path,
-            resolution=ds.spatial_resolution,
-            location=ds.location,
-            chunk_size=ds.tile_shape,
-            filesystem=ds.filesystem,
-            scale_and_dtype=(ds.scale, ds.dtype),
-        )
-
-FsDataSource.datasource_from_json_constructors[PrecomputedChunksDataSource.__name__] = PrecomputedChunksDataSource.from_json_value

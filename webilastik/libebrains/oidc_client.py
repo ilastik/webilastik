@@ -2,7 +2,6 @@
 
 from pathlib import PurePosixPath
 from typing import Optional, Set, Iterable
-import os
 import enum
 import uuid
 
@@ -58,12 +57,6 @@ class OidcClient:
         self.client_id: str = client_id
         self.client_secret: str = client_secret
         super().__init__()
-
-    @classmethod
-    def from_environment(cls) -> "OidcClient":
-        EBRAINS_CLIENT_ID = os.environ["EBRAINS_CLIENT_ID"]
-        EBRAINS_CLIENT_SECRET = os.environ["EBRAINS_CLIENT_SECRET"]
-        return OidcClient(client_id=EBRAINS_CLIENT_ID, client_secret=EBRAINS_CLIENT_SECRET)
 
     def create_user_login_url(self, *, redirect_uri: Url, scopes: Optional[Set["Scope"]] = None, state: Optional[str] = None) -> Url:
         scopes = scopes or set()

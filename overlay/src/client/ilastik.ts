@@ -1,38 +1,39 @@
 import { vec3 } from "gl-matrix"
-import { INativeView } from "../drivers/viewer_driver"
-import { fetchJson, sleep } from "../util/misc"
-import { Url } from "../util/parsed_url"
+import { assertUnreachable, fetchJson, sleep } from "../util/misc"
+import { Path, Url } from "../util/parsed_url"
+import { DataType, ensureDataType } from "../util/precomputed_chunks"
 import {
-    ensureJsonObject, ensureJsonString, JsonableValue, JsonValue, toJsonValue
+    ensureJsonObject, ensureJsonString, JsonableValue, toJsonValue
 } from "../util/serialization"
 import {
-    CheckLoginResultMessage,
-    CloseComputeSessionParamsMessage,
-    ColorMessage,
-    ComputeSessionStatusMessage,
-    CreateComputeSessionParamsMessage,
-    DataSourceMessage,
-    FailedViewMessage,
-    GetAvailableHpcSitesResponseMessage,
-    GetComputeSessionStatusParamsMessage,
-    GetDatasourcesFromUrlParamsMessage,
-    GetDatasourcesFromUrlResponseMessage,
-    IlpFeatureExtractorMessage,
-    Interval5DMessage,
-    ListComputeSessionsParamsMessage,
-    ListComputeSessionsResponseMessage,
-    LoadProjectParamsMessage,
-    MakeDataViewParams,
-    Point5DMessage,
-    PredictionsViewMessage,
-    RawDataViewMessage,
-    SaveProjectParamsMessage,
-    Shape5DMessage,
-    StrippedPrecomputedViewMessage,
-    UnsupportedDatasetViewMessage
-} from "./message_schema"
+    BucketFSDto,
+    CheckLoginResultDto,
+    CloseComputeSessionParamsDto,
+    ColorDto,
+    ComputeSessionStatusDto,
+    CreateComputeSessionParamsDto,
+    PrecomputedChunksDataSourceDto,
+    GetAvailableHpcSitesResponseDto,
+    GetComputeSessionStatusParamsDto,
+    GetDatasourcesFromUrlParamsDto,
+    GetDatasourcesFromUrlResponseDto,
+    HttpFsDto,
+    IlpFeatureExtractorDto,
+    Interval5DDto,
+    ListComputeSessionsParamsDto,
+    ListComputeSessionsResponseDto,
+    LoadProjectParamsDto,
+    OsfsDto,
+    Point5DDto,
+    PrecomputedChunksSinkDto,
+    SaveProjectParamsDto,
+    Shape5DDto,
+    N5DataSinkDto,
+    N5DataSourceDto,
+    SkimageDataSourceDto
+} from "./dto"
 
-export type HpcSiteName = ComputeSessionStatusMessage["hpc_site"] //FIXME?
+export type HpcSiteName = ComputeSessionStatusDto["hpc_site"] //FIXME?
 
 export const SESSION_DONE_STATES = [
     "BOOT_FAIL",
@@ -49,14 +50,14 @@ export const SESSION_DONE_STATES = [
 
 export class Session{
     public readonly ilastikUrl: Url
-    public readonly sessionStatus: ComputeSessionStatusMessage
+    public readonly sessionStatus: ComputeSessionStatusDto
     private websocket: WebSocket
     private messageHandlers = new Array<(ev: MessageEvent) => void>();
     private readonly onUsageError: (message: string) => void
 
     protected constructor(params: {
         ilastikUrl: Url,
-        sessionStatus: ComputeSessionStatusMessage,
+        sessionStatus: ComputeSessionStatusDto,
         onUsageError: (message: string) => void,
     }){
         this.ilastikUrl = params.ilastikUrl
@@ -66,7 +67,7 @@ export class Session{
     }
 
     public get sessionUrl(): Url{
-        return Url.fromMessage(this.sessionStatus.session_url)
+        return Url.fromDto(this.sessionStatus.session_url)
     }
 
     public get startTime(): Date | undefined{
@@ -134,7 +135,7 @@ export class Session{
         return true
     }
 
-    public async saveProject(params: SaveProjectParamsMessage): Promise<Error | undefined>{
+    public async saveProject(params: SaveProjectParamsDto): Promise<Error | undefined>{
         let response = await fetch(
             this.sessionUrl.joinPath("save_project").schemeless_raw,
             {
@@ -147,7 +148,7 @@ export class Session{
         return Error(`Could not save project: ${await response.text()}`)
     }
 
-    public async loadProject(params: LoadProjectParamsMessage): Promise<Error | undefined>{
+    public async loadProject(params: LoadProjectParamsDto): Promise<Error | undefined>{
         let response = await fetch(
             this.sessionUrl.joinPath("load_project").schemeless_raw,
             {
@@ -176,7 +177,7 @@ export class Session{
         return atob(encoded.replace("-", "+").replace("_", "/"))
     }
 
-    public static async check_login({ilastikUrl}: {ilastikUrl: Url}): Promise<CheckLoginResultMessage | Error>{
+    public static async check_login({ilastikUrl}: {ilastikUrl: Url}): Promise<CheckLoginResultDto | Error>{
         let response = await fetchJson(ilastikUrl.joinPath("/api/check_login").raw, {
             credentials: "include",
             cache: "no-store",
@@ -184,10 +185,10 @@ export class Session{
         if(response instanceof Error){
             return response
         }
-        return CheckLoginResultMessage.fromJsonValue(response)
+        return CheckLoginResultDto.fromJsonValue(response)
     }
 
-    public static async getStatus(params: {ilastikUrl: Url, rpcParams: GetComputeSessionStatusParamsMessage}): Promise<ComputeSessionStatusMessage | Error>{
+    public static async getStatus(params: {ilastikUrl: Url, rpcParams: GetComputeSessionStatusParamsDto}): Promise<ComputeSessionStatusDto | Error>{
         let result = await fetchJson(
             params.ilastikUrl.joinPath(`/api/get_session_status`).raw,
             {
@@ -199,10 +200,10 @@ export class Session{
         if(result instanceof Error){
             return result
         }
-        return ComputeSessionStatusMessage.fromJsonValue(result)
+        return ComputeSessionStatusDto.fromJsonValue(result)
     }
 
-    public static async listSessions(params: {ilastikUrl: Url, rpcParams: ListComputeSessionsParamsMessage}): Promise<ListComputeSessionsResponseMessage | Error>{
+    public static async listSessions(params: {ilastikUrl: Url, rpcParams: ListComputeSessionsParamsDto}): Promise<ListComputeSessionsResponseDto | Error>{
         let payload_result = await fetchJson(
             params.ilastikUrl.joinPath("/api/list_sessions").raw,
             {
@@ -214,10 +215,10 @@ export class Session{
         if(payload_result instanceof Error){
             return payload_result
         }
-        return ListComputeSessionsResponseMessage.fromJsonValue(payload_result)
+        return ListComputeSessionsResponseDto.fromJsonValue(payload_result)
     }
 
-    public static async getAvailableHpcSites(params: {ilastikUrl: Url}): Promise<GetAvailableHpcSitesResponseMessage | Error>{
+    public static async getAvailableHpcSites(params: {ilastikUrl: Url}): Promise<GetAvailableHpcSitesResponseDto | Error>{
         let payload_result = await fetchJson(
             params.ilastikUrl.joinPath("/api/get_available_hpc_sites").raw,
             {
@@ -228,7 +229,7 @@ export class Session{
         if(payload_result instanceof Error){
             return payload_result
         }
-        return GetAvailableHpcSitesResponseMessage.fromJsonValue(payload_result)
+        return GetAvailableHpcSitesResponseDto.fromJsonValue(payload_result)
     }
 
     public static getEbrainsToken(): string | undefined{
@@ -238,7 +239,7 @@ export class Session{
 
     public static async create(params: {
         ilastikUrl: Url,
-        rpcParams: CreateComputeSessionParamsMessage,
+        rpcParams: CreateComputeSessionParamsDto,
         timeout_minutes: number,
         onProgress?: (message: string) => void,
         onUsageError: (message: string) => void,
@@ -259,14 +260,14 @@ export class Session{
         if(!session_creation_response.ok){
             return Error(`Requesting session failed (${session_creation_response.status}): ${await session_creation_response.text()}`)
         }
-        const sessionStatusMsg = ComputeSessionStatusMessage.fromJsonValue(await session_creation_response.json())
+        const sessionStatusMsg = ComputeSessionStatusDto.fromJsonValue(await session_creation_response.json())
         if(sessionStatusMsg instanceof Error){
             return sessionStatusMsg
         }
         onProgress(`Successfully requested a session! Waiting for it to be ready...`)
         return Session.load({
             ilastikUrl: params.ilastikUrl,
-            getStatusRpcParams: new GetComputeSessionStatusParamsMessage({
+            getStatusRpcParams: new GetComputeSessionStatusParamsDto({
                 compute_session_id: sessionStatusMsg.compute_session.compute_session_id,
                 hpc_site: params.rpcParams.hpc_site,
             }),
@@ -279,7 +280,7 @@ export class Session{
 
     public static async load(params: {
         ilastikUrl: Url,
-        getStatusRpcParams: GetComputeSessionStatusParamsMessage,
+        getStatusRpcParams: GetComputeSessionStatusParamsDto,
         timeout_minutes: number,
         onProgress?: (message: string) => void,
         onUsageError: (message: string) => void,
@@ -323,7 +324,7 @@ export class Session{
             onProgress(`Cancelling session ${params.getStatusRpcParams.compute_session_id}`)
             const cancellation_result = await Session.cancel({
                 ilastikUrl: params.ilastikUrl,
-                rpcParams: new CloseComputeSessionParamsMessage({
+                rpcParams: new CloseComputeSessionParamsDto({
                     compute_session_id: params.getStatusRpcParams.compute_session_id,
                     hpc_site: params.getStatusRpcParams.hpc_site,
                 })
@@ -337,7 +338,7 @@ export class Session{
         return Error(`Could not create a session: timeout`)
     }
 
-    public static async cancel(params: {ilastikUrl: Url, rpcParams: CloseComputeSessionParamsMessage}): Promise<Error | undefined>{
+    public static async cancel(params: {ilastikUrl: Url, rpcParams: CloseComputeSessionParamsDto}): Promise<Error | undefined>{
         let result = await fetchJson(
             params.ilastikUrl.joinPath(`api/close_session`).raw,
             {
@@ -351,7 +352,7 @@ export class Session{
         return undefined
     }
 
-    public async getDatasourcesFromUrl(params: GetDatasourcesFromUrlParamsMessage): Promise<Array<DataSource> | Error>{
+    public async getDatasourcesFromUrl(params: GetDatasourcesFromUrlParamsDto): Promise<Array<FsDataSource> | undefined | Error>{
         let result = await fetchJson(this.sessionUrl.joinPath("get_datasources_from_url").raw, {
             method: "POST",
             body: JSON.stringify(toJsonValue(params)),
@@ -360,30 +361,18 @@ export class Session{
         if(result instanceof Error){
             return result
         }
-        const responseMessage =  GetDatasourcesFromUrlResponseMessage.fromJsonValue(result);
-        if(responseMessage instanceof Error){
-            return responseMessage
+        const responseDto =  GetDatasourcesFromUrlResponseDto.fromJsonValue(result);
+        if(responseDto instanceof Error){
+            return responseDto
         }
-        return responseMessage.datasources.map(msg => DataSource.fromMessage(msg))
-    }
-
-    public async makeDataView(params: MakeDataViewParams): Promise<DataViewUnion | Error>{
-        let result = await fetchJson(
-            this.sessionUrl.joinPath("make_data_view").raw,
-            {
-                method: "POST",
-                body: JSON.stringify(params.toJsonValue()),
-            }
-        )
-        if(result instanceof Error){
-            return result
+        if(responseDto.datasources === undefined){
+            return undefined
         }
-        return parseAsDataViewUnion(result)
+        return responseDto.datasources.map(msg => FsDataSource.fromDto(msg))
     }
-
 }
 
-export type FeatureClassName = IlpFeatureExtractorMessage["class_name"]
+export type FeatureClassName = IlpFeatureExtractorDto["class_name"]
 
 export class IlpFeatureExtractor{
     public readonly ilp_scale: number
@@ -396,7 +385,7 @@ export class IlpFeatureExtractor{
         this.__class__ = params.__class__
     }
 
-    public static fromMessage(message: IlpFeatureExtractorMessage): IlpFeatureExtractor{
+    public static fromDto(message: IlpFeatureExtractorDto): IlpFeatureExtractor{
         return new IlpFeatureExtractor({
             ilp_scale: message.ilp_scale,
             axis_2d: message.axis_2d || "z",
@@ -404,8 +393,8 @@ export class IlpFeatureExtractor{
         })
     }
 
-    public toMessage(): IlpFeatureExtractorMessage{
-        return new IlpFeatureExtractorMessage({
+    public toDto(): IlpFeatureExtractorDto{
+        return new IlpFeatureExtractorDto({
             ilp_scale: this.ilp_scale,
             axis_2d: this.axis_2d,
             class_name: this.__class__,
@@ -442,7 +431,7 @@ export class Color{
         return new Color({r: channels[0], g: channels[1], b: channels[2]})
     }
 
-    public static fromMessage(message: ColorMessage): Color{
+    public static fromDto(message: ColorDto): Color{
         return new Color({
             r: message.r,
             g: message.g,
@@ -450,8 +439,8 @@ export class Color{
         })
     }
 
-    public toMessage(): ColorMessage{
-        return new ColorMessage({
+    public toDto(): ColorDto{
+        return new ColorDto({
             r: this.r,
             g: this.g,
             b: this.b,
@@ -480,7 +469,11 @@ export class Point5D{
         this.x = x; this.y = y; this.z = z; this.t = t; this.c = c;
     }
 
-    public static fromMessage(message: Point5DMessage): Point5D{
+    public static fromVec3(value: vec3){
+        return new Point5D({x: value[0], y: value[1], z: value[2]})
+    }
+
+    public static fromDto(message: Point5DDto): Point5D{
         return new this({
             x: message.x,
             y: message.y,
@@ -490,8 +483,18 @@ export class Point5D{
         })
     }
 
-    public toMessage(): Point5DMessage {
-        return new Point5DMessage({x: this.x, y: this.y, z: this.z, t: this.t, c: this.c})
+    public toDto(): Point5DDto {
+        return new Point5DDto({x: this.x, y: this.y, z: this.z, t: this.t, c: this.c})
+    }
+
+    public plus(other: Point5D): Point5D{
+        return new Point5D({
+            x: this.x + other.x,
+            y: this.y + other.y,
+            z: this.z + other.z,
+            t: this.t + other.t,
+            c: this.c + other.c,
+        })
     }
 }
 
@@ -502,7 +505,7 @@ export class Shape5D extends Point5D{
         super({x, y, z, t, c})
     }
 
-    public static fromMessage(message: Shape5DMessage): Shape5D{
+    public static fromDto(message: Shape5DDto): Shape5D{
         return new this({
             x: message.x,
             y: message.y,
@@ -512,8 +515,8 @@ export class Shape5D extends Point5D{
         })
     }
 
-    public toMessage(): Shape5DMessage {
-        return new Shape5DMessage({x: this.x, y: this.y, z: this.z, t: this.t, c: this.c})
+    public toDto(): Shape5DDto {
+        return new Shape5DDto({x: this.x, y: this.y, z: this.z, t: this.t, c: this.c})
     }
 
     public updated(params: {x?: number, y?: number, z?: number, t?: number, c?: number}): Shape5D{
@@ -566,7 +569,17 @@ export class Interval5D{
         this.stop = new Point5D({x: x[1], y: y[1], z: z[1], t: t[1], c: c[1]})
     }
 
-    public static fromMessage(message: Interval5DMessage){
+    public static fromStartStop(params: {start: Point5D, stop: Point5D}): Interval5D{
+        return new Interval5D({
+            x: [params.start.x, params.stop.x],
+            y: [params.start.y, params.stop.y],
+            z: [params.start.z, params.stop.z],
+            t: [params.start.t, params.stop.t],
+            c: [params.start.c, params.stop.c],
+        })
+    }
+
+    public static fromDto(message: Interval5DDto){
         return new this({
             x: [message.start.x, message.stop.x],
             y: [message.start.y, message.stop.y],
@@ -576,29 +589,38 @@ export class Interval5D{
         })
     }
 
-    public toMessage(): Interval5DMessage{
-        return new Interval5DMessage({
-            start: this.start.toMessage(), stop: this.stop.toMessage(),
+    public toDto(): Interval5DDto{
+        return new Interval5DDto({
+            start: this.start.toDto(), stop: this.stop.toDto(),
         })
     }
 }
 
-export class DataSource{
+export abstract class FsDataSource{
     public readonly url: Url
+    public readonly filesystem: Filesystem
+    public readonly path: Path
     public readonly interval: Interval5D
     public readonly tile_shape: Shape5D
     public readonly spatial_resolution: [number, number, number]
+    public readonly dtype: DataType
 
     constructor(params: {
         url: Url,
+        filesystem: Filesystem,
+        path: Path,
         interval: Interval5D,
         tile_shape: Shape5D,
-        spatial_resolution: [number, number, number]
+        spatial_resolution: [number, number, number],
+        dtype: DataType,
     }){
-        this.url = params.url
-        this.interval = params.interval
-        this.tile_shape = params.tile_shape
-        this.spatial_resolution = params.spatial_resolution
+        this.url = params.url;
+        this.filesystem = params.filesystem;
+        this.path = params.path;
+        this.interval = params.interval;
+        this.tile_shape = params.tile_shape;
+        this.spatial_resolution = params.spatial_resolution;
+        this.dtype = params.dtype;
     }
 
     public get shape(): Shape5D{
@@ -609,23 +631,14 @@ export class DataSource{
         return this.url.raw
     }
 
-    public static fromMessage(message: DataSourceMessage) : DataSource{
-        return new DataSource({
-            url: Url.fromMessage(message.url),
-            interval: Interval5D.fromMessage(message.interval),
-            tile_shape: Shape5D.fromMessage(message.tile_shape),
-            spatial_resolution: message.spatial_resolution,
-        })
+    public static fromDto(dto: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto) : FsDataSource{
+        if(dto instanceof PrecomputedChunksDataSourceDto){
+            return PrecomputedChunksDataSource.fromDto(dto)
+        }
+        throw `FIXME: Other datasources not implemented yet`
     }
 
-    public toMessage(): DataSourceMessage{
-        return new DataSourceMessage({
-            url: this.url.toMessage(),
-            interval: this.interval.toMessage(),
-            tile_shape: this.tile_shape.toMessage(),
-            spatial_resolution: this.spatial_resolution,
-        })
-    }
+    public abstract toDto(): PrecomputedChunksDataSourceDto;
 
     public get resolutionString(): string{
         return `${this.spatial_resolution[0]} x ${this.spatial_resolution[1]} x ${this.spatial_resolution[2]}nm`
@@ -635,183 +648,241 @@ export class DataSource{
         return `${this.url.raw} (${this.resolutionString})`
     }
 
-    public equals(other: DataSource): boolean{
+    public equals(other: FsDataSource): boolean{
         return (
             this.url.equals(other.url) && vec3.equals(this.spatial_resolution, other.spatial_resolution)
         )
     }
 }
 
-export type DataViewMessageUnion = RawDataViewMessage | StrippedPrecomputedViewMessage | UnsupportedDatasetViewMessage | FailedViewMessage
-export type ViewMessageUnion = DataViewMessageUnion | PredictionsViewMessage
-export type DataViewUnion = RawDataView | StrippedPrecomputedView | UnsupportedDatasetView | FailedView
-export type ViewUnion = DataViewUnion | PredictionsView
+export class PrecomputedChunksDataSource extends FsDataSource{
+    public readonly encoder: "jpeg" | "raw"
+    public readonly scale_key: Path
 
-export abstract class View{
-    public readonly name: string;
-    public readonly url: Url;
-
-    constructor(params: {name: string, url: Url}){
-        this.name = params.name
-        this.url = params.url
-    }
-
-    public toNative(name?: string): INativeView{
-        return {
-            name: name || this.name,
-            url: this.url.updatedWith({search: new Map(), hash: ""}).raw
-        }
-    }
-
-    public static fromMessage(message: ViewMessageUnion): ViewUnion{
-        if(message instanceof PredictionsViewMessage){
-            return PredictionsView.fromMessage(message)
-        }
-        return DataView.fromMessage(message)
-    }
-}
-
-export function parseAsView(value: JsonValue): ViewUnion | Error{
-    const predictionsViewMessage = PredictionsViewMessage.fromJsonValue(value)
-    if(!(predictionsViewMessage instanceof Error)){
-        return PredictionsView.fromMessage(predictionsViewMessage)
-    }
-    return parseAsDataViewUnion(value)
-}
-
-export function parseAsDataViewUnion(value: JsonValue): DataViewUnion | Error{
-    //FIXME: this should probably be autogenerated
-    const rawDataViewMessage = RawDataViewMessage.fromJsonValue(value)
-    if(!(rawDataViewMessage instanceof Error)){
-        return RawDataView.fromMessage(rawDataViewMessage)
-    }
-
-    const strippedPrecompViewMessage = StrippedPrecomputedViewMessage.fromJsonValue(value)
-    if(!(strippedPrecompViewMessage instanceof Error)){
-        return StrippedPrecomputedView.fromMessage(strippedPrecompViewMessage)
-    }
-
-    const failedViewMessage = FailedViewMessage.fromJsonValue(value)
-    if(!(failedViewMessage instanceof Error)){
-        return FailedView.fromMessage(failedViewMessage)
-    }
-
-    const unsupportedDatasetViewMessage = UnsupportedDatasetViewMessage.fromJsonValue(value)
-    if(!(unsupportedDatasetViewMessage instanceof Error)){
-        return UnsupportedDatasetView.fromMessage(unsupportedDatasetViewMessage)
-    }
-    return Error(`Could not parse ${JSON.stringify(value)}`)
-}
-
-export abstract class DataView extends View{
-    public static fromMessage(message: DataViewMessageUnion): DataViewUnion{
-        if(message instanceof RawDataViewMessage){
-            return RawDataView.fromMessage(message)
-        }
-        if(message instanceof StrippedPrecomputedViewMessage){
-            return StrippedPrecomputedView.fromMessage(message)
-        }
-        if(message instanceof UnsupportedDatasetViewMessage){
-            return UnsupportedDatasetView.fromMessage(message)
-        }
-        if(message instanceof FailedViewMessage){
-            return FailedView.fromMessage(message)
-        }
-        throw `Should be unreachable`
-    }
-
-    public abstract getDatasources(): Array<DataSource> | undefined;
-}
-
-export class RawDataView extends DataView{
-    public readonly datasources: DataSource[]
-    constructor(params: {name: string, url: Url, datasources: Array<DataSource>}){
+    public constructor(params: ConstructorParameters<typeof FsDataSource>[0] & {
+        encoder: "jpeg" | "raw",
+        scale_key: Path,
+    }){
         super(params)
-        this.datasources = params.datasources
+        this.encoder = params.encoder
+        this.scale_key = params.scale_key
     }
 
-    public static fromMessage(message: RawDataViewMessage): RawDataView {
-        return new RawDataView({
-            datasources: message.datasources.map(ds_msg => DataSource.fromMessage(ds_msg)),
-            name: message.name,
-            url: Url.fromMessage(message.url)
+    public static fromDto(dto: PrecomputedChunksDataSourceDto) : PrecomputedChunksDataSource{
+        return new PrecomputedChunksDataSource({
+            filesystem: Filesystem.fromDto(dto.filesystem),
+            path: Path.fromDto(dto.path),
+            url: Url.fromDto(dto.url),
+            interval: Interval5D.fromDto(dto.interval),
+            tile_shape: Shape5D.fromDto(dto.tile_shape),
+            spatial_resolution: dto.spatial_resolution,
+            dtype: ensureDataType(dto.dtype), //FIXME?
+            encoder: dto.encoder,
+            scale_key: Path.parse(dto.scale_key)
         })
     }
 
-    public getDatasources(): Array<DataSource> | undefined{
-        return this.datasources.slice()
+    public toDto(): PrecomputedChunksDataSourceDto{
+        return new PrecomputedChunksDataSourceDto({
+            filesystem: this.filesystem.toDto(),
+            path: this.path.toDto(),
+            url: this.url.toDto(),
+            interval: this.interval.toDto(),
+            tile_shape: this.tile_shape.toDto(),
+            spatial_resolution: this.spatial_resolution,
+            dtype: this.dtype,
+            encoder: this.encoder,
+            scale_key: this.scale_key.raw,
+        })
     }
 }
 
-export class StrippedPrecomputedView extends DataView{
-    public readonly datasource: DataSource
-    constructor(params: {name: string, url: Url, datasource: DataSource}){
+export abstract class Filesystem{
+    public constructor(public readonly url: Url){}
+
+    public static fromDto(message: BucketFSDto | HttpFsDto | OsfsDto): Filesystem{
+        if(message instanceof BucketFSDto){
+            return BucketFs.fromDto(message)
+        }
+        if(message instanceof HttpFsDto){
+            return HttpFs.fromDto(message)
+        }
+        if(message instanceof OsfsDto){
+            return OsFs.fromDto(message)
+        }
+        assertUnreachable(message)
+    }
+
+    public abstract toDto(): OsfsDto | HttpFsDto | BucketFSDto;
+}
+
+export class OsFs extends Filesystem{
+    public constructor(public readonly path: Path){
+        super(new Url({
+            protocol: "file",
+            hostname: "localhost", //FIXME?
+            path: path,
+        }))
+    }
+
+    public static fromDto(message: OsfsDto): OsFs {
+        return new OsFs(Path.parse(message.path))
+    }
+    public toDto(): OsfsDto {
+        return new OsfsDto({path: this.url.path.raw})
+    }
+}
+
+export class HttpFs extends Filesystem{
+    public readonly protocol: "http" | "https"
+    public constructor(params: {
+        protocol: "http" | "https",
+        hostname: string,
+        port?: number,
+        path: Path,
+        search?: Map<string, string>
+    }){
+        super(new Url({
+            protocol: params.protocol,
+            hostname: params.hostname,
+            port: params.port,
+            path: params.path,
+            search: params.search
+        }))
+        this.protocol = params.protocol
+    }
+    public static fromDto(message: HttpFsDto): HttpFs {
+        const search = new Map<string, string>();
+        for(let key in message.search){
+            search.set(key, message.search[key])
+        }
+        return new HttpFs({
+            protocol: message.protocol,
+            hostname: message.hostname,
+            path: Path.parse(message.path),
+            port: message.port,
+            search,
+        })
+    }
+    public toDto(): HttpFsDto {
+        let search: {[key: string]: string} = {}
+        for(let [key, value] of this.url.search){
+            search[key] = value
+        }
+        return new HttpFsDto({
+            protocol: this.protocol,
+            hostname: this.url.hostname,
+            path: this.url.path.toDto(),
+            port: this.url.port,
+            search
+        })
+
+    }
+}
+
+export class BucketFs extends Filesystem{
+    public readonly bucket_name: string
+    public readonly prefix: Path
+
+    public constructor(params: {
+        bucket_name: string,
+        prefix: Path,
+    }){
+        super(new Url({
+            protocol: "https",
+            hostname: "data-proxy.ebrains.eu",
+            path: Path.parse(`/api/v1/buckets/${params.bucket_name}`).joinPath(params.prefix.raw),
+        }))
+        this.bucket_name = params.bucket_name
+        this.prefix = params.prefix
+    }
+    public static fromDto(message: BucketFSDto): BucketFs{
+        return new BucketFs({bucket_name: message.bucket_name, prefix: Path.parse(message.prefix)})
+    }
+    public toDto(): BucketFSDto{
+        return new BucketFSDto({
+            bucket_name: this.bucket_name,
+            prefix: this.prefix.toDto(),
+        })
+    }
+}
+
+export abstract class FsDataSink{
+    public readonly filesystem: Filesystem
+    public readonly path: Path
+    public readonly tile_shape: Shape5D
+    public readonly interval: Interval5D
+    public readonly dtype: DataType
+
+    public constructor(params: {
+        filesystem: Filesystem,
+        path: Path,
+        dtype: DataType,
+        tile_shape: Shape5D,
+        interval: Interval5D,
+    }){
+        this.tile_shape = params.tile_shape
+        this.interval = params.interval
+        this.dtype = params.dtype
+        this.filesystem = params.filesystem
+        this.path = params.path
+    }
+
+    public static fromDto(message: PrecomputedChunksSinkDto | N5DataSinkDto): FsDataSink{
+        if(message instanceof PrecomputedChunksSinkDto){
+            return PrecomputedChunksSink.fromDto(message)
+        }
+        throw `FIXME:N5 datasource not supported yet`
+    }
+
+    public abstract toDataSource(): FsDataSource;
+}
+
+export class PrecomputedChunksSink extends FsDataSink{
+    public readonly scale_key: Path
+    public readonly resolution: [number, number, number]
+    public readonly encoding: "raw" | "jpeg"
+
+    public constructor(params: ConstructorParameters<typeof FsDataSink>[0] & {
+        scale_key: Path,
+        resolution: [number, number, number],
+        encoding: "raw" | "jpeg",
+    }){
         super(params)
-        this.datasource = params.datasource
+        this.scale_key = params.scale_key
+        this.resolution = params.resolution
+        this.encoding = params.encoding
     }
 
-    public static fromMessage(message: StrippedPrecomputedViewMessage): StrippedPrecomputedView {
-        return new StrippedPrecomputedView({
-            datasource: DataSource.fromMessage(message.datasource),
-            name: message.name,
-            url: Url.fromMessage(message.url)
+    public static fromDto(message: PrecomputedChunksSinkDto): PrecomputedChunksSink{
+        return new PrecomputedChunksSink({
+            filesystem: Filesystem.fromDto(message.filesystem),
+            path: Path.parse(message.path),
+            dtype: message.dtype,
+            tile_shape: Shape5D.fromDto(message.tile_shape),
+            interval: Interval5D.fromDto(message.interval),
+            scale_key: Path.parse(message.scale_key),
+            resolution: message.resolution,
+            encoding: message.encoding,
         })
     }
 
-    public getDatasources(): Array<DataSource>{
-        return [this.datasource]
-    }
-}
-
-export class PredictionsView extends View{
-    public readonly raw_data: DataSource
-    public readonly classifier_generation: number
-    constructor(params: {name: string, url: Url, raw_data: DataSource, classifier_generation: number}){
-        super(params)
-        this.raw_data = params.raw_data
-        this.classifier_generation = params.classifier_generation
-    }
-
-    public static fromMessage(message: PredictionsViewMessage): PredictionsView {
-        return new PredictionsView({
-            classifier_generation: message.classifier_generation,
-            name: message.name,
-            raw_data: DataSource.fromMessage(message.raw_data),
-            url: Url.fromMessage(message.url)
+    public toDataSource(): PrecomputedChunksDataSource{
+        //FIXME: stop using URLs; have datasources encode al the stuff they need in properties
+        const datasourceUrl = this.filesystem.url.joinPath(this.path).updatedWith({
+            datascheme: "precomputed",
+            hash: `resolution=${this.resolution[0]}_${this.resolution[1]}_${this.resolution[2]}`
         })
-    }
-
-}
-
-export class UnsupportedDatasetView extends DataView{
-    public static fromMessage(message: UnsupportedDatasetViewMessage): UnsupportedDatasetView {
-        return new UnsupportedDatasetView({
-            name: message.name,
-            url: Url.fromMessage(message.url)
+        return new PrecomputedChunksDataSource({
+            url: datasourceUrl,
+            filesystem: this.filesystem,
+            path: this.path,
+            interval: this.interval,
+            spatial_resolution: this.resolution,
+            tile_shape: this.tile_shape,
+            dtype: this.dtype,
+            encoder: this.encoding,
+            scale_key: this.scale_key,
         })
-    }
-
-    public getDatasources(): undefined{
-        return undefined
-    }
-}
-
-export class FailedView extends DataView{
-    public readonly error_message: string
-    constructor(params: {name: string, url: Url, error_message: string}){
-        super(params)
-        this.error_message = params.error_message
-    }
-
-    public static fromMessage(message: FailedViewMessage): FailedView {
-        return new FailedView({
-            error_message: message.error_message,
-            name: message.name,
-            url: Url.fromMessage(message.url)
-        })
-    }
-
-    public getDatasources(): undefined{
-        return undefined
     }
 }

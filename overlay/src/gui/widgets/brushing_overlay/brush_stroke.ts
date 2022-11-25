@@ -1,6 +1,6 @@
 import { quat, vec3 } from "gl-matrix";
-import { Color, DataSource } from "../../../client/ilastik";
-import { PixelAnnotationMessage } from "../../../client/message_schema";
+import { Color, FsDataSource } from "../../../client/ilastik";
+import { PixelAnnotationDto } from "../../../client/dto";
 import { VecAttributeBuffer, BufferUsageHint } from "../../../gl/buffer";
 import { VertexArray } from "../../../gl/vertex_primitives";
 // import { vec3ToString } from "./utils";
@@ -9,13 +9,13 @@ export class BrushStroke extends VertexArray{
     public readonly camera_orientation: quat
     public num_points : number
     public readonly positions_buffer: VecAttributeBuffer<3, Float32Array>
-    public readonly annotated_data_source: DataSource;
+    public readonly annotated_data_source: FsDataSource;
 
     private constructor({gl, points_vx, camera_orientation, annotated_data_source}: {
         gl: WebGL2RenderingContext,
         points_vx: vec3[], // points in "voxel-space" (i.e. cooridnates are pixel indices into the image array)
         camera_orientation: quat,
-        annotated_data_source: DataSource,
+        annotated_data_source: FsDataSource,
     }){
         let data = new Float32Array(1024 * 3) // 1024 vec3's
         super(data)
@@ -30,7 +30,7 @@ export class BrushStroke extends VertexArray{
         gl: WebGL2RenderingContext,
         start_postition_uvw: vec3,
         camera_orientation: quat,
-        annotated_data_source: DataSource,
+        annotated_data_source: FsDataSource,
     }): BrushStroke{
         const stroke = new BrushStroke({gl, points_vx: [], camera_orientation, annotated_data_source})
         stroke.try_add_point_uvw(start_postition_uvw)
@@ -85,16 +85,16 @@ export class BrushStroke extends VertexArray{
         this.positions_buffer.destroy()
     }
 
-    public toMessage(): PixelAnnotationMessage{
+    public toDto(): PixelAnnotationDto{
         let raw_voxels: Array<[number, number, number]> = []
         for(let i=0; i<this.num_points; i++){
             let vert = this.getVertRef(i)
             raw_voxels.push([vert[0], vert[1], vert[2]])
         }
 
-        return new PixelAnnotationMessage({
+        return new PixelAnnotationDto({
             points: raw_voxels,
-            raw_data: this.annotated_data_source.toMessage(),
+            raw_data: this.annotated_data_source.toDto(),
             // "camera_orientation": [
                 // this.camera_orientation[0], this.camera_orientation[1], this.camera_orientation[2], this.camera_orientation[3],
             // ],
@@ -102,7 +102,7 @@ export class BrushStroke extends VertexArray{
         })
     }
 
-    public static fromMessage(gl: WebGL2RenderingContext, message: PixelAnnotationMessage): BrushStroke{
+    public static fromDto(gl: WebGL2RenderingContext, message: PixelAnnotationDto): BrushStroke{
         //FIXME: better error checking
         let camera_orientation: quat;
         // if("camera_orientation" in message){
@@ -113,7 +113,7 @@ export class BrushStroke extends VertexArray{
         // }else{
             camera_orientation = quat.create()
         // }
-        let annotated_data_source = DataSource.fromMessage(message.raw_data)
+        let annotated_data_source = FsDataSource.fromDto(message.raw_data)
         return new BrushStroke({
             gl, points_vx: message.points, camera_orientation, annotated_data_source
         })

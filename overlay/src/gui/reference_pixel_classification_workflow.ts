@@ -24,7 +24,7 @@ export class ReferencePixelClassificationWorkflowGui{
     }){
         this.session = session
         this.element = createElement({tagName: "div", parentElement, cssClasses: ["ReferencePixelClassificationWorkflowGui"]})
-        this.viewer = new Viewer({name: "viewer_applet", driver: viewer_driver, ilastik_session: session})
+        this.viewer = new Viewer({driver: viewer_driver, session})
 
         this.project_widget = new ProjectWidget({parentElement: this.element, session})
 
@@ -68,6 +68,7 @@ export class ReferencePixelClassificationWorkflowGui{
             name: "export_applet",
             parentElement: this.element,
             session: this.session,
+            viewer: this.viewer,
             help: [
                 `Once you trained your pixel classifier with the previous applets, you can apply it to other datasets
                 or even the same dataset that was used to do the training on.`,

@@ -1,4 +1,4 @@
-import { UrlMessage } from "../client/message_schema";
+import { UrlDto } from "../client/dto";
 import { IJsonable } from "./serialization";
 
 export const data_schemes = ["precomputed"] as const;
@@ -85,6 +85,12 @@ export class Path{
     public toJsonValue(): string{
         return this.toString()
     }
+    public static fromDto(dto: string): Path{
+        return Path.parse(dto)
+    }
+    public toDto(): string{
+        return this.raw
+    }
 }
 
 export class Url implements IJsonable{
@@ -138,6 +144,15 @@ export class Url implements IJsonable{
         }
     }
 
+    public toBase64(): string{
+        return btoa(this.raw.toString()).replace("+", "-").replace("/", "_")
+    }
+
+    public static fromBase64(encoded: String): Url{
+        const decoded = atob(encoded.replace("-", "+").replace("_", "/"))
+        return Url.parse(decoded)
+    }
+
     public toJsonValue(): string{
         return this.raw
     }
@@ -146,7 +161,7 @@ export class Url implements IJsonable{
         return this.toString()
     }
 
-    public static fromMessage(message: UrlMessage): Url{
+    public static fromDto(message: UrlDto): Url{
         return new Url({
             datascheme: message.datascheme,
             protocol: message.protocol,
@@ -158,7 +173,7 @@ export class Url implements IJsonable{
         })
     }
 
-    public toMessage(): UrlMessage{
+    public toDto(): UrlDto{
         if(this.protocol == "ws" || this.protocol == "wss"){
             throw `FIXME!!!`
         }
@@ -166,7 +181,7 @@ export class Url implements IJsonable{
         for(let [key, value] of this.search){
             searchObj[key] = value
         }
-        return new UrlMessage({
+        return new UrlDto({
             datascheme: this.datascheme,
             protocol: this.protocol,
             hostname: this.hostname,

@@ -7,8 +7,7 @@ import enum
 from typing import Literal, Optional, List, Dict, Mapping, Union
 from urllib.parse import parse_qs, urlencode, quote_plus, quote
 
-from ndstructs.utils.json_serializable import JsonValue, ensureJsonString
-from webilastik.server import message_schema
+from webilastik.server.rpc import dto
 
 DataScheme = Literal["precomputed"]
 Protocol = Literal["http", "https", "file", "memory"]
@@ -55,21 +54,11 @@ class Url:
         re.IGNORECASE
     )
 
-    def to_json_value(self) -> JsonValue:
-        return self.raw
-
     def to_ilp_info_filePath(self) -> str:
         if self.protocol == "file":
             return f"{self.datascheme or ''}" + self.path.as_posix()
         else:
             return self.raw
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "Url":
-        url = Url.parse(ensureJsonString(value))
-        if url is not None:
-            return url
-        raise ValueError(f"Bad url: {value}")
 
     @staticmethod
     def parse(url: str) -> Optional["Url"]:
@@ -105,7 +94,7 @@ class Url:
         return parsed
 
     @classmethod
-    def from_message(cls, url_message: message_schema.UrlMessage) -> 'Url':
+    def from_dto(cls, url_message: dto.UrlDto) -> 'Url':
         return Url(
             datascheme=url_message.datascheme,
             protocol=url_message.protocol,
@@ -116,8 +105,8 @@ class Url:
             hash_=url_message.fragment,
         )
 
-    def to_message(self) -> message_schema.UrlMessage:
-        return message_schema.UrlMessage(
+    def to_dto(self) -> dto.UrlDto:
+        return dto.UrlDto(
             datascheme=self.datascheme,
             protocol=self.protocol,
             hostname=self.hostname,

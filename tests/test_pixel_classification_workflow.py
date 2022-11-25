@@ -140,7 +140,7 @@ def test_pixel_classification_workflow():
     )
 
     print(f"Sending predictions job request??????")
-    result = workflow.export_applet.start_export_job(
+    result = workflow.export_applet.launch_pixel_probabilities_export_job(
         datasource=raw_data_source,
         datasink=predictions_export_datasink
     )
@@ -150,11 +150,7 @@ def test_pixel_classification_workflow():
     wait_until_jobs_completed(workflow=workflow)
     print(f"Done waiting. Checking outputs")
 
-    predictions_output = PrecomputedChunksDataSource(
-        filesystem=output_fs,
-        path=predictions_export_datasink.path,
-        resolution=(1,1,1)
-    )
+    predictions_output = predictions_export_datasink.to_datasource()
     for tile in predictions_output.roi.get_datasource_tiles():
         _ = tile.retrieve().cut(c=1).as_uint8(normalized=True)#.show_channels()
 
@@ -168,7 +164,7 @@ def test_pixel_classification_workflow():
     )
 
     print(f"Sending simple segmentation job request??????")
-    result = workflow.export_applet.start_simple_segmentation_export_job(
+    result = workflow.export_applet.launch_simple_segmentation_export_job(
         datasource=raw_data_source,
         datasink=simple_segmentation_datasink,
         label_name=pixel_annotations[1].name,
@@ -178,11 +174,7 @@ def test_pixel_classification_workflow():
     wait_until_jobs_completed(workflow=workflow)
     print(f"Done waiting. Checking outputs")
 
-    segmentation_output_1 = PrecomputedChunksDataSource(
-        filesystem=output_fs,
-        path=simple_segmentation_datasink.path,
-        resolution=(1,1,1)
-    )
+    segmentation_output_1 = simple_segmentation_datasink.to_datasource()
     for tile in segmentation_output_1.roi.get_datasource_tiles():
         _ = tile.retrieve()#.show_images()
 

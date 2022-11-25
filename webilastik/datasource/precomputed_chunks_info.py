@@ -14,8 +14,7 @@ from ndstructs.point5D import Point5D, Shape5D, Interval5D
 from ndstructs.array5D import Array5D
 
 from webilastik.datasource import DataSource
-from webilastik.filesystem import JsonableFilesystem
-from webilastik.server.message_schema import PrecomputedChunksScaleMessage
+from webilastik.filesystem import Filesystem
 
 class PrecomputedChunksEncoder(ABC):
     @abstractmethod
@@ -37,11 +36,11 @@ class PrecomputedChunksEncoder(ABC):
         pass
 
     @abstractmethod
-    def to_message(self) -> Literal["raw", "jpeg"]:
+    def to_dto(self) -> Literal["raw", "jpeg"]:
         pass
 
     @classmethod
-    def from_message(cls, message: Literal["raw", "jpeg"]) -> "PrecomputedChunksEncoder":
+    def from_dto(cls, message: Literal["raw", "jpeg"]) -> "PrecomputedChunksEncoder":
         if message == "raw":
             return RawEncoder()
         if message == "jpeg":
@@ -57,7 +56,7 @@ class PrecomputedChunksEncoder(ABC):
         raise ValueError(f"Bad encoding value: {label}")
 
 class RawEncoder(PrecomputedChunksEncoder):
-    def to_message(self) -> Literal["raw"]:
+    def to_dto(self) -> Literal["raw"]:
         return "raw"
 
     def to_json_value(self) -> JsonValue:
@@ -81,8 +80,11 @@ class RawEncoder(PrecomputedChunksEncoder):
     def encode(self, data: Array5D) -> bytes:
         return data.raw("xyzc").tobytes("F")
 
+    def __eq__(self, __o: object) -> bool:
+        return isinstance(__o, RawEncoder)
+
 class JpegEncoder(PrecomputedChunksEncoder):
-    def to_message(self) -> Literal["jpeg"]:
+    def to_dto(self) -> Literal["jpeg"]:
         return "jpeg"
 
     def to_json_value(self) -> JsonValue:
@@ -109,6 +111,8 @@ class JpegEncoder(PrecomputedChunksEncoder):
     def encode(self, data: Array5D) -> bytes:
         raise NotImplementedError
 
+    def __eq__(self, __o: object) -> bool:
+        return isinstance(__o, JpegEncoder)
 
 class PrecomputedChunksScale:
     def __init__(
@@ -166,27 +170,6 @@ class PrecomputedChunksScale:
                 for v in ensureJsonArray(value_obj.get("chunk_sizes"))
             ]),
             encoding=PrecomputedChunksEncoder.from_json_value(value_obj.get("encoding")),
-        )
-
-    @classmethod
-    def from_message(cls, message: PrecomputedChunksScaleMessage) -> "PrecomputedChunksScale":
-        return PrecomputedChunksScale(
-            key=PurePosixPath(message.key),
-            size=message.size,
-            resolution=message.resolution,
-            voxel_offset=message.voxel_offset,
-            chunk_sizes=message.chunk_sizes,
-            encoding=PrecomputedChunksEncoder.from_message(message.encoding),
-        )
-
-    def to_message(self) -> PrecomputedChunksScaleMessage:
-        return PrecomputedChunksScaleMessage(
-            chunk_sizes=self.chunk_sizes,
-            encoding=self.encoding.to_message(),
-            key=self.key.as_posix(),
-            resolution=self.resolution,
-            size=self.size,
-            voxel_offset=self.voxel_offset,
         )
 
     def __eq__(self, other: object) -> bool:
@@ -273,8 +256,6 @@ class PrecomputedChunksInfo:
             PrecomputedChunksScale5D.from_raw_scale(scale, num_channels=num_channels) for scale in scales
         ]
 
-        if self.type_ != "image":
-            raise NotImplementedError(f"Don't know how to interpret type '{self.type_}'")
         if num_channels <= 0:
             raise ValueError("num_channels must be greater than 0", self.__dict__)
         if len(scales) == 0:
@@ -302,19 +283,22 @@ class PrecomputedChunksInfo:
             ])
         )
 
-    def stripped(self, resolution: Tuple[int, int, int]) -> "PrecomputedChunksInfo":
+    def stripped(self, resolution: Tuple[int, int, int]) -> "PrecomputedChunksInfo | Exception":
+        scale = self.get_scale_5d(resolution=resolution)
+        if isinstance(scale, Exception):
+            return scale
         return PrecomputedChunksInfo(
             type_=self.type_,
             data_type=self.data_type,
             num_channels=self.num_channels,
-            scales=tuple([self.get_scale_5d(resolution=resolution)])
+            scales=tuple([scale])
         )
 
-    def get_scale_5d(self, resolution: Tuple[int, int, int]) -> PrecomputedChunksScale5D:
+    def get_scale_5d(self, resolution: Tuple[int, int, int]) -> "PrecomputedChunksScale5D | Exception":
         for scale in self.scales_5d:
             if scale.resolution == resolution:
                 return scale
-        raise ValueError(f"Scale with resolution {resolution} not found")
+        return ValueError(f"Scale with resolution {resolution} not found")
 
     def contains(self, scale: PrecomputedChunksScale) -> bool:
         return any(scale == s for s in self.scales)
@@ -329,7 +313,7 @@ class PrecomputedChunksInfo:
         )
 
     @classmethod
-    def tryLoad(cls, filesystem: JsonableFilesystem, path: PurePosixPath) ->"PrecomputedChunksInfo | Exception":
+    def tryLoad(cls, filesystem: Filesystem, path: PurePosixPath) ->"PrecomputedChunksInfo | Exception":
         url = filesystem.geturl(path.as_posix())
         if not filesystem.exists(path.as_posix()):
             return FileNotFoundError(f"Could not find info file at {url}")

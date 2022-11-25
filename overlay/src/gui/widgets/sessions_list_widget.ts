@@ -1,19 +1,19 @@
 import { HpcSiteName, Session, SESSION_DONE_STATES } from "../../client/ilastik";
-import { CloseComputeSessionParamsMessage, ComputeSessionStatusMessage, ListComputeSessionsParamsMessage } from "../../client/message_schema";
+import { CloseComputeSessionParamsDto, ComputeSessionStatusDto, ListComputeSessionsParamsDto } from "../../client/dto";
 import { createElement, createImage, createInput, removeElement, secondsToTimeDeltaString } from "../../util/misc";
 import { Url } from "../../util/parsed_url";
 import { ErrorPopupWidget, PopupWidget } from "./popup";
 
 class SessionItemWidget{
-    public readonly status: ComputeSessionStatusMessage;
+    public readonly status: ComputeSessionStatusDto;
     public readonly element: HTMLTableRowElement;
     private cancelButton: HTMLInputElement
 
     constructor(params: {
-        status: ComputeSessionStatusMessage,
+        status: ComputeSessionStatusDto,
         parentElement: HTMLTableElement,
         ilastikUrl: Url,
-        onSessionClosed: (status: ComputeSessionStatusMessage) => void,
+        onSessionClosed: (status: ComputeSessionStatusDto) => void,
     }){
         this.status = params.status
         this.element = createElement({tagName: "tr", parentElement: params.parentElement})
@@ -35,7 +35,7 @@ class SessionItemWidget{
                 this.cancelButton.classList.add("ItkLoadingBackground");
                 let cancellationResult = await Session.cancel({
                     ilastikUrl: params.ilastikUrl,
-                    rpcParams: new CloseComputeSessionParamsMessage({
+                    rpcParams: new CloseComputeSessionParamsDto({
                         compute_session_id: comp_session.compute_session_id,
                         hpc_site: params.status.hpc_site,
                     })
@@ -60,8 +60,8 @@ class SessionItemWidget{
 export class SessionsPopup{
     constructor(params: {
         ilastikUrl: Url,
-        sessionStati: Array<ComputeSessionStatusMessage>,
-        onSessionClosed: (status: ComputeSessionStatusMessage) => void,
+        sessionStati: Array<ComputeSessionStatusDto>,
+        onSessionClosed: (status: ComputeSessionStatusDto) => void,
     }){
         let popup = new PopupWidget("Sessions:")
         let table = createElement({tagName: "table", parentElement: popup.element, cssClasses: ["ItkTable"]})
@@ -79,7 +79,7 @@ export class SessionsPopup{
 
     public static async create(params: {
         ilastikUrl: Url,
-        onSessionClosed: (status: ComputeSessionStatusMessage) => void,
+        onSessionClosed: (status: ComputeSessionStatusDto) => void,
         hpc_site: HpcSiteName,
     }): Promise<SessionsPopup | Error | undefined>{
         const loadingPopup = new PopupWidget("Fetching sessions...");
@@ -92,7 +92,7 @@ export class SessionsPopup{
         })
         let sessionStatiResult = await Session.listSessions({
             ilastikUrl: params.ilastikUrl,
-            rpcParams: new ListComputeSessionsParamsMessage({hpc_site: params.hpc_site})
+            rpcParams: new ListComputeSessionsParamsDto({hpc_site: params.hpc_site})
         })
         if(!loadingPopup.element.parentElement){
             return undefined

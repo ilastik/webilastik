@@ -12,12 +12,10 @@ from typing import Callable, Final, List, Optional, Tuple
 import json
 from base64 import b64decode
 import ssl
-import contextlib
-from pathlib import Path, PurePosixPath
+from pathlib import PurePosixPath
 import traceback
 import re
 import datetime
-from typing_extensions import Never
 
 import aiohttp
 from aiohttp import web
@@ -28,17 +26,14 @@ from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonO
 from fs.errors import ResourceNotFound
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
-from webilastik.filesystem import JsonableFilesystem
-from webilastik.filesystem.bucket_fs import BucketFs
-from webilastik.filesystem.osfs import OsFs
-from webilastik.filesystem.util import fs_from_message
+from webilastik.filesystem import Filesystem
 from webilastik.scheduling.job import PriorityExecutor
-from webilastik.server.message_schema import GetDatasourcesFromUrlParamsMessage, GetDatasourcesFromUrlResponseMessage, MessageParsingError, RpcErrorMessage, SaveProjectParamsMessage
+from webilastik.server.rpc.dto import GetDatasourcesFromUrlParamsDto, GetDatasourcesFromUrlResponseDto, MessageParsingError, RpcErrorDto, SaveProjectParamsDto
 from webilastik.server.session_allocator import uncachable_json_response
 from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError
 from webilastik.ui.workflow.pixel_classification_workflow import WsPixelClassificationWorkflow
-from webilastik.utility.url import Protocol, Url
+from webilastik.utility.url import Url
 from webilastik.server.tunnel import ReverseSshTunnel
 from webilastik.ui.applet import dummy_prompt
 from webilastik.libebrains.user_token import UserToken
@@ -85,11 +80,11 @@ class RPCPayload:
             "arguments": self.arguments,
         }
 
-def do_save_project(filesystem: JsonableFilesystem, file_path: PurePosixPath, workflow_contents: bytes):
+def do_save_project(filesystem: Filesystem, file_path: PurePosixPath, workflow_contents: bytes):
     with filesystem.openbin(file_path.as_posix(), "w") as f:
         f.write(workflow_contents)
 
-def do_load_project_bytes(filesystem: JsonableFilesystem, file_path: PurePosixPath) -> "bytes | ResourceNotFound":
+def do_load_project_bytes(filesystem: Filesystem, file_path: PurePosixPath) -> "bytes | ResourceNotFound":
     try:
         with filesystem.openbin(file_path.as_posix(), "r") as f:
             return f.read()
@@ -186,6 +181,10 @@ class WebIlastik:
                 self.get_datasources_from_url
             ),
             web.post(
+                "/check_datasource_compatibility",
+                lambda request: self.workflow.pixel_classifier_applet.check_datasource_compatibility(request)
+            ),
+            web.post(
                 "/save_project",
                 self.save_project
             ),
@@ -201,10 +200,10 @@ class WebIlastik:
         self.app.on_shutdown.append(self.close_websockets)
 
     async def get_datasources_from_url(self, request: web.Request) -> web.Response:
-        params = GetDatasourcesFromUrlParamsMessage.from_json_value(await request.json())
+        params = GetDatasourcesFromUrlParamsDto.from_json_value(await request.json())
         if isinstance(params, MessageParsingError):
-            return  uncachable_json_response(RpcErrorMessage(error="bad payload").to_json_value(), status=400)
-        url = Url.from_message(params.url)
+            return  uncachable_json_response(RpcErrorDto(error="bad payload").to_json_value(), status=400)
+        url = Url.from_dto(params.url)
 
         selected_resolution: "Tuple[int, int, int] | None" = None
         stripped_precomputed_url_regex = re.compile(r"/stripped_precomputed/url=(?P<url>[^/]+)/resolution=(?P<resolution>\d+_\d+_\d+)")
@@ -215,15 +214,15 @@ class WebIlastik:
 
         datasources_result = try_get_datasources_from_url(url=url, allowed_protocols=("http", "https"))
         if isinstance(datasources_result, Exception):
-            return uncachable_json_response(RpcErrorMessage(error=str(datasources_result)).to_json_value(), status=400)
+            return uncachable_json_response(RpcErrorDto(error=str(datasources_result)).to_json_value(), status=400)
         if isinstance(datasources_result, type(None)):
-            return uncachable_json_response(RpcErrorMessage(error=f"Unsupported datasource type: {url}").to_json_value(), status=400)
+            return uncachable_json_response(GetDatasourcesFromUrlResponseDto(datasources=None).to_json_value(), status=400)
         if selected_resolution:
             datasources = [ds for ds in datasources_result if ds.spatial_resolution == selected_resolution]
             if len(datasources) != 1:
                 return uncachable_json_response(
-                    RpcErrorMessage(
-                        error=f"Expected single datasource, found these: {json.dumps([ds.to_json_value() for ds in datasources], indent=4)}"
+                    RpcErrorDto(
+                        error=f"Expected single datasource, found these: {json.dumps([ds.to_dto().to_json_value() for ds in datasources], indent=4)}"
                     ).to_json_value(),
                     status=400,
                 )
@@ -231,7 +230,7 @@ class WebIlastik:
             datasources = datasources_result
 
         return uncachable_json_response(
-            GetDatasourcesFromUrlResponseMessage(datasources=tuple([ds.to_message() for ds in datasources])).to_json_value(),
+            GetDatasourcesFromUrlResponseDto(datasources=tuple([ds.to_dto() for ds in datasources])).to_json_value(),
             status=200,
         )
 
@@ -240,7 +239,7 @@ class WebIlastik:
             {
                 "status": "running",
                 "start_time_utc": self.start_time_utc.timestamp(),
-                "max_duration_minutes": self.max_duration_minutes,
+                "max_duration_minutes": self.max_duration_minutes.to_int(),
             },
             status=200
         )
@@ -333,11 +332,12 @@ class WebIlastik:
         )
 
     async def save_project(self, request: web.Request) -> web.Response:
+        from webilastik.filesystem.osfs import OsFs
         payload = await request.json()
-        params_result = SaveProjectParamsMessage.from_json_value(payload)
+        params_result = SaveProjectParamsDto.from_json_value(payload)
         if isinstance(params_result, MessageParsingError):
             return web.Response(status=400, text=f"Bad payload")
-        filesystem = fs_from_message(params_result.fs)
+        filesystem = Filesystem.create_from_message(params_result.fs)
         if isinstance(filesystem, OsFs):
             return web.Response(status=400, text=f"OsFs not allowed for now")
         file_path = PurePosixPath(params_result.project_file_path)
@@ -354,11 +354,12 @@ class WebIlastik:
         return web.Response(status=200, text=f"Project saved to {filesystem.geturl(file_path.as_posix())}")
 
     async def load_project(self, request: web.Request) -> web.Response:
+        from webilastik.filesystem.osfs import OsFs
         payload = await request.json()
-        params_result = SaveProjectParamsMessage.from_json_value(payload)
+        params_result = SaveProjectParamsDto.from_json_value(payload)
         if isinstance(params_result, MessageParsingError):
             return web.Response(status=400, text=f"Bad payload")
-        filesystem = fs_from_message(params_result.fs)
+        filesystem = Filesystem.create_from_message(params_result.fs)
         if isinstance(filesystem, OsFs):
             return web.Response(status=400, text=f"OsFs not allowed for now")
         file_path = PurePosixPath(params_result.project_file_path)
@@ -425,6 +426,8 @@ class WebIlastik:
                     return web.Response(status=response.status, text=response_text)
                 info = PrecomputedChunksInfo.from_json_value(json.loads(response_text))
                 stripped_info = info.stripped(resolution=resolution)
+                if isinstance(stripped_info, Exception):
+                    return uncachable_json_response(str(stripped_info), status=400)
                 return web.json_response(stripped_info.to_json_value())
         raise Exception(f"Should be unreachable") #FIMXE
 
@@ -460,47 +463,28 @@ class WebIlastik:
         raise Exception(f"Should be unreachable") #FIMXE
 
 if __name__ == '__main__':
-    from argparse import ArgumentParser
-
-    parser = ArgumentParser()
-    parser.add_argument("--max-duration-minutes", type=int, required=True, help="Number of minutes this workflow can run for")
-    parser.add_argument("--listen-socket", type=Path, required=True)
-    parser.add_argument("--session-url", required=True)
-
-
-    subparsers = parser.add_subparsers(required=False, help="tunnel stuff")
-    tunnel_parser = subparsers.add_parser("tunnel", help="Creates a reverse tunnel to an orchestrator")
-    tunnel_parser.add_argument("--remote-username", type=str, required=True)
-    tunnel_parser.add_argument("--remote-host", required=True)
-    tunnel_parser.add_argument("--remote-unix-socket", type=Path, required=True)
-
-    args = parser.parse_args()
-
-    session_url = Url.parse_or_raise(args.session_url)
+    from webilastik.config import WorkflowConfig
+    workflow_config = WorkflowConfig.get()
 
     executor = get_executor(hint="server_tile_handler", max_workers=multiprocessing.cpu_count())
 
-    if "remote_username" in vars(args):
-        server_context = ReverseSshTunnel(
-            remote_username=args.remote_username,
-            remote_host=args.remote_host,
-            remote_unix_socket=args.remote_unix_socket,
-            local_unix_socket=args.listen_socket,
-        )
-    else:
-        server_context = contextlib.nullcontext()
-
+    server_context = ReverseSshTunnel(
+        remote_username=workflow_config.session_allocator_username,
+        remote_host=workflow_config.session_allocator_host,
+        remote_unix_socket=workflow_config.session_allocator_socket_path,
+        local_unix_socket=workflow_config.listen_socket,
+    )
 
     with server_context:
         WebIlastik(
             executor=executor,
-            max_duration_minutes=Minutes(args.max_duration_minutes),
-            session_url=session_url,
+            max_duration_minutes=workflow_config.max_duration_minutes,
+            session_url=workflow_config.session_url,
         ).run(
-            unix_socket_path=str(args.listen_socket),
+            unix_socket_path=str(workflow_config.listen_socket),
         )
     try:
-        os.remove(args.listen_socket)
+        os.remove(workflow_config.listen_socket)
     except FileNotFoundError:
         pass
 

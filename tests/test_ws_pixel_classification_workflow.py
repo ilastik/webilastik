@@ -1,8 +1,10 @@
 # pyright: reportUnusedCallResult=false
 
 import os
+from webilastik.config import WorkflowConfig
 
 from webilastik.datasource import DataSource
+from webilastik.server.rpc.dto import AddPixelAnnotationParams, LabelHeaderDto, StartPixelProbabilitiesExportJobParamsDto, StartSimpleSegmentationExportJobParamsDto
 # ensure requests will use the mkcert cert. Requests uses certifi by default, i think
 os.environ["REQUESTS_CA_BUNDLE"] = "/etc/ssl/certs/ca-certificates.crt"
 # ensure aiohttp will use the mkcert certts. I don't really know where it otherwise gets its certs from
@@ -58,11 +60,11 @@ async def main():
         raise datasources
     assert not isinstance(datasources, (Exception, type(None)))
     ds = datasources[0]
-    token = UserToken.from_environment()
+    token = WorkflowConfig.get().ebrains_user_token
     assert isinstance(token, UserToken)
 
     async with aiohttp.ClientSession(
-        cookies={UserToken.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME.lower(): token.access_token}
+        cookies={"ebrains_user_access_token": token.access_token}
     ) as session:
         print(f"Creating new session--------------")
         async with session.post(ilastik_root_url.concatpath("api/session").raw, json={"session_duration_minutes": 15}) as response:
@@ -93,7 +95,7 @@ async def main():
                     applet_name="feature_selection_applet",
                     method_name="add_feature_extractors",
                     arguments={
-                        "feature_extractors": tuple(fe.to_message().to_json_value() for fe in get_sample_feature_extractors())
+                        "feature_extractors": tuple(fe.to_dto().to_json_value() for fe in get_sample_feature_extractors())
                     }
                 ).to_json_value()
             )
@@ -101,16 +103,17 @@ async def main():
 
             print("sending some annotations=======")
             default_label_names = ["Foreground", "Background"]
-            for label_name, label in zip(default_label_names, get_sample_c_cells_pixel_annotations(override_datasource=ds)):
+            labels = get_sample_c_cells_pixel_annotations(override_datasource=ds)
+            for label_name, label in zip(default_label_names, labels):
                 for a in label.annotations:
                     await ws.send_json(
                         RPCPayload(
                             applet_name="brushing_applet",
                             method_name="add_annotation",
-                            arguments={
-                                "label_name": label_name,
-                                "annotation": a.to_json_data(),
-                            }
+                            arguments=AddPixelAnnotationParams(
+                                label_name=label_name,
+                                pixel_annotation=a.to_dto(),
+                            ).to_json_value()
                         ).to_json_value()
                     )
 
@@ -170,38 +173,31 @@ async def main():
                 RPCPayload(
                     applet_name="export_applet",
                     method_name="start_export_job",
-                    arguments={
-                        "datasource": ds.to_json_value(),
-                        "datasink": predictions_export_datasink.to_json_value(),
-                    }
+                    arguments=StartPixelProbabilitiesExportJobParamsDto(
+                        datasource=ds.to_dto(),
+                        datasink=predictions_export_datasink.to_dto(),
+                    ).to_json_value()
                 ).to_json_value()
             )
 
 
-            simple_segmentation_datasinks = [
-                create_precomputed_chunks_sink(
-                    shape=ds.shape.updated(c=3),
-                    dtype=np.dtype("uint8"),
-                    chunk_size=ds.tile_shape.updated(c=3),
-                    fs=hbp_image_service_bucket_fs
-                ),
-                create_precomputed_chunks_sink(
-                    shape=ds.shape.updated(c=3),
-                    dtype=np.dtype("uint8"),
-                    chunk_size=ds.tile_shape.updated(c=3),
-                    fs=hbp_image_service_bucket_fs
-                ),
-            ]
+            simple_segmentation_datasink = create_precomputed_chunks_sink(
+                shape=ds.shape.updated(c=3),
+                dtype=np.dtype("uint8"),
+                chunk_size=ds.tile_shape.updated(c=3),
+                fs=hbp_image_service_bucket_fs
+            )
 
             print(f"Sending simple segmentation job request??????")
             await ws.send_json(
                 RPCPayload(
                     applet_name="export_applet",
                     method_name="start_simple_segmentation_export_job",
-                    arguments={
-                        "datasource": ds.to_json_value(),
-                        "datasinks": tuple(ds.to_json_value() for ds in simple_segmentation_datasinks),
-                    }
+                    arguments=StartSimpleSegmentationExportJobParamsDto(
+                        label_header=labels[0].to_header_message.to_dto(),
+                        datasource=ds.to_dto(),
+                        datasink=simple_segmentation_datasink.to_dto(),
+                    ).to_json_value()
                 ).to_json_value()
             )
 
@@ -211,19 +207,11 @@ async def main():
             await asyncio.sleep(15)
             print(f"Done waiting. Checking outputs")
 
-            predictions_output = PrecomputedChunksDataSource(
-                filesystem=hbp_image_service_bucket_fs,
-                path=predictions_export_datasink.path,
-                resolution=(1,1,1)
-            )
+            predictions_output = predictions_export_datasink.to_datasource()
             for tile in predictions_output.roi.get_datasource_tiles():
                 tile.retrieve().as_uint8(normalized=True)#.show_channels()
 
-            segmentation_output_1 = PrecomputedChunksDataSource(
-                filesystem=hbp_image_service_bucket_fs,
-                path=simple_segmentation_datasinks[1].path,
-                resolution=(1,1,1)
-            )
+            segmentation_output_1 = simple_segmentation_datasink.to_datasource()
             for tile in segmentation_output_1.roi.get_datasource_tiles():
                 tile.retrieve()#.show_images()
 

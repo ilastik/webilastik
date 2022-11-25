@@ -17,14 +17,15 @@ from ndstructs.utils.json_serializable import JsonObject, JsonValue
 from webilastik.annotations.annotation import Annotation, Color
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.datasink import FsDataSink
-from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksScaleSink
+from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
 from webilastik.datasource import FsDataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale, RawEncoder
 from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.features.ilp_filter import IlpGaussianSmoothing, IlpHessianOfGaussianEigenvalues
 from webilastik.features.ilp_filter import IlpFilter
-from webilastik.filesystem import JsonableFilesystem
+from webilastik.filesystem import Filesystem
 from webilastik.filesystem.bucket_fs import BucketFs
+from webilastik.filesystem.http_fs import HttpFs
 from webilastik.filesystem.osfs import OsFs
 from webilastik.libebrains.user_token import UserToken
 from webilastik.ui.applet.brushing_applet import Label
@@ -62,22 +63,18 @@ def get_test_output_bucket_fs() -> BucketFs:
         prefix=PurePosixPath(f"/test-{now_str}"),
     )
 
-def create_precomputed_chunks_sink(*, shape: Shape5D, dtype: "np.dtype[Any]", chunk_size: Shape5D, fs: "JsonableFilesystem | None" = None) -> FsDataSink:
-    return PrecomputedChunksScaleSink(
-        filesystem=fs or get_test_output_osfs(),
-        info_dir=PurePosixPath(f"{uuid.uuid4()}.precomputed"),
+def create_precomputed_chunks_sink(
+    *, shape: Shape5D, dtype: "np.dtype[Any]", chunk_size: Shape5D, fs: "OsFs | HttpFs | BucketFs | None" = None
+) -> PrecomputedChunksSink:
+    return PrecomputedChunksSink(
+        filesystem=fs or get_test_output_bucket_fs(),
+        path=PurePosixPath(f"{uuid.uuid4()}.precomputed"),
         dtype=dtype,
-        num_channels=shape.c,
-        scale=PrecomputedChunksScale(
-            key=PurePosixPath("some_data"),
-            size=(shape.x, shape.y, shape.z),
-            resolution=(1,1,1),
-            voxel_offset=(0,0,0),
-            chunk_sizes=tuple([
-                (chunk_size.x, chunk_size.y, chunk_size.z)
-            ]),
-            encoding=RawEncoder(),
-        )
+        scale_key=PurePosixPath("some_data"),
+        encoding=RawEncoder(),
+        interval=shape.to_interval5d(),
+        tile_shape=chunk_size,
+        resolution=(1,1,1),
     )
 
 def get_sample_c_cells_pixel_annotations(override_datasource: "FsDataSource | None" = None) -> Sequence[Label]:

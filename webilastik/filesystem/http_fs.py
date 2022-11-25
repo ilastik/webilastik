@@ -15,11 +15,11 @@ from fs.permissions import Permissions
 from fs.enums import ResourceType
 from requests.models import CaseInsensitiveDict
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
-from webilastik.server.message_schema import HttpFsMessage
+from webilastik.server.rpc.dto import HttpFsDto
 from webilastik.ui.usage_error import UsageError
 
 from .RemoteFile import RemoteFile
-from webilastik.filesystem import JsonableFilesystem
+from webilastik.filesystem import Filesystem
 from webilastik.utility.url import Url, Protocol
 
 
@@ -27,7 +27,7 @@ def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
 
-class HttpFs(JsonableFilesystem):
+class HttpFs(Filesystem):
     def __init__(self, read_url: Url, write_url: Optional[Url] = None, headers: Optional[Mapping[str, str]] = None):
         super().__init__()
         self.read_url = read_url
@@ -56,8 +56,8 @@ class HttpFs(JsonableFilesystem):
             "__class__": self.__class__.__name__,
         }
 
-    def to_message(self) -> HttpFsMessage:
-        return HttpFsMessage(
+    def to_dto(self) -> HttpFsDto:
+        return HttpFsDto(
             protocol=self.protocol,
             hostname=self.read_url.hostname,
             path=self.read_url.path.as_posix(),
@@ -66,7 +66,7 @@ class HttpFs(JsonableFilesystem):
         )
 
     @classmethod
-    def from_message(cls, message: HttpFsMessage) -> "HttpFs":
+    def from_dto(cls, message: HttpFsDto) -> "HttpFs":
         return HttpFs(
             read_url=Url(
                 protocol=message.protocol,

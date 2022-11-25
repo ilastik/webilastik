@@ -3,13 +3,15 @@ import { BrushRenderer } from "./brush_renderer"
 import { Camera } from "./camera"
 import { VertexArrayObject } from "../../../gl/buffer"
 import { DrawingMode, RenderParams } from "../../../gl/gl"
-import { FragmentShader, ShaderProgram, VertexShader } from "../../../gl/shader"
+import { FragmentShader, ShaderProgram, UniformLocation, VertexShader } from "../../../gl/shader"
 import { BrushStroke } from "./brush_stroke"
 import { Color } from "../../../client/ilastik"
 
 
 export class BrushelLinesRenderer extends ShaderProgram implements BrushRenderer{
     readonly vao: VertexArrayObject
+    private readonly u_voxel_to_clip__location: UniformLocation
+    private readonly color__location: UniformLocation
 
     constructor(gl: WebGL2RenderingContext){
         super(
@@ -37,6 +39,9 @@ export class BrushelLinesRenderer extends ShaderProgram implements BrushRenderer
             `)
         )
         this.vao = new VertexArrayObject(gl) //FIXME: cleanup the vao and box buffer (but vao autodelets on GC anyway...)
+
+        this.u_voxel_to_clip__location = this.getUniformLocation("u_voxel_to_clip")
+        this.color__location = this.getUniformLocation("color")
     }
 
     public destroy(){
@@ -59,12 +64,12 @@ export class BrushelLinesRenderer extends ShaderProgram implements BrushRenderer
         this.vao.bind()
 
         let u_voxel_to_clip = mat4.multiply(mat4.create(), camera.world_to_clip, voxelToWorld);
-        this.uniformMatrix4fv("u_voxel_to_clip", u_voxel_to_clip);
+        this.uniformMatrix4fv(this.u_voxel_to_clip__location, u_voxel_to_clip);
 
         let a_offset_vx_location = this.getAttribLocation("a_offset_vx");
         for(let [color, annotations] of brush_strokes){
             for(let brush_stroke of annotations){
-                this.uniform3fv("color", color.vec3f)
+                this.uniform3fv(this.color__location, color.vec3f)
                 brush_stroke.positions_buffer.useWithAttribute({vao: this.vao, location: a_offset_vx_location})
                 this.gl.drawArrays(brush_stroke.num_points == 1 ? DrawingMode.POINTS : DrawingMode.LINE_STRIP, 0, brush_stroke.num_points)
             }
