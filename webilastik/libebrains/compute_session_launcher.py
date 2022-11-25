@@ -656,12 +656,12 @@ class JusufSshJobLauncher(SshJobLauncher):
             #SBATCH --partition=batch
             #SBATCH --hint=nomultithread
 
+            jutil env activate -p icei-hbp-2022-0010
             {job_config.to_bash_exports()}
 
             set -xeu
             set -o pipefail
 
-            jutil env activate -p icei-hbp-2022-0010
             module load git
             module load GCC/11.2.0
             module load OpenMPI/4.1.2
