@@ -65,16 +65,13 @@ class N5Compressor(ABC):
     def decompress(self, compressed: bytes) -> bytes:
         pass
 
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, self.__class__):
-            return False
-        return self.to_json_data() == other.to_json_data()
-
-
 class GzipCompressor(N5Compressor):
     def __init__(self, level: int = 1):
         self.level = level
         super().__init__()
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, GzipCompressor) and self.level == other.level
 
     @classmethod
     def get_label(cls) -> str:
@@ -111,6 +108,9 @@ class Bzip2Compressor(N5Compressor):
         self.blockSize = blockSize
         super().__init__()
 
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, Bzip2Compressor) and self.blockSize == other.blockSize
+
     @classmethod
     def get_label(cls) -> str:
         return "bzip2"
@@ -146,6 +146,9 @@ class XzCompressor(N5Compressor):
         self.preset = preset
         super().__init__()
 
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, XzCompressor) and self.preset == other.preset
+
     @classmethod
     def get_label(cls) -> str:
         return "xz"
@@ -177,6 +180,9 @@ class XzCompressor(N5Compressor):
 
 
 class RawCompressor(N5Compressor):
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, RawCompressor)
+
     @classmethod
     def get_label(cls) -> str:
         return "raw"

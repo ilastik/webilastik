@@ -247,7 +247,7 @@ class FsDataSource(DataSource):
     def __eq__(self, other: object) -> bool:
         return (
             super().__eq__(other) and
-            isinstance(other, self.__class__) and
+            isinstance(other, FsDataSource) and
             self.url == other.url
         )
 

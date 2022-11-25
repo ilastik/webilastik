@@ -80,6 +80,9 @@ class RawEncoder(PrecomputedChunksEncoder):
     def encode(self, data: Array5D) -> bytes:
         return data.raw("xyzc").tobytes("F")
 
+    def __eq__(self, __o: object) -> bool:
+        return isinstance(__o, RawEncoder)
+
 class JpegEncoder(PrecomputedChunksEncoder):
     def to_dto(self) -> Literal["jpeg"]:
         return "jpeg"
@@ -108,6 +111,8 @@ class JpegEncoder(PrecomputedChunksEncoder):
     def encode(self, data: Array5D) -> bytes:
         raise NotImplementedError
 
+    def __eq__(self, __o: object) -> bool:
+        return isinstance(__o, JpegEncoder)
 
 class PrecomputedChunksScale:
     def __init__(
