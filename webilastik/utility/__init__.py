@@ -1,7 +1,7 @@
 # pyright: reportUnusedImport=false
 from traceback import StackSummary
 import traceback
-from typing import Callable, Generic, Iterable, TypeVar
+from typing import Callable, Generic, Iterable, NewType, TypeVar
 import threading
 import os
 import sys
@@ -103,6 +103,8 @@ def get_env_var_or_exit(
     return value
 
 
+Username = NewType("Username", str)
+Hostname = NewType("Hostname", str)
 
 class NewTypeNumber:
     def __init__(self, value: float) -> None:

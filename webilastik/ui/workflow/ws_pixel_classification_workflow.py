@@ -12,12 +12,10 @@ from typing import Callable, Final, List, Optional, Tuple
 import json
 from base64 import b64decode
 import ssl
-import contextlib
-from pathlib import Path, PurePosixPath
+from pathlib import PurePosixPath
 import traceback
 import re
 import datetime
-from typing_extensions import Never
 
 import aiohttp
 from aiohttp import web
@@ -29,15 +27,13 @@ from fs.errors import ResourceNotFound
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
 from webilastik.filesystem import Filesystem
-from webilastik.filesystem.bucket_fs import BucketFs
-from webilastik.filesystem.osfs import OsFs
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.server.rpc.dto import GetDatasourcesFromUrlParamsDto, GetDatasourcesFromUrlResponseDto, MessageParsingError, RpcErrorDto, SaveProjectParamsDto
 from webilastik.server.session_allocator import uncachable_json_response
 from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError
 from webilastik.ui.workflow.pixel_classification_workflow import WsPixelClassificationWorkflow
-from webilastik.utility.url import Protocol, Url
+from webilastik.utility.url import Url
 from webilastik.server.tunnel import ReverseSshTunnel
 from webilastik.ui.applet import dummy_prompt
 from webilastik.libebrains.user_token import UserToken
@@ -243,7 +239,7 @@ class WebIlastik:
             {
                 "status": "running",
                 "start_time_utc": self.start_time_utc.timestamp(),
-                "max_duration_minutes": self.max_duration_minutes,
+                "max_duration_minutes": self.max_duration_minutes.to_int(),
             },
             status=200
         )
@@ -336,6 +332,7 @@ class WebIlastik:
         )
 
     async def save_project(self, request: web.Request) -> web.Response:
+        from webilastik.filesystem.osfs import OsFs
         payload = await request.json()
         params_result = SaveProjectParamsDto.from_json_value(payload)
         if isinstance(params_result, MessageParsingError):
@@ -357,6 +354,7 @@ class WebIlastik:
         return web.Response(status=200, text=f"Project saved to {filesystem.geturl(file_path.as_posix())}")
 
     async def load_project(self, request: web.Request) -> web.Response:
+        from webilastik.filesystem.osfs import OsFs
         payload = await request.json()
         params_result = SaveProjectParamsDto.from_json_value(payload)
         if isinstance(params_result, MessageParsingError):
@@ -465,47 +463,28 @@ class WebIlastik:
         raise Exception(f"Should be unreachable") #FIMXE
 
 if __name__ == '__main__':
-    from argparse import ArgumentParser
-
-    parser = ArgumentParser()
-    parser.add_argument("--max-duration-minutes", type=int, required=True, help="Number of minutes this workflow can run for")
-    parser.add_argument("--listen-socket", type=Path, required=True)
-    parser.add_argument("--session-url", required=True)
-
-
-    subparsers = parser.add_subparsers(required=False, help="tunnel stuff")
-    tunnel_parser = subparsers.add_parser("tunnel", help="Creates a reverse tunnel to an orchestrator")
-    tunnel_parser.add_argument("--remote-username", type=str, required=True)
-    tunnel_parser.add_argument("--remote-host", required=True)
-    tunnel_parser.add_argument("--remote-unix-socket", type=Path, required=True)
-
-    args = parser.parse_args()
-
-    session_url = Url.parse_or_raise(args.session_url)
+    from webilastik.config import WorkflowConfig
+    workflow_config = WorkflowConfig.get()
 
     executor = get_executor(hint="server_tile_handler", max_workers=multiprocessing.cpu_count())
 
-    if "remote_username" in vars(args):
-        server_context = ReverseSshTunnel(
-            remote_username=args.remote_username,
-            remote_host=args.remote_host,
-            remote_unix_socket=args.remote_unix_socket,
-            local_unix_socket=args.listen_socket,
-        )
-    else:
-        server_context = contextlib.nullcontext()
-
+    server_context = ReverseSshTunnel(
+        remote_username=workflow_config.session_allocator_username,
+        remote_host=workflow_config.session_allocator_host,
+        remote_unix_socket=workflow_config.session_allocator_socket_path,
+        local_unix_socket=workflow_config.listen_socket,
+    )
 
     with server_context:
         WebIlastik(
             executor=executor,
-            max_duration_minutes=Minutes(args.max_duration_minutes),
-            session_url=session_url,
+            max_duration_minutes=workflow_config.max_duration_minutes,
+            session_url=workflow_config.session_url,
         ).run(
-            unix_socket_path=str(args.listen_socket),
+            unix_socket_path=str(workflow_config.listen_socket),
         )
     try:
-        os.remove(args.listen_socket)
+        os.remove(workflow_config.listen_socket)
     except FileNotFoundError:
         pass
 

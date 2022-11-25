@@ -1,15 +1,14 @@
-import os
-
 from fs.osfs import OSFS
 
 from webilastik.filesystem import Filesystem
 from webilastik.server.rpc.dto import OsfsDto
+from webilastik.config import WorkflowConfig
 
 
 
 class OsFs(OSFS, Filesystem):
     def __init__(self, root_path: str) -> None:
-        if(os.environ.get("WEBILASTIK_ALLOW_OSFS", "false") != "true"):
+        if(not WorkflowConfig.get().allow_local_fs): #FIXME: move this to from_dto so we can return Exception?
             raise Exception("Not allowed to open local filesystem")
         super().__init__(
             root_path,

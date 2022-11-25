@@ -1,6 +1,7 @@
 # pyright: reportUnusedCallResult=false
 
 import os
+from webilastik.config import WorkflowConfig
 
 from webilastik.datasource import DataSource
 from webilastik.server.rpc.dto import AddPixelAnnotationParams, LabelHeaderDto, StartPixelProbabilitiesExportJobParamsDto, StartSimpleSegmentationExportJobParamsDto
@@ -59,11 +60,11 @@ async def main():
         raise datasources
     assert not isinstance(datasources, (Exception, type(None)))
     ds = datasources[0]
-    token = UserToken.from_environment()
+    token = WorkflowConfig.get().ebrains_user_token
     assert isinstance(token, UserToken)
 
     async with aiohttp.ClientSession(
-        cookies={UserToken.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME.lower(): token.access_token}
+        cookies={"ebrains_user_access_token": token.access_token}
     ) as session:
         print(f"Creating new session--------------")
         async with session.post(ilastik_root_url.concatpath("api/session").raw, json={"session_duration_minutes": 15}) as response:

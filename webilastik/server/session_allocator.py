@@ -2,6 +2,7 @@
 # pyright: reportUnusedCallResult=false
 
 from functools import wraps
+import getpass
 import json
 from typing import Any, Callable, Coroutine, Dict, List, Literal, NoReturn, Optional, Set
 from pathlib import Path, PurePosixPath
@@ -32,7 +33,8 @@ from webilastik.server.rpc.dto import (
     MessageParsingError,
     RpcErrorDto,
 )
-from webilastik.utility import ComputeNodes, NodeHours
+from webilastik.config import SessionAllocatorConfig
+from webilastik.utility import ComputeNodes, Hostname, NodeHours, Username
 from webilastik.utility.url import Url
 
 
@@ -69,6 +71,9 @@ def uncachable_json_response(payload: JsonValue, *, status: int) -> web.Response
     )
 
 class EbrainsLogin:
+    EBRAINS_USER_ACCESS_TOKEN_COOKIE_KEY="ebrains_user_access_token"
+    EBRAINS_USER_REFRESH_TOKEN_COOKIE_KEY="ebrains_user_refresh_token"
+
     def __init__(self, user_token: UserToken, refreshed: bool):
         self.user_token = user_token
         self.refreshed = refreshed
@@ -76,8 +81,8 @@ class EbrainsLogin:
 
     @classmethod
     async def from_cookie(cls, request: web.Request, http_client_session: ClientSession, oidc_client: OidcClient) -> Optional["EbrainsLogin"]:
-        access_token = request.cookies.get(UserToken.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME.lower())
-        refresh_token = request.cookies.get(UserToken.EBRAINS_USER_REFRESH_TOKEN_ENV_VAR_NAME.lower())
+        access_token = request.cookies.get(cls.EBRAINS_USER_ACCESS_TOKEN_COOKIE_KEY)
+        refresh_token = request.cookies.get(cls.EBRAINS_USER_REFRESH_TOKEN_COOKIE_KEY)
         if access_token is None or refresh_token is None:
             return None
         user_token = UserToken(access_token=access_token, refresh_token=refresh_token)
@@ -100,10 +105,10 @@ class EbrainsLogin:
 
     def set_cookie(self, response: web.Response) -> web.Response:
         response.set_cookie(
-            name=UserToken.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME.lower(), value=self.user_token.access_token, secure=True
+            name=self.EBRAINS_USER_ACCESS_TOKEN_COOKIE_KEY, value=self.user_token.access_token, secure=True
         )
         response.set_cookie(
-            name=UserToken.EBRAINS_USER_REFRESH_TOKEN_ENV_VAR_NAME.lower(), value=self.user_token.refresh_token, secure=True
+            name=self.EBRAINS_USER_REFRESH_TOKEN_COOKIE_KEY, value=self.user_token.refresh_token, secure=True
         )
         return response
 
@@ -181,7 +186,7 @@ class SessionAllocator:
         ebrains_login = await EbrainsLogin.from_cookie(request, http_client_session=self.http_client_session, oidc_client=self.oidc_client)
         if ebrains_login is None:
             return uncachable_json_response(RpcErrorDto(error=f"Not logged in").to_json_value(), status=400)
-        response = web.json_response({UserToken.EBRAINS_USER_ACCESS_TOKEN_ENV_VAR_NAME.lower(): ebrains_login.user_token.access_token})
+        response = web.json_response({EbrainsLogin.EBRAINS_USER_ACCESS_TOKEN_COOKIE_KEY: ebrains_login.user_token.access_token})
         ebrains_login.set_cookie(response)
         return response
 
@@ -309,11 +314,19 @@ class SessionAllocator:
 
             ###################################################################
 
+            server_config = SessionAllocatorConfig.get()
+
             session_result = await session_launcher.launch(
                 user_id=user_info.sub,
-                time=Minutes(params.session_duration_minutes),
-                ebrains_user_token=ebrains_login.user_token,
                 compute_session_id=compute_session_id,
+                allow_local_fs=server_config.allow_local_fs,
+                ebrains_oidc_client=server_config.ebrains_oidc_client,
+                ebrains_user_token=ebrains_login.user_token,
+                max_duration_minutes=Minutes(params.session_duration_minutes),
+                session_allocator_host=Hostname("app.ilastik.org"),
+                session_allocator_username=Username(getpass.getuser()),
+                session_allocator_socket_path=Path(f"/tmp/to-session-{compute_session_id}"),
+                session_url=self._make_compute_session_url(compute_session_id=compute_session_id),
             )
 
             if isinstance(session_result, Exception):
@@ -495,19 +508,11 @@ class SessionAllocator:
         web.run_app(self.app, port=port) #type: ignore
 
 if __name__ == '__main__':
-    from argparse import ArgumentParser
-    import os
-    fernet = Fernet(key=os.environ["WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY"].encode('utf8'))
-    parser = ArgumentParser()
-    parser.add_argument("--external-url", type=Url.parse, required=True, help="Url from which sessions can be accessed (where the session sockets live)")
-
-    args = parser.parse_args()
-
-    allow_local_sessions = bool(int(os.environ.get("WEBILASTIK_ALLOW_LOCAL_SESSIONS", "0")))
+    server_config = SessionAllocatorConfig.get()
 
     SessionAllocator(
-        fernet=fernet,
-        external_url=args.external_url,
-        oidc_client=OidcClient.from_environment(),
-        allow_local_sessions=allow_local_sessions
+        fernet=server_config.fernet,
+        external_url=server_config.external_url,
+        oidc_client=server_config.ebrains_oidc_client,
+        allow_local_sessions=server_config.allow_local_compute_sessions
     ).run(port=5000)

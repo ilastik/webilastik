@@ -134,16 +134,6 @@ tasks:
       - "{{.NEUROGLANCER_BUNDLE_PATH}}"
     generates:
       - "{{.DEB_TREE_PATH}}/**/*"
-    preconditions:
-      - test -n "$EBRAINS_CLIENT_ID"
-      - test -n "$EBRAINS_CLIENT_SECRET"
-      - test -n "$WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY"
-      - |
-        python3 <<CHECK_FERNET_KEY
-        import os;
-        from cryptography.fernet import Fernet;
-        Fernet(key=os.environ["WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY"].encode())
-        CHECK_FERNET_KEY
     vars:
       CONTROL_FILE_CONTENTS: |-
           Package: webilastik
@@ -155,6 +145,19 @@ tasks:
           Maintainer: ilastik Team <team@ilastik.org>
           Description: Webilastik
            Server and frontend for the web version of ilastik
+      SERVER_SYSTEMD_ENV_CONFS:
+        sh: |-
+          python3 <<SERVER_CONFIG
+          from webilastik.config import SessionAllocatorConfig
+          from webilastik.utility.url import Url
+          print(
+            SessionAllocatorConfig.from_env(
+              allow_local_fs=False,
+              allow_local_compute_sessions=False,
+              external_url=Url.parse_or_raise('https://app.ilastik.org/')
+            ).to_systemd_environment_confs()
+          )
+          SERVER_CONFIG
       SERVICE_FILE_CONTENTS: |-
         [Unit]
         Description=Webilastik session allocator server
@@ -169,13 +172,10 @@ tasks:
         # FIXME/BUG: aiohttp must be told where certs are when running from packed environment
         Environment=SSL_CERT_DIR=/etc/ssl/certs/
         Environment=REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
-        Environment=WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY={{.WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY}}
-        Environment=EBRAINS_CLIENT_ID={{.EBRAINS_CLIENT_ID}}
-        Environment=EBRAINS_CLIENT_SECRET={{.EBRAINS_CLIENT_SECRET}}
+        {{.SERVER_SYSTEMD_ENV_CONFS}}
 
         Environment=PYTHONPATH=/opt/webilastik/
-        ExecStart=/opt/webilastik/conda_env/bin/python3 -B /opt/webilastik/webilastik/server/session_allocator.py \
-            --external-url=https://app.ilastik.org/
+        ExecStart=/opt/webilastik/conda_env/bin/python3 -B /opt/webilastik/webilastik/server/session_allocator.py
 
         TimeoutStopSec=30
         KillMode=mixed
@@ -235,6 +235,20 @@ tasks:
 
   start-local-server:
     deps: [stop-local-server, create-deb-tree]
+    vars:
+      SERVER_SYSTEMD_ENV_CONFS:
+        sh: |-
+          python3 <<SERVER_CONFIG
+          from webilastik.config import SessionAllocatorConfig
+          from webilastik.utility.url import Url
+          print(
+            SessionAllocatorConfig.from_env(
+              allow_local_fs=True,
+              allow_local_compute_sessions=True,
+              external_url=Url.parse_or_raise('https://app.ilastik.org/')
+            ).to_systemd_environment_confs()
+          )
+          SERVER_CONFIG
     cmds: #this assumes an nginx like the one in webilastik.conf running already
       - echo "Ensuring that app.ilastik.org points to localhost"
       - getent hosts app.ilastik.org | awk '{ print $1 }' | grep -qE '^(127\.0\.0\.1|::1)$'
@@ -266,7 +280,8 @@ tasks:
         TTYPath=$(tty)
         StandardOutput=tty
         StandardError=inherit
-        Environment=WEBILASTIK_ALLOW_LOCAL_SESSIONS=1
+
+        {{.SERVER_SYSTEMD_ENV_CONFS}}
 
         ' > {{.WEBILASTIK_DEV_UNIT_CONFIG_DIR}}/output_to_tty.conf"
 
