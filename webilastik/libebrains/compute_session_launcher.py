@@ -656,7 +656,7 @@ class JusufSshJobLauncher(SshJobLauncher):
             #SBATCH --partition=batch
             #SBATCH --hint=nomultithread
 
-            jutil env activate -p icei-hbp-2022-0010
+            jutil env activate -p {self.account}
             {job_config.to_bash_exports()}
 
             set -xeu
