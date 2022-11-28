@@ -1,11 +1,12 @@
 import { Applet } from "../../client/applets/applet";
 import { CheckDatasourceCompatibilityParams, CheckDatasourceCompatibilityResponse } from "../../client/dto";
 import { Color, FsDataSource, Session } from "../../client/ilastik";
-import { assertUnreachable, createElement, createImage, createInput, createInputParagraph, removeElement } from "../../util/misc";
+import { assertUnreachable, createElement, createImage, createInputParagraph, removeElement } from "../../util/misc";
 import { ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonObject, ensureJsonString, JsonValue } from "../../util/serialization";
 import { FailedView, PredictionsView, RawDataView, StrippedPrecomputedView, UnsupportedDatasetView } from "../../viewer/view";
 import { Viewer } from "../../viewer/viewer";
 import { CssClasses } from "../css_classes";
+import { BooleanInput } from "./boolean_input";
 
 const classifier_descriptions = ["disabled", "waiting for inputs", "training", "ready", "error"] as const;
 export type ClassifierDescription = typeof classifier_descriptions[number];
@@ -47,7 +48,7 @@ export class PredictingWidget extends Applet<State>{
 
     public readonly element: HTMLDivElement
     private classifierDescriptionDisplay: HTMLSpanElement
-    private liveUpdateCheckbox: HTMLInputElement
+    private liveUpdateCheckbox: BooleanInput
     private compatCheckGeneration = 0;
     private state: State = {
         generation: -1,
@@ -64,7 +65,7 @@ export class PredictingWidget extends Applet<State>{
             onNewState: (new_state: State) => {
                 this.state = new_state
                 this.showInfo(new_state.description)
-                this.liveUpdateCheckbox.checked = new_state.live_update
+                this.liveUpdateCheckbox.value = new_state.live_update
                 this.refreshPredictions()
             },
         })
@@ -74,9 +75,9 @@ export class PredictingWidget extends Applet<State>{
 
         this.element = createElement({tagName: "div", parentElement})
         createElement({tagName: "label", innerText: "Live Update", parentElement: this.element})
-        this.liveUpdateCheckbox = createInput({
-            inputType: "checkbox", parentElement: this.element, onClick: () => {
-                this.doRPC("set_live_update", {live_update: this.liveUpdateCheckbox.checked})
+        this.liveUpdateCheckbox = new BooleanInput({
+            parentElement: this.element, onClick: () => {
+                this.doRPC("set_live_update", {live_update: this.liveUpdateCheckbox.value})
             }
         })
         this.classifierDescriptionDisplay = createElement({tagName: "span", parentElement: this.element})
