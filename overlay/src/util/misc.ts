@@ -128,7 +128,7 @@ export function createInput(params: {
     if(params.id !== undefined){
         input.id = params.id
     }
-    input.disabled = params.disabled ? true : false
+    input.disabled = params.disabled === undefined ? false : params.disabled
     return input
 }
 
