@@ -1,7 +1,7 @@
 import { quat, vec3 } from "gl-matrix"
 import { BrushStroke } from "../../.."
 import { Color, FsDataSource, PrecomputedChunksDataSource, Session } from "../../../client/ilastik"
-import { createElement, createInput, removeElement } from "../../../util/misc"
+import { createElement, removeElement } from "../../../util/misc"
 import { CollapsableWidget } from "../collapsable_applet_gui"
 import { PopupSelect } from "../selector_widget"
 import { BrushingOverlay } from "./brushing_overlay"
@@ -12,6 +12,7 @@ import { PredictingWidget } from "../predicting_widget";
 import { CssClasses } from "../../css_classes"
 import { UnsupportedDatasetView, FailedView, PredictionsView, StrippedPrecomputedView } from "../../../viewer/view"
 import { ErrorPopupWidget } from "../popup"
+import { BooleanInput } from "../boolean_input"
 
 
 export class BrushingWidget{
@@ -20,7 +21,7 @@ export class BrushingWidget{
     private readonly status_display: HTMLElement
     private readonly resolutionSelectionContainer: HTMLElement
     private readonly trainingWidget: HTMLDivElement
-    private readonly brushingEnabledCheckbox: HTMLInputElement
+    private readonly brushingEnabledCheckbox: BooleanInput
 
     private animationRequestId: number = 0
     session: Session
@@ -65,12 +66,11 @@ export class BrushingWidget{
 
             let brushingEnabledParagraph = createElement({tagName: "p", parentElement: this.trainingWidget})
             createElement({tagName: "label", parentElement: brushingEnabledParagraph, innerText: "Enable Brushing: "})
-            this.brushingEnabledCheckbox = createInput({
+            this.brushingEnabledCheckbox = new BooleanInput({
                 parentElement: brushingEnabledParagraph,
-                inputType: "checkbox",
                 title: "Enable to draw annotations by clicking and dragging. Disable to use the viewer's controls to navigate over the data.",
                 onClick: () => {
-                    this.setBrushingEnabled(this.brushingEnabledCheckbox.checked)
+                    this.setBrushingEnabled(this.brushingEnabledCheckbox.value)
                 }
             })
             this.brushingEnabledInfoSpan = createElement({
@@ -97,7 +97,7 @@ export class BrushingWidget{
     }
 
     private setBrushingEnabled(brushingEnabled: boolean){
-        this.brushingEnabledCheckbox.checked = brushingEnabled
+        this.brushingEnabledCheckbox.value = brushingEnabled
         this.overlay?.setBrushingEnabled(brushingEnabled)
         this.brushingEnabledInfoSpan.innerText = brushingEnabled ? "Navigating is disabled" : "Navigating is enabled"
     }
@@ -133,7 +133,7 @@ export class BrushingWidget{
                 }
             },
         })
-        overlay.setBrushingEnabled(this.brushingEnabledCheckbox.checked)
+        overlay.setBrushingEnabled(this.brushingEnabledCheckbox.value)
 
         window.cancelAnimationFrame(this.animationRequestId)
         const render = () => {
