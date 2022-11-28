@@ -162,14 +162,18 @@ export class Url implements IJsonable{
     }
 
     public static fromDto(message: UrlDto): Url{
+        const search = new Map<string, string>();
+        for(const key in message.search){
+            search.set(key, message.search[key])
+        }
         return new Url({
             datascheme: message.datascheme,
             protocol: message.protocol,
             hostname: message.hostname,
             port: message.port,
             path: Path.parse(message.path),
-
-
+            hash: message.fragment,
+            search: search,
         })
     }
 
