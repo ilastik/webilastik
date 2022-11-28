@@ -9,7 +9,6 @@ import { BrushelBoxRenderer } from "./brush_boxes_renderer"
 import { BrushingApplet } from "./brush_strokes_container"
 import { Viewer } from "../../../viewer/viewer"
 import { PredictingWidget } from "../predicting_widget";
-import { CssClasses } from "../../css_classes"
 import { UnsupportedDatasetView, FailedView, PredictionsView, StrippedPrecomputedView } from "../../../viewer/view"
 import { ErrorPopupWidget } from "../popup"
 import { BooleanInput } from "../boolean_input"
@@ -31,7 +30,6 @@ export class BrushingWidget{
     public readonly canvas: HTMLCanvasElement
     private brushingApplet: BrushingApplet
     private predictingWidget: PredictingWidget
-    private brushingEnabledInfoSpan: HTMLSpanElement
     private brushStrokeRenderer: BrushelBoxRenderer
 
     constructor({
@@ -69,15 +67,11 @@ export class BrushingWidget{
             this.brushingEnabledCheckbox = new BooleanInput({
                 parentElement: brushingEnabledParagraph,
                 title: "Enable to draw annotations by clicking and dragging. Disable to use the viewer's controls to navigate over the data.",
+                valueExplanations: {on: "Navigating is disabled", off: "Navigating is enabled"},
+                disabled: true,
                 onClick: () => {
                     this.setBrushingEnabled(this.brushingEnabledCheckbox.value)
                 }
-            })
-            this.brushingEnabledInfoSpan = createElement({
-                tagName: "span",
-                parentElement: brushingEnabledParagraph,
-                cssClasses: [CssClasses.InfoText],
-                innerText: ""
             })
 
             this.brushingApplet = new BrushingApplet({
@@ -87,146 +81,145 @@ export class BrushingWidget{
                 gl: this.gl,
                 onDataSourceClicked: async (datasource) => this.viewer.openDataViewFromDataSource(datasource),
                 onLabelSelected: () => {
-                    this.setBrushingEnabled(true)
+                    if(!this.brushingEnabledCheckbox.disabled){
+                        this.setBrushingEnabled(true)
+                    }
                 }
             })
 
         viewer.addDataChangedHandler(() => this.handleViewerDataDisplayChange())
-        this.setBrushingEnabled(false)
+        // this.setBrushingEnabled(false)
         this.handleViewerDataDisplayChange()
     }
 
     private setBrushingEnabled(brushingEnabled: boolean){
         this.brushingEnabledCheckbox.value = brushingEnabled
         this.overlay?.setBrushingEnabled(brushingEnabled)
-        this.brushingEnabledInfoSpan.innerText = brushingEnabled ? "Navigating is disabled" : "Navigating is enabled"
     }
 
-    public hideTrainingUi(){
+    private setMode(
+        mode: {name: "training", trainingDatasource: FsDataSource} |
+              {name: "selecting resolution", datasources: FsDataSource[]} |
+              {name: "error", message: string} |
+              {name:"no data"}
+    ){
+        const lastBrushingEnabledValue = this.brushingEnabledCheckbox.value
+
+        this.brushingEnabledCheckbox.disabled = true
+        this.setBrushingEnabled(false)
+        this.resolutionSelectionContainer.innerHTML = ""
+        this.clearStatus()
         window.cancelAnimationFrame(this.animationRequestId)
-        this.trainingWidget.style.display = "none"
         this.canvas.style.display = "none"
         this.overlay?.destroy()
         this.overlay = undefined
-    }
 
-    public showTrainingUi(trainingDatasource: FsDataSource){
-        this.trainingWidget.style.display = "block"
-        this.canvas.style.display = "block"
-        let overlay = this.overlay = new BrushingOverlay({
-            gl: this.gl,
-            trackedElement: this.viewer.getTrackedElement(),
-            viewport_drivers: this.viewer.getViewportDrivers(),
-            brush_stroke_handler: {
-                handleNewBrushStroke: (params: {start_position_uvw: vec3, camera_orientation_uvw: quat}) => {
-                    this.stagingStroke = BrushStroke.create({
-                        gl: this.gl,
-                        start_postition_uvw: params.start_position_uvw, //FIXME put scale somewhere
-                        annotated_data_source: trainingDatasource,
-                        camera_orientation: params.camera_orientation_uvw, //FIXME: realy data space? rename param in BrushStroke?
+        if(mode.name == "no data"){
+            //noop
+        }else if(mode.name == "error"){
+            this.showStatus(mode.message)
+        }else if(mode.name == "selecting resolution"){
+            createElement({tagName: "label", innerHTML: "Select a voxel size to annotate on:", parentElement: this.resolutionSelectionContainer});
+            new PopupSelect<FsDataSource>({
+                popupTitle: "Select a voxel size to annotate on",
+                parentElement: this.resolutionSelectionContainer,
+                options: mode.datasources,
+                optionRenderer: (args) => {
+                    let datasource = args.option
+                    return createElement({
+                        tagName: "span",
+                        parentElement: args.parentElement,
+                        innerText: datasource.resolutionString
                     })
-                    return this.stagingStroke
                 },
-                handleFinishedBrushStroke: (stagingStroke: BrushStroke) => {
-                    this.stagingStroke = undefined
-                    this.brushingApplet.addBrushStroke(stagingStroke)
+                onChange: async (datasource) => {
+                    if(!(datasource instanceof PrecomputedChunksDataSource)){
+                        new ErrorPopupWidget({message: "Can't handle this type of datasource yet"})
+                        return
+                    }
+                    let stripped_view = new StrippedPrecomputedView({
+                        datasource,
+                        name: datasource.getDisplayString(),
+                        session: this.session,
+                    })
+                    this.viewer.openDataView(stripped_view)
+                },
+            })
+        }else if(mode.name == "training"){
+            this.brushingEnabledCheckbox.disabled = false
+            this.canvas.style.display = "block"
+            let overlay = this.overlay = new BrushingOverlay({
+                gl: this.gl,
+                trackedElement: this.viewer.getTrackedElement(),
+                viewport_drivers: this.viewer.getViewportDrivers(),
+                brush_stroke_handler: {
+                    handleNewBrushStroke: (params: {start_position_uvw: vec3, camera_orientation_uvw: quat}) => {
+                        this.stagingStroke = BrushStroke.create({
+                            gl: this.gl,
+                            start_postition_uvw: params.start_position_uvw, //FIXME put scale somewhere
+                            annotated_data_source: mode.trainingDatasource,
+                            camera_orientation: params.camera_orientation_uvw, //FIXME: realy data space? rename param in BrushStroke?
+                        })
+                        return this.stagingStroke
+                    },
+                    handleFinishedBrushStroke: (stagingStroke: BrushStroke) => {
+                        this.stagingStroke = undefined
+                        this.brushingApplet.addBrushStroke(stagingStroke)
+                    }
+                },
+            })
+            overlay.setBrushingEnabled(lastBrushingEnabledValue)
+            const render = () => {
+                let strokes = new Array<[Color, BrushStroke[]]>();
+                if(this.stagingStroke){
+                    if(!this.brushingApplet.currentColor){
+                        console.error("FIXME: no color selected but still brushing")
+                    }else{
+                        strokes.push([this.brushingApplet.currentColor, [this.stagingStroke]])
+                    }
                 }
-            },
-        })
-        overlay.setBrushingEnabled(this.brushingEnabledCheckbox.value)
-
-        window.cancelAnimationFrame(this.animationRequestId)
-        const render = () => {
-            let strokes = new Array<[Color, BrushStroke[]]>();
-            if(this.stagingStroke){
-                if(!this.brushingApplet.currentColor){
-                    console.error("FIXME: no color selected but still brushing")
-                }else{
-                    strokes.push([this.brushingApplet.currentColor, [this.stagingStroke]])
-                }
+                strokes = strokes.concat(this.brushingApplet.getBrushStrokes(mode.trainingDatasource))
+                overlay.render(strokes, this.brushStrokeRenderer) //FIXME? remove this optional override?
+                this.animationRequestId = window.requestAnimationFrame(render)
             }
-            strokes = strokes.concat(this.brushingApplet.getBrushStrokes(trainingDatasource))
-            overlay.render(strokes, this.brushStrokeRenderer) //FIXME? remove this optional override?
-            this.animationRequestId = window.requestAnimationFrame(render)
+            render()
         }
-        render()
     }
 
     public showStatus(message: string){
         this.status_display.innerHTML = message
+        this.status_display.style.display = "block"
     }
 
     public clearStatus(){
         this.status_display.innerHTML = ""
-    }
-
-    private resetWidgets(){
-        window.cancelAnimationFrame(this.animationRequestId)
-        this.hideTrainingUi()
-        this.resolutionSelectionContainer.innerHTML = ""
-        this.clearStatus()
+        this.status_display.style.display = "none"
     }
 
     private async handleViewerDataDisplayChange(){
-        this.resetWidgets()
-
         const view = this.viewer.getActiveView()
         if(view === undefined){
-            return this.showStatus("No data")
+            return this.setMode({name: "no data"})
         }
         if(view instanceof Error){ //FIXME: remove this? or return error from viewer?
-            return this.showStatus(`${view}`)
+            return this.setMode({name: "error", message: view.message})
         }
         if(view instanceof UnsupportedDatasetView){
-            return this.showStatus(`Unsupported data: ${view.url}`)
+            return this.setMode({name: "error", message: `Unsupported data: ${view.url}`})
         }
         if(view instanceof FailedView){
-            return this.showStatus(`Failed opening data: ${view.url}`)
+            return this.setMode({name: "error", message: `Failed opening data: ${view.url}`})
         }
         if(view instanceof PredictionsView){
-            return this.startTraining(view.raw_data)
+            return this.setMode({name: "training", trainingDatasource: view.raw_data})
         }
         if(view instanceof StrippedPrecomputedView){
-            return this.startTraining(view.datasource)
+            return this.setMode({name:"training", trainingDatasource: view.datasource})
         }
         if(view.datasources.length == 1){
-            return this.startTraining(view.datasources[0])
+            return this.setMode({name: "training", trainingDatasource: view.datasources[0]})
         }
-
-        this.showStatus(`Viewing multi-resolution datasource`)
-
-        createElement({tagName: "label", innerHTML: "Select a voxel size to annotate on:", parentElement: this.resolutionSelectionContainer});
-        new PopupSelect<FsDataSource>({
-            popupTitle: "Select a voxel size to annotate on",
-            parentElement: this.resolutionSelectionContainer,
-            options: view.datasources,
-            optionRenderer: (args) => {
-                let datasource = args.option
-                return createElement({
-                    tagName: "span",
-                    parentElement: args.parentElement,
-                    innerText: datasource.resolutionString
-                })
-            },
-            onChange: async (datasource) => {
-                if(!(datasource instanceof PrecomputedChunksDataSource)){
-                    new ErrorPopupWidget({message: "Can't handle this type of datasource yet"})
-                    return
-                }
-                let stripped_view = new StrippedPrecomputedView({
-                    datasource,
-                    name: datasource.getDisplayString(),
-                    session: this.session,
-                })
-                this.viewer.openDataView(stripped_view)
-            },
-        })
-    }
-
-    private startTraining(datasource: FsDataSource){
-        this.resetWidgets()
-        this.showTrainingUi(datasource)
-        this.showStatus(`Now training on ${datasource.getDisplayString()}`)
+        this.setMode({name: "selecting resolution", datasources: view.datasources})
     }
 
     public destroy(){
