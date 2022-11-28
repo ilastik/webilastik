@@ -91,8 +91,8 @@ export class NeuroglancerDriver implements IViewerDriver{
 
     constructor(public readonly viewer: any){
         this.guessShader()
-        this.addDataChangedHandler(() => console.log("driver: Layers changed!"))
-        this.addViewportsChangedHandler(() => console.log("driver: Viewports changed!"))
+        // this.addDataChangedHandler(() => console.log("driver: Layers changed!"))
+        // this.addViewportsChangedHandler(() => console.log("driver: Viewports changed!"))
         this.addDataChangedHandler(this.guessShader)
     }
 

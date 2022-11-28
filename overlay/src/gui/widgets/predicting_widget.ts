@@ -137,7 +137,7 @@ export class PredictingWidget extends Applet<State>{
 
     private async refreshPredictions(){
         const compatCheckGeneration = this.compatCheckGeneration = this.compatCheckGeneration + 1
-        console.log(`(${compatCheckGeneration}) INFO: Starting new refreshPredictions`)
+        // console.log(`(${compatCheckGeneration}) INFO: Starting new refreshPredictions`)
 
         let stalePredictionViews = new Array<PredictionsView>();
         let validPredictionViews = new Array<PredictionsView>();
@@ -176,37 +176,37 @@ export class PredictingWidget extends Applet<State>{
 
         for(const [name, rawDataSource] of Array.from(predictionRawDataSources.entries())){
             if(validPredictionViews.find(prediction_view => prediction_view.raw_data.equals(rawDataSource))){
-                console.log(`(${compatCheckGeneration}) INFO: No need to open predictions for ${rawDataSource.url}`)
+                // console.log(`(${compatCheckGeneration}) INFO: No need to open predictions for ${rawDataSource.url}`)
                 predictionRawDataSources.delete(name)
             }
         }
 
         for(const view of stalePredictionViews){
-            console.log(`(${compatCheckGeneration}) WORK: Closing predictions view for ${view.raw_data.url}`)
+            // console.log(`(${compatCheckGeneration}) WORK: Closing predictions view for ${view.raw_data.url}`)
             this.viewer.closeView(view)
             if(compatCheckGeneration != this.compatCheckGeneration){
-                console.log(`(${compatCheckGeneration}) ABORTING (closing old preds): function recursed from events`)
+                // console.log(`(${compatCheckGeneration}) ABORTING (closing old preds): function recursed from events`)
                 return
             }
         }
 
         if(predictionRawDataSources.size == 0){
-            console.log(`(${compatCheckGeneration}) DONE: No remaining raw data needing predictions.`)
+            // console.log(`(${compatCheckGeneration}) DONE: No remaining raw data needing predictions.`)
             return
         }
 
         if(this.state.description != "ready"){
-            console.log(`(${compatCheckGeneration}) DONE: Classifier is not ready, not opening predictions.`)
+            // console.log(`(${compatCheckGeneration}) DONE: Classifier is not ready, not opening predictions.`)
             return
         }
 
         const compatibilities = await this.checkDatasourceCompatibility(Array.from(predictionRawDataSources.values()))
         if(compatCheckGeneration != this.compatCheckGeneration){
-            console.log(`(${compatCheckGeneration}) ABORTING: Predicting widget hook went stale.`)
+            // console.log(`(${compatCheckGeneration}) ABORTING: Predicting widget hook went stale.`)
             return
         }
         if(compatibilities instanceof Error){
-            console.log(`(${compatCheckGeneration}) ABORTING: Error when checking datasource compatibilities: ${compatibilities.message}`)
+            // console.log(`(${compatCheckGeneration}) ABORTING: Error when checking datasource compatibilities: ${compatibilities.message}`)
             return
         }
 
