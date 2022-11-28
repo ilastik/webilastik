@@ -1,6 +1,6 @@
 import { quat, vec3 } from "gl-matrix"
 import { BrushStroke } from "../../.."
-import { Color, FsDataSource, Session } from "../../../client/ilastik"
+import { Color, FsDataSource, PrecomputedChunksDataSource, Session } from "../../../client/ilastik"
 import { createElement, createInput, removeElement } from "../../../util/misc"
 import { CollapsableWidget } from "../collapsable_applet_gui"
 import { PopupSelect } from "../selector_widget"
@@ -11,6 +11,7 @@ import { Viewer } from "../../../viewer/viewer"
 import { PredictingWidget } from "../predicting_widget";
 import { CssClasses } from "../../css_classes"
 import { UnsupportedDatasetView, FailedView, PredictionsView, StrippedPrecomputedView } from "../../../viewer/view"
+import { ErrorPopupWidget } from "../popup"
 
 
 export class BrushingWidget{
@@ -208,7 +209,16 @@ export class BrushingWidget{
                 })
             },
             onChange: async (datasource) => {
-                this.viewer.openDataViewFromDataSource(datasource)
+                if(!(datasource instanceof PrecomputedChunksDataSource)){
+                    new ErrorPopupWidget({message: "Can't handle this type of datasource yet"})
+                    return
+                }
+                let stripped_view = new StrippedPrecomputedView({
+                    datasource,
+                    name: datasource.getDisplayString(),
+                    session: this.session,
+                })
+                this.viewer.openDataView(stripped_view)
             },
         })
     }
