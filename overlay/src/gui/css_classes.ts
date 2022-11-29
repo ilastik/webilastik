@@ -11,4 +11,8 @@ export enum CssClasses{
     ItkCheckbox = "ItkCheckbox",
     ItkBrushStrokeTableCaption = "ItkBrushStrokeTableCaption",
     ItkInvalidTextInput = "ItkInvalidTextInput",
+    ItkSelected = "ItkSelected",
+    ItkFsNodeWidget = "ItkFsNodeWidget",
+    ItkExpandFolderWidget = "ItkExpandFolderWidget",
+    ItkFsNodeName = "ItkFsNodeName",
 }

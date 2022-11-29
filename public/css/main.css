@@ -256,6 +256,11 @@ input[type=button], input[type=submit], .ItkPopupSelectTrigger{
 
 .ItkFolderWidget summary{
     list-style: none;
+    display: flex;
+}
+
+.ItkFolderWidget summary.ItkFsNodeName{
+    flex-grow: 1;
 }
 
 .ItkFileWidget{
