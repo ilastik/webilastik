@@ -145,7 +145,7 @@ class BucketFs(Filesystem):
             str(PurePosixPath("/").joinpath(subpath)).lstrip("/")
         )
 
-    def _list_objects(self, *, prefix: str, limit: Optional[int] = None) -> List[Union[BucketObject, BucketSubdir]]:
+    def list_objects(self, *, prefix: str, limit: Optional[int] = None) -> List[Union[BucketObject, BucketSubdir]]:
         list_objects_path = self.bucket_url.updated_with(extra_search={
             "delimiter": "/",
             "prefix": prefix.lstrip("/"),
@@ -211,7 +211,7 @@ class BucketFs(Filesystem):
         prefix = str(self._make_prefix(path))
         if not prefix.endswith("/"):
             prefix += "/"
-        return [str(item.name) for item in self._list_objects(prefix=prefix, limit=limit)]
+        return [str(item.name) for item in self.list_objects(prefix=prefix, limit=limit)]
 
     def makedir(self, path: str, permissions: Optional[Permissions] = None, recreate: bool = False) -> SubFS[FS]:
         return cast(SubFS[FS], BucketFs(
