@@ -156,6 +156,12 @@
     outline: none;
 }
 
+.ItkCheckbox{
+    transform: scale(2);
+    margin-left: 10px;
+    margin-right: 10px;
+}
+
 .ItkInputParagraph{
     display: flex;
 }
