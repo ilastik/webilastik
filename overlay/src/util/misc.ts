@@ -42,14 +42,17 @@ export type InlineCss = Partial<Omit<
     "getPropertyPriority" | "getPropertyValue" | "item" | "removeProperty" | "setProperty"
 >>
 
-export function createElement<K extends keyof HTMLElementTagNameMap>({tagName, parentElement, innerHTML, innerText, cssClasses, inlineCss={}, onClick}:{
+export function createElement<K extends keyof HTMLElementTagNameMap>({
+        tagName, parentElement, innerHTML, innerText, cssClasses, inlineCss={}, onClick, onDblClick
+    }:{
     tagName: K,
     parentElement:HTMLElement | undefined,
     innerHTML?:string,
     innerText?:string,
     cssClasses?:Array<string>,
     inlineCss?: InlineCss,
-    onClick?(event: Event): void
+    onClick?(event: MouseEvent): void,
+    onDblClick?(event: MouseEvent): void
 }): HTMLElementTagNameMap[K]{
 
     const element = document.createElement(tagName);
@@ -66,7 +69,11 @@ export function createElement<K extends keyof HTMLElementTagNameMap>({tagName, p
         element.classList.add(klass)
     })
     if(onClick !== undefined){
-        element.addEventListener('click', onClick)
+        (element as HTMLElement).addEventListener('click', onClick)
+    }
+    if(onDblClick !== undefined){
+        (element as HTMLElement).addEventListener('dblclick', onDblClick)
+
     }
     applyInlineCss(element, inlineCss)
     return element

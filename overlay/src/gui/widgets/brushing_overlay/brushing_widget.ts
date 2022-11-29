@@ -225,7 +225,7 @@ export class BrushingWidget{
     public destroy(){
         window.cancelAnimationFrame(this.animationRequestId)
         this.overlay?.destroy()
-        removeElement(this.gl.canvas)
+        removeElement(this.gl.canvas as HTMLElement) //FIXME?
         removeElement(this.element)
 
         this.predictingWidget.destroy()
