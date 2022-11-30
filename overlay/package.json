@@ -9,7 +9,7 @@
     "build-cjs": "rm -rf build/cjs && npx tsc --outDir build/cjs --module CommonJS",
     "build": "npm run build-cjs",
     "package": "npm run build && npm pack",
-    "bundle-ng-inject": "npm run build && npx esbuild src/injection/inject_into_neuroglancer.ts --bundle --loader:.ts=ts --sourcemap --outfile=build/inject_into_neuroglancer.js"
+    "bundle-ng-inject": "npx tsc --noEmit && npx esbuild src/injection/inject_into_neuroglancer.ts --bundle --loader:.ts=ts --sourcemap --outfile=build/inject_into_neuroglancer.js"
   },
   "files": [
     "build/**/*"
