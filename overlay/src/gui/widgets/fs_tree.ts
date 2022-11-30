@@ -1,13 +1,16 @@
-import { createElement } from "../../util/misc";
+import { createElement, removeElement } from "../../util/misc";
+import { Path } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
 
 export class FsFileWidget{
     public readonly element: HTMLParagraphElement;
     public readonly parent: FsFolderWidget;
+    public readonly path: Path;
 
     constructor(params: {
         parent: FsFolderWidget, name: string, onDblClick?: () => void
     }){
+        this.path = params.parent.path.joinPath(params.name)
         this.element = createElement({
             tagName: "p",
             parentElement: params.parent.element,
@@ -61,8 +64,14 @@ export class FsFolderWidget{
     private children = new Map<string, FsFileWidget | FsFolderWidget>()
     private expandWidget: HTMLSpanElement;
     public readonly parent: FsFolderWidget | undefined
+    public readonly path: Path
 
-    constructor(params: {parent: HTMLElement | FsFolderWidget, name: string, onOpen?: () => void}){
+    constructor(params: {
+        parent: HTMLElement | FsFolderWidget,
+        name: string,
+        onOpen?: (widget: FsFolderWidget) => void,
+    }){
+        this.path = params.parent instanceof FsFolderWidget ? params.parent.path.joinPath(params.name) : Path.parse("/")
         this.parent = params.parent instanceof FsFolderWidget ? params.parent : undefined
         this.element = createElement({
             tagName: "details",
@@ -85,7 +94,7 @@ export class FsFolderWidget{
                 if(this.element.open){
                     this.expandWidget.innerText = "▼"
                     if(params.onOpen){
-                        params.onOpen()
+                        params.onOpen(this)
                     }
                 }else{
                     this.expandWidget.innerText = "▶"
@@ -99,6 +108,15 @@ export class FsFolderWidget{
             this.handleNodeClicked(this, ev)
             return false
         }})
+    }
+
+    public clear(){
+        this.children = new Map();
+        for(const childElement of Array.from(this.element.children)){
+            if(childElement != this.summary){
+                removeElement(childElement as HTMLElement)
+            }
+        }
     }
 
     public handleNodeClicked(node: FsFileWidget | FsFolderWidget, ev: MouseEvent){
@@ -168,9 +186,9 @@ export class FsFolderWidget{
         return child
     }
 
-    public addChildFolder(name: string): FsFolderWidget{
-        const child = new FsFolderWidget({parent: this, name})
-        this.children.set(name, child)
+    public addChildFolder(params: {name: string, onOpen?: (widget: FsFolderWidget) => void}): FsFolderWidget{
+        const child = new FsFolderWidget({parent: this, ...params})
+        this.children.set(params.name, child)
         return child
     }
 
