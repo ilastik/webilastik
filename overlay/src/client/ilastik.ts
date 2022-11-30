@@ -30,7 +30,9 @@ import {
     Shape5DDto,
     N5DataSinkDto,
     N5DataSourceDto,
-    SkimageDataSourceDto
+    SkimageDataSourceDto,
+    ListDataProxyBucketRequest,
+    ListDataProxyBucketResponse
 } from "./dto"
 
 export type HpcSiteName = ComputeSessionStatusDto["hpc_site"] //FIXME?
@@ -369,6 +371,20 @@ export class Session{
             return undefined
         }
         return responseDto.datasources.map(msg => FsDataSource.fromDto(msg))
+    }
+
+    public async listDataProxyBucket(params: ListDataProxyBucketRequest): Promise<ListDataProxyBucketResponse | Error> {
+        let response = await fetch(
+            this.sessionUrl.joinPath("list_data_proxy_bucket").raw,
+            {
+                method: "POST",
+                body: JSON.stringify(params.toJsonValue()),
+            }
+        )
+        if(!response.ok){
+            return Error(`Could not list files in bucket:  ${response.text()}`)
+        }
+        return ListDataProxyBucketResponse.fromJsonValue(await response.json())
     }
 }
 

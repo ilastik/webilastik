@@ -445,3 +445,22 @@ class CheckDatasourceCompatibilityParams(DataTransferObject):
 @dataclass
 class CheckDatasourceCompatibilityResponse(DataTransferObject):
     compatible: Tuple[bool, ...]
+
+
+#################################################
+@dataclass
+class BucketObjectDto(DataTransferObject):
+    name: str
+
+@dataclass
+class BucketSubdirDto(DataTransferObject):
+    name: str
+
+@dataclass
+class ListDataProxyBucketRequest(DataTransferObject):
+    bucket_fs: BucketFSDto
+    path: str
+
+@dataclass
+class ListDataProxyBucketResponse(DataTransferObject):
+    items: Tuple[Union[BucketObjectDto, BucketSubdirDto], ...]

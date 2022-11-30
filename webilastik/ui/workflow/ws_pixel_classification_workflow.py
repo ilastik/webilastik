@@ -27,8 +27,9 @@ from fs.errors import ResourceNotFound
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
 from webilastik.filesystem import Filesystem
+from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.scheduling.job import PriorityExecutor
-from webilastik.server.rpc.dto import GetDatasourcesFromUrlParamsDto, GetDatasourcesFromUrlResponseDto, MessageParsingError, RpcErrorDto, SaveProjectParamsDto
+from webilastik.server.rpc.dto import GetDatasourcesFromUrlParamsDto, GetDatasourcesFromUrlResponseDto, ListDataProxyBucketRequest, ListDataProxyBucketResponse, MessageParsingError, RpcErrorDto, SaveProjectParamsDto
 from webilastik.server.session_allocator import uncachable_json_response
 from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError
@@ -195,9 +196,24 @@ class WebIlastik:
             web.post(
                 "/make_data_view",
                 lambda request: self.workflow.viewer_applet.make_data_view(request)
-            )
+            ),
+            web.post(
+                "/list_data_proxy_bucket",
+                self.list_data_proxy_bucket,
+            ),
         ])
         self.app.on_shutdown.append(self.close_websockets)
+
+    async def list_data_proxy_bucket(self, request: web.Request) -> web.Response:
+        params_result = ListDataProxyBucketRequest.from_json_value(await request.json())
+        if isinstance(params_result, MessageParsingError):
+            return uncachable_json_response(RpcErrorDto(error=str(params_result)).to_json_value(), status=400)
+        fs = BucketFs.from_dto(params_result.bucket_fs)
+        items = fs.list_objects(prefix=params_result.path)
+        return uncachable_json_response(
+            ListDataProxyBucketResponse(items=tuple(item.to_dto() for item in items)).to_json_value(),
+            status=200,
+        )
 
     async def get_datasources_from_url(self, request: web.Request) -> web.Response:
         params = GetDatasourcesFromUrlParamsDto.from_json_value(await request.json())

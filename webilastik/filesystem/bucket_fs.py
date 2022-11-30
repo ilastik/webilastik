@@ -16,7 +16,7 @@ from webilastik.filesystem import Filesystem
 
 from webilastik.filesystem.RemoteFile import RemoteFile
 from webilastik.libebrains.user_token import UserToken
-from webilastik.server.rpc.dto import BucketFSDto
+from webilastik.server.rpc.dto import BucketFSDto, BucketObjectDto, BucketSubdirDto
 from webilastik.ui.usage_error import UsageError
 from webilastik.utility.url import Protocol, Url
 from webilastik.libebrains import global_user_login
@@ -50,14 +50,14 @@ class BucketObject:
             content_type=ensureJsonString(value_dict.get("content_type")),
         )
 
-    def to_json_value(self) -> JsonValue:
-        return {
-            "hash": self.hash,
-            "last_modified": self.last_modified.isoformat(),
-            "bytes": self.bytes,
-            "name": str(self.name),
-            "content_type": self.content_type,
-        }
+    def to_dto(self) -> BucketObjectDto:
+        return BucketObjectDto(
+            # "hash": self.hash,
+            # "last_modified": self.last_modified.isoformat(),
+            # "bytes": self.bytes,
+            name=str(self.name),
+            # "content_type": self.content_type,
+        )
 
 class BucketSubdir:
     def __init__(self, subdir: PurePosixPath):
@@ -77,6 +77,9 @@ class BucketSubdir:
         return BucketSubdir(
             subdir=PurePosixPath(ensureJsonString(value_obj.get("subdir")))
         )
+
+    def to_dto(self) -> BucketSubdirDto:
+        return BucketSubdirDto(name=str(self.subdir))
 
 class DataProxySession:
     # @private
@@ -148,9 +151,11 @@ class BucketFs(Filesystem):
     def list_objects(self, *, prefix: str, limit: Optional[int] = None) -> List[Union[BucketObject, BucketSubdir]]:
         list_objects_path = self.bucket_url.updated_with(extra_search={
             "delimiter": "/",
-            "prefix": prefix.lstrip("/"),
+            "prefix": "" if prefix == "/" else prefix.lstrip("/").rstrip("/") + "/",
             "limit": str(limit or 50)
         })
+        print(f"{list_objects_path.raw}")
+        print(list_objects_path.search)
         response = self.session.get(list_objects_path)
         if isinstance(response, Exception):
             raise response # FIXME: return rather than raise?
