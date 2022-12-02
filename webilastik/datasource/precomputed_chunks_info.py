@@ -14,7 +14,7 @@ from ndstructs.point5D import Point5D, Shape5D, Interval5D
 from ndstructs.array5D import Array5D
 
 from webilastik.datasource import DataSource
-from webilastik.filesystem import Filesystem
+from webilastik.filesystem import IFilesystem
 
 class PrecomputedChunksEncoder(ABC):
     @abstractmethod
@@ -313,16 +313,11 @@ class PrecomputedChunksInfo:
         )
 
     @classmethod
-    def tryLoad(cls, filesystem: Filesystem, path: PurePosixPath) ->"PrecomputedChunksInfo | Exception":
-        url = filesystem.geturl(path.as_posix())
-        if not filesystem.exists(path.as_posix()):
-            return FileNotFoundError(f"Could not find info file at {url}")
-        with filesystem.openbin(path.as_posix(), "r") as f:
-            try:
-                info_json = f.read().decode("utf8")
-                return PrecomputedChunksInfo.from_json_value(json.loads(info_json))
-            except Exception:
-                return ValueError(f"Could not interpret json info file at {url}")
+    def tryLoad(cls, filesystem: IFilesystem, path: PurePosixPath) ->"PrecomputedChunksInfo | Exception":
+        info_json = filesystem.read_file(path)
+        if isinstance(info_json, Exception):
+            return info_json
+        return PrecomputedChunksInfo.from_json_value(json.loads(info_json))
 
     @classmethod
     def from_json_value(cls, data: JsonValue):

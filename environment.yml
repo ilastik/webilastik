@@ -6,7 +6,6 @@ dependencies:
   - python>=3.8
   - numpy
   - fastfilters
-  - fs
   - lemon
   - vigra
   - scikit-image

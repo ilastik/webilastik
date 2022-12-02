@@ -73,7 +73,7 @@ class Interval5DDto(DataTransferObject):
 
 @dataclass
 class OsfsDto(DataTransferObject):
-    path: str
+    pass
 
 @dataclass
 class HttpFsDto(DataTransferObject):
@@ -87,7 +87,6 @@ class HttpFsDto(DataTransferObject):
 @dataclass
 class BucketFSDto(DataTransferObject):
     bucket_name: str
-    prefix: str
 
 FsDto = Union[OsfsDto, HttpFsDto, BucketFSDto]
 
@@ -448,19 +447,13 @@ class CheckDatasourceCompatibilityResponse(DataTransferObject):
 
 
 #################################################
-@dataclass
-class BucketObjectDto(DataTransferObject):
-    name: str
 
 @dataclass
-class BucketSubdirDto(DataTransferObject):
-    name: str
-
-@dataclass
-class ListDataProxyBucketRequest(DataTransferObject):
-    bucket_fs: BucketFSDto
+class ListFsDirRequest(DataTransferObject):
+    fs: FsDto
     path: str
 
 @dataclass
-class ListDataProxyBucketResponse(DataTransferObject):
-    items: Tuple[Union[BucketObjectDto, BucketSubdirDto], ...]
+class ListFsDirResponse(DataTransferObject):
+    files: Tuple[str, ...]
+    directories: Tuple[str, ...]

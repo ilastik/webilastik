@@ -23,7 +23,7 @@ from aiohttp.client_ws import ClientWebSocketResponse
 
 from tests import create_precomputed_chunks_sink, get_sample_c_cells_pixel_annotations, get_sample_feature_extractors
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
-from webilastik.filesystem.bucket_fs import BucketFs
+from webilastik.filesystem import BucketFs
 from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.ui.workflow.ws_pixel_classification_workflow import RPCPayload
 from webilastik.utility.url import Url
@@ -158,7 +158,6 @@ async def main():
 
             hbp_image_service_bucket_fs = BucketFs(
                 bucket_name="hbp-image-service",
-                prefix=PurePosixPath("/"),
             )
 
             predictions_export_datasink = create_precomputed_chunks_sink(

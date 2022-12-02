@@ -15,8 +15,8 @@ from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 
 from webilastik.datasource import FsDataSource
 from webilastik.features.ilp_filter import IlpFilter
-from webilastik.filesystem import Filesystem
-from webilastik.filesystem.osfs import OsFs
+from webilastik.filesystem import IFilesystem
+from webilastik.filesystem import OsFs
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet.brushing_applet import Label, WsBrushingApplet
 from webilastik.ui.applet.feature_selection_applet import WsFeatureSelectionApplet
@@ -110,7 +110,7 @@ class PixelClassificationWorkflow:
         with h5py.File(ilp_path, "r") as f:
             parsing_result = IlpPixelClassificationWorkflowGroup.parse(
                 group=f,
-                ilp_fs=OsFs("/"),
+                ilp_fs=OsFs(),
                 allowed_protocols=allowed_protocols,
             )
             if isinstance(parsing_result, Exception):
@@ -160,9 +160,12 @@ class PixelClassificationWorkflow:
     def get_ilp_contents(self) -> bytes:
         return self.to_ilp_workflow_group().to_h5_file_bytes()
 
-    def save_project(self, fs: Filesystem, path: PurePosixPath) -> int:
-        with fs.openbin(path.as_posix(), "w") as f:
-            return f.write(self.get_ilp_contents())
+    def save_project(self, fs: IFilesystem, path: PurePosixPath) -> int:
+        contents = self.get_ilp_contents()
+        save_result = fs.create_file(path=path, contents=contents)
+        if isinstance(save_result, Exception):
+            raise save_result #FIXME: return instead
+        return len(contents)
 
     def run_rpc(self, *, user_prompt: UserPrompt, applet_name: str, method_name: str, arguments: JsonObject) -> "UsageError | None":
         return self.wsapplets[applet_name].run_rpc(method_name=method_name, arguments=arguments, user_prompt=user_prompt)
@@ -231,7 +234,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         with h5py.File(ilp_path, "r") as f:
             parsing_result = IlpPixelClassificationWorkflowGroup.parse(
                 group=f,
-                ilp_fs=OsFs("/"),
+                ilp_fs=OsFs(),
                 allowed_protocols=allowed_protocols,
             )
             if isinstance(parsing_result, Exception):

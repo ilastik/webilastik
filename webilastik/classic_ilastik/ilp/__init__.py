@@ -23,7 +23,7 @@ from webilastik.features.ilp_filter import (
     IlpLaplacianOfGaussian, IlpStructureTensorEigenvalues
 )
 from webilastik.features.ilp_filter import IlpFilter
-from webilastik.filesystem import Filesystem
+from webilastik.filesystem import IFilesystem
 from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.utility.url import Protocol, Url
 
@@ -412,16 +412,15 @@ class IlpDatasetInfo:
     def try_to_datasource(
         self,
         *,
-        ilp_fs: Filesystem,
+        ilp_fs: IFilesystem,
         ilp_path: PurePosixPath,
         allowed_protocols: Sequence[Protocol] = ("http", "https")
     ) -> "FsDataSource | Exception":
         url = Url.parse(self.filePath)
         if url is None: # filePath was probably a path, not an URL
             path = ilp_path.parent.joinpath(self.filePath)
-            url = Url.parse(ilp_fs.geturl(path.as_posix()))
-        if url is None:
-            return Exception(f"Could not parse {self.filePath} as URL")
+            url = ilp_fs.geturl(path)
+        # import pydevd; pydevd.settrace()
         datasources_result = try_get_datasources_from_url(url=url, allowed_protocols=allowed_protocols)
         if datasources_result is None:
             return Exception(f"Could not open {url} as a data source: unsupported format")
@@ -500,7 +499,7 @@ class IlpInputDataGroup:
         self,
         *,
         role_name: str,
-        ilp_fs: Filesystem,
+        ilp_fs: IFilesystem,
         ilp_path: PurePosixPath,
         allowed_protocols: Sequence[Protocol] = ("http", "https")
     ) -> "Dict[int, 'FsDataSource | None'] | Exception":

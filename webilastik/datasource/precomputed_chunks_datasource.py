@@ -8,11 +8,10 @@ import numpy as np
 from ndstructs.point5D import Shape5D, Interval5D
 from ndstructs.array5D import Array5D
 from ndstructs.utils.json_serializable import ensureJsonIntTripplet
-from fs.errors import ResourceNotFound
 
 from webilastik.datasource import FsDataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksEncoder, PrecomputedChunksInfo
-from webilastik.filesystem import Filesystem
+from webilastik.filesystem import FsFileNotFoundException, IFilesystem, create_filesystem_from_message, create_filesystem_from_url
 from webilastik.utility.url import Url
 from webilastik.server.rpc.dto import Interval5DDto, PrecomputedChunksDataSourceDto, Shape5DDto, dtype_to_dto
 
@@ -23,7 +22,7 @@ class PrecomputedChunksDataSource(FsDataSource):
     def __init__(
         self,
         *,
-        filesystem: Filesystem,
+        filesystem: IFilesystem,
         path: PurePosixPath,
         scale_key: PurePosixPath,
         tile_shape: Shape5D,
@@ -50,15 +49,16 @@ class PrecomputedChunksDataSource(FsDataSource):
     def try_load(
         cls,
         *,
-        filesystem: Filesystem,
+        filesystem: IFilesystem,
         path: PurePosixPath,
         spatial_resolution: Tuple[int, int, int],
         chunk_size: Optional[Shape5D] = None,
     ) -> "PrecomputedChunksDataSource | Exception":
         try:
             print("Opening precomputed chunks info.....")
-            with filesystem.openbin(path.joinpath("info").as_posix(), "r") as f:
-                info_json = f.read().decode("utf8")
+            info_json = filesystem.read_file(path.joinpath("info"))
+            if isinstance(info_json, Exception):
+                return info_json
         except Exception as e:
             return e
 
@@ -101,7 +101,7 @@ class PrecomputedChunksDataSource(FsDataSource):
     @staticmethod
     def from_dto(dto: PrecomputedChunksDataSourceDto) -> "PrecomputedChunksDataSource":
         return PrecomputedChunksDataSource(
-            filesystem=Filesystem.create_from_message(dto.filesystem),
+            filesystem=create_filesystem_from_message(dto.filesystem),
             path=PurePosixPath(dto.path),
             scale_key=PurePosixPath(dto.scale_key),
             dtype=np.dtype(dto.dtype),
@@ -124,12 +124,10 @@ class PrecomputedChunksDataSource(FsDataSource):
     def from_url(cls, url: Url) -> "Sequence[PrecomputedChunksDataSource] | Exception":
         if not cls.supports_url(url):
             return Exception(f"Unsupported url: {url}")
-        fs_url = url.parent.schemeless().hashless()
-        fs_result = Filesystem.from_url(url=fs_url)
+        fs_result = create_filesystem_from_url(url=url)
         if isinstance(fs_result, Exception):
             return fs_result
-        fs = fs_result
-        path = PurePosixPath(url.path.name)
+        fs, path = fs_result
 
         precomp_info_result = PrecomputedChunksInfo.tryLoad(filesystem=fs, path=path / "info")
         if isinstance(precomp_info_result, Exception):
@@ -140,7 +138,7 @@ class PrecomputedChunksDataSource(FsDataSource):
         if resolution_str is None:
             return [
                 PrecomputedChunksDataSource(
-                    filesystem=fs_result,
+                    filesystem=fs,
                     path=path,
                     scale_key=scale.key,
                     encoding=scale.encoding,
@@ -188,11 +186,10 @@ class PrecomputedChunksDataSource(FsDataSource):
     def _get_tile(self, tile: Interval5D) -> Array5D:
         assert tile.is_tile(tile_shape=self.tile_shape, full_interval=self.interval, clamped=True), f"Bad tile: {tile}"
         tile_path = self.scale_path / f"{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_{tile.z[0]}-{tile.z[1]}"
-        try:
-            with self.filesystem.openbin(tile_path.as_posix()) as f:
-                raw_tile_bytes = f.read()
-            tile_5d = self.encoding.decode(roi=tile, dtype=self.dtype, raw_chunk=raw_tile_bytes)
-        except ResourceNotFound:
+        raw_tile_bytes = self.filesystem.read_file(tile_path)
+        if isinstance(raw_tile_bytes, FsFileNotFoundException):
             logger.warn(f"tile {tile} not found. Returning zeros")
-            tile_5d = Array5D.allocate(interval=tile, dtype=self.dtype, value=0)
-        return tile_5d
+            return Array5D.allocate(interval=tile, dtype=self.dtype, value=0)
+        if isinstance(raw_tile_bytes, Exception):
+            raise raw_tile_bytes #FIXME: return instead
+        return self.encoding.decode(roi=tile, dtype=self.dtype, raw_chunk=raw_tile_bytes)

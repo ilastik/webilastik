@@ -229,7 +229,7 @@ class WsPixelClassificationExportApplet(WsApplet, PixelClassificationExportApple
             raise ValueError(f"Invalid method name: '{method_name}'") #FIXME: return error
         return rpc_result
 
-    def _get_json_state(self) -> JsonValue:
+    def get_state_dto(self) -> PixelClassificationExportAppletStateDto:
         with self._lock:
             labels = self._in_populated_labels()
             datasource_suggestions = self._in_datasource_suggestions()
@@ -237,4 +237,7 @@ class WsPixelClassificationExportApplet(WsApplet, PixelClassificationExportApple
                 jobs=tuple(job.to_dto() for job in self._jobs.values()),
                 populated_labels=None if not labels else tuple(l.to_header_message() for l in labels),
                 datasource_suggestions=None if datasource_suggestions is None else tuple(ds.to_dto() for ds in datasource_suggestions)
-            ).to_json_value()
+            )
+
+    def _get_json_state(self) -> JsonValue:
+        return self.get_state_dto().to_json_value()

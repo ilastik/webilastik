@@ -43,10 +43,11 @@ def try_get_datasources_from_url(
 
     if SkimageDataSource.supports_url(url):
         datasources = SkimageDataSource.from_url(url)
-    if PrecomputedChunksDataSource.supports_url(url):
+    elif PrecomputedChunksDataSource.supports_url(url):
         datasources = PrecomputedChunksDataSource.from_url(url)
     else:
-        return None
+        # try opening as precomputed, even without the prefix
+        datasources = PrecomputedChunksDataSource.from_url(url.updated_with(datascheme="precomputed"))
     if not isinstance(datasources, Exception):
         _datasource_cache[url] = datasources
     return datasources

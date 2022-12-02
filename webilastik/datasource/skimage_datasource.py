@@ -2,6 +2,7 @@
 
 from pathlib import PurePosixPath
 from typing import Optional, Sequence, Tuple, Any
+import io
 
 import skimage.io #type: ignore
 import numpy as np
@@ -9,7 +10,7 @@ from ndstructs.array5D import Array5D
 from ndstructs.point5D import Interval5D, Point5D, Shape5D
 
 from webilastik.datasource import FsDataSource
-from webilastik.filesystem import Filesystem
+from webilastik.filesystem import IFilesystem, create_filesystem_from_message, create_filesystem_from_url
 from webilastik.utility.url import Url
 from webilastik.server.rpc.dto import Interval5DDto, Shape5DDto, SkimageDataSourceDto, dtype_to_dto
 
@@ -20,11 +21,15 @@ class SkimageDataSource(FsDataSource):
         *,
         path: PurePosixPath,
         location: Point5D = Point5D.zero(),
-        filesystem: Filesystem,
+        filesystem: IFilesystem,
         tile_shape: Optional[Shape5D] = None,
         spatial_resolution: Optional[Tuple[int, int, int]] = None,
     ):
-        raw_data: "np.ndarray[Any, Any]" = skimage.io.imread(filesystem.openbin(path.as_posix())) # type: ignore
+        raw_data_result = filesystem.read_file(path)
+        if isinstance(raw_data_result, Exception):
+            raise raw_data_result #FIXME: return instead
+        file_like = io.BytesIO(raw_data_result)
+        raw_data: "np.ndarray[Any, Any]" = skimage.io.imread(file_like) #pyright: ignore [reportUnknownMemberType]
         c_axiskeys_on_disk = "yxc"[: len(raw_data.shape)]
         self._data = Array5D(raw_data, axiskeys=c_axiskeys_on_disk, location=location)
 
@@ -57,7 +62,7 @@ class SkimageDataSource(FsDataSource):
     @staticmethod
     def from_dto(dto: SkimageDataSourceDto) -> "SkimageDataSource":
         return SkimageDataSource(
-            filesystem=Filesystem.create_from_message(dto.filesystem),
+            filesystem=create_filesystem_from_message(dto.filesystem),
             path=PurePosixPath(dto.path),
             location=dto.interval.to_interval5d().start,
             tile_shape=dto.tile_shape.to_shape5d(),
@@ -79,13 +84,13 @@ class SkimageDataSource(FsDataSource):
     def from_url(cls, url: Url) -> "Sequence[SkimageDataSource] | Exception":
         if not cls.supports_url(url):
             return Exception(f"Unsupported url: {url}")
-        fs_url = url.parent.schemeless().hashless()
-        fs_result = Filesystem.from_url(url=fs_url)
+        fs_result = create_filesystem_from_url(url=url)
         if isinstance(fs_result, Exception):
             return fs_result
-        path = PurePosixPath(url.path.name)
+        fs, path = fs_result
+
         try:
-            return [SkimageDataSource(path=path, filesystem=fs_result)]
+            return [SkimageDataSource(path=path, filesystem=fs)]
         except Exception as e:
             return e
 

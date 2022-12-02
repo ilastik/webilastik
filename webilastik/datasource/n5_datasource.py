@@ -2,10 +2,9 @@ from typing import Any, Optional, Tuple
 from pathlib import PurePosixPath
 import enum
 import json
-from webilastik.filesystem import Filesystem
+from webilastik.filesystem import FsFileNotFoundException, IFilesystem, create_filesystem_from_message
 
 import numpy as np
-from fs.errors import ResourceNotFound
 from ndstructs.point5D import Point5D, Interval5D
 from ndstructs.array5D import Array5D
 
@@ -70,13 +69,15 @@ class N5DataSource(FsDataSource):
     def __init__(
         self,
         *,
-        filesystem: Filesystem,
+        filesystem: IFilesystem,
         path: PurePosixPath,
         location: Optional[Point5D] = None,
         spatial_resolution: Optional[Tuple[int, int, int]] = None,
     ):
-        with filesystem.openbin(path.joinpath("attributes.json").as_posix(), "r") as f:
-            attributes_json = f.read().decode("utf8")
+        attributes_read_result = filesystem.read_file(path.joinpath("attributes.json"))
+        if isinstance(attributes_read_result, Exception):
+            raise attributes_read_result #FIXME: return instead
+        attributes_json = attributes_read_result.decode("utf8")
         self.attributes = N5DatasetAttributes.from_json_data(json.loads(attributes_json), location_override=location)
 
         super().__init__(
@@ -92,7 +93,7 @@ class N5DataSource(FsDataSource):
     @staticmethod
     def from_dto(dto: N5DataSourceDto) -> "N5DataSource":
         return N5DataSource(
-            filesystem=Filesystem.create_from_message(dto.filesystem),
+            filesystem=create_filesystem_from_message(dto.filesystem),
             path=PurePosixPath(dto.path),
             spatial_resolution=dto.spatial_resolution,
         )
@@ -109,23 +110,22 @@ class N5DataSource(FsDataSource):
         )
 
     def __hash__(self) -> int:
-        return hash((self.filesystem.desc(self.path.as_posix()), self.interval))
+        return hash((self.filesystem.geturl(self.path), self.interval))
 
     def __eq__(self, other: object) -> bool:
         return (
             isinstance(other, N5DataSource) and
             super().__eq__(other) and
-            self.filesystem.desc(self.path.as_posix()) == self.filesystem.desc(self.path.as_posix())
+            self.filesystem.geturl(self.path) == other.filesystem.geturl(other.path)
         )
 
     def _get_tile(self, tile: Interval5D) -> Array5D:
         slice_address = self.path / self.attributes.get_tile_path(tile)
-        try:
-            with self.filesystem.openbin(slice_address.as_posix()) as f:
-                raw_tile = f.read()
-            tile_5d = N5Block.from_bytes(
-                data=raw_tile, c_axiskeys=self.c_axiskeys_on_disk, dtype=self.dtype, compression=self.attributes.compression, location=tile.start
-            )
-        except ResourceNotFound:
-            tile_5d = self._allocate(interval=tile, fill_value=0)
-        return tile_5d
+        read_result = self.filesystem.read_file(slice_address)
+        if isinstance(read_result, FsFileNotFoundException):
+            return self._allocate(interval=tile, fill_value=0)
+        if isinstance(read_result, Exception):
+            raise read_result #FIXME: return instead
+        return N5Block.from_bytes(
+            data=read_result, c_axiskeys=self.c_axiskeys_on_disk, dtype=self.dtype, compression=self.attributes.compression, location=tile.start
+        )

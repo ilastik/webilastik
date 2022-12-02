@@ -1,9 +1,8 @@
 from pathlib import PurePosixPath
-from webilastik.filesystem import SystemFs, BucketFs
-import json
+from webilastik.filesystem import OsFs, BucketFs
 import uuid
 
-for fs in [SystemFs(), BucketFs(bucket_name="hbp-image-service")]:
+for fs in [OsFs(), BucketFs(bucket_name="hbp-image-service")]:
     file_path = PurePosixPath(f"/tmp/test-{uuid.uuid4()}/test_file.txt")
     contents = "lalala".encode('utf8')
 

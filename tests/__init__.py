@@ -2,7 +2,7 @@ from datetime import datetime
 import os
 from pathlib import Path, PurePosixPath
 import time
-from typing import Any, Dict, Literal, Mapping, Dict, Sequence
+from typing import Any, Dict, Literal, Mapping, Dict, Sequence, Tuple
 import uuid
 import json
 from collections.abc import Mapping as MappingAbc
@@ -23,52 +23,47 @@ from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale
 from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.features.ilp_filter import IlpGaussianSmoothing, IlpHessianOfGaussianEigenvalues
 from webilastik.features.ilp_filter import IlpFilter
-from webilastik.filesystem import Filesystem
-from webilastik.filesystem.bucket_fs import BucketFs
-from webilastik.filesystem.http_fs import HttpFs
-from webilastik.filesystem.osfs import OsFs
+from webilastik.filesystem import IFilesystem, BucketFs, HttpFs, OsFs
 from webilastik.libebrains.user_token import UserToken
 from webilastik.ui.applet.brushing_applet import Label
 from webilastik.libebrains.global_user_login import get_global_login_token
 
-def get_project_root_dir() -> Path:
-    return Path(__file__).parent.parent
+def get_project_root_dir() -> PurePosixPath:
+    return PurePosixPath(__file__).parent.parent
 
-def get_project_test_dir() -> Path:
+def get_project_test_dir() -> PurePosixPath:
     return get_project_root_dir() / "tests"
 
-def get_tmp_dir() -> Path:
+def get_tmp_dir() -> PurePosixPath:
     return get_project_test_dir() / "tmp"
 
-def create_tmp_dir(prefix: str) -> Path:
+def create_tmp_dir(prefix: str) -> PurePosixPath:
     path = get_tmp_dir() / f"prefix_{uuid.uuid4()}"
-    path.mkdir(parents=True)
+    Path(path).mkdir(parents=True)
     return path
 
 def get_sample_c_cells_datasource() -> SkimageDataSource:
     return SkimageDataSource(
-        filesystem=OsFs(get_project_root_dir().as_posix()), path=PurePosixPath("public/images/c_cells_1.png")
+        filesystem=OsFs(), path=PurePosixPath(get_project_root_dir()) / "public/images/c_cells_1.png"
     )
 
-def get_test_output_osfs() -> OsFs:
+def get_test_output_path() -> PurePosixPath:
     test_dir_path = get_tmp_dir() / f"test-{time.monotonic()}/"
     os.makedirs(test_dir_path, exist_ok=True)
-    return OsFs(str(test_dir_path))
+    return test_dir_path
 
-def get_test_output_bucket_fs() -> BucketFs:
+def get_test_output_bucket_fs() -> Tuple[BucketFs, PurePosixPath]:
     now = datetime.now()
     now_str = f"{now.year:02}y{now.month:02}m{now.day:02}d__{now.hour:02}h{now.minute:02}m{now.second:02}s"
-    return BucketFs(
-        bucket_name="hbp-image-service",
-        prefix=PurePosixPath(f"/test-{now_str}"),
-    )
+    return (BucketFs(bucket_name="hbp-image-service"), PurePosixPath(f"/test-{now_str}"))
 
 def create_precomputed_chunks_sink(
     *, shape: Shape5D, dtype: "np.dtype[Any]", chunk_size: Shape5D, fs: "OsFs | HttpFs | BucketFs | None" = None
 ) -> PrecomputedChunksSink:
+    default_fs, path = get_test_output_bucket_fs()
     return PrecomputedChunksSink(
-        filesystem=fs or get_test_output_bucket_fs(),
-        path=PurePosixPath(f"{uuid.uuid4()}.precomputed"),
+        filesystem=fs or default_fs,
+        path=path / f"{uuid.uuid4()}.precomputed",
         dtype=dtype,
         scale_key=PurePosixPath("some_data"),
         encoding=RawEncoder(),

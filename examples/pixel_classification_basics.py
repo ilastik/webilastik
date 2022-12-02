@@ -4,8 +4,8 @@
 
 # in real applications, select your caching and executor_get implementation via PYTHONPATH
 import sys
-from pathlib import Path, PurePosixPath
-project_root_dir = Path(__file__).parent.parent
+from pathlib import PurePosixPath
+project_root_dir = PurePosixPath(__file__).parent.parent
 sys.path.insert(0, project_root_dir.as_posix())
 sys.path.insert(0, project_root_dir.joinpath('caching/no_cache').as_posix())
 sys.path.insert(0, project_root_dir.joinpath('executor_getters/default').as_posix())
@@ -21,13 +21,13 @@ from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
 from webilastik.datasource.precomputed_chunks_info import RawEncoder
 from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.features.ilp_filter import IlpGaussianSmoothing
-from webilastik.filesystem.osfs import OsFs
+from webilastik.filesystem import OsFs
 
 
 # some sample data to work on. DataSource implementations are tile-based.
 data_source = SkimageDataSource(
-    filesystem=OsFs(project_root_dir.as_posix()), #filesystem could also be HttpFs, BucketFs, etc
-    path=PurePosixPath("public/images/c_cells_1.png")
+    filesystem=OsFs(), #filesystem could also be HttpFs, BucketFs, etc
+    path=project_root_dir / "public/images/c_cells_1.png"
 )
 
 feature_extractors = [
@@ -79,8 +79,8 @@ assert not isinstance(classifier, Exception)
 # https://github.com/google/neuroglancer/tree/master/src/neuroglancer/datasource/precomputed
 output_interval: Interval5D = classifier.get_expected_roi(data_source.roi)
 predictions_data_sink = PrecomputedChunksSink(
-    filesystem=OsFs("/tmp"),
-    path=PurePosixPath("my_exported_data"),
+    filesystem=OsFs(),
+    path=PurePosixPath("/tmp/my_exported_data"),
     dtype=np.dtype("float32"),
     encoding=RawEncoder(),
     interval=output_interval,

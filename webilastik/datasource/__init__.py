@@ -11,7 +11,7 @@ import numpy as np
 
 from ndstructs.point5D import Shape5D, Interval5D, Point5D, SPAN
 from ndstructs.array5D import Array5D, SPAN_OVERRIDE, All
-from webilastik.filesystem import Filesystem
+from webilastik.filesystem import IFilesystem
 from webilastik.server.rpc.dto import FsDataSourceDto, PrecomputedChunksDataSourceDto, SkimageDataSourceDto
 from webilastik.utility.url import Url
 from webilastik.utility.url import Url, Protocol
@@ -221,7 +221,7 @@ class FsDataSource(DataSource):
         self,
         *,
         c_axiskeys_on_disk: str,
-        filesystem: Filesystem,
+        filesystem: IFilesystem,
         path: PurePosixPath,
         tile_shape: Shape5D,
         dtype: "np.dtype[Any]",
@@ -235,9 +235,7 @@ class FsDataSource(DataSource):
 
     @property
     def url(self) -> Url:
-        url = Url.parse(self.filesystem.geturl(self.path.as_posix()))
-        assert url is not None
-        return url
+        return self.filesystem.geturl(self.path)
 
     @abstractmethod
     def __hash__(self) -> int:

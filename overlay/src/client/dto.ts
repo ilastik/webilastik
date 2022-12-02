@@ -456,25 +456,16 @@ function parse_as_OsfsDto(value: JsonValue): OsfsDto | Error {
   if (valueObject["__class__"] != "OsfsDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a OsfsDto`);
   }
-  const temp_path = parse_as_str(valueObject.path);
-  if (temp_path instanceof Error) return temp_path;
-  return new OsfsDto({
-    path: temp_path,
-  });
+  return new OsfsDto({});
 }
 // Automatically generated via DataTransferObject for OsfsDto
 // Do not edit!
 export class OsfsDto {
-  public path: string;
-  constructor(_params: {
-    path: string;
-  }) {
-    this.path = _params.path;
+  constructor(_params: {}) {
   }
   public toJsonValue(): JsonObject {
     return {
       __class__: "OsfsDto",
-      path: this.path,
     };
   }
   public static fromJsonValue(value: JsonValue): OsfsDto | Error {
@@ -565,30 +556,23 @@ function parse_as_BucketFSDto(value: JsonValue): BucketFSDto | Error {
   }
   const temp_bucket_name = parse_as_str(valueObject.bucket_name);
   if (temp_bucket_name instanceof Error) return temp_bucket_name;
-  const temp_prefix = parse_as_str(valueObject.prefix);
-  if (temp_prefix instanceof Error) return temp_prefix;
   return new BucketFSDto({
     bucket_name: temp_bucket_name,
-    prefix: temp_prefix,
   });
 }
 // Automatically generated via DataTransferObject for BucketFSDto
 // Do not edit!
 export class BucketFSDto {
   public bucket_name: string;
-  public prefix: string;
   constructor(_params: {
     bucket_name: string;
-    prefix: string;
   }) {
     this.bucket_name = _params.bucket_name;
-    this.prefix = _params.prefix;
   }
   public toJsonValue(): JsonObject {
     return {
       __class__: "BucketFSDto",
       bucket_name: this.bucket_name,
-      prefix: this.prefix,
     };
   }
   public static fromJsonValue(value: JsonValue): BucketFSDto | Error {
@@ -3785,173 +3769,95 @@ export class CheckDatasourceCompatibilityResponse {
   }
 }
 
-function parse_as_BucketObjectDto(value: JsonValue): BucketObjectDto | Error {
+function parse_as_ListFsDirRequest(value: JsonValue): ListFsDirRequest | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
   }
-  if (valueObject["__class__"] != "BucketObjectDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a BucketObjectDto`);
+  if (valueObject["__class__"] != "ListFsDirRequest") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ListFsDirRequest`);
   }
-  const temp_name = parse_as_str(valueObject.name);
-  if (temp_name instanceof Error) return temp_name;
-  return new BucketObjectDto({
-    name: temp_name,
-  });
-}
-// Automatically generated via DataTransferObject for BucketObjectDto
-// Do not edit!
-export class BucketObjectDto {
-  public name: string;
-  constructor(_params: {
-    name: string;
-  }) {
-    this.name = _params.name;
-  }
-  public toJsonValue(): JsonObject {
-    return {
-      __class__: "BucketObjectDto",
-      name: this.name,
-    };
-  }
-  public static fromJsonValue(value: JsonValue): BucketObjectDto | Error {
-    return parse_as_BucketObjectDto(value);
-  }
-}
-
-function parse_as_BucketSubdirDto(value: JsonValue): BucketSubdirDto | Error {
-  const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
-    return valueObject;
-  }
-  if (valueObject["__class__"] != "BucketSubdirDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a BucketSubdirDto`);
-  }
-  const temp_name = parse_as_str(valueObject.name);
-  if (temp_name instanceof Error) return temp_name;
-  return new BucketSubdirDto({
-    name: temp_name,
-  });
-}
-// Automatically generated via DataTransferObject for BucketSubdirDto
-// Do not edit!
-export class BucketSubdirDto {
-  public name: string;
-  constructor(_params: {
-    name: string;
-  }) {
-    this.name = _params.name;
-  }
-  public toJsonValue(): JsonObject {
-    return {
-      __class__: "BucketSubdirDto",
-      name: this.name,
-    };
-  }
-  public static fromJsonValue(value: JsonValue): BucketSubdirDto | Error {
-    return parse_as_BucketSubdirDto(value);
-  }
-}
-
-function parse_as_ListDataProxyBucketRequest(value: JsonValue): ListDataProxyBucketRequest | Error {
-  const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
-    return valueObject;
-  }
-  if (valueObject["__class__"] != "ListDataProxyBucketRequest") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ListDataProxyBucketRequest`);
-  }
-  const temp_bucket_fs = parse_as_BucketFSDto(valueObject.bucket_fs);
-  if (temp_bucket_fs instanceof Error) return temp_bucket_fs;
+  const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.fs);
+  if (temp_fs instanceof Error) return temp_fs;
   const temp_path = parse_as_str(valueObject.path);
   if (temp_path instanceof Error) return temp_path;
-  return new ListDataProxyBucketRequest({
-    bucket_fs: temp_bucket_fs,
+  return new ListFsDirRequest({
+    fs: temp_fs,
     path: temp_path,
   });
 }
-// Automatically generated via DataTransferObject for ListDataProxyBucketRequest
+// Automatically generated via DataTransferObject for ListFsDirRequest
 // Do not edit!
-export class ListDataProxyBucketRequest {
-  public bucket_fs: BucketFSDto;
+export class ListFsDirRequest {
+  public fs: OsfsDto | HttpFsDto | BucketFSDto;
   public path: string;
   constructor(_params: {
-    bucket_fs: BucketFSDto;
+    fs: OsfsDto | HttpFsDto | BucketFSDto;
     path: string;
   }) {
-    this.bucket_fs = _params.bucket_fs;
+    this.fs = _params.fs;
     this.path = _params.path;
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "ListDataProxyBucketRequest",
-      bucket_fs: this.bucket_fs.toJsonValue(),
+      __class__: "ListFsDirRequest",
+      fs: toJsonValue(this.fs),
       path: this.path,
     };
   }
-  public static fromJsonValue(value: JsonValue): ListDataProxyBucketRequest | Error {
-    return parse_as_ListDataProxyBucketRequest(value);
+  public static fromJsonValue(value: JsonValue): ListFsDirRequest | Error {
+    return parse_as_ListFsDirRequest(value);
   }
 }
 
-function parse_as_Union_of_BucketObjectDto0BucketSubdirDto_endof_(
-  value: JsonValue,
-): BucketObjectDto | BucketSubdirDto | Error {
-  const parsed_option_0 = parse_as_BucketObjectDto(value);
-  if (!(parsed_option_0 instanceof Error)) {
-    return parsed_option_0;
-  }
-  const parsed_option_1 = parse_as_BucketSubdirDto(value);
-  if (!(parsed_option_1 instanceof Error)) {
-    return parsed_option_1;
-  }
-  return Error(`Could not parse ${JSON.stringify(value)} into BucketObjectDto | BucketSubdirDto`);
-}
-function parse_as_Tuple_of_Union_of_BucketObjectDto0BucketSubdirDto_endof_0_varlen__endof_(
-  value: JsonValue,
-): Array<BucketObjectDto | BucketSubdirDto> | Error {
+function parse_as_Tuple_of_str0_varlen__endof_(value: JsonValue): Array<string> | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
-  const out: Array<BucketObjectDto | BucketSubdirDto> = [];
+  const out: Array<string> = [];
   for (let item of arr) {
-    let parsed_item = parse_as_Union_of_BucketObjectDto0BucketSubdirDto_endof_(item);
+    let parsed_item = parse_as_str(item);
     if (parsed_item instanceof Error) return parsed_item;
     out.push(parsed_item);
   }
   return out;
 }
-function parse_as_ListDataProxyBucketResponse(value: JsonValue): ListDataProxyBucketResponse | Error {
+function parse_as_ListFsDirResponse(value: JsonValue): ListFsDirResponse | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
   }
-  if (valueObject["__class__"] != "ListDataProxyBucketResponse") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ListDataProxyBucketResponse`);
+  if (valueObject["__class__"] != "ListFsDirResponse") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ListFsDirResponse`);
   }
-  const temp_items = parse_as_Tuple_of_Union_of_BucketObjectDto0BucketSubdirDto_endof_0_varlen__endof_(
-    valueObject.items,
-  );
-  if (temp_items instanceof Error) return temp_items;
-  return new ListDataProxyBucketResponse({
-    items: temp_items,
+  const temp_files = parse_as_Tuple_of_str0_varlen__endof_(valueObject.files);
+  if (temp_files instanceof Error) return temp_files;
+  const temp_directories = parse_as_Tuple_of_str0_varlen__endof_(valueObject.directories);
+  if (temp_directories instanceof Error) return temp_directories;
+  return new ListFsDirResponse({
+    files: temp_files,
+    directories: temp_directories,
   });
 }
-// Automatically generated via DataTransferObject for ListDataProxyBucketResponse
+// Automatically generated via DataTransferObject for ListFsDirResponse
 // Do not edit!
-export class ListDataProxyBucketResponse {
-  public items: Array<BucketObjectDto | BucketSubdirDto>;
+export class ListFsDirResponse {
+  public files: Array<string>;
+  public directories: Array<string>;
   constructor(_params: {
-    items: Array<BucketObjectDto | BucketSubdirDto>;
+    files: Array<string>;
+    directories: Array<string>;
   }) {
-    this.items = _params.items;
+    this.files = _params.files;
+    this.directories = _params.directories;
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "ListDataProxyBucketResponse",
-      items: this.items.map((item) => toJsonValue(item)),
+      __class__: "ListFsDirResponse",
+      files: this.files.map((item) => item),
+      directories: this.directories.map((item) => item),
     };
   }
-  public static fromJsonValue(value: JsonValue): ListDataProxyBucketResponse | Error {
-    return parse_as_ListDataProxyBucketResponse(value);
+  public static fromJsonValue(value: JsonValue): ListFsDirResponse | Error {
+    return parse_as_ListFsDirResponse(value);
   }
 }

@@ -489,22 +489,16 @@ def parse_as_OsfsDto(value: JsonValue) -> "OsfsDto | MessageParsingError":
         return MessageParsingError(f"Could not parse {json.dumps(value)} as OsfsDto")
     if value.get("__class__") != "OsfsDto":
         return MessageParsingError(f"Could not parse {json.dumps(value)} as OsfsDto")
-    tmp_path = parse_as_str(value.get("path"))
-    if isinstance(tmp_path, MessageParsingError):
-        return tmp_path
-    return OsfsDto(
-        path=tmp_path,
-    )
+    return OsfsDto()
 
 
 @dataclass
 class OsfsDto(DataTransferObject):
-    path: str
+    pass
 
     def to_json_value(self) -> JsonObject:
         return {
             "__class__": "OsfsDto",
-            "path": self.path,
         }
 
     @classmethod
@@ -596,25 +590,19 @@ def parse_as_BucketFSDto(value: JsonValue) -> "BucketFSDto | MessageParsingError
     tmp_bucket_name = parse_as_str(value.get("bucket_name"))
     if isinstance(tmp_bucket_name, MessageParsingError):
         return tmp_bucket_name
-    tmp_prefix = parse_as_str(value.get("prefix"))
-    if isinstance(tmp_prefix, MessageParsingError):
-        return tmp_prefix
     return BucketFSDto(
         bucket_name=tmp_bucket_name,
-        prefix=tmp_prefix,
     )
 
 
 @dataclass
 class BucketFSDto(DataTransferObject):
     bucket_name: str
-    prefix: str
 
     def to_json_value(self) -> JsonObject:
         return {
             "__class__": "BucketFSDto",
             "bucket_name": self.bucket_name,
-            "prefix": self.prefix,
         }
 
     @classmethod
@@ -3981,191 +3969,105 @@ class CheckDatasourceCompatibilityResponse(DataTransferObject):
         return parse_as_CheckDatasourceCompatibilityResponse(value)
 
 
-def parse_as_BucketObjectDto(
+def parse_as_ListFsDirRequest(
     value: JsonValue,
-) -> "BucketObjectDto | MessageParsingError":
+) -> "ListFsDirRequest | MessageParsingError":
     from collections.abc import Mapping
 
     if not isinstance(value, Mapping):
         return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as BucketObjectDto"
+            f"Could not parse {json.dumps(value)} as ListFsDirRequest"
         )
-    if value.get("__class__") != "BucketObjectDto":
+    if value.get("__class__") != "ListFsDirRequest":
         return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as BucketObjectDto"
+            f"Could not parse {json.dumps(value)} as ListFsDirRequest"
         )
-    tmp_name = parse_as_str(value.get("name"))
-    if isinstance(tmp_name, MessageParsingError):
-        return tmp_name
-    return BucketObjectDto(
-        name=tmp_name,
-    )
-
-
-@dataclass
-class BucketObjectDto(DataTransferObject):
-    name: str
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "BucketObjectDto",
-            "name": self.name,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "BucketObjectDto | MessageParsingError":
-        return parse_as_BucketObjectDto(value)
-
-
-def parse_as_BucketSubdirDto(
-    value: JsonValue,
-) -> "BucketSubdirDto | MessageParsingError":
-    from collections.abc import Mapping
-
-    if not isinstance(value, Mapping):
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as BucketSubdirDto"
-        )
-    if value.get("__class__") != "BucketSubdirDto":
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as BucketSubdirDto"
-        )
-    tmp_name = parse_as_str(value.get("name"))
-    if isinstance(tmp_name, MessageParsingError):
-        return tmp_name
-    return BucketSubdirDto(
-        name=tmp_name,
-    )
-
-
-@dataclass
-class BucketSubdirDto(DataTransferObject):
-    name: str
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "BucketSubdirDto",
-            "name": self.name,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "BucketSubdirDto | MessageParsingError":
-        return parse_as_BucketSubdirDto(value)
-
-
-def parse_as_ListDataProxyBucketRequest(
-    value: JsonValue,
-) -> "ListDataProxyBucketRequest | MessageParsingError":
-    from collections.abc import Mapping
-
-    if not isinstance(value, Mapping):
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as ListDataProxyBucketRequest"
-        )
-    if value.get("__class__") != "ListDataProxyBucketRequest":
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as ListDataProxyBucketRequest"
-        )
-    tmp_bucket_fs = parse_as_BucketFSDto(value.get("bucket_fs"))
-    if isinstance(tmp_bucket_fs, MessageParsingError):
-        return tmp_bucket_fs
+    tmp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(value.get("fs"))
+    if isinstance(tmp_fs, MessageParsingError):
+        return tmp_fs
     tmp_path = parse_as_str(value.get("path"))
     if isinstance(tmp_path, MessageParsingError):
         return tmp_path
-    return ListDataProxyBucketRequest(
-        bucket_fs=tmp_bucket_fs,
+    return ListFsDirRequest(
+        fs=tmp_fs,
         path=tmp_path,
     )
 
 
 @dataclass
-class ListDataProxyBucketRequest(DataTransferObject):
-    bucket_fs: BucketFSDto
+class ListFsDirRequest(DataTransferObject):
+    fs: FsDto
     path: str
 
     def to_json_value(self) -> JsonObject:
         return {
-            "__class__": "ListDataProxyBucketRequest",
-            "bucket_fs": self.bucket_fs.to_json_value(),
+            "__class__": "ListFsDirRequest",
+            "fs": convert_to_json_value(self.fs),
             "path": self.path,
         }
 
     @classmethod
     def from_json_value(
         cls, value: JsonValue
-    ) -> "ListDataProxyBucketRequest | MessageParsingError":
-        return parse_as_ListDataProxyBucketRequest(value)
+    ) -> "ListFsDirRequest | MessageParsingError":
+        return parse_as_ListFsDirRequest(value)
 
 
-def parse_as_Union_of_BucketObjectDto0BucketSubdirDto_endof_(
+def parse_as_Tuple_of_str0_varlen__endof_(
     value: JsonValue,
-) -> "Union[BucketObjectDto, BucketSubdirDto] | MessageParsingError":
-    parsed_option_0 = parse_as_BucketObjectDto(value)
-    if not isinstance(parsed_option_0, MessageParsingError):
-        return parsed_option_0
-    parsed_option_1 = parse_as_BucketSubdirDto(value)
-    if not isinstance(parsed_option_1, MessageParsingError):
-        return parsed_option_1
-    return MessageParsingError(
-        f"Could not parse {json.dumps(value)} into Union[BucketObjectDto, BucketSubdirDto]"
-    )
-
-
-def parse_as_Tuple_of_Union_of_BucketObjectDto0BucketSubdirDto_endof_0_varlen__endof_(
-    value: JsonValue,
-) -> "Tuple[Union[BucketObjectDto, BucketSubdirDto], ...] | MessageParsingError":
+) -> "Tuple[str, ...] | MessageParsingError":
     if not isinstance(value, (list, tuple)):
         return MessageParsingError(
-            f"Could not parse Tuple[Union[BucketObjectDto, BucketSubdirDto], ...] from {json.dumps(value)}"
+            f"Could not parse Tuple[str, ...] from {json.dumps(value)}"
         )
-    items: List[Union[BucketObjectDto, BucketSubdirDto]] = []
+    items: List[str] = []
     for item in value:
-        parsed = parse_as_Union_of_BucketObjectDto0BucketSubdirDto_endof_(item)
+        parsed = parse_as_str(item)
         if isinstance(parsed, MessageParsingError):
             return parsed
         items.append(parsed)
     return tuple(items)
 
 
-def parse_as_ListDataProxyBucketResponse(
+def parse_as_ListFsDirResponse(
     value: JsonValue,
-) -> "ListDataProxyBucketResponse | MessageParsingError":
+) -> "ListFsDirResponse | MessageParsingError":
     from collections.abc import Mapping
 
     if not isinstance(value, Mapping):
         return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as ListDataProxyBucketResponse"
+            f"Could not parse {json.dumps(value)} as ListFsDirResponse"
         )
-    if value.get("__class__") != "ListDataProxyBucketResponse":
+    if value.get("__class__") != "ListFsDirResponse":
         return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as ListDataProxyBucketResponse"
+            f"Could not parse {json.dumps(value)} as ListFsDirResponse"
         )
-    tmp_items = parse_as_Tuple_of_Union_of_BucketObjectDto0BucketSubdirDto_endof_0_varlen__endof_(
-        value.get("items")
-    )
-    if isinstance(tmp_items, MessageParsingError):
-        return tmp_items
-    return ListDataProxyBucketResponse(
-        items=tmp_items,
+    tmp_files = parse_as_Tuple_of_str0_varlen__endof_(value.get("files"))
+    if isinstance(tmp_files, MessageParsingError):
+        return tmp_files
+    tmp_directories = parse_as_Tuple_of_str0_varlen__endof_(value.get("directories"))
+    if isinstance(tmp_directories, MessageParsingError):
+        return tmp_directories
+    return ListFsDirResponse(
+        files=tmp_files,
+        directories=tmp_directories,
     )
 
 
 @dataclass
-class ListDataProxyBucketResponse(DataTransferObject):
-    items: Tuple[Union[BucketObjectDto, BucketSubdirDto], ...]
+class ListFsDirResponse(DataTransferObject):
+    files: Tuple[str, ...]
+    directories: Tuple[str, ...]
 
     def to_json_value(self) -> JsonObject:
         return {
-            "__class__": "ListDataProxyBucketResponse",
-            "items": tuple(convert_to_json_value(item) for item in self.items),
+            "__class__": "ListFsDirResponse",
+            "files": tuple(item for item in self.files),
+            "directories": tuple(item for item in self.directories),
         }
 
     @classmethod
     def from_json_value(
         cls, value: JsonValue
-    ) -> "ListDataProxyBucketResponse | MessageParsingError":
-        return parse_as_ListDataProxyBucketResponse(value)
+    ) -> "ListFsDirResponse | MessageParsingError":
+        return parse_as_ListFsDirResponse(value)

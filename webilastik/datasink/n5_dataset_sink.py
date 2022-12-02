@@ -5,7 +5,7 @@ import numpy as np
 from ndstructs.point5D import Interval5D, Shape5D
 
 from webilastik.server.rpc.dto import Interval5DDto, N5DataSinkDto, Shape5DDto, dtype_to_dto
-from webilastik.filesystem import Filesystem
+from webilastik.filesystem import IFilesystem, create_filesystem_from_message
 
 from ndstructs.array5D import Array5D
 
@@ -25,16 +25,20 @@ class N5Writer(IDataSinkWriter):
     def write(self, data: Array5D) -> None:
         tile = N5Block.fromArray5D(data)
         tile_path = self._data_sink.full_path / self._data_sink.attributes.get_tile_path(data.interval)
-        with self._data_sink.filesystem.openbin(tile_path.as_posix(), "w") as f:
-            _ = f.write(tile.to_n5_bytes(
+        writing_result = self._data_sink.filesystem.create_file(
+            path=tile_path,
+            contents=tile.to_n5_bytes(
                 axiskeys=self._data_sink.attributes.c_axiskeys, compression=self._data_sink.attributes.compression
-            ))
+            )
+        )
+        if isinstance(writing_result, Exception):
+            raise writing_result #FIXME: return instead
 
 class N5DataSink(DataSink):
     def __init__(
         self,
         *,
-        filesystem: Filesystem,
+        filesystem: IFilesystem,
         outer_path: PurePosixPath,
         inner_path: PurePosixPath,
         interval: Interval5D,
@@ -65,13 +69,21 @@ class N5DataSink(DataSink):
 
 
     def open(self) -> "Exception | N5Writer":
-        _ = self.filesystem.makedirs(self.full_path.as_posix(), recreate=True)
+        # _ = self.filesystem.makedirs(self.full_path.as_posix(), recreate=True)
 
-        with self.filesystem.openbin(self.outer_path.joinpath("attributes.json").as_posix(), "w") as f:
-            _ = f.write(json.dumps({"n5": "2.0.0"}).encode("utf8"))
+        root_attributes_write_result = self.filesystem.create_file(
+            path=self.outer_path.joinpath("attributes.json"),
+            contents=json.dumps({"n5": "2.0.0"}).encode("utf8"),
+        )
+        if isinstance(root_attributes_write_result, Exception):
+            return root_attributes_write_result
 
-        with self.filesystem.openbin(self.full_path.joinpath("attributes.json").as_posix(), "w") as f:
-            _ = f.write(json.dumps(self.attributes.to_json_data()).encode("utf-8"))
+        dataset_attributes_write_result = self.filesystem.create_file(
+            path=self.full_path.joinpath("attributes.json"),
+            contents=json.dumps(self.attributes.to_json_data()).encode("utf-8")
+        )
+        if isinstance(dataset_attributes_write_result, Exception):
+            return dataset_attributes_write_result
 
         # create all directories in the constructor to avoid races when processing tiles
         created_dirs : Set[PurePosixPath] = set()
@@ -79,7 +91,9 @@ class N5DataSink(DataSink):
             dir_path = self.full_path / self.attributes.get_tile_path(tile).parent
             if dir_path and dir_path not in created_dirs:
                 # print(f"Will create dir at {dir_path}")
-                _ = self.filesystem.makedirs(dir_path.as_posix())
+                dir_creation_result = self.filesystem.create_directory(dir_path)
+                if isinstance(dir_creation_result, Exception):
+                    return dir_creation_result
                 created_dirs.add(dir_path)
 
         return N5Writer(self)
@@ -99,7 +113,7 @@ class N5DataSink(DataSink):
     @staticmethod
     def from_dto(dto: N5DataSinkDto) -> "N5DataSink":
         return N5DataSink(
-            filesystem=Filesystem.create_from_message(dto.filesystem),
+            filesystem=create_filesystem_from_message(dto.filesystem),
             outer_path=PurePosixPath(dto.outer_path),
             inner_path=PurePosixPath(dto.inner_path),
             interval=dto.interval.to_interval5d(),

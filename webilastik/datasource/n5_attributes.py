@@ -1,11 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional, Type, TypeVar
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import gzip
 import bz2
 import lzma
-from fs.base import FS as FileSystem
 import json
 import numpy as np
 
@@ -15,6 +14,7 @@ from ndstructs.utils.json_serializable import (
 )
 from webilastik.datasource import guess_axiskeys
 from webilastik.server.rpc.dto import N5Bzip2CompressorDto, N5CompressorDto, N5GzipCompressorDto, N5XzCompressorDto, N5RawCompressorDto
+from webilastik.filesystem import IFilesystem
 
 Compressor = TypeVar("Compressor", bound="N5Compressor")
 
@@ -247,10 +247,12 @@ class N5DatasetAttributes:
         )
 
     @classmethod
-    def load(cls, path: Path, filesystem: FileSystem) -> "N5DatasetAttributes":
-        with filesystem.openbin(path.joinpath("attributes.json").as_posix(), "r") as f:
-            attributes_json = f.read().decode("utf8")
-        raw_attributes = json.loads(attributes_json)
+    def load(cls, path: PurePosixPath, filesystem: IFilesystem) -> "N5DatasetAttributes":
+        read_result = filesystem.read_file(path / "attributes.json")
+        if isinstance(read_result, Exception):
+            raise read_result #FIXME: return instead
+        attributes_json = read_result.decode("utf8") #FIXME: could raise
+        raw_attributes = json.loads(attributes_json) #FIXME: could raise
         return cls.from_json_data(raw_attributes)
 
     @classmethod

@@ -6,7 +6,7 @@ import numpy as np
 
 from ndstructs.point5D import Shape5D, Interval5D
 from ndstructs.array5D import Array5D
-from webilastik.filesystem import Filesystem
+from webilastik.filesystem import IFilesystem
 from webilastik.server.rpc.dto import DataSinkDto, PrecomputedChunksSinkDto
 from webilastik.utility.url import Url
 
@@ -55,7 +55,7 @@ class FsDataSink(DataSink):
     def __init__(
         self,
         *,
-        filesystem: Filesystem,
+        filesystem: IFilesystem,
         path: PurePosixPath,
         tile_shape: Shape5D,
         interval: Interval5D,
@@ -73,6 +73,4 @@ class FsDataSink(DataSink):
 
     @property
     def url(self) -> Url:
-        url = Url.parse(self.filesystem.geturl(self.path.as_posix()))
-        assert url is not None
-        return url
+        return self.filesystem.geturl(self.path)
