@@ -99,9 +99,13 @@ class PrecomputedChunksDataSource(FsDataSource):
         )
 
     @staticmethod
-    def from_dto(dto: PrecomputedChunksDataSourceDto) -> "PrecomputedChunksDataSource":
+    def from_dto(dto: PrecomputedChunksDataSourceDto) -> "PrecomputedChunksDataSource | Exception":
+        fs_result = create_filesystem_from_message(dto.filesystem)
+        if isinstance(fs_result, Exception):
+            return fs_result
+
         return PrecomputedChunksDataSource(
-            filesystem=create_filesystem_from_message(dto.filesystem),
+            filesystem=fs_result,
             path=PurePosixPath(dto.path),
             scale_key=PurePosixPath(dto.scale_key),
             dtype=np.dtype(dto.dtype),

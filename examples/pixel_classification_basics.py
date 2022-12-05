@@ -21,12 +21,14 @@ from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
 from webilastik.datasource.precomputed_chunks_info import RawEncoder
 from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.features.ilp_filter import IlpGaussianSmoothing
-from webilastik.filesystem import OsFs
+from webilastik.filesystem.os_fs import OsFs
 
 
 # some sample data to work on. DataSource implementations are tile-based.
+fs = OsFs.create()
+assert not isinstance(fs, Exception)
 data_source = SkimageDataSource(
-    filesystem=OsFs(), #filesystem could also be HttpFs, BucketFs, etc
+    filesystem=fs, #filesystem could also be HttpFs, BucketFs, etc
     path=project_root_dir / "public/images/c_cells_1.png"
 )
 
@@ -79,7 +81,7 @@ assert not isinstance(classifier, Exception)
 # https://github.com/google/neuroglancer/tree/master/src/neuroglancer/datasource/precomputed
 output_interval: Interval5D = classifier.get_expected_roi(data_source.roi)
 predictions_data_sink = PrecomputedChunksSink(
-    filesystem=OsFs(),
+    filesystem=fs,
     path=PurePosixPath("/tmp/my_exported_data"),
     dtype=np.dtype("float32"),
     encoding=RawEncoder(),

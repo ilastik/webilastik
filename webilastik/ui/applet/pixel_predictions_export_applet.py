@@ -211,20 +211,26 @@ class WsPixelClassificationExportApplet(WsApplet, PixelClassificationExportApple
             if isinstance(params_result, MessageParsingError):
                 return UsageError(str(params_result)) #FIXME: this is a bug, not a usage error
             datasource_result = FsDataSource.try_from_message(params_result.datasource)
-            if isinstance(datasource_result, MessageParsingError):
+            if isinstance(datasource_result, Exception):
                 return UsageError(str(datasource_result)) #FIXME: this is a bug, not a usage error
+            datasink_result = DataSink.create_from_message(params_result.datasink)
+            if isinstance(datasink_result, Exception):
+                return UsageError(str(datasink_result)) #FIXME: may not be an usage error
             rpc_result = self.launch_pixel_probabilities_export_job(
-                datasource=datasource_result, datasink=DataSink.create_from_message(params_result.datasink)
+                datasource=datasource_result, datasink=datasink_result
             )
         elif method_name == "launch_simple_segmentation_export_job":
             params_result = StartSimpleSegmentationExportJobParamsDto.from_json_value(arguments)
             if isinstance(params_result, MessageParsingError):
                 return UsageError(str(params_result)) #FIXME: this is a bug, not a usage error
             datasource_result = FsDataSource.try_from_message(params_result.datasource)
-            if isinstance(datasource_result, MessageParsingError):
+            if isinstance(datasource_result, Exception):
                 return UsageError(str(datasource_result)) #FIXME: this is a bug, not a usage error
-            datasink = DataSink.create_from_message(params_result.datasink)
-            rpc_result = self.launch_simple_segmentation_export_job(datasource=datasource_result, datasink=datasink, label_name=params_result.label_header.name)
+            datasink_result = DataSink.create_from_message(params_result.datasink)
+            if isinstance(datasink_result, Exception):
+                return UsageError(str(datasink_result)) #FIXME: may not be an usage error
+
+            rpc_result = self.launch_simple_segmentation_export_job(datasource=datasource_result, datasink=datasink_result, label_name=params_result.label_header.name)
         else:
             raise ValueError(f"Invalid method name: '{method_name}'") #FIXME: return error
         return rpc_result

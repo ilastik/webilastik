@@ -135,7 +135,9 @@ class PrecomputedChunksSink(FsDataSink):
         )
 
     def to_dto(self) -> PrecomputedChunksSinkDto:
-        from webilastik.filesystem import BucketFs, HttpFs, OsFs
+        from webilastik.filesystem.http_fs import HttpFs
+        from webilastik.filesystem.os_fs import OsFs
+        from webilastik.filesystem.bucket_fs import BucketFs
         assert isinstance(self.filesystem, (HttpFs, OsFs, BucketFs)) #FIXME
         type_name: Literal["uint8", "uint16", "uint32", "uint64", "float32"] = str(self.dtype) #type: ignore #FIXME
         return PrecomputedChunksSinkDto(
@@ -150,9 +152,12 @@ class PrecomputedChunksSink(FsDataSink):
         )
 
     @classmethod
-    def from_dto(cls, message: PrecomputedChunksSinkDto) -> "PrecomputedChunksSink":
+    def from_dto(cls, message: PrecomputedChunksSinkDto) -> "PrecomputedChunksSink | Exception":
+        fs_result = create_filesystem_from_message(message.filesystem)
+        if isinstance(fs_result, Exception):
+            return fs_result
         return PrecomputedChunksSink(
-            filesystem=create_filesystem_from_message(message.filesystem),
+            filesystem=fs_result,
             path=PurePosixPath(message.path),
             scale_key=PurePosixPath(message.scale_key),
             dtype=np.dtype(message.dtype), #FIXME?

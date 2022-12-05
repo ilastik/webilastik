@@ -19,7 +19,7 @@ from webilastik.datasource.n5_attributes import N5Compressor, RawCompressor
 from webilastik.datasource import DataSource
 from webilastik.datasource.array_datasource import ArrayDataSource
 from webilastik.datasource.skimage_datasource import SkimageDataSource
-from webilastik.filesystem import OsFs
+from webilastik.filesystem.os_fs import OsFs
 
 # fmt: off
 raw = np.asarray([
@@ -71,10 +71,12 @@ def create_n5(
     array: Array5D, *, axiskeys: Optional[str] = None, chunk_size: Shape5D, compression: N5Compressor = RawCompressor()
 ):
     path = PurePosixPath(tempfile.mkstemp()[1] + ".n5")
+    fs = OsFs.create()
+    assert not isinstance(fs, Exception)
     sink = N5DataSink(
         outer_path=path,
         inner_path=PurePosixPath("/data"),
-        filesystem=OsFs(),
+        filesystem=fs,
         tile_shape=chunk_size,
         c_axiskeys=axiskeys or array.axiskeys,
         compressor=compression,
@@ -136,7 +138,9 @@ def test_retrieve_roi_smaller_than_tile():
     ])
     # fmt: on
     path = PurePosixPath(create_n5(data, chunk_size=Shape5D(c=2, y=4, x=4)))
-    ds = N5DataSource(path=path / "data", filesystem=OsFs())
+    fs = OsFs.create()
+    assert not isinstance(fs, Exception)
+    ds = N5DataSource(path=path / "data", filesystem=fs)
     smaller_than_tile = ds.retrieve(c=1, y=(0, 4), x=(0, 4))
     assert np.all(smaller_than_tile.raw("cyx") == expected_cyx)
 
@@ -152,7 +156,9 @@ def test_n5_datasource():
     # fmt: on
 
     path = PurePosixPath(create_n5(data, chunk_size=Shape5D(x=2, y=2)))
-    ds = N5DataSource(path=path / "data", filesystem=OsFs())
+    fs = OsFs.create()
+    assert not isinstance(fs, Exception)
+    ds = N5DataSource(path=path / "data", filesystem=fs)
     assert ds.shape == data.shape
 
     # fmt: off
@@ -188,7 +194,9 @@ def test_n5_datasource():
 
 
 def test_skimage_datasource_tiles():
-    bs = DataRoi(SkimageDataSource(path=png_image, filesystem=OsFs()))
+    fs = OsFs.create()
+    assert not isinstance(fs, Exception)
+    bs = DataRoi(SkimageDataSource(path=png_image, filesystem=fs))
     num_checked_tiles = 0
     for tile in bs.split(Shape5D(x=2, y=2)):
         if tile == Interval5D.zero(x=(0, 2), y=(0, 2)):
@@ -227,7 +235,9 @@ def test_neighboring_tiles():
 
         [0,   1,  2,    3,  4,  5,    6]], dtype=np.uint8), axiskeys="yx")
 
-    ds = SkimageDataSource(path=create_png(arr), filesystem=OsFs())
+    fs = OsFs.create()
+    assert not isinstance(fs, Exception)
+    ds = SkimageDataSource(path=create_png(arr), filesystem=fs)
 
     fifties_slice = DataRoi(ds, x=(3, 6), y=(3, 6))
     expected_fifties_slice = Array5D(np.asarray([

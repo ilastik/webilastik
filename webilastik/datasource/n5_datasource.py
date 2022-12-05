@@ -91,9 +91,12 @@ class N5DataSource(FsDataSource):
         )
 
     @staticmethod
-    def from_dto(dto: N5DataSourceDto) -> "N5DataSource":
+    def from_dto(dto: N5DataSourceDto) -> "N5DataSource | Exception":
+        fs_result = create_filesystem_from_message(dto.filesystem)
+        if isinstance(fs_result, Exception):
+            return fs_result
         return N5DataSource(
-            filesystem=create_filesystem_from_message(dto.filesystem),
+            filesystem=fs_result,
             path=PurePosixPath(dto.path),
             spatial_resolution=dto.spatial_resolution,
         )

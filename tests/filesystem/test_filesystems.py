@@ -1,8 +1,11 @@
 from pathlib import PurePosixPath
-from webilastik.filesystem import OsFs, BucketFs
+from webilastik.filesystem.os_fs import OsFs
+from webilastik.filesystem.bucket_fs import BucketFs
 import uuid
 
-for fs in [OsFs(), BucketFs(bucket_name="hbp-image-service")]:
+osfs = OsFs.create()
+assert not isinstance(osfs, Exception)
+for fs in [osfs, BucketFs(bucket_name="hbp-image-service")]:
     file_path = PurePosixPath(f"/tmp/test-{uuid.uuid4()}/test_file.txt")
     contents = "lalala".encode('utf8')
 

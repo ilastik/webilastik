@@ -17,7 +17,9 @@ export class DataSourceSelectionWidget{
         }).element
 
 
-        const bucketNameInput = createInputParagraph({inputType: "text", parentElement: this.element, label_text: "Bucket name: "})
+        const bucketNameInput = createInputParagraph({
+            inputType: "text", parentElement: this.element, value: "hbp-image-service", label_text: "Bucket name: "
+        })
         createInputParagraph({inputType: "button", parentElement: this.element, value: "Open file tree", onClick: () => {
             const bucketName = bucketNameInput.value
             if(bucketName.length == 0){

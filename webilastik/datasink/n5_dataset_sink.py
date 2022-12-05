@@ -111,9 +111,12 @@ class N5DataSink(DataSink):
         )
 
     @staticmethod
-    def from_dto(dto: N5DataSinkDto) -> "N5DataSink":
+    def from_dto(dto: N5DataSinkDto) -> "N5DataSink | Exception":
+        fs_result = create_filesystem_from_message(dto.filesystem)
+        if isinstance(fs_result, Exception):
+            return fs_result
         return N5DataSink(
-            filesystem=create_filesystem_from_message(dto.filesystem),
+            filesystem=fs_result,
             outer_path=PurePosixPath(dto.outer_path),
             inner_path=PurePosixPath(dto.inner_path),
             interval=dto.interval.to_interval5d(),

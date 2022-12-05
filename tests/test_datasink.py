@@ -1,5 +1,5 @@
 from tests import create_tmp_dir
-from webilastik.filesystem import OsFs
+from webilastik.filesystem.os_fs import OsFs
 from pathlib import PurePosixPath
 
 import numpy as np
@@ -37,8 +37,10 @@ def test_n5_attributes():
 
 def test_n5_datasink():
     tmp_path = create_tmp_dir(prefix="test_n5_datasink")
+    fs = OsFs.create()
+    assert not isinstance(fs, Exception)
     sink = N5DataSink(
-        filesystem=OsFs(),
+        filesystem=fs,
         outer_path=tmp_path / "test_n5_datasink.n5",
         inner_path=PurePosixPath("/data"),
         c_axiskeys=data.axiskeys, #FIXME: double check this
@@ -59,7 +61,8 @@ def test_n5_datasink():
 
 def test_distributed_n5_datasink():
     tmp_path = create_tmp_dir(prefix="test_distributed_n5_datasink")
-    filesystem = OsFs()
+    filesystem = OsFs.create()
+    assert not isinstance(filesystem, Exception)
     outer_path = tmp_path / "test_distributed_n5_datasink.n5"
     inner_path = PurePosixPath("/data")
     full_path = PurePosixPath("test_distributed_n5_datasink.n5/data")
@@ -87,7 +90,8 @@ def test_distributed_n5_datasink():
 def test_writing_to_precomputed_chunks():
     tmp_path = create_tmp_dir(prefix="test_writing_to_precomputed_chunks")
     datasource = ArrayDataSource(data=data, tile_shape=Shape5D(x=10, y=10))
-    filesystem = OsFs()
+    filesystem = OsFs.create()
+    assert not isinstance(filesystem, Exception)
     sink_path = tmp_path / "mytest.precomputed"
 
     datasink = PrecomputedChunksSink(
@@ -117,7 +121,8 @@ def test_writing_to_offset_precomputed_chunks():
     data_at_1000_1000 = data.translated(Point5D(x=1000, y=1000) - data.location)
     datasource = ArrayDataSource(data=data_at_1000_1000, tile_shape=Shape5D(x=10, y=10))
     sink_path = tmp_path / "mytest.precomputed"
-    filesystem = OsFs()
+    filesystem = OsFs.create()
+    assert not isinstance(filesystem, Exception)
 
     print(f"\n\n will write to '{filesystem.geturl(sink_path)}' ")
 

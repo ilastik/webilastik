@@ -40,7 +40,7 @@ class DataSink(ABC):
         pass
 
     @classmethod
-    def create_from_message(cls, message: DataSinkDto) -> "DataSink": #FIXME: add other sinks
+    def create_from_message(cls, message: DataSinkDto) -> "DataSink | Exception": #FIXME: add other sinks
         if isinstance(message, PrecomputedChunksSinkDto):
             from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
             return PrecomputedChunksSink.from_dto(message)

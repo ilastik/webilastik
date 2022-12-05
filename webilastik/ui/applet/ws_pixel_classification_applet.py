@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 from base64 import b64decode
 import asyncio
 import json
@@ -63,7 +63,12 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
         params = CheckDatasourceCompatibilityParams.from_json_value(await request.json())
         if isinstance(params, MessageParsingError):
             return  uncachable_json_response(RpcErrorDto(error="bad payload").to_json_value(), status=400)
-        datasources = [FsDataSource.try_from_message(dto) for dto in params.datasources]
+        datasources: List[FsDataSource] = []
+        for dto in params.datasources:
+            ds = FsDataSource.try_from_message(dto)
+            if isinstance(ds, Exception):
+                return uncachable_json_response(RpcErrorDto(error=str(ds)).to_json_value(), status=400)
+            datasources.append(ds)
         with self.lock:
             classifier = self.pixel_classifier()
         if classifier is None:

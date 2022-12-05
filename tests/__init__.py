@@ -23,7 +23,10 @@ from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale
 from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.features.ilp_filter import IlpGaussianSmoothing, IlpHessianOfGaussianEigenvalues
 from webilastik.features.ilp_filter import IlpFilter
-from webilastik.filesystem import IFilesystem, BucketFs, HttpFs, OsFs
+from webilastik.filesystem import IFilesystem
+from webilastik.filesystem.os_fs import OsFs
+from webilastik.filesystem.http_fs import HttpFs
+from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.libebrains.user_token import UserToken
 from webilastik.ui.applet.brushing_applet import Label
 from webilastik.libebrains.global_user_login import get_global_login_token
@@ -43,8 +46,10 @@ def create_tmp_dir(prefix: str) -> PurePosixPath:
     return path
 
 def get_sample_c_cells_datasource() -> SkimageDataSource:
+    fs = OsFs.create()
+    assert not isinstance(fs, Exception)
     return SkimageDataSource(
-        filesystem=OsFs(), path=PurePosixPath(get_project_root_dir()) / "public/images/c_cells_1.png"
+        filesystem=fs, path=PurePosixPath(get_project_root_dir()) / "public/images/c_cells_1.png"
     )
 
 def get_test_output_path() -> PurePosixPath:

@@ -15,7 +15,7 @@ from webilastik.features.ilp_filter import (
     IlpHessianOfGaussianEigenvalues, IlpLaplacianOfGaussian, IlpStructureTensorEigenvalues,
 )
 from webilastik.features.ilp_filter import IlpFilter
-from webilastik.filesystem import OsFs
+from webilastik.filesystem.os_fs import OsFs
 from webilastik.libebrains.user_token import UserToken
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet import dummy_prompt
@@ -94,8 +94,9 @@ def test_pixel_classification_workflow():
 
 
 
-
-    _ = workflow.save_project(fs=OsFs(), path=test_output_path / "blas.ilp")
+    fs = OsFs.create()
+    assert not isinstance(fs, Exception)
+    _ = workflow.save_project(fs=fs, path=test_output_path / "blas.ilp")
 
     loaded_workflow = PixelClassificationWorkflow.from_ilp(
         ilp_path=Path(test_output_path / "blas.ilp"),

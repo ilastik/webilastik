@@ -257,7 +257,7 @@ class FsDataSource(DataSource):
     def try_from_message(
         message: FsDataSourceDto,
         allowed_protocols: Sequence[Protocol] = ("http", "https"),
-    ) -> "FsDataSource":
+    ) -> "FsDataSource | Exception":
         from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
         from webilastik.datasource.n5_datasource import N5DataSource
         from webilastik.datasource.skimage_datasource import SkimageDataSource

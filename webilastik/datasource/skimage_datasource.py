@@ -60,9 +60,13 @@ class SkimageDataSource(FsDataSource):
         return url.datascheme == None and url.path.suffix in (".png", ".jpg", ".jpeg", ".bmp", ".gif")
 
     @staticmethod
-    def from_dto(dto: SkimageDataSourceDto) -> "SkimageDataSource":
+    def from_dto(dto: SkimageDataSourceDto) -> "SkimageDataSource | Exception":
+        fs_result = create_filesystem_from_message(dto.filesystem)
+        if isinstance(fs_result, Exception):
+            return fs_result
+
         return SkimageDataSource(
-            filesystem=create_filesystem_from_message(dto.filesystem),
+            filesystem=fs_result,
             path=PurePosixPath(dto.path),
             location=dto.interval.to_interval5d().start,
             tile_shape=dto.tile_shape.to_shape5d(),

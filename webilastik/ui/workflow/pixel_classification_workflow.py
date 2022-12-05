@@ -16,7 +16,7 @@ from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.datasource import FsDataSource
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.filesystem import IFilesystem
-from webilastik.filesystem import OsFs
+from webilastik.filesystem.os_fs import OsFs
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet.brushing_applet import Label, WsBrushingApplet
 from webilastik.ui.applet.feature_selection_applet import WsFeatureSelectionApplet
@@ -107,10 +107,13 @@ class PixelClassificationWorkflow:
         allowed_protocols: "Sequence[Protocol] | None" = None,
     ) -> "PixelClassificationWorkflow | Exception":
         allowed_protocols = allowed_protocols or ("http", "https")
+        fs_result = OsFs.create()
+        if isinstance(fs_result, Exception):
+            return fs_result
         with h5py.File(ilp_path, "r") as f:
             parsing_result = IlpPixelClassificationWorkflowGroup.parse(
                 group=f,
-                ilp_fs=OsFs(),
+                ilp_fs=fs_result,
                 allowed_protocols=allowed_protocols,
             )
             if isinstance(parsing_result, Exception):
@@ -231,10 +234,13 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         session_url: Url,
     ) -> "WsPixelClassificationWorkflow | Exception":
         allowed_protocols = allowed_protocols or ("http", "https")
+        fs_result = OsFs.create()
+        if isinstance(fs_result, Exception):
+            return fs_result
         with h5py.File(ilp_path, "r") as f:
             parsing_result = IlpPixelClassificationWorkflowGroup.parse(
                 group=f,
-                ilp_fs=OsFs(),
+                ilp_fs=fs_result,
                 allowed_protocols=allowed_protocols,
             )
             if isinstance(parsing_result, Exception):

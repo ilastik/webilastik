@@ -26,7 +26,6 @@ from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonO
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksInfo
 from webilastik.filesystem import FsFileNotFoundException, FsIoException, IFilesystem, create_filesystem_from_message
-from webilastik.filesystem import BucketFs
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.server.rpc.dto import GetDatasourcesFromUrlParamsDto, GetDatasourcesFromUrlResponseDto, ListFsDirRequest, ListFsDirResponse, MessageParsingError, RpcErrorDto, SaveProjectParamsDto
 from webilastik.server.session_allocator import uncachable_json_response
@@ -202,8 +201,10 @@ class WebIlastik:
         params_result = ListFsDirRequest.from_json_value(await request.json())
         if isinstance(params_result, MessageParsingError):
             return uncachable_json_response(RpcErrorDto(error=str(params_result)).to_json_value(), status=400)
-        fs = create_filesystem_from_message(params_result.fs)
-        items_result = fs.list_contents(path=PurePosixPath(params_result.path))
+        fs_result = create_filesystem_from_message(params_result.fs)
+        if isinstance(fs_result, Exception):
+            return uncachable_json_response(RpcErrorDto(error="Could not create filesystem").to_json_value(), status=400)
+        items_result = fs_result.list_contents(path=PurePosixPath(params_result.path))
         if isinstance(items_result, Exception):
             return uncachable_json_response(
                 RpcErrorDto(error=str(items_result)).to_json_value(),
@@ -350,21 +351,20 @@ class WebIlastik:
         )
 
     async def save_project(self, request: web.Request) -> web.Response:
-        from webilastik.filesystem import OsFs
         payload = await request.json()
         params_result = SaveProjectParamsDto.from_json_value(payload)
         if isinstance(params_result, MessageParsingError):
             return web.Response(status=400, text=f"Bad payload")
-        filesystem = create_filesystem_from_message(params_result.fs)
-        if isinstance(filesystem, OsFs):
-            return web.Response(status=400, text=f"OsFs not allowed for now")
+        fs_result = create_filesystem_from_message(params_result.fs)
+        if isinstance(fs_result, Exception):
+            return uncachable_json_response(RpcErrorDto(error=str(fs_result)).to_json_value(), status=400)
         file_path = PurePosixPath(params_result.project_file_path)
         if len(file_path.parts) == 0 or ".." in file_path.parts:
             return web.Response(status=400, text=f"Bad project file path: {file_path}")
 
         saving_result = await asyncio.wrap_future(self.executor.submit(
             do_save_project,
-            filesystem=filesystem,
+            filesystem=fs_result,
             file_path=file_path,
             workflow_contents=self.workflow.get_ilp_contents()
         ))
@@ -373,24 +373,23 @@ class WebIlastik:
                 RpcErrorDto(error=str(saving_result)).to_json_value(),
                 status=400, #FIXME?
             )
-        return web.Response(status=200, text=f"Project saved to {filesystem.geturl(file_path)}")
+        return web.Response(status=200, text=f"Project saved to {fs_result.geturl(file_path)}")
 
     async def load_project(self, request: web.Request) -> web.Response:
-        from webilastik.filesystem import OsFs
         payload = await request.json()
         params_result = SaveProjectParamsDto.from_json_value(payload)
         if isinstance(params_result, MessageParsingError):
             return web.Response(status=400, text=f"Bad payload")
-        filesystem = create_filesystem_from_message(params_result.fs)
-        if isinstance(filesystem, OsFs):
-            return web.Response(status=400, text=f"OsFs not allowed for now")
+        fs_result = create_filesystem_from_message(params_result.fs)
+        if isinstance(fs_result, Exception):
+            return uncachable_json_response(RpcErrorDto(error=str(fs_result)).to_json_value(), status=400)
         file_path = PurePosixPath(params_result.project_file_path)
         if len(file_path.parts) == 0 or ".." in file_path.parts:
             return web.Response(status=400, text=f"Bad project file path: {file_path}")
 
         ilp_bytes_result = await asyncio.wrap_future(self.executor.submit(
             do_load_project_bytes,
-            filesystem=filesystem,
+            filesystem=fs_result,
             file_path=file_path,
         ))
         if isinstance(ilp_bytes_result, Exception):
@@ -407,7 +406,7 @@ class WebIlastik:
             return web.Response(status=400, text=f"Could not load project: {new_workflow_result}")
         self.workflow = new_workflow_result
         self._update_clients()
-        return web.Response(status=200, text=f"Project saved to {filesystem.geturl(file_path)}")
+        return web.Response(status=200, text=f"Project saved to {fs_result.geturl(file_path)}")
 
     async def stripped_precomputed_info(self, request: web.Request) -> web.Response:
         """Serves a precomp info stripped of all but one scales"""
