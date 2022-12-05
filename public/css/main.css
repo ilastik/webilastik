@@ -38,7 +38,7 @@
     cursor: pointer;
 }
 
-.ItkCollapsableApplet summary:hover{
+.ItkCollapsableApplet>summary:hover{
     background-color: rgba(0,0,0, 40%);
 }
 
@@ -244,10 +244,15 @@ input[type=button], input[type=submit], .ItkPopupSelectTrigger{
 
 /*###############################*/
 
+.ItkFolderWidget{
+    user-select: none;
+}
+
 .ItkFolderWidget summary, .ItkFileWidget{
     background-color: white;
     color: black;
     cursor: default;
+    padding-left: 0px;
 }
 
 .ItkFolderWidget .ItkExpandFolderWidget{

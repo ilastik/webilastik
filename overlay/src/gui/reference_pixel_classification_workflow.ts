@@ -6,6 +6,7 @@ import { FeatureSelectionWidget } from "./widgets/feature_selection";
 import { Viewer } from "../viewer/viewer";
 import { PredictionsExportWidget } from "./widgets/predictions_export_widget";
 import { ProjectWidget } from "./widgets/project_widget";
+import { DataSourceSelectionWidget } from "./widgets/datasource_selection_widget";
 
 export class ReferencePixelClassificationWorkflowGui{
     public readonly element: HTMLElement
@@ -16,6 +17,7 @@ export class ReferencePixelClassificationWorkflowGui{
 
     public readonly session: Session;
     public readonly viewer: Viewer;
+    public readonly data_selection_widget: DataSourceSelectionWidget;
 
     public constructor({parentElement, session, viewer_driver}: {
         parentElement: HTMLElement,
@@ -27,6 +29,8 @@ export class ReferencePixelClassificationWorkflowGui{
         this.viewer = new Viewer({driver: viewer_driver, session})
 
         this.project_widget = new ProjectWidget({parentElement: this.element, session})
+
+        this.data_selection_widget = new DataSourceSelectionWidget({parentElement: this.element, session, viewer: this.viewer});
 
         this.feature_selection_applet = new FeatureSelectionWidget({
             name: "feature_selection_applet",

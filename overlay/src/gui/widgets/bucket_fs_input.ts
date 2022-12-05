@@ -1,29 +1,19 @@
 import { BucketFSDto } from "../../client/dto";
 import { createElement, createInputParagraph } from "../../util/misc";
-import { Path } from "../../util/parsed_url";
-import { PathInput } from "./path_input";
 
 export class BucketFsInput{
     private readonly bucketNameInput: HTMLInputElement;
-    private readonly prefixInput: PathInput;
 
     constructor(params: {
         parentElement: HTMLElement,
         bucketName?: string,
-        prefix?: Path,
         required?: boolean,
         value?: BucketFSDto,
-        hidePrefix?: boolean,
     }){
         let required = params.required === undefined ? true : params.required;
         this.bucketNameInput = createInputParagraph({
             inputType: "text", parentElement: params.parentElement, label_text: "Bucket Name: ", value: params.bucketName, required
         })
-
-        let prefixDisplay = params.hidePrefix === undefined || params.hidePrefix == false ? "block" : "none"
-        let prefixContainer = createElement({tagName: "p", parentElement: params.parentElement, inlineCss: {display: prefixDisplay}})
-        createElement({tagName: "label", parentElement: prefixContainer, innerHTML: "Prefix: "})
-        this.prefixInput = new PathInput({parentElement: prefixContainer, value: params.prefix, required})
 
         if(params.value){
             this.value = params.value
@@ -32,20 +22,17 @@ export class BucketFsInput{
 
     public get value(): BucketFSDto | undefined{
         let bucketName = this.bucketNameInput.value
-        let prefix = this.prefixInput.value
-        if(!bucketName || !prefix){
+        if(!bucketName){
             return undefined
         }
-        return new BucketFSDto({bucket_name: bucketName, prefix: prefix.raw})
+        return new BucketFSDto({bucket_name: bucketName})
     }
 
     public set value(fs: BucketFSDto | undefined){
         if(fs){
             this.bucketNameInput.value = fs.bucket_name
-            this.prefixInput.value = Path.parse(fs.prefix)
         }else{
             this.bucketNameInput.value = ""
-            this.prefixInput.value = undefined
         }
     }
 

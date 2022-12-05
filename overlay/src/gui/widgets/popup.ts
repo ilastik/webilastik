@@ -1,4 +1,4 @@
-import { createElement, createInput, createInputParagraph, removeElement } from "../../util/misc";
+import { createElement, createImage, createInput, createInputParagraph, removeElement } from "../../util/misc";
 
 export class PopupWidget{
     public readonly background: HTMLElement
@@ -32,6 +32,12 @@ export class PopupWidget{
         createInputParagraph({inputType: "button", parentElement:  popup.element, value: "Ok", onClick: () => {
             popup.destroy()
         }})
+        return popup
+    }
+
+    public static LoadingPopup(params: {title: string}): PopupWidget{
+        let popup = new PopupWidget(params.title);
+        createImage({src: "/public/images/loading.gif", parentElement: popup.element})
         return popup
     }
 }

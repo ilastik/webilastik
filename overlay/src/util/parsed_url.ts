@@ -52,6 +52,11 @@ export class Path{
         return this.components[this.components.length - 1] || "/" //FIXME ?
     }
 
+    public get suffix(): string{
+        const parts = this.name.split(".")
+        return parts.length > 1 ? parts[parts.length - 1] : ""
+    }
+
     public get parent(): Path{
         let new_components = this.components.slice()
         new_components.pop()

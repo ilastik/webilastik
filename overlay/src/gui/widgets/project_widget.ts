@@ -16,10 +16,9 @@ export class ProjectWidget{
         let form = createElement({tagName: "form", parentElement: this.containerWidget.element})
         let bucketInput = new BucketFsInput({
             parentElement: form,
-            hidePrefix: true,
             required: true,
             value: new BucketFSDto({
-                bucket_name: "hbp-image-service", prefix: "/"
+                bucket_name: "hbp-image-service"
             })
         })
 

@@ -31,8 +31,8 @@ import {
     N5DataSinkDto,
     N5DataSourceDto,
     SkimageDataSourceDto,
-    ListDataProxyBucketRequest,
-    ListDataProxyBucketResponse
+    ListFsDirRequest,
+    ListFsDirResponse,
 } from "./dto"
 
 export type HpcSiteName = ComputeSessionStatusDto["hpc_site"] //FIXME?
@@ -373,9 +373,9 @@ export class Session{
         return responseDto.datasources.map(msg => FsDataSource.fromDto(msg))
     }
 
-    public async listDataProxyBucket(params: ListDataProxyBucketRequest): Promise<ListDataProxyBucketResponse | Error> {
+    public async listFsDir(params: ListFsDirRequest): Promise<ListFsDirResponse | Error> {
         let response = await fetch(
-            this.sessionUrl.joinPath("list_data_proxy_bucket").raw,
+            this.sessionUrl.joinPath("list_fs_dir").raw,
             {
                 method: "POST",
                 body: JSON.stringify(params.toJsonValue()),
@@ -384,7 +384,7 @@ export class Session{
         if(!response.ok){
             return Error(`Could not list files in bucket:  ${response.text()}`)
         }
-        return ListDataProxyBucketResponse.fromJsonValue(await response.json())
+        return ListFsDirResponse.fromJsonValue(await response.json())
     }
 }
 
@@ -730,22 +730,27 @@ export abstract class Filesystem{
     }
 
     public abstract toDto(): OsfsDto | HttpFsDto | BucketFSDto;
+
+    public abstract getUrl(path: Path): Url;
 }
 
 export class OsFs extends Filesystem{
-    public constructor(public readonly path: Path){
+    public constructor(){
         super(new Url({
             protocol: "file",
             hostname: "localhost", //FIXME?
-            path: path,
+            path: Path.parse("/"),
         }))
     }
 
-    public static fromDto(message: OsfsDto): OsFs {
-        return new OsFs(Path.parse(message.path))
+    public static fromDto(_message: OsfsDto): OsFs {
+        return new OsFs()
     }
     public toDto(): OsfsDto {
         return new OsfsDto({path: this.url.path.raw})
+    }
+    public getUrl(_path: Path): Url {
+        throw `not implemented`
     }
 }
 
@@ -794,32 +799,34 @@ export class HttpFs extends Filesystem{
         })
 
     }
+    public getUrl(path: Path): Url{
+        return this.url.joinPath(path)
+    }
 }
 
 export class BucketFs extends Filesystem{
     public readonly bucket_name: string
-    public readonly prefix: Path
 
     public constructor(params: {
         bucket_name: string,
-        prefix: Path,
     }){
         super(new Url({
             protocol: "https",
             hostname: "data-proxy.ebrains.eu",
-            path: Path.parse(`/api/v1/buckets/${params.bucket_name}`).joinPath(params.prefix.raw),
+            path: Path.parse(`/api/v1/buckets/${params.bucket_name}`),
         }))
         this.bucket_name = params.bucket_name
-        this.prefix = params.prefix
     }
     public static fromDto(message: BucketFSDto): BucketFs{
-        return new BucketFs({bucket_name: message.bucket_name, prefix: Path.parse(message.prefix)})
+        return new BucketFs({bucket_name: message.bucket_name})
     }
     public toDto(): BucketFSDto{
         return new BucketFSDto({
             bucket_name: this.bucket_name,
-            prefix: this.prefix.toDto(),
         })
+    }
+    public getUrl(path: Path): Url{
+        return this.url.joinPath(path)
     }
 }
 

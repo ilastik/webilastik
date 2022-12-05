@@ -41,8 +41,6 @@ export class PrecomputedChunksScale_DataSink_Input{
         this.fileSystemSelector = BucketFsInput.createLabeledFieldset({
             parentElement, legend: "Data Proxy Bucket:",
             bucketName: "hbp-image-service",
-            prefix: Path.parse("/"),
-            hidePrefix: true,
         })
 
         this.infoDirectoryPathInput = PathInput.createLabeled({
