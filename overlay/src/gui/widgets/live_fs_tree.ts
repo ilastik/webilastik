@@ -47,7 +47,21 @@ export class LiveFsTree{
         return selected_nodes
     }
 
-    public getSelectedUrls(): Array<Url>{
-        return this.getSelectedNodes().map(node => this.fs.getUrl(node.path))
+    public getSelectedDatasourceUrls(): Array< Promise<Url|Error> >{
+        return this.getSelectedNodes().map(node => {
+            let url = this.fs.getUrl(node.path)
+            if(node instanceof FsFileWidget){
+                return Promise.resolve(url)
+            }
+            return this.session.listFsDir(new ListFsDirRequest({fs: this.fs.toDto(), path: node.path.toDto()})).then(result => {
+                if(result instanceof Error){
+                    return result
+                }
+                if(result.files.find(path => path.endsWith("/info"))){
+                    return url.updatedWith({datascheme: "precomputed"})
+                }
+                return url
+            })
+        })
     }
 }

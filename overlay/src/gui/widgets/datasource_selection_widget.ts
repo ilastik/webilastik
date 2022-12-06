@@ -1,11 +1,9 @@
 // import { ListFsDirRequest } from "../../client/dto";
-import { ListFsDirRequest } from "../../client/dto";
 import { BucketFs, Session } from "../../client/ilastik";
 import { createInput, createInputParagraph } from "../../util/misc";
 import { View, ViewUnion } from "../../viewer/view";
 import { Viewer } from "../../viewer/viewer";
 import { CollapsableWidget } from "./collapsable_applet_gui";
-import { FsFolderWidget } from "./fs_tree";
 import { LiveFsTree } from "./live_fs_tree";
 import { ErrorPopupWidget, PopupWidget } from "./popup";
 
@@ -36,27 +34,23 @@ export class DataSourceSelectionWidget{
             })
             createInput({inputType: "button", parentElement: popup.element, value: "Open", onClick: async () => {
                 popup.destroy()
-                const viewPromises = new Array<Promise<ViewUnion>>();
                 const loadingPopup = PopupWidget.LoadingPopup({title: "Loading data sources..."})
                 try{
-                    for(const node of fsTreeWidget.getSelectedNodes()){
-                        let url = fs.getUrl(node.path)
-                        if(node instanceof FsFolderWidget){
-                            const result = await params.session.listFsDir(new ListFsDirRequest({fs: fs.toDto(), path: node.path.toDto()}))
-                            if(result instanceof Error){
-                                new ErrorPopupWidget({message: result.message})
-                                return
-                            }
-                            if(result.files.find(path => path.endsWith("/info"))){
-                                url = url.updatedWith({datascheme: "precomputed"})
-                            }
-                        }
-                        const viewPromise =  View.tryOpen({name: url.path.name, url, session: params.session})
-                        viewPromises.push(viewPromise)
-                    }
+                    let viewPromises = fsTreeWidget.getSelectedDatasourceUrls().map(urlPromise => urlPromise.then(async (urlResult) => {
+                        return urlResult instanceof Error ?
+                            urlResult:
+                            await View.tryOpen({name: urlResult.path.name, url: urlResult, session: params.session})
+                    }))
+                    const viewsToOpen = new Array<ViewUnion>();
                     for(const viewPromise of viewPromises){
-                        params.viewer.openDataView(await viewPromise)
+                        const viewResult = await viewPromise;
+                        if(viewResult instanceof Error){
+                            new ErrorPopupWidget({message: `Could not open view: ${viewResult.message}`})
+                            return
+                        }
+                        viewsToOpen.push(viewResult)
                     }
+                    viewsToOpen.forEach(v => params.viewer.openDataView(v))
                 }finally{
                     loadingPopup.destroy()
                 }
