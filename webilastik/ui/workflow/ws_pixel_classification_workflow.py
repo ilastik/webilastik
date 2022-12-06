@@ -231,7 +231,9 @@ class WebIlastik:
             url = Url.from_base64(match.group("url"))
             selected_resolution = tuple(int(axis) for axis in match.group("resolution").split("_"))
 
-        datasources_result = try_get_datasources_from_url(url=url, allowed_protocols=("http", "https"))
+        datasources_result = await asyncio.wrap_future(self.executor.submit(
+            try_get_datasources_from_url, url=url,
+        ))
         if isinstance(datasources_result, Exception):
             return uncachable_json_response(RpcErrorDto(error=str(datasources_result)).to_json_value(), status=400)
         if isinstance(datasources_result, type(None)):
