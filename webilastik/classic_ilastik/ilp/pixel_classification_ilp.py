@@ -41,8 +41,6 @@ from webilastik.annotations import Annotation
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier, dump_to_temp_file, vigra_forest_to_h5_bytes
 from webilastik.filesystem import IFilesystem
 from webilastik.ui.applet.brushing_applet import Label
-from webilastik.utility.url import Protocol
-
 
 VIGRA_ILP_CLASSIFIER_FACTORY = textwrap.dedent(
         """
@@ -364,7 +362,6 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
         cls,
         group: h5py.Group,
         ilp_fs: IFilesystem,
-        allowed_protocols: Sequence[Protocol] = ("http", "https")
     ) -> "IlpPixelClassificationWorkflowGroup | Exception":
         workflowname = ensure_encoded_string(group, "workflowName")
         if workflowname != "Pixel Classification":
@@ -372,7 +369,7 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
 
         Input_Data = IlpInputDataGroup.parse(ensure_group(group, "Input Data"))
         raw_data_datasources_result = Input_Data.try_to_datasources(
-            role_name="Raw Data", ilp_fs=ilp_fs, ilp_path=PurePosixPath(group.file.filename), allowed_protocols=allowed_protocols
+            role_name="Raw Data", ilp_fs=ilp_fs, ilp_path=PurePosixPath(group.file.filename)
         )
         if isinstance(raw_data_datasources_result, Exception):
             return raw_data_datasources_result

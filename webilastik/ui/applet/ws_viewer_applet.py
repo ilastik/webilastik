@@ -52,8 +52,8 @@ class RawDataView(DataView):
         )
 
     @classmethod
-    def try_from_url(cls, name: str, url: Url, allowed_protocols: Sequence[Protocol]) -> "RawDataView | None | Exception":
-        datasources_result = try_get_datasources_from_url(url=url, allowed_protocols=allowed_protocols)
+    def try_from_url(cls, name: str, url: Url) -> "RawDataView | None | Exception":
+        datasources_result = try_get_datasources_from_url(url=url)
         if isinstance(datasources_result, (Exception, type(None))):
             return datasources_result
         return RawDataView(name=name, url=url, datasources=datasources_result)
@@ -95,12 +95,12 @@ class StrippedPrecomputedView(DataView):
             return e
 
     @classmethod
-    def try_from_url(cls, *, name: str, url: Url, session_url: Url, allowed_protocols: Sequence[Protocol]) -> "StrippedPrecomputedView | None | Exception":
+    def try_from_url(cls, *, name: str, url: Url, session_url: Url) -> "StrippedPrecomputedView | None | Exception":
         url_params_result = cls.extract_url_params(url)
         if isinstance(url_params_result,  (Exception, type(None))):
             return url_params_result
         original_url, selected_resolution = url_params_result
-        raw_view_result = RawDataView.try_from_url(name=name, url=original_url, allowed_protocols=allowed_protocols)
+        raw_view_result = RawDataView.try_from_url(name=name, url=original_url)
         assert raw_view_result is not None
         if isinstance(raw_view_result, Exception):
             return raw_view_result
@@ -159,7 +159,7 @@ class PredictionsView(View):
             if isinstance(url_params_result, (Exception, type(None))):
                 return url_params_result
             raw_data_url, classifier_generation = url_params_result
-            raw_view_result = RawDataView.try_from_url(name=name, url=raw_data_url, allowed_protocols=allowed_protocols)
+            raw_view_result = RawDataView.try_from_url(name=name, url=raw_data_url)
             assert raw_view_result is not None
             if isinstance(raw_view_result, Exception):
                 return raw_view_result
@@ -342,7 +342,7 @@ class WsViewerApplet(WsApplet):
                     continue
                 future_view = self.executor.submit(
                     _try_open_data_view,
-                    name=view_name, url=view_url, allowed_protocols=tuple(self.allowed_protocols), session_url=self.session_url
+                    name=view_name, url=view_url, session_url=self.session_url
                 )
                 future_view.add_done_callback(lambda fut: self._add_data_view(user_prompt, fut.result(), frontend_timestamp=frontend_timestamp))
                 future_view.add_done_callback(lambda _: self.on_async_change())
@@ -393,22 +393,22 @@ class WsViewerApplet(WsApplet):
                         return web.json_response(view.to_dto().to_json_value(), status=200)
         view = await asyncio.wrap_future(self.executor.submit(
             _try_open_data_view,
-            name=params.view_name, url=url, session_url=self.session_url, allowed_protocols=["https", "http"]
+            name=params.view_name, url=url, session_url=self.session_url
         ))
         return web.json_response(view.to_dto().to_json_value(), status=200)
 
 
 def _try_open_data_view(
-    *, name: str, url: Url, session_url: Url, allowed_protocols: Sequence[Protocol] = ("https", "http")
+    *, name: str, url: Url, session_url: Url
 ) -> "DataViewUnion":
-    stripped_view_result = StrippedPrecomputedView.try_from_url(name=name, url=url, session_url=session_url, allowed_protocols=allowed_protocols)
+    stripped_view_result = StrippedPrecomputedView.try_from_url(name=name, url=url, session_url=session_url)
     if isinstance(stripped_view_result, Exception):
         return FailedView(name=name, url=url, error_message=str(stripped_view_result))
     if isinstance(stripped_view_result, StrippedPrecomputedView):
         return stripped_view_result
 
     fixed_url = url.updated_with(hash_="")
-    datasources_result = try_get_datasources_from_url(url=fixed_url, allowed_protocols=allowed_protocols)
+    datasources_result = try_get_datasources_from_url(url=fixed_url)
     if isinstance(datasources_result, type(None)):
         return UnsupportedDatasetView(name=name, url=url)
     if isinstance(datasources_result, Exception):

@@ -25,7 +25,7 @@ def _decode_datasource_url(encoded_url: str) -> "FsDataSource | web.Response":
         datasource_url = Url.from_base64(encoded_url)
     except Exception:
         return uncachable_json_response({"error": f"Bad raw_data encoded url: {encoded_url}"}, status=400)
-    datasources_result = try_get_datasources_from_url(url=datasource_url, allowed_protocols=("http", "https"))
+    datasources_result = try_get_datasources_from_url(url=datasource_url)
     if isinstance(datasources_result, Exception):
         return uncachable_json_response({"error": f"Could not open datasource at {datasource_url}"}, status=500)
     if isinstance(datasources_result, type(None)):

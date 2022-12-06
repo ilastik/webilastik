@@ -9,7 +9,7 @@ from webilastik.libebrains.user_token import UserToken
 from webilastik.ui import parse_url
 from webilastik.ui.usage_error import UsageError
 
-from webilastik.utility.url import Url, Protocol
+from webilastik.utility.url import Url
 
 
 _datasource_cache: Dict[Url, Sequence[FsDataSource]] = {}
@@ -18,16 +18,12 @@ def try_get_datasources_from_url(
     *,
     url: Union[Url, str],
     ebrains_user_token: Optional[UserToken] = None,
-    allowed_protocols: Sequence[Protocol] = ("http", "https")
 ) -> "Sequence[FsDataSource] | None | Exception":
     if isinstance(url, str):
         parsing_result = parse_url(url)
         if isinstance(parsing_result, UsageError):
             return parsing_result
         url = parsing_result
-
-    if url.protocol not in allowed_protocols:
-        return Exception(f"Disallowed protocol: {url.protocol} in {url}")
 
     cached_datasources = _datasource_cache.get(url)
     if cached_datasources is not None:

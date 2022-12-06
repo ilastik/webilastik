@@ -25,7 +25,7 @@ from webilastik.features.ilp_filter import (
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.filesystem import IFilesystem
 from webilastik.ui.datasource import try_get_datasources_from_url
-from webilastik.utility.url import Protocol, Url
+from webilastik.utility.url import Url
 
 
 DT = TypeVar("DT", np.float64, np.int64, np.bool_, np.object_)
@@ -414,14 +414,13 @@ class IlpDatasetInfo:
         *,
         ilp_fs: IFilesystem,
         ilp_path: PurePosixPath,
-        allowed_protocols: Sequence[Protocol] = ("http", "https")
     ) -> "FsDataSource | Exception":
         url = Url.parse(self.filePath)
         if url is None: # filePath was probably a path, not an URL
             path = ilp_path.parent.joinpath(self.filePath)
             url = ilp_fs.geturl(path)
         # import pydevd; pydevd.settrace()
-        datasources_result = try_get_datasources_from_url(url=url, allowed_protocols=allowed_protocols)
+        datasources_result = try_get_datasources_from_url(url=url)
         if datasources_result is None:
             return Exception(f"Could not open {url} as a data source: unsupported format")
         if isinstance(datasources_result, Exception):
@@ -501,7 +500,6 @@ class IlpInputDataGroup:
         role_name: str,
         ilp_fs: IFilesystem,
         ilp_path: PurePosixPath,
-        allowed_protocols: Sequence[Protocol] = ("http", "https")
     ) -> "Dict[int, 'FsDataSource | None'] | Exception":
         infos = [lane.roles[role_name] for lane in self.lanes]
         raw_data_datasources: Dict[int, "FsDataSource | None"] = {}
@@ -509,9 +507,7 @@ class IlpInputDataGroup:
             if info is None:
                 raw_data_datasources[lane_index] = None
             else:
-                datasource_result = info.try_to_datasource(
-                    ilp_fs=ilp_fs, ilp_path=ilp_path, allowed_protocols=allowed_protocols
-                )
+                datasource_result = info.try_to_datasource(ilp_fs=ilp_fs, ilp_path=ilp_path)
                 if isinstance(datasource_result, Exception):
                     return datasource_result
                 raw_data_datasources[lane_index] = datasource_result

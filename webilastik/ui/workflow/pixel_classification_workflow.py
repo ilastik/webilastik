@@ -27,7 +27,7 @@ from webilastik.ui.applet import UserPrompt
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.applet.ws_pixel_classification_applet import WsPixelClassificationApplet
 from webilastik.classic_ilastik.ilp.pixel_classification_ilp import IlpPixelClassificationWorkflowGroup
-from webilastik.utility.url import Protocol, Url
+from webilastik.utility.url import Url
 
 
 
@@ -104,9 +104,7 @@ class PixelClassificationWorkflow:
         on_async_change: Callable[[], None],
         executor: Executor,
         priority_executor: PriorityExecutor,
-        allowed_protocols: "Sequence[Protocol] | None" = None,
     ) -> "PixelClassificationWorkflow | Exception":
-        allowed_protocols = allowed_protocols or ("http", "https")
         fs_result = OsFs.create()
         if isinstance(fs_result, Exception):
             return fs_result
@@ -114,7 +112,6 @@ class PixelClassificationWorkflow:
             parsing_result = IlpPixelClassificationWorkflowGroup.parse(
                 group=f,
                 ilp_fs=fs_result,
-                allowed_protocols=allowed_protocols,
             )
             if isinstance(parsing_result, Exception):
                 return parsing_result
@@ -137,7 +134,6 @@ class PixelClassificationWorkflow:
         on_async_change: Callable[[], None],
         executor: Executor,
         priority_executor: PriorityExecutor,
-        allowed_protocols: "Sequence[Protocol] | None" = None,
     ) -> "PixelClassificationWorkflow | Exception":
         tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5") # FIXME
         num_bytes_written = os.write(tmp_file_handle, ilp_bytes)
@@ -148,7 +144,6 @@ class PixelClassificationWorkflow:
             on_async_change=on_async_change,
             executor=executor,
             priority_executor=priority_executor,
-            allowed_protocols=allowed_protocols,
         )
         os.remove(tmp_file_path)
         return workflow
@@ -230,10 +225,8 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         on_async_change: Callable[[], None],
         executor: Executor,
         priority_executor: PriorityExecutor,
-        allowed_protocols: "Sequence[Protocol] | None" = None,
         session_url: Url,
     ) -> "WsPixelClassificationWorkflow | Exception":
-        allowed_protocols = allowed_protocols or ("http", "https")
         fs_result = OsFs.create()
         if isinstance(fs_result, Exception):
             return fs_result
@@ -241,7 +234,6 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             parsing_result = IlpPixelClassificationWorkflowGroup.parse(
                 group=f,
                 ilp_fs=fs_result,
-                allowed_protocols=allowed_protocols,
             )
             if isinstance(parsing_result, Exception):
                 return parsing_result
@@ -264,7 +256,6 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         on_async_change: Callable[[], None],
         executor: Executor,
         priority_executor: PriorityExecutor,
-        allowed_protocols: "Sequence[Protocol] | None" = None,
         session_url: Url,
     ) -> "WsPixelClassificationWorkflow | Exception":
         tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5") # FIXME
@@ -276,7 +267,6 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             on_async_change=on_async_change,
             executor=executor,
             priority_executor=priority_executor,
-            allowed_protocols=allowed_protocols,
             session_url=session_url,
         )
         os.remove(tmp_file_path)

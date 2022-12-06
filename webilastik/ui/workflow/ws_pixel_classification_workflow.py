@@ -401,7 +401,6 @@ class WebIlastik:
             on_async_change=lambda: self.enqueue_user_interaction(user_interaction=lambda: None), #FIXME?
             executor=self.executor,
             priority_executor=self.priority_executor,
-            allowed_protocols=("http", "https"),
             session_url=self.session_url,
         )
         if isinstance(new_workflow_result, Exception):
