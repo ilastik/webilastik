@@ -40,6 +40,17 @@ export class PopupWidget{
         createImage({src: "/public/images/loading.gif", parentElement: popup.element})
         return popup
     }
+
+    public static async WaitPopup<T>(params: {
+        title: string,
+        operation: Promise<T>,
+    }): Promise<T>{
+        let popup = PopupWidget.LoadingPopup({title: params.title});
+        let result = await params.operation
+        popup.destroy()
+        return result
+    }
+
 }
 
 export class ErrorPopupWidget extends PopupWidget{
