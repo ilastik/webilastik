@@ -137,13 +137,18 @@ class BucketFs(IFilesystem):
     def create_directory(self, path: PurePosixPath) -> "None | FsIoException":
         return None
 
-    def read_file(self, path: PurePosixPath) -> "bytes | FsIoException | FsFileNotFoundException":
+    def get_swift_object_url(self, path: PurePosixPath) -> "Url | FsIoException | FsFileNotFoundException":
         file_url = self.url.concatpath(path).updated_with(extra_search={"redirect": "false"})
         data_proxy_response = self.session.get(file_url)
         if isinstance(data_proxy_response, Exception):
             return data_proxy_response
-        cscs_url = Url.parse_or_raise(data_proxy_response.json()["url"]) #FIXME: could raise
-        cscs_response = _safe_request(self.cscs_session, method="get", url=cscs_url)
+        return Url.parse_or_raise(data_proxy_response.json()["url"]) #FIXME: fix all raises
+
+    def read_file(self, path: PurePosixPath) -> "bytes | FsIoException | FsFileNotFoundException":
+        cscs_url_result = self.get_swift_object_url(path=path)
+        if isinstance(cscs_url_result, Exception):
+            return cscs_url_result
+        cscs_response = _safe_request(self.cscs_session, method="get", url=cscs_url_result)
         if isinstance(cscs_response, Exception):
             return cscs_response
         return cscs_response

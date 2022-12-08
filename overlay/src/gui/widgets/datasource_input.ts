@@ -56,11 +56,11 @@ export class DataSourceInput{
             new ErrorPopupWidget({message: `Error retrieving datasources: ${datasources_result}`})
             return
         }
-        if(datasources_result === undefined || datasources_result.length == 0){
+        if(datasources_result === undefined){
             new ErrorPopupWidget({message: `No datasources fond with given URL: ${url}`})
             return
         }
-        this.popupSuggestions(datasources_result)
+        this.popupSuggestions(datasources_result instanceof Array ? datasources_result : [datasources_result])
     }
 
     protected popupSuggestions(suggestions: FsDataSource[]){

@@ -1,7 +1,7 @@
 #pyright: strict
 
 from pathlib import PurePosixPath
-from typing import Optional, Sequence, Tuple, Any
+from typing import Optional, Tuple, Any, cast
 import io
 
 import skimage.io #type: ignore
@@ -10,8 +10,7 @@ from ndstructs.array5D import Array5D
 from ndstructs.point5D import Interval5D, Point5D, Shape5D
 
 from webilastik.datasource import FsDataSource
-from webilastik.filesystem import IFilesystem, create_filesystem_from_message, create_filesystem_from_url
-from webilastik.utility.url import Url
+from webilastik.filesystem import IFilesystem, create_filesystem_from_message
 from webilastik.server.rpc.dto import Interval5DDto, Shape5DDto, SkimageDataSourceDto, dtype_to_dto
 
 class SkimageDataSource(FsDataSource):
@@ -29,7 +28,7 @@ class SkimageDataSource(FsDataSource):
         if isinstance(raw_data_result, Exception):
             raise raw_data_result #FIXME: return instead
         file_like = io.BytesIO(raw_data_result)
-        raw_data: "np.ndarray[Any, Any]" = skimage.io.imread(file_like) #pyright: ignore [reportUnknownMemberType]
+        raw_data = cast("np.ndarray[Any, Any]", skimage.io.imread(file_like)) #pyright: ignore [reportUnknownMemberType]
         c_axiskeys_on_disk = "yxc"[: len(raw_data.shape)]
         self._data = Array5D(raw_data, axiskeys=c_axiskeys_on_disk, location=location)
 
@@ -56,8 +55,8 @@ class SkimageDataSource(FsDataSource):
         return super().__eq__(other)
 
     @classmethod
-    def supports_url(cls, url: Url) -> bool:
-        return url.datascheme == None and url.path.suffix in (".png", ".jpg", ".jpeg", ".bmp", ".gif")
+    def supports_path(cls, path: PurePosixPath) -> bool:
+        return path.suffix.lower() in (".png", ".jpg", ".jpeg", ".bmp", ".gif")
 
     @staticmethod
     def from_dto(dto: SkimageDataSourceDto) -> "SkimageDataSource | Exception":
@@ -85,16 +84,11 @@ class SkimageDataSource(FsDataSource):
         )
 
     @classmethod
-    def from_url(cls, url: Url) -> "Sequence[SkimageDataSource] | Exception":
-        if not cls.supports_url(url):
-            return Exception(f"Unsupported url: {url}")
-        fs_result = create_filesystem_from_url(url=url)
-        if isinstance(fs_result, Exception):
-            return fs_result
-        fs, path = fs_result
-
+    def try_open(cls, fs: IFilesystem, path: PurePosixPath) -> "SkimageDataSource | Exception":
+        if not cls.supports_path(path):
+            return Exception(f"Unsupported path: {path}")
         try:
-            return [SkimageDataSource(path=path, filesystem=fs)]
+            return SkimageDataSource(path=path, filesystem=fs)
         except Exception as e:
             return e
 

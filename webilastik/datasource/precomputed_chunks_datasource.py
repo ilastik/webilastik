@@ -1,6 +1,5 @@
-from typing import Optional, Sequence, Tuple, Any
+from typing import Optional, Tuple, Any, List
 from pathlib import PurePosixPath
-import json
 import logging
 
 import numpy as np
@@ -11,7 +10,7 @@ from ndstructs.utils.json_serializable import ensureJsonIntTripplet
 
 from webilastik.datasource import FsDataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksEncoder, PrecomputedChunksInfo
-from webilastik.filesystem import FsFileNotFoundException, IFilesystem, create_filesystem_from_message, create_filesystem_from_url
+from webilastik.filesystem import FsFileNotFoundException, IFilesystem, create_filesystem_from_message
 from webilastik.utility.url import Url
 from webilastik.server.rpc.dto import Interval5DDto, PrecomputedChunksDataSourceDto, Shape5DDto, dtype_to_dto
 
@@ -54,16 +53,10 @@ class PrecomputedChunksDataSource(FsDataSource):
         spatial_resolution: Tuple[int, int, int],
         chunk_size: Optional[Shape5D] = None,
     ) -> "PrecomputedChunksDataSource | Exception":
-        try:
-            print("Opening precomputed chunks info.....")
-            info_json = filesystem.read_file(path.joinpath("info"))
-            if isinstance(info_json, Exception):
-                return info_json
-        except Exception as e:
-            return e
-
-        info = PrecomputedChunksInfo.from_json_value(json.loads(info_json))
-        scale = info.get_scale_5d(resolution=spatial_resolution)
+        info_result = PrecomputedChunksInfo.tryLoad(filesystem=filesystem, path=path / "info")
+        if isinstance(info_result, Exception):
+            return info_result
+        scale = info_result.get_scale_5d(resolution=spatial_resolution)
         if isinstance(scale, Exception):
             return scale
         if chunk_size:
@@ -74,7 +67,7 @@ class PrecomputedChunksDataSource(FsDataSource):
             tile_shape = scale.chunk_sizes_5d[0]
 
         return PrecomputedChunksDataSource(
-            dtype=info.data_type,
+            dtype=info_result.data_type,
             encoding=scale.encoding,
             filesystem=filesystem,
             path=path,
@@ -121,60 +114,76 @@ class PrecomputedChunksDataSource(FsDataSource):
         return super().url.updated_with(datascheme="precomputed", hash_=f"resolution={resolution_str}")
 
     @classmethod
+    def get_resolution_from_url(cls, url: Url) -> "Tuple[int, int, int] | None | Exception":
+        resolution_str = url.get_hash_params().get("resolution")
+        if resolution_str is None:
+            return None
+        try:
+            return ensureJsonIntTripplet(tuple(int(axis) for axis in resolution_str.split("_")))
+        except Exception:
+            return Exception(f"Bad resolution fragment parameter: {resolution_str}")
+
+    @classmethod
     def supports_url(cls, url: Url) -> bool:
         return url.datascheme == "precomputed"
 
     @classmethod
-    def from_url(cls, url: Url) -> "Sequence[PrecomputedChunksDataSource] | Exception":
-        if not cls.supports_url(url):
-            return Exception(f"Unsupported url: {url}")
-        fs_result = create_filesystem_from_url(url=url)
-        if isinstance(fs_result, Exception):
-            return fs_result
-        fs, path = fs_result
-
+    def try_open_scales(
+        cls, fs: IFilesystem, path: PurePosixPath, resolution: Optional[Tuple[int, int, int]]
+    ) -> "PrecomputedChunksDataSource | Tuple[PrecomputedChunksDataSource, ...] | FsFileNotFoundException | Exception":
+        if resolution is not None:
+            return cls.try_load(filesystem=fs, path=path, spatial_resolution=resolution)
         precomp_info_result = PrecomputedChunksInfo.tryLoad(filesystem=fs, path=path / "info")
         if isinstance(precomp_info_result, Exception):
             return precomp_info_result
-        info = precomp_info_result
-
-        resolution_str = url.get_hash_params().get("resolution")
-        if resolution_str is None:
-            return [
-                PrecomputedChunksDataSource(
-                    filesystem=fs,
-                    path=path,
-                    scale_key=scale.key,
-                    encoding=scale.encoding,
-                    dtype=info.data_type,
-                    interval=scale.interval,
-                    spatial_resolution=scale.resolution,
-                    tile_shape=scale.chunk_sizes_5d[0],
-                )
-                for scale in info.scales_5d
-            ]
-        try:
-            resolution_tripplet = ensureJsonIntTripplet(tuple(int(axis) for axis in resolution_str.split("_")))
-        except Exception:
-            return Exception(f"Bad resolution fragment parameter: {resolution_str}")
-        resolution_options = [scale.resolution for scale in info.scales]
-        if resolution_tripplet not in resolution_options:
-            return Exception(f"Bad 'resolution' tripplet in url: {url}. Options are {resolution_options}")
-        scale_result = info.get_scale_5d(resolution_tripplet)
-        if isinstance(scale_result, Exception):
-            return scale_result
-        return [
+        return tuple(
             PrecomputedChunksDataSource(
                 filesystem=fs,
                 path=path,
-                interval=scale_result.interval,
-                dtype=info.data_type,
-                encoding=scale_result.encoding,
-                scale_key=scale_result.key,
-                spatial_resolution=resolution_tripplet,
-                tile_shape=scale_result.chunk_sizes_5d[0],
+                scale_key=scale.key,
+                encoding=scale.encoding,
+                dtype=precomp_info_result.data_type,
+                interval=scale.interval,
+                spatial_resolution=scale.resolution,
+                tile_shape=scale.chunk_sizes_5d[0],
             )
-        ]
+            for scale in precomp_info_result.scales_5d
+        )
+
+    @classmethod
+    def try_open_as_scale_path(cls, fs: IFilesystem, path: PurePosixPath) -> "PrecomputedChunksDataSource | FsFileNotFoundException | Exception":
+        original_path = path #FIXME: maybe don't modify the original?
+        path = PurePosixPath("/") / path
+        scale_key_components: List[str] = []
+        while True:
+            scale_key_components.insert(0, path.name)
+            path = path.parent
+            scale_path = "/".join(scale_key_components)
+            precomp_info_result = PrecomputedChunksInfo.tryLoad(filesystem=fs, path=path / "info")
+            if isinstance(precomp_info_result, FsFileNotFoundException):
+                if path == PurePosixPath("/"):
+                    return FsFileNotFoundException(original_path)
+                path = path.parent
+                continue
+            if isinstance(precomp_info_result, Exception):
+                return precomp_info_result
+            scales = [s for s in precomp_info_result.scales_5d if s.key.as_posix().lstrip("/").rstrip("/") == scale_path]
+            if len(scales) == 0:
+                return FsFileNotFoundException(original_path)
+            if len(scales) != 1:
+                return Exception(f"Expected a single scale, found {len(scales)}")
+            scale = scales[0]
+            return PrecomputedChunksDataSource(
+                dtype=precomp_info_result.data_type,
+                encoding=scale.encoding,
+                filesystem=fs,
+                path=path,
+                interval=scale.interval,
+                scale_key=scale.key,
+                spatial_resolution=scale.resolution,
+                tile_shape=scale.chunk_sizes_5d[0],
+            )
+
 
     def __hash__(self) -> int:
         return hash((self.url, self.scale_key, self.interval))

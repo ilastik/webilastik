@@ -103,7 +103,6 @@ def test_pixel_classification_workflow():
         on_async_change=lambda : print(json.dumps(workflow.export_applet._get_json_state(), indent=4)),
         executor=executor,
         priority_executor=priority_executor,
-        allowed_protocols=["file"],
     )
     print(loaded_workflow)
     assert isinstance(loaded_workflow, PixelClassificationWorkflow)

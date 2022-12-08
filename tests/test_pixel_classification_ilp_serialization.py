@@ -56,7 +56,6 @@ def test_pixel_classification_ilp_serialization():
         sample_workflow_data = IlpPixelClassificationWorkflowGroup.parse(
             group=f,
             ilp_fs=osfs, #FIXME?
-            allowed_protocols=["file"],
         )
         assert not isinstance(sample_workflow_data, Exception)
         with open(output_ilp_path, "wb") as rewritten:
@@ -67,7 +66,6 @@ def test_pixel_classification_ilp_serialization():
         reloaded_data = IlpPixelClassificationWorkflowGroup.parse(
             group=rewritten,
             ilp_fs=osfs,
-            allowed_protocols=["file"],
         )
         assert not isinstance(reloaded_data, Exception)
 
@@ -95,7 +93,6 @@ def test_pixel_classification_ilp_serialization():
     some_executor = ProcessPoolExecutor(max_workers=2)
     priority_executor = PriorityExecutor(executor=some_executor, max_active_job_steps=2)
     workflow = PixelClassificationWorkflow.from_ilp(
-        allowed_protocols=["file"],
         executor=some_executor,
         priority_executor=priority_executor,
         ilp_path=output_ilp_path,

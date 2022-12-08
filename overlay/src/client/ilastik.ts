@@ -3,7 +3,7 @@ import { assertUnreachable, fetchJson, sleep } from "../util/misc"
 import { Path, Url } from "../util/parsed_url"
 import { DataType, ensureDataType } from "../util/precomputed_chunks"
 import {
-    ensureJsonObject, ensureJsonString, JsonableValue, toJsonValue
+    ensureJsonObject, ensureJsonString, fromBase64, JsonableValue, toBase64, toJsonValue
 } from "../util/serialization"
 import {
     BucketFSDto,
@@ -33,6 +33,7 @@ import {
     SkimageDataSourceDto,
     ListFsDirRequest,
     ListFsDirResponse,
+    parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_,
 } from "./dto"
 
 export type HpcSiteName = ComputeSessionStatusDto["hpc_site"] //FIXME?
@@ -354,7 +355,7 @@ export class Session{
         return undefined
     }
 
-    public async getDatasourcesFromUrl(params: GetDatasourcesFromUrlParamsDto): Promise<Array<FsDataSource> | undefined | Error>{
+    public async getDatasourcesFromUrl(params: GetDatasourcesFromUrlParamsDto): Promise<Array<FsDataSource> | FsDataSource | undefined | Error>{
         let result = await fetchJson(this.sessionUrl.joinPath("get_datasources_from_url").raw, {
             method: "POST",
             body: JSON.stringify(toJsonValue(params)),
@@ -370,7 +371,10 @@ export class Session{
         if(responseDto.datasources === undefined){
             return undefined
         }
-        return responseDto.datasources.map(msg => FsDataSource.fromDto(msg))
+        if(responseDto.datasources instanceof Array){
+            return responseDto.datasources.map(msg => FsDataSource.fromDto(msg))
+        }
+        return FsDataSource.fromDto(responseDto.datasources)
     }
 
     public async listFsDir(params: ListFsDirRequest): Promise<ListFsDirResponse | Error> {
@@ -647,14 +651,28 @@ export abstract class FsDataSource{
         return this.url.raw
     }
 
-    public static fromDto(dto: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto) : FsDataSource{
+    public static fromDto(dto: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto) : PrecomputedChunksDataSource{
         if(dto instanceof PrecomputedChunksDataSourceDto){
             return PrecomputedChunksDataSource.fromDto(dto)
         }
         throw `FIXME: Other datasources not implemented yet`
     }
 
+    public static fromBase64(encoded: string): Error | ReturnType<typeof FsDataSource.fromDto>{
+        const dtoResult = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_(
+            JSON.parse(fromBase64(encoded))
+        )
+        if(dtoResult instanceof Error){
+            return dtoResult
+        }
+        return FsDataSource.fromDto(dtoResult)
+    }
+
     public abstract toDto(): PrecomputedChunksDataSourceDto;
+
+    public toBase64(): string{
+        return toBase64(JSON.stringify(this.toDto().toJsonValue()))
+    }
 
     public get resolutionString(): string{
         return `${this.spatial_resolution[0]} x ${this.spatial_resolution[1]} x ${this.spatial_resolution[2]}nm`

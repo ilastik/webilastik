@@ -1,10 +1,11 @@
 # pyright: strict
 
-from typing import Optional, Sequence, Union, Dict
+from typing import Optional, Sequence, Union, Tuple
 
 from webilastik.datasource import FsDataSource
 from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
+from webilastik.filesystem import FsFileNotFoundException, create_filesystem_from_url
 from webilastik.libebrains.user_token import UserToken
 from webilastik.ui import parse_url
 from webilastik.ui.usage_error import UsageError
@@ -12,38 +13,33 @@ from webilastik.ui.usage_error import UsageError
 from webilastik.utility.url import Url
 
 
-_datasource_cache: Dict[Url, Sequence[FsDataSource]] = {}
-
 def try_get_datasources_from_url(
     *,
     url: Union[Url, str],
     ebrains_user_token: Optional[UserToken] = None,
-) -> "Sequence[FsDataSource] | None | Exception":
+) -> "FsDataSource | Tuple[FsDataSource, ...] | None | Exception":
     if isinstance(url, str):
         parsing_result = parse_url(url)
         if isinstance(parsing_result, UsageError):
             return parsing_result
         url = parsing_result
 
-    cached_datasources = _datasource_cache.get(url)
-    if cached_datasources is not None:
-        return cached_datasources
+    fs_result = create_filesystem_from_url(url=url)
+    if isinstance(fs_result, Exception):
+        return fs_result
+    fs, path = fs_result
 
-    hashless_url = url.updated_with(hash_="")
-    cached_datasources = _datasource_cache.get(hashless_url)
-    for ds in cached_datasources or ():
-        if ds.url == url:
-            out = [ds]
-            _datasource_cache[hashless_url] = out
-            return out
-
-    if SkimageDataSource.supports_url(url):
-        datasources = SkimageDataSource.from_url(url)
-    elif PrecomputedChunksDataSource.supports_url(url):
-        datasources = PrecomputedChunksDataSource.from_url(url)
+    datasources_result: "FsDataSource | Sequence[FsDataSource] | None | Exception"
+    if SkimageDataSource.supports_path(path):
+        datasources_result = SkimageDataSource.try_open(fs=fs, path=path)
     else:
+        resolution_result = PrecomputedChunksDataSource.get_resolution_from_url(url)
+        if isinstance(resolution_result, Exception):
+            return resolution_result
+        datasources_result = PrecomputedChunksDataSource.try_open_scales(fs=fs, path=path, resolution=resolution_result)
+        if isinstance(datasources_result, (PrecomputedChunksDataSource, tuple)):
+            return datasources_result
+        if not isinstance(datasources_result, FsFileNotFoundException):
+            return datasources_result
         # try opening as precomputed, even without the prefix
-        datasources = PrecomputedChunksDataSource.from_url(url.updated_with(datascheme="precomputed"))
-    if not isinstance(datasources, Exception):
-        _datasource_cache[url] = datasources
-    return datasources
+        return PrecomputedChunksDataSource.try_open_as_scale_path(fs=fs, path=path)

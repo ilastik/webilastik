@@ -8,10 +8,10 @@ import {
 } from "../util/safe_serialization";
 import { JsonObject, JsonValue, toJsonValue } from "../util/serialization";
 
-function parse_as_int(value: JsonValue): number | Error {
+export function parse_as_int(value: JsonValue): number | Error {
   return ensureJsonNumber(value);
 }
-function parse_as_ColorDto(value: JsonValue): ColorDto | Error {
+export function parse_as_ColorDto(value: JsonValue): ColorDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -59,10 +59,10 @@ export class ColorDto {
   }
 }
 
-function parse_as_str(value: JsonValue): string | Error {
+export function parse_as_str(value: JsonValue): string | Error {
   return ensureJsonString(value);
 }
-function parse_as_LabelHeaderDto(value: JsonValue): LabelHeaderDto | Error {
+export function parse_as_LabelHeaderDto(value: JsonValue): LabelHeaderDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -103,17 +103,17 @@ export class LabelHeaderDto {
   }
 }
 
-function parse_as_Literal_of__quote_precomputed_quote__endof_(value: JsonValue): "precomputed" | Error {
+export function parse_as_Literal_of__quote_precomputed_quote__endof_(value: JsonValue): "precomputed" | Error {
   const tmp_0 = parse_as_str(value);
   if (!(tmp_0 instanceof Error) && tmp_0 === "precomputed") {
     return tmp_0;
   }
   return Error(`Could not parse ${value} as 'precomputed'`);
 }
-function parse_as_None(value: JsonValue): undefined | Error {
+export function parse_as_None(value: JsonValue): undefined | Error {
   return ensureJsonUndefined(value);
 }
-function parse_as_Union_of_Literal_of__quote_precomputed_quote__endof_0None_endof_(
+export function parse_as_Union_of_Literal_of__quote_precomputed_quote__endof_0None_endof_(
   value: JsonValue,
 ): "precomputed" | undefined | Error {
   const parsed_option_0 = parse_as_Literal_of__quote_precomputed_quote__endof_(value);
@@ -126,7 +126,7 @@ function parse_as_Union_of_Literal_of__quote_precomputed_quote__endof_0None_endo
   }
   return Error(`Could not parse ${JSON.stringify(value)} into 'precomputed' | undefined`);
 }
-function parse_as_Literal_of__quote_http_quote_0_quote_https_quote_0_quote_file_quote_0_quote_memory_quote__endof_(
+export function parse_as_Literal_of__quote_http_quote_0_quote_https_quote_0_quote_file_quote_0_quote_memory_quote__endof_(
   value: JsonValue,
 ): "http" | "https" | "file" | "memory" | Error {
   const tmp_0 = parse_as_str(value);
@@ -147,7 +147,7 @@ function parse_as_Literal_of__quote_http_quote_0_quote_https_quote_0_quote_file_
   }
   return Error(`Could not parse ${value} as 'http' | 'https' | 'file' | 'memory'`);
 }
-function parse_as_Union_of_int0None_endof_(value: JsonValue): number | undefined | Error {
+export function parse_as_Union_of_int0None_endof_(value: JsonValue): number | undefined | Error {
   const parsed_option_0 = parse_as_int(value);
   if (!(parsed_option_0 instanceof Error)) {
     return parsed_option_0;
@@ -158,7 +158,7 @@ function parse_as_Union_of_int0None_endof_(value: JsonValue): number | undefined
   }
   return Error(`Could not parse ${JSON.stringify(value)} into number | undefined`);
 }
-function parse_as_Mapping_of_str0str_endof_(value: JsonValue): { [key: string]: string } | Error {
+export function parse_as_Mapping_of_str0str_endof_(value: JsonValue): { [key: string]: string } | Error {
   const valueObj = ensureJsonObject(value);
   if (valueObj instanceof Error) {
     return valueObj;
@@ -178,7 +178,7 @@ function parse_as_Mapping_of_str0str_endof_(value: JsonValue): { [key: string]: 
   }
   return out;
 }
-function parse_as_Union_of_Mapping_of_str0str_endof_0None_endof_(
+export function parse_as_Union_of_Mapping_of_str0str_endof_0None_endof_(
   value: JsonValue,
 ): { [key: string]: string } | undefined | Error {
   const parsed_option_0 = parse_as_Mapping_of_str0str_endof_(value);
@@ -191,7 +191,7 @@ function parse_as_Union_of_Mapping_of_str0str_endof_0None_endof_(
   }
   return Error(`Could not parse ${JSON.stringify(value)} into { [key: string]: string } | undefined`);
 }
-function parse_as_Union_of_str0None_endof_(value: JsonValue): string | undefined | Error {
+export function parse_as_Union_of_str0None_endof_(value: JsonValue): string | undefined | Error {
   const parsed_option_0 = parse_as_str(value);
   if (!(parsed_option_0 instanceof Error)) {
     return parsed_option_0;
@@ -202,7 +202,7 @@ function parse_as_Union_of_str0None_endof_(value: JsonValue): string | undefined
   }
   return Error(`Could not parse ${JSON.stringify(value)} into string | undefined`);
 }
-function parse_as_UrlDto(value: JsonValue): UrlDto | Error {
+export function parse_as_UrlDto(value: JsonValue): UrlDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -283,7 +283,7 @@ export class UrlDto {
   }
 }
 
-function parse_as_Point5DDto(value: JsonValue): Point5DDto | Error {
+export function parse_as_Point5DDto(value: JsonValue): Point5DDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -345,7 +345,7 @@ export class Point5DDto {
   }
 }
 
-function parse_as_Shape5DDto(value: JsonValue): Shape5DDto | Error {
+export function parse_as_Shape5DDto(value: JsonValue): Shape5DDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -407,7 +407,7 @@ export class Shape5DDto {
   }
 }
 
-function parse_as_Interval5DDto(value: JsonValue): Interval5DDto | Error {
+export function parse_as_Interval5DDto(value: JsonValue): Interval5DDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -448,7 +448,7 @@ export class Interval5DDto {
   }
 }
 
-function parse_as_OsfsDto(value: JsonValue): OsfsDto | Error {
+export function parse_as_OsfsDto(value: JsonValue): OsfsDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -473,7 +473,9 @@ export class OsfsDto {
   }
 }
 
-function parse_as_Literal_of__quote_http_quote_0_quote_https_quote__endof_(value: JsonValue): "http" | "https" | Error {
+export function parse_as_Literal_of__quote_http_quote_0_quote_https_quote__endof_(
+  value: JsonValue,
+): "http" | "https" | Error {
   const tmp_0 = parse_as_str(value);
   if (!(tmp_0 instanceof Error) && tmp_0 === "http") {
     return tmp_0;
@@ -484,7 +486,7 @@ function parse_as_Literal_of__quote_http_quote_0_quote_https_quote__endof_(value
   }
   return Error(`Could not parse ${value} as 'http' | 'https'`);
 }
-function parse_as_HttpFsDto(value: JsonValue): HttpFsDto | Error {
+export function parse_as_HttpFsDto(value: JsonValue): HttpFsDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -546,7 +548,7 @@ export class HttpFsDto {
   }
 }
 
-function parse_as_BucketFSDto(value: JsonValue): BucketFSDto | Error {
+export function parse_as_BucketFSDto(value: JsonValue): BucketFSDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -580,7 +582,7 @@ export class BucketFSDto {
   }
 }
 
-function parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
+export function parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
   value: JsonValue,
 ): OsfsDto | HttpFsDto | BucketFSDto | Error {
   const parsed_option_0 = parse_as_OsfsDto(value);
@@ -597,7 +599,7 @@ function parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
   }
   return Error(`Could not parse ${JSON.stringify(value)} into OsfsDto | HttpFsDto | BucketFSDto`);
 }
-function parse_as_Tuple_of_int0int0int_endof_(value: JsonValue): [number, number, number] | Error {
+export function parse_as_Tuple_of_int0int0int_endof_(value: JsonValue): [number, number, number] | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
   const temp_0 = parse_as_int(arr[0]);
@@ -608,7 +610,7 @@ function parse_as_Tuple_of_int0int0int_endof_(value: JsonValue): [number, number
   if (temp_2 instanceof Error) return temp_2;
   return [temp_0, temp_1, temp_2];
 }
-function parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_float32_quote__endof_(
+export function parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_float32_quote__endof_(
   value: JsonValue,
 ): "uint8" | "uint16" | "uint32" | "uint64" | "float32" | Error {
   const tmp_0 = parse_as_str(value);
@@ -633,7 +635,9 @@ function parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uin
   }
   return Error(`Could not parse ${value} as 'uint8' | 'uint16' | 'uint32' | 'uint64' | 'float32'`);
 }
-function parse_as_Literal_of__quote_raw_quote_0_quote_jpeg_quote__endof_(value: JsonValue): "raw" | "jpeg" | Error {
+export function parse_as_Literal_of__quote_raw_quote_0_quote_jpeg_quote__endof_(
+  value: JsonValue,
+): "raw" | "jpeg" | Error {
   const tmp_0 = parse_as_str(value);
   if (!(tmp_0 instanceof Error) && tmp_0 === "raw") {
     return tmp_0;
@@ -644,7 +648,7 @@ function parse_as_Literal_of__quote_raw_quote_0_quote_jpeg_quote__endof_(value: 
   }
   return Error(`Could not parse ${value} as 'raw' | 'jpeg'`);
 }
-function parse_as_PrecomputedChunksDataSourceDto(value: JsonValue): PrecomputedChunksDataSourceDto | Error {
+export function parse_as_PrecomputedChunksDataSourceDto(value: JsonValue): PrecomputedChunksDataSourceDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -737,7 +741,7 @@ export class PrecomputedChunksDataSourceDto {
   }
 }
 
-function parse_as_N5DataSourceDto(value: JsonValue): N5DataSourceDto | Error {
+export function parse_as_N5DataSourceDto(value: JsonValue): N5DataSourceDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -816,7 +820,7 @@ export class N5DataSourceDto {
   }
 }
 
-function parse_as_SkimageDataSourceDto(value: JsonValue): SkimageDataSourceDto | Error {
+export function parse_as_SkimageDataSourceDto(value: JsonValue): SkimageDataSourceDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -895,7 +899,7 @@ export class SkimageDataSourceDto {
   }
 }
 
-function parse_as_PrecomputedChunksSinkDto(value: JsonValue): PrecomputedChunksSinkDto | Error {
+export function parse_as_PrecomputedChunksSinkDto(value: JsonValue): PrecomputedChunksSinkDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -981,7 +985,7 @@ export class PrecomputedChunksSinkDto {
   }
 }
 
-function parse_as_N5GzipCompressorDto(value: JsonValue): N5GzipCompressorDto | Error {
+export function parse_as_N5GzipCompressorDto(value: JsonValue): N5GzipCompressorDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1015,7 +1019,7 @@ export class N5GzipCompressorDto {
   }
 }
 
-function parse_as_N5Bzip2CompressorDto(value: JsonValue): N5Bzip2CompressorDto | Error {
+export function parse_as_N5Bzip2CompressorDto(value: JsonValue): N5Bzip2CompressorDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1049,7 +1053,7 @@ export class N5Bzip2CompressorDto {
   }
 }
 
-function parse_as_N5XzCompressorDto(value: JsonValue): N5XzCompressorDto | Error {
+export function parse_as_N5XzCompressorDto(value: JsonValue): N5XzCompressorDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1083,7 +1087,7 @@ export class N5XzCompressorDto {
   }
 }
 
-function parse_as_N5RawCompressorDto(value: JsonValue): N5RawCompressorDto | Error {
+export function parse_as_N5RawCompressorDto(value: JsonValue): N5RawCompressorDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1108,7 +1112,7 @@ export class N5RawCompressorDto {
   }
 }
 
-function parse_as_Union_of_N5GzipCompressorDto0N5Bzip2CompressorDto0N5XzCompressorDto0N5RawCompressorDto_endof_(
+export function parse_as_Union_of_N5GzipCompressorDto0N5Bzip2CompressorDto0N5XzCompressorDto0N5RawCompressorDto_endof_(
   value: JsonValue,
 ): N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto | Error {
   const parsed_option_0 = parse_as_N5GzipCompressorDto(value);
@@ -1133,7 +1137,7 @@ function parse_as_Union_of_N5GzipCompressorDto0N5Bzip2CompressorDto0N5XzCompress
     } into N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto`,
   );
 }
-function parse_as_N5DataSinkDto(value: JsonValue): N5DataSinkDto | Error {
+export function parse_as_N5DataSinkDto(value: JsonValue): N5DataSinkDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1222,7 +1226,7 @@ export class N5DataSinkDto {
   }
 }
 
-function parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_(
+export function parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_(
   value: JsonValue,
 ): PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | Error {
   const parsed_option_0 = parse_as_PrecomputedChunksDataSourceDto(value);
@@ -1243,7 +1247,7 @@ function parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0Skimag
     } into PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto`,
   );
 }
-function parse_as_Tuple_of_Tuple_of_int0int0int_endof_0_varlen__endof_(
+export function parse_as_Tuple_of_Tuple_of_int0int0int_endof_0_varlen__endof_(
   value: JsonValue,
 ): Array<[number, number, number]> | Error {
   const arr = ensureJsonArray(value);
@@ -1256,7 +1260,7 @@ function parse_as_Tuple_of_Tuple_of_int0int0int_endof_0_varlen__endof_(
   }
   return out;
 }
-function parse_as_PixelAnnotationDto(value: JsonValue): PixelAnnotationDto | Error {
+export function parse_as_PixelAnnotationDto(value: JsonValue): PixelAnnotationDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1299,7 +1303,7 @@ export class PixelAnnotationDto {
   }
 }
 
-function parse_as_RpcErrorDto(value: JsonValue): RpcErrorDto | Error {
+export function parse_as_RpcErrorDto(value: JsonValue): RpcErrorDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1333,7 +1337,7 @@ export class RpcErrorDto {
   }
 }
 
-function parse_as_RecolorLabelParams(value: JsonValue): RecolorLabelParams | Error {
+export function parse_as_RecolorLabelParams(value: JsonValue): RecolorLabelParams | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1374,7 +1378,7 @@ export class RecolorLabelParams {
   }
 }
 
-function parse_as_RenameLabelParams(value: JsonValue): RenameLabelParams | Error {
+export function parse_as_RenameLabelParams(value: JsonValue): RenameLabelParams | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1415,7 +1419,7 @@ export class RenameLabelParams {
   }
 }
 
-function parse_as_CreateLabelParams(value: JsonValue): CreateLabelParams | Error {
+export function parse_as_CreateLabelParams(value: JsonValue): CreateLabelParams | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1456,7 +1460,7 @@ export class CreateLabelParams {
   }
 }
 
-function parse_as_RemoveLabelParams(value: JsonValue): RemoveLabelParams | Error {
+export function parse_as_RemoveLabelParams(value: JsonValue): RemoveLabelParams | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1490,7 +1494,7 @@ export class RemoveLabelParams {
   }
 }
 
-function parse_as_AddPixelAnnotationParams(value: JsonValue): AddPixelAnnotationParams | Error {
+export function parse_as_AddPixelAnnotationParams(value: JsonValue): AddPixelAnnotationParams | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1531,7 +1535,7 @@ export class AddPixelAnnotationParams {
   }
 }
 
-function parse_as_RemovePixelAnnotationParams(value: JsonValue): RemovePixelAnnotationParams | Error {
+export function parse_as_RemovePixelAnnotationParams(value: JsonValue): RemovePixelAnnotationParams | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1572,7 +1576,9 @@ export class RemovePixelAnnotationParams {
   }
 }
 
-function parse_as_Tuple_of_PixelAnnotationDto0_varlen__endof_(value: JsonValue): Array<PixelAnnotationDto> | Error {
+export function parse_as_Tuple_of_PixelAnnotationDto0_varlen__endof_(
+  value: JsonValue,
+): Array<PixelAnnotationDto> | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
   const out: Array<PixelAnnotationDto> = [];
@@ -1583,7 +1589,7 @@ function parse_as_Tuple_of_PixelAnnotationDto0_varlen__endof_(value: JsonValue):
   }
   return out;
 }
-function parse_as_LabelDto(value: JsonValue): LabelDto | Error {
+export function parse_as_LabelDto(value: JsonValue): LabelDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1631,7 +1637,7 @@ export class LabelDto {
   }
 }
 
-function parse_as_Tuple_of_LabelDto0_varlen__endof_(value: JsonValue): Array<LabelDto> | Error {
+export function parse_as_Tuple_of_LabelDto0_varlen__endof_(value: JsonValue): Array<LabelDto> | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
   const out: Array<LabelDto> = [];
@@ -1642,7 +1648,7 @@ function parse_as_Tuple_of_LabelDto0_varlen__endof_(value: JsonValue): Array<Lab
   }
   return out;
 }
-function parse_as_BrushingAppletStateDto(value: JsonValue): BrushingAppletStateDto | Error {
+export function parse_as_BrushingAppletStateDto(value: JsonValue): BrushingAppletStateDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1676,7 +1682,7 @@ export class BrushingAppletStateDto {
   }
 }
 
-function parse_as_ViewDto(value: JsonValue): ViewDto | Error {
+export function parse_as_ViewDto(value: JsonValue): ViewDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1717,7 +1723,7 @@ export class ViewDto {
   }
 }
 
-function parse_as_DataView(value: JsonValue): DataView | Error {
+export function parse_as_DataView(value: JsonValue): DataView | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1758,7 +1764,7 @@ export class DataView {
   }
 }
 
-function parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_(
+export function parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_(
   value: JsonValue,
 ): Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto> | Error {
   const arr = ensureJsonArray(value);
@@ -1773,7 +1779,7 @@ function parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceD
   }
   return out;
 }
-function parse_as_RawDataViewDto(value: JsonValue): RawDataViewDto | Error {
+export function parse_as_RawDataViewDto(value: JsonValue): RawDataViewDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1824,7 +1830,7 @@ export class RawDataViewDto {
   }
 }
 
-function parse_as_StrippedPrecomputedViewDto(value: JsonValue): StrippedPrecomputedViewDto | Error {
+export function parse_as_StrippedPrecomputedViewDto(value: JsonValue): StrippedPrecomputedViewDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1874,7 +1880,7 @@ export class StrippedPrecomputedViewDto {
   }
 }
 
-function parse_as_PredictionsViewDto(value: JsonValue): PredictionsViewDto | Error {
+export function parse_as_PredictionsViewDto(value: JsonValue): PredictionsViewDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1931,7 +1937,7 @@ export class PredictionsViewDto {
   }
 }
 
-function parse_as_FailedViewDto(value: JsonValue): FailedViewDto | Error {
+export function parse_as_FailedViewDto(value: JsonValue): FailedViewDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1979,7 +1985,7 @@ export class FailedViewDto {
   }
 }
 
-function parse_as_UnsupportedDatasetViewDto(value: JsonValue): UnsupportedDatasetViewDto | Error {
+export function parse_as_UnsupportedDatasetViewDto(value: JsonValue): UnsupportedDatasetViewDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -2020,7 +2026,7 @@ export class UnsupportedDatasetViewDto {
   }
 }
 
-function parse_as_Union_of_RawDataViewDto0StrippedPrecomputedViewDto0FailedViewDto0UnsupportedDatasetViewDto_endof_(
+export function parse_as_Union_of_RawDataViewDto0StrippedPrecomputedViewDto0FailedViewDto0UnsupportedDatasetViewDto_endof_(
   value: JsonValue,
 ): RawDataViewDto | StrippedPrecomputedViewDto | FailedViewDto | UnsupportedDatasetViewDto | Error {
   const parsed_option_0 = parse_as_RawDataViewDto(value);
@@ -2045,7 +2051,7 @@ function parse_as_Union_of_RawDataViewDto0StrippedPrecomputedViewDto0FailedViewD
     } into RawDataViewDto | StrippedPrecomputedViewDto | FailedViewDto | UnsupportedDatasetViewDto`,
   );
 }
-function parse_as_Tuple_of_Union_of_RawDataViewDto0StrippedPrecomputedViewDto0FailedViewDto0UnsupportedDatasetViewDto_endof_0_varlen__endof_(
+export function parse_as_Tuple_of_Union_of_RawDataViewDto0StrippedPrecomputedViewDto0FailedViewDto0UnsupportedDatasetViewDto_endof_0_varlen__endof_(
   value: JsonValue,
 ): Array<RawDataViewDto | StrippedPrecomputedViewDto | FailedViewDto | UnsupportedDatasetViewDto> | Error {
   const arr = ensureJsonArray(value);
@@ -2059,7 +2065,9 @@ function parse_as_Tuple_of_Union_of_RawDataViewDto0StrippedPrecomputedViewDto0Fa
   }
   return out;
 }
-function parse_as_Tuple_of_PredictionsViewDto0_varlen__endof_(value: JsonValue): Array<PredictionsViewDto> | Error {
+export function parse_as_Tuple_of_PredictionsViewDto0_varlen__endof_(
+  value: JsonValue,
+): Array<PredictionsViewDto> | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
   const out: Array<PredictionsViewDto> = [];
@@ -2070,7 +2078,7 @@ function parse_as_Tuple_of_PredictionsViewDto0_varlen__endof_(value: JsonValue):
   }
   return out;
 }
-function parse_as_Tuple_of_ColorDto0_varlen__endof_(value: JsonValue): Array<ColorDto> | Error {
+export function parse_as_Tuple_of_ColorDto0_varlen__endof_(value: JsonValue): Array<ColorDto> | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
   const out: Array<ColorDto> = [];
@@ -2081,7 +2089,7 @@ function parse_as_Tuple_of_ColorDto0_varlen__endof_(value: JsonValue): Array<Col
   }
   return out;
 }
-function parse_as_ViewerAppletStateDto(value: JsonValue): ViewerAppletStateDto | Error {
+export function parse_as_ViewerAppletStateDto(value: JsonValue): ViewerAppletStateDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -2139,7 +2147,7 @@ export class ViewerAppletStateDto {
   }
 }
 
-function parse_as_MakeDataViewParams(value: JsonValue): MakeDataViewParams | Error {
+export function parse_as_MakeDataViewParams(value: JsonValue): MakeDataViewParams | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -2180,7 +2188,7 @@ export class MakeDataViewParams {
   }
 }
 
-function parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_failed_quote_0_quote_succeeded_quote__endof_(
+export function parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_failed_quote_0_quote_succeeded_quote__endof_(
   value: JsonValue,
 ): "pending" | "running" | "cancelled" | "failed" | "succeeded" | Error {
   const tmp_0 = parse_as_str(value);
@@ -2205,7 +2213,7 @@ function parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_
   }
   return Error(`Could not parse ${value} as 'pending' | 'running' | 'cancelled' | 'failed' | 'succeeded'`);
 }
-function parse_as_JobDto(value: JsonValue): JobDto | Error {
+export function parse_as_JobDto(value: JsonValue): JobDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -2277,7 +2285,7 @@ export class JobDto {
   }
 }
 
-function parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto_endof_(
+export function parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto_endof_(
   value: JsonValue,
 ): PrecomputedChunksSinkDto | N5DataSinkDto | Error {
   const parsed_option_0 = parse_as_PrecomputedChunksSinkDto(value);
@@ -2290,7 +2298,7 @@ function parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto_endof_(
   }
   return Error(`Could not parse ${JSON.stringify(value)} into PrecomputedChunksSinkDto | N5DataSinkDto`);
 }
-function parse_as_ExportJobDto(value: JsonValue): ExportJobDto | Error {
+export function parse_as_ExportJobDto(value: JsonValue): ExportJobDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -2369,7 +2377,7 @@ export class ExportJobDto {
   }
 }
 
-function parse_as_OpenDatasinkJobDto(value: JsonValue): OpenDatasinkJobDto | Error {
+export function parse_as_OpenDatasinkJobDto(value: JsonValue): OpenDatasinkJobDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -2448,7 +2456,7 @@ export class OpenDatasinkJobDto {
   }
 }
 
-function parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_(
+export function parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_(
   value: JsonValue,
 ): ExportJobDto | OpenDatasinkJobDto | Error {
   const parsed_option_0 = parse_as_ExportJobDto(value);
@@ -2461,7 +2469,7 @@ function parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_(
   }
   return Error(`Could not parse ${JSON.stringify(value)} into ExportJobDto | OpenDatasinkJobDto`);
 }
-function parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_0_varlen__endof_(
+export function parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_0_varlen__endof_(
   value: JsonValue,
 ): Array<ExportJobDto | OpenDatasinkJobDto> | Error {
   const arr = ensureJsonArray(value);
@@ -2474,7 +2482,7 @@ function parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_0_varl
   }
   return out;
 }
-function parse_as_Tuple_of_LabelHeaderDto0_varlen__endof_(value: JsonValue): Array<LabelHeaderDto> | Error {
+export function parse_as_Tuple_of_LabelHeaderDto0_varlen__endof_(value: JsonValue): Array<LabelHeaderDto> | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
   const out: Array<LabelHeaderDto> = [];
@@ -2485,7 +2493,7 @@ function parse_as_Tuple_of_LabelHeaderDto0_varlen__endof_(value: JsonValue): Arr
   }
   return out;
 }
-function parse_as_Union_of_Tuple_of_LabelHeaderDto0_varlen__endof_0None_endof_(
+export function parse_as_Union_of_Tuple_of_LabelHeaderDto0_varlen__endof_0None_endof_(
   value: JsonValue,
 ): Array<LabelHeaderDto> | undefined | Error {
   const parsed_option_0 = parse_as_Tuple_of_LabelHeaderDto0_varlen__endof_(value);
@@ -2498,7 +2506,7 @@ function parse_as_Union_of_Tuple_of_LabelHeaderDto0_varlen__endof_0None_endof_(
   }
   return Error(`Could not parse ${JSON.stringify(value)} into Array<LabelHeaderDto> | undefined`);
 }
-function parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_0None_endof_(
+export function parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_0None_endof_(
   value: JsonValue,
 ): Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto> | undefined | Error {
   const parsed_option_0 =
@@ -2518,7 +2526,7 @@ function parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5Da
     } into Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto> | undefined`,
   );
 }
-function parse_as_PixelClassificationExportAppletStateDto(
+export function parse_as_PixelClassificationExportAppletStateDto(
   value: JsonValue,
 ): PixelClassificationExportAppletStateDto | Error {
   const valueObject = ensureJsonObject(value);
@@ -2575,10 +2583,10 @@ export class PixelClassificationExportAppletStateDto {
   }
 }
 
-function parse_as_float(value: JsonValue): number | Error {
+export function parse_as_float(value: JsonValue): number | Error {
   return ensureJsonNumber(value);
 }
-function parse_as_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_(
+export function parse_as_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_(
   value: JsonValue,
 ): "x" | "y" | "z" | Error {
   const tmp_0 = parse_as_str(value);
@@ -2595,7 +2603,7 @@ function parse_as_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__end
   }
   return Error(`Could not parse ${value} as 'x' | 'y' | 'z'`);
 }
-function parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
+export function parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
   value: JsonValue,
 ): "x" | "y" | "z" | undefined | Error {
   const parsed_option_0 = parse_as_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_(value);
@@ -2608,7 +2616,7 @@ function parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_q
   }
   return Error(`Could not parse ${JSON.stringify(value)} into 'x' | 'y' | 'z' | undefined`);
 }
-function parse_as_Literal_of__quote_GaussianSmoothing_quote_0_quote_LaplacianofGaussian_quote_0_quote_GaussianGradientMagnitude_quote_0_quote_DifferenceofGaussians_quote_0_quote_StructureTensorEigenvalues_quote_0_quote_HessianofGaussianEigenvalues_quote__endof_(
+export function parse_as_Literal_of__quote_GaussianSmoothing_quote_0_quote_LaplacianofGaussian_quote_0_quote_GaussianGradientMagnitude_quote_0_quote_DifferenceofGaussians_quote_0_quote_StructureTensorEigenvalues_quote_0_quote_HessianofGaussianEigenvalues_quote__endof_(
   value: JsonValue,
 ):
   | "Gaussian Smoothing"
@@ -2646,7 +2654,7 @@ function parse_as_Literal_of__quote_GaussianSmoothing_quote_0_quote_LaplacianofG
     `Could not parse ${value} as 'Gaussian Smoothing' | 'Laplacian of Gaussian' | 'Gaussian Gradient Magnitude' | 'Difference of Gaussians' | 'Structure Tensor Eigenvalues' | 'Hessian of Gaussian Eigenvalues'`,
   );
 }
-function parse_as_IlpFeatureExtractorDto(value: JsonValue): IlpFeatureExtractorDto | Error {
+export function parse_as_IlpFeatureExtractorDto(value: JsonValue): IlpFeatureExtractorDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -2711,7 +2719,7 @@ export class IlpFeatureExtractorDto {
   }
 }
 
-function parse_as_Tuple_of_IlpFeatureExtractorDto0_varlen__endof_(
+export function parse_as_Tuple_of_IlpFeatureExtractorDto0_varlen__endof_(
   value: JsonValue,
 ): Array<IlpFeatureExtractorDto> | Error {
   const arr = ensureJsonArray(value);
@@ -2724,7 +2732,7 @@ function parse_as_Tuple_of_IlpFeatureExtractorDto0_varlen__endof_(
   }
   return out;
 }
-function parse_as_FeatureSelectionAppletStateDto(value: JsonValue): FeatureSelectionAppletStateDto | Error {
+export function parse_as_FeatureSelectionAppletStateDto(value: JsonValue): FeatureSelectionAppletStateDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -2760,7 +2768,7 @@ export class FeatureSelectionAppletStateDto {
   }
 }
 
-function parse_as_AddFeatureExtractorsParamsDto(value: JsonValue): AddFeatureExtractorsParamsDto | Error {
+export function parse_as_AddFeatureExtractorsParamsDto(value: JsonValue): AddFeatureExtractorsParamsDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -2796,7 +2804,7 @@ export class AddFeatureExtractorsParamsDto {
   }
 }
 
-function parse_as_RemoveFeatureExtractorsParamsDto(value: JsonValue): RemoveFeatureExtractorsParamsDto | Error {
+export function parse_as_RemoveFeatureExtractorsParamsDto(value: JsonValue): RemoveFeatureExtractorsParamsDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -2832,7 +2840,7 @@ export class RemoveFeatureExtractorsParamsDto {
   }
 }
 
-function parse_as_Literal_of__quote_BOOT_FAIL_quote_0_quote_CANCELLED_quote_0_quote_COMPLETED_quote_0_quote_DEADLINE_quote_0_quote_FAILED_quote_0_quote_NODE_FAIL_quote_0_quote_OUT_OF_MEMORY_quote_0_quote_PENDING_quote_0_quote_PREEMPTED_quote_0_quote_RUNNING_quote_0_quote_REQUEUED_quote_0_quote_RESIZING_quote_0_quote_REVOKED_quote_0_quote_SUSPENDED_quote_0_quote_TIMEOUT_quote__endof_(
+export function parse_as_Literal_of__quote_BOOT_FAIL_quote_0_quote_CANCELLED_quote_0_quote_COMPLETED_quote_0_quote_DEADLINE_quote_0_quote_FAILED_quote_0_quote_NODE_FAIL_quote_0_quote_OUT_OF_MEMORY_quote_0_quote_PENDING_quote_0_quote_PREEMPTED_quote_0_quote_RUNNING_quote_0_quote_REQUEUED_quote_0_quote_RESIZING_quote_0_quote_REVOKED_quote_0_quote_SUSPENDED_quote_0_quote_TIMEOUT_quote__endof_(
   value: JsonValue,
 ):
   | "BOOT_FAIL"
@@ -2915,7 +2923,7 @@ function parse_as_Literal_of__quote_BOOT_FAIL_quote_0_quote_CANCELLED_quote_0_qu
     `Could not parse ${value} as 'BOOT_FAIL' | 'CANCELLED' | 'COMPLETED' | 'DEADLINE' | 'FAILED' | 'NODE_FAIL' | 'OUT_OF_MEMORY' | 'PENDING' | 'PREEMPTED' | 'RUNNING' | 'REQUEUED' | 'RESIZING' | 'REVOKED' | 'SUSPENDED' | 'TIMEOUT'`,
   );
 }
-function parse_as_ComputeSessionDto(value: JsonValue): ComputeSessionDto | Error {
+export function parse_as_ComputeSessionDto(value: JsonValue): ComputeSessionDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3017,7 +3025,7 @@ export class ComputeSessionDto {
   }
 }
 
-function parse_as_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
+export function parse_as_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
   value: JsonValue,
 ): "LOCAL" | "CSCS" | "JUSUF" | Error {
   const tmp_0 = parse_as_str(value);
@@ -3034,10 +3042,10 @@ function parse_as_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF
   }
   return Error(`Could not parse ${value} as 'LOCAL' | 'CSCS' | 'JUSUF'`);
 }
-function parse_as_bool(value: JsonValue): boolean | Error {
+export function parse_as_bool(value: JsonValue): boolean | Error {
   return ensureJsonBoolean(value);
 }
-function parse_as_ComputeSessionStatusDto(value: JsonValue): ComputeSessionStatusDto | Error {
+export function parse_as_ComputeSessionStatusDto(value: JsonValue): ComputeSessionStatusDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3094,7 +3102,7 @@ export class ComputeSessionStatusDto {
   }
 }
 
-function parse_as_CreateComputeSessionParamsDto(value: JsonValue): CreateComputeSessionParamsDto | Error {
+export function parse_as_CreateComputeSessionParamsDto(value: JsonValue): CreateComputeSessionParamsDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3137,7 +3145,7 @@ export class CreateComputeSessionParamsDto {
   }
 }
 
-function parse_as_GetComputeSessionStatusParamsDto(value: JsonValue): GetComputeSessionStatusParamsDto | Error {
+export function parse_as_GetComputeSessionStatusParamsDto(value: JsonValue): GetComputeSessionStatusParamsDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3180,7 +3188,7 @@ export class GetComputeSessionStatusParamsDto {
   }
 }
 
-function parse_as_CloseComputeSessionParamsDto(value: JsonValue): CloseComputeSessionParamsDto | Error {
+export function parse_as_CloseComputeSessionParamsDto(value: JsonValue): CloseComputeSessionParamsDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3223,7 +3231,7 @@ export class CloseComputeSessionParamsDto {
   }
 }
 
-function parse_as_CloseComputeSessionResponseDto(value: JsonValue): CloseComputeSessionResponseDto | Error {
+export function parse_as_CloseComputeSessionResponseDto(value: JsonValue): CloseComputeSessionResponseDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3257,7 +3265,7 @@ export class CloseComputeSessionResponseDto {
   }
 }
 
-function parse_as_ListComputeSessionsParamsDto(value: JsonValue): ListComputeSessionsParamsDto | Error {
+export function parse_as_ListComputeSessionsParamsDto(value: JsonValue): ListComputeSessionsParamsDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3293,7 +3301,7 @@ export class ListComputeSessionsParamsDto {
   }
 }
 
-function parse_as_Tuple_of_ComputeSessionStatusDto0_varlen__endof_(
+export function parse_as_Tuple_of_ComputeSessionStatusDto0_varlen__endof_(
   value: JsonValue,
 ): Array<ComputeSessionStatusDto> | Error {
   const arr = ensureJsonArray(value);
@@ -3306,7 +3314,7 @@ function parse_as_Tuple_of_ComputeSessionStatusDto0_varlen__endof_(
   }
   return out;
 }
-function parse_as_ListComputeSessionsResponseDto(value: JsonValue): ListComputeSessionsResponseDto | Error {
+export function parse_as_ListComputeSessionsResponseDto(value: JsonValue): ListComputeSessionsResponseDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3342,7 +3350,7 @@ export class ListComputeSessionsResponseDto {
   }
 }
 
-function parse_as_Tuple_of_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_0_varlen__endof_(
+export function parse_as_Tuple_of_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_0_varlen__endof_(
   value: JsonValue,
 ): Array<"LOCAL" | "CSCS" | "JUSUF"> | Error {
   const arr = ensureJsonArray(value);
@@ -3355,7 +3363,7 @@ function parse_as_Tuple_of_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_qu
   }
   return out;
 }
-function parse_as_GetAvailableHpcSitesResponseDto(value: JsonValue): GetAvailableHpcSitesResponseDto | Error {
+export function parse_as_GetAvailableHpcSitesResponseDto(value: JsonValue): GetAvailableHpcSitesResponseDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3392,7 +3400,7 @@ export class GetAvailableHpcSitesResponseDto {
   }
 }
 
-function parse_as_CheckLoginResultDto(value: JsonValue): CheckLoginResultDto | Error {
+export function parse_as_CheckLoginResultDto(value: JsonValue): CheckLoginResultDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3426,7 +3434,7 @@ export class CheckLoginResultDto {
   }
 }
 
-function parse_as_StartPixelProbabilitiesExportJobParamsDto(
+export function parse_as_StartPixelProbabilitiesExportJobParamsDto(
   value: JsonValue,
 ): StartPixelProbabilitiesExportJobParamsDto | Error {
   const valueObject = ensureJsonObject(value);
@@ -3471,7 +3479,7 @@ export class StartPixelProbabilitiesExportJobParamsDto {
   }
 }
 
-function parse_as_StartSimpleSegmentationExportJobParamsDto(
+export function parse_as_StartSimpleSegmentationExportJobParamsDto(
   value: JsonValue,
 ): StartSimpleSegmentationExportJobParamsDto | Error {
   const valueObject = ensureJsonObject(value);
@@ -3523,7 +3531,7 @@ export class StartSimpleSegmentationExportJobParamsDto {
   }
 }
 
-function parse_as_Union_of_HttpFsDto0BucketFSDto_endof_(value: JsonValue): HttpFsDto | BucketFSDto | Error {
+export function parse_as_Union_of_HttpFsDto0BucketFSDto_endof_(value: JsonValue): HttpFsDto | BucketFSDto | Error {
   const parsed_option_0 = parse_as_HttpFsDto(value);
   if (!(parsed_option_0 instanceof Error)) {
     return parsed_option_0;
@@ -3534,7 +3542,7 @@ function parse_as_Union_of_HttpFsDto0BucketFSDto_endof_(value: JsonValue): HttpF
   }
   return Error(`Could not parse ${JSON.stringify(value)} into HttpFsDto | BucketFSDto`);
 }
-function parse_as_LoadProjectParamsDto(value: JsonValue): LoadProjectParamsDto | Error {
+export function parse_as_LoadProjectParamsDto(value: JsonValue): LoadProjectParamsDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3575,7 +3583,7 @@ export class LoadProjectParamsDto {
   }
 }
 
-function parse_as_SaveProjectParamsDto(value: JsonValue): SaveProjectParamsDto | Error {
+export function parse_as_SaveProjectParamsDto(value: JsonValue): SaveProjectParamsDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3616,7 +3624,7 @@ export class SaveProjectParamsDto {
   }
 }
 
-function parse_as_GetDatasourcesFromUrlParamsDto(value: JsonValue): GetDatasourcesFromUrlParamsDto | Error {
+export function parse_as_GetDatasourcesFromUrlParamsDto(value: JsonValue): GetDatasourcesFromUrlParamsDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3650,7 +3658,45 @@ export class GetDatasourcesFromUrlParamsDto {
   }
 }
 
-function parse_as_GetDatasourcesFromUrlResponseDto(value: JsonValue): GetDatasourcesFromUrlResponseDto | Error {
+export function parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_0None_endof_(
+  value: JsonValue,
+):
+  | PrecomputedChunksDataSourceDto
+  | N5DataSourceDto
+  | SkimageDataSourceDto
+  | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto>
+  | undefined
+  | Error {
+  const parsed_option_0 = parse_as_PrecomputedChunksDataSourceDto(value);
+  if (!(parsed_option_0 instanceof Error)) {
+    return parsed_option_0;
+  }
+  const parsed_option_1 = parse_as_N5DataSourceDto(value);
+  if (!(parsed_option_1 instanceof Error)) {
+    return parsed_option_1;
+  }
+  const parsed_option_2 = parse_as_SkimageDataSourceDto(value);
+  if (!(parsed_option_2 instanceof Error)) {
+    return parsed_option_2;
+  }
+  const parsed_option_3 =
+    parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_(
+      value,
+    );
+  if (!(parsed_option_3 instanceof Error)) {
+    return parsed_option_3;
+  }
+  const parsed_option_4 = parse_as_None(value);
+  if (!(parsed_option_4 instanceof Error)) {
+    return parsed_option_4;
+  }
+  return Error(
+    `Could not parse ${
+      JSON.stringify(value)
+    } into PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto> | undefined`,
+  );
+}
+export function parse_as_GetDatasourcesFromUrlResponseDto(value: JsonValue): GetDatasourcesFromUrlResponseDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3659,7 +3705,7 @@ function parse_as_GetDatasourcesFromUrlResponseDto(value: JsonValue): GetDatasou
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a GetDatasourcesFromUrlResponseDto`);
   }
   const temp_datasources =
-    parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_0None_endof_(
+    parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_0None_endof_(
       valueObject.datasources,
     );
   if (temp_datasources instanceof Error) return temp_datasources;
@@ -3670,9 +3716,19 @@ function parse_as_GetDatasourcesFromUrlResponseDto(value: JsonValue): GetDatasou
 // Automatically generated via DataTransferObject for GetDatasourcesFromUrlResponseDto
 // Do not edit!
 export class GetDatasourcesFromUrlResponseDto {
-  public datasources: Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto> | undefined;
+  public datasources:
+    | PrecomputedChunksDataSourceDto
+    | N5DataSourceDto
+    | SkimageDataSourceDto
+    | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto>
+    | undefined;
   constructor(_params: {
-    datasources: Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto> | undefined;
+    datasources:
+      | PrecomputedChunksDataSourceDto
+      | N5DataSourceDto
+      | SkimageDataSourceDto
+      | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto>
+      | undefined;
   }) {
     this.datasources = _params.datasources;
   }
@@ -3687,7 +3743,9 @@ export class GetDatasourcesFromUrlResponseDto {
   }
 }
 
-function parse_as_CheckDatasourceCompatibilityParams(value: JsonValue): CheckDatasourceCompatibilityParams | Error {
+export function parse_as_CheckDatasourceCompatibilityParams(
+  value: JsonValue,
+): CheckDatasourceCompatibilityParams | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3724,7 +3782,7 @@ export class CheckDatasourceCompatibilityParams {
   }
 }
 
-function parse_as_Tuple_of_bool0_varlen__endof_(value: JsonValue): Array<boolean> | Error {
+export function parse_as_Tuple_of_bool0_varlen__endof_(value: JsonValue): Array<boolean> | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
   const out: Array<boolean> = [];
@@ -3735,7 +3793,9 @@ function parse_as_Tuple_of_bool0_varlen__endof_(value: JsonValue): Array<boolean
   }
   return out;
 }
-function parse_as_CheckDatasourceCompatibilityResponse(value: JsonValue): CheckDatasourceCompatibilityResponse | Error {
+export function parse_as_CheckDatasourceCompatibilityResponse(
+  value: JsonValue,
+): CheckDatasourceCompatibilityResponse | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3769,7 +3829,7 @@ export class CheckDatasourceCompatibilityResponse {
   }
 }
 
-function parse_as_ListFsDirRequest(value: JsonValue): ListFsDirRequest | Error {
+export function parse_as_ListFsDirRequest(value: JsonValue): ListFsDirRequest | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3810,7 +3870,7 @@ export class ListFsDirRequest {
   }
 }
 
-function parse_as_Tuple_of_str0_varlen__endof_(value: JsonValue): Array<string> | Error {
+export function parse_as_Tuple_of_str0_varlen__endof_(value: JsonValue): Array<string> | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
   const out: Array<string> = [];
@@ -3821,7 +3881,7 @@ function parse_as_Tuple_of_str0_varlen__endof_(value: JsonValue): Array<string> 
   }
   return out;
 }
-function parse_as_ListFsDirResponse(value: JsonValue): ListFsDirResponse | Error {
+export function parse_as_ListFsDirResponse(value: JsonValue): ListFsDirResponse | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;

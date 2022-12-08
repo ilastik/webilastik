@@ -425,9 +425,12 @@ class IlpDatasetInfo:
             return Exception(f"Could not open {url} as a data source: unsupported format")
         if isinstance(datasources_result, Exception):
             return Exception(f"Could not open {url} as a data source: {datasources_result}")
-        if len(datasources_result) != 1:
-            return Exception(f"Expected a single datasource from {url}, found {len(datasources_result)}")
-        return datasources_result[0]
+        if isinstance(datasources_result, tuple):
+            if len(datasources_result) != 1:
+                return Exception(f"Expected a single datasource from {url}, found {len(datasources_result)}")
+            return datasources_result[0]
+        else:
+            return datasources_result
 
 
 class IlpLane: #FIXME: generic over TypeVarTuple(..., bound=Literal["Raw Data", "Prediciton Mask", ...])

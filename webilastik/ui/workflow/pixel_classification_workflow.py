@@ -21,7 +21,6 @@ from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet.brushing_applet import Label, WsBrushingApplet
 from webilastik.ui.applet.feature_selection_applet import WsFeatureSelectionApplet
 from webilastik.ui.applet.pixel_predictions_export_applet import WsPixelClassificationExportApplet
-from webilastik.ui.applet.ws_viewer_applet import WsViewerApplet
 from webilastik.ui.usage_error import UsageError
 from webilastik.ui.applet import UserPrompt
 from webilastik.ui.applet.ws_applet import WsApplet
@@ -193,18 +192,6 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             labels=labels,
             pixel_classifier=pixel_classifier,
         )
-
-        self.viewer_applet = WsViewerApplet(
-            name="viewer_applet",
-            allowed_protocols=set(["http", "https"]),
-            executor=priority_executor,
-            generational_classifier=self.pixel_classifier_applet.generational_pixel_classifier,
-            labels=self.brushing_applet.labels,
-            session_url=session_url,
-            on_async_change=on_async_change,
-        )
-
-        self.wsapplets[self.viewer_applet.name] = self.viewer_applet
 
     @staticmethod
     def from_pixel_classification_workflow(workflow: PixelClassificationWorkflow, session_url: Url) -> "WsPixelClassificationWorkflow":

@@ -32,10 +32,8 @@ export class DataSourceSelectionWidget{
     }
 
     private tryOpenViews = async (liveFsTree: LiveFsTree) => {
-        let viewPromises = liveFsTree.getSelectedDatasourceUrls().map(urlPromise => urlPromise.then(async (urlResult) => {
-            return urlResult instanceof Error ?
-                urlResult:
-                await View.tryOpen({name: urlResult.path.name, url: urlResult, session: this.session})
+        let viewPromises = liveFsTree.getSelectedUrls().map(url => View.tryOpen({
+            name: url.path.name, url, session: this.session
         }))
         const viewsToOpen = new Array<ViewUnion>();
         for(const viewPromise of viewPromises){

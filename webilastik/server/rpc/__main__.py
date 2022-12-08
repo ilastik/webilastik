@@ -81,7 +81,7 @@ class TsFromJsonValueFunction:
         super().__init__()
         self.name = make_serialization_function_name(prefix="parse_as_", py_hint=py_hint)
         self.full_code = (
-            f"function {self.name}(value: JsonValue): {ts_hint} | Error{{" + "\n" +
+            f"export function {self.name}(value: JsonValue): {ts_hint} | Error{{" + "\n" +
                 textwrap.indent(textwrap.dedent(code), prefix="    ") + "\n" +
             f"}}"
         )
