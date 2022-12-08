@@ -187,9 +187,12 @@ class PrecomputedChunksDataSource(FsDataSource):
             self.scale_key == other.scale_key
         )
 
+    def get_tile_path(self, tile: Interval5D) -> PurePosixPath:
+        return self.scale_path / f"{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_{tile.z[0]}-{tile.z[1]}"
+
     def _get_tile(self, tile: Interval5D) -> Array5D:
         assert tile.is_tile(tile_shape=self.tile_shape, full_interval=self.interval, clamped=True), f"Bad tile: {tile}"
-        tile_path = self.scale_path / f"{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_{tile.z[0]}-{tile.z[1]}"
+        tile_path = self.get_tile_path(tile)
         raw_tile_bytes = self.filesystem.read_file(tile_path)
         if isinstance(raw_tile_bytes, FsFileNotFoundException):
             logger.warn(f"tile {tile} not found. Returning zeros")
