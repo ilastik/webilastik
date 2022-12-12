@@ -15,4 +15,12 @@ export enum CssClasses{
     ItkFsNodeWidget = "ItkFsNodeWidget",
     ItkExpandFolderWidget = "ItkExpandFolderWidget",
     ItkFsNodeName = "ItkFsNodeName",
+    ItkDataSourceListWidget = "ItkDataSourceListWidget",
+    ItkListWidget = "ItkListWidget",
+    ItkListWidgetRow = "ItkListWidgetRow",
+    ItkTabLabel = "ItkTabLabel",
+    ItkActiveTabLabel = "ItkActiveTabLabel",
+    ItkTabLabelWidgetsContainer = "ItkTabLabelWidgetsContainer",
+    ItkTabBodyContainer = "ItkTabBodyContainer",
+    ItkTabLabelTrailer = "ItkTabLabelTrailer",
 }
