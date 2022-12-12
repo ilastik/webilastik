@@ -51,8 +51,8 @@ export function createElement<K extends keyof HTMLElementTagNameMap>({
     innerText?:string,
     cssClasses?:Array<string>,
     inlineCss?: InlineCss,
-    onClick?(event: MouseEvent): void,
-    onDblClick?(event: MouseEvent): void
+    onClick?(event: MouseEvent, thisElement: HTMLElementTagNameMap[K]): void,
+    onDblClick?(event: MouseEvent, thisElement: HTMLElementTagNameMap[K]): void
 }): HTMLElementTagNameMap[K]{
 
     const element = document.createElement(tagName);
@@ -69,10 +69,10 @@ export function createElement<K extends keyof HTMLElementTagNameMap>({
         element.classList.add(klass)
     })
     if(onClick !== undefined){
-        (element as HTMLElement).addEventListener('click', onClick)
+        (element as HTMLElement).addEventListener('click', (ev) => onClick(ev, element))
     }
     if(onDblClick !== undefined){
-        (element as HTMLElement).addEventListener('dblclick', onDblClick)
+        (element as HTMLElement).addEventListener('dblclick', (ev) => onDblClick(ev, element))
 
     }
     applyInlineCss(element, inlineCss)
