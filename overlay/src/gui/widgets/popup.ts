@@ -3,6 +3,7 @@ import { createElement, createImage, createInput, createInputParagraph, removeEl
 export class PopupWidget{
     public readonly background: HTMLElement
     public readonly element: HTMLElement
+    public readonly header: HTMLHeadingElement
 
     constructor(title: string){
         const zIndex = 99999
@@ -16,12 +17,20 @@ export class PopupWidget{
             backgroundColor: "rgba(0,0,0, 0.5)",
         }})
         this.element = createElement({tagName: "div", parentElement: document.body, cssClasses: ["ItkPopupWidget"]})
-        createElement({tagName: "h2", parentElement: this.element, innerHTML: title})
+        this.header = createElement({tagName: "h2", parentElement: this.element, innerHTML: title})
     }
 
     public destroy(){
         removeElement(this.background)
         removeElement(this.element)
+    }
+
+    public static ClosablePopup(params: {title: string}): PopupWidget{
+        let popup = new PopupWidget(params.title);
+        createInput({inputType: "button", value: "x", parentElement: popup.header, onClick: () => {
+            popup.destroy()
+        }})
+        return popup
     }
 
     public static OkPopup(params: {title: string, paragraphs: string[]}): PopupWidget{
