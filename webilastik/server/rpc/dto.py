@@ -3693,20 +3693,6 @@ class StartSimpleSegmentationExportJobParamsDto(DataTransferObject):
         return parse_as_StartSimpleSegmentationExportJobParamsDto(value)
 
 
-def parse_as_Union_of_HttpFsDto0BucketFSDto_endof_(
-    value: JsonValue,
-) -> "Union[HttpFsDto, BucketFSDto] | MessageParsingError":
-    parsed_option_0 = parse_as_HttpFsDto(value)
-    if not isinstance(parsed_option_0, MessageParsingError):
-        return parsed_option_0
-    parsed_option_1 = parse_as_BucketFSDto(value)
-    if not isinstance(parsed_option_1, MessageParsingError):
-        return parsed_option_1
-    return MessageParsingError(
-        f"Could not parse {json.dumps(value)} into Union[HttpFsDto, BucketFSDto]"
-    )
-
-
 def parse_as_LoadProjectParamsDto(
     value: JsonValue,
 ) -> "LoadProjectParamsDto | MessageParsingError":
@@ -3720,7 +3706,7 @@ def parse_as_LoadProjectParamsDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as LoadProjectParamsDto"
         )
-    tmp_fs = parse_as_Union_of_HttpFsDto0BucketFSDto_endof_(value.get("fs"))
+    tmp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(value.get("fs"))
     if isinstance(tmp_fs, MessageParsingError):
         return tmp_fs
     tmp_project_file_path = parse_as_str(value.get("project_file_path"))
@@ -3734,7 +3720,7 @@ def parse_as_LoadProjectParamsDto(
 
 @dataclass
 class LoadProjectParamsDto(DataTransferObject):
-    fs: Union[HttpFsDto, BucketFSDto]
+    fs: FsDto
     project_file_path: str
 
     def to_json_value(self) -> JsonObject:
@@ -3764,7 +3750,7 @@ def parse_as_SaveProjectParamsDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as SaveProjectParamsDto"
         )
-    tmp_fs = parse_as_Union_of_HttpFsDto0BucketFSDto_endof_(value.get("fs"))
+    tmp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(value.get("fs"))
     if isinstance(tmp_fs, MessageParsingError):
         return tmp_fs
     tmp_project_file_path = parse_as_str(value.get("project_file_path"))
@@ -3778,7 +3764,7 @@ def parse_as_SaveProjectParamsDto(
 
 @dataclass
 class SaveProjectParamsDto(DataTransferObject):
-    fs: Union[HttpFsDto, BucketFSDto]
+    fs: FsDto
     project_file_path: str
 
     def to_json_value(self) -> JsonObject:

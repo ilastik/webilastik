@@ -1,10 +1,10 @@
 import { Applet } from '../../client/applets/applet';
 import { JsonValue } from '../../util/serialization';
-import { assertUnreachable, createElement, createInput, createInputParagraph, createTable } from '../../util/misc';
+import { assertUnreachable, createElement, createFieldset, createInput, createInputParagraph, createTable } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
 import { BucketFs, Color, FsDataSource, Filesystem, FsDataSink, Session } from '../../client/ilastik';
 import { CssClasses } from '../css_classes';
-import { ErrorPopupWidget, InputPopupWidget } from './popup';
+import { ErrorPopupWidget } from './popup';
 import {
     ExportJobDto,
     LabelHeaderDto,
@@ -14,10 +14,12 @@ import {
     StartPixelProbabilitiesExportJobParamsDto,
     StartSimpleSegmentationExportJobParamsDto
 } from '../../client/dto';
-import { PopupSelect, SelectorWidget } from './selector_widget';
-import { DataSourceInput } from './datasource_input';
-import { PrecomputedChunksScale_DataSink_Input } from './precomputed_chunks_scale_datasink_input';
+import { PopupSelect } from './selector_widget';
 import { Viewer } from '../../viewer/viewer';
+import { DataSourceListWidget } from './list_widget';
+import { DatasinkConfigWidget } from './datasink_builder_widget';
+import { DataType } from '../../util/precomputed_chunks';
+import { FileLocationPatternInputWidget } from './file_location_input';
 
 const sink_creation_stati = ["pending", "running", "cancelled", "failed", "succeeded"] as const;
 export type SinkCreationStatus = typeof sink_creation_stati[number];
@@ -65,15 +67,14 @@ class PixelClassificationExportAppletState{
 }
 
 export class PredictionsExportWidget extends Applet<PixelClassificationExportAppletState>{
+    private viewer: Viewer
+
     public readonly element: HTMLElement;
     private jobsDisplay: HTMLDivElement;
-    private exportModeSelector: PopupSelect<"pixel probabilities" | "simple segmentation">;
-    private datasinkInput: PrecomputedChunksScale_DataSink_Input;
-    private datasourceInput: DataSourceInput;
     private labelSelectorContainer: HTMLParagraphElement;
     private labelToExportSelector: PopupSelect<LabelHeader> | undefined;
-    private inputSuggestionsButtonContainer: HTMLSpanElement;
-    private viewer: Viewer
+    private exportModeSelector: PopupSelect<"pixel probabilities" | "simple segmentation">;
+    private datasourceListWidget: DataSourceListWidget;
 
     public constructor({name, parentElement, session, help, viewer}: {
         name: string, parentElement: HTMLElement, session: Session, help: string[], viewer: Viewer
@@ -101,126 +102,89 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
             parentElement: exportModeContainer,
             options: ["pixel probabilities", "simple segmentation"], //FIXME?
             optionRenderer: (args) => createElement({tagName: "span", parentElement: args.parentElement, innerText: args.option}),
-            onChange: () => this.refreshInputs(),
         })
 
-        const datasourceFieldset = createElement({tagName: "fieldset", parentElement: this.element})
-        createElement({tagName: "legend", parentElement: datasourceFieldset, innerText: "Input Data:"})
-        this.datasourceInput = new DataSourceInput({
-            parentElement: datasourceFieldset,
-            session,
-            onChanged: (ds: FsDataSource | undefined) => {
-                if(!ds){
-                    this.datasinkInput.sinkShapeInput.xInput.value = undefined
-                    this.datasinkInput.sinkShapeInput.yInput.value = undefined
-                    this.datasinkInput.sinkShapeInput.zInput.value = undefined
-                    this.datasinkInput.sinkShapeInput.tInput.value = undefined
+        const datasourceFieldset = createFieldset({parentElement: this.element, legend: "Input Datasets:"})
+        this.datasourceListWidget = new DataSourceListWidget({parentElement: datasourceFieldset, session: this.session})
 
-                    this.datasinkInput.tileShapeInput.xInput.value = undefined
-                    this.datasinkInput.tileShapeInput.yInput.value = undefined
-                    this.datasinkInput.tileShapeInput.zInput.value = undefined
-                    this.datasinkInput.tileShapeInput.tInput.value = undefined
-                }else{
-                    this.datasinkInput.sinkShapeInput.xInput.value = ds.shape.x
-                    this.datasinkInput.sinkShapeInput.yInput.value = ds.shape.y
-                    this.datasinkInput.sinkShapeInput.zInput.value = ds.shape.z
-                    this.datasinkInput.sinkShapeInput.tInput.value = ds.shape.t
-
-                    this.datasinkInput.tileShapeInput.xInput.value = ds.tile_shape.x
-                    this.datasinkInput.tileShapeInput.yInput.value = ds.tile_shape.y
-                    this.datasinkInput.tileShapeInput.zInput.value = ds.tile_shape.z
-                    this.datasinkInput.tileShapeInput.tInput.value = ds.tile_shape.t
-                }
-                this.datasinkInput.resolutionInput.value = ds?.spatial_resolution
-            }
+        const datasinkFieldset = createFieldset({legend: "Output: ", parentElement: this.element})
+        const fileLocationInputWidget = new FileLocationPatternInputWidget({
+            parentElement: datasinkFieldset, defaultBucketName: "hbp-image-service"
         })
-        this.inputSuggestionsButtonContainer = createElement({tagName: "span", parentElement: datasourceFieldset})
-
-
-        const datasinkFieldset = createElement({tagName: "fieldset", parentElement: this.element})
-        createElement({tagName: "legend", parentElement: datasinkFieldset, innerText: "Output: "})
-        this.datasinkInput = new PrecomputedChunksScale_DataSink_Input({
-            parentElement: datasinkFieldset,
-            disableDataType: true,
-            disableShape: true,
-            disableTileShape: true,
-            disableEncoding: true,
-            disableResolution: true,
-        })
+        const datasinkConfigWidget = new DatasinkConfigWidget({parentElement: datasinkFieldset})
+            datasinkConfigWidget.element.style.backgroundColor = "beige" //FIXME
 
         this.labelSelectorContainer = createElement({tagName: "p", parentElement: this.element});
 
         createInputParagraph({
-            inputType: "button", value: "Start Export Job", parentElement: this.element, onClick: () => {
-                const datasource = this.datasourceInput.value
-                const datasink = this.datasinkInput.value
-                if(!datasource || !datasink){
-                    new ErrorPopupWidget({message: "Missing export parameters"})
+            inputType: "button", value: "Start Export Jobs", parentElement: this.element, onClick: () => {
+                const exportMode = this.exportModeSelector.value
+                let dtype: DataType;
+                let numChannels: number;
+                if(exportMode == "pixel probabilities"){
+                    dtype = "float32"
+                    numChannels = this.labelToExportSelector?.options.length || 0 //FIXME: maybe just save the number of labels in state?
+                }else if(exportMode == "simple segmentation"){
+                    dtype = "uint8"
+                    numChannels = 3
+                }else{
+                    assertUnreachable(exportMode)
+                }
+
+                if(numChannels == 0){
+                    new ErrorPopupWidget({message: "Missing or wrong parameters"})
                     return
                 }
-                if(this.exportModeSelector.value == "pixel probabilities"){
-                    this.doRPC("launch_pixel_probabilities_export_job", new StartPixelProbabilitiesExportJobParamsDto({
-                        datasource: datasource.toDto(), datasink: datasink
-                    }))
-                }else if(this.exportModeSelector.value == "simple segmentation"){
-                    const label_header = this.labelToExportSelector?.value;
-                    if(!label_header){
+
+                for(let job_index=0; job_index < this.datasourceListWidget.value.length; job_index++){
+                    const datasource = this.datasourceListWidget.value[job_index]
+                    let fileLocation = fileLocationInputWidget.tryGetLocation({
+                        item_index: job_index, name: datasource.url.path.name
+                    });
+                    if(fileLocation === undefined){
+                        new ErrorPopupWidget({message: "Unexpected bad file location"}) //FIXME? Shouldn't this be impossible?
+                        return
+                    }
+                    if(!(datasource instanceof FsDataSource)){
+                        continue
+                    }
+                    const datasink = datasinkConfigWidget.tryMakeDataSink({
+                        filesystem: fileLocation.filesystem,
+                        path: fileLocation.path,
+                        dtype,
+                        interval: datasource.interval.updated({c: [0, numChannels]}),
+                        resolution: datasource.spatial_resolution,
+                        tile_shape: datasource.tile_shape.updated({c: numChannels})
+                    })
+                    if(!datasource || !datasink){
                         new ErrorPopupWidget({message: "Missing export parameters"})
                         return
                     }
-                    this.doRPC("launch_simple_segmentation_export_job", new StartSimpleSegmentationExportJobParamsDto({
-                        datasource: datasource.toDto(), datasink: datasink, label_header: label_header.toDto()
-                    }))
-                }else{
-                    assertUnreachable(this.exportModeSelector.value)
+                    if(this.exportModeSelector.value == "pixel probabilities"){
+                        this.doRPC("launch_pixel_probabilities_export_job", new StartPixelProbabilitiesExportJobParamsDto({
+                            datasource: datasource.toDto(), datasink: datasink.toDto()
+                        }))
+                    }else if(this.exportModeSelector.value == "simple segmentation"){
+                        const label_header = this.labelToExportSelector?.value;
+                        if(!label_header){
+                            new ErrorPopupWidget({message: "Missing export parameters"})
+                            return
+                        }
+                        this.doRPC("launch_simple_segmentation_export_job", new StartSimpleSegmentationExportJobParamsDto({
+                            datasource: datasource.toDto(), datasink: datasink.toDto(), label_header: label_header.toDto()
+                        }))
+                    }else{
+                        assertUnreachable(this.exportModeSelector.value)
+                    }
                 }
             }
         })
 
         this.jobsDisplay = createElement({tagName: "div", parentElement: this.element});
-        this.refreshInputs()
-    }
-
-    private refreshInputs = () => {
-        const exportMode = this.exportModeSelector.value
-        if(exportMode == 'pixel probabilities'){
-            this.datasinkInput.dataTypeSelector.value = "float32"
-            this.datasinkInput.tileShapeInput.cInput.value = this.labelToExportSelector?.options.length
-            this.datasinkInput.sinkShapeInput.cInput.value = this.labelToExportSelector?.options.length
-            this.labelSelectorContainer.style.display = "none"
-        }else if (exportMode == "simple segmentation"){
-            this.datasinkInput.dataTypeSelector.value = "uint8"
-            this.datasinkInput.tileShapeInput.cInput.value = 3
-            this.datasinkInput.sinkShapeInput.cInput.value = 3
-            this.labelSelectorContainer.style.display = "block"
-        }else{
-            assertUnreachable(exportMode)
-        }
     }
 
     protected onNewState(new_state: PixelClassificationExportAppletState){
         this.jobsDisplay.innerHTML = ""
-
-        this.inputSuggestionsButtonContainer.innerHTML = ""
-        createInput({
-            inputType: "button",
-            parentElement: this.inputSuggestionsButtonContainer,
-            value: "Use an Annotated Dataset",
-            disabled: new_state.datasource_suggestions.length == 0,
-            onClick: () => new InputPopupWidget<FsDataSource>({
-                title: "Pick an annotated dataset as input",
-                inputWidgetFactory: (parentElement) => {
-                    return new SelectorWidget({
-                        parentElement: parentElement,
-                        options: new_state.datasource_suggestions,
-                        optionRenderer: (args) => createElement({tagName: "span", parentElement: args.parentElement, innerText: args.option.getDisplayString()}),
-                    })
-                },
-                onConfirm: (ds) => {
-                    this.datasourceInput.value = ds
-                },
-            })
-        })
 
         let previousLabelSelection = this.labelToExportSelector?.value;
         this.labelSelectorContainer.innerHTML = ""
@@ -252,40 +216,39 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
             createElement({tagName: "span", parentElement: this.labelSelectorContainer, innerText: "No populated labels"})
         }
 
-        if(new_state.jobs.length > 0){
-            createTable({
-                parentElement: this.jobsDisplay,
-                cssClasses: [CssClasses.ItkTable],
-                title: {header: "Jobs:"},
-                headers: {name: "Name", status: "Status", progress: "Progress"},
-                rows: new_state.jobs.map(job => {
-                    let progressColumnContents: HTMLElement | string = job.num_args === undefined ? "unknwown" : `${Math.round(job.num_completed_steps / job.num_args * 100)}%`
-                    if(job.status == 'succeeded' && job instanceof ExportJobDto){
-                        progressColumnContents = createElement({tagName: "span", parentElement: undefined})
-                        const outputFs = Filesystem.fromDto(job.datasink.filesystem);
-                        if(outputFs instanceof BucketFs && job.datasink instanceof PrecomputedChunksSinkDto){ //FIXME
-                            const dataProxyLink = createElement({tagName: "a", parentElement: progressColumnContents, innerText: "Open in Data Proxy"})
-                            let dataProxyPrefixParam = job.datasink.path.replace(/^\//, "")
-                            if(job.datasink instanceof PrecomputedChunksSinkDto){
-                                dataProxyPrefixParam += "/"
-                            }
-                            dataProxyLink.href = `https://data-proxy.ebrains.eu/${outputFs.bucket_name}?prefix=${dataProxyPrefixParam}`
-                            dataProxyLink.target = "_blank"
-                            dataProxyLink.rel = "noopener noreferrer"
-                        }
-                        createInput({inputType: "button", parentElement: progressColumnContents, value: "Open in Viewer", onClick: () => {
-                            this.viewer.openDataViewFromDataSource(FsDataSink.fromDto(job.datasink).toDataSource())
-                        }})
-                    }
-                    return{
-                        name: job.name,
-                        status: job.status,
-                        progress: progressColumnContents
-                    }
-                })
-            })
+        if(new_state.jobs.length == 0){
+            return
         }
-
-        this.refreshInputs()
+        createTable({
+            parentElement: this.jobsDisplay,
+            cssClasses: [CssClasses.ItkTable],
+            title: {header: "Jobs:"},
+            headers: {name: "Name", status: "Status", progress: "Progress"},
+            rows: new_state.jobs.map(job => {
+                let progressColumnContents: HTMLElement | string = job.num_args === undefined ? "unknwown" : `${Math.round(job.num_completed_steps / job.num_args * 100)}%`
+                if(job.status == 'succeeded' && job instanceof ExportJobDto){
+                    progressColumnContents = createElement({tagName: "span", parentElement: undefined})
+                    const outputFs = Filesystem.fromDto(job.datasink.filesystem);
+                    if(outputFs instanceof BucketFs && job.datasink instanceof PrecomputedChunksSinkDto){ //FIXME
+                        const dataProxyLink = createElement({tagName: "a", parentElement: progressColumnContents, innerText: "Open in Data Proxy"})
+                        let dataProxyPrefixParam = job.datasink.path.replace(/^\//, "")
+                        if(job.datasink instanceof PrecomputedChunksSinkDto){
+                            dataProxyPrefixParam += "/"
+                        }
+                        dataProxyLink.href = `https://data-proxy.ebrains.eu/${outputFs.bucket_name}?prefix=${dataProxyPrefixParam}`
+                        dataProxyLink.target = "_blank"
+                        dataProxyLink.rel = "noopener noreferrer"
+                    }
+                    createInput({inputType: "button", parentElement: progressColumnContents, value: "Open in Viewer", onClick: () => {
+                        this.viewer.openDataViewFromDataSource(FsDataSink.fromDto(job.datasink).toDataSource())
+                    }})
+                }
+                return{
+                    name: job.name,
+                    status: job.status,
+                    progress: progressColumnContents
+                }
+            })
+        })
     }
 }

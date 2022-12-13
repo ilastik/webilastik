@@ -1,12 +1,10 @@
 import { Session } from "../../client/ilastik";
-import { BucketFSDto, LoadProjectParamsDto, SaveProjectParamsDto } from "../../client/dto";
+import { LoadProjectParamsDto, SaveProjectParamsDto } from "../../client/dto";
 import { createElement, createInput, getNowString } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
-import { CssClasses } from "../css_classes";
-import { BucketFsInput } from "./bucket_fs_input";
 import { CollapsableWidget } from "./collapsable_applet_gui";
-import { PathInput } from "./path_input";
 import { ErrorPopupWidget } from "./popup";
+import { FileLocationInputWidget } from "./file_location_input";
 
 export class ProjectWidget{
     public readonly containerWidget: CollapsableWidget;
@@ -14,31 +12,22 @@ export class ProjectWidget{
     constructor(params: {parentElement: HTMLElement, session: Session}){
         this.containerWidget = new CollapsableWidget({display_name: "Project", parentElement: params.parentElement})
         let form = createElement({tagName: "form", parentElement: this.containerWidget.element})
-        let bucketInput = new BucketFsInput({
+        const fileLocationInputWidget = new FileLocationInputWidget({
             parentElement: form,
+            defaultBucketName: "hbp-image-service",
+            defaultPath: Path.parse(`/MyProject_${getNowString()}.ilp`),
             required: true,
-            value: new BucketFSDto({
-                bucket_name: "hbp-image-service"
-            })
         })
 
-        let p = createElement({tagName: "p", parentElement: form, cssClasses: [CssClasses.ItkInputParagraph]})
-        createElement({tagName: "label", parentElement: p, innerText: "Project File Path: "})
-        let projectFilePathInput = new PathInput({
-            parentElement: p, required: true, value: Path.parse(`/MyProject_${getNowString()}.ilp`)
-        })
-
-        p = createElement({tagName: "p", parentElement: form})
+        let p = createElement({tagName: "p", parentElement: form})
         let saveButtonText = "Save Project"
         let loadButtonText = "Load Project"
         let saveButton = createInput({inputType: "submit", parentElement: p, value: saveButtonText})
         let loadButton = createInput({inputType: "submit", parentElement: p, value: loadButtonText})
         form.addEventListener("submit", (ev: SubmitEvent): false => {
             ev.preventDefault()
-
-            let fs = bucketInput.value
-            let project_file_path = projectFilePathInput.value
-            if(!fs || !project_file_path){
+            const location = fileLocationInputWidget.value
+            if(location === undefined){
                 new ErrorPopupWidget({message: "Some inputs missing"})
                 return false
             }
@@ -47,7 +36,9 @@ export class ProjectWidget{
 
             if(ev.submitter == loadButton){
                 loadButton.value = "Loading project..."
-                params.session.loadProject(new LoadProjectParamsDto({fs,  project_file_path: project_file_path.raw})).then(result => {
+                params.session.loadProject(new LoadProjectParamsDto({
+                    fs: location.filesystem.toDto(),  project_file_path: location.path.toDto(),
+                })).then(result => {
                     if(result instanceof Error){
                         new ErrorPopupWidget({message: result.message})
                     }
@@ -56,7 +47,9 @@ export class ProjectWidget{
                 })
             }else if(ev.submitter == saveButton){
                 saveButton.value = "Saving project..."
-                params.session.saveProject(new SaveProjectParamsDto({fs,  project_file_path: project_file_path.raw})).then(result => {
+                params.session.saveProject(new SaveProjectParamsDto({
+                    fs: location.filesystem.toDto(),  project_file_path: location.path.toDto()
+                })).then(result => {
                     if(result instanceof Error){
                         new ErrorPopupWidget({message: result.message})
                     }

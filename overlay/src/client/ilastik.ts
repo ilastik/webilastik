@@ -599,6 +599,22 @@ export class Interval5D{
         })
     }
 
+    public updated(params: {
+        x?: [number, number],
+        y?: [number, number],
+        z?: [number, number],
+        t?: [number, number],
+        c?: [number, number],
+    }): Interval5D{
+        return new Interval5D({
+            x: params.x || this.x,
+            y: params.y || this.y,
+            z: params.z || this.z,
+            t: params.t || this.t,
+            c: params.c || this.c,
+        })
+    }
+
     public static fromDto(message: Interval5DDto){
         return new this({
             x: [message.start.x, message.stop.x],
@@ -905,6 +921,19 @@ export class PrecomputedChunksSink extends FsDataSink{
             scale_key: Path.parse(message.scale_key),
             resolution: message.resolution,
             encoding: message.encoding,
+        })
+    }
+
+    public toDto(): PrecomputedChunksSinkDto{
+        return new PrecomputedChunksSinkDto({
+            filesystem: this.filesystem.toDto(),
+            path: this.path.toDto(),
+            dtype: this.dtype,
+            encoding: this.encoding,
+            interval: this.interval.toDto(),
+            resolution: this.resolution,
+            scale_key: this.scale_key.toDto(),
+            tile_shape: this.tile_shape.toDto(),
         })
     }
 

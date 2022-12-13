@@ -1,5 +1,12 @@
-import { FsDataSource } from "../../client/ilastik";
+import { GetDatasourcesFromUrlParamsDto } from "../../client/dto";
+import { FsDataSource, Session } from "../../client/ilastik";
+import { HashMap } from "../../util/hashmap";
 import { createElement, createInput } from "../../util/misc";
+import { Url } from "../../util/parsed_url";
+import { CssClasses } from "../css_classes";
+import { DataProxyFilePicker } from "./data_proxy_file_picker";
+import { LiveFsTree } from "./live_fs_tree";
+import { PopupWidget } from "./popup";
 
 export class ListWidget<T>{
     public readonly element: HTMLTableElement;
@@ -13,7 +20,7 @@ export class ListWidget<T>{
         onItemRemoved?: (value: T) => void,
         items?: Array<T>,
     }){
-        this.element = createElement({tagName: "table", parentElement: params.parentElement})
+        this.element = createElement({tagName: "table", parentElement: params.parentElement, cssClasses: [CssClasses.ItkListWidget]})
         this.itemRenderer = params.itemRenderer;
         this.onItemRemoved = params.onItemRemoved;
         this.redraw()
@@ -39,7 +46,7 @@ export class ListWidget<T>{
         this.element.innerHTML = ""
         for(let i=0; i<this.items.length; i++){
             const item = this.items[i];
-            const tr = createElement({tagName: "tr", parentElement: this.element})
+            const tr = createElement({tagName: "tr", parentElement: this.element, cssClasses: [CssClasses.ItkListWidgetRow]})
             const contentTd = createElement({tagName: "td", parentElement: tr})
             contentTd.appendChild(this.itemRenderer(item))
 
@@ -54,21 +61,89 @@ export class ListWidget<T>{
             removeButton.title = "Remove"
         }
     }
+
+    public get value(): Array<T>{
+        return this.items.slice()
+    }
+}
+
+export class DataSourceFetchError extends Error{
+    public readonly url: Url;
+    public readonly cause: Error;
+    constructor(params: {url: Url, cause: Error}){
+        super(params.cause.message)
+        this.url = params.url
+        this.cause = params.cause
+    }
 }
 
 export class DataSourceListWidget{
     element: HTMLDivElement;
-    listWidget: ListWidget<FsDataSource>;
+    listWidget: ListWidget<FsDataSource | DataSourceFetchError>;
+    session: Session;
 
     constructor(params: {
         parentElement: HTMLElement,
-        itemRenderer: (value: FsDataSource) => HTMLElement,
-        onItemRemoved?: (value: FsDataSource) => void,
-        items?: Array<FsDataSource>,
+        itemRenderer?: (value: FsDataSource | DataSourceFetchError) => HTMLElement,
+        onItemRemoved?: (value: FsDataSource | DataSourceFetchError) => void,
+        items?: Array<FsDataSource | DataSourceFetchError>,
+        session: Session,
     }){
-        this.element = createElement({tagName: "div", parentElement: params.parentElement})
-        this.listWidget = new ListWidget({...params, parentElement: this.element})
+        this.session = params.session
+        this.element = createElement({tagName: "div", parentElement: params.parentElement, cssClasses: [CssClasses.ItkDataSourceListWidget]})
+        this.listWidget = new ListWidget({...params, parentElement: this.element, itemRenderer: params.itemRenderer || this.renderDataSourceOrError})
         const buttonsContainer = createElement({tagName: "p", parentElement: this.element})
-        createInput({inputType: "button", value: "Browse Data Proxy", parentElement: buttonsContainer})
+        createInput({inputType: "button", value: "Browse Data Proxy", parentElement: buttonsContainer, onClick: () => this.openFilePicker()})
+    }
+
+    public get value(): Array<FsDataSource | DataSourceFetchError>{
+        return this.listWidget.value
+    }
+
+    private openFilePicker = () => {
+        const popup = PopupWidget.ClosablePopup({title: "Select datasets from Data Proxy"})
+        new DataProxyFilePicker({
+            parentElement: popup.element,
+            session: this.session,
+            onOk: (liveFsTree: LiveFsTree) => this.addDataSourcesFromUrls(liveFsTree.getSelectedUrls()),
+            okButtonValue: "Add",
+        })
+    }
+
+    private addDataSourcesFromUrls = async (urls: Url[]) => {
+        PopupWidget.WaitPopup({
+            title: "Loading data sources...",
+            operation: (async () => {
+                const datasourcePromises = new HashMap<Url, Promise<FsDataSource[] | FsDataSource | undefined | Error>, string>();
+                urls.forEach(url => datasourcePromises.set(
+                    url,
+                    this.session.getDatasourcesFromUrl(new GetDatasourcesFromUrlParamsDto({url: url.toDto()}))
+                ));
+                for(const [url, dsPromise] of datasourcePromises.entries()){
+                    const datasources_result = await dsPromise;
+                    if(datasources_result instanceof Error){
+                        this.listWidget.push(new DataSourceFetchError({url, cause: datasources_result}))
+                    }else if(datasources_result === undefined){
+                        this.listWidget.push(new DataSourceFetchError({url, cause: new Error(`Could not open datasource at ${url.raw}`)}))
+                    }else if(datasources_result instanceof Array){
+                        datasources_result.forEach(ds => this.listWidget.push(ds))
+                    }else{
+                        this.listWidget.push(datasources_result)
+                    }
+                }
+            })(),
+        })
+    }
+
+    private renderDataSourceOrError = (ds: FsDataSource | DataSourceFetchError): HTMLElement => {
+        if(ds instanceof DataSourceFetchError){
+            return createElement({
+                tagName: "span", parentElement: undefined, cssClasses: [CssClasses.ErrorText], innerText: ds.url.raw, onClick: () => {
+                    PopupWidget.OkPopup({title: "Error Details", paragraphs: [ds.cause.message]})
+                }
+            })
+        }else{
+            return createElement({tagName: "span", parentElement: undefined, innerText: ds.url.raw})
+        }
     }
 }

@@ -3531,17 +3531,6 @@ export class StartSimpleSegmentationExportJobParamsDto {
   }
 }
 
-export function parse_as_Union_of_HttpFsDto0BucketFSDto_endof_(value: JsonValue): HttpFsDto | BucketFSDto | Error {
-  const parsed_option_0 = parse_as_HttpFsDto(value);
-  if (!(parsed_option_0 instanceof Error)) {
-    return parsed_option_0;
-  }
-  const parsed_option_1 = parse_as_BucketFSDto(value);
-  if (!(parsed_option_1 instanceof Error)) {
-    return parsed_option_1;
-  }
-  return Error(`Could not parse ${JSON.stringify(value)} into HttpFsDto | BucketFSDto`);
-}
 export function parse_as_LoadProjectParamsDto(value: JsonValue): LoadProjectParamsDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
@@ -3550,7 +3539,7 @@ export function parse_as_LoadProjectParamsDto(value: JsonValue): LoadProjectPara
   if (valueObject["__class__"] != "LoadProjectParamsDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a LoadProjectParamsDto`);
   }
-  const temp_fs = parse_as_Union_of_HttpFsDto0BucketFSDto_endof_(valueObject.fs);
+  const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.fs);
   if (temp_fs instanceof Error) return temp_fs;
   const temp_project_file_path = parse_as_str(valueObject.project_file_path);
   if (temp_project_file_path instanceof Error) return temp_project_file_path;
@@ -3562,10 +3551,10 @@ export function parse_as_LoadProjectParamsDto(value: JsonValue): LoadProjectPara
 // Automatically generated via DataTransferObject for LoadProjectParamsDto
 // Do not edit!
 export class LoadProjectParamsDto {
-  public fs: HttpFsDto | BucketFSDto;
+  public fs: OsfsDto | HttpFsDto | BucketFSDto;
   public project_file_path: string;
   constructor(_params: {
-    fs: HttpFsDto | BucketFSDto;
+    fs: OsfsDto | HttpFsDto | BucketFSDto;
     project_file_path: string;
   }) {
     this.fs = _params.fs;
@@ -3591,7 +3580,7 @@ export function parse_as_SaveProjectParamsDto(value: JsonValue): SaveProjectPara
   if (valueObject["__class__"] != "SaveProjectParamsDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a SaveProjectParamsDto`);
   }
-  const temp_fs = parse_as_Union_of_HttpFsDto0BucketFSDto_endof_(valueObject.fs);
+  const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.fs);
   if (temp_fs instanceof Error) return temp_fs;
   const temp_project_file_path = parse_as_str(valueObject.project_file_path);
   if (temp_project_file_path instanceof Error) return temp_project_file_path;
@@ -3603,10 +3592,10 @@ export function parse_as_SaveProjectParamsDto(value: JsonValue): SaveProjectPara
 // Automatically generated via DataTransferObject for SaveProjectParamsDto
 // Do not edit!
 export class SaveProjectParamsDto {
-  public fs: HttpFsDto | BucketFSDto;
+  public fs: OsfsDto | HttpFsDto | BucketFSDto;
   public project_file_path: string;
   constructor(_params: {
-    fs: HttpFsDto | BucketFSDto;
+    fs: OsfsDto | HttpFsDto | BucketFSDto;
     project_file_path: string;
   }) {
     this.fs = _params.fs;

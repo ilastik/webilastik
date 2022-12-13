@@ -416,13 +416,13 @@ class StartSimpleSegmentationExportJobParamsDto(DataTransferObject):
 
 @dataclass
 class LoadProjectParamsDto(DataTransferObject):
-    fs: Union[HttpFsDto, BucketFSDto]
+    fs: FsDto
     project_file_path: str
 
 
 @dataclass
 class SaveProjectParamsDto(DataTransferObject):
-    fs: Union[HttpFsDto, BucketFSDto]
+    fs: FsDto
     project_file_path: str
 
 #########################################

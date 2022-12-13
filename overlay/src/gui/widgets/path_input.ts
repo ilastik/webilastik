@@ -1,4 +1,4 @@
-import { createElement, createInput } from "../../util/misc";
+import { createInput } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
 
 export class PathInput{
@@ -25,11 +25,5 @@ export class PathInput{
         }else{
             this.inputElement.value = ""
         }
-    }
-
-    public static createLabeled(params: {label: string} & ConstructorParameters<typeof PathInput>[0]): PathInput{
-        let span = createElement({tagName: "span", parentElement: params.parentElement})
-        createElement({tagName: "label", parentElement: span, innerHTML: params.label})
-        return new PathInput({...params, parentElement: span})
     }
 }
