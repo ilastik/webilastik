@@ -32,7 +32,7 @@ export class LiveFsTree{
             }
             for(const file of items_result.files){
                 let file_path = Path.parse(file)
-                folderWidget.addChildFolder({name: file_path.name, onOpen: onOpen})
+                folderWidget.addChildFile(file_path.name)
             }
         }
 
