@@ -32,7 +32,7 @@ from webilastik.filesystem import FsFileNotFoundException, FsIoException, IFiles
 from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.server.util import get_encoded_datasource_from_url
-from webilastik.server.rpc.dto import GetDatasourcesFromUrlParamsDto, GetDatasourcesFromUrlResponseDto, ListFsDirRequest, ListFsDirResponse, MessageParsingError, RpcErrorDto, SaveProjectParamsDto, parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_
+from webilastik.server.rpc.dto import GetDatasourcesFromUrlParamsDto, GetDatasourcesFromUrlResponseDto, ListFsDirRequest, ListFsDirResponse, LoadProjectParamsDto, MessageParsingError, RpcErrorDto, SaveProjectParamsDto
 from webilastik.server.session_allocator import uncachable_json_response
 from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError
@@ -366,7 +366,7 @@ class WebIlastik:
 
     async def load_project(self, request: web.Request) -> web.Response:
         payload = await request.json()
-        params_result = SaveProjectParamsDto.from_json_value(payload)
+        params_result = LoadProjectParamsDto.from_json_value(payload)
         if isinstance(params_result, MessageParsingError):
             return web.Response(status=400, text=f"Bad payload")
         fs_result = create_filesystem_from_message(params_result.fs)
