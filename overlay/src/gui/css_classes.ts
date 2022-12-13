@@ -23,4 +23,13 @@ export enum CssClasses{
     ItkTabLabelWidgetsContainer = "ItkTabLabelWidgetsContainer",
     ItkTabBodyContainer = "ItkTabBodyContainer",
     ItkTabLabelTrailer = "ItkTabLabelTrailer",
+    ItkOptionsWidget = "ItkOptionsWidget",
+    ItkOptionsWidgetOptsContainer = "ItkOptionsWidgetOptsContainer",
+    ItkButtonLike = "ItkButtonLike",
+    ItkSelectButton = "ItkSelectButton",
+    ItkPopupWidget = "ItkPopupWidget",
+    ItkTitleBar = "ItkTitleBar",
+    ItkOverlayControlsHeader = "ItkOverlayControlsHeader",
+    ItkOverlayControls = "ItkOverlayControls",
+    ItkDragHandle = "ItkDragHandle",
 }

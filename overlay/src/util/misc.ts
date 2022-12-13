@@ -106,7 +106,7 @@ export function createImage({src, parentElement, cssClasses, onClick}:
     return image
 }
 
-export type InputType = "button" | "text" | "checkbox" | "submit" | "url" | "radio" | "number" | "color"
+export type InputType = "button" | "text" | "search" | "checkbox" | "submit" | "url" | "radio" | "number" | "color"
 
 export function createInput(params: {
         inputType: InputType,

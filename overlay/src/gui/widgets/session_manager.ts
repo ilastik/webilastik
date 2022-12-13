@@ -6,7 +6,7 @@ import { Url } from "../../util/parsed_url";
 import { ReferencePixelClassificationWorkflowGui } from "../reference_pixel_classification_workflow";
 import { CollapsableWidget } from "./collapsable_applet_gui";
 import { ErrorPopupWidget, PopupWidget } from "./popup";
-import { PopupSelect } from "./selector_widget";
+import { PopupSelectWidget } from "./selector_widget";
 import { SessionsPopup } from "./sessions_list_widget";
 
 export class SessionManagerWidget{
@@ -31,7 +31,7 @@ export class SessionManagerWidget{
     listSessionsButton: HTMLInputElement;
     sessionDurationInput: HTMLInputElement;
     private warnedUserOfImpendingClose = false
-    hpcSiteInput: PopupSelect<HpcSiteName>;
+    hpcSiteInput: PopupSelectWidget<HpcSiteName>;
 
     constructor({parentElement, ilastikUrl, viewer_driver, workflow_container, hpcSiteNames}: {
         parentElement: HTMLElement, ilastikUrl: Url, viewer_driver: IViewerDriver, workflow_container: HTMLElement, hpcSiteNames: Array<HpcSiteName>
@@ -66,11 +66,11 @@ export class SessionManagerWidget{
 
         let p = createElement({tagName: "p", parentElement: this.element})
         createElement({tagName: "label", parentElement: p, innerText: "HPC site: "})
-        this.hpcSiteInput = new PopupSelect<HpcSiteName>({
-            popupTitle: "Select an HPC Site",
+        this.hpcSiteInput = new PopupSelectWidget<HpcSiteName>({
             parentElement: p,
+            popupTitle: "Select an HPC Site",
             options: hpcSiteNames,
-            optionRenderer: (args) => createElement({tagName: "span", parentElement: args.parentElement, innerText: args.option}),
+            renderer: (site) => createElement({tagName: "span", parentElement: undefined, innerText: site}),
         })
         this.listSessionsButton = createInput({
             inputType: "button",

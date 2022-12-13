@@ -1,5 +1,80 @@
 import { createElement, createInput, removeElement, uuidv4 } from "../../util/misc";
-import { InputPopupWidget } from "./popup";
+import { CssClasses } from "../css_classes";
+import { InputPopupWidget, PopupWidget } from "./popup";
+
+
+
+export class OptionsWidget<T>{
+    public readonly element: HTMLDivElement;
+
+    constructor(params: {
+        parentElement: HTMLElement,
+        options: Array<T>,
+        renderer: (val: T) => HTMLElement,
+        onOptionClicked: (opt: T) => void,
+    }){
+        this.element = createElement({tagName: "div", parentElement: params.parentElement, cssClasses: [CssClasses.ItkOptionsWidget]})
+        if(params.options.length == 0){
+            createElement({tagName: "p", parentElement: this.element, innerText: "No options available"})
+            return
+        }
+        const optionsContainer = createElement({tagName: "div", parentElement: this.element, cssClasses: [CssClasses.ItkOptionsWidgetOptsContainer]})
+        for(const opt of params.options){
+            const optParagraph = createElement({tagName: "p", parentElement: optionsContainer});
+            const renderedOpt = params.renderer(opt);
+            optParagraph.appendChild(renderedOpt)
+            renderedOpt.addEventListener("click", () => {
+                params.onOptionClicked(opt)
+                removeElement(this.element)
+            })
+        }
+    }
+}
+
+
+export class PopupSelectWidget<T>{
+    public readonly element: HTMLSpanElement;
+    private _value: T
+    private readonly renderer: (val: T) => HTMLElement;
+
+    constructor(params: {
+        parentElement: HTMLElement | undefined,
+        popupTitle: string,
+        options: Array<T>,
+        renderer: (val: T) => HTMLElement,
+        onChange?: (opt: T) => void,
+    }){
+        this.renderer = params.renderer
+        this.element = createElement({
+            tagName: "span", parentElement: params.parentElement, cssClasses: [CssClasses.ItkButtonLike, CssClasses.ItkSelectButton], onClick: () => {
+            const popup = PopupWidget.ClosablePopup({title: params.popupTitle});
+            new OptionsWidget({
+                parentElement: popup.element,
+                options: params.options,
+                onOptionClicked: (opt) => {
+                    this.value = opt
+                    if(params.onChange){
+                        params.onChange(opt)
+                    }
+                },
+                renderer: params.renderer
+            })
+        }})
+        this._value = params.options[0]
+        this.value = params.options[0]
+    }
+
+    public get value(): T{
+        return this._value
+    }
+
+    public set value(val: T){
+        this._value = val
+        this.element.innerHTML = ""
+        this.element.appendChild(this.renderer(val))
+    }
+}
+
 
 export class SelectorOption<T>{
     private _value: T;

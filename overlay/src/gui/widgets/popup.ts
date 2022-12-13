@@ -1,4 +1,5 @@
 import { createElement, createImage, createInput, createInputParagraph, removeElement } from "../../util/misc";
+import { CssClasses } from "../css_classes";
 
 export class PopupWidget{
     public readonly background: HTMLElement
@@ -16,8 +17,9 @@ export class PopupWidget{
             zIndex: zIndex + "",
             backgroundColor: "rgba(0,0,0, 0.5)",
         }})
-        this.element = createElement({tagName: "div", parentElement: document.body, cssClasses: ["ItkPopupWidget"]})
-        this.header = createElement({tagName: "h2", parentElement: this.element, innerHTML: title})
+        this.element = createElement({tagName: "div", parentElement: document.body, cssClasses: [CssClasses.ItkPopupWidget]})
+        this.header = createElement({tagName: "h2", parentElement: this.element, cssClasses: [CssClasses.ItkTitleBar]})
+        createElement({tagName: "span", parentElement: this.header, innerText: title})
     }
 
     public destroy(){

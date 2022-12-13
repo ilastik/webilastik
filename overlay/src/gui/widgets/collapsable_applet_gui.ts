@@ -1,4 +1,5 @@
 import { createElement, createInput } from "../../util/misc";
+import { CssClasses } from "../css_classes";
 import { PopupWidget } from "./popup";
 
 export class CollapsableWidget{
@@ -10,14 +11,14 @@ export class CollapsableWidget{
     }){
         this.element = createElement({tagName: "details", parentElement, cssClasses: ["ItkCollapsableApplet"]})
         this.summary = createElement({
-            tagName: "summary", parentElement: this.element, innerHTML: display_name, cssClasses: ["ItkCollapsableApplet_header"]
+            tagName: "summary", parentElement: this.element, cssClasses: [CssClasses.ItkTitleBar]
         });
+        createElement({tagName: "span", innerText: display_name, parentElement: this.summary})
         if(help !== undefined){
             this.help_button = createInput({
                 inputType: "button",
                 parentElement: this.summary,
                 value: "?",
-                inlineCss: {float: "right"},
                 onClick: () => {
                     PopupWidget.OkPopup({title: `Help: ${display_name}`, paragraphs: help})
                 }

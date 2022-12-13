@@ -2,6 +2,7 @@ import { Session } from "../../client/ilastik";
 import { IViewerDriver } from "../../drivers/viewer_driver";
 import { createElement, injectCss } from "../../util/misc";
 import { Url } from "../../util/parsed_url";
+import { CssClasses } from "../css_classes";
 import { ErrorPopupWidget } from "./popup";
 import { SessionManagerWidget } from "./session_manager";
 // import { SessionManagerWidget } from "./session_manager";
@@ -16,8 +17,13 @@ export class OverlayControls{
         if(css){
             injectCss(css)
         }
-        this.element = createElement({tagName: "div", parentElement, cssClasses: ["ItkOverlayControls"]})
-        const header = createElement({tagName: "h1", parentElement: this.element, cssClasses: ["ItkOverlayControls_header"], innerHTML: "Webilastik"})
+        this.element = createElement({tagName: "div", parentElement, cssClasses: [CssClasses.ItkOverlayControls]})
+        const header = createElement({
+            tagName: "h1",
+            parentElement: this.element,
+            cssClasses: [CssClasses.ItkOverlayControlsHeader, CssClasses.ItkTitleBar],
+        })
+        createElement({tagName: "span", parentElement: header, innerText: "Webilastik"})
 
         if(draggable){
             this.element.style.position = "fixed"
@@ -26,7 +32,10 @@ export class OverlayControls{
             header.style.userSelect = "none"
             header.style.cursor = "move"
             createElement({
-                tagName: "span", parentElement: header, innerText: "⠿", cssClasses: ["ItkOverlayControls_drag_handle"], inlineCss: {float: "right"}
+                tagName: "span",
+                parentElement: header,
+                innerText: "⠿",
+                cssClasses: [CssClasses.ItkDragHandle],
             })
             header.addEventListener("mousedown", (mouse_down_event) => {
                 let current_pos = {x: parseInt(this.element.style.left), y: parseInt(this.element.style.top)}
