@@ -32,4 +32,6 @@ export enum CssClasses{
     ItkOverlayControlsHeader = "ItkOverlayControlsHeader",
     ItkOverlayControls = "ItkOverlayControls",
     ItkDragHandle = "ItkDragHandle",
+    ItkDisabled = "ItkDisabled",
+    ItkPopupContents = "ItkPopupContents",
 }

@@ -5,6 +5,7 @@ export class PopupWidget{
     public readonly background: HTMLElement
     public readonly element: HTMLElement
     public readonly header: HTMLHeadingElement
+    public readonly contents: HTMLDivElement;
 
     constructor(title: string){
         const zIndex = 99999
@@ -19,6 +20,7 @@ export class PopupWidget{
         }})
         this.element = createElement({tagName: "div", parentElement: document.body, cssClasses: [CssClasses.ItkPopupWidget]})
         this.header = createElement({tagName: "h2", parentElement: this.element, cssClasses: [CssClasses.ItkTitleBar]})
+        this.contents = createElement({tagName: "div", parentElement: this.element, cssClasses: [CssClasses.ItkPopupContents]})
         createElement({tagName: "span", parentElement: this.header, innerText: title})
     }
 

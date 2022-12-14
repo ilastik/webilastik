@@ -43,12 +43,13 @@ export type InlineCss = Partial<Omit<
 >>
 
 export function createElement<K extends keyof HTMLElementTagNameMap>({
-        tagName, parentElement, innerHTML, innerText, cssClasses, inlineCss={}, onClick, onDblClick
+        tagName, parentElement, innerHTML, innerText, title, cssClasses, inlineCss={}, onClick, onDblClick
     }:{
     tagName: K,
     parentElement:HTMLElement | undefined,
     innerHTML?:string,
     innerText?:string,
+    title?: string,
     cssClasses?:Array<string>,
     inlineCss?: InlineCss,
     onClick?(event: MouseEvent, thisElement: HTMLElementTagNameMap[K]): void,
@@ -64,6 +65,9 @@ export function createElement<K extends keyof HTMLElementTagNameMap>({
     }
     if(innerText !== undefined){
         element.innerText = innerText
+    }
+    if(title){
+        element.title = title
     }
     (cssClasses || []).forEach(klass => {
         element.classList.add(klass)

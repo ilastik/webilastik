@@ -8,8 +8,9 @@ import { JsonValue } from "../../../util/serialization";
 import { CssClasses } from "../../css_classes";
 import { ColorPicker } from "../color_picker";
 import { ErrorPopupWidget, PopupWidget } from "../popup";
-import { PopupSelect } from "../selector_widget";
 import { BrushStroke } from "./brush_stroke";
+import { Span } from "../widget";
+import { Select } from "../input_widget";
 
 export type resolution = vec3;
 
@@ -44,7 +45,7 @@ export class BrushingApplet extends Applet<State>{
     public readonly element: HTMLDivElement;
     private labelWidgets = new Map<string, LabelWidget>()
     private labelSelectorContainer: HTMLSpanElement;
-    private labelSelector: PopupSelect<{name: string, color: Color}> | undefined
+    private labelSelector: Select<{name: string, color: Color}> | undefined
     private onDataSourceClicked?: (datasource: FsDataSource) => void
     private onLabelSelected?: () => void;
 
@@ -80,9 +81,12 @@ export class BrushingApplet extends Applet<State>{
             let popup = new PopupWidget("Create Label")
             let labelForm = createElement({tagName: "form", parentElement: popup.element})
             let labelNameInput = createInputParagraph({inputType: "text", parentElement: labelForm, label_text: "Input Name: ", required: true})
-            let colorPicker = new ColorPicker({label: "Label Color: ", parentElement: labelForm})
 
-            let p = createElement({tagName: "p", parentElement: popup.element})
+            let p = createElement({tagName: "p", parentElement: labelForm})
+            createElement({tagName: "label", parentElement: p, innerText: "Label Color: "})
+            let colorPicker = new ColorPicker({parentElement: labelForm})
+
+            p = createElement({tagName: "p", parentElement: popup.element})
             createInputParagraph({inputType: "submit", value: "Ok", parentElement: labelForm})
             createInput({inputType: "button", parentElement: p, value: "Cancel", onClick: () => {
                 popup.destroy()
@@ -195,19 +199,21 @@ export class BrushingApplet extends Applet<State>{
         }
 
         createElement({tagName: "label", parentElement: this.labelSelectorContainer, innerText: "Current label: "})
-        this.labelSelector = new PopupSelect<{name: string, color: Color}>({
+        this.labelSelector = new Select<{name: string, color: Color}>({
             popupTitle: "Select a label",
             parentElement: this.labelSelectorContainer,
             options: labelOptions,
-            comparator: (label1, label2) => label1.name == label2.name,
-            optionRenderer: (args) => {
-                createElement({tagName: "span", parentElement: args.parentElement, innerText: args.option.name + " "})
-                createElement({tagName: "span", parentElement: args.parentElement, innerText: "🖌️", inlineCss: {
-                    backgroundColor: args.option.color.hexCode,
-                    padding: "2px",
-                    border: "solid 1px black"
-                }})
-            },
+            renderer: (val) => new Span({
+                parentElement: undefined,
+                children: [
+                    new Span({parentElement: undefined, innerText: val.name + " "}),
+                    new Span({parentElement: undefined, innerText: "🖌️", inlineCss: {
+                        backgroundColor: val.color.hexCode,
+                        padding: "2px",
+                        border: "solid 1px black"
+                    }}),
+                ]
+            }),
             onChange: () => {
                 if(this.onLabelSelected){
                     this.onLabelSelected()

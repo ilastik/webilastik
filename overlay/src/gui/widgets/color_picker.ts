@@ -1,44 +1,29 @@
 import { Color } from "../../client/ilastik";
-import { createElement, createInput} from "../../util/misc";
+import { createInput} from "../../util/misc";
+import { CssClasses } from "../css_classes";
 
 export class ColorPicker{
-    private picker: HTMLInputElement
-    private color: Color;
-    private onChange?: (colors: {oldColor: Color, newColor: Color}) => void;
+    public readonly element: HTMLInputElement
 
-    constructor({parentElement, onChange, color=new Color({r: 0, g: 255, b:0}), label}:{
+    constructor(params:{
         parentElement: HTMLElement,
-        onChange?: (colors: {oldColor: Color, newColor: Color}) => void,
+        onChange?: (colors: {newColor: Color}) => void,
         color?: Color,
-        label?: string
     }){
-        this.color = color
-        this.onChange = onChange
-        if(label != undefined){
-            parentElement = createElement({tagName: "p", parentElement})
-            createElement({tagName: "label", innerHTML: label, parentElement})
-        }
-        this.picker = createInput({inputType: "color", parentElement})
-        this.picker.addEventListener("change", () => {
-            let oldColor = this.color
-            this.color = Color.fromHexCode(this.picker.value)
-            if(this.onChange){
-                this.onChange({oldColor, newColor: this.color})
-            }
-        })
-        this.setColor(color)
-    }
+        this.element = createInput({inputType: "color", parentElement: params.parentElement, cssClasses: [CssClasses.ItkButton]})
+        this.value = params.color || new Color({r:0, g:255, b: 0})
 
-    public getColor() : Color{
-        return this.color
+        const onChange = params.onChange
+        if(onChange){
+            this.element.addEventListener("change", () => onChange({newColor: this.value}))
+        }
     }
 
     public get value(): Color{
-        return this.color
+        return Color.fromHexCode(this.element.value)
     }
 
-    public setColor(color: Color){
-        this.color = color
-        this.picker.value = color.hexCode
+    public set value(color: Color){
+        this.element.value = color.hexCode
     }
 }
