@@ -157,6 +157,8 @@ export class SessionManagerWidget{
         new Paragraph({parentElement: this.element, children: [
             new Label({parentElement: undefined, innerText: "Session ID :"}),
             this.sessionIdField = new TextInput({parentElement: undefined, value: undefined}),
+        ]})
+        new Paragraph({parentElement: this.element, children: [
             this.rejoinSessionButton = new Button({
                 inputType: "button",
                 text: "Rejoin Session",
