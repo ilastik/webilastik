@@ -8,7 +8,8 @@ import { CollapsableWidget } from "./collapsable_applet_gui";
 import { ErrorPopupWidget, PopupWidget } from "./popup";
 import { SessionsPopup } from "./sessions_list_widget";
 import { Label, Paragraph, Span } from "./widget";
-import { Button, NumberInput, Select, TextInput } from "./input_widget";
+import { Button, Select } from "./input_widget";
+import { TextInput, NumberInput } from "./value_input_widget";
 
 export class SessionManagerWidget{
     element: HTMLElement
@@ -155,7 +156,7 @@ export class SessionManagerWidget{
         createElement({tagName: "h3", parentElement: this.element, innerText: "Rejoin Session"})
         new Paragraph({parentElement: this.element, children: [
             new Label({parentElement: undefined, innerText: "Session ID :"}),
-            this.sessionIdField = new TextInput({parentElement: undefined}),
+            this.sessionIdField = new TextInput({parentElement: undefined, value: undefined}),
             this.rejoinSessionButton = new Button({
                 inputType: "button",
                 text: "Rejoin Session",
@@ -165,7 +166,7 @@ export class SessionManagerWidget{
                     if(timeoutMinutes === undefined){
                         return
                     }
-                    let sessionId = this.sessionIdField.value.trim()
+                    let sessionId = this.sessionIdField.value
                     if(!sessionId){
                         new ErrorPopupWidget({message: "Bad session ID"})
                         return

@@ -6,11 +6,11 @@ import { HashMap } from "../../../util/hashmap";
 import { createElement, createInput, createInputParagraph, InlineCss, removeElement, vecToString } from "../../../util/misc";
 import { JsonValue } from "../../../util/serialization";
 import { CssClasses } from "../../css_classes";
-import { ColorPicker } from "../color_picker";
 import { ErrorPopupWidget, PopupWidget } from "../popup";
 import { BrushStroke } from "./brush_stroke";
 import { Span } from "../widget";
 import { Select } from "../input_widget";
+import { ColorPicker } from "../value_input_widget";
 
 export type resolution = vec3;
 
@@ -84,7 +84,7 @@ export class BrushingApplet extends Applet<State>{
 
             let p = createElement({tagName: "p", parentElement: labelForm})
             createElement({tagName: "label", parentElement: p, innerText: "Label Color: "})
-            let colorPicker = new ColorPicker({parentElement: labelForm})
+            let colorPicker = new ColorPicker({parentElement: labelForm, value: new Color({r: 255, g: 0, b:0})})
 
             p = createElement({tagName: "p", parentElement: popup.element})
             createInputParagraph({inputType: "submit", value: "Ok", parentElement: labelForm})
@@ -266,7 +266,7 @@ class LabelWidget{
 
         let labelControlsContainer = createElement({tagName: "p", parentElement: this.element})
         this.colorPicker = new ColorPicker({
-            parentElement: labelControlsContainer, color: params.color, onChange: colors => params.onColorChange(colors.newColor)
+            parentElement: labelControlsContainer, value: params.color, onChange: newColor => params.onColorChange(newColor)
         })
         createInput({
             inputType: "button", parentElement: labelControlsContainer, value: "Select Label", onClick: () => params.onLabelSelected(this.label)

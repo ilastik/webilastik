@@ -34,4 +34,5 @@ export enum CssClasses{
     ItkDragHandle = "ItkDragHandle",
     ItkDisabled = "ItkDisabled",
     ItkPopupContents = "ItkPopupContents",
+    ItkCharacterInput = "ItkCharacterInput",
 }
