@@ -9,7 +9,7 @@ import { ErrorPopupWidget, PopupWidget } from "./popup";
 import { SessionsPopup } from "./sessions_list_widget";
 import { Label, Paragraph, Span } from "./widget";
 import { Button, Select } from "./input_widget";
-import { TextInput, NumberInput } from "./value_input_widget";
+import { TextInput, NumberInput, UrlInput } from "./value_input_widget";
 
 export class SessionManagerWidget{
     element: HTMLElement
@@ -19,7 +19,7 @@ export class SessionManagerWidget{
     private remainingTimeIntervalID: number = 0;
     private reminaningTimeContainer: Paragraph
     private remainingTimeDisplay: TextInput
-    ilastikUrlInput: HTMLInputElement;
+    ilastikUrlInput: UrlInput;
     timeoutInput: NumberInput;
     createSessionButton: Button<"button">;
     messagesContainerLabel: Label;
@@ -61,42 +61,43 @@ export class SessionManagerWidget{
         }).element;
         this.element.classList.add("ItkLauncherWidget")
 
+        new Paragraph({parentElement: this.element, children: [
+            new Label({parentElement: undefined, innerText: "Ilastik API URL: "}),
+            this.ilastikUrlInput = new UrlInput({parentElement: undefined, required: true, value: ilastikUrl}),
+        ]})
 
-        this.ilastikUrlInput = createInputParagraph({
-            label_text: "Ilastik api URL: ", inputType: "url", parentElement: this.element, required: true, value: ilastikUrl.toString()
-        })
-
-        let p = createElement({tagName: "p", parentElement: this.element})
-        createElement({tagName: "label", parentElement: p, innerText: "HPC site: "})
-        this.hpcSiteInput = new Select<HpcSiteName>({
-            parentElement: p,
-            popupTitle: "Select an HPC Site",
-            options: hpcSiteNames,
-            renderer: (site) => new Span({parentElement: undefined, innerText: site}),
-        })
-        this.listSessionsButton = new Button({
-            inputType: "button",
-            text: "List Sessions",
-            parentElement: p,
-            onClick: async () => {
-                this.listSessionsButton.disabled = true
-                let ilastikUrl = await this.ensureLoggedInAndGetIlastikUrl();
-                if(!ilastikUrl){
-                    this.listSessionsButton.disabled = false
-                    return
-                }
-                await SessionsPopup.create({
-                    ilastikUrl,
-                    hpc_site: this.hpcSiteInput.value,
-                    onSessionClosed: (status) => {
-                        if(this.session && this.session.sessionUrl.equals(Url.fromDto(status.session_url))){
-                            this.onLeaveSession()
-                        }
+        new Paragraph({parentElement: this.element, children: [
+            new Label({parentElement: undefined, innerText: "HPC site: "}),
+            this.hpcSiteInput = new Select<HpcSiteName>({
+                parentElement: undefined,
+                popupTitle: "Select an HPC Site",
+                options: hpcSiteNames,
+                renderer: (site) => new Span({parentElement: undefined, innerText: site}),
+            }),
+            this.listSessionsButton = new Button({
+                inputType: "button",
+                text: "List Sessions",
+                parentElement: undefined,
+                onClick: async () => {
+                    this.listSessionsButton.disabled = true
+                    let ilastikUrl = await this.ensureLoggedInAndGetIlastikUrl();
+                    if(!ilastikUrl){
+                        this.listSessionsButton.disabled = false
+                        return
                     }
-                });
-                this.listSessionsButton.disabled = false
-            }
-        })
+                    await SessionsPopup.create({
+                        ilastikUrl,
+                        hpc_site: this.hpcSiteInput.value,
+                        onSessionClosed: (status) => {
+                            if(this.session && this.session.sessionUrl.equals(Url.fromDto(status.session_url))){
+                                this.onLeaveSession()
+                            }
+                        }
+                    });
+                    this.listSessionsButton.disabled = false
+                }
+            }),
+        ]})
 
         new Paragraph({
             parentElement: this.element,
@@ -263,12 +264,12 @@ export class SessionManagerWidget{
     }
 
     private getIlastikUrl(): Url | undefined{
-        try{
-            return Url.parse(this.ilastikUrlInput.value)
-        }catch{
-            new ErrorPopupWidget({message: `Could not parse ilastik url: ${this.ilastikUrlInput.value}`})
+        const url = this.ilastikUrlInput.value;
+        if(url === undefined){
+            new ErrorPopupWidget({message: `Bad ilastik API url`})
             return
         }
+        return url
     }
 
     private getWaitTimeout(): number | undefined{

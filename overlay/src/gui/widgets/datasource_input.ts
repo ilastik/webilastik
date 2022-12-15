@@ -1,17 +1,19 @@
 import { FsDataSource, Session } from "../../client/ilastik";
 import { GetDatasourcesFromUrlParamsDto } from "../../client/dto";
-import { createElement, createInput } from "../../util/misc";
+import { createElement } from "../../util/misc";
 import { CssClasses } from "../css_classes";
 import { ErrorPopupWidget, InputPopupWidget } from "./popup";
 import { SelectorWidget } from "./selector_widget";
-import { UrlInput } from "./url_input";
+import { UrlInput } from "./value_input_widget";
+import { Label, Paragraph } from "./widget";
+import { Button } from "./input_widget";
 
 
 export class DataSourceInput{
     public readonly element: HTMLDivElement;
     private readonly session: Session;
     private readonly urlInput: UrlInput;
-    public readonly checkButton: HTMLInputElement;
+    public readonly checkButton: Button<"button">;
     private readonly onChanged: ((newValue: FsDataSource | undefined) => void) | undefined;
     private statusMessageContainer: HTMLParagraphElement;
     private _value: FsDataSource | undefined;
@@ -27,16 +29,18 @@ export class DataSourceInput{
         this.onChanged = params.onChanged
         this.element = createElement({tagName: "div", parentElement: params.parentElement})
 
-        let p = createElement({tagName: "p", parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph]})
-        this.urlInput = UrlInput.createLabeled({label: "Url: ", parentElement: p})
-        this.urlInput.input.addEventListener("keyup", (ev) => {
+        new Paragraph({parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
+            new Label({parentElement: undefined, innerText: "Url: "}),
+            this.urlInput = new UrlInput({parentElement: undefined}),
+            this.checkButton = new Button({inputType: "button", text: "check", parentElement: undefined, onClick: () => this.checkUrl()}),
+        ]})
+        this.urlInput.element.addEventListener("keyup", (ev) => {
             this.checkButton.disabled = this.urlInput.value === undefined;
             if(ev.key === 'Enter'){
                 this.checkUrl()
             }
         })
-        this.urlInput.input.addEventListener("focusout", () => this.checkUrl())
-        this.checkButton = createInput({inputType: "button", value: "check", parentElement: p, onClick: () => this.checkUrl()})
+        this.urlInput.element.addEventListener("focusout", () => this.checkUrl())
 
         this.statusMessageContainer = createElement({tagName: "p", parentElement: this.element, cssClasses: [CssClasses.InfoText]})
     }

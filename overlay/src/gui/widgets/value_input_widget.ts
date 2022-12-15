@@ -1,50 +1,48 @@
 import { Color } from "../../client/ilastik";
+import { Url } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
 import { InputType, InputWidget, InputWidgetParams } from "./input_widget";
 
 export type ValueInputWidgetParams<V> = InputWidgetParams & {
     onChange?: (newvalue: V) => void,
-    value: V,
 }
 
 export abstract class ValueInputWidget<V, IT extends InputType> extends InputWidget<IT>{
-    private readonly onChange: ((newvalue: V) => void) | undefined;
-
     constructor(params: ValueInputWidgetParams<V> & {inputType: IT}){
         super(params)
-        this.onChange = params.onChange
-        this.element.value = this.valueToRaw(params.value)
-    }
-
-    protected abstract rawToValue(raw: string): V;
-    protected abstract valueToRaw(val: V): string;
-    public get value(): V{
-        return this.rawToValue(this.element.value)
-    }
-
-    public set value(val: V){
-        this.element.value = this.valueToRaw(val)
-        if(this.onChange){
-            this.onChange(this.value)
+        const onChange = params.onChange;
+        if(onChange){
+            this.element.addEventListener("change", () => onChange(this.value))
         }
     }
+
+    protected get raw(): string{
+        return this.element.value.trim()
+    }
+    protected set raw(val: string){
+        this.element.value = val.trim()
+    }
+
+    public abstract get value(): V;
+    public abstract set value(val: V);
 }
 
 export class TextInput extends ValueInputWidget<string | undefined, "text">{
-    constructor(params: ValueInputWidgetParams<string | undefined>){
+    constructor(params: ValueInputWidgetParams<string | undefined> & {value?: string}){
         super({...params, inputType: "text"})
         this.element.classList.add(CssClasses.ItkCharacterInput)
+        this.value = params.value
     }
-    protected rawToValue(raw: string): string | undefined{
-        return raw.trim() || undefined
+    public get value(): string | undefined{
+        return this.element.value.trim() || undefined
     }
-    protected valueToRaw(val: string | undefined): string{
-        return val === undefined ? "" : val
+    public set value(val: string | undefined){
+        this.element.value = val === undefined ? "" : val
     }
 }
 
 export class NumberInput extends ValueInputWidget<number, "number">{
-    constructor(params: ValueInputWidgetParams<number> & {min?: number, max?: number}){
+    constructor(params: ValueInputWidgetParams<number> & {value: number, min?: number, max?: number}){
         super({...params, inputType: "number"});
         this.element.classList.add(CssClasses.ItkCharacterInput)
         if(params.min !== undefined){
@@ -53,24 +51,48 @@ export class NumberInput extends ValueInputWidget<number, "number">{
         if(params.max !== undefined){
             this.element.max = params.max.toString()
         }
+        this.value = params.value
     }
-    protected rawToValue(raw: string): number{
-        return parseFloat(raw)
+    public get value(): number{
+        return parseFloat(this.raw)
     }
-    protected valueToRaw(val: number): string{
-        return val.toString()
+    public set value(val: number){
+        this.raw = val.toString()
     }
 }
 
 export class ColorPicker extends ValueInputWidget<Color, "color">{
-    constructor(params: ValueInputWidgetParams<Color>){
+    constructor(params: ValueInputWidgetParams<Color> & {value?: Color}){
         super({...params, inputType: "color"})
         this.element.classList.add(CssClasses.ItkButton)
+        if(params.value){
+            this.value = params.value
+        }
     }
-    protected rawToValue(raw: string): Color{
-        return Color.fromHexCode(raw)
+    public get value(): Color{
+        return Color.fromHexCode(this.raw)
     }
-    protected valueToRaw(val: Color): string{
-        return val.hexCode
+    public set value(val: Color){
+        this.raw = val.hexCode
+    }
+}
+
+export class UrlInput extends ValueInputWidget<Url | undefined, "url">{
+    constructor(params: ValueInputWidgetParams<Url | undefined> & {value?: Url}){
+        super({...params, inputType: "url"})
+        this.element.addEventListener("change", () => {
+            this.element.setCustomValidity(this.raw && this.value === undefined ? "Bad URL" : "")
+        })
+        this.value = params.value
+    }
+    public get value(): Url | undefined{
+        try{
+            return Url.parse(this.element.value)
+        }catch(e){
+            return undefined
+        }
+    }
+    public set value(value: Url | undefined){
+        this.element.value = value === undefined ? "" : value.toString()
     }
 }
