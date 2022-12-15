@@ -20,6 +20,8 @@ import { DataSourceListWidget } from './list_widget';
 import { DatasinkConfigWidget } from './datasink_builder_widget';
 import { DataType } from '../../util/precomputed_chunks';
 import { FileLocationPatternInputWidget } from './file_location_input';
+import { Select } from './input_widget';
+import { Label, Paragraph, Span } from './widget';
 
 const sink_creation_stati = ["pending", "running", "cancelled", "failed", "succeeded"] as const;
 export type SinkCreationStatus = typeof sink_creation_stati[number];
@@ -73,7 +75,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
     private jobsDisplay: HTMLDivElement;
     private labelSelectorContainer: HTMLParagraphElement;
     private labelToExportSelector: PopupSelect<LabelHeader> | undefined;
-    private exportModeSelector: PopupSelect<"pixel probabilities" | "simple segmentation">;
+    private exportModeSelector: Select<"pixel probabilities" | "simple segmentation">;
     private datasourceListWidget: DataSourceListWidget;
 
     public constructor({name, parentElement, session, help, viewer}: {
@@ -95,14 +97,15 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
         this.element = new CollapsableWidget({display_name: "Export Predictions", parentElement, help}).element
         this.element.classList.add("ItkPredictionsExportApplet")
 
-        const exportModeContainer = createElement({tagName: "p", parentElement: this.element})
-        createElement({tagName: "label", parentElement: exportModeContainer, innerText: "Export mode: "})
-        this.exportModeSelector = new PopupSelect<"pixel probabilities" | "simple segmentation">({
-            popupTitle: "Select an export mode",
-            parentElement: exportModeContainer,
-            options: ["pixel probabilities", "simple segmentation"], //FIXME?
-            optionRenderer: (args) => createElement({tagName: "span", parentElement: args.parentElement, innerText: args.option}),
-        })
+        new Paragraph({parentElement: this.element, children: [
+            new Label({parentElement: undefined, innerText: "Export mode: "}),
+            this.exportModeSelector = new Select<"pixel probabilities" | "simple segmentation">({
+                popupTitle: "Select an export mode",
+                parentElement: undefined,
+                options: ["pixel probabilities", "simple segmentation"], //FIXME?
+                renderer: (opt) => new Span({parentElement: undefined, innerText: opt}),
+            })
+        ]})
 
         const datasourceFieldset = createFieldset({parentElement: this.element, legend: "Input Datasets:"})
         this.datasourceListWidget = new DataSourceListWidget({parentElement: datasourceFieldset, session: this.session})
