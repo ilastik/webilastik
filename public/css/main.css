@@ -116,11 +116,6 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
     content:" ↕";
 }
 
-.ItkCollapsableApplet table{
-    border-collapse: collapse;
-    width: 100%;
-}
-
 .ItkCollapsableApplet caption{
 /*   white-space: nowrap; */
 /*   overflow: hidden; */
