@@ -65,6 +65,7 @@ export class ColorPicker extends ValueInputWidget<Color, "color">{
     constructor(params: ValueInputWidgetParams<Color> & {value?: Color}){
         super({...params, inputType: "color"})
         this.element.classList.add(CssClasses.ItkButton)
+        this.element.classList.add(CssClasses.ItkColorPicker)
         if(params.value){
             this.value = params.value
         }
@@ -79,7 +80,11 @@ export class ColorPicker extends ValueInputWidget<Color, "color">{
 
 export class UrlInput extends ValueInputWidget<Url | undefined, "url">{
     constructor(params: ValueInputWidgetParams<Url | undefined> & {value?: Url}){
-        super({...params, inputType: "url"})
+        super({
+            ...params,
+            cssClasses: [CssClasses.ItkCharacterInput, ...(params.cssClasses || [])],
+            inputType: "url"
+        })
         this.element.addEventListener("change", () => {
             this.element.setCustomValidity(this.raw && this.value === undefined ? "Bad URL" : "")
         })

@@ -86,11 +86,27 @@ export abstract class ContainerWidget<T extends keyof HTMLElementTagNameMap> ext
     public appendChild(child: Widget<any>){
         this.element.appendChild(child.element)
     }
+
+    public clear(){
+        this.element.innerHTML = ""
+    }
 }
 
 export class Span extends ContainerWidget<"span">{
     constructor(params: WidgetParams & {children?: Array<Widget<any>>}){
         super({...params, tagName: "span"})
+    }
+}
+
+export class Caption extends ContainerWidget<"caption">{
+    constructor(params: WidgetParams & {children?: Array<Widget<any>>}){
+        super({...params, tagName: "caption"})
+    }
+}
+
+export class Div extends ContainerWidget<"div">{
+    constructor(params: WidgetParams & {children?: Array<Widget<any>>}){
+        super({...params, tagName: "div"})
     }
 }
 
@@ -100,4 +116,20 @@ export class Paragraph extends ContainerWidget<"p">{
     }
 }
 
+export class Table extends ContainerWidget<"table">{
+    constructor(params: WidgetParams & {children?: Array<Widget<"tr" | "caption">>}){
+        super({...params, tagName: "table"})
+    }
+}
 
+export class TableRow extends ContainerWidget<"tr">{
+    constructor(params: WidgetParams & {children?: Array<Widget<"td">>}){
+        super({...params, tagName: "tr"})
+    }
+}
+
+export class TableData extends ContainerWidget<"td">{
+    constructor(params: WidgetParams & {children?: Array<Widget<any>>}){
+        super({...params, tagName: "td"})
+    }
+}
