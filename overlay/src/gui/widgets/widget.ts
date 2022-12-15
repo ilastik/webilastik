@@ -1,7 +1,7 @@
 import { applyInlineCss, InlineCss } from "../../util/misc";
 import { CssClasses } from "../css_classes";
 
-type WidgetParams = {
+export type WidgetParams = {
     parentElement:HTMLElement | ContainerWidget<any> | undefined,
     innerText?:string,
     title?: string,
@@ -82,6 +82,9 @@ export abstract class ContainerWidget<T extends keyof HTMLElementTagNameMap> ext
     protected constructor(params: WidgetParams & {tagName: T, children?: Array<Widget<any>>}){
         super({...params, tagName: params.tagName});
         (params.children || []).forEach(child => this.element.appendChild(child.element))
+    }
+    public appendChild(child: Widget<any>){
+        this.element.appendChild(child.element)
     }
 }
 

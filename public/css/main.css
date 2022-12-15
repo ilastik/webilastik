@@ -1,8 +1,5 @@
-*{
-    font-family: helvetica;
-}
-
 :root{
+    --default-font-family: helvetica;
     --default-font-size: 14px;
     --default-background-color: white;
     --default-title-bar-background-color: #eeeeee;
@@ -21,15 +18,21 @@
 }
 
 .ItkPopupWidget{
+    font-family: var(--default-font-family);
     background-color: var(--default-background-color);
     color: var(--default-text-color);
     padding: var(--default-content-padding);
 }
 
 .ItkOverlayControls{
+    font-family: var(--default-font-family);
     padding: 0;
     background-color: var(--default-background-color);
     color: var(--default-text-color);
+    resize: both;
+    max-width: 30em;
+    filter: drop-shadow(10px 10px 4px rgba(0,0,0, 0.3));
+    user-select: none;
 }
 
 .ItkTitleBar{
@@ -42,22 +45,17 @@
     padding: var(--default-title-bar-padding);
 }
 
-.ItkTitleBar > span:first-of-type{
+.ItkTitleBar .ItkTitleBarText{
     flex-grow: 1;
+    font-size: calc(var(--default-font-size) + 1px);
 }
 
-.ItkTitleBar .ItkDragHandle{
-/*     align-self: flex-end; */
-}
-
-details > summary:before {
-    content: "▶";
-    margin-left: 1ex;
-    margin-right: 1ex;
-}
-
-details[open] > summary:before {
+details.ItkCollapsableApplet[open] .ItkTitleBar::before{
     transform: rotate(90deg);
+}
+
+details.ItkCollapsableApplet .ItkTitleBar::before{
+    content: "▶";
 }
 
 .ItkOverlayControlsHeader{
@@ -66,7 +64,7 @@ details[open] > summary:before {
     background-color: black;
 }
 
-input[type=button], input[type=submit], button, .ItkSelectButton{
+.ItkButton{
     margin-left: 0.5ex;
     padding: 0.3em;
     font-size: var(--default-button-font-size);
@@ -79,11 +77,26 @@ input[type=button], input[type=submit], button, .ItkSelectButton{
     border-right: solid var(--default-button-border-thickness) var(--default-highlight-dark-color);
 }
 
-input[type=button]:active, input[type=submit]:active, button:active, .MMHandleSelectButton:active{
+.ItkButton:active{
     border-top: solid var(--default-button-border-thickness) var(--default-highlight-dark-color);
     border-left: solid var(--default-button-border-thickness) var(--default-highlight-dark-color);
     border-bottom: solid var(--default-button-border-thickness) var(--default-highlight-bright-color);
     border-right: solid var(--default-button-border-thickness) var(--default-highlight-bright-color);
+}
+
+.ItkCharacterInput{
+    margin-left: 0.5ex;
+    padding: 0.3em;
+    font-size: var(--default-button-font-size);
+    color: var(--default-text-color);;
+    background-color: var(--default-background-color);
+    border-radius: var(--default-border-radius);
+    border: solid var(--default-button-border-thickness) var(--default-highlight-color);
+}
+
+.ItkDisabled{
+    filter: grayscale(70%);
+    opacity: 0.5;
 }
 
 .ItkSelectButton:after{
@@ -108,4 +121,23 @@ input[type=button]:active, input[type=submit]:active, button:active, .MMHandleSe
 .ItkInputParagraph > input[type=text]{
     flex-grow: 1;
     margin-left: 1ex;
+}
+
+/*https://stackoverflow.com/a/21457838*/
+.ItkGrayedOut {
+    position: relative;
+    color: gray;
+    pointer-events: none;
+}
+
+.ItkGrayedOut::after {
+    content: " ";
+    z-index: 10;
+    display: block;
+    position: absolute;
+    height: 100%;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.1);
 }

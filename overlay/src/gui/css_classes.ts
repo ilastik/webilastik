@@ -35,4 +35,5 @@ export enum CssClasses{
     ItkDisabled = "ItkDisabled",
     ItkPopupContents = "ItkPopupContents",
     ItkCharacterInput = "ItkCharacterInput",
+    ItkTitleBarText = "ItkTitleBarText",
 }

@@ -5,8 +5,10 @@ import { Url } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
 import { ErrorPopupWidget } from "./popup";
 import { SessionManagerWidget } from "./session_manager";
+import { TitleBar } from "./title_bar";
+import { Span } from "./widget";
 // import { SessionManagerWidget } from "./session_manager";
-
+``
 export class OverlayControls{
     element: HTMLElement;
     constructor({
@@ -18,26 +20,22 @@ export class OverlayControls{
             injectCss(css)
         }
         this.element = createElement({tagName: "div", parentElement, cssClasses: [CssClasses.ItkOverlayControls]})
-        const header = createElement({
-            tagName: "h1",
-            parentElement: this.element,
-            cssClasses: [CssClasses.ItkOverlayControlsHeader, CssClasses.ItkTitleBar],
+        const titleBar = new TitleBar({
+            tagName: "h1", parentElement: this.element, text: "Webilastik", cssClasses: [CssClasses.ItkOverlayControlsHeader]
         })
-        createElement({tagName: "span", parentElement: header, innerText: "Webilastik"})
 
         if(draggable){
             this.element.style.position = "fixed"
             this.element.style.top = "0"
             this.element.style.left = "0"
-            header.style.userSelect = "none"
-            header.style.cursor = "move"
-            createElement({
-                tagName: "span",
-                parentElement: header,
+            titleBar.element.style.userSelect = "none"
+            titleBar.element.style.cursor = "move"
+            new Span({
+                parentElement: titleBar.element,
                 innerText: "⠿",
                 cssClasses: [CssClasses.ItkDragHandle],
             })
-            header.addEventListener("mousedown", (mouse_down_event) => {
+            titleBar.element.addEventListener("mousedown", (mouse_down_event) => {
                 let current_pos = {x: parseInt(this.element.style.left), y: parseInt(this.element.style.top)}
                 let drag_handler = (move_event: MouseEvent) => {
                     let delta = {x: move_event.screenX - mouse_down_event.screenX, y: move_event.screenY - mouse_down_event.screenY}
