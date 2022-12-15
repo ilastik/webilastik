@@ -1,5 +1,5 @@
 import { Color } from "../../client/ilastik";
-import { Url } from "../../util/parsed_url";
+import { Path, Url } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
 import { InputType, InputWidget, InputWidgetParams } from "./input_widget";
 
@@ -99,5 +99,31 @@ export class UrlInput extends ValueInputWidget<Url | undefined, "url">{
     }
     public set value(value: Url | undefined){
         this.element.value = value === undefined ? "" : value.toString()
+    }
+}
+
+export class PathInput extends ValueInputWidget<Path | undefined, "text">{
+    constructor(params: ValueInputWidgetParams<Path | undefined> & {value?: Path}){
+        super({
+            ...params,
+            cssClasses: [CssClasses.ItkCharacterInput, ...(params.cssClasses || [])],
+            inputType: "text"
+        })
+        this.value = params.value
+    }
+
+    public get value(): Path | undefined{
+        if(!this.raw){
+            return undefined
+        }
+        return Path.parse(this.raw) //FIXME: bad path?
+    }
+
+    public set value(path: Path | undefined){
+        if(path){
+            this.element.value = path.toString()
+        }else{
+            this.element.value = ""
+        }
     }
 }

@@ -2,10 +2,10 @@ import { Filesystem, Interval5D, PrecomputedChunksSink, Shape5D } from "../../cl
 import { createElement } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
 import { DataType } from "../../util/precomputed_chunks";
-import { PathInput } from "./path_input";
 import { ErrorPopupWidget } from "./popup";
 import { PopupSelect } from "./selector_widget";
 import { TabsWidget } from "./tabs_widget";
+import { PathInput } from "./value_input_widget";
 
 
 export interface IDatasinkConfigWidget{

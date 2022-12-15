@@ -2,7 +2,7 @@ import { Filesystem } from "../../client/ilastik";
 import { createElement, createInput } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
 import { FsInputWidget } from "./fs_input";
-import { PathInput } from "./path_input";
+import { PathInput } from "./value_input_widget";
 
 export const replacements = ["item_index", "name"] as const;
 export type Replacement = typeof replacements[number];
