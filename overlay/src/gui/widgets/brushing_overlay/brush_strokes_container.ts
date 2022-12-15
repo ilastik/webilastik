@@ -8,7 +8,7 @@ import { JsonValue } from "../../../util/serialization";
 import { CssClasses } from "../../css_classes";
 import { ErrorPopupWidget, PopupWidget } from "../popup";
 import { BrushStroke } from "./brush_stroke";
-import { Paragraph, Span, Label as LabelElement, TableRow, TableData, Div, Table, Caption, ContainerWidget } from "../widget";
+import { Paragraph, Span, Label as LabelElement, Div, Table, Caption, ContainerWidget } from "../widget";
 import { Button, Select } from "../input_widget";
 import { ColorPicker, TextInput } from "../value_input_widget";
 
@@ -276,7 +276,7 @@ class PixelLabelWidget{
     }){
         this.originalName = params.name
         this.element = new Div({parentElement: params.parentElement, children: [
-            new Paragraph({parentElement: undefined, children: [
+            new Paragraph({parentElement: undefined, cssClasses: [CssClasses.ItkInputParagraph], children: [
                 this.colorPicker = new ColorPicker({
                     parentElement: undefined, value: params.color, onChange: newColor => params.onColorChange(newColor)
                 }),
@@ -324,7 +324,7 @@ class PixelLabelWidget{
         for(let [datasource, strokes] of strokesPerDataSource.entries()){
             this.brushStrokesTables.set(datasource, new BrushStokeTable({
                 parentElement: this.element.element,
-                caption: datasource.getDisplayString(),
+                datasource: datasource,
                 onBrushStrokeDeleteClicked: (stroke) => params.onBrushStrokeDeleteClicked(this.colorPicker.value, stroke),
                 onCaptionCliked: () => {
                     if(params.onDataSourceClicked){
@@ -383,7 +383,7 @@ class BrushStokeTable{
 
     constructor(params: {
         parentElement: HTMLElement,
-        caption: string,
+        datasource: FsDataSource,
         strokes: BrushStroke[],
         onBrushStrokeDeleteClicked: (stroke: BrushStroke) => void,
         onCaptionCliked: () => void,
@@ -391,7 +391,8 @@ class BrushStokeTable{
         this.element = new Table({parentElement: params.parentElement, children: [
             new Caption({
                 parentElement: undefined,
-                innerText: params.caption,
+                innerText: `${params.datasource.url.name} ${params.datasource.resolutionString}`,
+                title: params.datasource.url.raw,
                 cssClasses: [CssClasses.ItkBrushStrokeTableCaption],
                 onClick: params.onCaptionCliked,
             })
@@ -417,7 +418,7 @@ class BrushStokeTable{
 }
 
 class BrushStrokeWidget{
-    public readonly element: TableRow
+    public readonly element: Paragraph
     public readonly brushStroke: BrushStroke
 
     constructor({brushStroke, parentElement, onLabelClicked, onDeleteClicked}:{
@@ -427,27 +428,23 @@ class BrushStrokeWidget{
         onDeleteClicked : (stroke: BrushStroke) => void,
     }){
         this.brushStroke = brushStroke
-        this.element = new TableRow({parentElement, children: [
-            new TableData({
+        this.element = new Paragraph({parentElement, cssClasses: [CssClasses.ItkBrushStrokeWidget], children: [
+            new Span({
                 parentElement: undefined,
-                innerText: `at voxel ${vecToString(brushStroke.getVertRef(0), 0)}`,
+                cssClasses: [CssClasses.ItkBrushStrokeCoords],
+                innerText: `🖌️ at ${vecToString(brushStroke.getVertRef(0), 0)}`,
                 onClick: () => onLabelClicked(brushStroke),
                 inlineCss: {cursor: "pointer"}
             }),
-            new TableData({
+            new Button({
+                inputType: "button",
+                text: "✖",
+                title: "Delete this annotation",
                 parentElement: undefined,
-                children: [
-                    new Button({
-                        inputType: "button",
-                        text: "✖",
-                        title: "Delete this annotation",
-                        parentElement: undefined,
-                        onClick: () => {
-                            onDeleteClicked(brushStroke)
-                            this.destroy()
-                        },
-                    })
-                ]
+                onClick: () => {
+                    onDeleteClicked(brushStroke)
+                    this.destroy()
+                },
             })
         ]})
     }

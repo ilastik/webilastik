@@ -97,10 +97,6 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
     height: 2em;
 }
 
-.ItkButton, .ItkCharacterInput{
-    line-height: 1.5em;
-}
-
 .ItkCharacterInput{
     margin-left: 0.5ex;
     padding: 0.3em;
@@ -120,6 +116,26 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
     content:" ↕";
 }
 
+.ItkCollapsableApplet table{
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.ItkCollapsableApplet caption{
+/*   white-space: nowrap; */
+/*   overflow: hidden; */
+/*   text-overflow: ellipsis; */
+    text-decoration: underline;
+    font-style: italic;
+    cursor: pointer;
+    margin-bottom: 0.2em;
+    opacity: 0.5;
+}
+
+.ItkCollapsableApplet tr{
+    border: solid 1px black;
+}
+
 .ItkPopupWidget{
     position: fixed;
     z-index: 100000;
@@ -131,13 +147,24 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
     overflow: auto;
 }
 
-.ItkInputParagraph{
+.ItkInputParagraph, .ItkBrushStrokeWidget{
     display: flex;
+    align-items: center;
 }
 
-.ItkInputParagraph > input[type=text]{
+.ItkInputParagraph > .ItkCharacterInput, .ItkBrushStrokeCoords{
     flex-grow: 1;
     margin-left: 1ex;
+}
+
+.ItkBrushStrokeCoords{
+    font-family: "Courier New";
+    font-size: calc(var(--default-font-size) - 2px);
+}
+
+.ItkBrushStrokeWidget{
+    margin: 0.1em;
+    padding-left: 1em;
 }
 
 /*https://stackoverflow.com/a/21457838*/

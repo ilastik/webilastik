@@ -37,4 +37,6 @@ export enum CssClasses{
     ItkCharacterInput = "ItkCharacterInput",
     ItkTitleBarText = "ItkTitleBarText",
     ItkColorPicker = "ItkColorPicker",
+    ItkBrushStrokeWidget = "ItkBrushStrokeWidget",
+    ItkBrushStrokeCoords = "ItkBrushStrokeCoords",
 }

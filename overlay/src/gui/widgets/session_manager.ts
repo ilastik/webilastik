@@ -10,6 +10,7 @@ import { SessionsPopup } from "./sessions_list_widget";
 import { Label, Paragraph, Span } from "./widget";
 import { Button, Select } from "./input_widget";
 import { TextInput, NumberInput, UrlInput } from "./value_input_widget";
+import { CssClasses } from "../css_classes";
 
 export class SessionManagerWidget{
     element: HTMLElement
@@ -61,12 +62,12 @@ export class SessionManagerWidget{
         }).element;
         this.element.classList.add("ItkLauncherWidget")
 
-        new Paragraph({parentElement: this.element, children: [
+        new Paragraph({parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
             new Label({parentElement: undefined, innerText: "Ilastik API URL: "}),
             this.ilastikUrlInput = new UrlInput({parentElement: undefined, required: true, value: ilastikUrl}),
         ]})
 
-        new Paragraph({parentElement: this.element, children: [
+        new Paragraph({parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
             new Label({parentElement: undefined, innerText: "HPC site: "}),
             this.hpcSiteInput = new Select<HpcSiteName>({
                 parentElement: undefined,
@@ -101,6 +102,7 @@ export class SessionManagerWidget{
 
         new Paragraph({
             parentElement: this.element,
+            cssClasses: [CssClasses.ItkInputParagraph],
             children: [
                 new Label({parentElement: undefined, innerText: "Timeout (minutes): "}),
                 this.timeoutInput = new NumberInput({parentElement: undefined, value: 15, min: 1}),
@@ -111,6 +113,7 @@ export class SessionManagerWidget{
         createElement({tagName: "h3", parentElement: this.element, innerText: "Create Session"})
         new Paragraph({
             parentElement: this.element,
+            cssClasses: [CssClasses.ItkInputParagraph],
             children: [
                 new Label({parentElement: undefined, innerText: "Session Duration (minutes): "}),
                 this.sessionDurationInput = new NumberInput({parentElement: undefined, value: 60, min: 5}),
@@ -119,6 +122,7 @@ export class SessionManagerWidget{
 
         new Paragraph({
             parentElement: this.element,
+            cssClasses: [CssClasses.ItkInputParagraph],
             children: [
                 this.createSessionButton = new Button({parentElement: undefined, inputType: "button", text: "Create Session", onClick: async () => {
                     let timeoutMinutes = this.getWaitTimeout()
@@ -155,7 +159,7 @@ export class SessionManagerWidget{
         })
 
         createElement({tagName: "h3", parentElement: this.element, innerText: "Rejoin Session"})
-        new Paragraph({parentElement: this.element, children: [
+        new Paragraph({parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
             new Label({parentElement: undefined, innerText: "Session ID :"}),
             this.sessionIdField = new TextInput({parentElement: undefined, value: undefined}),
         ]})
