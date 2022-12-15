@@ -82,6 +82,7 @@ export class Select<T> extends ButtonSpan{
     }){
         super({
             ...params,
+            cssClasses: [CssClasses.ItkSelectButton, ...(params.cssClasses || [])],
             content: params.renderer(params.options[0]),
             onClick: () => {
                 const popup = PopupWidget.ClosablePopup({title: params.popupTitle});
