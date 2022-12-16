@@ -1,64 +1,43 @@
 import { Filesystem } from "../../client/ilastik";
-import { createElement, createInput } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
 import { FsInputWidget } from "./fs_input";
 import { PathInput } from "./value_input_widget";
 import { Div, Label, Paragraph } from "./widget";
+import { InputWidget, InputWidgetParams } from "./input_widget";
 
-export const replacements = ["item_index", "name"] as const;
-export type Replacement = typeof replacements[number];
-
-export class PathPatternInput{
-    public readonly element: HTMLInputElement;
-    private _raw_value: string | undefined;
-
-    constructor(params: {
-        parentElement: HTMLElement | undefined,
-        pattern?: string,
-    }){
-        this.element = createInput({inputType: "text", parentElement: params.parentElement, value: params.pattern})
+export class PathPatternInput extends InputWidget<"text">{
+    constructor(params: InputWidgetParams & {value?: string}){ //FIXME: string really?
+        super({...params, inputType: "text", cssClasses: [CssClasses.ItkCharacterInput].concat(params.cssClasses || [])})
         this.element.addEventListener("change", () => {
-            const raw = this.element.value.trim()
-            this._raw_value = undefined
-            this.element.setCustomValidity("")
-            if(!raw){
-                return
-            }
-            let cleaned = raw
-            for(const replacement of replacements){
-                cleaned = cleaned.replace(`{${replacement}}`, `_${replacement}_`)
-            }
-
-            for(const brace of "{}"){
-                let braceIndex = cleaned.indexOf(brace)
-                if(braceIndex >= 0){
-                    this.element.setCustomValidity(`Unexpected '${brace}' at ${braceIndex + 1}`)
-                    return
-                }
-            }
-
-            //FIXME: parse should check for bad paths
-            let parsed = Path.parse(cleaned);
-            if(parsed instanceof Error){
-                this.element.setCustomValidity(`Bad path: ${parsed.message}`)
-                return
-            }
-            this._raw_value = raw
+            const value = this.tryGetPath({item_index: 1, name: "_name_"})
+            this.element.setCustomValidity(value instanceof Error ? value.message : "")
         })
     }
 
     public tryGetPath(params:{
         item_index: number,
         name: string,
-    }): Path | undefined{
-        if(!this._raw_value){
+    }): Path | undefined | Error{
+        if(!this.element.value){
             return undefined
         }
-        let out = this._raw_value
-            .replace(/\{item_index\}/, params.item_index.toString())
-            .replace(/\{name\}/, params.name.toString())
-        return Path.parse(out)
+        let replaced = this.element.value
+            .replace(/\{item_index\}/g, params.item_index.toString())
+            .replace(/\{name\}/g, params.name.toString())
+
+        for(const brace of "{}"){
+            let braceIndex = replaced.indexOf(brace)
+            if(braceIndex >= 0){
+                return new Error(`Unexpected '${brace}'`)
+            }
+        }
+        //FIXME: parse should check for bad paths
+        let parsed = Path.parse(replaced);
+        if(parsed instanceof Error){
+            return new Error(`Bad path`)
+        }
+        return parsed
     }
 }
 
@@ -107,14 +86,17 @@ export class FileLocationPatternInputWidget{
         this.fsInput = new FsInputWidget({
             parentElement: params.parentElement, defaultBucketName: params.defaultBucketName,
         })
-        createElement({tagName: "label", innerText: "Path pattern: ", parentElement: params.parentElement})
-        this.pathPatternInput = new PathPatternInput({parentElement: params.parentElement, pattern: params.defaultPathPattern})
+        new Paragraph({parentElement: params.parentElement, cssClasses: [CssClasses.ItkInputParagraph], children: [
+            new Label({innerText: "Path pattern: ", parentElement: undefined}),
+            this.pathPatternInput = new PathPatternInput({value: params.defaultPathPattern, parentElement: undefined})
+        ]})
+
     }
 
     public tryGetLocation(params: {item_index: number, name: string}): {filesystem: Filesystem, path: Path} | undefined{
         const filesystem = this.fsInput.value
         const path = this.pathPatternInput.tryGetPath(params)
-        if(!filesystem || !path){
+        if(!filesystem || !(path instanceof Path)){
             return undefined
         }
         return {filesystem, path}
