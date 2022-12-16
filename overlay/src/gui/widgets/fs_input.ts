@@ -1,64 +1,62 @@
-import { BucketFs, Filesystem } from "../../client/ilastik";
-import { createElement, createInput } from "../../util/misc";
+import { BucketFs, Filesystem, HttpFs } from "../../client/ilastik";
+import { Path } from "../../util/parsed_url";
+import { CssClasses } from "../css_classes";
 import { TabsWidget } from "./tabs_widget";
+import { BucketFsInput, HttpFsInput } from "./value_input_widget";
+import { Div, Label, WidgetParams } from "./widget";
 
 
-export interface IFsInputWidget<FS extends Filesystem>{
-    readonly element: HTMLElement;
-    readonly value: FS | undefined;
-    required: boolean;
+abstract class FsInputForm extends Div{
+    public abstract readonly fs: Filesystem | undefined;
+    public abstract required: boolean
 }
 
-export class BucketFsInputWidget implements IFsInputWidget<BucketFs>{
-    public readonly element: HTMLSpanElement;
-    private readonly bucketNameInput: HTMLInputElement;
+class BucketFsInputForm extends FsInputForm{
+    public readonly fsInput: BucketFsInput;
 
-    constructor(params: {
-        parentElement: HTMLElement | undefined,
-        bucketName?: string,
-        required?: boolean,
-        value?: BucketFs,
-    }){
-        let required = params.required === undefined ? false : params.required;
-        this.element = createElement({tagName: "span", parentElement: params.parentElement})
-        createElement({tagName: "label", innerText: "Bucket Name: ", parentElement: this.element})
-        this.bucketNameInput = createInput({
-            inputType: "text", parentElement: this.element, value: params.bucketName, required
-        })
-
-        if(params.value){
-            this.value = params.value
-        }
+    constructor(params: WidgetParams & {value?: BucketFs}){
+        let fsInput = new BucketFsInput({parentElement: undefined, value: params.value})
+        super({...params, cssClasses: [CssClasses.ItkInputParagraph], children: [
+            new Label({parentElement: undefined, innerText: "Data-Proxy Bucket Name: "}),
+            fsInput
+        ]})
+        this.fsInput = fsInput
     }
-
-    public get value(): BucketFs | undefined{
-        let bucketName = this.bucketNameInput.value
-        if(!bucketName){
-            return undefined
-        }
-        return new BucketFs({bucket_name: bucketName})
+    public get fs(): BucketFs | undefined{
+        return this.fsInput.value
     }
-
-    public set value(fs: BucketFs | undefined){
-        if(fs){
-            this.bucketNameInput.value = fs.bucket_name
-        }else{
-            this.bucketNameInput.value = ""
-        }
-    }
-
     public get required(): boolean{
-        return this.bucketNameInput.required
+        return this.fsInput.required
     }
-
     public set required(val: boolean){
-        this.bucketNameInput.required = val
+        this.fsInput.required = val
     }
+}
 
+class HttpFsInputForm extends FsInputForm{
+    public readonly fsInput: HttpFsInput;
+
+    constructor(params: WidgetParams & {value?: HttpFs}){
+        let fsInput = new HttpFsInput({parentElement: undefined, value: params.value})
+        super({...params, cssClasses: [CssClasses.ItkInputParagraph], children: [
+            new Label({parentElement: undefined, innerText: "Base Url: "}),
+            fsInput
+        ]})
+        this.fsInput = fsInput
+    }
+    public get fs(): HttpFs | undefined{
+        return this.fsInput.value
+    }
+    public get required(): boolean{
+        return this.fsInput.required
+    }
+    public set required(val: boolean){
+        this.fsInput.required = val
+    }
 }
 
 export class FsInputWidget{
-    tabs: TabsWidget<IFsInputWidget<Filesystem>>;
+    tabs: TabsWidget<FsInputForm>;
     private _required: boolean;
 
     constructor(params: {
@@ -68,10 +66,20 @@ export class FsInputWidget{
         this.tabs = new TabsWidget({
             parentElement: params.parentElement,
             onSwitch: (_, activeWidget, allWidgets) => this.refreshRequiredProperty(activeWidget, allWidgets),
-            tabBodyWidgets: new Map<string, IFsInputWidget<Filesystem>>([
+            tabBodyWidgets: new Map<string, FsInputForm>([
                 [
                     "Data-Proxy",
-                    new BucketFsInputWidget({parentElement: undefined, bucketName: params.defaultBucketName})
+                    new BucketFsInputForm({
+                        parentElement: undefined,
+                        value: params.defaultBucketName ? new BucketFs({bucket_name: params.defaultBucketName}) : undefined
+                    })
+                ],
+                [
+                    "HTTP",
+                    new HttpFsInputForm({
+                        parentElement: undefined,
+                        value: new HttpFs({protocol: "https", hostname: "app.ilastik.org", path: Path.parse("/public/images")}),
+                    })
                 ],
             ])
         })
@@ -80,10 +88,10 @@ export class FsInputWidget{
     }
 
     public get value(): Filesystem | undefined{
-        return this.tabs.current.widget.value
+        return this.tabs.current.widget.fs
     }
 
-    private refreshRequiredProperty = (currentWidget: IFsInputWidget<Filesystem>, allWidgets: IFsInputWidget<Filesystem>[]) => {
+    private refreshRequiredProperty = (currentWidget: FsInputForm, allWidgets: FsInputForm[]) => {
         if(!this._required){
             allWidgets.forEach(widget => {widget.required = false})
             return

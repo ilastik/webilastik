@@ -1,50 +1,53 @@
-import { Filesystem, Interval5D, PrecomputedChunksSink, Shape5D } from "../../client/ilastik";
-import { createElement } from "../../util/misc";
+import { DataSinkUnion, Filesystem, Interval5D, PrecomputedChunksSink, Shape5D } from "../../client/ilastik";
 import { Path } from "../../util/parsed_url";
 import { DataType } from "../../util/precomputed_chunks";
+import { CssClasses } from "../css_classes";
+import { Select } from "./input_widget";
 import { ErrorPopupWidget } from "./popup";
-import { PopupSelect } from "./selector_widget";
 import { TabsWidget } from "./tabs_widget";
 import { PathInput } from "./value_input_widget";
+import { Div, Label, Paragraph, Span } from "./widget";
 
 
-export interface IDatasinkConfigWidget{
-    readonly element: HTMLElement;
-
-    tryMakeDataSink(params: {
+abstract class DatasinkInputForm extends Div{
+    abstract tryMakeDataSink(params: {
         filesystem: Filesystem,
         path: Path,
         interval: Interval5D,
         dtype: DataType,
         resolution: [number, number, number],
         tile_shape: Shape5D,
-    }): PrecomputedChunksSink | undefined;
+    }): DataSinkUnion | undefined;
 }
 
-export class PrecomputedChunksDatasinkConfigWidget implements IDatasinkConfigWidget{
-    public readonly element: HTMLDivElement;
-    public readonly encoderSelector: PopupSelect<"raw" | "jpeg">;
+class PrecomputedChunksDatasinkConfigWidget extends DatasinkInputForm{
+    public readonly encoderSelector: Select<"raw" | "jpeg">;
     public readonly scaleKeyInput: PathInput;
 
     constructor(params: {parentElement: HTMLElement | undefined, disableEncoding: boolean}){
-        this.element = createElement({tagName: "div", parentElement: params.parentElement})
-
-        let p = createElement({tagName: "p", parentElement: this.element})
-        createElement({tagName: "label", parentElement: p, innerText: "Scale Key: "})
-        this.scaleKeyInput = new PathInput({
-            parentElement: p,
+        const scaleKeyInput = new PathInput({
+            parentElement: undefined,
             value: new Path({components: ["exported_data"]})
         })
-
-        p = createElement({tagName: "p", parentElement: this.element})
-        createElement({tagName: "label", parentElement: p, innerText: "Encoding: "})
-        this.encoderSelector = new PopupSelect<"raw" | "jpeg">({
+        const encoderSelector = new Select<"raw" | "jpeg">({
             popupTitle: "Select an encoding",
-            parentElement: p,
+            parentElement: undefined,
             options: ["raw", "jpeg"], //FIXME?
-            optionRenderer: (args) => createElement({tagName: "span", parentElement: args.parentElement, innerText: args.option}),
+            renderer: (opt) => new Span({parentElement: undefined, innerText: opt}),
             disabled: params.disableEncoding,
         })
+        super({...params, children: [
+            new Paragraph({parentElement: undefined, cssClasses: [CssClasses.ItkInputParagraph], children: [
+                new Label({innerText: "Scale Key: ", parentElement: undefined}),
+                scaleKeyInput,
+            ]}),
+            new Paragraph({parentElement: undefined, cssClasses: [CssClasses.ItkInputParagraph], children: [
+                new Label({innerText: "Encoding: ", parentElement: undefined}),
+                encoderSelector,
+            ]})
+        ]})
+        this.scaleKeyInput = scaleKeyInput
+        this.encoderSelector = encoderSelector
     }
 
     public tryMakeDataSink(params: {
@@ -76,13 +79,7 @@ export class PrecomputedChunksDatasinkConfigWidget implements IDatasinkConfigWid
 }
 
 
-export class DummySinkParamsInput implements IDatasinkConfigWidget{
-    public readonly element: HTMLDivElement;
-
-    constructor(params: {parentElement: HTMLElement | undefined}){
-        this.element = createElement({tagName: "div", parentElement: params.parentElement, innerText: "BLAS"})
-    }
-
+class DummySinkParamsInput extends DatasinkInputForm{
     public tryMakeDataSink(_params: {
         filesystem: Filesystem,
         path: Path,
@@ -96,13 +93,13 @@ export class DummySinkParamsInput implements IDatasinkConfigWidget{
 }
 
 export class DatasinkConfigWidget{
-    public readonly element: HTMLDivElement;
-    private readonly tabs: TabsWidget<IDatasinkConfigWidget>;
+    public readonly element: Div;
+    private readonly tabs: TabsWidget<DatasinkInputForm>;
 
     constructor(params: {parentElement: HTMLElement}){
         this.tabs = new TabsWidget({
             parentElement: params.parentElement,
-            tabBodyWidgets: new Map<string, IDatasinkConfigWidget>([
+            tabBodyWidgets: new Map<string, DatasinkInputForm>([
                 ["Precomputed Chunks", new PrecomputedChunksDatasinkConfigWidget({parentElement: undefined, disableEncoding: true})],
                 ["Dummy", new DummySinkParamsInput({parentElement: undefined})],
             ])

@@ -180,3 +180,36 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
     right: 0;
     background: rgba(0, 0, 0, 0.1);
 }
+
+.ItkTabBodyContainer{
+    border-left: solid 2px var(--default-highlight-color);
+    border-right: solid 2px var(--default-highlight-color);
+    border-bottom: solid 2px var(--default-highlight-color);
+    padding: var(--default-content-padding);
+    overflow: auto;
+    display: flex;
+}
+
+
+.ItkTabLabelTrailer{
+    flex-grow: 1;
+    border-bottom: solid 2px var(--default-highlight-color);
+}
+
+.ItkTabLabel{
+    border: solid 2px var(--default-highlight-color);
+    border-radius: 5px 5px 0 0;
+    margin-top: 1px;
+    margin-right: 2px;
+    display: inline-block;
+    padding: 0.1em;
+}
+
+.ItkActiveTabLabel{
+    border-bottom: 0;
+}
+
+.ItkTabLabelWidgetsContainer{
+    overflow-x: auto;
+    display: flex;
+}

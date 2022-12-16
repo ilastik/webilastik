@@ -1,13 +1,13 @@
-import { createElement } from "../../util/misc";
 import { CssClasses } from "../css_classes";
+import { Div, Label, Span, Widget } from "./widget";
 
 
-export class TabsWidget<WIDGET extends {readonly element: HTMLElement}>{
-    public readonly element: HTMLDivElement;
-    private tabLabelWidgets: Map<string, HTMLLabelElement>;
+export class TabsWidget<WIDGET extends Widget<any>>{
+    public readonly element: Div;
+    private tabLabelWidgets: Map<string, Label>;
     private tabBodyWidgets: Map<string, WIDGET>;
-    private tabLabelWidgetsContainer: HTMLDivElement;
-    private tabBodyWidgetsContainer: HTMLDivElement;
+    private tabLabelWidgetsContainer: Div;
+    private tabBodyWidgetsContainer: Div;
     private _current: {label: string, widget: WIDGET};
 
     constructor(params: {
@@ -16,46 +16,43 @@ export class TabsWidget<WIDGET extends {readonly element: HTMLElement}>{
         onSwitch?: (label: string, activeWidget: WIDGET, allWidgets: Array<WIDGET>) => void,
     }){
         this.tabBodyWidgets = params.tabBodyWidgets
-        this.tabLabelWidgets = new Map<string, HTMLLabelElement>()
+        this.tabLabelWidgets = new Map<string, Label>()
 
         const entries = Array.from(params.tabBodyWidgets.entries());
         this._current = {label: entries[0][0], widget: entries[0][1]}
 
-        this.element = createElement({tagName: "div", parentElement: params.parentElement})
-        this.tabLabelWidgetsContainer = createElement({
-            tagName: "div", parentElement: this.element, cssClasses: [CssClasses.ItkTabLabelWidgetsContainer]
-        })
-        this.tabBodyWidgetsContainer = createElement({
-            tagName: "div", parentElement: this.element, cssClasses: [CssClasses.ItkTabBodyContainer]
-        })
+        this.element = new Div({parentElement: params.parentElement, children: [
+            this.tabLabelWidgetsContainer = new Div({parentElement: undefined, cssClasses: [CssClasses.ItkTabLabelWidgetsContainer]}),
+            this.tabBodyWidgetsContainer = new Div({parentElement: undefined, cssClasses: [CssClasses.ItkTabBodyContainer]}),
+        ]})
 
         for(const [labelText, tabBodyWidget] of this.tabBodyWidgets.entries()){
-            this.tabBodyWidgetsContainer.appendChild(tabBodyWidget.element)
+            this.tabBodyWidgetsContainer.element.appendChild(tabBodyWidget.element)
 
-            this.tabLabelWidgets.set(labelText, createElement({
-                tagName: "label",
+            let labelWidget = new Label({
                 parentElement: this.tabLabelWidgetsContainer,
                 innerText: labelText,
                 cssClasses: [CssClasses.ItkTabLabel],
-                onClick: (_, labelWidget) => {
+                onClick: () => {
                     for(const widget of this.tabBodyWidgets.values()){
-                        widget.element.style.display = "none"
+                        widget.show(false)
                     }
                     for(const widget of this.tabLabelWidgets.values()){
-                        widget.classList.remove(CssClasses.ItkActiveTabLabel)
+                        widget.removeCssClass(CssClasses.ItkActiveTabLabel)
                     }
-                    labelWidget.style.display = ""
-                    labelWidget.classList.add(CssClasses.ItkActiveTabLabel)
-                    tabBodyWidget.element.style.display = ""
+                    labelWidget.show(true)
+                    labelWidget.addCssClass(CssClasses.ItkActiveTabLabel)
+                    tabBodyWidget.show(true)
                     this._current = {label: labelText, widget: tabBodyWidget}
 
                     if(params.onSwitch){
                         params.onSwitch(labelText, tabBodyWidget, Array.from(this.tabBodyWidgets.values()))
                     }
                 }
-            }))
+            })
+            this.tabLabelWidgets.set(labelText, labelWidget)
         }
-        createElement({tagName: "span", parentElement: this.tabLabelWidgetsContainer, cssClasses: [CssClasses.ItkTabLabelTrailer]})
+        new Span({parentElement: this.tabLabelWidgetsContainer, cssClasses: [CssClasses.ItkTabLabelTrailer]})
 
         for(const t of this.tabLabelWidgets.values()){
             t.click();

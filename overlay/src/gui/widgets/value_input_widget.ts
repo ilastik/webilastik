@@ -1,4 +1,4 @@
-import { Color } from "../../client/ilastik";
+import { BucketFs, Color, HttpFs } from "../../client/ilastik";
 import { Path, Url } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
 import { InputType, InputWidget, InputWidgetParams } from "./input_widget";
@@ -13,6 +13,9 @@ export abstract class ValueInputWidget<V, IT extends InputType> extends InputWid
         const onChange = params.onChange;
         if(onChange){
             this.element.addEventListener("change", () => onChange(this.value))
+        }
+        if(["text", "number", "search", "url"].includes(params.inputType)){
+            this.element.classList.add(CssClasses.ItkCharacterInput)
         }
     }
 
@@ -30,7 +33,6 @@ export abstract class ValueInputWidget<V, IT extends InputType> extends InputWid
 export class TextInput extends ValueInputWidget<string | undefined, "text">{
     constructor(params: ValueInputWidgetParams<string | undefined> & {value?: string}){
         super({...params, inputType: "text"})
-        this.element.classList.add(CssClasses.ItkCharacterInput)
         this.value = params.value
     }
     public get value(): string | undefined{
@@ -44,7 +46,6 @@ export class TextInput extends ValueInputWidget<string | undefined, "text">{
 export class NumberInput extends ValueInputWidget<number, "number">{
     constructor(params: ValueInputWidgetParams<number> & {value: number, min?: number, max?: number}){
         super({...params, inputType: "number"});
-        this.element.classList.add(CssClasses.ItkCharacterInput)
         if(params.min !== undefined){
             this.element.min = params.min.toString()
         }
@@ -82,7 +83,6 @@ export class UrlInput extends ValueInputWidget<Url | undefined, "url">{
     constructor(params: ValueInputWidgetParams<Url | undefined> & {value?: Url}){
         super({
             ...params,
-            cssClasses: [CssClasses.ItkCharacterInput, ...(params.cssClasses || [])],
             inputType: "url"
         })
         this.element.addEventListener("change", () => {
@@ -106,7 +106,6 @@ export class PathInput extends ValueInputWidget<Path | undefined, "text">{
     constructor(params: ValueInputWidgetParams<Path | undefined> & {value?: Path}){
         super({
             ...params,
-            cssClasses: [CssClasses.ItkCharacterInput, ...(params.cssClasses || [])],
             inputType: "text"
         })
         this.value = params.value
@@ -124,6 +123,61 @@ export class PathInput extends ValueInputWidget<Path | undefined, "text">{
             this.element.value = path.toString()
         }else{
             this.element.value = ""
+        }
+    }
+}
+
+export class BucketFsInput extends ValueInputWidget<BucketFs | undefined, "text">{
+    constructor(params: ValueInputWidgetParams<BucketFs | undefined> & {value?: BucketFs}){
+        super({...params, inputType: "text"})
+        this.value  = params.value
+    }
+
+    public get value(): BucketFs | undefined{
+        if(!this.raw){
+            return undefined
+        }
+        return new BucketFs({bucket_name: this.raw})
+    }
+
+    public set value(fs: BucketFs | undefined){
+        if(fs){
+            this.raw = fs.bucket_name
+        }else{
+            this.raw = ""
+        }
+    }
+}
+
+export class HttpFsInput extends ValueInputWidget<HttpFs | undefined, "url">{
+    constructor(params: ValueInputWidgetParams<HttpFs | undefined> & {value?: HttpFs}){
+        super({...params, inputType: "url"})
+        this.value  = params.value
+    }
+
+    public get value(): HttpFs | undefined{
+        try{//FIXME: make URl.parse return an error
+            let url = Url.parse(this.raw)
+            if(url.protocol != "http" && url.protocol != "https"){
+                return undefined
+            }
+            return new HttpFs({
+                protocol: url.protocol,
+                hostname: url.hostname,
+                port: url.port,
+                path: url.path,
+                search: url.search,
+            })
+        }catch{
+            return undefined
+        }
+    }
+
+    public set value(fs: HttpFs | undefined){
+        if(fs){
+            this.raw = fs.url.toString()
+        }else{
+            this.raw = ""
         }
     }
 }

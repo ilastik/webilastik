@@ -9,7 +9,7 @@ export type InputType = "button" | "text" | "search" | "checkbox" | "submit" | "
 export type InputWidgetParams = {
     parentElement:HTMLElement | ContainerWidget<any> | undefined,
     title?: string,
-    cssClasses?:Array<string>,
+    cssClasses?: Array<CssClasses>,
     inlineCss?: InlineCss,
     onClick?: (event: MouseEvent) => void,
     onDblClick?: (event: MouseEvent) => void,

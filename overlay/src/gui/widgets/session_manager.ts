@@ -201,7 +201,7 @@ export class SessionManagerWidget{
         ]})
 
         this.messagesContainerLabel = new Label({parentElement: this.element, innerText: "Log:", show: false});
-        this.messagesContainer = new Paragraph({parentElement: this.element, cssClasses: ["ItkSessionCreatorWidget_status-messages"], show: false})
+        this.messagesContainer = new Paragraph({parentElement: this.element, cssClasses: [CssClasses.ItkLogContainer], show: false})
 
         new Paragraph({parentElement: this.element, children: [
             this.closeSessionButton = new Button({

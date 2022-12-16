@@ -864,6 +864,8 @@ export class BucketFs extends Filesystem{
     }
 }
 
+export type DataSinkUnion = PrecomputedChunksSink // | N5DataSink | etc
+
 export abstract class FsDataSink{
     public readonly filesystem: Filesystem
     public readonly path: Path

@@ -115,7 +115,6 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
             parentElement: datasinkFieldset, defaultBucketName: "hbp-image-service"
         })
         const datasinkConfigWidget = new DatasinkConfigWidget({parentElement: datasinkFieldset})
-            datasinkConfigWidget.element.style.backgroundColor = "beige" //FIXME
 
         this.labelSelectorContainer = createElement({tagName: "p", parentElement: this.element});
 

@@ -1,10 +1,13 @@
 import { Session } from "../../client/ilastik";
 import { LoadProjectParamsDto, SaveProjectParamsDto } from "../../client/dto";
-import { createElement, createInput, getNowString } from "../../util/misc";
+import { createElement, getNowString } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
 import { CollapsableWidget } from "./collapsable_applet_gui";
 import { ErrorPopupWidget } from "./popup";
 import { FileLocationInputWidget } from "./file_location_input";
+import { Paragraph } from "./widget";
+import { CssClasses } from "../css_classes";
+import { Button } from "./input_widget";
 
 export class ProjectWidget{
     public readonly containerWidget: CollapsableWidget;
@@ -19,11 +22,15 @@ export class ProjectWidget{
             required: true,
         })
 
-        let p = createElement({tagName: "p", parentElement: form})
         let saveButtonText = "Save Project"
         let loadButtonText = "Load Project"
-        let saveButton = createInput({inputType: "submit", parentElement: p, value: saveButtonText})
-        let loadButton = createInput({inputType: "submit", parentElement: p, value: loadButtonText})
+        let saveButton: Button<"submit">;
+        let loadButton: Button<"submit">;
+        new Paragraph({parentElement: form, cssClasses: [CssClasses.ItkInputParagraph], children: [
+            saveButton = new Button({inputType: "submit", parentElement: undefined, text: saveButtonText}),
+            loadButton = new Button({inputType: "submit", parentElement: undefined, text: loadButtonText}),
+        ]})
+
         form.addEventListener("submit", (ev: SubmitEvent): false => {
             ev.preventDefault()
             const location = fileLocationInputWidget.value
@@ -34,26 +41,26 @@ export class ProjectWidget{
 
             saveButton.disabled = loadButton.disabled = true
 
-            if(ev.submitter == loadButton){
-                loadButton.value = "Loading project..."
+            if(ev.submitter == loadButton.element){
+                loadButton.text = "Loading project..."
                 params.session.loadProject(new LoadProjectParamsDto({
                     fs: location.filesystem.toDto(),  project_file_path: location.path.toDto(),
                 })).then(result => {
                     if(result instanceof Error){
                         new ErrorPopupWidget({message: result.message})
                     }
-                    loadButton.value = loadButtonText
+                    loadButton.text = loadButtonText
                     saveButton.disabled = loadButton.disabled = false
                 })
-            }else if(ev.submitter == saveButton){
-                saveButton.value = "Saving project..."
+            }else if(ev.submitter == saveButton.element){
+                saveButton.text = "Saving project..."
                 params.session.saveProject(new SaveProjectParamsDto({
                     fs: location.filesystem.toDto(),  project_file_path: location.path.toDto()
                 })).then(result => {
                     if(result instanceof Error){
                         new ErrorPopupWidget({message: result.message})
                     }
-                    saveButton.value = saveButtonText
+                    saveButton.text = saveButtonText
                     saveButton.disabled = loadButton.disabled = false
                 })
             }

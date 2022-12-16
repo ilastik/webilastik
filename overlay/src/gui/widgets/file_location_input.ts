@@ -1,8 +1,10 @@
 import { Filesystem } from "../../client/ilastik";
 import { createElement, createInput } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
+import { CssClasses } from "../css_classes";
 import { FsInputWidget } from "./fs_input";
 import { PathInput } from "./value_input_widget";
+import { Div, Label, Paragraph } from "./widget";
 
 export const replacements = ["item_index", "name"] as const;
 export type Replacement = typeof replacements[number];
@@ -70,11 +72,16 @@ export class FileLocationInputWidget{
         defaultPath?: Path,
         required?: boolean,
     }){
+        new Div({parentElement: params.parentElement, children: [
+
+        ]})
         this.fsInput = new FsInputWidget({
             parentElement: params.parentElement, defaultBucketName: params.defaultBucketName,
         })
-        createElement({tagName: "label", innerText: "Path: ", parentElement: params.parentElement})
-        this.pathInput = new PathInput({parentElement: params.parentElement, value: params.defaultPath})
+        new Paragraph({parentElement: params.parentElement, cssClasses: [CssClasses.ItkInputParagraph], children: [
+            new Label({innerText: "Path: ", parentElement: undefined}),
+            this.pathInput = new PathInput({parentElement: undefined, value: params.defaultPath}),
+        ]})
     }
 
     public get value(): {filesystem: Filesystem, path: Path} | undefined{

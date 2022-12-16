@@ -5,7 +5,7 @@ export type WidgetParams = {
     parentElement:HTMLElement | ContainerWidget<any> | undefined,
     innerText?:string,
     title?: string,
-    cssClasses?:Array<string>,
+    cssClasses?: Array<CssClasses>,
     inlineCss?: InlineCss,
     onClick?: (event: MouseEvent) => void,
     onDblClick?: (event: MouseEvent) => void,
@@ -69,6 +69,16 @@ export abstract class Widget<T extends keyof HTMLElementTagNameMap>{
 
     public show(show: boolean){
         this.element.style.display = show ? "" : "none"
+    }
+
+    public addCssClass(klass: CssClasses){
+        this.element.classList.add(klass)
+    }
+    public removeCssClass(klass: CssClasses){
+        this.element.classList.remove(klass)
+    }
+    public click(){
+        this.element.click()
     }
 }
 
