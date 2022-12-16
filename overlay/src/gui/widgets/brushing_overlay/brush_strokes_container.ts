@@ -8,7 +8,7 @@ import { JsonValue } from "../../../util/serialization";
 import { CssClasses } from "../../css_classes";
 import { ErrorPopupWidget, PopupWidget } from "../popup";
 import { BrushStroke } from "./brush_stroke";
-import { Paragraph, Span, Label as LabelElement, Div, Table, Caption, ContainerWidget } from "../widget";
+import { Paragraph, Span, Label as LabelElement, Div, ContainerWidget } from "../widget";
 import { Button, Select } from "../input_widget";
 import { ColorPicker, TextInput } from "../value_input_widget";
 
@@ -377,8 +377,7 @@ class PixelLabelWidget{
 }
 
 
-class BrushStokeTable{
-    public readonly element: Table;
+class BrushStokeTable extends Div{
     private strokeWidgets: BrushStrokeWidget[]
 
     constructor(params: {
@@ -388,18 +387,18 @@ class BrushStokeTable{
         onBrushStrokeDeleteClicked: (stroke: BrushStroke) => void,
         onCaptionCliked: () => void,
     }){
-        this.element = new Table({parentElement: params.parentElement, children: [
-            new Caption({
+        super({...params, children: [
+            new Paragraph({
                 parentElement: undefined,
                 innerText: `${params.datasource.url.name} ${params.datasource.resolutionString}`,
                 title: params.datasource.url.raw,
-                cssClasses: [CssClasses.ItkBrushStrokeTableCaption],
+                cssClasses: [CssClasses.ItkBrushDatasourceLink],
                 onClick: params.onCaptionCliked,
             })
-        ]});
+        ]})
         this.strokeWidgets = params.strokes.map(stroke => new BrushStrokeWidget({
                 brushStroke: stroke,
-                parentElement: this.element,
+                parentElement: this,
                 onLabelClicked: (_) => {}, //FIXME: snap viewer to coord
                 onDeleteClicked: () => params.onBrushStrokeDeleteClicked(stroke)
         }))
@@ -413,27 +412,25 @@ class BrushStokeTable{
         for(let strokeWiget of this.strokeWidgets){
             strokeWiget.destroy()
         }
-        this.element.destroy()
+        super.destroy()
     }
 }
 
-class BrushStrokeWidget{
-    public readonly element: Paragraph
+class BrushStrokeWidget extends Paragraph{
     public readonly brushStroke: BrushStroke
 
-    constructor({brushStroke, parentElement, onLabelClicked, onDeleteClicked}:{
+    constructor(params: {
         brushStroke: BrushStroke,
-        parentElement: Table,
+        parentElement: Div,
         onLabelClicked : (stroke: BrushStroke) => void,
         onDeleteClicked : (stroke: BrushStroke) => void,
     }){
-        this.brushStroke = brushStroke
-        this.element = new Paragraph({parentElement, cssClasses: [CssClasses.ItkBrushStrokeWidget], children: [
+        super({...params, cssClasses: [CssClasses.ItkBrushStrokeWidget], children: [
             new Span({
                 parentElement: undefined,
                 cssClasses: [CssClasses.ItkBrushStrokeCoords],
-                innerText: `🖌️ at ${vecToString(brushStroke.getVertRef(0), 0)}`,
-                onClick: () => onLabelClicked(brushStroke),
+                innerText: `🖌️ at ${vecToString(params.brushStroke.getVertRef(0), 0)}`,
+                onClick: () => params.onLabelClicked(params.brushStroke),
                 inlineCss: {cursor: "pointer"}
             }),
             new Button({
@@ -442,15 +439,16 @@ class BrushStrokeWidget{
                 title: "Delete this annotation",
                 parentElement: undefined,
                 onClick: () => {
-                    onDeleteClicked(brushStroke)
+                    params.onDeleteClicked(params.brushStroke)
                     this.destroy()
                 },
             })
         ]})
+        this.brushStroke = params.brushStroke
     }
 
     public destroy(){
         this.brushStroke.destroy()
-        this.element.destroy()
+        super.destroy()
     }
 }

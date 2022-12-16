@@ -116,7 +116,7 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
     content:" ↕";
 }
 
-.ItkCollapsableApplet caption{
+.ItkBrushDatasourceLink{
 /*   white-space: nowrap; */
 /*   overflow: hidden; */
 /*   text-overflow: ellipsis; */
