@@ -120,6 +120,18 @@ export class Div extends ContainerWidget<"div">{
     }
 }
 
+export class Details extends ContainerWidget<"details">{
+    constructor(params: WidgetParams & {children?: Array<Widget<any>>}){
+        super({...params, tagName: "details"})
+    }
+}
+
+export class Summary extends ContainerWidget<"summary">{
+    constructor(params: WidgetParams & {children?: Array<Widget<any>>}){
+        super({...params, tagName: "summary"})
+    }
+}
+
 export class Paragraph extends ContainerWidget<"p">{
     constructor(params: WidgetParams & {children?: Array<Widget<any>>}){
         super({...params, tagName: "p"})
