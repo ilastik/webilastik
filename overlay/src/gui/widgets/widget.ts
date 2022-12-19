@@ -1,4 +1,5 @@
 import { applyInlineCss, InlineCss } from "../../util/misc";
+import { Url } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
 
 export type TagName = keyof HTMLElementTagNameMap
@@ -91,11 +92,11 @@ export class Label extends Widget<"label">{
 }
 
 export abstract class ContainerWidget<T extends keyof HTMLElementTagNameMap> extends Widget<T>{
-    protected constructor(params: WidgetParams & {tagName: T, children?: Array<Widget<any>>}){
+    protected constructor(params: WidgetParams & {tagName: T, children?: Array<Widget<TagName>>}){
         super({...params, tagName: params.tagName});
         (params.children || []).forEach(child => this.element.appendChild(child.element))
     }
-    public appendChild(child: Widget<any>){
+    public appendChild(child: Widget<TagName>){
         this.element.appendChild(child.element)
     }
 
@@ -105,37 +106,51 @@ export abstract class ContainerWidget<T extends keyof HTMLElementTagNameMap> ext
 }
 
 export class Span extends ContainerWidget<"span">{
-    constructor(params: WidgetParams & {children?: Array<Widget<any>>}){
+    constructor(params: WidgetParams & {children?: Array<Widget<TagName>>}){
         super({...params, tagName: "span"})
     }
 }
 
+export class Anchor extends ContainerWidget<"a">{
+    constructor(params: WidgetParams & {
+        children?: Array<Widget<TagName>>,
+        href: Url,
+        target: "_blank",
+        rel: "noopener noreferrer"
+    }){
+        super({...params, tagName: "a"})
+        this.element.href = params.href.raw
+        this.element.target = params.target
+        this.element.rel = params.rel
+    }
+}
+
 export class Caption extends ContainerWidget<"caption">{
-    constructor(params: WidgetParams & {children?: Array<Widget<any>>}){
+    constructor(params: WidgetParams & {children?: Array<Widget<TagName>>}){
         super({...params, tagName: "caption"})
     }
 }
 
 export class Div extends ContainerWidget<"div">{
-    constructor(params: WidgetParams & {children?: Array<Widget<any>>}){
+    constructor(params: WidgetParams & {children?: Array<Widget<TagName>>}){
         super({...params, tagName: "div"})
     }
 }
 
 export class Details extends ContainerWidget<"details">{
-    constructor(params: WidgetParams & {children?: Array<Widget<any>>}){
+    constructor(params: WidgetParams & {children?: Array<Widget<TagName>>}){
         super({...params, tagName: "details"})
     }
 }
 
 export class Summary extends ContainerWidget<"summary">{
-    constructor(params: WidgetParams & {children?: Array<Widget<any>>}){
+    constructor(params: WidgetParams & {children?: Array<Widget<TagName>>}){
         super({...params, tagName: "summary"})
     }
 }
 
 export class Paragraph extends ContainerWidget<"p">{
-    constructor(params: WidgetParams & {children?: Array<Widget<any>>}){
+    constructor(params: WidgetParams & {children?: Array<Widget<TagName>>}){
         super({...params, tagName: "p"})
     }
 }
@@ -147,13 +162,19 @@ export class Table extends ContainerWidget<"table">{
 }
 
 export class TableRow extends ContainerWidget<"tr">{
-    constructor(params: WidgetParams & {children?: Array<Widget<"td">>}){
+    constructor(params: WidgetParams & {children?: Array<Widget<"td"> | Widget<"th">>}){
         super({...params, tagName: "tr"})
     }
 }
 
+export class TableHeader extends ContainerWidget<"th">{
+    constructor(params: WidgetParams & {children?: Array<Widget<TagName>>}){
+        super({...params, tagName: "th"})
+    }
+}
+
 export class TableData extends ContainerWidget<"td">{
-    constructor(params: WidgetParams & {children?: Array<Widget<any>>}){
+    constructor(params: WidgetParams & {children?: Array<Widget<TagName>>}){
         super({...params, tagName: "td"})
     }
 }
