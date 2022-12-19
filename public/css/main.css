@@ -44,6 +44,13 @@
     max-height: 80vh;
 }
 
+.ItkTable{
+    border-collapse: collapse;
+}
+.ItkTable td, .ItkTable th{
+    border: var(--default-border);
+}
+
 .ItkTitleBar{
     margin: 0;
     display: flex;

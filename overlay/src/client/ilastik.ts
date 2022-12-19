@@ -917,7 +917,7 @@ export abstract class FsDataSink{
         this.path = params.path
     }
 
-    public static fromDto(message: PrecomputedChunksSinkDto | N5DataSinkDto): FsDataSink{
+    public static fromDto(message: PrecomputedChunksSinkDto | N5DataSinkDto): DataSinkUnion{
         if(message instanceof PrecomputedChunksSinkDto){
             return PrecomputedChunksSink.fromDto(message)
         }
