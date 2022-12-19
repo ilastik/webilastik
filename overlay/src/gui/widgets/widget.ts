@@ -1,5 +1,5 @@
 import { applyInlineCss, InlineCss } from "../../util/misc";
-import { Url } from "../../util/parsed_url";
+import { Path, Url } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
 
 export type TagName = keyof HTMLElementTagNameMap
@@ -176,5 +176,14 @@ export class TableHeader extends ContainerWidget<"th">{
 export class TableData extends ContainerWidget<"td">{
     constructor(params: WidgetParams & {children?: Array<Widget<TagName>>}){
         super({...params, tagName: "td"})
+    }
+}
+
+export class ImageWidget extends Widget<"img">{
+    constructor(params: Omit<WidgetParams, "innerText"> & {
+        src: Url | Path
+    }){
+        super({...params, tagName: "img"})
+        this.element.src = params.src.raw
     }
 }
