@@ -114,7 +114,11 @@ export class StrippedPrecomputedView extends DataView{
         if(match === null){
             return undefined
         }
-        return FsDataSource.fromBase64(match.groups!["datasource"])
+        let ds = FsDataSource.fromBase64(match.groups!["datasource"])
+        if(ds instanceof PrecomputedChunksDataSource){
+            return ds
+        }
+        return new Error(`Expected Precomputed Chunks in encoded datasource, got ${ds}`)
     }
 
     public static async tryFromUrl(params: {name: string, url: Url, session: Session}): Promise<StrippedPrecomputedView | undefined | Error>{

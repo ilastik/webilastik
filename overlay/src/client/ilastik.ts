@@ -29,11 +29,11 @@ import {
     SaveProjectParamsDto,
     Shape5DDto,
     N5DataSinkDto,
-    N5DataSourceDto,
     SkimageDataSourceDto,
     ListFsDirRequest,
     ListFsDirResponse,
     parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_,
+    PixelAnnotationDto,
 } from "./dto"
 
 export type HpcSiteName = ComputeSessionStatusDto["hpc_site"] //FIXME?
@@ -632,6 +632,8 @@ export class Interval5D{
     }
 }
 
+export type FsDataSourceDto = PixelAnnotationDto["raw_data"]; //FIXME: define this alias automatically
+
 export abstract class FsDataSource{
     public readonly url: Url
     public readonly filesystem: Filesystem
@@ -667,9 +669,12 @@ export abstract class FsDataSource{
         return this.url.raw
     }
 
-    public static fromDto(dto: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto) : PrecomputedChunksDataSource{
+    public static fromDto(dto: FsDataSourceDto) : PrecomputedChunksDataSource | SkimageDataSource{
         if(dto instanceof PrecomputedChunksDataSourceDto){
             return PrecomputedChunksDataSource.fromDto(dto)
+        }
+        if(dto instanceof SkimageDataSourceDto){
+            return SkimageDataSource.fromDto(dto)
         }
         throw `FIXME: Other datasources not implemented yet`
     }
@@ -684,7 +689,7 @@ export abstract class FsDataSource{
         return FsDataSource.fromDto(dtoResult)
     }
 
-    public abstract toDto(): PrecomputedChunksDataSourceDto;
+    public abstract toDto(): FsDataSourceDto;
 
     public toBase64(): string{
         return toBase64(JSON.stringify(this.toDto().toJsonValue()))
@@ -743,6 +748,31 @@ export class PrecomputedChunksDataSource extends FsDataSource{
             dtype: this.dtype,
             encoder: this.encoder,
             scale_key: this.scale_key.raw,
+        })
+    }
+}
+
+export class SkimageDataSource extends FsDataSource{
+    public toDto(): SkimageDataSourceDto {
+        return new  SkimageDataSourceDto({
+            filesystem: this.filesystem.toDto(),
+            path: this.path.toDto(),
+            url: this.url.toDto(),
+            interval: this.interval.toDto(),
+            tile_shape: this.tile_shape.toDto(),
+            spatial_resolution: this.spatial_resolution,
+            dtype: this.dtype,
+        })
+    }
+    public static fromDto(dto: SkimageDataSourceDto) : SkimageDataSource{
+        return new SkimageDataSource({
+            filesystem: Filesystem.fromDto(dto.filesystem),
+            path: Path.fromDto(dto.path),
+            url: Url.fromDto(dto.url),
+            interval: Interval5D.fromDto(dto.interval),
+            tile_shape: Shape5D.fromDto(dto.tile_shape),
+            spatial_resolution: dto.spatial_resolution,
+            dtype: ensureDataType(dto.dtype), //FIXME?
         })
     }
 }
