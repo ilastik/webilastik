@@ -147,6 +147,7 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
 .ItkInputParagraph, .ItkBrushStrokeWidget{
     display: flex;
     align-items: center;
+    flex-grow: 1;
 }
 
 .ItkInputParagraph > .ItkCharacterInput, .ItkBrushStrokeCoords{
