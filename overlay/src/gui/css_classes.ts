@@ -41,4 +41,6 @@ export enum CssClasses{
     ItkBrushStrokeCoords = "ItkBrushStrokeCoords",
     ItkLogContainer = "ItkLogContainer",
     ItkBrushDatasourceLink = "ItkBrushDatasourceLink",
+    ItkFileWidget = "ItkFileWidget",
+    ItkFolderWidget = "ItkFolderWidget",
 }

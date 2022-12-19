@@ -1,26 +1,26 @@
-import { createElement, removeElement } from "../../util/misc";
+import { removeElement } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
+import { Details, Paragraph, Span, Summary } from "./widget";
 
-export class FsFileWidget{
-    public readonly element: HTMLParagraphElement;
+export class FsFileWidget extends Paragraph{
     public readonly parent: FsFolderWidget;
     public readonly path: Path;
 
     constructor(params: {
         parent: FsFolderWidget, name: string, onDblClick?: () => void
     }){
-        this.path = params.parent.path.joinPath(params.name)
-        this.element = createElement({
-            tagName: "p",
+        super({
             parentElement: params.parent.element,
             innerText: "🗎 " + params.name,
-            cssClasses: ["ItkFileWidget"],
+            cssClasses: [CssClasses.ItkFileWidget],
             onClick: (ev) => {
                 this.parent.handleNodeClicked(this, ev)
             },
             onDblClick: params.onDblClick,
+
         })
+        this.path = params.parent.path.joinPath(params.name)
         this.parent = params.parent
     }
 
@@ -58,11 +58,9 @@ export class FsFileWidget{
     }
 }
 
-export class FsFolderWidget{
-    public readonly element: HTMLDetailsElement;
-    public readonly summary: HTMLElement;
+export class FsFolderWidget extends Details{
+    public readonly summary: Summary;
     private children = new Map<string, FsFileWidget | FsFolderWidget>()
-    private expandWidget: HTMLSpanElement;
     public readonly parent: FsFolderWidget | undefined
     public readonly path: Path
 
@@ -71,49 +69,55 @@ export class FsFolderWidget{
         name: string,
         onOpen?: (widget: FsFolderWidget) => void,
     }){
+        let summary: Summary;
+        let expandWidget: Span;
+        super({
+            parentElement: params.parent instanceof FsFolderWidget ? params.parent.element : params.parent,
+            cssClasses: [CssClasses.ItkFolderWidget],
+            children: [
+                summary = new Summary({parentElement: undefined, children: [
+                    expandWidget = new Span({
+                        parentElement: undefined,
+                        innerText: "▶",
+                        cssClasses: [CssClasses.ItkExpandFolderWidget],
+                        onClick: (ev): false => {
+                            ev.stopPropagation()
+                            ev.preventDefault()
+                            this.element.open = !this.element.open
+                            if(this.element.open){
+                                expandWidget.element.innerText = "▼"
+                                if(params.onOpen){
+                                    params.onOpen(this)
+                                }
+                            }else{
+                                expandWidget.element.innerText = "▶"
+                            }
+                            return false
+                        }
+                    }),
+                    new Span({
+                        parentElement: undefined,
+                        innerText: "📁 " + params.name,
+                        cssClasses: [CssClasses.ItkFsNodeName],
+                        onClick: (ev): false => {
+                            ev.stopPropagation()
+                            ev.preventDefault()
+                            this.handleNodeClicked(this, ev)
+                            return false
+                        }
+                    })
+                ]}),
+            ]
+        })
         this.path = params.parent instanceof FsFolderWidget ? params.parent.path.joinPath(params.name) : Path.parse("/")
         this.parent = params.parent instanceof FsFolderWidget ? params.parent : undefined
-        this.element = createElement({
-            tagName: "details",
-            parentElement: params.parent instanceof FsFolderWidget ? params.parent.element : params.parent,
-            cssClasses: ["ItkFolderWidget"]
-        })
-        this.summary = createElement({
-            tagName: "summary",
-            parentElement: this.element,
-        });
-        this.expandWidget = createElement({
-            tagName: "span",
-            parentElement: this.summary,
-            innerText: "▶",
-            cssClasses: [CssClasses.ItkExpandFolderWidget],
-            onClick: (ev): false => {
-                ev.stopPropagation()
-                ev.preventDefault()
-                this.element.open = !this.element.open
-                if(this.element.open){
-                    this.expandWidget.innerText = "▼"
-                    if(params.onOpen){
-                        params.onOpen(this)
-                    }
-                }else{
-                    this.expandWidget.innerText = "▶"
-                }
-                return false
-            }
-        })
-        createElement({tagName: "span", parentElement: this.summary, innerText: "📁 " + params.name, cssClasses: [CssClasses.ItkFsNodeName], onClick: (ev): false => {
-            ev.stopPropagation()
-            ev.preventDefault()
-            this.handleNodeClicked(this, ev)
-            return false
-        }})
+        this.summary = summary;
     }
 
     public clear(){
         this.children = new Map();
         for(const childElement of Array.from(this.element.children)){
-            if(childElement != this.summary){
+            if(childElement != this.summary.element){
                 removeElement(childElement as HTMLElement)
             }
         }
@@ -162,13 +166,13 @@ export class FsFolderWidget{
     }
 
     public get selected(): boolean{
-        return this.summary.classList.contains(CssClasses.ItkSelected)
+        return this.summary.element.classList.contains(CssClasses.ItkSelected)
     }
 
     public set selected(value: boolean){
-        this.summary.classList.remove(CssClasses.ItkSelected)
+        this.summary.element.classList.remove(CssClasses.ItkSelected)
         if(value){
-            this.summary.classList.add(CssClasses.ItkSelected)
+            this.summary.element.classList.add(CssClasses.ItkSelected)
         }
     }
 

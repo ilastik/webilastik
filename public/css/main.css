@@ -231,3 +231,51 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
     margin-top: 0.1em;
     margin-bottom: 0.1em;
 }
+
+
+/*File tree widgets*/
+.ItkFolderWidget{
+    user-select: none;
+}
+
+.ItkFolderWidget summary, .ItkFileWidget{
+    background-color: white;
+    color: black;
+    cursor: default;
+    padding-left: 0px;
+}
+
+.ItkFolderWidget .ItkExpandFolderWidget{
+    cursor: pointer;
+}
+
+.ItkFolderWidget summary{
+    list-style: none;
+    display: flex;
+}
+
+.ItkFolderWidget summary.ItkFsNodeName{
+    flex-grow: 1;
+}
+
+.ItkFileWidget{
+    margin-bottom: 1px;
+    margin-top: 1px;
+}
+
+.ItkSelected{
+    filter: invert(1);
+}
+
+.ItkFolderWidget, .ItkFileWidget{
+    margin-left: 10px;
+}
+
+.ItkFolderWidget summary::before, .ItkFileWidget::before{
+    content: "├";
+}
+
+.ItkFolderWidget:last-child summary::before, .ItkFileWidget:last-child::before{
+    content: "└";
+}
+/*END File tree widgets*/
