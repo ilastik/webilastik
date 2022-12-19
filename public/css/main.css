@@ -8,7 +8,7 @@
     --default-highlight-bright-color: #c63902;
     --default-highlight-dark-color: #702101;
     --default-border-radius: 3px;
-    --default-border: solid 1px black;
+    --default-border: solid 1px var(--default-highlight-color);
     --default-button-text-color: white;
     --default-button-border-thickness: 2px;
     --default-button-height: 2.5em;
@@ -127,10 +127,6 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
     cursor: pointer;
     margin-bottom: 0.2em;
     opacity: 0.5;
-}
-
-.ItkCollapsableApplet tr{
-    border: solid 1px black;
 }
 
 .ItkPopupWidget{
@@ -279,3 +275,10 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
     content: "└";
 }
 /*END File tree widgets*/
+
+.ItkListWidget{
+    border-collapse: collapse;
+}
+.ItkListWidgetRow > td{
+    border-bottom: solid 1px var(--default-highlight-color);
+}

@@ -1,26 +1,26 @@
 import { GetDatasourcesFromUrlParamsDto } from "../../client/dto";
 import { FsDataSource, Session } from "../../client/ilastik";
 import { HashMap } from "../../util/hashmap";
-import { createElement, createInput } from "../../util/misc";
 import { Url } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
 import { DataProxyFilePicker } from "./data_proxy_file_picker";
+import { Button } from "./input_widget";
 import { LiveFsTree } from "./live_fs_tree";
 import { PopupWidget } from "./popup";
+import { ContainerWidget, Div, Paragraph, Span, Table, TableData, TableRow, TagName, Widget } from "./widget";
 
-export class ListWidget<T>{
-    public readonly element: HTMLTableElement;
+export class ListWidget<T> extends Table{
     private items = new Array<T>();
-    private readonly itemRenderer: (value: T) => HTMLElement;
+    private readonly itemRenderer: (value: T) => Widget<TagName>;
     private readonly onItemRemoved: ((value: T) => void) | undefined;
 
     constructor(params: {
-        parentElement: HTMLElement,
-        itemRenderer: (value: T) => HTMLElement,
+        parentElement: ContainerWidget<TagName> | undefined,
+        itemRenderer: (value: T) => Widget<TagName>,
         onItemRemoved?: (value: T) => void,
         items?: Array<T>,
     }){
-        this.element = createElement({tagName: "table", parentElement: params.parentElement, cssClasses: [CssClasses.ItkListWidget]})
+        super({...params, cssClasses: [CssClasses.ItkListWidget]})
         this.itemRenderer = params.itemRenderer;
         this.onItemRemoved = params.onItemRemoved;
         this.redraw()
@@ -34,7 +34,7 @@ export class ListWidget<T>{
     public clear(){
         let items = this.items
         this.items = []
-        this.redraw()
+        super.clear()
         if(this.onItemRemoved){
             for(const item of items){
                 this.onItemRemoved(item)
@@ -43,22 +43,26 @@ export class ListWidget<T>{
     }
 
     private redraw(){
-        this.element.innerHTML = ""
+        super.clear()
+        if(this.items.length == 0){
+            new Paragraph({parentElement: this, innerText: "No items selected"})
+            return
+        }
         for(let i=0; i<this.items.length; i++){
             const item = this.items[i];
-            const tr = createElement({tagName: "tr", parentElement: this.element, cssClasses: [CssClasses.ItkListWidgetRow]})
-            const contentTd = createElement({tagName: "td", parentElement: tr})
-            contentTd.appendChild(this.itemRenderer(item))
 
-            const removeItemTd = createElement({tagName: "td", parentElement: tr})
-            const removeButton = createInput({inputType: "button", value: "x", parentElement: removeItemTd, onClick: () => {
-                this.items.splice(i, 1);
-                this.redraw()
-                if(this.onItemRemoved){
-                    this.onItemRemoved(item)
-                }
-            }})
-            removeButton.title = "Remove"
+            new TableRow({parentElement: this, cssClasses: [CssClasses.ItkListWidgetRow], children: [
+                new TableData({parentElement: undefined, children: [this.itemRenderer(item)]}),
+                new TableData({parentElement: undefined, children: [
+                    new Button({inputType: "button", parentElement: undefined, text: "✖", title: "Remove this item", onClick: () => {
+                        this.items.splice(i, 1);
+                        this.redraw()
+                        if(this.onItemRemoved){
+                            this.onItemRemoved(item)
+                        }
+                    }})
+                ]}),
+            ]})
         }
     }
 
@@ -77,23 +81,23 @@ export class DataSourceFetchError extends Error{
     }
 }
 
-export class DataSourceListWidget{
-    element: HTMLDivElement;
+export class DataSourceListWidget extends Div{
     listWidget: ListWidget<FsDataSource | DataSourceFetchError>;
     session: Session;
 
     constructor(params: {
         parentElement: HTMLElement,
-        itemRenderer?: (value: FsDataSource | DataSourceFetchError) => HTMLElement,
+        itemRenderer?: (value: FsDataSource | DataSourceFetchError) => Widget<TagName>,
         onItemRemoved?: (value: FsDataSource | DataSourceFetchError) => void,
         items?: Array<FsDataSource | DataSourceFetchError>,
         session: Session,
     }){
+        super({parentElement: params.parentElement, cssClasses: [CssClasses.ItkDataSourceListWidget]})
+        this.listWidget = new ListWidget({...params, parentElement: this, itemRenderer: params.itemRenderer || this.renderDataSourceOrError});
+        new Paragraph({parentElement: this, children: [
+            new Button({inputType: "button", text: "Browse Data Proxy", onClick: this.openFilePicker, parentElement: undefined})
+        ]}),
         this.session = params.session
-        this.element = createElement({tagName: "div", parentElement: params.parentElement, cssClasses: [CssClasses.ItkDataSourceListWidget]})
-        this.listWidget = new ListWidget({...params, parentElement: this.element, itemRenderer: params.itemRenderer || this.renderDataSourceOrError})
-        const buttonsContainer = createElement({tagName: "p", parentElement: this.element})
-        createInput({inputType: "button", value: "Browse Data Proxy", parentElement: buttonsContainer, onClick: () => this.openFilePicker()})
     }
 
     public get value(): Array<FsDataSource | DataSourceFetchError>{
@@ -135,15 +139,15 @@ export class DataSourceListWidget{
         })
     }
 
-    private renderDataSourceOrError = (ds: FsDataSource | DataSourceFetchError): HTMLElement => {
+    private renderDataSourceOrError = (ds: FsDataSource | DataSourceFetchError): Span => {
         if(ds instanceof DataSourceFetchError){
-            return createElement({
-                tagName: "span", parentElement: undefined, cssClasses: [CssClasses.ErrorText], innerText: ds.url.raw, onClick: () => {
+            return new Span({
+                parentElement: undefined, cssClasses: [CssClasses.ErrorText], innerText: ds.url.raw, onClick: () => {
                     PopupWidget.OkPopup({title: "Error Details", paragraphs: [ds.cause.message]})
                 }
             })
         }else{
-            return createElement({tagName: "span", parentElement: undefined, innerText: ds.url.raw})
+            return new Span({parentElement: undefined, innerText: ds.url.raw})
         }
     }
 }
