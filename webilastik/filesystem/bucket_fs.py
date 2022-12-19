@@ -78,7 +78,12 @@ class BucketFs(IFilesystem):
 
     @classmethod
     def recognizes(cls, url: Url) -> bool:
-        return url.raw.startswith(cls.API_URL.updated_with(datascheme=url.datascheme).raw)
+        return (
+            url.protocol == "https" and
+            url.hostname == cls.API_URL.hostname and
+            url.port == cls.API_URL.port and
+            url.path.as_posix().startswith(cls.API_URL.path.as_posix())
+        )
 
     @classmethod
     def try_from_url(cls, url: Url) -> "Tuple[BucketFs, PurePosixPath] | Exception":

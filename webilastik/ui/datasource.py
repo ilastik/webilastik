@@ -31,7 +31,7 @@ def try_get_datasources_from_url(
 
     datasources_result: "FsDataSource | Sequence[FsDataSource] | None | Exception"
     if SkimageDataSource.supports_path(path):
-        datasources_result = SkimageDataSource.try_open(fs=fs, path=path)
+        return SkimageDataSource.try_open(fs=fs, path=path)
     else:
         resolution_result = PrecomputedChunksDataSource.get_resolution_from_url(url)
         if isinstance(resolution_result, Exception):
