@@ -141,11 +141,12 @@ export class DataSourceListWidget extends Div{
 
     private renderDataSourceOrError = (ds: FsDataSource | DataSourceFetchError): Span => {
         if(ds instanceof DataSourceFetchError){
-            return new Span({
-                parentElement: undefined, cssClasses: [CssClasses.ErrorText], innerText: ds.url.raw, onClick: () => {
+            return new Span({parentElement: undefined, cssClasses: [CssClasses.ItkErrorText], children: [
+                new Span({parentElement: undefined, innerText: ds.url.raw}),
+                new Button({inputType: "button", text: "?", parentElement: undefined, onClick: () => {
                     PopupWidget.OkPopup({title: "Error Details", paragraphs: [ds.cause.message]})
-                }
-            })
+                }}),
+            ]})
         }else{
             return new Span({parentElement: undefined, innerText: ds.url.raw})
         }

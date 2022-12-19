@@ -1,5 +1,5 @@
 export enum CssClasses{
-    ErrorText = "ItkErrorText",
+    ItkErrorText = "ItkErrorText",
     SuccessText = "ItkSuccessText",
     InfoText = "ItkInfoText",
     ItkInputParagraph = "ItkInputParagraph",

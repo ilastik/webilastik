@@ -7,6 +7,7 @@
     --default-highlight-color: #a02e00;
     --default-highlight-bright-color: #c63902;
     --default-highlight-dark-color: #702101;
+    --default-error-color: #ff0000;
     --default-border-radius: 3px;
     --default-border: solid 1px var(--default-highlight-color);
     --default-button-text-color: white;
@@ -17,6 +18,10 @@
     --default-title-bar-padding: 5px;
     --default-log-font-family: "Courier New";
     --default-log-font-size: calc(var(--default-font-size) - 2px);
+}
+
+.ItkErrorText{
+    color: var(--default-error-color);
 }
 
 .ItkPopupWidget{

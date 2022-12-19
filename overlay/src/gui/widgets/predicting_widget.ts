@@ -128,11 +128,11 @@ export class PredictingWidget extends Applet<State>{
         }
 
         if(description == "error"){
-            this.classifierDescriptionDisplay.classList.add(CssClasses.ErrorText)
+            this.classifierDescriptionDisplay.classList.add(CssClasses.ItkErrorText)
             this.classifierDescriptionDisplay.classList.remove(CssClasses.InfoText)
         }else{
             this.classifierDescriptionDisplay.classList.add(CssClasses.InfoText)
-            this.classifierDescriptionDisplay.classList.remove(CssClasses.ErrorText)
+            this.classifierDescriptionDisplay.classList.remove(CssClasses.ItkErrorText)
         }
     }
 
