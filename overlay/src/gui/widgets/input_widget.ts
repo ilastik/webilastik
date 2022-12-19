@@ -73,6 +73,7 @@ export class ButtonSpan extends Widget<"span">{
 export class Select<T> extends ButtonSpan{
     private _value: T
     private readonly renderer: (val: T) => Widget<"span">;
+    private _options: T[];
 
     constructor(params: InputWidgetParams & {
         popupTitle: string,
@@ -107,6 +108,7 @@ export class Select<T> extends ButtonSpan{
         })
         this.renderer = params.renderer
         this._value = params.options[0]
+        this._options = params.options
     }
 
     public get value(): T{
@@ -116,5 +118,9 @@ export class Select<T> extends ButtonSpan{
     public set value(val: T){
         this._value = val
         this.setContent(this.renderer(val))
+    }
+
+    public get options(): T[]{
+        return this._options.slice()
     }
 }
