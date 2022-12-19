@@ -1,6 +1,8 @@
 import { applyInlineCss, InlineCss } from "../../util/misc";
 import { CssClasses } from "../css_classes";
 
+export type TagName = keyof HTMLElementTagNameMap
+
 export type WidgetParams = {
     parentElement:HTMLElement | ContainerWidget<any> | undefined,
     innerText?:string,
@@ -12,7 +14,7 @@ export type WidgetParams = {
     show?: boolean,
 }
 
-export abstract class Widget<T extends keyof HTMLElementTagNameMap>{
+export abstract class Widget<T extends TagName>{
     public readonly element: HTMLElementTagNameMap[T];
 
     constructor(params: {tagName: T} & WidgetParams){
