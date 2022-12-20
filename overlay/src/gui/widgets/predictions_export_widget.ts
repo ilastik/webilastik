@@ -182,7 +182,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
 
     public readonly element: HTMLElement;
     private jobsDisplay: Div;
-    private labelSelectorContainer: Paragraph;
+    private labelSelectorContainer: Span;
     private labelToExportSelector: Select<LabelHeader> | undefined;
     private exportModeSelector: Select<"pixel probabilities" | "simple segmentation">;
     private datasourceListWidget: DataSourceListWidget;
@@ -213,8 +213,11 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                 parentElement: undefined,
                 options: ["pixel probabilities", "simple segmentation"], //FIXME?
                 renderer: (opt) => new Span({parentElement: undefined, innerText: opt}),
-            })
+                onChange: (val) => this.labelSelectorContainer.show(val == "simple segmentation"),
+            }),
         ]})
+        this.labelSelectorContainer = new Paragraph({parentElement: this.element});
+        this.labelSelectorContainer.show(false)
 
         const datasourceFieldset = createFieldset({parentElement: this.element, legend: "Input Datasets:"})
         this.datasourceListWidget = new DataSourceListWidget({parentElement: datasourceFieldset, session: this.session})
@@ -225,7 +228,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
         })
         const datasinkConfigWidget = new DatasinkConfigWidget({parentElement: datasinkFieldset})
 
-        this.labelSelectorContainer = new Paragraph({parentElement: this.element});
+
 
         new Paragraph({parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
             new Button({parentElement: undefined, inputType: "button", text: "Start Export Jobs", onClick: () => {
@@ -325,7 +328,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                 }
             }
         }else{
-            new Span({parentElement: this.labelSelectorContainer, innerText: "No populated labels"})
+            new Span({parentElement: this.labelSelectorContainer, innerText: "No populated labels", cssClasses: [CssClasses.ItkErrorText]})
         }
 
         if(new_state.jobs.length == 0){
