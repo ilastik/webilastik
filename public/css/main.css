@@ -1,5 +1,7 @@
 :root{
     --default-font-family: helvetica;
+    --default-info-font-style: italic;
+    --default-info-color: grey;
     --default-font-size: 14px;
     --default-background-color: white;
     --default-title-bar-background-color: #eeeeee;
@@ -22,6 +24,11 @@
 
 .ItkErrorText{
     color: var(--default-error-color);
+}
+
+.ItkInfoText{
+    color: var(--default-info-color);
+    font-style: var(--default-info-font-style);
 }
 
 .ItkPopupWidget{

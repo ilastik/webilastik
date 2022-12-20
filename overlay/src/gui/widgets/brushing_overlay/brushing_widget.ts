@@ -11,7 +11,7 @@ import { Viewer } from "../../../viewer/viewer"
 import { PredictingWidget } from "../predicting_widget";
 import { UnsupportedDatasetView, FailedView, PredictionsView, StrippedPrecomputedView } from "../../../viewer/view"
 import { ErrorPopupWidget } from "../popup"
-import { BooleanInput } from "../boolean_input"
+import { BooleanInput } from "../value_input_widget"
 
 
 export class BrushingWidget{

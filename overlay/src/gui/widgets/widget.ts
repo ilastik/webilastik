@@ -83,6 +83,9 @@ export abstract class Widget<T extends TagName>{
     public click(){
         this.element.click()
     }
+    public setInnerText(text: string){
+        this.element.innerText = text
+    }
 }
 
 export class Label extends Widget<"label">{

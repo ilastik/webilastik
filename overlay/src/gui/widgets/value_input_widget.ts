@@ -2,6 +2,7 @@ import { BucketFs, Color, HttpFs } from "../../client/ilastik";
 import { Path, Url } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
 import { InputType, InputWidget, InputWidgetParams } from "./input_widget";
+import { Span } from "./widget";
 
 export type ValueInputWidgetParams<V> = InputWidgetParams & {
     onChange?: (newvalue: V) => void,
@@ -183,8 +184,16 @@ export class HttpFsInput extends ValueInputWidget<HttpFs | undefined, "url">{
 }
 
 export class BooleanInput extends ValueInputWidget<boolean, "checkbox">{
-    constructor(params: ValueInputWidgetParams<boolean> & {value?: boolean}){
+    private readonly valueExplanationSpan: Span;
+    private readonly valueExplanations: { on: string; off: string; }
+
+    constructor(params: ValueInputWidgetParams<boolean> & {
+        value?: boolean,
+        valueExplanations?: {on: string, off: string},
+    }){
         super({...params, inputType: "checkbox"})
+        this.valueExplanations = params.valueExplanations || {on: "", off: ""}
+        this.valueExplanationSpan = new Span({parentElement: params.parentElement, cssClasses: [CssClasses.InfoText]})
         this.value  = params.value === undefined ? false : params.value
     }
 
@@ -194,5 +203,6 @@ export class BooleanInput extends ValueInputWidget<boolean, "checkbox">{
 
     public set value(val: boolean){
         this.element.checked = val
+        this.valueExplanationSpan.setInnerText(this.valueExplanations[val ? "on" : "off"])
     }
 }
