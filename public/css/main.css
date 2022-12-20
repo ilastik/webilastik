@@ -49,6 +49,7 @@
 }
 .ItkTable td, .ItkTable th{
     border: var(--default-border);
+    padding: 0.2em;
 }
 
 .ItkTitleBar{

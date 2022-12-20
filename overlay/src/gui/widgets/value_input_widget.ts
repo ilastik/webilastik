@@ -181,3 +181,18 @@ export class HttpFsInput extends ValueInputWidget<HttpFs | undefined, "url">{
         }
     }
 }
+
+export class BooleanInput extends ValueInputWidget<boolean, "checkbox">{
+    constructor(params: ValueInputWidgetParams<boolean> & {value?: boolean}){
+        super({...params, inputType: "checkbox"})
+        this.value  = params.value === undefined ? false : params.value
+    }
+
+    public get value(): boolean{
+        return this.element.checked
+    }
+
+    public set value(val: boolean){
+        this.element.checked = val
+    }
+}
