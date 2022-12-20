@@ -5,12 +5,14 @@ import { FsInputWidget } from "./fs_input";
 import { PathInput } from "./value_input_widget";
 import { Div, Label, Paragraph } from "./widget";
 import { InputWidget, InputWidgetParams } from "./input_widget";
+import { getNowString } from "../../util/misc";
 
 export class PathPatternInput extends InputWidget<"text">{
     constructor(params: InputWidgetParams & {value?: string}){ //FIXME: string really?
         super({...params, inputType: "text", cssClasses: [CssClasses.ItkCharacterInput].concat(params.cssClasses || [])})
+        this.element.value = params.value || ""
         this.element.addEventListener("change", () => {
-            const value = this.tryGetPath({item_index: 1, name: "_name_"})
+            const value = this.tryGetPath({item_index: 1, name: "_name_", output_type: "_output_type_"})
             this.element.setCustomValidity(value instanceof Error ? value.message : "")
         })
     }
@@ -18,13 +20,16 @@ export class PathPatternInput extends InputWidget<"text">{
     public tryGetPath(params:{
         item_index: number,
         name: string,
+        output_type: string
     }): Path | undefined | Error{
         if(!this.element.value){
             return undefined
         }
         let replaced = this.element.value
             .replace(/\{item_index\}/g, params.item_index.toString())
-            .replace(/\{name\}/g, params.name.toString())
+            .replace(/\{name\}/g, params.name.toString().replace(/ /g, "_")) //FIXME: use safer escape?
+            .replace(/\{output_type\}/g, params.output_type.toString().replace(/ /g, "_")) //FIXME: use safer escape?
+            .replace(/\{timestamp\}/g, getNowString())
 
         for(const brace of "{}"){
             let braceIndex = replaced.indexOf(brace)
@@ -93,7 +98,7 @@ export class FileLocationPatternInputWidget{
 
     }
 
-    public tryGetLocation(params: {item_index: number, name: string}): {filesystem: Filesystem, path: Path} | undefined{
+    public tryGetLocation(params: {item_index: number, name: string, output_type: string}): {filesystem: Filesystem, path: Path} | undefined{
         const filesystem = this.fsInput.value
         const path = this.pathPatternInput.tryGetPath(params)
         if(!filesystem || !(path instanceof Path)){

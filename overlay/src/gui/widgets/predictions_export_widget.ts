@@ -224,7 +224,9 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
 
         const datasinkFieldset = createFieldset({legend: "Output: ", parentElement: this.element})
         const fileLocationInputWidget = new FileLocationPatternInputWidget({
-            parentElement: datasinkFieldset, defaultBucketName: "hbp-image-service"
+            parentElement: datasinkFieldset,
+            defaultBucketName: "hbp-image-service",
+            defaultPathPattern: "/ilastik_exports/{timestamp}/{name}_{output_type}",
         })
         const datasinkConfigWidget = new DatasinkConfigWidget({parentElement: datasinkFieldset})
 
@@ -253,7 +255,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                 for(let job_index=0; job_index < this.datasourceListWidget.value.length; job_index++){
                     const datasource = this.datasourceListWidget.value[job_index]
                     let fileLocation = fileLocationInputWidget.tryGetLocation({
-                        item_index: job_index, name: datasource.url.path.name
+                        item_index: job_index, name: datasource.url.path.name, output_type: this.exportModeSelector.value
                     });
                     if(fileLocation === undefined){
                         new ErrorPopupWidget({message: "Unexpected bad file location"}) //FIXME? Shouldn't this be impossible?
