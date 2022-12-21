@@ -253,6 +253,11 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                     return
                 }
 
+                if(this.datasourceListWidget.value.filter(ds => ds instanceof FsDataSource).length == 0){
+                    new ErrorPopupWidget({message: "No valid datasets to process"})
+                    return
+                }
+
                 for(let job_index=0; job_index < this.datasourceListWidget.value.length; job_index++){
                     const datasource = this.datasourceListWidget.value[job_index]
                     let fileLocation = fileLocationInputWidget.tryGetLocation({
