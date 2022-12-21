@@ -55,12 +55,13 @@ export class FileLocationInputWidget{
         defaultBucketName?: string,
         defaultPath?: Path,
         required?: boolean,
+        filesystemChoices: Array<"http" | "data-proxy">
     }){
         new Div({parentElement: params.parentElement, children: [
 
         ]})
         this.fsInput = new FsInputWidget({
-            parentElement: params.parentElement, defaultBucketName: params.defaultBucketName,
+            parentElement: params.parentElement, defaultBucketName: params.defaultBucketName, filesystemChoices: params.filesystemChoices
         })
         new Paragraph({parentElement: params.parentElement, cssClasses: [CssClasses.ItkInputParagraph], children: [
             new Label({innerText: "Path: ", parentElement: undefined}),
@@ -87,9 +88,10 @@ export class FileLocationPatternInputWidget{
         defaultBucketName?: string,
         defaultPathPattern?: string,
         required?: boolean,
+        filesystemChoices: Array<"http" | "data-proxy">,
     }){
         this.fsInput = new FsInputWidget({
-            parentElement: params.parentElement, defaultBucketName: params.defaultBucketName,
+            parentElement: params.parentElement, defaultBucketName: params.defaultBucketName, filesystemChoices: params.filesystemChoices
         })
         new Paragraph({parentElement: params.parentElement, cssClasses: [CssClasses.ItkInputParagraph], children: [
             new Label({innerText: "Path pattern: ", parentElement: undefined}),

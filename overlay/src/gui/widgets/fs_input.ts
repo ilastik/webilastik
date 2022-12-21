@@ -60,20 +60,25 @@ export class FsInputWidget{
     private _required: boolean;
 
     constructor(params: {
-        parentElement: HTMLElement, defaultBucketName?: string, required?: boolean
+        parentElement: HTMLElement, defaultBucketName?: string, required?: boolean, filesystemChoices: Array<"http" | "data-proxy">
     }){
         this._required = params.required === undefined ? false : params.required;
-        this.tabs = new TabsWidget({
-            parentElement: params.parentElement,
-            onSwitch: (_, activeWidget, allWidgets) => this.refreshRequiredProperty(activeWidget, allWidgets),
-            tabBodyWidgets: new Map<string, FsInputForm>([
+        let filesystemWidgets = new Array<[string, FsInputForm]>()
+
+        if(params.filesystemChoices.includes("data-proxy")){
+            filesystemWidgets.push(
                 [
                     "Data-Proxy",
                     new BucketFsInputForm({
                         parentElement: undefined,
                         value: params.defaultBucketName ? new BucketFs({bucket_name: params.defaultBucketName}) : undefined
                     })
-                ],
+                ]
+            )
+        }
+
+        if(params.filesystemChoices.includes("http")){
+            filesystemWidgets.push(
                 [
                     "HTTP",
                     new HttpFsInputForm({
@@ -81,7 +86,13 @@ export class FsInputWidget{
                         value: new HttpFs({protocol: "https", hostname: "app.ilastik.org", path: Path.parse("/public/images")}),
                     })
                 ],
-            ])
+            )
+        }
+
+        this.tabs = new TabsWidget({
+            parentElement: params.parentElement,
+            onSwitch: (_, activeWidget, allWidgets) => this.refreshRequiredProperty(activeWidget, allWidgets),
+            tabBodyWidgets: new Map<string, FsInputForm>(filesystemWidgets)
         })
         const fsWidgets = Array.from(this.tabs.getTabBodyWidgets())
         this.refreshRequiredProperty(fsWidgets[0], fsWidgets)

@@ -227,6 +227,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
             parentElement: datasinkFieldset,
             defaultBucketName: "hbp-image-service",
             defaultPathPattern: "/ilastik_exports/{timestamp}/{name}_{output_type}",
+            filesystemChoices: ["data-proxy"]
         })
         const datasinkConfigWidget = new DatasinkConfigWidget({parentElement: datasinkFieldset})
 
