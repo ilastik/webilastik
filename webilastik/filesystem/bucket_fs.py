@@ -33,9 +33,9 @@ def _requests_from_data_proxy(
         return response_result
     if isinstance(response_result, ErrRequestCrashed):
         return response_result
-    if response_result.response.status_code == 404:
+    if response_result.status_code == 404:
         return FsFileNotFoundException(url.path) #FIXME
-    if response_result.response.status_code != 401 or not refresh_on_401:
+    if response_result.status_code != 401 or not refresh_on_401:
         return response_result
     print(f"Asking to refresh token in BucketFS.........................")
     refreshed_token_result = global_user_login.refresh_global_login_token()

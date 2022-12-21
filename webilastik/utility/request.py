@@ -4,9 +4,9 @@ import requests
 from webilastik.utility.url import Url
 
 class ErrRequestCompletedAsFailure(Exception):
-    def __init__(self, response: requests.Response) -> None:
-        self.response = response
-        super().__init__(f"Request completed but with a failure response: {response.status_code}")
+    def __init__(self, status_code: int) -> None:
+        self.status_code = status_code
+        super().__init__(f"Request completed but with a failure response: {status_code}")
 
 class ErrRequestCrashed(Exception):
     def __init__(self, cause: Exception) -> None:
@@ -23,7 +23,7 @@ def request(
     try:
         response = session.request(method=method, url=url.schemeless_raw, data=data, headers=headers)
         if not response.ok:
-            return ErrRequestCompletedAsFailure(response)
+            return ErrRequestCompletedAsFailure(response.status_code)
         return response.content
     except Exception as e:
         print(f"WTF? {e}")

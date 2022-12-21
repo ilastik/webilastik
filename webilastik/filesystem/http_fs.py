@@ -99,7 +99,7 @@ class HttpFs(IFilesystem):
         )
         if isinstance(result, bytes):
             return result
-        if isinstance(result, ErrRequestCompletedAsFailure) and result.response.status_code == 404:
+        if isinstance(result, ErrRequestCompletedAsFailure) and result.status_code == 404:
             return FsFileNotFoundException(path=path)
         return FsIoException(result)
 
