@@ -115,6 +115,13 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
     border-right: solid var(--default-button-border-thickness) var(--default-highlight-bright-color);
 }
 
+.ItkRecenterButton{
+    position: fixed;
+    bottom: 10px;
+    z-index: 99999;
+    right: 10px;
+}
+
 .ItkColorPicker{
     width: 2em;
     height: 2em;

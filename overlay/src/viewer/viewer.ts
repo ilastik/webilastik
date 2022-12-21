@@ -2,9 +2,10 @@
 import { quat, vec3 } from "gl-matrix";
 import { FsDataSource, Session } from "../client/ilastik";
 import { IViewerDriver, IViewportDriver } from "../drivers/viewer_driver";
+import { CssClasses } from "../gui/css_classes";
+import { Button } from "../gui/widgets/input_widget";
 import { ErrorPopupWidget } from "../gui/widgets/popup";
 import { HashMap } from "../util/hashmap";
-import { createInput, removeElement } from "../util/misc";
 import { Url } from "../util/parsed_url";
 import { View, PredictionsView, DataView, FailedView, ViewUnion } from "./view";
 
@@ -16,7 +17,7 @@ export class Viewer{
     private readonly cached_views = new HashMap<Url, ViewUnion, string>();
     private views = new HashMap<Url, ViewUnion, string>();
     private dataViewsGeneration = 0;
-    private recenterButton: HTMLInputElement;
+    private recenterButton: Button<"button">;
     private onViewportsChangedHandlers: Array<() => void> = []
     private onDataChangedHandlers: Array<() => void> = []
 
@@ -26,11 +27,11 @@ export class Viewer{
     }){
         this.session = params.session
         this.driver = params.driver
-        this.recenterButton = createInput({
+        this.recenterButton = new Button({
             inputType: "button",
             parentElement: document.body,
-            cssClasses: ["ItkRecenterButton"],
-            value: "Recenter",
+            cssClasses: [CssClasses.ItkRecenterButton],
+            text: "Recenter",
             onClick: () => {
                 if(!this.driver.snapTo){
                     return
@@ -137,7 +138,7 @@ export class Viewer{
     }
 
     public destroy(){
-        removeElement(this.recenterButton)
+        this.recenterButton.destroy()
         this.onViewportsChangedHandlers.forEach(handler => this.driver.removeViewportsChangedHandler(handler))
         this.driver.removeDataChangedHandler(this.synchronizeWithNativeViews)
     }
