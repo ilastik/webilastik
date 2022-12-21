@@ -34,12 +34,12 @@ export class ListWidget<T> extends Table{
     public clear(){
         let items = this.items
         this.items = []
-        super.clear()
         if(this.onItemRemoved){
             for(const item of items){
                 this.onItemRemoved(item)
             }
         }
+        this.redraw()
     }
 
     private redraw(){
