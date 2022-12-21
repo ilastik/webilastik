@@ -168,7 +168,7 @@ export class BrushingWidget{
                     }
                 },
             })
-            overlay.setBrushingEnabled(lastBrushingEnabledValue)
+            this.setBrushingEnabled(lastBrushingEnabledValue)
             const render = () => {
                 let strokes = new Array<[Color, BrushStroke[]]>();
                 if(this.stagingStroke){
