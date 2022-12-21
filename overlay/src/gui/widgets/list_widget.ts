@@ -93,9 +93,14 @@ export class DataSourceListWidget extends Div{
         session: Session,
     }){
         super({parentElement: params.parentElement, cssClasses: [CssClasses.ItkDataSourceListWidget]})
-        this.listWidget = new ListWidget({...params, parentElement: this, itemRenderer: params.itemRenderer || this.renderDataSourceOrError});
+        new Div({parentElement: this, cssClasses: [CssClasses.ItkDatasourcesListContainer], children: [
+            this.listWidget = new ListWidget({...params, parentElement: undefined, itemRenderer: params.itemRenderer || this.renderDataSourceOrError})
+        ]})
         new Paragraph({parentElement: this, children: [
-            new Button({inputType: "button", text: "Browse Data Proxy", onClick: this.openFilePicker, parentElement: undefined})
+            new Button({inputType: "button", text: "Browse Data Proxy", onClick: this.openFilePicker, parentElement: undefined}),
+            new Button({inputType: "button", text: "Clear Datasets", parentElement: undefined, onClick: () => {
+                this.listWidget.clear()
+            }}),
         ]}),
         this.session = params.session
     }

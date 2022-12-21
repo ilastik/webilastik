@@ -310,3 +310,12 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
 .ItkListWidgetRow > td{
     border-bottom: solid 1px var(--default-highlight-color);
 }
+
+.ItkListWidget{
+    font-size: calc(var(--default-font-size) - 2px);
+}
+
+.ItkDatasourcesListContainer{
+    max-height: 10em;
+    overflow: auto;
+}
