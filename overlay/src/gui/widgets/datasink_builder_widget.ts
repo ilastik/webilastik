@@ -78,20 +78,6 @@ class PrecomputedChunksDatasinkConfigWidget extends DatasinkInputForm{
     }
 }
 
-
-class DummySinkParamsInput extends DatasinkInputForm{
-    public tryMakeDataSink(_params: {
-        filesystem: Filesystem,
-        path: Path,
-        interval: Interval5D,
-        dtype: DataType,
-        resolution: [number, number, number],
-        tile_shape: Shape5D,
-    }): PrecomputedChunksSink | undefined{
-        return undefined
-    }
-}
-
 export class DatasinkConfigWidget{
     public readonly element: Div;
     private readonly tabs: TabsWidget<DatasinkInputForm>;
@@ -101,7 +87,6 @@ export class DatasinkConfigWidget{
             parentElement: params.parentElement,
             tabBodyWidgets: new Map<string, DatasinkInputForm>([
                 ["Precomputed Chunks", new PrecomputedChunksDatasinkConfigWidget({parentElement: undefined, disableEncoding: true})],
-                ["Dummy", new DummySinkParamsInput({parentElement: undefined})],
             ])
         })
         this.element = this.tabs.element
