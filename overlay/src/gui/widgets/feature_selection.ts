@@ -171,7 +171,11 @@ export class FeatureSelectionWidget extends Applet<{feature_extractors: IlpFeatu
         for(const [featureName, scalesMap] of this.checkboxes.entries()){
             const upstreamScales = upstreamTable.get(featureName) || new Set()
             for(const [scale, checkbox] of scalesMap.entries()){
-                checkbox.upstreamValue = upstreamScales.has(scale)
+                const upstreamValue = upstreamScales.has(scale)
+                if(!checkbox.isHighlighted()){
+                    checkbox.value = upstreamValue
+                }
+                checkbox.upstreamValue = upstreamValue
             }
         }
     }
