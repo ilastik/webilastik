@@ -13,6 +13,9 @@ class OsFs(IFilesystem):
     def __init__(self, _marker: _PrivateMarker) -> None:
         super().__init__()
 
+    def _make_path(self, path: PurePosixPath) -> Path:
+        return Path("/") / path
+
     @classmethod
     def create(cls) -> "OsFs | Exception":
         return OsFs(_marker=_PrivateMarker())
@@ -28,7 +31,7 @@ class OsFs(IFilesystem):
         files: List[PurePosixPath] = []
         directories: List[PurePosixPath] = []
         try:
-            for child in Path(path).iterdir():
+            for child in self._make_path(path).iterdir():
                 if child.is_dir():
                     directories.append(PurePosixPath(child))
                 else:
@@ -37,8 +40,11 @@ class OsFs(IFilesystem):
         except Exception as e:
             return FsIoException(e)
 
+    def exists(self, path: PurePosixPath) -> "bool | FsIoException":
+        return self._make_path(path).exists()
+
     def create_file(self, *, path: PurePosixPath, contents: bytes) -> "None | FsIoException":
-        file_path = Path(path)
+        file_path = self._make_path(path)
         try:
             file_path.parent.mkdir(parents=True, exist_ok=True)
             with file_path.open("wb") as f:
@@ -47,15 +53,16 @@ class OsFs(IFilesystem):
             return FsIoException(e)
 
     def create_directory(self, path: PurePosixPath) -> "None | FsIoException":
-        dir_path = Path(path)
+        dir_path = self._make_path(path)
         try:
             dir_path.mkdir(parents=True, exist_ok=True)
         except Exception as e:
             return FsIoException(e)
 
     def read_file(self, path: PurePosixPath) -> "bytes | FsIoException | FsFileNotFoundException":
+        file_path = self._make_path(path)
         try:
-            with open(path, "rb") as f:
+            with open(file_path, "rb") as f:
                 return f.read()
         except FileNotFoundError as e:
             return FsFileNotFoundException(path=path)
