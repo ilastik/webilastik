@@ -392,6 +392,9 @@ export class Session{
     }
 }
 
+export type AxisKey = "x" | "y" | "z" | "t" | "c";
+export type AxesKeys = [AxisKey, AxisKey, AxisKey, AxisKey, AxisKey]
+
 export type FeatureClassName = IlpFeatureExtractorDto["class_name"]
 
 export class IlpFeatureExtractor{

@@ -1,8 +1,8 @@
-import { BucketFs, Color, HttpFs } from "../../client/ilastik";
+import { AxesKeys, AxisKey, BucketFs, Color, HttpFs } from "../../client/ilastik";
 import { Path, Url } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
-import { InputType, InputWidget, InputWidgetParams } from "./input_widget";
-import { Span } from "./widget";
+import { InputType, InputWidget, InputWidgetParams, Select } from "./input_widget";
+import { ContainerWidget, Span, TagName } from "./widget";
 
 export type ValueInputWidgetParams<V> = InputWidgetParams & {
     onChange?: (newvalue: V) => void,
@@ -207,5 +207,81 @@ export class BooleanInput extends ValueInputWidget<boolean, "checkbox">{
     public set value(val: boolean){
         this.element.checked = val
         this.valueExplanationSpan.setInnerText(this.valueExplanations[val ? "on" : "off"])
+    }
+}
+
+export class AxisKeyInput extends Select<AxisKey>{
+    constructor(params: {parentElement: HTMLElement | ContainerWidget<TagName> | undefined, value?: AxisKey}){
+        super({
+            parentElement: params.parentElement,
+            options: ["x", "y", "z", "t", "c"],
+            renderer: (val) => new Span({parentElement: undefined, innerText: val}),
+            popupTitle: "Select an axis",
+            value: params.value
+        })
+    }
+}
+
+export class AxesKeysInput extends Span{
+    public readonly axisLabel0: Select<AxisKey>;
+    public readonly axisLabel1: Select<AxisKey>;
+    public readonly axisLabel2: Select<AxisKey>;
+    public readonly axisLabel3: Select<AxisKey>;
+    public readonly axisLabel4: Select<AxisKey>;
+
+    constructor(params: {
+        parentElement: HTMLElement | ContainerWidget<TagName> | undefined,
+        value?: AxesKeys,
+    }){
+        let axisLabel0: Select<AxisKey>;
+        let axisLabel1: Select<AxisKey>;
+        let axisLabel2: Select<AxisKey>;
+        let axisLabel3: Select<AxisKey>;
+        let axisLabel4: Select<AxisKey>;
+        super({...params, children: [
+            axisLabel0 = new AxisKeyInput({parentElement: undefined, value: "t"}),
+            axisLabel1 = new AxisKeyInput({parentElement: undefined, value: "z"}),
+            axisLabel2 = new AxisKeyInput({parentElement: undefined, value: "y"}),
+            axisLabel3 = new AxisKeyInput({parentElement: undefined, value: "x"}),
+            axisLabel4 = new AxisKeyInput({parentElement: undefined, value: "c"}),
+        ]})
+        this.axisLabel0 = axisLabel0
+        this.axisLabel1 = axisLabel1
+        this.axisLabel2 = axisLabel2
+        this.axisLabel3 = axisLabel3
+        this.axisLabel4 = axisLabel4
+    }
+
+    protected validate = (): AxesKeys | Error => {
+        let axes = new Set<AxisKey>([this.axisLabel0.value]);
+        for(const [idx, selector] of [this.axisLabel1, this.axisLabel2, this.axisLabel3, this.axisLabel4].entries()){
+            axes.add(selector.value)
+            if(axes.size < idx + 2){
+                // selector.element.setCustomValidity("...")
+                return Error("Repeated axis")
+            }//else{selector.element.setCustomValidity("")}
+        }
+        return [
+            this.axisLabel0.value, this.axisLabel1.value, this.axisLabel2.value, this.axisLabel3.value, this.axisLabel4.value
+        ]
+    }
+
+    public get value(): AxesKeys | undefined{
+        const value = this.validate()
+        if(value instanceof Error){
+            return undefined
+        }
+        return value
+    }
+
+    public set value(value: AxesKeys | undefined){
+        if(value === undefined){
+            return //FIXME? forced to accept undefined because of get/set semantics
+        }
+        this.axisLabel0.value = value[0]
+        this.axisLabel1.value = value[1]
+        this.axisLabel2.value = value[2]
+        this.axisLabel3.value = value[3]
+        this.axisLabel4.value = value[4]
     }
 }
