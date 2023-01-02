@@ -34,6 +34,11 @@ import {
     ListFsDirResponse,
     parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_,
     PixelAnnotationDto,
+    N5Bzip2CompressorDto,
+    N5GzipCompressorDto,
+    N5RawCompressorDto,
+    N5XzCompressorDto,
+    N5DataSourceDto,
 } from "./dto"
 
 export type HpcSiteName = ComputeSessionStatusDto["hpc_site"] //FIXME?
@@ -672,14 +677,17 @@ export abstract class FsDataSource{
         return this.url.raw
     }
 
-    public static fromDto(dto: FsDataSourceDto) : PrecomputedChunksDataSource | SkimageDataSource{
+    public static fromDto(dto: FsDataSourceDto) : PrecomputedChunksDataSource | SkimageDataSource | N5DataSource{
         if(dto instanceof PrecomputedChunksDataSourceDto){
             return PrecomputedChunksDataSource.fromDto(dto)
         }
         if(dto instanceof SkimageDataSourceDto){
             return SkimageDataSource.fromDto(dto)
         }
-        throw `FIXME: Other datasources not implemented yet`
+        if(dto instanceof N5DataSourceDto){
+            return N5DataSource.fromDto(dto)
+        }
+        assertUnreachable(dto)
     }
 
     public static fromBase64(encoded: string): Error | ReturnType<typeof FsDataSource.fromDto>{
@@ -776,6 +784,48 @@ export class SkimageDataSource extends FsDataSource{
             tile_shape: Shape5D.fromDto(dto.tile_shape),
             spatial_resolution: dto.spatial_resolution,
             dtype: ensureDataType(dto.dtype), //FIXME?
+        })
+    }
+}
+
+export class N5DataSource extends FsDataSource{
+    public readonly compressor: N5Compressor
+    public readonly c_axiskeys: string
+
+    public constructor(params: ConstructorParameters<typeof FsDataSource>[0] & {
+        compressor: N5Compressor,
+        c_axiskeys: string,
+    }){
+        super(params)
+        this.compressor = params.compressor
+        this.c_axiskeys = params.c_axiskeys
+    }
+
+    public static fromDto(dto: N5DataSourceDto) : N5DataSource{
+        return new N5DataSource({
+            filesystem: Filesystem.fromDto(dto.filesystem),
+            path: Path.fromDto(dto.path),
+            url: Url.fromDto(dto.url),
+            interval: Interval5D.fromDto(dto.interval),
+            tile_shape: Shape5D.fromDto(dto.tile_shape),
+            spatial_resolution: dto.spatial_resolution,
+            dtype: ensureDataType(dto.dtype), //FIXME?
+            compressor: N5Compressor.create_from_dto(dto.compressor),
+            c_axiskeys: dto.c_axiskeys_on_disk,
+        })
+    }
+
+    public toDto(): N5DataSourceDto{
+        return new N5DataSourceDto({
+            filesystem: this.filesystem.toDto(),
+            path: this.path.toDto(),
+            url: this.url.toDto(),
+            interval: this.interval.toDto(),
+            tile_shape: this.tile_shape.toDto(),
+            spatial_resolution: this.spatial_resolution,
+            dtype: this.dtype,
+            compressor: this.compressor.to_dto(),
+            c_axiskeys_on_disk: this.c_axiskeys,
         })
     }
 }
@@ -897,7 +947,7 @@ export class BucketFs extends Filesystem{
     }
 }
 
-export type DataSinkUnion = PrecomputedChunksSink // | N5DataSink | etc
+export type DataSinkUnion = PrecomputedChunksSink | N5DataSink
 
 export abstract class FsDataSink{
     public readonly filesystem: Filesystem
@@ -905,6 +955,7 @@ export abstract class FsDataSink{
     public readonly tile_shape: Shape5D
     public readonly interval: Interval5D
     public readonly dtype: DataType
+    public readonly resolution: [number, number, number]
 
     public constructor(params: {
         filesystem: Filesystem,
@@ -912,12 +963,14 @@ export abstract class FsDataSink{
         dtype: DataType,
         tile_shape: Shape5D,
         interval: Interval5D,
+        resolution: [number, number, number]
     }){
         this.tile_shape = params.tile_shape
         this.interval = params.interval
         this.dtype = params.dtype
         this.filesystem = params.filesystem
         this.path = params.path
+        this.resolution = params.resolution
     }
 
     public static fromDto(message: PrecomputedChunksSinkDto | N5DataSinkDto): DataSinkUnion{
@@ -932,17 +985,14 @@ export abstract class FsDataSink{
 
 export class PrecomputedChunksSink extends FsDataSink{
     public readonly scale_key: Path
-    public readonly resolution: [number, number, number]
     public readonly encoding: "raw" | "jpeg"
 
     public constructor(params: ConstructorParameters<typeof FsDataSink>[0] & {
         scale_key: Path,
-        resolution: [number, number, number],
         encoding: "raw" | "jpeg",
     }){
         super(params)
         this.scale_key = params.scale_key
-        this.resolution = params.resolution
         this.encoding = params.encoding
     }
 
@@ -988,6 +1038,139 @@ export class PrecomputedChunksSink extends FsDataSink{
             dtype: this.dtype,
             encoder: this.encoding,
             scale_key: this.scale_key,
+        })
+    }
+}
+
+export type N5CompressorDto = N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto;
+
+export abstract class N5Compressor{
+    public abstract to_dto(): N5CompressorDto;
+
+    public static create_from_dto(dto: N5CompressorDto): N5Compressor{
+        if(dto instanceof N5GzipCompressorDto){
+            return GzipCompressor.from_dto(dto)
+        }
+        if(dto instanceof N5Bzip2CompressorDto){
+            return Bzip2Compressor.from_dto(dto)
+        }
+        if(dto instanceof N5XzCompressorDto){
+            return XzCompressor.from_dto(dto)
+        }
+        return RawCompressor.from_dto(dto)
+    }
+}
+
+export class GzipCompressor extends N5Compressor{
+    level: number
+    constructor(params: {level: number}){
+        super()
+        this.level = params.level
+    }
+
+    public to_dto(): N5GzipCompressorDto{
+        return new N5GzipCompressorDto({level: this.level})
+    }
+
+    public static from_dto(dto: N5GzipCompressorDto): GzipCompressor{
+        return new GzipCompressor({level: dto.level})
+    }
+}
+
+export class Bzip2Compressor extends N5Compressor{
+    compressionLevel: number
+    constructor(params: {compressionLevel: number}){
+        super()
+        this.compressionLevel = params.compressionLevel
+    }
+
+    public to_dto(): N5Bzip2CompressorDto{
+        return new N5Bzip2CompressorDto({blockSize: this.compressionLevel})
+    }
+
+    public static from_dto(dto: N5Bzip2CompressorDto): Bzip2Compressor{
+        return new Bzip2Compressor({compressionLevel: dto.blockSize})
+    }
+}
+
+export class XzCompressor extends N5Compressor{
+    preset: number
+    constructor(params: {preset: number}){
+        super()
+        this.preset = params.preset
+    }
+
+    public to_dto(): N5XzCompressorDto{
+        return new N5XzCompressorDto({preset: this.preset})
+    }
+
+    public static from_dto(dto: N5XzCompressorDto): XzCompressor{
+        return new XzCompressor({preset: dto.preset})
+    }
+}
+
+export class RawCompressor extends N5Compressor{
+    public to_dto(): N5RawCompressorDto{
+        return new N5RawCompressorDto({})
+    }
+
+    public static from_dto(_dto: N5RawCompressorDto): RawCompressor{
+        return new RawCompressor()
+    }
+}
+
+
+export class N5DataSink extends FsDataSink{
+    public readonly compressor: N5Compressor
+    public readonly c_axiskeys: string
+
+    public constructor(params: ConstructorParameters<typeof FsDataSink>[0] & {
+        c_axiskeys: string,
+        compressor: N5Compressor,
+    }){
+        super(params)
+        this.c_axiskeys = params.c_axiskeys
+        this.compressor = params.compressor
+    }
+    public static fromDto(message: N5DataSinkDto): N5DataSink{
+        return new N5DataSink({
+            filesystem: Filesystem.fromDto(message.filesystem),
+            path: Path.parse(message.path),
+            dtype: message.dtype,
+            tile_shape: Shape5D.fromDto(message.tile_shape),
+            interval: Interval5D.fromDto(message.interval),
+            resolution: message.spatial_resolution,
+            compressor: N5Compressor.create_from_dto(message.compressor),
+            c_axiskeys: message.c_axiskeys,
+        })
+    }
+    public toDto(): N5DataSinkDto{
+        return new N5DataSinkDto({
+            filesystem: this.filesystem.toDto(),
+            path: this.path.toDto(),
+            dtype: this.dtype,
+            compressor: this.compressor.to_dto(),
+            interval: this.interval.toDto(),
+            spatial_resolution: this.resolution,
+            tile_shape: this.tile_shape.toDto(),
+            c_axiskeys: this.c_axiskeys,
+        })
+    }
+    public toDataSource(): N5DataSource{
+        //FIXME: stop using URLs; have datasources encode al the stuff they need in properties
+        const datasourceUrl = this.filesystem.url.joinPath(this.path).updatedWith({
+            datascheme: "n5",
+        })
+        return new N5DataSource({
+            url: datasourceUrl,
+            filesystem: this.filesystem,
+            path: this.path,
+            interval: this.interval,
+            spatial_resolution: this.resolution,
+            tile_shape: this.tile_shape,
+            dtype: this.dtype,
+            compressor: this.compressor,
+            c_axiskeys: this.c_axiskeys,
         })
     }
 }

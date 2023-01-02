@@ -2,7 +2,7 @@ import { Applet } from '../../client/applets/applet';
 import { JsonValue } from '../../util/serialization';
 import { assertUnreachable, createFieldset } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
-import { BucketFs, Color, FsDataSource, FsDataSink, Session, DataSinkUnion, PrecomputedChunksSink, PrecomputedChunksDataSource } from '../../client/ilastik';
+import { BucketFs, Color, FsDataSource, FsDataSink, Session, DataSinkUnion, PrecomputedChunksSink, PrecomputedChunksDataSource, N5DataSource } from '../../client/ilastik';
 import { CssClasses } from '../css_classes';
 import { ErrorPopupWidget } from './popup';
 import {
@@ -92,7 +92,7 @@ abstract class Job{
         }
         assertUnreachable(dto)
     }
-    private makeProgressDisplay(openInViewer: (datasource: PrecomputedChunksDataSource) => void): TableData{
+    private makeProgressDisplay(openInViewer: (datasource: PrecomputedChunksDataSource | N5DataSource) => void): TableData{
         if(this.status == "pending" || this.status == "cancelled" || this.status == "failed"){
             return new TableData({parentElement: undefined, innerText: this.status})
         }
@@ -127,7 +127,7 @@ abstract class Job{
         }
         assertUnreachable(this.status)
     }
-    public toTableRow(openInViewer: (datasource: PrecomputedChunksDataSource) => void): {name: TableData, progress: TableData}{
+    public toTableRow(openInViewer: (datasource: PrecomputedChunksDataSource | N5DataSource) => void): {name: TableData, progress: TableData}{
         return {
             name: new TableData({parentElement: undefined, innerText: this.name}),
             progress: this.makeProgressDisplay(openInViewer),

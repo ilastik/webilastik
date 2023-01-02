@@ -103,20 +103,26 @@ export class LabelHeaderDto {
   }
 }
 
-export function parse_as_Literal_of__quote_precomputed_quote__endof_(value: JsonValue): "precomputed" | Error {
+export function parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_(
+  value: JsonValue,
+): "precomputed" | "n5" | Error {
   const tmp_0 = parse_as_str(value);
   if (!(tmp_0 instanceof Error) && tmp_0 === "precomputed") {
     return tmp_0;
   }
-  return Error(`Could not parse ${value} as 'precomputed'`);
+  const tmp_1 = parse_as_str(value);
+  if (!(tmp_1 instanceof Error) && tmp_1 === "n5") {
+    return tmp_1;
+  }
+  return Error(`Could not parse ${value} as 'precomputed' | 'n5'`);
 }
 export function parse_as_None(value: JsonValue): undefined | Error {
   return ensureJsonUndefined(value);
 }
-export function parse_as_Union_of_Literal_of__quote_precomputed_quote__endof_0None_endof_(
+export function parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_0None_endof_(
   value: JsonValue,
-): "precomputed" | undefined | Error {
-  const parsed_option_0 = parse_as_Literal_of__quote_precomputed_quote__endof_(value);
+): "precomputed" | "n5" | undefined | Error {
+  const parsed_option_0 = parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_(value);
   if (!(parsed_option_0 instanceof Error)) {
     return parsed_option_0;
   }
@@ -124,7 +130,7 @@ export function parse_as_Union_of_Literal_of__quote_precomputed_quote__endof_0No
   if (!(parsed_option_1 instanceof Error)) {
     return parsed_option_1;
   }
-  return Error(`Could not parse ${JSON.stringify(value)} into 'precomputed' | undefined`);
+  return Error(`Could not parse ${JSON.stringify(value)} into 'precomputed' | 'n5' | undefined`);
 }
 export function parse_as_Literal_of__quote_http_quote_0_quote_https_quote_0_quote_file_quote_0_quote_memory_quote__endof_(
   value: JsonValue,
@@ -210,7 +216,7 @@ export function parse_as_UrlDto(value: JsonValue): UrlDto | Error {
   if (valueObject["__class__"] != "UrlDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a UrlDto`);
   }
-  const temp_datascheme = parse_as_Union_of_Literal_of__quote_precomputed_quote__endof_0None_endof_(
+  const temp_datascheme = parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_0None_endof_(
     valueObject.datascheme,
   );
   if (temp_datascheme instanceof Error) return temp_datascheme;
@@ -242,7 +248,7 @@ export function parse_as_UrlDto(value: JsonValue): UrlDto | Error {
 // Automatically generated via DataTransferObject for UrlDto
 // Do not edit!
 export class UrlDto {
-  public datascheme: "precomputed" | undefined;
+  public datascheme: "precomputed" | "n5" | undefined;
   public protocol: "http" | "https" | "file" | "memory";
   public hostname: string;
   public port: number | undefined;
@@ -250,7 +256,7 @@ export class UrlDto {
   public search: { [key: string]: string } | undefined;
   public fragment: string | undefined;
   constructor(_params: {
-    datascheme: "precomputed" | undefined;
+    datascheme: "precomputed" | "n5" | undefined;
     protocol: "http" | "https" | "file" | "memory";
     hostname: string;
     port: number | undefined;
@@ -610,9 +616,9 @@ export function parse_as_Tuple_of_int0int0int_endof_(value: JsonValue): [number,
   if (temp_2 instanceof Error) return temp_2;
   return [temp_0, temp_1, temp_2];
 }
-export function parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_float32_quote__endof_(
+export function parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
   value: JsonValue,
-): "uint8" | "uint16" | "uint32" | "uint64" | "float32" | Error {
+): "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32" | Error {
   const tmp_0 = parse_as_str(value);
   if (!(tmp_0 instanceof Error) && tmp_0 === "uint8") {
     return tmp_0;
@@ -630,10 +636,14 @@ export function parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_qu
     return tmp_3;
   }
   const tmp_4 = parse_as_str(value);
-  if (!(tmp_4 instanceof Error) && tmp_4 === "float32") {
+  if (!(tmp_4 instanceof Error) && tmp_4 === "int64") {
     return tmp_4;
   }
-  return Error(`Could not parse ${value} as 'uint8' | 'uint16' | 'uint32' | 'uint64' | 'float32'`);
+  const tmp_5 = parse_as_str(value);
+  if (!(tmp_5 instanceof Error) && tmp_5 === "float32") {
+    return tmp_5;
+  }
+  return Error(`Could not parse ${value} as 'uint8' | 'uint16' | 'uint32' | 'uint64' | 'int64' | 'float32'`);
 }
 export function parse_as_Literal_of__quote_raw_quote_0_quote_jpeg_quote__endof_(
   value: JsonValue,
@@ -671,7 +681,7 @@ export function parse_as_PrecomputedChunksDataSourceDto(value: JsonValue): Preco
   const temp_spatial_resolution = parse_as_Tuple_of_int0int0int_endof_(valueObject.spatial_resolution);
   if (temp_spatial_resolution instanceof Error) return temp_spatial_resolution;
   const temp_dtype =
-    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_float32_quote__endof_(
+    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
       valueObject.dtype,
     );
   if (temp_dtype instanceof Error) return temp_dtype;
@@ -699,7 +709,7 @@ export class PrecomputedChunksDataSourceDto {
   public interval: Interval5DDto;
   public tile_shape: Shape5DDto;
   public spatial_resolution: [number, number, number];
-  public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "float32";
+  public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
   public encoder: "raw" | "jpeg";
   constructor(_params: {
     url: UrlDto;
@@ -709,7 +719,7 @@ export class PrecomputedChunksDataSourceDto {
     interval: Interval5DDto;
     tile_shape: Shape5DDto;
     spatial_resolution: [number, number, number];
-    dtype: "uint8" | "uint16" | "uint32" | "uint64" | "float32";
+    dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
     encoder: "raw" | "jpeg";
   }) {
     this.url = _params.url;
@@ -738,250 +748,6 @@ export class PrecomputedChunksDataSourceDto {
   }
   public static fromJsonValue(value: JsonValue): PrecomputedChunksDataSourceDto | Error {
     return parse_as_PrecomputedChunksDataSourceDto(value);
-  }
-}
-
-export function parse_as_N5DataSourceDto(value: JsonValue): N5DataSourceDto | Error {
-  const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
-    return valueObject;
-  }
-  if (valueObject["__class__"] != "N5DataSourceDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5DataSourceDto`);
-  }
-  const temp_url = parse_as_UrlDto(valueObject.url);
-  if (temp_url instanceof Error) return temp_url;
-  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.filesystem);
-  if (temp_filesystem instanceof Error) return temp_filesystem;
-  const temp_path = parse_as_str(valueObject.path);
-  if (temp_path instanceof Error) return temp_path;
-  const temp_interval = parse_as_Interval5DDto(valueObject.interval);
-  if (temp_interval instanceof Error) return temp_interval;
-  const temp_tile_shape = parse_as_Shape5DDto(valueObject.tile_shape);
-  if (temp_tile_shape instanceof Error) return temp_tile_shape;
-  const temp_spatial_resolution = parse_as_Tuple_of_int0int0int_endof_(valueObject.spatial_resolution);
-  if (temp_spatial_resolution instanceof Error) return temp_spatial_resolution;
-  const temp_dtype =
-    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_float32_quote__endof_(
-      valueObject.dtype,
-    );
-  if (temp_dtype instanceof Error) return temp_dtype;
-  return new N5DataSourceDto({
-    url: temp_url,
-    filesystem: temp_filesystem,
-    path: temp_path,
-    interval: temp_interval,
-    tile_shape: temp_tile_shape,
-    spatial_resolution: temp_spatial_resolution,
-    dtype: temp_dtype,
-  });
-}
-// Automatically generated via DataTransferObject for N5DataSourceDto
-// Do not edit!
-export class N5DataSourceDto {
-  public url: UrlDto;
-  public filesystem: OsfsDto | HttpFsDto | BucketFSDto;
-  public path: string;
-  public interval: Interval5DDto;
-  public tile_shape: Shape5DDto;
-  public spatial_resolution: [number, number, number];
-  public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "float32";
-  constructor(_params: {
-    url: UrlDto;
-    filesystem: OsfsDto | HttpFsDto | BucketFSDto;
-    path: string;
-    interval: Interval5DDto;
-    tile_shape: Shape5DDto;
-    spatial_resolution: [number, number, number];
-    dtype: "uint8" | "uint16" | "uint32" | "uint64" | "float32";
-  }) {
-    this.url = _params.url;
-    this.filesystem = _params.filesystem;
-    this.path = _params.path;
-    this.interval = _params.interval;
-    this.tile_shape = _params.tile_shape;
-    this.spatial_resolution = _params.spatial_resolution;
-    this.dtype = _params.dtype;
-  }
-  public toJsonValue(): JsonObject {
-    return {
-      __class__: "N5DataSourceDto",
-      url: this.url.toJsonValue(),
-      filesystem: toJsonValue(this.filesystem),
-      path: this.path,
-      interval: this.interval.toJsonValue(),
-      tile_shape: this.tile_shape.toJsonValue(),
-      spatial_resolution: [this.spatial_resolution[0], this.spatial_resolution[1], this.spatial_resolution[2]],
-      dtype: this.dtype,
-    };
-  }
-  public static fromJsonValue(value: JsonValue): N5DataSourceDto | Error {
-    return parse_as_N5DataSourceDto(value);
-  }
-}
-
-export function parse_as_SkimageDataSourceDto(value: JsonValue): SkimageDataSourceDto | Error {
-  const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
-    return valueObject;
-  }
-  if (valueObject["__class__"] != "SkimageDataSourceDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a SkimageDataSourceDto`);
-  }
-  const temp_url = parse_as_UrlDto(valueObject.url);
-  if (temp_url instanceof Error) return temp_url;
-  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.filesystem);
-  if (temp_filesystem instanceof Error) return temp_filesystem;
-  const temp_path = parse_as_str(valueObject.path);
-  if (temp_path instanceof Error) return temp_path;
-  const temp_interval = parse_as_Interval5DDto(valueObject.interval);
-  if (temp_interval instanceof Error) return temp_interval;
-  const temp_tile_shape = parse_as_Shape5DDto(valueObject.tile_shape);
-  if (temp_tile_shape instanceof Error) return temp_tile_shape;
-  const temp_spatial_resolution = parse_as_Tuple_of_int0int0int_endof_(valueObject.spatial_resolution);
-  if (temp_spatial_resolution instanceof Error) return temp_spatial_resolution;
-  const temp_dtype =
-    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_float32_quote__endof_(
-      valueObject.dtype,
-    );
-  if (temp_dtype instanceof Error) return temp_dtype;
-  return new SkimageDataSourceDto({
-    url: temp_url,
-    filesystem: temp_filesystem,
-    path: temp_path,
-    interval: temp_interval,
-    tile_shape: temp_tile_shape,
-    spatial_resolution: temp_spatial_resolution,
-    dtype: temp_dtype,
-  });
-}
-// Automatically generated via DataTransferObject for SkimageDataSourceDto
-// Do not edit!
-export class SkimageDataSourceDto {
-  public url: UrlDto;
-  public filesystem: OsfsDto | HttpFsDto | BucketFSDto;
-  public path: string;
-  public interval: Interval5DDto;
-  public tile_shape: Shape5DDto;
-  public spatial_resolution: [number, number, number];
-  public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "float32";
-  constructor(_params: {
-    url: UrlDto;
-    filesystem: OsfsDto | HttpFsDto | BucketFSDto;
-    path: string;
-    interval: Interval5DDto;
-    tile_shape: Shape5DDto;
-    spatial_resolution: [number, number, number];
-    dtype: "uint8" | "uint16" | "uint32" | "uint64" | "float32";
-  }) {
-    this.url = _params.url;
-    this.filesystem = _params.filesystem;
-    this.path = _params.path;
-    this.interval = _params.interval;
-    this.tile_shape = _params.tile_shape;
-    this.spatial_resolution = _params.spatial_resolution;
-    this.dtype = _params.dtype;
-  }
-  public toJsonValue(): JsonObject {
-    return {
-      __class__: "SkimageDataSourceDto",
-      url: this.url.toJsonValue(),
-      filesystem: toJsonValue(this.filesystem),
-      path: this.path,
-      interval: this.interval.toJsonValue(),
-      tile_shape: this.tile_shape.toJsonValue(),
-      spatial_resolution: [this.spatial_resolution[0], this.spatial_resolution[1], this.spatial_resolution[2]],
-      dtype: this.dtype,
-    };
-  }
-  public static fromJsonValue(value: JsonValue): SkimageDataSourceDto | Error {
-    return parse_as_SkimageDataSourceDto(value);
-  }
-}
-
-export function parse_as_PrecomputedChunksSinkDto(value: JsonValue): PrecomputedChunksSinkDto | Error {
-  const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
-    return valueObject;
-  }
-  if (valueObject["__class__"] != "PrecomputedChunksSinkDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a PrecomputedChunksSinkDto`);
-  }
-  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.filesystem);
-  if (temp_filesystem instanceof Error) return temp_filesystem;
-  const temp_path = parse_as_str(valueObject.path);
-  if (temp_path instanceof Error) return temp_path;
-  const temp_tile_shape = parse_as_Shape5DDto(valueObject.tile_shape);
-  if (temp_tile_shape instanceof Error) return temp_tile_shape;
-  const temp_interval = parse_as_Interval5DDto(valueObject.interval);
-  if (temp_interval instanceof Error) return temp_interval;
-  const temp_dtype =
-    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_float32_quote__endof_(
-      valueObject.dtype,
-    );
-  if (temp_dtype instanceof Error) return temp_dtype;
-  const temp_scale_key = parse_as_str(valueObject.scale_key);
-  if (temp_scale_key instanceof Error) return temp_scale_key;
-  const temp_resolution = parse_as_Tuple_of_int0int0int_endof_(valueObject.resolution);
-  if (temp_resolution instanceof Error) return temp_resolution;
-  const temp_encoding = parse_as_Literal_of__quote_raw_quote_0_quote_jpeg_quote__endof_(valueObject.encoding);
-  if (temp_encoding instanceof Error) return temp_encoding;
-  return new PrecomputedChunksSinkDto({
-    filesystem: temp_filesystem,
-    path: temp_path,
-    tile_shape: temp_tile_shape,
-    interval: temp_interval,
-    dtype: temp_dtype,
-    scale_key: temp_scale_key,
-    resolution: temp_resolution,
-    encoding: temp_encoding,
-  });
-}
-// Automatically generated via DataTransferObject for PrecomputedChunksSinkDto
-// Do not edit!
-export class PrecomputedChunksSinkDto {
-  public filesystem: OsfsDto | HttpFsDto | BucketFSDto;
-  public path: string;
-  public tile_shape: Shape5DDto;
-  public interval: Interval5DDto;
-  public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "float32";
-  public scale_key: string;
-  public resolution: [number, number, number];
-  public encoding: "raw" | "jpeg";
-  constructor(_params: {
-    filesystem: OsfsDto | HttpFsDto | BucketFSDto;
-    path: string;
-    tile_shape: Shape5DDto;
-    interval: Interval5DDto;
-    dtype: "uint8" | "uint16" | "uint32" | "uint64" | "float32";
-    scale_key: string;
-    resolution: [number, number, number];
-    encoding: "raw" | "jpeg";
-  }) {
-    this.filesystem = _params.filesystem;
-    this.path = _params.path;
-    this.tile_shape = _params.tile_shape;
-    this.interval = _params.interval;
-    this.dtype = _params.dtype;
-    this.scale_key = _params.scale_key;
-    this.resolution = _params.resolution;
-    this.encoding = _params.encoding;
-  }
-  public toJsonValue(): JsonObject {
-    return {
-      __class__: "PrecomputedChunksSinkDto",
-      filesystem: toJsonValue(this.filesystem),
-      path: this.path,
-      tile_shape: this.tile_shape.toJsonValue(),
-      interval: this.interval.toJsonValue(),
-      dtype: this.dtype,
-      scale_key: this.scale_key,
-      resolution: [this.resolution[0], this.resolution[1], this.resolution[2]],
-      encoding: this.encoding,
-    };
-  }
-  public static fromJsonValue(value: JsonValue): PrecomputedChunksSinkDto | Error {
-    return parse_as_PrecomputedChunksSinkDto(value);
   }
 }
 
@@ -1112,6 +878,41 @@ export class N5RawCompressorDto {
   }
 }
 
+export function parse_as_Tuple_of_int0_varlen__endof_(value: JsonValue): Array<number> | Error {
+  const arr = ensureJsonArray(value);
+  if (arr instanceof Error) return arr;
+  const out: Array<number> = [];
+  for (let item of arr) {
+    let parsed_item = parse_as_int(item);
+    if (parsed_item instanceof Error) return parsed_item;
+    out.push(parsed_item);
+  }
+  return out;
+}
+export function parse_as_Tuple_of_str0_varlen__endof_(value: JsonValue): Array<string> | Error {
+  const arr = ensureJsonArray(value);
+  if (arr instanceof Error) return arr;
+  const out: Array<string> = [];
+  for (let item of arr) {
+    let parsed_item = parse_as_str(item);
+    if (parsed_item instanceof Error) return parsed_item;
+    out.push(parsed_item);
+  }
+  return out;
+}
+export function parse_as_Union_of_Tuple_of_str0_varlen__endof_0None_endof_(
+  value: JsonValue,
+): Array<string> | undefined | Error {
+  const parsed_option_0 = parse_as_Tuple_of_str0_varlen__endof_(value);
+  if (!(parsed_option_0 instanceof Error)) {
+    return parsed_option_0;
+  }
+  const parsed_option_1 = parse_as_None(value);
+  if (!(parsed_option_1 instanceof Error)) {
+    return parsed_option_1;
+  }
+  return Error(`Could not parse ${JSON.stringify(value)} into Array<string> | undefined`);
+}
 export function parse_as_Union_of_N5GzipCompressorDto0N5Bzip2CompressorDto0N5XzCompressorDto0N5RawCompressorDto_endof_(
   value: JsonValue,
 ): N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto | Error {
@@ -1137,6 +938,335 @@ export function parse_as_Union_of_N5GzipCompressorDto0N5Bzip2CompressorDto0N5XzC
     } into N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto`,
   );
 }
+export function parse_as_N5DatasetAttributesDto(value: JsonValue): N5DatasetAttributesDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "N5DatasetAttributesDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5DatasetAttributesDto`);
+  }
+  const temp_dimensions = parse_as_Tuple_of_int0_varlen__endof_(valueObject.dimensions);
+  if (temp_dimensions instanceof Error) return temp_dimensions;
+  const temp_blockSize = parse_as_Tuple_of_int0_varlen__endof_(valueObject.blockSize);
+  if (temp_blockSize instanceof Error) return temp_blockSize;
+  const temp_axes = parse_as_Union_of_Tuple_of_str0_varlen__endof_0None_endof_(valueObject.axes);
+  if (temp_axes instanceof Error) return temp_axes;
+  const temp_dataType =
+    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
+      valueObject.dataType,
+    );
+  if (temp_dataType instanceof Error) return temp_dataType;
+  const temp_compression =
+    parse_as_Union_of_N5GzipCompressorDto0N5Bzip2CompressorDto0N5XzCompressorDto0N5RawCompressorDto_endof_(
+      valueObject.compression,
+    );
+  if (temp_compression instanceof Error) return temp_compression;
+  return new N5DatasetAttributesDto({
+    dimensions: temp_dimensions,
+    blockSize: temp_blockSize,
+    axes: temp_axes,
+    dataType: temp_dataType,
+    compression: temp_compression,
+  });
+}
+// Automatically generated via DataTransferObject for N5DatasetAttributesDto
+// Do not edit!
+export class N5DatasetAttributesDto {
+  public dimensions: Array<number>;
+  public blockSize: Array<number>;
+  public axes: Array<string> | undefined;
+  public dataType: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
+  public compression: N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto;
+  constructor(_params: {
+    dimensions: Array<number>;
+    blockSize: Array<number>;
+    axes: Array<string> | undefined;
+    dataType: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
+    compression: N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto;
+  }) {
+    this.dimensions = _params.dimensions;
+    this.blockSize = _params.blockSize;
+    this.axes = _params.axes;
+    this.dataType = _params.dataType;
+    this.compression = _params.compression;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      __class__: "N5DatasetAttributesDto",
+      dimensions: this.dimensions.map((item) => item),
+      blockSize: this.blockSize.map((item) => item),
+      axes: toJsonValue(this.axes),
+      dataType: this.dataType,
+      compression: toJsonValue(this.compression),
+    };
+  }
+  public static fromJsonValue(value: JsonValue): N5DatasetAttributesDto | Error {
+    return parse_as_N5DatasetAttributesDto(value);
+  }
+}
+
+export function parse_as_N5DataSourceDto(value: JsonValue): N5DataSourceDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "N5DataSourceDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5DataSourceDto`);
+  }
+  const temp_url = parse_as_UrlDto(valueObject.url);
+  if (temp_url instanceof Error) return temp_url;
+  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.filesystem);
+  if (temp_filesystem instanceof Error) return temp_filesystem;
+  const temp_path = parse_as_str(valueObject.path);
+  if (temp_path instanceof Error) return temp_path;
+  const temp_interval = parse_as_Interval5DDto(valueObject.interval);
+  if (temp_interval instanceof Error) return temp_interval;
+  const temp_tile_shape = parse_as_Shape5DDto(valueObject.tile_shape);
+  if (temp_tile_shape instanceof Error) return temp_tile_shape;
+  const temp_spatial_resolution = parse_as_Tuple_of_int0int0int_endof_(valueObject.spatial_resolution);
+  if (temp_spatial_resolution instanceof Error) return temp_spatial_resolution;
+  const temp_dtype =
+    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
+      valueObject.dtype,
+    );
+  if (temp_dtype instanceof Error) return temp_dtype;
+  const temp_compressor =
+    parse_as_Union_of_N5GzipCompressorDto0N5Bzip2CompressorDto0N5XzCompressorDto0N5RawCompressorDto_endof_(
+      valueObject.compressor,
+    );
+  if (temp_compressor instanceof Error) return temp_compressor;
+  const temp_c_axiskeys_on_disk = parse_as_str(valueObject.c_axiskeys_on_disk);
+  if (temp_c_axiskeys_on_disk instanceof Error) return temp_c_axiskeys_on_disk;
+  return new N5DataSourceDto({
+    url: temp_url,
+    filesystem: temp_filesystem,
+    path: temp_path,
+    interval: temp_interval,
+    tile_shape: temp_tile_shape,
+    spatial_resolution: temp_spatial_resolution,
+    dtype: temp_dtype,
+    compressor: temp_compressor,
+    c_axiskeys_on_disk: temp_c_axiskeys_on_disk,
+  });
+}
+// Automatically generated via DataTransferObject for N5DataSourceDto
+// Do not edit!
+export class N5DataSourceDto {
+  public url: UrlDto;
+  public filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+  public path: string;
+  public interval: Interval5DDto;
+  public tile_shape: Shape5DDto;
+  public spatial_resolution: [number, number, number];
+  public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
+  public compressor: N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto;
+  public c_axiskeys_on_disk: string;
+  constructor(_params: {
+    url: UrlDto;
+    filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+    path: string;
+    interval: Interval5DDto;
+    tile_shape: Shape5DDto;
+    spatial_resolution: [number, number, number];
+    dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
+    compressor: N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto;
+    c_axiskeys_on_disk: string;
+  }) {
+    this.url = _params.url;
+    this.filesystem = _params.filesystem;
+    this.path = _params.path;
+    this.interval = _params.interval;
+    this.tile_shape = _params.tile_shape;
+    this.spatial_resolution = _params.spatial_resolution;
+    this.dtype = _params.dtype;
+    this.compressor = _params.compressor;
+    this.c_axiskeys_on_disk = _params.c_axiskeys_on_disk;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      __class__: "N5DataSourceDto",
+      url: this.url.toJsonValue(),
+      filesystem: toJsonValue(this.filesystem),
+      path: this.path,
+      interval: this.interval.toJsonValue(),
+      tile_shape: this.tile_shape.toJsonValue(),
+      spatial_resolution: [this.spatial_resolution[0], this.spatial_resolution[1], this.spatial_resolution[2]],
+      dtype: this.dtype,
+      compressor: toJsonValue(this.compressor),
+      c_axiskeys_on_disk: this.c_axiskeys_on_disk,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): N5DataSourceDto | Error {
+    return parse_as_N5DataSourceDto(value);
+  }
+}
+
+export function parse_as_SkimageDataSourceDto(value: JsonValue): SkimageDataSourceDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "SkimageDataSourceDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a SkimageDataSourceDto`);
+  }
+  const temp_url = parse_as_UrlDto(valueObject.url);
+  if (temp_url instanceof Error) return temp_url;
+  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.filesystem);
+  if (temp_filesystem instanceof Error) return temp_filesystem;
+  const temp_path = parse_as_str(valueObject.path);
+  if (temp_path instanceof Error) return temp_path;
+  const temp_interval = parse_as_Interval5DDto(valueObject.interval);
+  if (temp_interval instanceof Error) return temp_interval;
+  const temp_tile_shape = parse_as_Shape5DDto(valueObject.tile_shape);
+  if (temp_tile_shape instanceof Error) return temp_tile_shape;
+  const temp_spatial_resolution = parse_as_Tuple_of_int0int0int_endof_(valueObject.spatial_resolution);
+  if (temp_spatial_resolution instanceof Error) return temp_spatial_resolution;
+  const temp_dtype =
+    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
+      valueObject.dtype,
+    );
+  if (temp_dtype instanceof Error) return temp_dtype;
+  return new SkimageDataSourceDto({
+    url: temp_url,
+    filesystem: temp_filesystem,
+    path: temp_path,
+    interval: temp_interval,
+    tile_shape: temp_tile_shape,
+    spatial_resolution: temp_spatial_resolution,
+    dtype: temp_dtype,
+  });
+}
+// Automatically generated via DataTransferObject for SkimageDataSourceDto
+// Do not edit!
+export class SkimageDataSourceDto {
+  public url: UrlDto;
+  public filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+  public path: string;
+  public interval: Interval5DDto;
+  public tile_shape: Shape5DDto;
+  public spatial_resolution: [number, number, number];
+  public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
+  constructor(_params: {
+    url: UrlDto;
+    filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+    path: string;
+    interval: Interval5DDto;
+    tile_shape: Shape5DDto;
+    spatial_resolution: [number, number, number];
+    dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
+  }) {
+    this.url = _params.url;
+    this.filesystem = _params.filesystem;
+    this.path = _params.path;
+    this.interval = _params.interval;
+    this.tile_shape = _params.tile_shape;
+    this.spatial_resolution = _params.spatial_resolution;
+    this.dtype = _params.dtype;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      __class__: "SkimageDataSourceDto",
+      url: this.url.toJsonValue(),
+      filesystem: toJsonValue(this.filesystem),
+      path: this.path,
+      interval: this.interval.toJsonValue(),
+      tile_shape: this.tile_shape.toJsonValue(),
+      spatial_resolution: [this.spatial_resolution[0], this.spatial_resolution[1], this.spatial_resolution[2]],
+      dtype: this.dtype,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): SkimageDataSourceDto | Error {
+    return parse_as_SkimageDataSourceDto(value);
+  }
+}
+
+export function parse_as_PrecomputedChunksSinkDto(value: JsonValue): PrecomputedChunksSinkDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "PrecomputedChunksSinkDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a PrecomputedChunksSinkDto`);
+  }
+  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.filesystem);
+  if (temp_filesystem instanceof Error) return temp_filesystem;
+  const temp_path = parse_as_str(valueObject.path);
+  if (temp_path instanceof Error) return temp_path;
+  const temp_tile_shape = parse_as_Shape5DDto(valueObject.tile_shape);
+  if (temp_tile_shape instanceof Error) return temp_tile_shape;
+  const temp_interval = parse_as_Interval5DDto(valueObject.interval);
+  if (temp_interval instanceof Error) return temp_interval;
+  const temp_dtype =
+    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
+      valueObject.dtype,
+    );
+  if (temp_dtype instanceof Error) return temp_dtype;
+  const temp_scale_key = parse_as_str(valueObject.scale_key);
+  if (temp_scale_key instanceof Error) return temp_scale_key;
+  const temp_resolution = parse_as_Tuple_of_int0int0int_endof_(valueObject.resolution);
+  if (temp_resolution instanceof Error) return temp_resolution;
+  const temp_encoding = parse_as_Literal_of__quote_raw_quote_0_quote_jpeg_quote__endof_(valueObject.encoding);
+  if (temp_encoding instanceof Error) return temp_encoding;
+  return new PrecomputedChunksSinkDto({
+    filesystem: temp_filesystem,
+    path: temp_path,
+    tile_shape: temp_tile_shape,
+    interval: temp_interval,
+    dtype: temp_dtype,
+    scale_key: temp_scale_key,
+    resolution: temp_resolution,
+    encoding: temp_encoding,
+  });
+}
+// Automatically generated via DataTransferObject for PrecomputedChunksSinkDto
+// Do not edit!
+export class PrecomputedChunksSinkDto {
+  public filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+  public path: string;
+  public tile_shape: Shape5DDto;
+  public interval: Interval5DDto;
+  public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
+  public scale_key: string;
+  public resolution: [number, number, number];
+  public encoding: "raw" | "jpeg";
+  constructor(_params: {
+    filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+    path: string;
+    tile_shape: Shape5DDto;
+    interval: Interval5DDto;
+    dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
+    scale_key: string;
+    resolution: [number, number, number];
+    encoding: "raw" | "jpeg";
+  }) {
+    this.filesystem = _params.filesystem;
+    this.path = _params.path;
+    this.tile_shape = _params.tile_shape;
+    this.interval = _params.interval;
+    this.dtype = _params.dtype;
+    this.scale_key = _params.scale_key;
+    this.resolution = _params.resolution;
+    this.encoding = _params.encoding;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      __class__: "PrecomputedChunksSinkDto",
+      filesystem: toJsonValue(this.filesystem),
+      path: this.path,
+      tile_shape: this.tile_shape.toJsonValue(),
+      interval: this.interval.toJsonValue(),
+      dtype: this.dtype,
+      scale_key: this.scale_key,
+      resolution: [this.resolution[0], this.resolution[1], this.resolution[2]],
+      encoding: this.encoding,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): PrecomputedChunksSinkDto | Error {
+    return parse_as_PrecomputedChunksSinkDto(value);
+  }
+}
+
 export function parse_as_N5DataSinkDto(value: JsonValue): N5DataSinkDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
@@ -1147,18 +1277,18 @@ export function parse_as_N5DataSinkDto(value: JsonValue): N5DataSinkDto | Error 
   }
   const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.filesystem);
   if (temp_filesystem instanceof Error) return temp_filesystem;
-  const temp_outer_path = parse_as_str(valueObject.outer_path);
-  if (temp_outer_path instanceof Error) return temp_outer_path;
-  const temp_inner_path = parse_as_str(valueObject.inner_path);
-  if (temp_inner_path instanceof Error) return temp_inner_path;
+  const temp_path = parse_as_str(valueObject.path);
+  if (temp_path instanceof Error) return temp_path;
   const temp_interval = parse_as_Interval5DDto(valueObject.interval);
   if (temp_interval instanceof Error) return temp_interval;
   const temp_tile_shape = parse_as_Shape5DDto(valueObject.tile_shape);
   if (temp_tile_shape instanceof Error) return temp_tile_shape;
+  const temp_spatial_resolution = parse_as_Tuple_of_int0int0int_endof_(valueObject.spatial_resolution);
+  if (temp_spatial_resolution instanceof Error) return temp_spatial_resolution;
   const temp_c_axiskeys = parse_as_str(valueObject.c_axiskeys);
   if (temp_c_axiskeys instanceof Error) return temp_c_axiskeys;
   const temp_dtype =
-    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_float32_quote__endof_(
+    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
       valueObject.dtype,
     );
   if (temp_dtype instanceof Error) return temp_dtype;
@@ -1169,10 +1299,10 @@ export function parse_as_N5DataSinkDto(value: JsonValue): N5DataSinkDto | Error 
   if (temp_compressor instanceof Error) return temp_compressor;
   return new N5DataSinkDto({
     filesystem: temp_filesystem,
-    outer_path: temp_outer_path,
-    inner_path: temp_inner_path,
+    path: temp_path,
     interval: temp_interval,
     tile_shape: temp_tile_shape,
+    spatial_resolution: temp_spatial_resolution,
     c_axiskeys: temp_c_axiskeys,
     dtype: temp_dtype,
     compressor: temp_compressor,
@@ -1182,28 +1312,28 @@ export function parse_as_N5DataSinkDto(value: JsonValue): N5DataSinkDto | Error 
 // Do not edit!
 export class N5DataSinkDto {
   public filesystem: OsfsDto | HttpFsDto | BucketFSDto;
-  public outer_path: string;
-  public inner_path: string;
+  public path: string;
   public interval: Interval5DDto;
   public tile_shape: Shape5DDto;
+  public spatial_resolution: [number, number, number];
   public c_axiskeys: string;
-  public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "float32";
+  public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
   public compressor: N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto;
   constructor(_params: {
     filesystem: OsfsDto | HttpFsDto | BucketFSDto;
-    outer_path: string;
-    inner_path: string;
+    path: string;
     interval: Interval5DDto;
     tile_shape: Shape5DDto;
+    spatial_resolution: [number, number, number];
     c_axiskeys: string;
-    dtype: "uint8" | "uint16" | "uint32" | "uint64" | "float32";
+    dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
     compressor: N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto;
   }) {
     this.filesystem = _params.filesystem;
-    this.outer_path = _params.outer_path;
-    this.inner_path = _params.inner_path;
+    this.path = _params.path;
     this.interval = _params.interval;
     this.tile_shape = _params.tile_shape;
+    this.spatial_resolution = _params.spatial_resolution;
     this.c_axiskeys = _params.c_axiskeys;
     this.dtype = _params.dtype;
     this.compressor = _params.compressor;
@@ -1212,10 +1342,10 @@ export class N5DataSinkDto {
     return {
       __class__: "N5DataSinkDto",
       filesystem: toJsonValue(this.filesystem),
-      outer_path: this.outer_path,
-      inner_path: this.inner_path,
+      path: this.path,
       interval: this.interval.toJsonValue(),
       tile_shape: this.tile_shape.toJsonValue(),
+      spatial_resolution: [this.spatial_resolution[0], this.spatial_resolution[1], this.spatial_resolution[2]],
       c_axiskeys: this.c_axiskeys,
       dtype: this.dtype,
       compressor: toJsonValue(this.compressor),
@@ -3859,17 +3989,6 @@ export class ListFsDirRequest {
   }
 }
 
-export function parse_as_Tuple_of_str0_varlen__endof_(value: JsonValue): Array<string> | Error {
-  const arr = ensureJsonArray(value);
-  if (arr instanceof Error) return arr;
-  const out: Array<string> = [];
-  for (let item of arr) {
-    let parsed_item = parse_as_str(item);
-    if (parsed_item instanceof Error) return parsed_item;
-    out.push(parsed_item);
-  }
-  return out;
-}
 export function parse_as_ListFsDirResponse(value: JsonValue): ListFsDirResponse | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {

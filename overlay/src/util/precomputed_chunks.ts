@@ -71,7 +71,7 @@ export function ensureType(value: string): Type{
     return variant
 }
 
-export const dataTypes = ["uint8", "uint16", "uint32", "uint64", "float32"] as const;
+export const dataTypes = ["uint8", "uint16", "uint32", "uint64", "int64", "float32"] as const;
 export type DataType = typeof dataTypes[number];
 export function ensureDataType(value: string): DataType{
     const variant = dataTypes.find(variant => variant === value)
