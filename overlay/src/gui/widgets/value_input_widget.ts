@@ -45,13 +45,16 @@ export class TextInput extends ValueInputWidget<string | undefined, "text">{
 }
 
 export class NumberInput extends ValueInputWidget<number, "number">{
-    constructor(params: ValueInputWidgetParams<number> & {value: number, min?: number, max?: number}){
+    constructor(params: ValueInputWidgetParams<number> & {value: number, min?: number, max?: number, step?: number}){
         super({...params, inputType: "number"});
         if(params.min !== undefined){
             this.element.min = params.min.toString()
         }
         if(params.max !== undefined){
             this.element.max = params.max.toString()
+        }
+        if(params.step !== undefined){
+            this.element.step = params.step.toString()
         }
         this.value = params.value
     }
