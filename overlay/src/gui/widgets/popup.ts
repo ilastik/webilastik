@@ -10,6 +10,8 @@ export class PopupWidget extends Div{
     public readonly header: TitleBar<"h1">
     public readonly contents: Div;
 
+    protected static popupStack: Array<PopupWidget> = []
+
     constructor(title: string, closable: boolean = false){
         super({parentElement: document.body, cssClasses: [CssClasses.ItkPopupWidget]})
         const zIndex = 99999
@@ -32,11 +34,24 @@ export class PopupWidget extends Div{
                 ] : []
         })
         this.contents = new Div({parentElement: this.element, cssClasses: [CssClasses.ItkPopupContents]})
+        if(PopupWidget.popupStack.length > 0){
+            PopupWidget.popupStack[PopupWidget.popupStack.length - 1].show(false)
+        }
+        PopupWidget.popupStack.push(this)
+    }
+
+    public show(show: boolean): void {
+        super.show(show)
+        this.background.show(show)
     }
 
     public destroy(){
         this.background.destroy()
         super.destroy()
+        PopupWidget.popupStack.pop()
+        if(PopupWidget.popupStack.length > 0){
+            PopupWidget.popupStack[PopupWidget.popupStack.length - 1].show(true)
+        }
     }
 
     public static ClosablePopup(params: {title: string}): PopupWidget{
