@@ -80,6 +80,7 @@ export class Select<T> extends ButtonSpan{
         options: Array<T>,
         renderer: (val: T) => Widget<"span">,
         onChange?: (opt: T) => void,
+        value?: T,
     }){
         super({
             ...params,
@@ -107,8 +108,9 @@ export class Select<T> extends ButtonSpan{
             },
         })
         this.renderer = params.renderer
-        this._value = params.options[0]
+        this._value = params.value === undefined? params.options[0] : params.value
         this._options = params.options
+        this.value = this._value
     }
 
     public get value(): T{
