@@ -111,17 +111,47 @@ class PrecomputedChunksDataSourceDto(DataTransferObject):
 class N5GzipCompressorDto(DataTransferObject):
     level: int
 
+    @classmethod
+    def tag_key(cls) -> str:
+        return "type"
+
+    @classmethod
+    def tag_value(cls) -> str:
+        return "gzip"
+
 @dataclass
 class N5Bzip2CompressorDto(DataTransferObject):
     blockSize: int # name doesn't make sense but is what is in the n5 'spec'
+
+    @classmethod
+    def tag_key(cls) -> str:
+        return "type"
+
+    @classmethod
+    def tag_value(cls) -> str:
+        return "bzip2"
 
 @dataclass
 class N5XzCompressorDto(DataTransferObject):
     preset: int
 
+    @classmethod
+    def tag_key(cls) -> str:
+        return "type"
+
+    @classmethod
+    def tag_value(cls) -> str:
+        return "xz"
+
 @dataclass
 class N5RawCompressorDto(DataTransferObject):
-    pass
+    @classmethod
+    def tag_key(cls) -> str:
+        return "type"
+
+    @classmethod
+    def tag_value(cls) -> str:
+        return "raw"
 
 N5CompressorDto = Union[N5GzipCompressorDto, N5Bzip2CompressorDto, N5XzCompressorDto, N5RawCompressorDto]
 
@@ -133,6 +163,10 @@ class N5DatasetAttributesDto(DataTransferObject):
     axes: Optional[Tuple[str, ...]] # FIXME: retore this
     dataType: DtypeDto
     compression: N5CompressorDto
+
+    @classmethod
+    def tag_value(cls) -> None:
+        return None
 
 @dataclass
 class N5DataSourceDto(DataTransferObject):

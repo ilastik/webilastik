@@ -17,6 +17,9 @@ from webilastik.server.rpc.dto import (
 from webilastik.filesystem import IFilesystem
 
 class N5Compressor(ABC):
+    def __init__(self) -> None:
+        super().__init__()
+
     @abstractmethod
     def to_dto(self) -> N5CompressorDto:
         pass
@@ -106,6 +109,9 @@ class XzCompressor(N5Compressor):
 
 
 class RawCompressor(N5Compressor):
+    def __init__(self):
+        super().__init__()
+
     def __eq__(self, other: object) -> bool:
         return isinstance(other, RawCompressor)
 

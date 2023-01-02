@@ -809,7 +809,7 @@ def parse_as_N5GzipCompressorDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as N5GzipCompressorDto"
         )
-    if value.get("__class__") != "N5GzipCompressorDto":
+    if value.get("type") != "gzip":
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as N5GzipCompressorDto"
         )
@@ -825,9 +825,17 @@ def parse_as_N5GzipCompressorDto(
 class N5GzipCompressorDto(DataTransferObject):
     level: int
 
+    @classmethod
+    def tag_key(cls) -> str:
+        return "type"
+
+    @classmethod
+    def tag_value(cls) -> str:
+        return "gzip"
+
     def to_json_value(self) -> JsonObject:
         return {
-            "__class__": "N5GzipCompressorDto",
+            "type": "gzip",
             "level": self.level,
         }
 
@@ -847,7 +855,7 @@ def parse_as_N5Bzip2CompressorDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as N5Bzip2CompressorDto"
         )
-    if value.get("__class__") != "N5Bzip2CompressorDto":
+    if value.get("type") != "bzip2":
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as N5Bzip2CompressorDto"
         )
@@ -861,11 +869,19 @@ def parse_as_N5Bzip2CompressorDto(
 
 @dataclass
 class N5Bzip2CompressorDto(DataTransferObject):
-    blockSize: int
+    blockSize: int  # name doesn't make sense but is what is in the n5 'spec'
+
+    @classmethod
+    def tag_key(cls) -> str:
+        return "type"
+
+    @classmethod
+    def tag_value(cls) -> str:
+        return "bzip2"
 
     def to_json_value(self) -> JsonObject:
         return {
-            "__class__": "N5Bzip2CompressorDto",
+            "type": "bzip2",
             "blockSize": self.blockSize,
         }
 
@@ -885,7 +901,7 @@ def parse_as_N5XzCompressorDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as N5XzCompressorDto"
         )
-    if value.get("__class__") != "N5XzCompressorDto":
+    if value.get("type") != "xz":
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as N5XzCompressorDto"
         )
@@ -901,9 +917,17 @@ def parse_as_N5XzCompressorDto(
 class N5XzCompressorDto(DataTransferObject):
     preset: int
 
+    @classmethod
+    def tag_key(cls) -> str:
+        return "type"
+
+    @classmethod
+    def tag_value(cls) -> str:
+        return "xz"
+
     def to_json_value(self) -> JsonObject:
         return {
-            "__class__": "N5XzCompressorDto",
+            "type": "xz",
             "preset": self.preset,
         }
 
@@ -923,7 +947,7 @@ def parse_as_N5RawCompressorDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as N5RawCompressorDto"
         )
-    if value.get("__class__") != "N5RawCompressorDto":
+    if value.get("type") != "raw":
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as N5RawCompressorDto"
         )
@@ -932,11 +956,17 @@ def parse_as_N5RawCompressorDto(
 
 @dataclass
 class N5RawCompressorDto(DataTransferObject):
-    pass
+    @classmethod
+    def tag_key(cls) -> str:
+        return "type"
+
+    @classmethod
+    def tag_value(cls) -> str:
+        return "raw"
 
     def to_json_value(self) -> JsonObject:
         return {
-            "__class__": "N5RawCompressorDto",
+            "type": "raw",
         }
 
     @classmethod
@@ -1026,7 +1056,7 @@ def parse_as_N5DatasetAttributesDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as N5DatasetAttributesDto"
         )
-    if value.get("__class__") != "N5DatasetAttributesDto":
+    if value.get("__class__") != "None":
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as N5DatasetAttributesDto"
         )
@@ -1069,9 +1099,12 @@ class N5DatasetAttributesDto(DataTransferObject):
     dataType: DtypeDto
     compression: N5CompressorDto
 
+    @classmethod
+    def tag_value(cls) -> None:
+        return None
+
     def to_json_value(self) -> JsonObject:
         return {
-            "__class__": "N5DatasetAttributesDto",
             "dimensions": tuple(item for item in self.dimensions),
             "blockSize": tuple(item for item in self.blockSize),
             "axes": convert_to_json_value(self.axes),

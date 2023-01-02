@@ -48,7 +48,7 @@ export class ColorDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "ColorDto",
+      "__class__": "ColorDto",
       r: this.r,
       g: this.g,
       b: this.b,
@@ -93,7 +93,7 @@ export class LabelHeaderDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "LabelHeaderDto",
+      "__class__": "LabelHeaderDto",
       name: this.name,
       color: this.color.toJsonValue(),
     };
@@ -274,7 +274,7 @@ export class UrlDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "UrlDto",
+      "__class__": "UrlDto",
       datascheme: toJsonValue(this.datascheme),
       protocol: this.protocol,
       hostname: this.hostname,
@@ -338,7 +338,7 @@ export class Point5DDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "Point5DDto",
+      "__class__": "Point5DDto",
       x: this.x,
       y: this.y,
       z: this.z,
@@ -400,7 +400,7 @@ export class Shape5DDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "Shape5DDto",
+      "__class__": "Shape5DDto",
       x: this.x,
       y: this.y,
       z: this.z,
@@ -444,7 +444,7 @@ export class Interval5DDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "Interval5DDto",
+      "__class__": "Interval5DDto",
       start: this.start.toJsonValue(),
       stop: this.stop.toJsonValue(),
     };
@@ -471,7 +471,7 @@ export class OsfsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "OsfsDto",
+      "__class__": "OsfsDto",
     };
   }
   public static fromJsonValue(value: JsonValue): OsfsDto | Error {
@@ -541,7 +541,7 @@ export class HttpFsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "HttpFsDto",
+      "__class__": "HttpFsDto",
       protocol: this.protocol,
       hostname: this.hostname,
       port: toJsonValue(this.port),
@@ -579,7 +579,7 @@ export class BucketFSDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "BucketFSDto",
+      "__class__": "BucketFSDto",
       bucket_name: this.bucket_name,
     };
   }
@@ -734,7 +734,7 @@ export class PrecomputedChunksDataSourceDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "PrecomputedChunksDataSourceDto",
+      "__class__": "PrecomputedChunksDataSourceDto",
       url: this.url.toJsonValue(),
       filesystem: toJsonValue(this.filesystem),
       path: this.path,
@@ -756,7 +756,7 @@ export function parse_as_N5GzipCompressorDto(value: JsonValue): N5GzipCompressor
   if (valueObject instanceof Error) {
     return valueObject;
   }
-  if (valueObject["__class__"] != "N5GzipCompressorDto") {
+  if (valueObject["type"] != "gzip") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5GzipCompressorDto`);
   }
   const temp_level = parse_as_int(valueObject.level);
@@ -776,7 +776,7 @@ export class N5GzipCompressorDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "N5GzipCompressorDto",
+      "type": "gzip",
       level: this.level,
     };
   }
@@ -790,7 +790,7 @@ export function parse_as_N5Bzip2CompressorDto(value: JsonValue): N5Bzip2Compress
   if (valueObject instanceof Error) {
     return valueObject;
   }
-  if (valueObject["__class__"] != "N5Bzip2CompressorDto") {
+  if (valueObject["type"] != "bzip2") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5Bzip2CompressorDto`);
   }
   const temp_blockSize = parse_as_int(valueObject.blockSize);
@@ -810,7 +810,7 @@ export class N5Bzip2CompressorDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "N5Bzip2CompressorDto",
+      "type": "bzip2",
       blockSize: this.blockSize,
     };
   }
@@ -824,7 +824,7 @@ export function parse_as_N5XzCompressorDto(value: JsonValue): N5XzCompressorDto 
   if (valueObject instanceof Error) {
     return valueObject;
   }
-  if (valueObject["__class__"] != "N5XzCompressorDto") {
+  if (valueObject["type"] != "xz") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5XzCompressorDto`);
   }
   const temp_preset = parse_as_int(valueObject.preset);
@@ -844,7 +844,7 @@ export class N5XzCompressorDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "N5XzCompressorDto",
+      "type": "xz",
       preset: this.preset,
     };
   }
@@ -858,7 +858,7 @@ export function parse_as_N5RawCompressorDto(value: JsonValue): N5RawCompressorDt
   if (valueObject instanceof Error) {
     return valueObject;
   }
-  if (valueObject["__class__"] != "N5RawCompressorDto") {
+  if (valueObject["type"] != "raw") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5RawCompressorDto`);
   }
   return new N5RawCompressorDto({});
@@ -870,7 +870,7 @@ export class N5RawCompressorDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "N5RawCompressorDto",
+      "type": "raw",
     };
   }
   public static fromJsonValue(value: JsonValue): N5RawCompressorDto | Error {
@@ -943,7 +943,7 @@ export function parse_as_N5DatasetAttributesDto(value: JsonValue): N5DatasetAttr
   if (valueObject instanceof Error) {
     return valueObject;
   }
-  if (valueObject["__class__"] != "N5DatasetAttributesDto") {
+  if (valueObject["__class__"] != "undefined") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5DatasetAttributesDto`);
   }
   const temp_dimensions = parse_as_Tuple_of_int0_varlen__endof_(valueObject.dimensions);
@@ -993,7 +993,6 @@ export class N5DatasetAttributesDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "N5DatasetAttributesDto",
       dimensions: this.dimensions.map((item) => item),
       blockSize: this.blockSize.map((item) => item),
       axes: toJsonValue(this.axes),
@@ -1085,7 +1084,7 @@ export class N5DataSourceDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "N5DataSourceDto",
+      "__class__": "N5DataSourceDto",
       url: this.url.toJsonValue(),
       filesystem: toJsonValue(this.filesystem),
       path: this.path,
@@ -1166,7 +1165,7 @@ export class SkimageDataSourceDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "SkimageDataSourceDto",
+      "__class__": "SkimageDataSourceDto",
       url: this.url.toJsonValue(),
       filesystem: toJsonValue(this.filesystem),
       path: this.path,
@@ -1251,7 +1250,7 @@ export class PrecomputedChunksSinkDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "PrecomputedChunksSinkDto",
+      "__class__": "PrecomputedChunksSinkDto",
       filesystem: toJsonValue(this.filesystem),
       path: this.path,
       tile_shape: this.tile_shape.toJsonValue(),
@@ -1340,7 +1339,7 @@ export class N5DataSinkDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "N5DataSinkDto",
+      "__class__": "N5DataSinkDto",
       filesystem: toJsonValue(this.filesystem),
       path: this.path,
       interval: this.interval.toJsonValue(),
@@ -1423,7 +1422,7 @@ export class PixelAnnotationDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "PixelAnnotationDto",
+      "__class__": "PixelAnnotationDto",
       raw_data: toJsonValue(this.raw_data),
       points: this.points.map((item) => [item[0], item[1], item[2]]),
     };
@@ -1458,7 +1457,7 @@ export class RpcErrorDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "RpcErrorDto",
+      "__class__": "RpcErrorDto",
       error: this.error,
     };
   }
@@ -1498,7 +1497,7 @@ export class RecolorLabelParams {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "RecolorLabelParams",
+      "__class__": "RecolorLabelParams",
       label_name: this.label_name,
       new_color: this.new_color.toJsonValue(),
     };
@@ -1539,7 +1538,7 @@ export class RenameLabelParams {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "RenameLabelParams",
+      "__class__": "RenameLabelParams",
       old_name: this.old_name,
       new_name: this.new_name,
     };
@@ -1580,7 +1579,7 @@ export class CreateLabelParams {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "CreateLabelParams",
+      "__class__": "CreateLabelParams",
       label_name: this.label_name,
       color: this.color.toJsonValue(),
     };
@@ -1615,7 +1614,7 @@ export class RemoveLabelParams {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "RemoveLabelParams",
+      "__class__": "RemoveLabelParams",
       label_name: this.label_name,
     };
   }
@@ -1655,7 +1654,7 @@ export class AddPixelAnnotationParams {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "AddPixelAnnotationParams",
+      "__class__": "AddPixelAnnotationParams",
       label_name: this.label_name,
       pixel_annotation: this.pixel_annotation.toJsonValue(),
     };
@@ -1696,7 +1695,7 @@ export class RemovePixelAnnotationParams {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "RemovePixelAnnotationParams",
+      "__class__": "RemovePixelAnnotationParams",
       label_name: this.label_name,
       pixel_annotation: this.pixel_annotation.toJsonValue(),
     };
@@ -1756,7 +1755,7 @@ export class LabelDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "LabelDto",
+      "__class__": "LabelDto",
       name: this.name,
       color: this.color.toJsonValue(),
       annotations: this.annotations.map((item) => item.toJsonValue()),
@@ -1803,7 +1802,7 @@ export class BrushingAppletStateDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "BrushingAppletStateDto",
+      "__class__": "BrushingAppletStateDto",
       labels: this.labels.map((item) => item.toJsonValue()),
     };
   }
@@ -1843,7 +1842,7 @@ export class ViewDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "ViewDto",
+      "__class__": "ViewDto",
       name: this.name,
       url: this.url.toJsonValue(),
     };
@@ -1884,7 +1883,7 @@ export class DataView {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "DataView",
+      "__class__": "DataView",
       name: this.name,
       url: this.url.toJsonValue(),
     };
@@ -1949,7 +1948,7 @@ export class RawDataViewDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "RawDataViewDto",
+      "__class__": "RawDataViewDto",
       name: this.name,
       url: this.url.toJsonValue(),
       datasources: this.datasources.map((item) => toJsonValue(item)),
@@ -1999,7 +1998,7 @@ export class StrippedPrecomputedViewDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "StrippedPrecomputedViewDto",
+      "__class__": "StrippedPrecomputedViewDto",
       name: this.name,
       url: this.url.toJsonValue(),
       datasource: toJsonValue(this.datasource),
@@ -2055,7 +2054,7 @@ export class PredictionsViewDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "PredictionsViewDto",
+      "__class__": "PredictionsViewDto",
       name: this.name,
       url: this.url.toJsonValue(),
       raw_data: toJsonValue(this.raw_data),
@@ -2104,7 +2103,7 @@ export class FailedViewDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "FailedViewDto",
+      "__class__": "FailedViewDto",
       name: this.name,
       url: this.url.toJsonValue(),
       error_message: this.error_message,
@@ -2146,7 +2145,7 @@ export class UnsupportedDatasetViewDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "UnsupportedDatasetViewDto",
+      "__class__": "UnsupportedDatasetViewDto",
       name: this.name,
       url: this.url.toJsonValue(),
     };
@@ -2265,7 +2264,7 @@ export class ViewerAppletStateDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "ViewerAppletStateDto",
+      "__class__": "ViewerAppletStateDto",
       frontend_timestamp: this.frontend_timestamp,
       data_views: this.data_views.map((item) => toJsonValue(item)),
       prediction_views: this.prediction_views.map((item) => item.toJsonValue()),
@@ -2308,7 +2307,7 @@ export class MakeDataViewParams {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "MakeDataViewParams",
+      "__class__": "MakeDataViewParams",
       view_name: this.view_name,
       url: this.url.toJsonValue(),
     };
@@ -2401,7 +2400,7 @@ export class JobDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "JobDto",
+      "__class__": "JobDto",
       name: this.name,
       num_args: toJsonValue(this.num_args),
       uuid: this.uuid,
@@ -2492,7 +2491,7 @@ export class ExportJobDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "ExportJobDto",
+      "__class__": "ExportJobDto",
       name: this.name,
       num_args: toJsonValue(this.num_args),
       uuid: this.uuid,
@@ -2571,7 +2570,7 @@ export class OpenDatasinkJobDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "OpenDatasinkJobDto",
+      "__class__": "OpenDatasinkJobDto",
       name: this.name,
       num_args: toJsonValue(this.num_args),
       uuid: this.uuid,
@@ -2702,7 +2701,7 @@ export class PixelClassificationExportAppletStateDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "PixelClassificationExportAppletStateDto",
+      "__class__": "PixelClassificationExportAppletStateDto",
       jobs: this.jobs.map((item) => toJsonValue(item)),
       populated_labels: toJsonValue(this.populated_labels),
       datasource_suggestions: toJsonValue(this.datasource_suggestions),
@@ -2838,7 +2837,7 @@ export class IlpFeatureExtractorDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "IlpFeatureExtractorDto",
+      "__class__": "IlpFeatureExtractorDto",
       ilp_scale: this.ilp_scale,
       axis_2d: toJsonValue(this.axis_2d),
       class_name: this.class_name,
@@ -2889,7 +2888,7 @@ export class FeatureSelectionAppletStateDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "FeatureSelectionAppletStateDto",
+      "__class__": "FeatureSelectionAppletStateDto",
       feature_extractors: this.feature_extractors.map((item) => item.toJsonValue()),
     };
   }
@@ -2925,7 +2924,7 @@ export class AddFeatureExtractorsParamsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "AddFeatureExtractorsParamsDto",
+      "__class__": "AddFeatureExtractorsParamsDto",
       feature_extractors: this.feature_extractors.map((item) => item.toJsonValue()),
     };
   }
@@ -2961,7 +2960,7 @@ export class RemoveFeatureExtractorsParamsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "RemoveFeatureExtractorsParamsDto",
+      "__class__": "RemoveFeatureExtractorsParamsDto",
       feature_extractors: this.feature_extractors.map((item) => item.toJsonValue()),
     };
   }
@@ -3141,7 +3140,7 @@ export class ComputeSessionDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "ComputeSessionDto",
+      "__class__": "ComputeSessionDto",
       start_time_utc_sec: toJsonValue(this.start_time_utc_sec),
       time_elapsed_sec: this.time_elapsed_sec,
       time_limit_minutes: this.time_limit_minutes,
@@ -3220,7 +3219,7 @@ export class ComputeSessionStatusDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "ComputeSessionStatusDto",
+      "__class__": "ComputeSessionStatusDto",
       compute_session: this.compute_session.toJsonValue(),
       hpc_site: this.hpc_site,
       session_url: this.session_url.toJsonValue(),
@@ -3265,7 +3264,7 @@ export class CreateComputeSessionParamsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "CreateComputeSessionParamsDto",
+      "__class__": "CreateComputeSessionParamsDto",
       session_duration_minutes: this.session_duration_minutes,
       hpc_site: this.hpc_site,
     };
@@ -3308,7 +3307,7 @@ export class GetComputeSessionStatusParamsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "GetComputeSessionStatusParamsDto",
+      "__class__": "GetComputeSessionStatusParamsDto",
       compute_session_id: this.compute_session_id,
       hpc_site: this.hpc_site,
     };
@@ -3351,7 +3350,7 @@ export class CloseComputeSessionParamsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "CloseComputeSessionParamsDto",
+      "__class__": "CloseComputeSessionParamsDto",
       compute_session_id: this.compute_session_id,
       hpc_site: this.hpc_site,
     };
@@ -3386,7 +3385,7 @@ export class CloseComputeSessionResponseDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "CloseComputeSessionResponseDto",
+      "__class__": "CloseComputeSessionResponseDto",
       compute_session_id: this.compute_session_id,
     };
   }
@@ -3422,7 +3421,7 @@ export class ListComputeSessionsParamsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "ListComputeSessionsParamsDto",
+      "__class__": "ListComputeSessionsParamsDto",
       hpc_site: this.hpc_site,
     };
   }
@@ -3471,7 +3470,7 @@ export class ListComputeSessionsResponseDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "ListComputeSessionsResponseDto",
+      "__class__": "ListComputeSessionsResponseDto",
       compute_sessions_stati: this.compute_sessions_stati.map((item) => item.toJsonValue()),
     };
   }
@@ -3521,7 +3520,7 @@ export class GetAvailableHpcSitesResponseDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "GetAvailableHpcSitesResponseDto",
+      "__class__": "GetAvailableHpcSitesResponseDto",
       available_sites: this.available_sites.map((item) => item),
     };
   }
@@ -3555,7 +3554,7 @@ export class CheckLoginResultDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "CheckLoginResultDto",
+      "__class__": "CheckLoginResultDto",
       logged_in: this.logged_in,
     };
   }
@@ -3599,7 +3598,7 @@ export class StartPixelProbabilitiesExportJobParamsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "StartPixelProbabilitiesExportJobParamsDto",
+      "__class__": "StartPixelProbabilitiesExportJobParamsDto",
       datasource: toJsonValue(this.datasource),
       datasink: toJsonValue(this.datasink),
     };
@@ -3650,7 +3649,7 @@ export class StartSimpleSegmentationExportJobParamsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "StartSimpleSegmentationExportJobParamsDto",
+      "__class__": "StartSimpleSegmentationExportJobParamsDto",
       datasource: toJsonValue(this.datasource),
       datasink: toJsonValue(this.datasink),
       label_header: this.label_header.toJsonValue(),
@@ -3692,7 +3691,7 @@ export class LoadProjectParamsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "LoadProjectParamsDto",
+      "__class__": "LoadProjectParamsDto",
       fs: toJsonValue(this.fs),
       project_file_path: this.project_file_path,
     };
@@ -3733,7 +3732,7 @@ export class SaveProjectParamsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "SaveProjectParamsDto",
+      "__class__": "SaveProjectParamsDto",
       fs: toJsonValue(this.fs),
       project_file_path: this.project_file_path,
     };
@@ -3768,7 +3767,7 @@ export class GetDatasourcesFromUrlParamsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "GetDatasourcesFromUrlParamsDto",
+      "__class__": "GetDatasourcesFromUrlParamsDto",
       url: this.url.toJsonValue(),
     };
   }
@@ -3853,7 +3852,7 @@ export class GetDatasourcesFromUrlResponseDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "GetDatasourcesFromUrlResponseDto",
+      "__class__": "GetDatasourcesFromUrlResponseDto",
       datasources: toJsonValue(this.datasources),
     };
   }
@@ -3892,7 +3891,7 @@ export class CheckDatasourceCompatibilityParams {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "CheckDatasourceCompatibilityParams",
+      "__class__": "CheckDatasourceCompatibilityParams",
       datasources: this.datasources.map((item) => toJsonValue(item)),
     };
   }
@@ -3939,7 +3938,7 @@ export class CheckDatasourceCompatibilityResponse {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "CheckDatasourceCompatibilityResponse",
+      "__class__": "CheckDatasourceCompatibilityResponse",
       compatible: this.compatible.map((item) => item),
     };
   }
@@ -3979,7 +3978,7 @@ export class ListFsDirRequest {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "ListFsDirRequest",
+      "__class__": "ListFsDirRequest",
       fs: toJsonValue(this.fs),
       path: this.path,
     };
@@ -4020,7 +4019,7 @@ export class ListFsDirResponse {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "ListFsDirResponse",
+      "__class__": "ListFsDirResponse",
       files: this.files.map((item) => item),
       directories: this.directories.map((item) => item),
     };
