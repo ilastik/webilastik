@@ -174,3 +174,8 @@ class NodeHours(NewTypeNumber):
     def to_node_minutes(self) -> "NodeMinutes":
         return NodeMinutes(self._value * 60)
 
+class Nanometers(NewTypeNumber):
+    pass
+
+class Nanoseconds(NewTypeNumber):
+    pass
