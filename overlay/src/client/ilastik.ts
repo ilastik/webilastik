@@ -977,7 +977,10 @@ export abstract class FsDataSink{
         if(message instanceof PrecomputedChunksSinkDto){
             return PrecomputedChunksSink.fromDto(message)
         }
-        throw `FIXME:N5 datasource not supported yet`
+        if(message instanceof N5DataSinkDto){
+            return N5DataSink.fromDto(message)
+        }
+        assertUnreachable(message)
     }
 
     public abstract toDataSource(): FsDataSource;
