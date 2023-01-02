@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from typing import Optional, Any
+from typing import Optional, Any, Tuple
 import tempfile
 from pathlib import PurePosixPath
 import pickle
@@ -19,6 +19,7 @@ from webilastik.datasource.n5_attributes import N5Compressor, RawCompressor
 from webilastik.datasource import DataSource
 from webilastik.datasource.array_datasource import ArrayDataSource
 from webilastik.datasource.skimage_datasource import SkimageDataSource
+from webilastik.filesystem import IFilesystem
 from webilastik.filesystem.os_fs import OsFs
 
 # fmt: off
@@ -69,13 +70,12 @@ def create_png(array: Array5D) -> PurePosixPath:
 
 def create_n5(
     array: Array5D, *, axiskeys: Optional[str] = None, chunk_size: Shape5D, compression: N5Compressor = RawCompressor()
-):
-    path = PurePosixPath(tempfile.mkstemp()[1] + ".n5")
+) -> Tuple[IFilesystem, PurePosixPath]:
+    path = PurePosixPath(tempfile.mkstemp()[1] + ".n5/data")
     fs = OsFs.create()
     assert not isinstance(fs, Exception)
     sink = N5DataSink(
-        outer_path=path,
-        inner_path=PurePosixPath("/data"),
+        path=path,
         filesystem=fs,
         tile_shape=chunk_size,
         c_axiskeys=axiskeys or array.axiskeys,
@@ -88,7 +88,7 @@ def create_n5(
 
     for tile in array.split(chunk_size):
         sink_writer.write(tile)
-    return path.as_posix()
+    return (fs, path)
 
 
 def create_h5(array: Array5D, axiskeys_style: str, chunk_shape: Optional[Shape5D] = None, axiskeys: str = "xyztc"):
@@ -137,10 +137,10 @@ def test_retrieve_roi_smaller_than_tile():
          [1600, 1700, 1800, 1900]]
     ])
     # fmt: on
-    path = PurePosixPath(create_n5(data, chunk_size=Shape5D(c=2, y=4, x=4)))
-    fs = OsFs.create()
+    fs, path = create_n5(data, chunk_size=Shape5D(c=2, y=4, x=4))
     assert not isinstance(fs, Exception)
-    ds = N5DataSource(path=path / "data", filesystem=fs)
+    ds = N5DataSource.try_load(path=path, filesystem=fs)
+    assert not isinstance(ds, Exception)
     smaller_than_tile = ds.retrieve(c=1, y=(0, 4), x=(0, 4))
     assert np.all(smaller_than_tile.raw("cyx") == expected_cyx)
 
@@ -155,10 +155,10 @@ def test_n5_datasource():
     ]).astype(np.uint8), axiskeys="yx")
     # fmt: on
 
-    path = PurePosixPath(create_n5(data, chunk_size=Shape5D(x=2, y=2)))
-    fs = OsFs.create()
+    fs, path = create_n5(data, chunk_size=Shape5D(x=2, y=2))
     assert not isinstance(fs, Exception)
-    ds = N5DataSource(path=path / "data", filesystem=fs)
+    ds = N5DataSource.try_load(path=path, filesystem=fs)
+    assert not isinstance(ds, Exception), str(ds)
     assert ds.shape == data.shape
 
     # fmt: off

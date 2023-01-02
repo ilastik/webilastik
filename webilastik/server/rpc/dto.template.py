@@ -27,7 +27,7 @@ Protocol = Literal["http", "https", "file", "memory"]
 
 @dataclass
 class UrlDto(DataTransferObject):
-    datascheme: Optional[Literal["precomputed"]]
+    datascheme: Optional[Literal["precomputed", "n5"]]
     protocol: Literal["http", "https", "file", "memory"]
     hostname: str
     port: Optional[int]
@@ -90,7 +90,7 @@ class BucketFSDto(DataTransferObject):
 
 FsDto = Union[OsfsDto, HttpFsDto, BucketFSDto]
 
-DtypeDto = Literal["uint8", "uint16", "uint32", "uint64", "float32"]
+DtypeDto = Literal["uint8", "uint16", "uint32", "uint64", "int64", "float32"]
 
 def dtype_to_dto(dtype: "np.dtype[Any]") -> DtypeDto:
     return cast(DtypeDto, str(dtype))
@@ -108,6 +108,33 @@ class PrecomputedChunksDataSourceDto(DataTransferObject):
     encoder: Literal["raw", "jpeg"]
 
 @dataclass
+class N5GzipCompressorDto(DataTransferObject):
+    level: int
+
+@dataclass
+class N5Bzip2CompressorDto(DataTransferObject):
+    blockSize: int # name doesn't make sense but is what is in the n5 'spec'
+
+@dataclass
+class N5XzCompressorDto(DataTransferObject):
+    preset: int
+
+@dataclass
+class N5RawCompressorDto(DataTransferObject):
+    pass
+
+N5CompressorDto = Union[N5GzipCompressorDto, N5Bzip2CompressorDto, N5XzCompressorDto, N5RawCompressorDto]
+
+@dataclass
+class N5DatasetAttributesDto(DataTransferObject):
+    dimensions: Tuple[int, ...]
+    blockSize: Tuple[int, ...]
+    # axes: Optional[Tuple[Literal["x", "y", "z", "t", "c"], ...]] # FIXME: retore this
+    axes: Optional[Tuple[str, ...]] # FIXME: retore this
+    dataType: DtypeDto
+    compression: N5CompressorDto
+
+@dataclass
 class N5DataSourceDto(DataTransferObject):
     url: UrlDto
     filesystem: FsDto
@@ -116,6 +143,8 @@ class N5DataSourceDto(DataTransferObject):
     tile_shape: Shape5DDto
     spatial_resolution: Tuple[int, int, int]
     dtype: DtypeDto
+    compressor: N5CompressorDto
+    c_axiskeys_on_disk: str
 
 @dataclass
 class SkimageDataSourceDto(DataTransferObject):
@@ -144,30 +173,12 @@ class PrecomputedChunksSinkDto(DataTransferObject):
     encoding: Literal["raw", "jpeg"]
 
 @dataclass
-class N5GzipCompressorDto(DataTransferObject):
-    level: int
-
-@dataclass
-class N5Bzip2CompressorDto(DataTransferObject):
-    blockSize: int
-
-@dataclass
-class N5XzCompressorDto(DataTransferObject):
-    preset: int
-
-@dataclass
-class N5RawCompressorDto(DataTransferObject):
-    pass
-
-N5CompressorDto = Union[N5GzipCompressorDto, N5Bzip2CompressorDto, N5XzCompressorDto, N5RawCompressorDto]
-
-@dataclass
 class N5DataSinkDto(DataTransferObject):
     filesystem: FsDto
-    outer_path: str
-    inner_path: str
+    path: str
     interval: Interval5DDto
     tile_shape: Shape5DDto
+    spatial_resolution: Tuple[int, int, int]
     c_axiskeys: str
     dtype: DtypeDto
     compressor: N5CompressorDto

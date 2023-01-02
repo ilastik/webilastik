@@ -32,10 +32,10 @@ def convert_to_json_value(value: JsonableValue) -> JsonValue:
     return value.to_json_value()
 
 class BadJsonException(Exception):
-    def __init__(self, json_str: str) -> None:
+    def __init__(self, json_str: "str | bytes") -> None:
         super().__init__(f"Bad json: {json_str}")
 
-def parse_json(value: str) -> "JsonValue | BadJsonException":
+def parse_json(value: "str | bytes") -> "JsonValue | BadJsonException":
     try:
         return json.loads(value)
     except Exception:

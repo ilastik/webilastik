@@ -1,11 +1,10 @@
 from typing import Any, Optional, Tuple
 from pathlib import PurePosixPath
 import enum
-import json
 from webilastik.filesystem import FsFileNotFoundException, IFilesystem, create_filesystem_from_message
 
 import numpy as np
-from ndstructs.point5D import Point5D, Interval5D
+from ndstructs.point5D import Point5D, Interval5D, Shape5D
 from ndstructs.array5D import Array5D
 
 from webilastik.datasource.n5_attributes import N5Compressor, N5DatasetAttributes
@@ -71,23 +70,52 @@ class N5DataSource(FsDataSource):
         *,
         filesystem: IFilesystem,
         path: PurePosixPath,
-        location: Optional[Point5D] = None,
+        interval: Interval5D,
+        tile_shape: Shape5D,
+        c_axiskeys_on_disk: str,
+        dtype: "np.dtype[Any]",
         spatial_resolution: Optional[Tuple[int, int, int]] = None,
+        compressor: N5Compressor,
     ):
-        attributes_read_result = filesystem.read_file(path.joinpath("attributes.json"))
-        if isinstance(attributes_read_result, Exception):
-            raise attributes_read_result #FIXME: return instead
-        attributes_json = attributes_read_result.decode("utf8")
-        self.attributes = N5DatasetAttributes.from_json_data(json.loads(attributes_json), location_override=location)
-
+        self.compressor = compressor
         super().__init__(
-            c_axiskeys_on_disk=self.attributes.c_axiskeys,
+            c_axiskeys_on_disk=c_axiskeys_on_disk,
             filesystem=filesystem,
             path=path,
-            tile_shape=self.attributes.blockSize,
-            interval=self.attributes.interval,
-            dtype=self.attributes.dataType,
+            tile_shape=tile_shape,
+            interval=interval,
+            dtype=dtype,
             spatial_resolution=spatial_resolution,
+        )
+        self.attributes = N5DatasetAttributes(
+            dimensions=self.interval.shape,
+            c_axiskeys=self.c_axiskeys_on_disk,
+            blockSize=self.tile_shape,
+            compression=self.compressor,
+            dataType=self.dtype,
+        )
+
+    @classmethod
+    def try_load(
+        cls,
+        *,
+        filesystem: IFilesystem,
+        path: PurePosixPath,
+        spatial_resolution: Optional[Tuple[int, int, int]] = None,
+    ) -> "N5DataSource | Exception":
+        attributes_result = N5DatasetAttributes.try_load(filesystem=filesystem, path=path.joinpath("attributes.json"))
+        if isinstance(attributes_result, Exception):
+            return attributes_result
+
+        return N5DataSource(
+            filesystem=filesystem,
+            path=path,
+            c_axiskeys_on_disk=attributes_result.c_axiskeys,
+            tile_shape=attributes_result.blockSize,
+            interval=attributes_result.interval,
+            dtype=attributes_result.dataType,
+            spatial_resolution=spatial_resolution,
+            compressor=attributes_result.compression,
         )
 
     @staticmethod
@@ -95,10 +123,16 @@ class N5DataSource(FsDataSource):
         fs_result = create_filesystem_from_message(dto.filesystem)
         if isinstance(fs_result, Exception):
             return fs_result
+
         return N5DataSource(
             filesystem=fs_result,
             path=PurePosixPath(dto.path),
+            dtype=np.dtype(dto.dtype),
+            interval=dto.interval.to_interval5d(),
+            compressor=N5Compressor.create_from_dto(dto.compressor),
             spatial_resolution=dto.spatial_resolution,
+            tile_shape=dto.tile_shape.to_shape5d(),
+            c_axiskeys_on_disk=dto.c_axiskeys_on_disk,
         )
 
     def to_dto(self) -> N5DataSourceDto:
@@ -110,6 +144,8 @@ class N5DataSource(FsDataSource):
             spatial_resolution=self.spatial_resolution,
             tile_shape=Shape5DDto.from_shape5d(self.tile_shape),
             dtype=dtype_to_dto(self.dtype),
+            c_axiskeys_on_disk=self.c_axiskeys_on_disk,
+            compressor=self.compressor.to_dto(),
         )
 
     def __hash__(self) -> int:
@@ -130,5 +166,5 @@ class N5DataSource(FsDataSource):
         if isinstance(read_result, Exception):
             raise read_result #FIXME: return instead
         return N5Block.from_bytes(
-            data=read_result, c_axiskeys=self.c_axiskeys_on_disk, dtype=self.dtype, compression=self.attributes.compression, location=tile.start
+            data=read_result, c_axiskeys=self.c_axiskeys_on_disk, dtype=self.dtype, compression=self.compressor, location=tile.start
         )

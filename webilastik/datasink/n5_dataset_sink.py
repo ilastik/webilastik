@@ -1,4 +1,4 @@
-from typing import Any, Set
+from typing import Any, Optional, Set, Tuple
 from pathlib import PurePosixPath
 import json
 import numpy as np
@@ -24,7 +24,7 @@ class N5Writer(IDataSinkWriter):
 
     def write(self, data: Array5D) -> None:
         tile = N5Block.fromArray5D(data)
-        tile_path = self._data_sink.full_path / self._data_sink.attributes.get_tile_path(data.interval)
+        tile_path = self._data_sink.path / self._data_sink.attributes.get_tile_path(data.interval)
         writing_result = self._data_sink.filesystem.create_file(
             path=tile_path,
             contents=tile.to_n5_bytes(
@@ -39,22 +39,22 @@ class N5DataSink(DataSink):
         self,
         *,
         filesystem: IFilesystem,
-        outer_path: PurePosixPath,
-        inner_path: PurePosixPath,
+        path: PurePosixPath,
         interval: Interval5D,
         tile_shape: Shape5D,
         c_axiskeys: str,
         dtype: "np.dtype[Any]",
         compressor: N5Compressor,
+        resolution: Tuple[int, int, int] = (1,1,1), #FIXME
     ):
         super().__init__(
             dtype=dtype,
             tile_shape=tile_shape,
             interval=interval,
+            resolution=resolution
         )
-        self.outer_path = outer_path
-        self.inner_path = inner_path
-        self.full_path = outer_path.joinpath(inner_path.as_posix().lstrip("/"))
+        self.resolution = resolution
+        self.path = path
         self.filesystem = filesystem
         self.c_axiskeys = c_axiskeys
         self.compressor = compressor
@@ -64,23 +64,30 @@ class N5DataSink(DataSink):
             blockSize=self.tile_shape,
             compression=self.compressor,
             dataType=self.dtype,
-            location=self.interval.start
         )
 
+        self.outer_path: Optional[PurePosixPath] = None
+        while path != path.parent:
+            if path.suffix.lower() == ".n5":
+                self.outer_path = path
+                break
+            path = path.parent
 
     def open(self) -> "Exception | N5Writer":
-        # _ = self.filesystem.makedirs(self.full_path.as_posix(), recreate=True)
-
-        root_attributes_write_result = self.filesystem.create_file(
-            path=self.outer_path.joinpath("attributes.json"),
-            contents=json.dumps({"n5": "2.0.0"}).encode("utf8"),
-        )
-        if isinstance(root_attributes_write_result, Exception):
-            return root_attributes_write_result
+        if self.outer_path:
+            attributes_path = self.outer_path / "attributes.json"
+            exists_result = self.filesystem.exists(attributes_path)
+            if isinstance(exists_result, Exception):
+                return exists_result
+            if not exists_result:
+                root_attrs = json.dumps({"n5": "2.0.0"}).encode("utf8")
+                root_attrs_result = self.filesystem.create_file(path=attributes_path, contents=root_attrs)
+                if isinstance(root_attrs_result, Exception):
+                    return root_attrs_result
 
         dataset_attributes_write_result = self.filesystem.create_file(
-            path=self.full_path.joinpath("attributes.json"),
-            contents=json.dumps(self.attributes.to_json_data()).encode("utf-8")
+            path=self.path.joinpath("attributes.json"),
+            contents=json.dumps(self.attributes.to_dto().to_json_value()).encode("utf-8")
         )
         if isinstance(dataset_attributes_write_result, Exception):
             return dataset_attributes_write_result
@@ -88,7 +95,7 @@ class N5DataSink(DataSink):
         # create all directories in the constructor to avoid races when processing tiles
         created_dirs : Set[PurePosixPath] = set()
         for tile in self.interval.split(self.tile_shape):
-            dir_path = self.full_path / self.attributes.get_tile_path(tile).parent
+            dir_path = self.path / self.attributes.get_tile_path(tile).parent
             if dir_path and dir_path not in created_dirs:
                 # print(f"Will create dir at {dir_path}")
                 dir_creation_result = self.filesystem.create_directory(dir_path)
@@ -101,13 +108,13 @@ class N5DataSink(DataSink):
     def to_dto(self) -> N5DataSinkDto:
         return N5DataSinkDto(
             filesystem=self.filesystem.to_dto(),
-            outer_path=self.outer_path.as_posix(),
-            inner_path=self.inner_path.as_posix(),
+            path=self.path.as_posix(),
             interval=Interval5DDto.from_interval5d(self.interval),
             tile_shape=Shape5DDto.from_shape5d(self.tile_shape),
             c_axiskeys=self.c_axiskeys,
             dtype=dtype_to_dto(self.dtype),
             compressor=self.compressor.to_dto(),
+            spatial_resolution=self.resolution,
         )
 
     @staticmethod
@@ -117,11 +124,11 @@ class N5DataSink(DataSink):
             return fs_result
         return N5DataSink(
             filesystem=fs_result,
-            outer_path=PurePosixPath(dto.outer_path),
-            inner_path=PurePosixPath(dto.inner_path),
+            path=PurePosixPath(dto.path),
             interval=dto.interval.to_interval5d(),
             tile_shape=dto.tile_shape.to_shape5d(),
             c_axiskeys=dto.c_axiskeys,
             dtype=np.dtype(dto.dtype),
             compressor=N5Compressor.create_from_dto(dto.compressor),
+            resolution=dto.spatial_resolution
         )

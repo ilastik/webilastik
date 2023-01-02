@@ -127,13 +127,18 @@ class LabelHeaderDto(DataTransferObject):
 Protocol = Literal["http", "https", "file", "memory"]
 
 
-def parse_as_Literal_of__quote_precomputed_quote__endof_(
+def parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_(
     value: JsonValue,
-) -> "Literal['precomputed'] | MessageParsingError":
+) -> "Literal['precomputed', 'n5'] | MessageParsingError":
     tmp_0 = parse_as_str(value)
     if not isinstance(tmp_0, MessageParsingError) and tmp_0 == "precomputed":
         return tmp_0
-    return MessageParsingError(f"Could not parse {value} as Literal['precomputed']")
+    tmp_1 = parse_as_str(value)
+    if not isinstance(tmp_1, MessageParsingError) and tmp_1 == "n5":
+        return tmp_1
+    return MessageParsingError(
+        f"Could not parse {value} as Literal['precomputed', 'n5']"
+    )
 
 
 def parse_as_None(value: JsonValue) -> "None | MessageParsingError":
@@ -143,17 +148,19 @@ def parse_as_None(value: JsonValue) -> "None | MessageParsingError":
     return MessageParsingError(f"Could not parse {json.dumps(value)} as None")
 
 
-def parse_as_Union_of_Literal_of__quote_precomputed_quote__endof_0None_endof_(
+def parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_0None_endof_(
     value: JsonValue,
-) -> "Union[Literal['precomputed'], None] | MessageParsingError":
-    parsed_option_0 = parse_as_Literal_of__quote_precomputed_quote__endof_(value)
+) -> "Union[Literal['precomputed', 'n5'], None] | MessageParsingError":
+    parsed_option_0 = (
+        parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_(value)
+    )
     if not isinstance(parsed_option_0, MessageParsingError):
         return parsed_option_0
     parsed_option_1 = parse_as_None(value)
     if not isinstance(parsed_option_1, MessageParsingError):
         return parsed_option_1
     return MessageParsingError(
-        f"Could not parse {json.dumps(value)} into Union[Literal['precomputed'], None]"
+        f"Could not parse {json.dumps(value)} into Union[Literal['precomputed', 'n5'], None]"
     )
 
 
@@ -247,10 +254,8 @@ def parse_as_UrlDto(value: JsonValue) -> "UrlDto | MessageParsingError":
         return MessageParsingError(f"Could not parse {json.dumps(value)} as UrlDto")
     if value.get("__class__") != "UrlDto":
         return MessageParsingError(f"Could not parse {json.dumps(value)} as UrlDto")
-    tmp_datascheme = (
-        parse_as_Union_of_Literal_of__quote_precomputed_quote__endof_0None_endof_(
-            value.get("datascheme")
-        )
+    tmp_datascheme = parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_0None_endof_(
+        value.get("datascheme")
     )
     if isinstance(tmp_datascheme, MessageParsingError):
         return tmp_datascheme
@@ -289,7 +294,7 @@ def parse_as_UrlDto(value: JsonValue) -> "UrlDto | MessageParsingError":
 
 @dataclass
 class UrlDto(DataTransferObject):
-    datascheme: Optional[Literal["precomputed"]]
+    datascheme: Optional[Literal["precomputed", "n5"]]
     protocol: Literal["http", "https", "file", "memory"]
     hostname: str
     port: Optional[int]
@@ -612,7 +617,7 @@ class BucketFSDto(DataTransferObject):
 
 FsDto = Union[OsfsDto, HttpFsDto, BucketFSDto]
 
-DtypeDto = Literal["uint8", "uint16", "uint32", "uint64", "float32"]
+DtypeDto = Literal["uint8", "uint16", "uint32", "uint64", "int64", "float32"]
 
 
 def dtype_to_dto(dtype: "np.dtype[Any]") -> DtypeDto:
@@ -659,9 +664,9 @@ def parse_as_Tuple_of_int0int0int_endof_(
     )
 
 
-def parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_float32_quote__endof_(
+def parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
     value: JsonValue,
-) -> "Literal['uint8', 'uint16', 'uint32', 'uint64', 'float32'] | MessageParsingError":
+) -> "Literal['uint8', 'uint16', 'uint32', 'uint64', 'int64', 'float32'] | MessageParsingError":
     tmp_0 = parse_as_str(value)
     if not isinstance(tmp_0, MessageParsingError) and tmp_0 == "uint8":
         return tmp_0
@@ -675,10 +680,13 @@ def parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_q
     if not isinstance(tmp_3, MessageParsingError) and tmp_3 == "uint64":
         return tmp_3
     tmp_4 = parse_as_str(value)
-    if not isinstance(tmp_4, MessageParsingError) and tmp_4 == "float32":
+    if not isinstance(tmp_4, MessageParsingError) and tmp_4 == "int64":
         return tmp_4
+    tmp_5 = parse_as_str(value)
+    if not isinstance(tmp_5, MessageParsingError) and tmp_5 == "float32":
+        return tmp_5
     return MessageParsingError(
-        f"Could not parse {value} as Literal['uint8', 'uint16', 'uint32', 'uint64', 'float32']"
+        f"Could not parse {value} as Literal['uint8', 'uint16', 'uint32', 'uint64', 'int64', 'float32']"
     )
 
 
@@ -732,7 +740,7 @@ def parse_as_PrecomputedChunksDataSourceDto(
     )
     if isinstance(tmp_spatial_resolution, MessageParsingError):
         return tmp_spatial_resolution
-    tmp_dtype = parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_float32_quote__endof_(
+    tmp_dtype = parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
         value.get("dtype")
     )
     if isinstance(tmp_dtype, MessageParsingError):
@@ -790,269 +798,6 @@ class PrecomputedChunksDataSourceDto(DataTransferObject):
         cls, value: JsonValue
     ) -> "PrecomputedChunksDataSourceDto | MessageParsingError":
         return parse_as_PrecomputedChunksDataSourceDto(value)
-
-
-def parse_as_N5DataSourceDto(
-    value: JsonValue,
-) -> "N5DataSourceDto | MessageParsingError":
-    from collections.abc import Mapping
-
-    if not isinstance(value, Mapping):
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as N5DataSourceDto"
-        )
-    if value.get("__class__") != "N5DataSourceDto":
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as N5DataSourceDto"
-        )
-    tmp_url = parse_as_UrlDto(value.get("url"))
-    if isinstance(tmp_url, MessageParsingError):
-        return tmp_url
-    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
-        value.get("filesystem")
-    )
-    if isinstance(tmp_filesystem, MessageParsingError):
-        return tmp_filesystem
-    tmp_path = parse_as_str(value.get("path"))
-    if isinstance(tmp_path, MessageParsingError):
-        return tmp_path
-    tmp_interval = parse_as_Interval5DDto(value.get("interval"))
-    if isinstance(tmp_interval, MessageParsingError):
-        return tmp_interval
-    tmp_tile_shape = parse_as_Shape5DDto(value.get("tile_shape"))
-    if isinstance(tmp_tile_shape, MessageParsingError):
-        return tmp_tile_shape
-    tmp_spatial_resolution = parse_as_Tuple_of_int0int0int_endof_(
-        value.get("spatial_resolution")
-    )
-    if isinstance(tmp_spatial_resolution, MessageParsingError):
-        return tmp_spatial_resolution
-    tmp_dtype = parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_float32_quote__endof_(
-        value.get("dtype")
-    )
-    if isinstance(tmp_dtype, MessageParsingError):
-        return tmp_dtype
-    return N5DataSourceDto(
-        url=tmp_url,
-        filesystem=tmp_filesystem,
-        path=tmp_path,
-        interval=tmp_interval,
-        tile_shape=tmp_tile_shape,
-        spatial_resolution=tmp_spatial_resolution,
-        dtype=tmp_dtype,
-    )
-
-
-@dataclass
-class N5DataSourceDto(DataTransferObject):
-    url: UrlDto
-    filesystem: FsDto
-    path: str
-    interval: Interval5DDto
-    tile_shape: Shape5DDto
-    spatial_resolution: Tuple[int, int, int]
-    dtype: DtypeDto
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "N5DataSourceDto",
-            "url": self.url.to_json_value(),
-            "filesystem": convert_to_json_value(self.filesystem),
-            "path": self.path,
-            "interval": self.interval.to_json_value(),
-            "tile_shape": self.tile_shape.to_json_value(),
-            "spatial_resolution": (
-                self.spatial_resolution[0],
-                self.spatial_resolution[1],
-                self.spatial_resolution[2],
-            ),
-            "dtype": self.dtype,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "N5DataSourceDto | MessageParsingError":
-        return parse_as_N5DataSourceDto(value)
-
-
-def parse_as_SkimageDataSourceDto(
-    value: JsonValue,
-) -> "SkimageDataSourceDto | MessageParsingError":
-    from collections.abc import Mapping
-
-    if not isinstance(value, Mapping):
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as SkimageDataSourceDto"
-        )
-    if value.get("__class__") != "SkimageDataSourceDto":
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as SkimageDataSourceDto"
-        )
-    tmp_url = parse_as_UrlDto(value.get("url"))
-    if isinstance(tmp_url, MessageParsingError):
-        return tmp_url
-    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
-        value.get("filesystem")
-    )
-    if isinstance(tmp_filesystem, MessageParsingError):
-        return tmp_filesystem
-    tmp_path = parse_as_str(value.get("path"))
-    if isinstance(tmp_path, MessageParsingError):
-        return tmp_path
-    tmp_interval = parse_as_Interval5DDto(value.get("interval"))
-    if isinstance(tmp_interval, MessageParsingError):
-        return tmp_interval
-    tmp_tile_shape = parse_as_Shape5DDto(value.get("tile_shape"))
-    if isinstance(tmp_tile_shape, MessageParsingError):
-        return tmp_tile_shape
-    tmp_spatial_resolution = parse_as_Tuple_of_int0int0int_endof_(
-        value.get("spatial_resolution")
-    )
-    if isinstance(tmp_spatial_resolution, MessageParsingError):
-        return tmp_spatial_resolution
-    tmp_dtype = parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_float32_quote__endof_(
-        value.get("dtype")
-    )
-    if isinstance(tmp_dtype, MessageParsingError):
-        return tmp_dtype
-    return SkimageDataSourceDto(
-        url=tmp_url,
-        filesystem=tmp_filesystem,
-        path=tmp_path,
-        interval=tmp_interval,
-        tile_shape=tmp_tile_shape,
-        spatial_resolution=tmp_spatial_resolution,
-        dtype=tmp_dtype,
-    )
-
-
-@dataclass
-class SkimageDataSourceDto(DataTransferObject):
-    url: UrlDto
-    filesystem: FsDto
-    path: str
-    interval: Interval5DDto
-    tile_shape: Shape5DDto
-    spatial_resolution: Tuple[int, int, int]
-    dtype: DtypeDto
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "SkimageDataSourceDto",
-            "url": self.url.to_json_value(),
-            "filesystem": convert_to_json_value(self.filesystem),
-            "path": self.path,
-            "interval": self.interval.to_json_value(),
-            "tile_shape": self.tile_shape.to_json_value(),
-            "spatial_resolution": (
-                self.spatial_resolution[0],
-                self.spatial_resolution[1],
-                self.spatial_resolution[2],
-            ),
-            "dtype": self.dtype,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "SkimageDataSourceDto | MessageParsingError":
-        return parse_as_SkimageDataSourceDto(value)
-
-
-FsDataSourceDto = Union[
-    PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto
-]
-
-
-def parse_as_PrecomputedChunksSinkDto(
-    value: JsonValue,
-) -> "PrecomputedChunksSinkDto | MessageParsingError":
-    from collections.abc import Mapping
-
-    if not isinstance(value, Mapping):
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as PrecomputedChunksSinkDto"
-        )
-    if value.get("__class__") != "PrecomputedChunksSinkDto":
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as PrecomputedChunksSinkDto"
-        )
-    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
-        value.get("filesystem")
-    )
-    if isinstance(tmp_filesystem, MessageParsingError):
-        return tmp_filesystem
-    tmp_path = parse_as_str(value.get("path"))
-    if isinstance(tmp_path, MessageParsingError):
-        return tmp_path
-    tmp_tile_shape = parse_as_Shape5DDto(value.get("tile_shape"))
-    if isinstance(tmp_tile_shape, MessageParsingError):
-        return tmp_tile_shape
-    tmp_interval = parse_as_Interval5DDto(value.get("interval"))
-    if isinstance(tmp_interval, MessageParsingError):
-        return tmp_interval
-    tmp_dtype = parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_float32_quote__endof_(
-        value.get("dtype")
-    )
-    if isinstance(tmp_dtype, MessageParsingError):
-        return tmp_dtype
-    tmp_scale_key = parse_as_str(value.get("scale_key"))
-    if isinstance(tmp_scale_key, MessageParsingError):
-        return tmp_scale_key
-    tmp_resolution = parse_as_Tuple_of_int0int0int_endof_(value.get("resolution"))
-    if isinstance(tmp_resolution, MessageParsingError):
-        return tmp_resolution
-    tmp_encoding = parse_as_Literal_of__quote_raw_quote_0_quote_jpeg_quote__endof_(
-        value.get("encoding")
-    )
-    if isinstance(tmp_encoding, MessageParsingError):
-        return tmp_encoding
-    return PrecomputedChunksSinkDto(
-        filesystem=tmp_filesystem,
-        path=tmp_path,
-        tile_shape=tmp_tile_shape,
-        interval=tmp_interval,
-        dtype=tmp_dtype,
-        scale_key=tmp_scale_key,
-        resolution=tmp_resolution,
-        encoding=tmp_encoding,
-    )
-
-
-@dataclass
-class PrecomputedChunksSinkDto(DataTransferObject):
-    filesystem: Union[OsfsDto, HttpFsDto, BucketFSDto]
-    path: str  # FIXME?
-    tile_shape: Shape5DDto
-    interval: Interval5DDto
-    dtype: DtypeDto
-    scale_key: str  # fixme?
-    resolution: Tuple[int, int, int]
-    encoding: Literal["raw", "jpeg"]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "PrecomputedChunksSinkDto",
-            "filesystem": convert_to_json_value(self.filesystem),
-            "path": self.path,
-            "tile_shape": self.tile_shape.to_json_value(),
-            "interval": self.interval.to_json_value(),
-            "dtype": self.dtype,
-            "scale_key": self.scale_key,
-            "resolution": (
-                self.resolution[0],
-                self.resolution[1],
-                self.resolution[2],
-            ),
-            "encoding": self.encoding,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "PrecomputedChunksSinkDto | MessageParsingError":
-        return parse_as_PrecomputedChunksSinkDto(value)
 
 
 def parse_as_N5GzipCompressorDto(
@@ -1206,6 +951,52 @@ N5CompressorDto = Union[
 ]
 
 
+def parse_as_Tuple_of_int0_varlen__endof_(
+    value: JsonValue,
+) -> "Tuple[int, ...] | MessageParsingError":
+    if not isinstance(value, (list, tuple)):
+        return MessageParsingError(
+            f"Could not parse Tuple[int, ...] from {json.dumps(value)}"
+        )
+    items: List[int] = []
+    for item in value:
+        parsed = parse_as_int(item)
+        if isinstance(parsed, MessageParsingError):
+            return parsed
+        items.append(parsed)
+    return tuple(items)
+
+
+def parse_as_Tuple_of_str0_varlen__endof_(
+    value: JsonValue,
+) -> "Tuple[str, ...] | MessageParsingError":
+    if not isinstance(value, (list, tuple)):
+        return MessageParsingError(
+            f"Could not parse Tuple[str, ...] from {json.dumps(value)}"
+        )
+    items: List[str] = []
+    for item in value:
+        parsed = parse_as_str(item)
+        if isinstance(parsed, MessageParsingError):
+            return parsed
+        items.append(parsed)
+    return tuple(items)
+
+
+def parse_as_Union_of_Tuple_of_str0_varlen__endof_0None_endof_(
+    value: JsonValue,
+) -> "Union[Tuple[str, ...], None] | MessageParsingError":
+    parsed_option_0 = parse_as_Tuple_of_str0_varlen__endof_(value)
+    if not isinstance(parsed_option_0, MessageParsingError):
+        return parsed_option_0
+    parsed_option_1 = parse_as_None(value)
+    if not isinstance(parsed_option_1, MessageParsingError):
+        return parsed_option_1
+    return MessageParsingError(
+        f"Could not parse {json.dumps(value)} into Union[Tuple[str, ...], None]"
+    )
+
+
 def parse_as_Union_of_N5GzipCompressorDto0N5Bzip2CompressorDto0N5XzCompressorDto0N5RawCompressorDto_endof_(
     value: JsonValue,
 ) -> "Union[N5GzipCompressorDto, N5Bzip2CompressorDto, N5XzCompressorDto, N5RawCompressorDto] | MessageParsingError":
@@ -1226,6 +1017,352 @@ def parse_as_Union_of_N5GzipCompressorDto0N5Bzip2CompressorDto0N5XzCompressorDto
     )
 
 
+def parse_as_N5DatasetAttributesDto(
+    value: JsonValue,
+) -> "N5DatasetAttributesDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as N5DatasetAttributesDto"
+        )
+    if value.get("__class__") != "N5DatasetAttributesDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as N5DatasetAttributesDto"
+        )
+    tmp_dimensions = parse_as_Tuple_of_int0_varlen__endof_(value.get("dimensions"))
+    if isinstance(tmp_dimensions, MessageParsingError):
+        return tmp_dimensions
+    tmp_blockSize = parse_as_Tuple_of_int0_varlen__endof_(value.get("blockSize"))
+    if isinstance(tmp_blockSize, MessageParsingError):
+        return tmp_blockSize
+    tmp_axes = parse_as_Union_of_Tuple_of_str0_varlen__endof_0None_endof_(
+        value.get("axes")
+    )
+    if isinstance(tmp_axes, MessageParsingError):
+        return tmp_axes
+    tmp_dataType = parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
+        value.get("dataType")
+    )
+    if isinstance(tmp_dataType, MessageParsingError):
+        return tmp_dataType
+    tmp_compression = parse_as_Union_of_N5GzipCompressorDto0N5Bzip2CompressorDto0N5XzCompressorDto0N5RawCompressorDto_endof_(
+        value.get("compression")
+    )
+    if isinstance(tmp_compression, MessageParsingError):
+        return tmp_compression
+    return N5DatasetAttributesDto(
+        dimensions=tmp_dimensions,
+        blockSize=tmp_blockSize,
+        axes=tmp_axes,
+        dataType=tmp_dataType,
+        compression=tmp_compression,
+    )
+
+
+@dataclass
+class N5DatasetAttributesDto(DataTransferObject):
+    dimensions: Tuple[int, ...]
+    blockSize: Tuple[int, ...]
+    # axes: Optional[Tuple[Literal["x", "y", "z", "t", "c"], ...]] # FIXME: retore this
+    axes: Optional[Tuple[str, ...]]  # FIXME: retore this
+    dataType: DtypeDto
+    compression: N5CompressorDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "N5DatasetAttributesDto",
+            "dimensions": tuple(item for item in self.dimensions),
+            "blockSize": tuple(item for item in self.blockSize),
+            "axes": convert_to_json_value(self.axes),
+            "dataType": self.dataType,
+            "compression": convert_to_json_value(self.compression),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "N5DatasetAttributesDto | MessageParsingError":
+        return parse_as_N5DatasetAttributesDto(value)
+
+
+def parse_as_N5DataSourceDto(
+    value: JsonValue,
+) -> "N5DataSourceDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as N5DataSourceDto"
+        )
+    if value.get("__class__") != "N5DataSourceDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as N5DataSourceDto"
+        )
+    tmp_url = parse_as_UrlDto(value.get("url"))
+    if isinstance(tmp_url, MessageParsingError):
+        return tmp_url
+    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
+        value.get("filesystem")
+    )
+    if isinstance(tmp_filesystem, MessageParsingError):
+        return tmp_filesystem
+    tmp_path = parse_as_str(value.get("path"))
+    if isinstance(tmp_path, MessageParsingError):
+        return tmp_path
+    tmp_interval = parse_as_Interval5DDto(value.get("interval"))
+    if isinstance(tmp_interval, MessageParsingError):
+        return tmp_interval
+    tmp_tile_shape = parse_as_Shape5DDto(value.get("tile_shape"))
+    if isinstance(tmp_tile_shape, MessageParsingError):
+        return tmp_tile_shape
+    tmp_spatial_resolution = parse_as_Tuple_of_int0int0int_endof_(
+        value.get("spatial_resolution")
+    )
+    if isinstance(tmp_spatial_resolution, MessageParsingError):
+        return tmp_spatial_resolution
+    tmp_dtype = parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
+        value.get("dtype")
+    )
+    if isinstance(tmp_dtype, MessageParsingError):
+        return tmp_dtype
+    tmp_compressor = parse_as_Union_of_N5GzipCompressorDto0N5Bzip2CompressorDto0N5XzCompressorDto0N5RawCompressorDto_endof_(
+        value.get("compressor")
+    )
+    if isinstance(tmp_compressor, MessageParsingError):
+        return tmp_compressor
+    tmp_c_axiskeys_on_disk = parse_as_str(value.get("c_axiskeys_on_disk"))
+    if isinstance(tmp_c_axiskeys_on_disk, MessageParsingError):
+        return tmp_c_axiskeys_on_disk
+    return N5DataSourceDto(
+        url=tmp_url,
+        filesystem=tmp_filesystem,
+        path=tmp_path,
+        interval=tmp_interval,
+        tile_shape=tmp_tile_shape,
+        spatial_resolution=tmp_spatial_resolution,
+        dtype=tmp_dtype,
+        compressor=tmp_compressor,
+        c_axiskeys_on_disk=tmp_c_axiskeys_on_disk,
+    )
+
+
+@dataclass
+class N5DataSourceDto(DataTransferObject):
+    url: UrlDto
+    filesystem: FsDto
+    path: str
+    interval: Interval5DDto
+    tile_shape: Shape5DDto
+    spatial_resolution: Tuple[int, int, int]
+    dtype: DtypeDto
+    compressor: N5CompressorDto
+    c_axiskeys_on_disk: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "N5DataSourceDto",
+            "url": self.url.to_json_value(),
+            "filesystem": convert_to_json_value(self.filesystem),
+            "path": self.path,
+            "interval": self.interval.to_json_value(),
+            "tile_shape": self.tile_shape.to_json_value(),
+            "spatial_resolution": (
+                self.spatial_resolution[0],
+                self.spatial_resolution[1],
+                self.spatial_resolution[2],
+            ),
+            "dtype": self.dtype,
+            "compressor": convert_to_json_value(self.compressor),
+            "c_axiskeys_on_disk": self.c_axiskeys_on_disk,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "N5DataSourceDto | MessageParsingError":
+        return parse_as_N5DataSourceDto(value)
+
+
+def parse_as_SkimageDataSourceDto(
+    value: JsonValue,
+) -> "SkimageDataSourceDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as SkimageDataSourceDto"
+        )
+    if value.get("__class__") != "SkimageDataSourceDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as SkimageDataSourceDto"
+        )
+    tmp_url = parse_as_UrlDto(value.get("url"))
+    if isinstance(tmp_url, MessageParsingError):
+        return tmp_url
+    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
+        value.get("filesystem")
+    )
+    if isinstance(tmp_filesystem, MessageParsingError):
+        return tmp_filesystem
+    tmp_path = parse_as_str(value.get("path"))
+    if isinstance(tmp_path, MessageParsingError):
+        return tmp_path
+    tmp_interval = parse_as_Interval5DDto(value.get("interval"))
+    if isinstance(tmp_interval, MessageParsingError):
+        return tmp_interval
+    tmp_tile_shape = parse_as_Shape5DDto(value.get("tile_shape"))
+    if isinstance(tmp_tile_shape, MessageParsingError):
+        return tmp_tile_shape
+    tmp_spatial_resolution = parse_as_Tuple_of_int0int0int_endof_(
+        value.get("spatial_resolution")
+    )
+    if isinstance(tmp_spatial_resolution, MessageParsingError):
+        return tmp_spatial_resolution
+    tmp_dtype = parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
+        value.get("dtype")
+    )
+    if isinstance(tmp_dtype, MessageParsingError):
+        return tmp_dtype
+    return SkimageDataSourceDto(
+        url=tmp_url,
+        filesystem=tmp_filesystem,
+        path=tmp_path,
+        interval=tmp_interval,
+        tile_shape=tmp_tile_shape,
+        spatial_resolution=tmp_spatial_resolution,
+        dtype=tmp_dtype,
+    )
+
+
+@dataclass
+class SkimageDataSourceDto(DataTransferObject):
+    url: UrlDto
+    filesystem: FsDto
+    path: str
+    interval: Interval5DDto
+    tile_shape: Shape5DDto
+    spatial_resolution: Tuple[int, int, int]
+    dtype: DtypeDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "SkimageDataSourceDto",
+            "url": self.url.to_json_value(),
+            "filesystem": convert_to_json_value(self.filesystem),
+            "path": self.path,
+            "interval": self.interval.to_json_value(),
+            "tile_shape": self.tile_shape.to_json_value(),
+            "spatial_resolution": (
+                self.spatial_resolution[0],
+                self.spatial_resolution[1],
+                self.spatial_resolution[2],
+            ),
+            "dtype": self.dtype,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "SkimageDataSourceDto | MessageParsingError":
+        return parse_as_SkimageDataSourceDto(value)
+
+
+FsDataSourceDto = Union[
+    PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto
+]
+
+
+def parse_as_PrecomputedChunksSinkDto(
+    value: JsonValue,
+) -> "PrecomputedChunksSinkDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as PrecomputedChunksSinkDto"
+        )
+    if value.get("__class__") != "PrecomputedChunksSinkDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as PrecomputedChunksSinkDto"
+        )
+    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
+        value.get("filesystem")
+    )
+    if isinstance(tmp_filesystem, MessageParsingError):
+        return tmp_filesystem
+    tmp_path = parse_as_str(value.get("path"))
+    if isinstance(tmp_path, MessageParsingError):
+        return tmp_path
+    tmp_tile_shape = parse_as_Shape5DDto(value.get("tile_shape"))
+    if isinstance(tmp_tile_shape, MessageParsingError):
+        return tmp_tile_shape
+    tmp_interval = parse_as_Interval5DDto(value.get("interval"))
+    if isinstance(tmp_interval, MessageParsingError):
+        return tmp_interval
+    tmp_dtype = parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
+        value.get("dtype")
+    )
+    if isinstance(tmp_dtype, MessageParsingError):
+        return tmp_dtype
+    tmp_scale_key = parse_as_str(value.get("scale_key"))
+    if isinstance(tmp_scale_key, MessageParsingError):
+        return tmp_scale_key
+    tmp_resolution = parse_as_Tuple_of_int0int0int_endof_(value.get("resolution"))
+    if isinstance(tmp_resolution, MessageParsingError):
+        return tmp_resolution
+    tmp_encoding = parse_as_Literal_of__quote_raw_quote_0_quote_jpeg_quote__endof_(
+        value.get("encoding")
+    )
+    if isinstance(tmp_encoding, MessageParsingError):
+        return tmp_encoding
+    return PrecomputedChunksSinkDto(
+        filesystem=tmp_filesystem,
+        path=tmp_path,
+        tile_shape=tmp_tile_shape,
+        interval=tmp_interval,
+        dtype=tmp_dtype,
+        scale_key=tmp_scale_key,
+        resolution=tmp_resolution,
+        encoding=tmp_encoding,
+    )
+
+
+@dataclass
+class PrecomputedChunksSinkDto(DataTransferObject):
+    filesystem: Union[OsfsDto, HttpFsDto, BucketFSDto]
+    path: str  # FIXME?
+    tile_shape: Shape5DDto
+    interval: Interval5DDto
+    dtype: DtypeDto
+    scale_key: str  # fixme?
+    resolution: Tuple[int, int, int]
+    encoding: Literal["raw", "jpeg"]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "PrecomputedChunksSinkDto",
+            "filesystem": convert_to_json_value(self.filesystem),
+            "path": self.path,
+            "tile_shape": self.tile_shape.to_json_value(),
+            "interval": self.interval.to_json_value(),
+            "dtype": self.dtype,
+            "scale_key": self.scale_key,
+            "resolution": (
+                self.resolution[0],
+                self.resolution[1],
+                self.resolution[2],
+            ),
+            "encoding": self.encoding,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "PrecomputedChunksSinkDto | MessageParsingError":
+        return parse_as_PrecomputedChunksSinkDto(value)
+
+
 def parse_as_N5DataSinkDto(value: JsonValue) -> "N5DataSinkDto | MessageParsingError":
     from collections.abc import Mapping
 
@@ -1242,22 +1379,24 @@ def parse_as_N5DataSinkDto(value: JsonValue) -> "N5DataSinkDto | MessageParsingE
     )
     if isinstance(tmp_filesystem, MessageParsingError):
         return tmp_filesystem
-    tmp_outer_path = parse_as_str(value.get("outer_path"))
-    if isinstance(tmp_outer_path, MessageParsingError):
-        return tmp_outer_path
-    tmp_inner_path = parse_as_str(value.get("inner_path"))
-    if isinstance(tmp_inner_path, MessageParsingError):
-        return tmp_inner_path
+    tmp_path = parse_as_str(value.get("path"))
+    if isinstance(tmp_path, MessageParsingError):
+        return tmp_path
     tmp_interval = parse_as_Interval5DDto(value.get("interval"))
     if isinstance(tmp_interval, MessageParsingError):
         return tmp_interval
     tmp_tile_shape = parse_as_Shape5DDto(value.get("tile_shape"))
     if isinstance(tmp_tile_shape, MessageParsingError):
         return tmp_tile_shape
+    tmp_spatial_resolution = parse_as_Tuple_of_int0int0int_endof_(
+        value.get("spatial_resolution")
+    )
+    if isinstance(tmp_spatial_resolution, MessageParsingError):
+        return tmp_spatial_resolution
     tmp_c_axiskeys = parse_as_str(value.get("c_axiskeys"))
     if isinstance(tmp_c_axiskeys, MessageParsingError):
         return tmp_c_axiskeys
-    tmp_dtype = parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_float32_quote__endof_(
+    tmp_dtype = parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
         value.get("dtype")
     )
     if isinstance(tmp_dtype, MessageParsingError):
@@ -1269,10 +1408,10 @@ def parse_as_N5DataSinkDto(value: JsonValue) -> "N5DataSinkDto | MessageParsingE
         return tmp_compressor
     return N5DataSinkDto(
         filesystem=tmp_filesystem,
-        outer_path=tmp_outer_path,
-        inner_path=tmp_inner_path,
+        path=tmp_path,
         interval=tmp_interval,
         tile_shape=tmp_tile_shape,
+        spatial_resolution=tmp_spatial_resolution,
         c_axiskeys=tmp_c_axiskeys,
         dtype=tmp_dtype,
         compressor=tmp_compressor,
@@ -1282,10 +1421,10 @@ def parse_as_N5DataSinkDto(value: JsonValue) -> "N5DataSinkDto | MessageParsingE
 @dataclass
 class N5DataSinkDto(DataTransferObject):
     filesystem: FsDto
-    outer_path: str
-    inner_path: str
+    path: str
     interval: Interval5DDto
     tile_shape: Shape5DDto
+    spatial_resolution: Tuple[int, int, int]
     c_axiskeys: str
     dtype: DtypeDto
     compressor: N5CompressorDto
@@ -1294,10 +1433,14 @@ class N5DataSinkDto(DataTransferObject):
         return {
             "__class__": "N5DataSinkDto",
             "filesystem": convert_to_json_value(self.filesystem),
-            "outer_path": self.outer_path,
-            "inner_path": self.inner_path,
+            "path": self.path,
             "interval": self.interval.to_json_value(),
             "tile_shape": self.tile_shape.to_json_value(),
+            "spatial_resolution": (
+                self.spatial_resolution[0],
+                self.spatial_resolution[1],
+                self.spatial_resolution[2],
+            ),
             "c_axiskeys": self.c_axiskeys,
             "dtype": self.dtype,
             "compressor": convert_to_json_value(self.compressor),
@@ -4022,22 +4165,6 @@ class ListFsDirRequest(DataTransferObject):
         cls, value: JsonValue
     ) -> "ListFsDirRequest | MessageParsingError":
         return parse_as_ListFsDirRequest(value)
-
-
-def parse_as_Tuple_of_str0_varlen__endof_(
-    value: JsonValue,
-) -> "Tuple[str, ...] | MessageParsingError":
-    if not isinstance(value, (list, tuple)):
-        return MessageParsingError(
-            f"Could not parse Tuple[str, ...] from {json.dumps(value)}"
-        )
-    items: List[str] = []
-    for item in value:
-        parsed = parse_as_str(item)
-        if isinstance(parsed, MessageParsingError):
-            return parsed
-        items.append(parsed)
-    return tuple(items)
 
 
 def parse_as_ListFsDirResponse(
