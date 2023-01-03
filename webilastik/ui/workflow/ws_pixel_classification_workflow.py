@@ -8,13 +8,11 @@ import multiprocessing
 import os
 import signal
 import asyncio
-from typing import Callable, Final, List, Optional, Tuple
+from typing import Callable, Final, List, Optional
 import json
-from base64 import b64decode
 import ssl
 from pathlib import PurePosixPath
 import traceback
-import re
 import datetime
 
 import aiohttp
@@ -22,9 +20,7 @@ from aiohttp import web
 from aiohttp.client import ClientSession
 from aiohttp.http_websocket import WSCloseCode
 from aiohttp.web_app import Application
-from ndstructs.array5D import Interval5D
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
-from webilastik.datasource import FsDataSource
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource, PrecomputedChunksInfo
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale
@@ -40,9 +36,7 @@ from webilastik.ui.workflow.pixel_classification_workflow import WsPixelClassifi
 from webilastik.utility.url import Url
 from webilastik.server.tunnel import ReverseSshTunnel
 from webilastik.ui.applet import dummy_prompt
-from webilastik.libebrains.user_token import UserToken
 from webilastik.libebrains.compute_session_launcher import Minutes
-from webilastik.libebrains import global_user_login
 from executor_getter import get_executor
 
 
