@@ -82,7 +82,7 @@ class BucketFs(IFilesystem):
     def to_dto(self) -> BucketFSDto:
         return BucketFSDto(bucket_name=self.bucket_name)
 
-    def list_contents(self, path: PurePosixPath, limit: Optional[int] = 50) -> "FsDirectoryContents | FsIoException":
+    def list_contents(self, path: PurePosixPath, limit: Optional[int] = 500) -> "FsDirectoryContents | FsIoException":
         list_objects_path = self.url.updated_with(extra_search={
             "delimiter": "/",
             "prefix": "" if path.as_posix() == "/" else path.as_posix().lstrip("/").rstrip("/") + "/",
