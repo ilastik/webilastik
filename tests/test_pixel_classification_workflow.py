@@ -116,11 +116,11 @@ def test_pixel_classification_workflow():
     raw_data_source = get_sample_c_cells_datasource()
     preds_future = executor.submit(classifier, raw_data_source.roi)
     local_predictions = preds_future.result()
-    local_predictions.as_uint8().show_channels()
+    # local_predictions.as_uint8().show_channels()
 
     # # calculate predictions on just a piece of arbitrary data
     exported_tile = executor.submit(classifier, DataRoi(datasource=raw_data_source, x=(100, 200), y=(100, 200)))
-    exported_tile.result().show_channels()
+    # exported_tile.result().show_channels()
 
 ###################################
 
