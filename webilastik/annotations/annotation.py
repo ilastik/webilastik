@@ -169,9 +169,9 @@ class Annotation(ScalarData):
         cls,
         message: PixelAnnotationDto,
         allowed_protocols: Sequence[Protocol] = ("http", "https"),
-    ) -> "Annotation | MessageParsingError":
+    ) -> "Annotation | Exception":
         raw_data_result = FsDataSource.try_from_message(message.raw_data, allowed_protocols=allowed_protocols)
-        if isinstance(raw_data_result, MessageParsingError):
+        if isinstance(raw_data_result, Exception):
             return raw_data_result
 
         # FIXME: do sothing more efficient than this

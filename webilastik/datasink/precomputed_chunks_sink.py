@@ -9,10 +9,7 @@ from ndstructs.array5D import Array5D
 from webilastik.datasink import FsDataSink, IDataSinkWriter
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale, PrecomputedChunksEncoder
-from webilastik.filesystem import Filesystem
-from webilastik.filesystem.bucket_fs import BucketFs
-from webilastik.filesystem.http_fs import HttpFs
-from webilastik.filesystem.osfs import OsFs
+from webilastik.filesystem import IFilesystem, create_filesystem_from_message
 from webilastik.server.rpc.dto import Interval5DDto, PrecomputedChunksSinkDto, Shape5DDto
 from webilastik.utility.url import Url
 
@@ -30,15 +27,16 @@ class PrecomputedChunksWriter(IDataSinkWriter):
         assert tile.is_tile(tile_shape=self._data_sink.tile_shape, full_interval=self._data_sink.interval, clamped=True), f"Bad tile: {tile}"
         chunk_name = f"{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_{tile.z[0]}-{tile.z[1]}"
         chunk_path = self._data_sink.path / self._data_sink.scale.key / chunk_name
-        with self._data_sink.filesystem.openbin(chunk_path.as_posix(), "w") as f:
-            _ = f.write(self._data_sink.scale.encoding.encode(data))
+        result = self._data_sink.filesystem.create_file(path=chunk_path, contents=self._data_sink.scale.encoding.encode(data))
+        if isinstance(result, Exception):
+            raise result #FIXME
 
 
 class PrecomputedChunksSink(FsDataSink):
     def __init__(
         self,
         *,
-        filesystem: Filesystem,
+        filesystem: IFilesystem,
         path: PurePosixPath,
         scale_key: PurePosixPath,
         tile_shape: Shape5D,
@@ -80,10 +78,10 @@ class PrecomputedChunksSink(FsDataSink):
 
     def open(self) -> "Exception | PrecomputedChunksWriter":
         info_path = self.path.joinpath("info")
-        scale_path = self.path / self.scale_key
+        scale_path = self.path / self.scale_key.as_posix().lstrip("/")
 
-        if not self.filesystem.exists(info_path.as_posix()):
-            _ = self.filesystem.makedirs(self.path.as_posix())
+        if not self.filesystem.exists(info_path):
+            # _ = self.filesystem.makedirs(self.path.as_posix())
             info = PrecomputedChunksInfo(
                 type_="image",
                 data_type=self.dtype,
@@ -102,7 +100,9 @@ class PrecomputedChunksSink(FsDataSink):
 
             for scale in existing_info.scales:
                 if scale.key == self.scale.key:
-                    self.filesystem.removedir(scale_path.as_posix())
+                    deletion_result = self.filesystem.delete(scale_path)
+                    if isinstance(deletion_result, Exception):
+                        return deletion_result
                     info = existing_info
                     break
             else:
@@ -115,10 +115,11 @@ class PrecomputedChunksSink(FsDataSink):
                     ),
                 )
 
-        _ = self.filesystem.makedirs(scale_path.as_posix())
+        # _ = self.filesystem.makedirs(scale_path.as_posix())
 
-        with self.filesystem.openbin(info_path.as_posix(), "w") as info_file:
-            _ = info_file.write(json.dumps(info.to_json_value(), indent=4).encode("utf8"))
+        info_write_result = self.filesystem.create_file(path=info_path, contents=json.dumps(info.to_json_value(), indent=4).encode("utf8"))
+        if isinstance(info_write_result, Exception):
+            return info_write_result
         return PrecomputedChunksWriter(data_sink=self)
 
     def to_datasource(self) -> PrecomputedChunksDataSource:
@@ -134,6 +135,9 @@ class PrecomputedChunksSink(FsDataSink):
         )
 
     def to_dto(self) -> PrecomputedChunksSinkDto:
+        from webilastik.filesystem.http_fs import HttpFs
+        from webilastik.filesystem.os_fs import OsFs
+        from webilastik.filesystem.bucket_fs import BucketFs
         assert isinstance(self.filesystem, (HttpFs, OsFs, BucketFs)) #FIXME
         type_name: Literal["uint8", "uint16", "uint32", "uint64", "float32"] = str(self.dtype) #type: ignore #FIXME
         return PrecomputedChunksSinkDto(
@@ -148,24 +152,12 @@ class PrecomputedChunksSink(FsDataSink):
         )
 
     @classmethod
-    def from_dto(cls, message: PrecomputedChunksSinkDto) -> "PrecomputedChunksSink":
+    def from_dto(cls, message: PrecomputedChunksSinkDto) -> "PrecomputedChunksSink | Exception":
+        fs_result = create_filesystem_from_message(message.filesystem)
+        if isinstance(fs_result, Exception):
+            return fs_result
         return PrecomputedChunksSink(
-            filesystem=Filesystem.create_from_message(message.filesystem),
-            path=PurePosixPath(message.path),
-            scale_key=PurePosixPath(message.scale_key),
-            dtype=np.dtype(message.dtype), #FIXME?
-            interval=message.interval.to_interval5d(),
-            tile_shape=message.tile_shape.to_shape5d(),
-            encoding=PrecomputedChunksEncoder.from_dto(message.encoding),
-            resolution=message.resolution,
-        )
-
-    def __getstate__(self) -> PrecomputedChunksSinkDto:
-        return self.to_dto()
-
-    def __setstate__(self, message: PrecomputedChunksSinkDto):
-        self.__init__(
-            filesystem=Filesystem.create_from_message(message.filesystem),
+            filesystem=fs_result,
             path=PurePosixPath(message.path),
             scale_key=PurePosixPath(message.scale_key),
             dtype=np.dtype(message.dtype), #FIXME?

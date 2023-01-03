@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import json
-from typing import Any, Literal, Optional, Tuple
+from typing import Any, Literal, Optional, Tuple, cast
 from pathlib import PurePosixPath
 import io
 
@@ -14,7 +14,7 @@ from ndstructs.point5D import Point5D, Shape5D, Interval5D
 from ndstructs.array5D import Array5D
 
 from webilastik.datasource import DataSource
-from webilastik.filesystem import Filesystem
+from webilastik.filesystem import FsFileNotFoundException, IFilesystem
 
 class PrecomputedChunksEncoder(ABC):
     @abstractmethod
@@ -105,7 +105,8 @@ class JpegEncoder(PrecomputedChunksEncoder):
         # FIXME: check if this works with any sort of funny JPEG shapes
         # FIXME: Also, what to do if dtype is weird?
         raw_jpg: "np.ndarray[Any, Any]" = skimage.io.imread(io.BytesIO(raw_chunk)) # type: ignore
-        tile_5d = Array5D(raw_jpg.reshape(roi.shape.to_tuple("zyxc")), axiskeys="zyxc", location=roi.start)
+        reshaped_raw = cast("np.ndarray[Any, Any]", raw_jpg.reshape(roi.shape.to_tuple("zyxc"))) # pyright: ignore [reportUnknownMemberType]
+        tile_5d = Array5D(reshaped_raw, axiskeys="zyxc", location=roi.start)
         return tile_5d
 
     def encode(self, data: Array5D) -> bytes:
@@ -298,7 +299,7 @@ class PrecomputedChunksInfo:
         for scale in self.scales_5d:
             if scale.resolution == resolution:
                 return scale
-        return ValueError(f"Scale with resolution {resolution} not found")
+        return ValueError(f"Scale with resolution {resolution} not found. Options were {[s.resolution for s in self.scales]}")
 
     def contains(self, scale: PrecomputedChunksScale) -> bool:
         return any(scale == s for s in self.scales)
@@ -313,16 +314,11 @@ class PrecomputedChunksInfo:
         )
 
     @classmethod
-    def tryLoad(cls, filesystem: Filesystem, path: PurePosixPath) ->"PrecomputedChunksInfo | Exception":
-        url = filesystem.geturl(path.as_posix())
-        if not filesystem.exists(path.as_posix()):
-            return FileNotFoundError(f"Could not find info file at {url}")
-        with filesystem.openbin(path.as_posix(), "r") as f:
-            try:
-                info_json = f.read().decode("utf8")
-                return PrecomputedChunksInfo.from_json_value(json.loads(info_json))
-            except Exception:
-                return ValueError(f"Could not interpret json info file at {url}")
+    def tryLoad(cls, filesystem: IFilesystem, path: PurePosixPath) -> "PrecomputedChunksInfo | FsFileNotFoundException | Exception":
+        info_json = filesystem.read_file(path)
+        if isinstance(info_json, Exception):
+            return info_json
+        return PrecomputedChunksInfo.from_json_value(json.loads(info_json))
 
     @classmethod
     def from_json_value(cls, data: JsonValue):

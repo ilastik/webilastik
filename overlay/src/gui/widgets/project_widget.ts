@@ -1,71 +1,92 @@
 import { Session } from "../../client/ilastik";
-import { BucketFSDto, LoadProjectParamsDto, SaveProjectParamsDto } from "../../client/dto";
-import { createElement, createInput, getNowString } from "../../util/misc";
+import { LoadProjectParamsDto, SaveProjectParamsDto } from "../../client/dto";
+import { dateToSafeString } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
-import { CssClasses } from "../css_classes";
-import { BucketFsInput } from "./bucket_fs_input";
 import { CollapsableWidget } from "./collapsable_applet_gui";
-import { PathInput } from "./path_input";
-import { ErrorPopupWidget } from "./popup";
+import { ErrorPopupWidget, PopupWidget } from "./popup";
+import { FileLocationInputWidget } from "./file_location_input";
+import { Paragraph } from "./widget";
+import { CssClasses } from "../css_classes";
+import { Button } from "./input_widget";
 
 export class ProjectWidget{
     public readonly containerWidget: CollapsableWidget;
+    private readonly session: Session;
+    private savedPath: Path | undefined
+    private readonly defaultPath: Path;
 
     constructor(params: {parentElement: HTMLElement, session: Session}){
+        this.session = params.session
+        this.defaultPath = Path.parse(`/MyProject_${dateToSafeString(params.session.startTime || new Date())}.ilp`)
         this.containerWidget = new CollapsableWidget({display_name: "Project", parentElement: params.parentElement})
-        let form = createElement({tagName: "form", parentElement: this.containerWidget.element})
-        let bucketInput = new BucketFsInput({
-            parentElement: form,
-            hidePrefix: true,
-            required: true,
-            value: new BucketFSDto({
-                bucket_name: "hbp-image-service", prefix: "/"
-            })
+        new Paragraph({parentElement: this.containerWidget.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
+            new Button({inputType: "button", parentElement: undefined, text: "Save Project", onClick: this.popupSaveProject}),
+            new Button({inputType: "button", parentElement: undefined, text: "Load Project", onClick: this.popupLoadProject}),
+            new Button({inputType: "button", parentElement: undefined, text: "Download Project", onClick: () => {
+                    const ilp_form = document.body.appendChild(document.createElement("form"))
+                    ilp_form.action = params.session.sessionUrl.joinPath("download_project_as_ilp").raw
+                    ilp_form.method = "post"
+                    ilp_form.target = "_blank"
+                    ilp_form.style.display = "none"
+                    ilp_form.submit()
+            }}),
+        ]})
+    }
+    private popupSaveProject = () => {
+        const popup = new PopupWidget("Save Project", true);
+        const fileLocationInput = new FileLocationInputWidget({
+            parentElement: popup.element,
+            filesystemChoices: ["data-proxy"],
+            defaultBucketName: "hbp-image-service",
+            defaultPath: this.savedPath || this.defaultPath,
         })
-
-        let p = createElement({tagName: "p", parentElement: form, cssClasses: [CssClasses.ItkInputParagraph]})
-        createElement({tagName: "label", parentElement: p, innerText: "Project File Path: "})
-        let projectFilePathInput = new PathInput({
-            parentElement: p, required: true, value: Path.parse(`/MyProject_${getNowString()}.ilp`)
-        })
-
-        p = createElement({tagName: "p", parentElement: form})
-        let saveButtonText = "Save Project"
-        let loadButtonText = "Load Project"
-        let saveButton = createInput({inputType: "submit", parentElement: p, value: saveButtonText})
-        let loadButton = createInput({inputType: "submit", parentElement: p, value: loadButtonText})
-        form.addEventListener("submit", (ev: SubmitEvent): false => {
-            ev.preventDefault()
-
-            let fs = bucketInput.value
-            let project_file_path = projectFilePathInput.value
-            if(!fs || !project_file_path){
-                new ErrorPopupWidget({message: "Some inputs missing"})
-                return false
-            }
-
-            saveButton.disabled = loadButton.disabled = true
-
-            if(ev.submitter == loadButton){
-                loadButton.value = "Loading project..."
-                params.session.loadProject(new LoadProjectParamsDto({fs,  project_file_path: project_file_path.raw})).then(result => {
-                    if(result instanceof Error){
-                        new ErrorPopupWidget({message: result.message})
-                    }
-                    loadButton.value = loadButtonText
-                    saveButton.disabled = loadButton.disabled = false
+        new Paragraph({parentElement: popup.element, children: [
+            new Button({inputType: "button", text: "Save Project", parentElement: undefined, onClick: async () => {
+                const fileLocation = fileLocationInput.value
+                if(fileLocation === undefined){
+                    new ErrorPopupWidget({message: "Missing parameters"})
+                    return
+                }
+                let result = await PopupWidget.WaitPopup({
+                    title: "Saving project...",
+                    operation: this.session.saveProject(new SaveProjectParamsDto({
+                        fs: fileLocation.filesystem.toDto(),  project_file_path: fileLocation.path.toDto()
+                    })),
                 })
-            }else if(ev.submitter == saveButton){
-                saveButton.value = "Saving project..."
-                params.session.saveProject(new SaveProjectParamsDto({fs,  project_file_path: project_file_path.raw})).then(result => {
-                    if(result instanceof Error){
-                        new ErrorPopupWidget({message: result.message})
-                    }
-                    saveButton.value = saveButtonText
-                    saveButton.disabled = loadButton.disabled = false
-                })
-            }
-            return false
+                if(result instanceof Error){
+                    new ErrorPopupWidget({message: result.message})
+                }
+                this.savedPath = fileLocation.path
+                popup.destroy()
+            }})
+        ]})
+    }
+    private popupLoadProject = () => {
+        const popup = new PopupWidget("Load Project", true);
+        const fileLocationInput = new FileLocationInputWidget({
+            parentElement: popup.element,
+            filesystemChoices: ["data-proxy", "http"],
+            defaultBucketName: "hbp-image-service",
+            defaultPath: this.savedPath || this.defaultPath,
         })
+        new Paragraph({parentElement: popup.element, children: [
+            new Button({inputType: "button", text: "Load Project", parentElement: undefined, onClick: async () => {
+                const fileLocation = fileLocationInput.value
+                if(fileLocation === undefined){
+                    new ErrorPopupWidget({message: "Missing parameters"})
+                    return
+                }
+                let result = await PopupWidget.WaitPopup({
+                    title: "Loading project...",
+                    operation: this.session.loadProject(new LoadProjectParamsDto({
+                        fs: fileLocation.filesystem.toDto(),  project_file_path: fileLocation.path.toDto()
+                    })),
+                })
+                if(result instanceof Error){
+                    new ErrorPopupWidget({message: result.message})
+                }
+                popup.destroy()
+            }})
+        ]})
     }
 }

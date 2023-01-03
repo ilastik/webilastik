@@ -1,10 +1,10 @@
 import { Applet } from '../../client/applets/applet';
 import { JsonValue } from '../../util/serialization';
-import { assertUnreachable, createElement, createInput, createInputParagraph, createTable } from '../../util/misc';
+import { assertUnreachable, createFieldset } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
-import { BucketFs, Color, FsDataSource, Filesystem, FsDataSink, Session } from '../../client/ilastik';
+import { BucketFs, Color, FsDataSource, FsDataSink, Session, DataSinkUnion, PrecomputedChunksSink, PrecomputedChunksDataSource, N5DataSource, Shape5D } from '../../client/ilastik';
 import { CssClasses } from '../css_classes';
-import { ErrorPopupWidget, InputPopupWidget } from './popup';
+import { ErrorPopupWidget } from './popup';
 import {
     ExportJobDto,
     LabelHeaderDto,
@@ -14,10 +14,16 @@ import {
     StartPixelProbabilitiesExportJobParamsDto,
     StartSimpleSegmentationExportJobParamsDto
 } from '../../client/dto';
-import { PopupSelect, SelectorWidget } from './selector_widget';
-import { DataSourceInput } from './datasource_input';
-import { PrecomputedChunksScale_DataSink_Input } from './precomputed_chunks_scale_datasink_input';
 import { Viewer } from '../../viewer/viewer';
+import { DataSourceListWidget } from './list_widget';
+import { DatasinkConfigWidget } from './datasink_builder_widget';
+import { DataType } from '../../util/precomputed_chunks';
+import { FileLocationPatternInputWidget } from './file_location_input';
+import { Button, Select } from './input_widget';
+import { Anchor, Div, Label, Paragraph, Span, Table, TableData, TableHeader, TableRow } from './widget';
+import { Url } from '../../util/parsed_url';
+import { BooleanInput } from './value_input_widget';
+import { Shape5DInputNoChannel } from './shape5d_input';
 
 const sink_creation_stati = ["pending", "running", "cancelled", "failed", "succeeded"] as const;
 export type SinkCreationStatus = typeof sink_creation_stati[number];
@@ -38,10 +44,119 @@ class LabelHeader{
     public toDto(): LabelHeaderDto{
         return new LabelHeaderDto({name: this.name, color: this.color.toDto()})
     }
+    public equals(other: LabelHeader): boolean{
+        return this.name == other.name && this.color == other.color
+    }
+    public couldBe(other: LabelHeader): boolean{
+        return this.name == other.name || this.color == other.color
+    }
+}
+
+abstract class Job{
+    public readonly name: string;
+    public readonly num_args: number | undefined;
+    public readonly uuid: string;
+    public readonly status: "pending" | "running" | "cancelled" | "failed" | "succeeded";
+    public readonly num_completed_steps: number;
+    public readonly error_message: string | undefined;
+    public readonly datasink: DataSinkUnion;
+
+    constructor(params: {
+        name: string,
+        num_args: number | undefined,
+        uuid: string,
+        status: "pending" | "running" | "cancelled" | "failed" | "succeeded",
+        num_completed_steps: number,
+        error_message: string | undefined,
+        datasink: DataSinkUnion,
+    }){
+        this.name = params.name;
+        this.num_args = params.num_args;
+        this.uuid = params.uuid;
+        this.status = params.status;
+        this.num_completed_steps = params.num_completed_steps;
+        this.error_message = params.error_message;
+        this.datasink = params.datasink;
+    }
+
+    public static fromDto(dto: ExportJobDto | OpenDatasinkJobDto): Job{
+        if(dto instanceof ExportJobDto){
+            return new ExportJob({
+                ...dto,
+                datasink: FsDataSink.fromDto(dto.datasink,)
+            })
+        }
+        if(dto instanceof OpenDatasinkJobDto){
+            return new OpenDatasinkJob({
+                ...dto,
+                datasink: FsDataSink.fromDto(dto.datasink,)
+            })
+        }
+        assertUnreachable(dto)
+    }
+    private makeProgressDisplay(openInViewer: (datasource: PrecomputedChunksDataSource | N5DataSource) => void): TableData{
+        if(this.status == "pending" || this.status == "cancelled" || this.status == "failed"){
+            return new TableData({parentElement: undefined, innerText: this.status})
+        }
+        if(this.status == "running"){
+            return new TableData({
+                parentElement: undefined,
+                innerText: this.num_args === undefined ? "unknwown" : `${Math.round(this.num_completed_steps / this.num_args * 100)}%`
+            })
+        }
+        if(this.status == "succeeded"){
+            let out = new TableData({parentElement: undefined, innerText: "100%"})
+            if(this.datasink.filesystem instanceof BucketFs){
+                out.clear()
+                let dataProxyPrefixParam = this.datasink.path.raw.replace(/^\//, "")
+                if(this.datasink instanceof PrecomputedChunksSinkDto){
+                    dataProxyPrefixParam += "/"
+                }
+                new Anchor({
+                    parentElement: out,
+                    innerText: "Open in Data Proxy",
+                    href: Url.parse(`https://data-proxy.ebrains.eu/${this.datasink.filesystem.bucket_name}?prefix=${dataProxyPrefixParam}`), //FIXME
+                    target: "_blank",
+                    rel: "noopener noreferrer",
+                })
+            }
+            if(this.datasink instanceof PrecomputedChunksSink){
+                new Button({parentElement: out, inputType: "button", text: "Open in Viewer", onClick: () => {
+                    openInViewer(this.datasink.toDataSource())
+                }})
+            }
+            return out
+        }
+        assertUnreachable(this.status)
+    }
+    public toTableRow(openInViewer: (datasource: PrecomputedChunksDataSource | N5DataSource) => void): {name: TableData, progress: TableData}{
+        return {
+            name: new TableData({parentElement: undefined, innerText: this.name}),
+            progress: this.makeProgressDisplay(openInViewer),
+        }
+    }
+}
+
+class ExportJob extends Job{
+    public static fromDto(dto: ExportJobDto): ExportJob{
+        return new ExportJob({
+            ...dto,
+            datasink: FsDataSink.fromDto(dto.datasink,)
+        })
+    }
+}
+
+class OpenDatasinkJob extends Job{
+    public static fromDto(dto: OpenDatasinkJobDto): OpenDatasinkJob{
+        return new OpenDatasinkJob({
+            ...dto,
+            datasink: FsDataSink.fromDto(dto.datasink,)
+        })
+    }
 }
 
 class PixelClassificationExportAppletState{
-    jobs: Array<ExportJobDto | OpenDatasinkJobDto>
+    jobs: Array<Job>
     populated_labels: LabelHeader[] | undefined
     datasource_suggestions: FsDataSource[]
 
@@ -50,7 +165,7 @@ class PixelClassificationExportAppletState{
         populated_labels: LabelHeaderDto[] | undefined
         datasource_suggestions: FsDataSource[]
     }){
-        this.jobs = params.jobs
+        this.jobs = params.jobs.map(dto => Job.fromDto(dto))
         this.populated_labels = params.populated_labels?.map(msg => LabelHeader.fromDto(msg))
         this.datasource_suggestions = params.datasource_suggestions
     }
@@ -65,15 +180,16 @@ class PixelClassificationExportAppletState{
 }
 
 export class PredictionsExportWidget extends Applet<PixelClassificationExportAppletState>{
-    public readonly element: HTMLElement;
-    private jobsDisplay: HTMLDivElement;
-    private exportModeSelector: PopupSelect<"pixel probabilities" | "simple segmentation">;
-    private datasinkInput: PrecomputedChunksScale_DataSink_Input;
-    private datasourceInput: DataSourceInput;
-    private labelSelectorContainer: HTMLParagraphElement;
-    private labelToExportSelector: PopupSelect<LabelHeader> | undefined;
-    private inputSuggestionsButtonContainer: HTMLSpanElement;
     private viewer: Viewer
+
+    public readonly element: HTMLElement;
+    private jobsDisplay: Div;
+    private labelSelectorContainer: Span;
+    private labelToExportSelector: Select<LabelHeader> | undefined;
+    private exportModeSelector: Select<"pixel probabilities" | "simple segmentation">;
+    private datasourceListWidget: DataSourceListWidget;
+    private customTileShapeCheckbox: BooleanInput;
+    private tileShapeInput: Shape5DInputNoChannel
 
     public constructor({name, parentElement, session, help, viewer}: {
         name: string, parentElement: HTMLElement, session: Session, help: string[], viewer: Viewer
@@ -94,198 +210,177 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
         this.element = new CollapsableWidget({display_name: "Export Predictions", parentElement, help}).element
         this.element.classList.add("ItkPredictionsExportApplet")
 
-        const exportModeContainer = createElement({tagName: "p", parentElement: this.element})
-        createElement({tagName: "label", parentElement: exportModeContainer, innerText: "Export mode: "})
-        this.exportModeSelector = new PopupSelect<"pixel probabilities" | "simple segmentation">({
-            popupTitle: "Select an export mode",
-            parentElement: exportModeContainer,
-            options: ["pixel probabilities", "simple segmentation"], //FIXME?
-            optionRenderer: (args) => createElement({tagName: "span", parentElement: args.parentElement, innerText: args.option}),
-            onChange: () => this.refreshInputs(),
-        })
+        new Paragraph({parentElement: this.element, children: [
+            new Label({parentElement: undefined, innerText: "Export mode: "}),
+            this.exportModeSelector = new Select<"pixel probabilities" | "simple segmentation">({
+                popupTitle: "Select an export mode",
+                parentElement: undefined,
+                options: ["pixel probabilities", "simple segmentation"], //FIXME?
+                renderer: (opt) => new Span({parentElement: undefined, innerText: opt}),
+                onChange: (val) => this.labelSelectorContainer.show(val == "simple segmentation"),
+            }),
+        ]})
+        this.labelSelectorContainer = new Paragraph({parentElement: this.element});
+        this.labelSelectorContainer.show(false)
 
-        const datasourceFieldset = createElement({tagName: "fieldset", parentElement: this.element})
-        createElement({tagName: "legend", parentElement: datasourceFieldset, innerText: "Input Data:"})
-        this.datasourceInput = new DataSourceInput({
-            parentElement: datasourceFieldset,
-            session,
-            onChanged: (ds: FsDataSource | undefined) => {
-                if(!ds){
-                    this.datasinkInput.sinkShapeInput.xInput.value = undefined
-                    this.datasinkInput.sinkShapeInput.yInput.value = undefined
-                    this.datasinkInput.sinkShapeInput.zInput.value = undefined
-                    this.datasinkInput.sinkShapeInput.tInput.value = undefined
+        const datasourceFieldset = createFieldset({parentElement: this.element, legend: "Input Datasets:"})
+        this.datasourceListWidget = new DataSourceListWidget({parentElement: datasourceFieldset, session: this.session})
 
-                    this.datasinkInput.tileShapeInput.xInput.value = undefined
-                    this.datasinkInput.tileShapeInput.yInput.value = undefined
-                    this.datasinkInput.tileShapeInput.zInput.value = undefined
-                    this.datasinkInput.tileShapeInput.tInput.value = undefined
-                }else{
-                    this.datasinkInput.sinkShapeInput.xInput.value = ds.shape.x
-                    this.datasinkInput.sinkShapeInput.yInput.value = ds.shape.y
-                    this.datasinkInput.sinkShapeInput.zInput.value = ds.shape.z
-                    this.datasinkInput.sinkShapeInput.tInput.value = ds.shape.t
-
-                    this.datasinkInput.tileShapeInput.xInput.value = ds.tile_shape.x
-                    this.datasinkInput.tileShapeInput.yInput.value = ds.tile_shape.y
-                    this.datasinkInput.tileShapeInput.zInput.value = ds.tile_shape.z
-                    this.datasinkInput.tileShapeInput.tInput.value = ds.tile_shape.t
-                }
-                this.datasinkInput.resolutionInput.value = ds?.spatial_resolution
-            }
-        })
-        this.inputSuggestionsButtonContainer = createElement({tagName: "span", parentElement: datasourceFieldset})
-
-
-        const datasinkFieldset = createElement({tagName: "fieldset", parentElement: this.element})
-        createElement({tagName: "legend", parentElement: datasinkFieldset, innerText: "Output: "})
-        this.datasinkInput = new PrecomputedChunksScale_DataSink_Input({
+        const datasinkFieldset = createFieldset({legend: "Output: ", parentElement: this.element})
+        const fileLocationInputWidget = new FileLocationPatternInputWidget({
             parentElement: datasinkFieldset,
-            disableDataType: true,
-            disableShape: true,
-            disableTileShape: true,
-            disableEncoding: true,
-            disableResolution: true,
+            defaultBucketName: "hbp-image-service",
+            defaultPathPattern: "/ilastik_exports/{timestamp}/{name}_{output_type}",
+            filesystemChoices: ["data-proxy"]
         })
+        const datasinkConfigWidget = new DatasinkConfigWidget({parentElement: datasinkFieldset})
 
-        this.labelSelectorContainer = createElement({tagName: "p", parentElement: this.element});
+        new Paragraph({parentElement: this.element, children: [
+            new Label({parentElement: undefined, innerText: "Use Custom Tile Shape: "}),
+            this.customTileShapeCheckbox = new BooleanInput({parentElement: undefined, value: false, onChange: () => {
+                this.tileShapeInput.disabled = !this.customTileShapeCheckbox.value
+                tileShapeP.show(this.customTileShapeCheckbox.value)
+            }}),
+        ]})
+        let tileShapeP = new Paragraph({parentElement: this.element})
+        tileShapeP.show(this.customTileShapeCheckbox.value)
+        this.tileShapeInput = new Shape5DInputNoChannel({parentElement: tileShapeP.element, disabled: !this.customTileShapeCheckbox.value})
 
-        createInputParagraph({
-            inputType: "button", value: "Start Export Job", parentElement: this.element, onClick: () => {
-                const datasource = this.datasourceInput.value
-                const datasink = this.datasinkInput.value
-                if(!datasource || !datasink){
-                    new ErrorPopupWidget({message: "Missing export parameters"})
+
+        new Paragraph({parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
+            new Button({parentElement: undefined, inputType: "button", text: "Start Export Jobs", onClick: () => {
+                const exportMode = this.exportModeSelector.value
+                let dtype: DataType;
+                let numChannels: number;
+                if(exportMode == "pixel probabilities"){
+                    dtype = "float32"
+                    numChannels = this.labelToExportSelector?.options.length || 0 //FIXME: maybe just save the number of labels in state?
+                }else if(exportMode == "simple segmentation"){
+                    dtype = "uint8"
+                    numChannels = 3
+                }else{
+                    assertUnreachable(exportMode)
+                }
+
+                if(numChannels == 0){
+                    new ErrorPopupWidget({message: "Missing or wrong parameters"})
                     return
                 }
-                if(this.exportModeSelector.value == "pixel probabilities"){
-                    this.doRPC("launch_pixel_probabilities_export_job", new StartPixelProbabilitiesExportJobParamsDto({
-                        datasource: datasource.toDto(), datasink: datasink
-                    }))
-                }else if(this.exportModeSelector.value == "simple segmentation"){
-                    const label_header = this.labelToExportSelector?.value;
-                    if(!label_header){
+
+                if(this.datasourceListWidget.value.filter(ds => ds instanceof FsDataSource).length == 0){
+                    new ErrorPopupWidget({message: "No valid datasets to process"})
+                    return
+                }
+
+                for(let job_index=0; job_index < this.datasourceListWidget.value.length; job_index++){
+                    const datasource = this.datasourceListWidget.value[job_index]
+                    let fileLocation = fileLocationInputWidget.tryGetLocation({
+                        item_index: job_index, name: datasource.url.path.name, output_type: this.exportModeSelector.value
+                    });
+                    if(fileLocation === undefined){
+                        new ErrorPopupWidget({message: "Unexpected bad file location"}) //FIXME? Shouldn't this be impossible?
+                        return
+                    }
+                    if(!(datasource instanceof FsDataSource)){
+                        continue
+                    }
+                    let datasink_tile_shape: Shape5D
+                    if(this.customTileShapeCheckbox.value){
+                        const custom_tile_shape = this.tileShapeInput.getShape({c: numChannels})
+                        if(custom_tile_shape === undefined){
+                            new ErrorPopupWidget({message: "Custom tile shape is incomplete"})
+                            return
+                        }
+                        datasink_tile_shape = custom_tile_shape.clampedWith(datasource.shape)
+                    }else{
+                        datasink_tile_shape = datasource.tile_shape
+                    }
+
+                    const datasink = datasinkConfigWidget.tryMakeDataSink({
+                        filesystem: fileLocation.filesystem,
+                        path: fileLocation.path,
+                        dtype,
+                        interval: datasource.interval.updated({c: [0, numChannels]}),
+                        resolution: datasource.spatial_resolution,
+                        tile_shape: datasink_tile_shape.updated({c: numChannels}),
+                    })
+                    if(!datasource || !datasink){
                         new ErrorPopupWidget({message: "Missing export parameters"})
                         return
                     }
-                    this.doRPC("launch_simple_segmentation_export_job", new StartSimpleSegmentationExportJobParamsDto({
-                        datasource: datasource.toDto(), datasink: datasink, label_header: label_header.toDto()
-                    }))
-                }else{
-                    assertUnreachable(this.exportModeSelector.value)
+                    if(this.exportModeSelector.value == "pixel probabilities"){
+                        this.doRPC("launch_pixel_probabilities_export_job", new StartPixelProbabilitiesExportJobParamsDto({
+                            datasource: datasource.toDto(), datasink: datasink.toDto()
+                        }))
+                    }else if(this.exportModeSelector.value == "simple segmentation"){
+                        const label_header = this.labelToExportSelector?.value;
+                        if(!label_header){
+                            new ErrorPopupWidget({message: "Missing export parameters"})
+                            return
+                        }
+                        this.doRPC("launch_simple_segmentation_export_job", new StartSimpleSegmentationExportJobParamsDto({
+                            datasource: datasource.toDto(), datasink: datasink.toDto(), label_header: label_header.toDto()
+                        }))
+                    }else{
+                        assertUnreachable(this.exportModeSelector.value)
+                    }
                 }
-            }
-        })
+            }}),
+        ]})
 
-        this.jobsDisplay = createElement({tagName: "div", parentElement: this.element});
-        this.refreshInputs()
-    }
-
-    private refreshInputs = () => {
-        const exportMode = this.exportModeSelector.value
-        if(exportMode == 'pixel probabilities'){
-            this.datasinkInput.dataTypeSelector.value = "float32"
-            this.datasinkInput.tileShapeInput.cInput.value = this.labelToExportSelector?.options.length
-            this.datasinkInput.sinkShapeInput.cInput.value = this.labelToExportSelector?.options.length
-            this.labelSelectorContainer.style.display = "none"
-        }else if (exportMode == "simple segmentation"){
-            this.datasinkInput.dataTypeSelector.value = "uint8"
-            this.datasinkInput.tileShapeInput.cInput.value = 3
-            this.datasinkInput.sinkShapeInput.cInput.value = 3
-            this.labelSelectorContainer.style.display = "block"
-        }else{
-            assertUnreachable(exportMode)
-        }
+        this.jobsDisplay = new Div({parentElement: this.element});
     }
 
     protected onNewState(new_state: PixelClassificationExportAppletState){
-        this.jobsDisplay.innerHTML = ""
-
-        this.inputSuggestionsButtonContainer.innerHTML = ""
-        createInput({
-            inputType: "button",
-            parentElement: this.inputSuggestionsButtonContainer,
-            value: "Use an Annotated Dataset",
-            disabled: new_state.datasource_suggestions.length == 0,
-            onClick: () => new InputPopupWidget<FsDataSource>({
-                title: "Pick an annotated dataset as input",
-                inputWidgetFactory: (parentElement) => {
-                    return new SelectorWidget({
-                        parentElement: parentElement,
-                        options: new_state.datasource_suggestions,
-                        optionRenderer: (args) => createElement({tagName: "span", parentElement: args.parentElement, innerText: args.option.getDisplayString()}),
-                    })
-                },
-                onConfirm: (ds) => {
-                    this.datasourceInput.value = ds
-                },
-            })
-        })
+        this.jobsDisplay.clear()
 
         let previousLabelSelection = this.labelToExportSelector?.value;
-        this.labelSelectorContainer.innerHTML = ""
-        createElement({tagName: "label", parentElement: this.labelSelectorContainer, innerText: "Select a label to segment: "})
+        this.labelSelectorContainer.clear()
+        new Label({parentElement: this.labelSelectorContainer, innerText: "Select a label to segment: "})
         if(new_state.populated_labels){
-            this.labelToExportSelector = new PopupSelect<LabelHeader>({
+            this.labelToExportSelector = new Select<LabelHeader>({
                 parentElement: this.labelSelectorContainer,
                 popupTitle: "Select a label to segment",
                 options: new_state.populated_labels,
-                comparator: (label1, label2) => label1.name == label2.name,
-                optionRenderer: (args) => {
-                    createElement({tagName: "span", parentElement: args.parentElement, innerText: args.option.name + " "})
-                    createElement({tagName: "span", parentElement: args.parentElement, innerText: "🖌️", inlineCss: {
-                        backgroundColor: args.option.color.hexCode,
-                        padding: "2px",
-                        border: "solid 1px black"
-                    }})
-                },
+                renderer: (val) => new Span({
+                    parentElement: undefined,
+                    children: [
+                        new Span({parentElement: undefined, innerText: val.name + " "}),
+                        new Span({parentElement: undefined, innerText: "🖌️", inlineCss: {
+                            backgroundColor: val.color.hexCode,
+                            padding: "2px",
+                            border: "solid 1px black"
+                        }}),
+                    ]
+                }),
             })
+
             if(previousLabelSelection){
-                for(let labelHeader of new_state.populated_labels){
-                    if(labelHeader.name == previousLabelSelection.name || labelHeader.color.equals(previousLabelSelection.color)){
-                        this.labelToExportSelector.value = labelHeader
-                        break
-                    }
+                const foudnLabel = new_state.populated_labels.find(labelHeader => previousLabelSelection?.couldBe(labelHeader))
+                if(foudnLabel){
+                    this.labelToExportSelector.value = foudnLabel
                 }
             }
         }else{
-            createElement({tagName: "span", parentElement: this.labelSelectorContainer, innerText: "No populated labels"})
+            new Span({parentElement: this.labelSelectorContainer, innerText: "No populated labels", cssClasses: [CssClasses.ItkErrorText]})
         }
 
-        if(new_state.jobs.length > 0){
-            createTable({
-                parentElement: this.jobsDisplay,
-                cssClasses: [CssClasses.ItkTable],
-                title: {header: "Jobs:"},
-                headers: {name: "Name", status: "Status", progress: "Progress"},
-                rows: new_state.jobs.map(job => {
-                    let progressColumnContents: HTMLElement | string = job.num_args === undefined ? "unknwown" : `${Math.round(job.num_completed_steps / job.num_args * 100)}%`
-                    if(job.status == 'succeeded' && job instanceof ExportJobDto){
-                        progressColumnContents = createElement({tagName: "span", parentElement: undefined})
-                        const outputFs = Filesystem.fromDto(job.datasink.filesystem);
-                        if(outputFs instanceof BucketFs && job.datasink instanceof PrecomputedChunksSinkDto){ //FIXME
-                            const dataProxyLink = createElement({tagName: "a", parentElement: progressColumnContents, innerText: "Open in Data Proxy"})
-                            let dataProxyPrefixParam = job.datasink.path.replace(/^\//, "")
-                            if(job.datasink instanceof PrecomputedChunksSinkDto){
-                                dataProxyPrefixParam += "/"
-                            }
-                            dataProxyLink.href = `https://data-proxy.ebrains.eu/${outputFs.bucket_name}?prefix=${dataProxyPrefixParam}`
-                            dataProxyLink.target = "_blank"
-                            dataProxyLink.rel = "noopener noreferrer"
-                        }
-                        createInput({inputType: "button", parentElement: progressColumnContents, value: "Open in Viewer", onClick: () => {
-                            this.viewer.openDataViewFromDataSource(FsDataSink.fromDto(job.datasink).toDataSource())
-                        }})
-                    }
-                    return{
-                        name: job.name,
-                        status: job.status,
-                        progress: progressColumnContents
-                    }
-                })
+        if(new_state.jobs.length == 0){
+            return
+        }
+
+        const jobsTable = new Table({parentElement: this.jobsDisplay, cssClasses: [CssClasses.ItkTable], children: [
+            new TableRow({parentElement: undefined, children: [
+                new TableHeader({parentElement: undefined, innerText: "Name"}), //FIXME: mode? name?
+                new TableHeader({parentElement: undefined, innerText: "Progress"}),
+            ]}),
+        ]})
+
+        new_state.jobs.forEach(job => {
+            const row = job.toTableRow((datasource) => {
+                this.viewer.openDataViewFromDataSource(datasource)
             })
-        }
-
-        this.refreshInputs()
+            new TableRow({parentElement: jobsTable, children: [row.name, row.progress]})
+        })
     }
 }

@@ -21,12 +21,14 @@ from webilastik.features.ilp_filter import (
     IlpStructureTensorEigenvalues
 )
 from webilastik.features.ilp_filter import IlpFilter
-from webilastik.filesystem.osfs import OsFs
+from webilastik.filesystem.os_fs import OsFs
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet import dummy_prompt
 from webilastik.utility.url import Protocol
 from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
 
+osfs = OsFs.create()
+assert not isinstance(osfs, Exception)
 
 def test_feature_extractor_serialization():
     all_feature_extractors: List[IlpFilter] = []
@@ -53,8 +55,7 @@ def test_pixel_classification_ilp_serialization():
     with h5py.File(sample_trained_ilp_path, "r") as f:
         sample_workflow_data = IlpPixelClassificationWorkflowGroup.parse(
             group=f,
-            ilp_fs=OsFs("."),
-            allowed_protocols=["file"],
+            ilp_fs=osfs, #FIXME?
         )
         assert not isinstance(sample_workflow_data, Exception)
         with open(output_ilp_path, "wb") as rewritten:
@@ -64,8 +65,7 @@ def test_pixel_classification_ilp_serialization():
     with h5py.File(output_ilp_path, "r") as rewritten:
         reloaded_data = IlpPixelClassificationWorkflowGroup.parse(
             group=rewritten,
-            ilp_fs=OsFs("/"),
-            allowed_protocols=["file"],
+            ilp_fs=osfs,
         )
         assert not isinstance(reloaded_data, Exception)
 
@@ -93,7 +93,6 @@ def test_pixel_classification_ilp_serialization():
     some_executor = ProcessPoolExecutor(max_workers=2)
     priority_executor = PriorityExecutor(executor=some_executor, max_active_job_steps=2)
     workflow = PixelClassificationWorkflow.from_ilp(
-        allowed_protocols=["file"],
         executor=some_executor,
         priority_executor=priority_executor,
         ilp_path=output_ilp_path,

@@ -27,7 +27,7 @@ Protocol = Literal["http", "https", "file", "memory"]
 
 @dataclass
 class UrlDto(DataTransferObject):
-    datascheme: Optional[Literal["precomputed"]]
+    datascheme: Optional[Literal["precomputed", "n5"]]
     protocol: Literal["http", "https", "file", "memory"]
     hostname: str
     port: Optional[int]
@@ -73,7 +73,7 @@ class Interval5DDto(DataTransferObject):
 
 @dataclass
 class OsfsDto(DataTransferObject):
-    path: str
+    pass
 
 @dataclass
 class HttpFsDto(DataTransferObject):
@@ -87,11 +87,10 @@ class HttpFsDto(DataTransferObject):
 @dataclass
 class BucketFSDto(DataTransferObject):
     bucket_name: str
-    prefix: str
 
 FsDto = Union[OsfsDto, HttpFsDto, BucketFSDto]
 
-DtypeDto = Literal["uint8", "uint16", "uint32", "uint64", "float32"]
+DtypeDto = Literal["uint8", "uint16", "uint32", "uint64", "int64", "float32"]
 
 def dtype_to_dto(dtype: "np.dtype[Any]") -> DtypeDto:
     return cast(DtypeDto, str(dtype))
@@ -109,6 +108,67 @@ class PrecomputedChunksDataSourceDto(DataTransferObject):
     encoder: Literal["raw", "jpeg"]
 
 @dataclass
+class N5GzipCompressorDto(DataTransferObject):
+    level: int
+
+    @classmethod
+    def tag_key(cls) -> str:
+        return "type"
+
+    @classmethod
+    def tag_value(cls) -> str:
+        return "gzip"
+
+@dataclass
+class N5Bzip2CompressorDto(DataTransferObject):
+    blockSize: int # name doesn't make sense but is what is in the n5 'spec'
+
+    @classmethod
+    def tag_key(cls) -> str:
+        return "type"
+
+    @classmethod
+    def tag_value(cls) -> str:
+        return "bzip2"
+
+@dataclass
+class N5XzCompressorDto(DataTransferObject):
+    preset: int
+
+    @classmethod
+    def tag_key(cls) -> str:
+        return "type"
+
+    @classmethod
+    def tag_value(cls) -> str:
+        return "xz"
+
+@dataclass
+class N5RawCompressorDto(DataTransferObject):
+    @classmethod
+    def tag_key(cls) -> str:
+        return "type"
+
+    @classmethod
+    def tag_value(cls) -> str:
+        return "raw"
+
+N5CompressorDto = Union[N5GzipCompressorDto, N5Bzip2CompressorDto, N5XzCompressorDto, N5RawCompressorDto]
+
+@dataclass
+class N5DatasetAttributesDto(DataTransferObject):
+    dimensions: Tuple[int, ...]
+    blockSize: Tuple[int, ...]
+    # axes: Optional[Tuple[Literal["x", "y", "z", "t", "c"], ...]] # FIXME: retore this
+    axes: Optional[Tuple[str, ...]] # FIXME: retore this
+    dataType: DtypeDto
+    compression: N5CompressorDto
+
+    @classmethod
+    def tag_value(cls) -> None:
+        return None
+
+@dataclass
 class N5DataSourceDto(DataTransferObject):
     url: UrlDto
     filesystem: FsDto
@@ -117,6 +177,8 @@ class N5DataSourceDto(DataTransferObject):
     tile_shape: Shape5DDto
     spatial_resolution: Tuple[int, int, int]
     dtype: DtypeDto
+    compressor: N5CompressorDto
+    c_axiskeys_on_disk: str
 
 @dataclass
 class SkimageDataSourceDto(DataTransferObject):
@@ -145,30 +207,12 @@ class PrecomputedChunksSinkDto(DataTransferObject):
     encoding: Literal["raw", "jpeg"]
 
 @dataclass
-class N5GzipCompressorDto(DataTransferObject):
-    level: int
-
-@dataclass
-class N5Bzip2CompressorDto(DataTransferObject):
-    blockSize: int
-
-@dataclass
-class N5XzCompressorDto(DataTransferObject):
-    preset: int
-
-@dataclass
-class N5RawCompressorDto(DataTransferObject):
-    pass
-
-N5CompressorDto = Union[N5GzipCompressorDto, N5Bzip2CompressorDto, N5XzCompressorDto, N5RawCompressorDto]
-
-@dataclass
 class N5DataSinkDto(DataTransferObject):
     filesystem: FsDto
-    outer_path: str
-    inner_path: str
+    path: str
     interval: Interval5DDto
     tile_shape: Shape5DDto
+    spatial_resolution: Tuple[int, int, int]
     c_axiskeys: str
     dtype: DtypeDto
     compressor: N5CompressorDto
@@ -417,13 +461,13 @@ class StartSimpleSegmentationExportJobParamsDto(DataTransferObject):
 
 @dataclass
 class LoadProjectParamsDto(DataTransferObject):
-    fs: Union[HttpFsDto, BucketFSDto]
+    fs: FsDto
     project_file_path: str
 
 
 @dataclass
 class SaveProjectParamsDto(DataTransferObject):
-    fs: Union[HttpFsDto, BucketFSDto]
+    fs: FsDto
     project_file_path: str
 
 #########################################
@@ -434,7 +478,7 @@ class GetDatasourcesFromUrlParamsDto(DataTransferObject):
 
 @dataclass
 class GetDatasourcesFromUrlResponseDto(DataTransferObject):
-    datasources: Optional[Tuple[FsDataSourceDto, ...]]
+    datasources: Union[FsDataSourceDto, Tuple[FsDataSourceDto, ...], None]
 
 
 @dataclass
@@ -445,3 +489,16 @@ class CheckDatasourceCompatibilityParams(DataTransferObject):
 @dataclass
 class CheckDatasourceCompatibilityResponse(DataTransferObject):
     compatible: Tuple[bool, ...]
+
+
+#################################################
+
+@dataclass
+class ListFsDirRequest(DataTransferObject):
+    fs: FsDto
+    path: str
+
+@dataclass
+class ListFsDirResponse(DataTransferObject):
+    files: Tuple[str, ...]
+    directories: Tuple[str, ...]

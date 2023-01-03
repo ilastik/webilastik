@@ -1,241 +1,112 @@
-import json
-import os
-from pathlib import Path, PurePosixPath
-import io
-from typing import Collection, Dict, List, Any, Mapping, Optional, Tuple, Union, Literal
+from typing import Dict, Literal, Optional, Mapping, Final, Tuple
+from pathlib import PurePosixPath
+
 import requests
-from requests import HTTPError
-import sys
 
-from fs.base import FS
-from fs.subfs import SubFS
-from fs.info import Info
-from fs.errors import DirectoryExpected, FileExpected, ResourceNotFound
-from fs.permissions import Permissions
-from fs.enums import ResourceType
-from requests.models import CaseInsensitiveDict
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
+from webilastik.filesystem import IFilesystem, FsIoException, FsFileNotFoundException, FsDirectoryContents
+from webilastik.utility.url import Url
 from webilastik.server.rpc.dto import HttpFsDto
-from webilastik.ui.usage_error import UsageError
+from webilastik.utility.request import ErrRequestCompletedAsFailure, ErrRequestCrashed, request as safe_request
 
-from .RemoteFile import RemoteFile
-from webilastik.filesystem import Filesystem
-from webilastik.utility.url import Url, Protocol
+_sessions: Dict[str, requests.Session] = {}
+
+def _do_request(
+    method: Literal["get", "put", "post", "delete"],
+    url: Url,
+    data: Optional[bytes] = None,
+    headers: "Mapping[str, str] | None" = None,
+) -> "bytes | ErrRequestCompletedAsFailure | ErrRequestCrashed":
+    session = _sessions.get(url.hostname)
+    if session is None:
+        session = requests.Session()
+        _sessions[url.hostname] = session
+    return safe_request(session=session, method=method, url=url, data=data, headers=headers)
 
 
-def eprint(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
-
-
-class HttpFs(Filesystem):
-    def __init__(self, read_url: Url, write_url: Optional[Url] = None, headers: Optional[Mapping[str, str]] = None):
+class HttpFs(IFilesystem):
+    def __init__(
+        self,
+        *,
+        protocol: Literal["http", "https"],
+        hostname: str,
+        path: PurePosixPath,
+        port: Optional[int] = None,
+        search: Optional[Mapping[str, str]] = None,
+    ) -> None:
         super().__init__()
-        self.read_url = read_url
-        self.write_url = write_url or read_url
-        if self.read_url.protocol not in ("http", "https") or  self.write_url.protocol not in ("http", "https"):
-            raise ValueError("Can only handle http procotols")
-        self.protocol: Literal["http", "https"] = self.read_url.protocol
-        self.requests_verify: Union[str, bool] = os.environ.get("CA_CERT_PATH", True)
-        if isinstance(self.requests_verify, str) and not Path(self.requests_verify).exists():
-            raise ValueError(f"CA_CERT_PATH '{self.requests_verify}' not found")
-
-        self.headers = headers or {}
-        self.session = requests.Session()
-        self.session.headers.update(self.headers)
+        self.protocol: Literal["http", "https"] = protocol
+        self.base: Final[Url] = Url(
+            protocol=protocol,
+            hostname=hostname,
+            path=path,
+            port=port,
+            search=search,
+        )
 
     @classmethod
-    def try_from_url(cls, url: Url) -> "HttpFs | UsageError":
+    def try_from_url(cls, url: Url) -> "Tuple[HttpFs, PurePosixPath] | Exception":
         if url.protocol not in ("http", "https"):
-            return UsageError(f"Bad url for HttpFs: {url}")
-        return HttpFs(read_url=url)
+            return Exception(f"Bad url for HttpFs: {url}")
+        return (
+            HttpFs(
+                protocol=url.protocol,
+                hostname=url.hostname,
+                port=url.port,
+                path=PurePosixPath("/"),
+                search=url.search,
+            ),
+            url.path
+        )
 
-    def to_json_value(self) -> JsonObject:
-        return {
-            "read_url": self.read_url.raw,
-            "write_url": self.write_url.raw,
-            "__class__": self.__class__.__name__,
-        }
+    @classmethod
+    def from_dto(cls, dto: HttpFsDto) -> "HttpFs":
+        return HttpFs(
+            protocol=dto.protocol,
+            hostname=dto.hostname,
+            path=PurePosixPath(dto.path),
+            port=dto.port,
+            search=dto.search,
+        )
 
     def to_dto(self) -> HttpFsDto:
         return HttpFsDto(
             protocol=self.protocol,
-            hostname=self.read_url.hostname,
-            path=self.read_url.path.as_posix(),
-            port=self.read_url.port,
-            search=self.read_url.search,
+            hostname=self.base.hostname,
+            path=self.base.path.as_posix(),
+            port=self.base.port,
+            search=self.base.search,
         )
 
-    @classmethod
-    def from_dto(cls, message: HttpFsDto) -> "HttpFs":
-        return HttpFs(
-            read_url=Url(
-                protocol=message.protocol,
-                hostname=message.hostname,
-                path=PurePosixPath(message.path),
-                port=message.port,
-                search=message.search,
-            ),
+    def list_contents(self, path: PurePosixPath) -> "FsDirectoryContents | FsIoException":
+        return FsIoException("Can't reliably list contents of http dir yet")
+
+    def create_file(self, *, path: PurePosixPath, contents: bytes) -> "None | FsIoException":
+        result = _do_request(
+            method="post",
+            url=self.base.concatpath(path),
+            data=contents,
         )
+        if isinstance(result, Exception):
+            return FsIoException(result)
 
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "HttpFs":
-        value_obj = ensureJsonObject(value)
+    def create_directory(self, path: PurePosixPath) -> "None | FsIoException":
+        return None
 
-        raw_headers = value_obj.get("headers")
-        if raw_headers is None:
-            headers = {}
-        else:
-            headers_obj = ensureJsonObject(raw_headers)
-            headers = {ensureJsonString(k): ensureJsonString(v) for k,v in headers_obj.items()}
-
-        read_url = Url.parse(ensureJsonString(value_obj.get("read_url")))
-        if read_url is None:
-            raise ValueError(f"Bad 'read_url' in json payload: {json.dumps(value, indent=4)}")
-
-        raw_write_url = value_obj.get("write_url")
-        if raw_write_url is None:
-            write_url = None
-        else:
-            write_url = Url.parse(ensureJsonString(raw_write_url))
-            if write_url is None:
-                raise ValueError(f"Bad write_url in HttpFs payload: {json.dumps(value, indent=4)}")
-
-        return cls(
-            read_url=read_url,
-            write_url=write_url,
-            headers=headers,
+    def read_file(self, path: PurePosixPath) -> "bytes | FsIoException | FsFileNotFoundException":
+        result = _do_request(
+            method="get",
+            url=self.base.concatpath(path),
         )
+        if isinstance(result, bytes):
+            return result
+        if isinstance(result, ErrRequestCompletedAsFailure) and result.status_code == 404:
+            return FsFileNotFoundException(path=path)
+        return FsIoException(result)
 
-    def __getstate__(self) -> JsonObject:
-        return self.to_json_value()
+    def delete(self, path: PurePosixPath) -> "None | FsIoException":
+        result = _do_request(method="delete", url=self.base.concatpath(path))
+        if isinstance(result, Exception):
+            return FsIoException(result)
 
-    def __setstate__(self, data: Dict[str, Any]):
-        url = HttpFs.from_json_value(data)
-        self.__init__(
-            read_url=url.read_url,
-            write_url=url.write_url,
-            headers=url.headers,
-        )
-
-    def desc(self, path: str) -> str:
-        return self.read_url.concatpath(path).raw
-
-    def geturl(self, path: str, purpose: str = 'download') -> str:
-        return self.read_url.concatpath(path).raw
-
-    def _delete_object(self, subpath: str) -> None:
-        full_path = self.write_url.concatpath(subpath)
-        eprint(f"Removing object at {full_path}")
-        resp = self.session.delete(full_path.raw, verify=self.requests_verify)
-        resp.raise_for_status()
-
-    def _put_object(self, subpath: str, contents: bytes) -> requests.Response:
-        full_path = self.write_url.concatpath(subpath)
-        assert full_path.raw != "/"
-
-        # try:
-        #     resource_type = self._get_type(subpath)
-        #     if resource_type == ResourceType.directory:
-        #         raise ValueError(f"{full_path} is a directory")
-        #     eprint(f"Overwriting object at {full_path}")
-        #     self._delete_object(full_path.raw)
-        # except HTTPError as e:
-        #     if e.response.status_code == 404:
-        #         pass
-
-        response = self.session.put(
-            full_path.raw, data=contents, headers={"Content-Type": "application/octet-stream"}, verify=self.requests_verify
-        )
-        response.raise_for_status()
-        return response
-
-    def _get_object(self, subpath: str) -> Tuple["CaseInsensitiveDict[str]", bytes]:
-        full_path = self.read_url.concatpath(subpath)
-        response = self.session.get(full_path.raw, verify=self.requests_verify)
-        response.raise_for_status()
-        return response.headers, response.content
-
-    def _head_object(self, subpath: str) -> "CaseInsensitiveDict[str]":
-        full_path = self.read_url.concatpath(subpath)
-        resp = self.session.head(full_path.raw, verify=self.requests_verify)
-        if resp.status_code == 404:
-            raise ResourceNotFound(subpath)
-        else:
-            resp.raise_for_status()
-        return resp.headers
-
-    def _get_type(self, subpath: str) -> ResourceType:
-        headers = self._head_object(subpath)
-        if headers["Content-Type"] == "application/octet-stream":
-            return ResourceType.file
-        return ResourceType.directory
-
-    def getinfo(self, path: str, namespaces: Optional[Collection[str]] = ("basic",)) -> Info:
-        full_path = self.read_url.concatpath(path)
-        resource_type = self._get_type(path)
-        return Info(
-            raw_info={
-                "basic": {
-                    "name": full_path.path.name,
-                    "is_dir": True if resource_type == ResourceType.directory else False,
-                },
-                "details": {"type": resource_type},
-            }
-        )
-
-    def openbin(self, path: str, mode: str = "r", buffering: int = -1, **options: Dict[str, Any]) -> RemoteFile:
-        def close_callback(f: RemoteFile):
-            if mode == "r":
-                return
-            _ = f.seek(0)
-            self._put_object(path, f.read()).raise_for_status()
-
-        contents = bytes()
-        if mode in ("r", "r+", "w+", "a", "a+"):
-            try:
-                _, contents = self._get_object(path)
-            except HTTPError as e:
-                if e.response.status_code == 404 and "r" in mode:
-                    raise ResourceNotFound(path) from e
-        remote_file = RemoteFile(close_callback=close_callback, mode=mode, data=contents)
-        if "a" in mode:
-            _ = remote_file.seek(0, io.SEEK_END)
-        return remote_file
-
-    def opendir(self, path: str, factory=None) -> SubFS[FS]:
-        #FIXME: is the typing correct?
-        return HttpFs(self.read_url.concatpath(path)) #type: ignore
-
-    def listdir(self, path: str) -> List[str]:
-        raise NotImplementedError("Can't reliably list directories via http")
-
-    def makedir(
-        self, path: str, permissions: Optional[Permissions] = None, recreate: bool = False
-    ) -> SubFS[FS]:
-        raise NotImplementedError("makedir")
-
-    def remove(self, path: str) -> None:
-        self._delete_object(path)
-
-    def removedir(self, path: str) -> None:
-        raise NotImplementedError("removedir")
-
-    def setinfo(self, path, info):
-        raise NotImplementedError("setinfo")
-
-class SwiftTempUrlFs(HttpFs):
-    def exists(self, path: str) -> bool:
-        # FIXME: folders with never exist
-        try:
-            _ = self._get_object(path)
-            return True
-        except HTTPError as e:
-            if e.response.status_code == 404:
-                return False
-            raise
-
-    def makedir(self, path: str, permissions: Optional[Permissions] = None, recreate: bool = False) -> SubFS[FS]:
-        return self.opendir(path)
-
-    def makedirs(self, path: str, permissions: Optional[Permissions]=None, recreate: bool = True) -> SubFS[FS]:
-        return self.opendir(path)
+    def geturl(self, path: PurePosixPath) -> Url:
+        return self.base.concatpath(path)

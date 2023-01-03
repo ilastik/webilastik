@@ -1,5 +1,6 @@
+#pyright: strict
 from tests import create_tmp_dir
-from webilastik.filesystem.osfs import OsFs
+from webilastik.filesystem.os_fs import OsFs
 from pathlib import PurePosixPath
 
 import numpy as np
@@ -11,36 +12,23 @@ from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
 from webilastik.datasource import DataRoi
 from webilastik.datasource.array_datasource import ArrayDataSource
 from webilastik.datasource.n5_datasource import N5DataSource
-from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale, RawEncoder
-from webilastik.datasource.n5_attributes import GzipCompressor, N5DatasetAttributes, RawCompressor
-from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
+from webilastik.datasource.precomputed_chunks_info import RawEncoder
+from webilastik.datasource.n5_attributes import RawCompressor
 
 
 
-data = Array5D(np.arange(20 * 10 * 7).reshape(20, 10, 7), axiskeys="xyz")
+data = Array5D(np.arange(20 * 10 * 7).reshape(20, 10, 7), axiskeys="xyz") # pyright: ignore [reportUnknownMemberType]
 data.setflags(write=False)
 
 datasource = ArrayDataSource(data=data, tile_shape=Shape5D(x=10, y=10))
 
-def test_n5_attributes():
-    attributes = N5DatasetAttributes(
-        dimensions=Shape5D(x=100, y=200),
-        blockSize=Shape5D(x=10, y=20),
-        c_axiskeys="yx",
-        dataType=np.dtype("uint16").newbyteorder(">"),
-        compression=GzipCompressor(level=3)
-    )
-
-    reserialized_attributes = N5DatasetAttributes.from_json_data(attributes.to_json_data())
-    assert reserialized_attributes == attributes
-    assert attributes.to_json_data()["axes"] == ("x", "y")
-
 def test_n5_datasink():
     tmp_path = create_tmp_dir(prefix="test_n5_datasink")
+    fs = OsFs.create()
+    assert not isinstance(fs, Exception)
     sink = N5DataSink(
-        filesystem=OsFs(tmp_path.as_posix()),
-        outer_path=PurePosixPath("test_n5_datasink.n5"),
-        inner_path=PurePosixPath("/data"),
+        filesystem=fs,
+        path=tmp_path / "test_n5_datasink.n5/data",
         c_axiskeys=data.axiskeys, #FIXME: double check this
         compressor=RawCompressor(),
         dtype=datasource.dtype,
@@ -50,23 +38,21 @@ def test_n5_datasink():
     sink_writer = sink.open()
     assert not isinstance(sink_writer, Exception)
     for tile in DataRoi(datasource).split(sink.tile_shape):
-        sink_writer.write(tile.retrieve().translated(Point5D.zero(x=7, y=13)))
+        sink_writer.write(tile.retrieve())
 
-    n5ds = N5DataSource(filesystem=sink.filesystem, path=sink.full_path)
+    n5ds = N5DataSource.try_load(filesystem=sink.filesystem, path=sink.path)
+    assert not isinstance(n5ds, Exception), str(n5ds)
     saved_data = n5ds.retrieve()
-    assert saved_data.location == Point5D.zero(x=7, y=13)
     assert saved_data == data
 
 def test_distributed_n5_datasink():
     tmp_path = create_tmp_dir(prefix="test_distributed_n5_datasink")
-    filesystem = OsFs(tmp_path.as_posix())
-    outer_path = PurePosixPath("test_distributed_n5_datasink.n5")
-    inner_path = PurePosixPath("/data")
-    full_path = PurePosixPath("test_distributed_n5_datasink.n5/data")
+    filesystem = OsFs.create()
+    assert not isinstance(filesystem, Exception)
+    path = tmp_path / "test_distributed_n5_datasink.n5/data"
     sink = N5DataSink(
         filesystem=filesystem,
-        outer_path=outer_path,
-        inner_path=inner_path,
+        path=path,
         c_axiskeys=data.axiskeys, #FIXME: double check this
         compressor=RawCompressor(),
         dtype=datasource.dtype,
@@ -74,21 +60,23 @@ def test_distributed_n5_datasink():
         tile_shape=datasource.tile_shape,
     )
     sink_writer = sink.open()
-    assert not isinstance(sink_writer, Exception)
+    assert not isinstance(sink_writer, Exception), str(sink_writer)
     sink_writers = [sink_writer] * 4
 
     for idx, piece in enumerate(DataRoi(datasource).default_split()):
         sink = sink_writers[idx % len(sink_writers)]
         sink.write(piece.retrieve())
 
-    n5ds = N5DataSource(filesystem=filesystem, path=full_path)
+    n5ds = N5DataSource.try_load(filesystem=filesystem, path=path)
+    assert not isinstance(n5ds, Exception), str(n5ds)
     assert n5ds.retrieve() == data
 
 def test_writing_to_precomputed_chunks():
     tmp_path = create_tmp_dir(prefix="test_writing_to_precomputed_chunks")
     datasource = ArrayDataSource(data=data, tile_shape=Shape5D(x=10, y=10))
-    sink_path = PurePosixPath("mytest.precomputed")
-    filesystem = OsFs(tmp_path.as_posix())
+    filesystem = OsFs.create()
+    assert not isinstance(filesystem, Exception)
+    sink_path = tmp_path / "mytest.precomputed"
 
     datasink = PrecomputedChunksSink(
         filesystem=filesystem,
@@ -116,10 +104,11 @@ def test_writing_to_offset_precomputed_chunks():
     tmp_path = create_tmp_dir(prefix="test_writing_to_offset_precomputed_chunks")
     data_at_1000_1000 = data.translated(Point5D(x=1000, y=1000) - data.location)
     datasource = ArrayDataSource(data=data_at_1000_1000, tile_shape=Shape5D(x=10, y=10))
-    sink_path = PurePosixPath("mytest.precomputed")
-    filesystem = OsFs(tmp_path.as_posix())
+    sink_path = tmp_path / "mytest.precomputed"
+    filesystem = OsFs.create()
+    assert not isinstance(filesystem, Exception)
 
-    print(f"\n\n will write to '{filesystem.geturl(sink_path.as_posix())}' ")
+    print(f"\n\n will write to '{filesystem.geturl(sink_path)}' ")
 
     datasink = PrecomputedChunksSink(
         filesystem=filesystem,

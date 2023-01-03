@@ -11,7 +11,7 @@ import numpy as np
 
 from ndstructs.point5D import Shape5D, Interval5D, Point5D, SPAN
 from ndstructs.array5D import Array5D, SPAN_OVERRIDE, All
-from webilastik.filesystem import Filesystem
+from webilastik.filesystem import IFilesystem
 from webilastik.server.rpc.dto import FsDataSourceDto, PrecomputedChunksDataSourceDto, SkimageDataSourceDto
 from webilastik.utility.url import Url
 from webilastik.utility.url import Url, Protocol
@@ -221,7 +221,7 @@ class FsDataSource(DataSource):
         self,
         *,
         c_axiskeys_on_disk: str,
-        filesystem: Filesystem,
+        filesystem: IFilesystem,
         path: PurePosixPath,
         tile_shape: Shape5D,
         dtype: "np.dtype[Any]",
@@ -235,9 +235,7 @@ class FsDataSource(DataSource):
 
     @property
     def url(self) -> Url:
-        url = Url.parse(self.filesystem.geturl(self.path.as_posix()))
-        assert url is not None
-        return url
+        return self.filesystem.geturl(self.path)
 
     @abstractmethod
     def __hash__(self) -> int:
@@ -259,7 +257,7 @@ class FsDataSource(DataSource):
     def try_from_message(
         message: FsDataSourceDto,
         allowed_protocols: Sequence[Protocol] = ("http", "https"),
-    ) -> "FsDataSource":
+    ) -> "FsDataSource | Exception":
         from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
         from webilastik.datasource.n5_datasource import N5DataSource
         from webilastik.datasource.skimage_datasource import SkimageDataSource
@@ -271,38 +269,3 @@ class FsDataSource(DataSource):
         return N5DataSource.from_dto(message)
 
     _datasource_cache: ClassVar[Dict[Url, Sequence['FsDataSource']]] = {}
-
-    @staticmethod
-    def try_get_datasources_from_url(
-        *,
-        url: Url,
-        allowed_protocols: Sequence[Protocol] = ("http", "https")
-    ) -> "Sequence[FsDataSource] | None | Exception":
-        if url.protocol not in allowed_protocols:
-            return Exception(f"Disallowed protocol: {url.protocol} in {url}")
-
-        cached_datasources = FsDataSource._datasource_cache.get(url)
-        if cached_datasources is not None:
-            return cached_datasources
-
-        hashless_url = url.updated_with(hash_="")
-        cached_datasources = FsDataSource._datasource_cache.get(hashless_url)
-        for ds in cached_datasources or ():
-            if ds.url == url:
-                out = [ds]
-                FsDataSource._datasource_cache[hashless_url] = out
-                return out
-
-        from webilastik.datasource.skimage_datasource import SkimageDataSource
-        from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
-
-
-        if SkimageDataSource.supports_url(url):
-            datasources = SkimageDataSource.from_url(url)
-        if PrecomputedChunksDataSource.supports_url(url):
-            datasources = PrecomputedChunksDataSource.from_url(url)
-        else:
-            return None
-        if not isinstance(datasources, Exception):
-            FsDataSource._datasource_cache[url] = datasources
-        return datasources

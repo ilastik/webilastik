@@ -58,7 +58,7 @@ async def main():
     datasources = try_get_datasources_from_url(url=data_url)
     if isinstance(datasources, Exception):
         raise datasources
-    assert not isinstance(datasources, (Exception, type(None)))
+    assert isinstance(datasources, tuple)
     ds = datasources[0]
     token = WorkflowConfig.get().ebrains_user_token
     assert isinstance(token, UserToken)
@@ -158,7 +158,6 @@ async def main():
 
             hbp_image_service_bucket_fs = BucketFs(
                 bucket_name="hbp-image-service",
-                prefix=PurePosixPath("/"),
             )
 
             predictions_export_datasink = create_precomputed_chunks_sink(

@@ -1,7 +1,7 @@
 import { UrlDto } from "../client/dto";
 import { IJsonable } from "./serialization";
 
-export const data_schemes = ["precomputed"] as const;
+export const data_schemes = ["precomputed", "n5"] as const;
 export type DataScheme = typeof data_schemes[number];
 export function ensureDataScheme(value: string): DataScheme{
     const variant = data_schemes.find(variant => variant === value)
@@ -50,6 +50,11 @@ export class Path{
 
     public get name(): string{
         return this.components[this.components.length - 1] || "/" //FIXME ?
+    }
+
+    public get suffix(): string{
+        const parts = this.name.split(".")
+        return parts.length > 1 ? parts[parts.length - 1] : ""
     }
 
     public get parent(): Path{
@@ -162,14 +167,18 @@ export class Url implements IJsonable{
     }
 
     public static fromDto(message: UrlDto): Url{
+        const search = new Map<string, string>();
+        for(const key in message.search){
+            search.set(key, message.search[key])
+        }
         return new Url({
             datascheme: message.datascheme,
             protocol: message.protocol,
             hostname: message.hostname,
             port: message.port,
             path: Path.parse(message.path),
-
-
+            hash: message.fragment,
+            search: search,
         })
     }
 

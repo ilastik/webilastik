@@ -1,10 +1,176 @@
-.ItkOverlayControls, .ItkPopupWidget{
-    padding: 10px;
-    border-radius: 3px;
-    font-family: helvetica;
-    background-color: rgb(239 239 239);
-    margin-bottom: 5px;
-    color: black
+:root{
+    --default-font-family: helvetica;
+    --default-info-font-style: italic;
+    --default-info-color: grey;
+    --default-font-size: 14px;
+    --default-background-color: white;
+    --default-title-bar-background-color: #eeeeee;
+    --default-text-color: black;
+    --default-highlight-color: #a02e00;
+    --default-highlight-bright-color: #c63902;
+    --default-highlight-dark-color: #702101;
+    --default-error-color: #ff0000;
+    --default-border-radius: 3px;
+    --default-border: solid 1px var(--default-highlight-color);
+    --default-button-text-color: white;
+    --default-button-border-thickness: 2px;
+    --default-button-height: 2.5em;
+    --default-button-font-size: 14px;
+    --default-content-padding: 10px;
+    --default-title-bar-padding: 5px;
+    --default-log-font-family: "Courier New";
+    --default-log-font-size: calc(var(--default-font-size) - 2px);
+}
+
+.ItkErrorText{
+    color: var(--default-error-color);
+}
+
+.ItkInfoText{
+    color: var(--default-info-color);
+    font-style: var(--default-info-font-style);
+}
+
+.ItkPopupWidget{
+    font-family: var(--default-font-family);
+    background-color: var(--default-background-color);
+    color: var(--default-text-color);
+    padding: var(--default-content-padding);
+}
+
+.ItkOverlayControls{
+    font-family: var(--default-font-family);
+    padding: 0;
+    background-color: var(--default-background-color);
+    color: var(--default-text-color);
+    resize: both;
+    overflow: auto;
+    max-width: 30em;
+    filter: drop-shadow(10px 10px 4px rgba(0,0,0, 0.3));
+    user-select: none;
+    max-height: 80vh;
+}
+
+.ItkTable{
+    border-collapse: collapse;
+}
+.ItkTable td, .ItkTable th{
+    border: var(--default-border);
+    padding: 0.2em;
+}
+
+.ItkTitleBar{
+    margin: 0;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: end;
+    background-color: var(--default-title-bar-background-color);
+    padding: var(--default-title-bar-padding);
+}
+
+.ItkTitleBar .ItkTitleBarText{
+    flex-grow: 1;
+    font-size: calc(var(--default-font-size) + 1px);
+}
+
+details.ItkCollapsableApplet[open] .ItkTitleBar::before{
+    transform: rotate(90deg);
+}
+
+details.ItkCollapsableApplet .ItkTitleBar::before{
+    content: "▶";
+    margin-right: 1em;
+}
+
+.ItkCollapsableApplet > .ItkTitleBar{
+    cursor: pointer;
+}
+
+.ItkOverlayControlsHeader{
+    font-size: calc(var(--default-font-size) + 1px);
+    color: white;
+    background-color: black;
+}
+
+.ItkButton{
+    margin-left: 0.5ex;
+    padding: 0.3em;
+    display: inline-block;
+    box-sizing: border-box;
+    font-size: var(--default-button-font-size);
+    color: var(--default-button-text-color);;
+    background-color: var(--default-highlight-color);
+    border-radius: var(--default-border-radius);
+    border-top: solid var(--default-button-border-thickness) var(--default-highlight-bright-color);
+    border-left: solid var(--default-button-border-thickness) var(--default-highlight-bright-color);
+    border-bottom: solid var(--default-button-border-thickness) var(--default-highlight-dark-color);
+    border-right: solid var(--default-button-border-thickness) var(--default-highlight-dark-color);
+}
+
+.ItkButton:active{
+    border-top: solid var(--default-button-border-thickness) var(--default-highlight-dark-color);
+    border-left: solid var(--default-button-border-thickness) var(--default-highlight-dark-color);
+    border-bottom: solid var(--default-button-border-thickness) var(--default-highlight-bright-color);
+    border-right: solid var(--default-button-border-thickness) var(--default-highlight-bright-color);
+}
+
+.ItkRecenterButton{
+    position: fixed;
+    bottom: 10px;
+    z-index: 99999;
+    right: 10px;
+}
+
+.ItkColorPicker{
+    width: 2em;
+    height: 2em;
+}
+
+.ItkCharacterInput{
+    margin-left: 0.5ex;
+    padding: 0.3em;
+    font-size: var(--default-button-font-size);
+    color: var(--default-text-color);;
+    background-color: var(--default-background-color);
+    border-radius: var(--default-border-radius);
+    border: solid var(--default-button-border-thickness) var(--default-highlight-color);
+}
+
+.ItkAxisLengthField{
+    flex-grow: 1;
+    white-space: nowrap;
+}
+
+.ItkAxisLengthField .ItkCharacterInput{
+    width: 4em;
+    -moz-appearance: textfield;
+}
+/* Chrome, Safari, Edge, Opera */
+.ItkAxisLengthField input.ItkCharacterInput::-webkit-outer-spin-button,
+.ItkAxisLengthField input.ItkCharacterInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.ItkDisabled{
+    filter: grayscale(70%);
+    opacity: 0.5;
+}
+
+.ItkSelectButton:after{
+    content:" ↕";
+}
+
+.ItkBrushDatasourceLink{
+/*   white-space: nowrap; */
+/*   overflow: hidden; */
+/*   text-overflow: ellipsis; */
+    text-decoration: underline;
+    font-style: italic;
+    cursor: pointer;
+    margin-bottom: 0.2em;
+    opacity: 0.5;
 }
 
 .ItkPopupWidget{
@@ -15,112 +181,28 @@
     transform: translate(-50%, -50%);
     max-height: 90vh;
     max-width: 90vw;
-    overflow: scroll;
+    overflow: auto;
 }
 
-.ItkCollapsableApplet{
-    font-family: helvetica;
-    background-color: rgb(239 239 239);
-    color: black;
-    border-bottom: solid 2px black;
-    padding-left: 0px;
+.ItkInputParagraph, .ItkBrushStrokeWidget{
+    display: flex;
+    align-items: center;
+    flex-grow: 1;
 }
 
-.ItkCollapsableApplet > *{
-    margin-left: 8px;
+.ItkInputParagraph > .ItkCharacterInput, .ItkBrushStrokeCoords{
+    flex-grow: 1;
+    margin-left: 1ex;
 }
 
-.ItkCollapsableApplet summary{
-    margin-left: 0px;
-    font-weight: bolder;
-    background-color: rgba(0,0,0, 15%);
-    padding: 5px;
-    cursor: pointer;
+.ItkBrushStrokeCoords{
+    font-family: "Courier New";
+    font-size: calc(var(--default-font-size) - 2px);
 }
 
-.ItkCollapsableApplet summary:hover{
-    background-color: rgba(0,0,0, 40%);
-}
-
-.ItkOverlayControls{
-    padding: 0px;
-    position: fixed;
-    resize: both;
-    overflow: scroll;
-    filter: drop-shadow(10px 10px 4px rgba(0,0,0, 0.3));
-    max-width: 30em;
-    max-height: 80vh;
-}
-
-.ItkOverlayControls_header{
-    margin: 0;
-    padding: 0.3em;
-    color: white;
-    background-color: black;
-    font-size: 15px;
-    position: sticky;
-    top: 0
-}
-
-.ItkOverlayControls_drag_handle{
-    color: white;
-    font-size: 1.0em;
-}
-
-.ItkSessionCreatorWidget form, .ItkSessionLoaderWidget form{
-    padding-left: 2em;
-}
-
-.ItkSessionCreatorWidget_status-messages{
-    height: 6em;
-    resize: both;
-    overflow-y: scroll;
-    background-color: rgba(0, 0, 0, 10%);
-    padding: 5px;
-}
-
-.ItkSessionCreatorWidget_status-messages p{
-    margin-top: 2px;
-    margin-bottom: 2px;
-}
-
-.ItkFeatureSelectionWidget td, .ItkFeatureSelectionWidget th, .ItkTable td, .ItkTable th{
-    border: solid 1px grey;
-    padding: 0.3em;
-}
-
-.ItkBrushingWidget_status_display{
-    border: dashed 1px grey;
-    background-color: rgba(0,0,0, 0.1);
-    padding: 0.2em;
-    max-width: 30em;
-    overflow: scroll;
-}
-
-.ItkBrushStrokesContainer{
-    /* background-color: rgba(0,0,0, 0.1); */
-}
-
-.ItkLabelWidget{
-
-}
-
-.ItkPencilCursor{
-    cursor: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAdklEQVRIie3SwQmAMAxG4TeCo3QkR3EER3Aj3cAR2g3qJaURevzbUwI5iPA9CIWYBXMBL5Bm4dU2qyMNL8Cjjng8AZuL3Cq87W6RbN+nAi/Awf/+1f5L8HZnH5Hj/iyBB74Ih/6mp+A+MAX3Ab8yfBSQ4jHD+QAU2l7EdHJYSwAAAABJRU5ErkJggg==) 3 20, auto;
-}
-
-.ItkBrushStrokeTableCaption{
-    color: grey;
-    font-style: italic;
-}
-
-.ItkBrushStrokeWidget td{
-    padding: 0.4em;
-    background-color: rgba(0,0,0, 0.1);
-}
-
-.ItkSelector{
-    background-color: rgba(0,0,0, 0.1);
+.ItkBrushStrokeWidget{
+    margin: 0.1em;
+    padding-left: 1em;
 }
 
 /*https://stackoverflow.com/a/21457838*/
@@ -142,95 +224,114 @@
     background: rgba(0, 0, 0, 0.1);
 }
 
-.ItkButton{
-    border: solid 1px gray;
-    padding: 5px;
-    margin: 5px;
-    background-color: white;
-    user-select: none;
-}
-
-.ItkButton:active{
-    background: #e5e5e5;
-    box-shadow: inset 0px 0px 5px #c1c1c1;
-    outline: none;
-}
-
-.ItkInputParagraph{
+.ItkTabBodyContainer{
+    border-left: solid 2px var(--default-highlight-color);
+    border-right: solid 2px var(--default-highlight-color);
+    border-bottom: solid 2px var(--default-highlight-color);
+    padding: var(--default-content-padding);
+    overflow: auto;
     display: flex;
 }
 
-.ItkInputParagraph label{
-    margin-left: 5px;
-    margin-right: 5px;
+
+.ItkTabLabelTrailer{
+    flex-grow: 1;
+    border-bottom: solid 2px var(--default-highlight-color);
 }
 
-.ItkInputParagraph input[type=text], .ItkInputParagraph input[type=url]{
-    flex-grow: 1; /*make input stretch to occupy all remaining space*/
-}
-
-.ItkInvalidTextInput{
-    border: solid 1px red;
-    background-color: lightpink;
-}
-
-.ItkInputParagraph input[type=number]{
-    width: 4em;
-}
-
-.ItkErrorText{
-    font-style: italic;
-    color: red;
-}
-
-.ItkSuccessText{
-    font-style: italic;
-    color: green;
-}
-
-.ItkInfoText{
-    font-style: italic;
-    color: grey;
-}
-
-.ItkInfoText img, .ItkErrorText img{
-    height: 1em;
-    width: 1em;
-}
-
-.ItkNumberInput{
-    width: 3em;
-}
-
-input[type=button], input[type=submit], .ItkPopupSelectTrigger{
-    font-weight: bold;
-    border-radius: 2px;
-    margin-left: 2px;
-}
-
-.ItkPopupSelectTrigger{
-    border: solid 1px black;
-    padding: 4px;
-    cursor: default;
+.ItkTabLabel{
+    border: solid 2px var(--default-highlight-color);
+    border-radius: 5px 5px 0 0;
+    margin-top: 1px;
+    margin-right: 2px;
     display: inline-block;
+    padding: 0.1em;
 }
 
-.ItkBrushStrokeTable{
+.ItkActiveTabLabel{
+    border-bottom: 0;
+}
+
+.ItkTabLabelWidgetsContainer{
+    overflow-x: auto;
+    display: flex;
+}
+
+.ItkLogContainer{
+    font-family: var(--default-log-font-family);
+    font-size: var(--default-log-font-size);
+    overflow-y: auto;
+    max-height: 20em;
+    padding-left: 0.6em;
+    user-select: text;
+    cursor: text;
+}
+
+.ItkLogContainer > *{
+    margin-top: 0.1em;
+    margin-bottom: 0.1em;
+}
+
+
+/*File tree widgets*/
+.ItkFolderWidget{
+    user-select: none;
+}
+
+.ItkFolderWidget summary, .ItkFileWidget{
+    background-color: white;
+    color: black;
+    cursor: default;
+    padding-left: 0px;
+}
+
+.ItkFolderWidget .ItkExpandFolderWidget{
+    cursor: pointer;
+}
+
+.ItkFolderWidget summary{
+    list-style: none;
+    display: flex;
+}
+
+.ItkFolderWidget summary.ItkFsNodeName{
+    flex-grow: 1;
+}
+
+.ItkFileWidget{
+    margin-bottom: 1px;
+    margin-top: 1px;
+}
+
+.ItkSelected{
+    filter: invert(1);
+}
+
+.ItkFolderWidget, .ItkFileWidget{
     margin-left: 10px;
 }
 
-.ItkRecenterButton{
-    position: fixed;
-    bottom: 10px;
-    display: inline;
-    z-index: 99999;
-    right: 10px;
-    padding: 10px;
-    border-radius: 5px;
+.ItkFolderWidget summary::before, .ItkFileWidget::before{
+    content: "├";
 }
 
-.ItkLoadingBackground{
-    background: url(/public/images/loading.gif) no-repeat;
-    background-size: contain;
-    background-position: center;
+.ItkFolderWidget:last-child summary::before, .ItkFileWidget:last-child::before{
+    content: "└";
+}
+/*END File tree widgets*/
+
+.ItkListWidget{
+    border-collapse: collapse;
+}
+.ItkListWidgetRow > td{
+    border-bottom: solid 1px var(--default-highlight-color);
+}
+
+.ItkListWidget{
+    font-size: calc(var(--default-font-size) - 2px);
+}
+
+.ItkDatasourcesListContainer{
+    max-height: 10em;
+    overflow: auto;
 }

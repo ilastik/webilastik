@@ -1,39 +1,22 @@
-from typing import Optional
-from base64 import b64decode
+from pathlib import PurePosixPath
+from typing import Optional, List
 import asyncio
-import json
 
+import numpy as np
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonBoolean
 from aiohttp import web
-from webilastik import datasource
 from webilastik.classifiers.pixel_classifier import PixelClassifier
 
 from webilastik.datasource import DataRoi, FsDataSource
+from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale, RawEncoder
+from webilastik.server.util import get_encoded_datasource_from_url
 from webilastik.server.rpc import MessageParsingError
 from webilastik.server.rpc.dto import CheckDatasourceCompatibilityParams, CheckDatasourceCompatibilityResponse, RpcErrorDto
 from webilastik.ui.applet import CascadeError, UserPrompt
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
 from webilastik.ui.applet.ws_applet import WsApplet
-from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError
-from webilastik.utility.url import Protocol, Url
 from webilastik.server.session_allocator import uncachable_json_response
-
-
-def _decode_datasource_url(encoded_url: str) -> "FsDataSource | web.Response":
-    try:
-        datasource_url = Url.from_base64(encoded_url)
-    except Exception:
-        return uncachable_json_response({"error": f"Bad raw_data encoded url: {encoded_url}"}, status=400)
-    datasources_result = try_get_datasources_from_url(url=datasource_url, allowed_protocols=("http", "https"))
-    if isinstance(datasources_result, Exception):
-        return uncachable_json_response({"error": f"Could not open datasource at {datasource_url}"}, status=500)
-    if isinstance(datasources_result, type(None)):
-        return uncachable_json_response({"error": f"Unsupported datasource at {datasource_url}"}, status=400)
-    if len(datasources_result) != 1:
-        return uncachable_json_response({"error": f"Expect url to lead to one single datasource: {datasource_url}"}, status=400)
-    return datasources_result[0]
-
 
 class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
     def _get_json_state(self) -> JsonValue:
@@ -63,7 +46,12 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
         params = CheckDatasourceCompatibilityParams.from_json_value(await request.json())
         if isinstance(params, MessageParsingError):
             return  uncachable_json_response(RpcErrorDto(error="bad payload").to_json_value(), status=400)
-        datasources = [FsDataSource.try_from_message(dto) for dto in params.datasources]
+        datasources: List[FsDataSource] = []
+        for dto in params.datasources:
+            ds = FsDataSource.try_from_message(dto)
+            if isinstance(ds, Exception):
+                return uncachable_json_response(RpcErrorDto(error=str(ds)).to_json_value(), status=400)
+            datasources.append(ds)
         with self.lock:
             classifier = self.pixel_classifier()
         if classifier is None:
@@ -80,38 +68,31 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
         if not isinstance(classifier, PixelClassifier) :
             return web.json_response({"error": "Classifier is not ready yet"}, status=412)
 
-        encoded_raw_data_url = str(request.match_info.get("encoded_raw_data_url"))
-        datasource_result = _decode_datasource_url(encoded_raw_data_url)
-        if not isinstance(datasource_result, FsDataSource):
-            return datasource_result
-        datasource = datasource_result
+        ds_result = get_encoded_datasource_from_url(match_info_key="encoded_raw_data", request=request)
+        if isinstance(ds_result, Exception):
+            return uncachable_json_response(payload=f"Could not get data source from URL: {ds_result}", status=400)
 
-        return web.Response(
-            text=json.dumps({
-                "@type": "neuroglancer_multiscale_volume",
-                "type": "image",
-                "data_type": "uint8",  # DONT FORGET TO CONVERT PREDICTIONS TO UINT8!
-                "num_channels": classifier.num_classes,
-                "scales": [
-                    {
-                        "key": "data",
-                        "size": [int(v) for v in datasource.shape.to_tuple("xyz")],
-                        "resolution": datasource.spatial_resolution,
-                        "voxel_offset": [0, 0, 0],
-                        "chunk_sizes": [datasource.tile_shape.to_tuple("xyz")],
-                        "encoding": "raw",
-                    }
-                ],
-            }),
-            headers={
-                "Cache-Control": "no-store, must-revalidate",
-                "Expires": "0",
-            },
-            content_type="application/json",
+        info = PrecomputedChunksInfo(
+            type_="image",
+            data_type=np.dtype("uint8"), #FIXME: use float, fix display in shader
+            num_channels=classifier.num_classes,
+            scales=tuple([
+                PrecomputedChunksScale(
+                    chunk_sizes=tuple([
+                        (ds_result.tile_shape.x, ds_result.tile_shape.y, ds_result.tile_shape.z)
+                    ]),
+                    encoding=RawEncoder(),
+                    key=PurePosixPath("data"),
+                    resolution=ds_result.spatial_resolution,
+                    size=(ds_result.shape.x, ds_result.shape.y, ds_result.shape.z),
+                    voxel_offset=(ds_result.interval.start.x, ds_result.interval.start.y, ds_result.interval.start.z),
+                )
+            ])
         )
 
+        return uncachable_json_response(info.to_json_value(), status=200)
+
     async def precomputed_chunks_compute(self, request: web.Request) -> web.Response:
-        encoded_raw_data_url = str(request.match_info.get("encoded_raw_data_url"))
         generation = int(request.match_info.get("generation")) # type: ignore
         xBegin = int(request.match_info.get("xBegin")) # type: ignore
         xEnd = int(request.match_info.get("xEnd")) # type: ignore
@@ -120,10 +101,10 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
         zBegin = int(request.match_info.get("zBegin")) # type: ignore
         zEnd = int(request.match_info.get("zEnd")) # type: ignore
 
-        datasource_result = _decode_datasource_url(encoded_raw_data_url)
-        if not isinstance(datasource_result, FsDataSource):
-            return datasource_result
-        datasource = datasource_result
+        ds_result = get_encoded_datasource_from_url(match_info_key="encoded_raw_data", request=request)
+        if isinstance(ds_result, Exception):
+            return uncachable_json_response(payload=f"Could not get data source from URL: {ds_result}", status=400)
+        datasource = ds_result
 
         with self.lock:
             classifier = self.pixel_classifier()

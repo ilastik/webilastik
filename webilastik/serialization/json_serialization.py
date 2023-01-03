@@ -1,4 +1,5 @@
-from typing import Union, Mapping, Tuple, Protocol, List
+from typing import Any, Union, Mapping, Tuple, Protocol, List
+import json
 from collections.abc import Mapping
 
 JsonLeafValue = Union[int, float, str, bool, None]
@@ -29,3 +30,13 @@ def convert_to_json_value(value: JsonableValue) -> JsonValue:
     if isinstance(value, Mapping):
         return {k: convert_to_json_value(v) for k, v in value.items()}
     return value.to_json_value()
+
+class BadJsonException(Exception):
+    def __init__(self, json_str: "str | bytes") -> None:
+        super().__init__(f"Bad json: {json_str}")
+
+def parse_json(value: "str | bytes") -> "JsonValue | BadJsonException":
+    try:
+        return json.loads(value)
+    except Exception:
+        return BadJsonException(value)

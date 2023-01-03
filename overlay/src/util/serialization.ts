@@ -122,3 +122,11 @@ export function ensureOptional<T>(f: (value: JsonValue) => T, value: JsonValue):
     }
     return f(value)
 }
+
+export function toBase64(value: string): string{
+    return btoa(value).replace("+", "-").replace("/", "_")
+}
+
+export function fromBase64(encoded: string): string{
+    return atob(encoded.replace("-", "+").replace("_", "/"))
+}

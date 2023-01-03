@@ -42,26 +42,15 @@ export abstract class View{
         //     return predictionsViewResult
         // }
 
-        const fixedUrl = params.url.updatedWith({hash: ""})
-        const datasourcesResult = await params.session.getDatasourcesFromUrl(
-            new GetDatasourcesFromUrlParamsDto({url: fixedUrl.toDto()})
-        )
-        if(datasourcesResult === undefined){
+
+        const rawDataViewResult = await RawDataView.tryFromUrl({session: params.session, url: params.url, name: params.name})
+        if(rawDataViewResult === undefined){
             return new UnsupportedDatasetView({...params})
         }
-        if(datasourcesResult instanceof Error){
-            return new FailedView({...params, errorMessage: datasourcesResult.message})
+        if(rawDataViewResult instanceof Error){
+            return new FailedView({...params, errorMessage: rawDataViewResult.message})
         }
-
-        // if the requested URL matches the URL of a single returned datasource, we have to strip it out of the other scales
-        if(datasourcesResult.length > 1){
-            for(const ds of datasourcesResult){
-                if(ds instanceof PrecomputedChunksDataSource && ds.url.equals(params.url)){
-                    return new StrippedPrecomputedView({name: params.name, session: params.session, datasource: ds})
-                }
-            }
-        }
-        return new RawDataView({...params, datasources: datasourcesResult})
+        return rawDataViewResult
     }
 }
 
@@ -73,7 +62,10 @@ export abstract class DataView extends View{
 export class RawDataView extends DataView{
     public readonly datasources: FsDataSource[]
     constructor(params: {name: string, url: Url, datasources: Array<FsDataSource>}){
-        super(params)
+        const url = params.datasources.find(ds => ds instanceof PrecomputedChunksDataSource) ?
+            params.url.updatedWith({datascheme: "precomputed"}) :
+            params.url
+        super({...params, url})
         this.datasources = params.datasources
     }
 
@@ -88,25 +80,22 @@ export class RawDataView extends DataView{
         if(datasources_result instanceof Error || datasources_result === undefined){
             return datasources_result
         }
-        return new RawDataView({name: params.name, url: params.url, datasources: datasources_result})
+        return new RawDataView({name: params.name, url: params.url, datasources: datasources_result instanceof Array ? datasources_result : [datasources_result]})
     }
 }
 
 export class StrippedPrecomputedView extends DataView{
     public static readonly regex = new RegExp(
-        String.raw`/stripped_precomputed/url=(?<url>[^/]+)/resolution=(?<resolution>\d+_\d+_\d+)`
+        String.raw`/stripped_precomputed/datasource=(?<datasource>[^/]+)`
     )
     public readonly datasource: FsDataSource
 
     public constructor(params: {name: string, session: Session, datasource: PrecomputedChunksDataSource}){
-        const all_scales_url = params.datasource.url.updatedWith({hash: ""})
-        const resolution_str = params.datasource.spatial_resolution.map(axis => axis.toString()).join("_")
-
         super({
             name: params.name,
             url: params.session.sessionUrl.updatedWith({
                 datascheme: "precomputed",
-            }).joinPath(`stripped_precomputed/url=${all_scales_url.toBase64()}/resolution=${resolution_str}`),
+            }).joinPath(`stripped_precomputed/datasource=${params.datasource.toBase64()}`),
         })
         this.datasource = params.datasource
     }
@@ -116,55 +105,28 @@ export class StrippedPrecomputedView extends DataView{
     }
 
     public static matches(url: Url): boolean{
-        const extractedParams = this.extractUrlParams(url)
+        const extractedParams = this.extractDatasourceFromUrl(url)
         return extractedParams !== undefined && !(extractedParams instanceof Error)
     }
 
-    public static extractUrlParams(url: Url): {datasetUrl: Url, selectedResolution: [number, number, number]} | undefined | Error{
+    public static extractDatasourceFromUrl(url: Url): PrecomputedChunksDataSource | undefined | Error{
         const match = url.path.raw.match(StrippedPrecomputedView.regex)
         if(match === null){
             return undefined
         }
-        const datasetUrl = Url.fromBase64(match.groups!["url"])
-        const selectedResolutionStr = match.groups!["resolution"].split("_")
-        const selectedResolution: [number, number, number] = [
-            parseInt(selectedResolutionStr[0]), parseInt(selectedResolutionStr[1]), parseInt(selectedResolutionStr[2])
-        ]
-        for(let i of selectedResolution){
-            if(Number.isNaN(i)){
-                return new Error(`Bad resolution: ${selectedResolutionStr}`)
-            }
+        let ds = FsDataSource.fromBase64(match.groups!["datasource"])
+        if(ds instanceof PrecomputedChunksDataSource){
+            return ds
         }
-        return {datasetUrl, selectedResolution}
+        return new Error(`Expected Precomputed Chunks in encoded datasource, got ${ds}`)
     }
 
     public static async tryFromUrl(params: {name: string, url: Url, session: Session}): Promise<StrippedPrecomputedView | undefined | Error>{
-        const url_params_result = this.extractUrlParams(params.url)
-        if(url_params_result instanceof Error || url_params_result === undefined){
-            return url_params_result
+        const datasource_result = this.extractDatasourceFromUrl(params.url)
+        if(datasource_result instanceof Error || datasource_result === undefined){
+            return datasource_result
         }
-        const {datasetUrl, selectedResolution} = url_params_result;
-        const rawViewResult = await RawDataView.tryFromUrl({name: params.name, url: datasetUrl, session: params.session})
-        if(rawViewResult instanceof Error || rawViewResult === undefined){
-            return rawViewResult
-        }
-
-        const datasources = rawViewResult.datasources.filter(ds => {
-            return ds.spatial_resolution[0] === selectedResolution[0] &&
-                   ds.spatial_resolution[1] === selectedResolution[1] &&
-                   ds.spatial_resolution[2] === selectedResolution[2]
-        })
-        if(datasources.length != 1){
-            return Error(`Expected single datasource, found these: ${[datasources.map(ds => ds.url.raw)]}`)
-        }
-        const datasource = datasources[0]
-        if(!(datasource instanceof PrecomputedChunksDataSource)){
-            return Error(`
-                Expected ${datasetUrl.raw} to point to precomptued chunks. Got this:
-                ${JSON.stringify(datasource.toDto().toJsonValue())}
-            }`)
-        }
-        return new StrippedPrecomputedView({name: params.name, datasource, session: params.session})
+        return new StrippedPrecomputedView({name: params.name, datasource: datasource_result, session: params.session})
     }
 }
 
@@ -183,27 +145,29 @@ export class PredictionsView extends View{
             name: params.name,
             url: params.session.sessionUrl.updatedWith({
                 datascheme: "precomputed" // FIXME: this assumes neuroglancer as the viewer
-            }).joinPath(`predictions/raw_data=${params.raw_data.url.toBase64()}/generation=${params.classifierGeneration}`),
+            }).joinPath(`predictions/raw_data=${params.raw_data.toBase64()}/generation=${params.classifierGeneration}`),
         })
         this.raw_data = params.raw_data
         this.classifierGeneration = params.classifierGeneration
         this.channel_colors = params.channel_colors
     }
 
-
     public static matches(url: Url): boolean | Error {
         const result = this.extractUrlParams(url)
         return result instanceof Error ? result : (result !== undefined)
     }
 
-    public static extractUrlParams(url: Url): {rawDataUrl: Url, classifierGeneration: number} | undefined | Error{
+    public static extractUrlParams(url: Url): {raw_data: FsDataSource, classifierGeneration: number} | undefined | Error{
         const match = url.path.raw.match(PredictionsView.regex)
         if(match === null){
             return undefined
         }
-        const rawDataUrl = Url.fromBase64(match.groups!["raw_data"])
+        const raw_data_result = FsDataSource.fromBase64(match.groups!["raw_data"])
+        if(raw_data_result instanceof Error){
+            return raw_data_result
+        }
         const classifierGeneration = parseInt(match.groups!["generation"])
-        return {rawDataUrl, classifierGeneration}
+        return {raw_data: raw_data_result, classifierGeneration}
     }
 
     // public static async tryFromUrl(params:{name: string, url: Url, session: Session}): Promise<PredictionsView | undefined | Error>{
@@ -211,17 +175,9 @@ export class PredictionsView extends View{
     //     if(urlParamsResult instanceof Error || urlParamsResult === undefined){
     //         return urlParamsResult
     //     }
-    //     const {rawDataUrl, classifierGeneration} = urlParamsResult
-    //     const rawViewUrl = await RawDataView.tryFromUrl({name: params.name, url: rawDataUrl, session: params.session})
-    //     if(rawViewUrl instanceof Error || rawViewUrl === undefined){
-    //         return rawViewUrl
-    //     }
-    //     const datasources = rawViewUrl.datasources
-    //     if(datasources.length != 1){
-    //         return Error(`Expected single datasource, found these: ${datasources.map(ds => ds.url.raw).join(', ')}`)
-    //     }
+    //     const {raw_data, classifierGeneration} = urlParamsResult
     //     return new PredictionsView({
-    //         name: params.name, session: params.session, raw_data: datasources[0], classifierGeneration
+    //         name: params.name, session: params.session, raw_data: raw_data, classifierGeneration, channel_colors: "FIXME"
     //     })
     // }
 }

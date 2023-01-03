@@ -42,14 +42,18 @@ export type InlineCss = Partial<Omit<
     "getPropertyPriority" | "getPropertyValue" | "item" | "removeProperty" | "setProperty"
 >>
 
-export function createElement<K extends keyof HTMLElementTagNameMap>({tagName, parentElement, innerHTML, innerText, cssClasses, inlineCss={}, onClick}:{
+export function createElement<K extends keyof HTMLElementTagNameMap>({
+        tagName, parentElement, innerHTML, innerText, title, cssClasses, inlineCss={}, onClick, onDblClick
+    }:{
     tagName: K,
     parentElement:HTMLElement | undefined,
     innerHTML?:string,
     innerText?:string,
+    title?: string,
     cssClasses?:Array<string>,
     inlineCss?: InlineCss,
-    onClick?(event: Event): void
+    onClick?(event: MouseEvent, thisElement: HTMLElementTagNameMap[K]): void,
+    onDblClick?(event: MouseEvent, thisElement: HTMLElementTagNameMap[K]): void
 }): HTMLElementTagNameMap[K]{
 
     const element = document.createElement(tagName);
@@ -62,11 +66,18 @@ export function createElement<K extends keyof HTMLElementTagNameMap>({tagName, p
     if(innerText !== undefined){
         element.innerText = innerText
     }
+    if(title){
+        element.title = title
+    }
     (cssClasses || []).forEach(klass => {
         element.classList.add(klass)
     })
     if(onClick !== undefined){
-        element.addEventListener('click', onClick)
+        (element as HTMLElement).addEventListener('click', (ev) => onClick(ev, element))
+    }
+    if(onDblClick !== undefined){
+        (element as HTMLElement).addEventListener('dblclick', (ev) => onDblClick(ev, element))
+
     }
     applyInlineCss(element, inlineCss)
     return element
@@ -99,7 +110,7 @@ export function createImage({src, parentElement, cssClasses, onClick}:
     return image
 }
 
-export type InputType = "button" | "text" | "checkbox" | "submit" | "url" | "radio" | "number" | "color"
+export type InputType = "button" | "text" | "search" | "checkbox" | "submit" | "url" | "radio" | "number" | "color"
 
 export function createInput(params: {
         inputType: InputType,
@@ -128,7 +139,7 @@ export function createInput(params: {
     if(params.id !== undefined){
         input.id = params.id
     }
-    input.disabled = params.disabled ? true : false
+    input.disabled = params.disabled === undefined ? false : params.disabled
     return input
 }
 
@@ -401,15 +412,18 @@ export function setValueIfUnfocused(input: HTMLInputElement, value: string){
     }
 }
 
-export function getNowString(): string{
-    let now = new Date()
-    let month = (now.getMonth() + 1).toString().padStart(2, '0')
-    let day = now.getDate().toString().padStart(2, '0')
-    let hours = now.getHours().toString().padStart(2, '0')
-    let minutes = now.getMinutes().toString().padStart(2, '0')
-    let seconds = now.getSeconds().toString().padStart(2, '0')
+export function dateToSafeString(date: Date): string{
+    let month = (date.getMonth() + 1).toString().padStart(2, '0')
+    let day = date.getDate().toString().padStart(2, '0')
+    let hours = date.getHours().toString().padStart(2, '0')
+    let minutes = date.getMinutes().toString().padStart(2, '0')
+    let seconds = date.getSeconds().toString().padStart(2, '0')
 
-    return `${now.getFullYear()}y_${month}m_${day}d__${hours}h_${minutes}min_${seconds}s`
+    return `${date.getFullYear()}y_${month}m_${day}d__${hours}h_${minutes}min_${seconds}s`
+}
+
+export function getNowString(): string{
+    return dateToSafeString(new Date())
 }
 
 const SECONDS_PER_DAY = 60 * 60 * 24

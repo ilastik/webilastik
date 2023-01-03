@@ -1,47 +1,24 @@
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Type, TypeVar
+from typing import Any
 
-from pathlib import Path
+from pathlib import PurePosixPath
 import gzip
 import bz2
 import lzma
-from fs.base import FS as FileSystem
 import json
 import numpy as np
 
-from ndstructs.point5D import Interval5D, Shape5D, Point5D
-from ndstructs.utils.json_serializable import (
-    JsonValue, JsonObject, ensureJsonObject, ensureJsonInt, ensureJsonIntArray, ensureJsonStringArray, ensureJsonString
-)
+from ndstructs.point5D import Interval5D, Shape5D
 from webilastik.datasource import guess_axiskeys
-from webilastik.server.rpc.dto import N5Bzip2CompressorDto, N5CompressorDto, N5GzipCompressorDto, N5XzCompressorDto, N5RawCompressorDto
-
-Compressor = TypeVar("Compressor", bound="N5Compressor")
+from webilastik.serialization.json_serialization import parse_json
+from webilastik.server.rpc.dto import (
+    N5DatasetAttributesDto, N5Bzip2CompressorDto, N5CompressorDto, N5GzipCompressorDto, N5XzCompressorDto, N5RawCompressorDto, dtype_to_dto
+)
+from webilastik.filesystem import IFilesystem
 
 class N5Compressor(ABC):
-    @classmethod
-    @abstractmethod
-    def get_label(cls) -> str:
-        pass
-
-    @classmethod
-    @abstractmethod
-    def from_json_data(cls: Type[Compressor], data: JsonValue) -> Compressor:
-        data_dict = ensureJsonObject(data)
-        label = ensureJsonString(data_dict.get("type"))
-        if label == GzipCompressor.get_label():
-            return GzipCompressor.from_json_data(data)
-        if label == Bzip2Compressor.get_label():
-            return Bzip2Compressor.from_json_data(data)
-        if label == XzCompressor.get_label():
-            return XzCompressor.from_json_data(data)
-        if label == RawCompressor.get_label():
-            return RawCompressor.from_json_data(data)
-        raise ValueError(f"Could not interpret {json.dumps(data)} as an n5 compressor")
-
-    @abstractmethod
-    def to_json_data(self) -> JsonObject:
-        return {"type": self.get_label()}
+    def __init__(self) -> None:
+        super().__init__()
 
     @abstractmethod
     def to_dto(self) -> N5CompressorDto:
@@ -73,22 +50,6 @@ class GzipCompressor(N5Compressor):
     def __eq__(self, other: object) -> bool:
         return isinstance(other, GzipCompressor) and self.level == other.level
 
-    @classmethod
-    def get_label(cls) -> str:
-        return "gzip"
-
-    @classmethod
-    def from_json_data(cls, data: JsonValue) -> "GzipCompressor":
-        return GzipCompressor(
-            level=ensureJsonInt(ensureJsonObject(data).get("level", 1))
-        )
-
-    def to_json_data(self) -> JsonObject:
-        return {
-            **super().to_json_data(),
-            "level": self.level
-        }
-
     def to_dto(self) -> N5GzipCompressorDto:
         return N5GzipCompressorDto(level=self.level)
 
@@ -104,38 +65,22 @@ class GzipCompressor(N5Compressor):
 
 
 class Bzip2Compressor(N5Compressor):
-    def __init__(self, blockSize: int = 9):
-        self.blockSize = blockSize
+    def __init__(self, compressionLevel: int = 9):
+        self.compressionLevel = compressionLevel
         super().__init__()
 
     def __eq__(self, other: object) -> bool:
-        return isinstance(other, Bzip2Compressor) and self.blockSize == other.blockSize
-
-    @classmethod
-    def get_label(cls) -> str:
-        return "bzip2"
-
-    @classmethod
-    def from_json_data(cls, data: JsonValue) -> "Bzip2Compressor":
-        return Bzip2Compressor(
-            blockSize=ensureJsonInt(ensureJsonObject(data).get("blockSize", 9))
-        )
-
-    def to_json_data(self) -> JsonObject:
-        return {
-            **super().to_json_data(),
-            "blockSize": self.blockSize
-        }
+        return isinstance(other, Bzip2Compressor) and self.compressionLevel == other.compressionLevel
 
     def to_dto(self) -> N5Bzip2CompressorDto:
-        return N5Bzip2CompressorDto(blockSize=self.blockSize)
+        return N5Bzip2CompressorDto(blockSize=self.compressionLevel)
 
     @staticmethod
     def from_dto(dto: N5Bzip2CompressorDto) -> "Bzip2Compressor":
-        return Bzip2Compressor(blockSize=dto.blockSize)
+        return Bzip2Compressor(compressionLevel=dto.blockSize)
 
     def compress(self, raw: bytes) -> bytes:
-        return bz2.compress(raw, self.blockSize)
+        return bz2.compress(raw, self.compressionLevel)
 
     def decompress(self, compressed: bytes) -> bytes:
         return bz2.decompress(compressed)
@@ -148,22 +93,6 @@ class XzCompressor(N5Compressor):
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, XzCompressor) and self.preset == other.preset
-
-    @classmethod
-    def get_label(cls) -> str:
-        return "xz"
-
-    @classmethod
-    def from_json_data(cls, data: JsonValue) -> "XzCompressor":
-        return XzCompressor(
-            preset=ensureJsonInt(ensureJsonObject(data).get("preset"))
-        )
-
-    def to_json_data(self) -> JsonObject:
-        return {
-            **super().to_json_data(),
-            "preset": self.preset
-        }
 
     def to_dto(self) -> N5XzCompressorDto:
         return N5XzCompressorDto(preset=self.preset)
@@ -180,19 +109,11 @@ class XzCompressor(N5Compressor):
 
 
 class RawCompressor(N5Compressor):
+    def __init__(self):
+        super().__init__()
+
     def __eq__(self, other: object) -> bool:
         return isinstance(other, RawCompressor)
-
-    @classmethod
-    def get_label(cls) -> str:
-        return "raw"
-
-    @classmethod
-    def from_json_data(cls, data: JsonValue) -> "RawCompressor":
-        return RawCompressor()
-
-    def to_json_data(self) -> JsonObject:
-        return super().to_json_data()
 
     def to_dto(self) -> N5RawCompressorDto:
         return N5RawCompressorDto()
@@ -216,7 +137,6 @@ class N5DatasetAttributes:
         c_axiskeys: str,
         dataType: "np.dtype[Any]", #FIXME
         compression: N5Compressor,
-        location: Point5D = Point5D.zero(),
     ):
         """axiskeys follows ndstructs conventions (c-order), despite 'axes' in N5 datasets being F-order"""
         self.dimensions = dimensions
@@ -224,16 +144,17 @@ class N5DatasetAttributes:
         self.c_axiskeys = c_axiskeys
         self.dataType = dataType
         self.compression = compression
-        self.location = location
-        self.interval = self.dimensions.to_interval5d(self.location)
+        self.interval = self.dimensions.to_interval5d()
         super().__init__()
 
-    def get_tile_path(self, tile: Interval5D) -> Path:
+    def get_tile_path(self, tile: Interval5D) -> PurePosixPath:
         "Gets the relative path into the n5 dataset where 'tile' should be stored"
+        assert tile.is_tile(tile_shape=self.blockSize, full_interval=self.interval, clamped=True), f"Bad tile: {tile}"
+
         if not tile.is_tile(tile_shape=self.blockSize, full_interval=self.interval, clamped=True):
-            raise ValueError(f"{tile} is not a tile of {json.dumps(self.to_json_data())}")
-        slice_address_components = (tile.translated(-self.location).start // self.blockSize).to_tuple(self.c_axiskeys[::-1])
-        return Path("/".join(str(component) for component in slice_address_components))
+            raise ValueError(f"{tile} is not a tile of {json.dumps(self.to_dto().to_json_value())}")
+        slice_address_components = (tile.translated(-self.interval.start).start // self.blockSize).to_tuple(self.c_axiskeys[::-1])
+        return PurePosixPath("/".join(str(component) for component in slice_address_components))
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, N5DatasetAttributes):
@@ -247,44 +168,41 @@ class N5DatasetAttributes:
         )
 
     @classmethod
-    def load(cls, path: Path, filesystem: FileSystem) -> "N5DatasetAttributes":
-        with filesystem.openbin(path.joinpath("attributes.json").as_posix(), "r") as f:
-            attributes_json = f.read().decode("utf8")
-        raw_attributes = json.loads(attributes_json)
-        return cls.from_json_data(raw_attributes)
+    def try_load(cls, path: PurePosixPath, filesystem: IFilesystem) -> "N5DatasetAttributes | Exception":
+        read_result = filesystem.read_file(path)
+        if isinstance(read_result, Exception):
+            return read_result
+        attributes_json_result = parse_json(read_result)
+        if isinstance(attributes_json_result, Exception):
+            return attributes_json_result
+        dto_result = N5DatasetAttributesDto.from_json_value(attributes_json_result)
+        if isinstance(dto_result, Exception):
+            return dto_result
+        return N5DatasetAttributes.from_dto(dto_result)
 
     @classmethod
-    def from_json_data(cls, data: JsonValue, location_override: Optional[Point5D] = None) -> "N5DatasetAttributes":
-        raw_attributes = ensureJsonObject(data)
+    def from_dto(cls, dto: N5DatasetAttributesDto) -> "N5DatasetAttributes | Exception":
+        if dto.axes is None:
+            c_axiskeys = guess_axiskeys(dto.dimensions)
+        else:
+            c_axiskeys = "".join(dto.axes[::-1]).lower()
 
-        dimensions = ensureJsonIntArray(raw_attributes.get("dimensions"))
-        blockSize = ensureJsonIntArray(raw_attributes.get("blockSize"))
-        axes = raw_attributes.get("axes")
-        if axes is None:
-            c_axiskeys = guess_axiskeys(dimensions)
-        else:
-            c_axiskeys = "".join(ensureJsonStringArray(axes)[::-1]).lower()
-        location = raw_attributes.get("location")
-        if location is None:
-            location_5d = Point5D.zero()
-        else:
-            location_5d = Point5D.zero(**dict(zip(c_axiskeys, ensureJsonIntArray(location)[::-1])))
+        if len(set(len(prop) for prop in [dto.dimensions, dto.blockSize, c_axiskeys])) != 1:
+            return Exception(f"Missmatched lengths of N5 attribute properties")
 
         return N5DatasetAttributes(
-            blockSize=Shape5D.create(raw_shape=blockSize[::-1], axiskeys=c_axiskeys),
-            dimensions=Shape5D.create(raw_shape=dimensions[::-1], axiskeys=c_axiskeys),
-            dataType=np.dtype(ensureJsonString(raw_attributes.get("dataType"))).newbyteorder(">"),
+            blockSize=Shape5D.create(raw_shape=dto.blockSize[::-1], axiskeys=c_axiskeys),
+            dimensions=Shape5D.create(raw_shape=dto.dimensions[::-1], axiskeys=c_axiskeys),
+            dataType=np.dtype(dto.dataType).newbyteorder(">"),
             c_axiskeys=c_axiskeys,
-            compression=N5Compressor.from_json_data(raw_attributes["compression"]),
-            location=location_override or location_5d,
+            compression=N5Compressor.create_from_dto(dto.compression),
         )
 
-    def to_json_data(self) -> JsonObject:
-        return {
-            "dimensions": self.dimensions.to_tuple(self.c_axiskeys[::-1]),
-            "blockSize": self.blockSize.to_tuple(self.c_axiskeys[::-1]),
-            "axes": tuple(self.c_axiskeys[::-1]),
-            "dataType": str(self.dataType.name),
-            "compression": self.compression.to_json_data(),
-            "location": self.location.to_tuple(self.c_axiskeys[::-1])
-        }
+    def to_dto(self) -> N5DatasetAttributesDto:
+        return N5DatasetAttributesDto(
+            dimensions=self.dimensions.to_tuple(self.c_axiskeys[::-1]),
+            blockSize=self.blockSize.to_tuple(self.c_axiskeys[::-1]),
+            axes=tuple(self.c_axiskeys[::-1]),
+            dataType=dtype_to_dto(self.dataType),
+            compression=self.compression.to_dto(),
+        )

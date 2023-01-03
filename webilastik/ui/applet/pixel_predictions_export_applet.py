@@ -163,8 +163,8 @@ class PixelClassificationExportApplet(StatelesApplet):
                 on_changed=self.on_async_change,
                 operator=operator,
                 sink_writer=result,
-                args=datasource.roi.get_datasource_tiles(), #FIXME: use sink tile_size
-                num_args=datasource.roi.get_num_tiles(tile_shape=datasource.tile_shape),
+                args=datasource.roi.split(block_shape=result.data_sink.tile_shape.updated(c=datasource.shape.c)),
+                num_args=datasource.roi.get_num_tiles(tile_shape=result.data_sink.tile_shape),
             ))
 
         _ = self._launch_open_datasink_job(
@@ -211,25 +211,31 @@ class WsPixelClassificationExportApplet(WsApplet, PixelClassificationExportApple
             if isinstance(params_result, MessageParsingError):
                 return UsageError(str(params_result)) #FIXME: this is a bug, not a usage error
             datasource_result = FsDataSource.try_from_message(params_result.datasource)
-            if isinstance(datasource_result, MessageParsingError):
+            if isinstance(datasource_result, Exception):
                 return UsageError(str(datasource_result)) #FIXME: this is a bug, not a usage error
+            datasink_result = DataSink.create_from_message(params_result.datasink)
+            if isinstance(datasink_result, Exception):
+                return UsageError(str(datasink_result)) #FIXME: may not be an usage error
             rpc_result = self.launch_pixel_probabilities_export_job(
-                datasource=datasource_result, datasink=DataSink.create_from_message(params_result.datasink)
+                datasource=datasource_result, datasink=datasink_result
             )
         elif method_name == "launch_simple_segmentation_export_job":
             params_result = StartSimpleSegmentationExportJobParamsDto.from_json_value(arguments)
             if isinstance(params_result, MessageParsingError):
                 return UsageError(str(params_result)) #FIXME: this is a bug, not a usage error
             datasource_result = FsDataSource.try_from_message(params_result.datasource)
-            if isinstance(datasource_result, MessageParsingError):
+            if isinstance(datasource_result, Exception):
                 return UsageError(str(datasource_result)) #FIXME: this is a bug, not a usage error
-            datasink = DataSink.create_from_message(params_result.datasink)
-            rpc_result = self.launch_simple_segmentation_export_job(datasource=datasource_result, datasink=datasink, label_name=params_result.label_header.name)
+            datasink_result = DataSink.create_from_message(params_result.datasink)
+            if isinstance(datasink_result, Exception):
+                return UsageError(str(datasink_result)) #FIXME: may not be an usage error
+
+            rpc_result = self.launch_simple_segmentation_export_job(datasource=datasource_result, datasink=datasink_result, label_name=params_result.label_header.name)
         else:
             raise ValueError(f"Invalid method name: '{method_name}'") #FIXME: return error
         return rpc_result
 
-    def _get_json_state(self) -> JsonValue:
+    def get_state_dto(self) -> PixelClassificationExportAppletStateDto:
         with self._lock:
             labels = self._in_populated_labels()
             datasource_suggestions = self._in_datasource_suggestions()
@@ -237,4 +243,7 @@ class WsPixelClassificationExportApplet(WsApplet, PixelClassificationExportApple
                 jobs=tuple(job.to_dto() for job in self._jobs.values()),
                 populated_labels=None if not labels else tuple(l.to_header_message() for l in labels),
                 datasource_suggestions=None if datasource_suggestions is None else tuple(ds.to_dto() for ds in datasource_suggestions)
-            ).to_json_value()
+            )
+
+    def _get_json_state(self) -> JsonValue:
+        return self.get_state_dto().to_json_value()

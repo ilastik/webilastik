@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from typing import List, Optional, Any
+from typing import Optional, Any, Tuple
 import tempfile
 from pathlib import PurePosixPath
 import pickle
@@ -15,13 +15,12 @@ from ndstructs.array5D import Array5D
 from webilastik.datasource import DataRoi
 from webilastik.datasink.n5_dataset_sink import N5DataSink
 from webilastik.datasource.n5_datasource import N5DataSource
-from webilastik.datasource.n5_attributes import N5Compressor, N5DatasetAttributes, RawCompressor
+from webilastik.datasource.n5_attributes import N5Compressor, RawCompressor
 from webilastik.datasource import DataSource
 from webilastik.datasource.array_datasource import ArrayDataSource
 from webilastik.datasource.skimage_datasource import SkimageDataSource
-from webilastik.datasource.h5_datasource import H5DataSource
-from webilastik.datasource.sequence_datasource import SequenceDataSource
-from webilastik.filesystem.osfs import OsFs
+from webilastik.filesystem import IFilesystem
+from webilastik.filesystem.os_fs import OsFs
 
 # fmt: off
 raw = np.asarray([
@@ -71,12 +70,13 @@ def create_png(array: Array5D) -> PurePosixPath:
 
 def create_n5(
     array: Array5D, *, axiskeys: Optional[str] = None, chunk_size: Shape5D, compression: N5Compressor = RawCompressor()
-):
-    path = PurePosixPath(tempfile.mkstemp()[1] + ".n5")
+) -> Tuple[IFilesystem, PurePosixPath]:
+    path = PurePosixPath(tempfile.mkstemp()[1] + ".n5/data")
+    fs = OsFs.create()
+    assert not isinstance(fs, Exception)
     sink = N5DataSink(
-        outer_path=path,
-        inner_path=PurePosixPath("/data"),
-        filesystem=OsFs("/"),
+        path=path,
+        filesystem=fs,
         tile_shape=chunk_size,
         c_axiskeys=axiskeys or array.axiskeys,
         compressor=compression,
@@ -88,7 +88,7 @@ def create_n5(
 
     for tile in array.split(chunk_size):
         sink_writer.write(tile)
-    return path.as_posix()
+    return (fs, path)
 
 
 def create_h5(array: Array5D, axiskeys_style: str, chunk_shape: Optional[Shape5D] = None, axiskeys: str = "xyztc"):
@@ -137,8 +137,10 @@ def test_retrieve_roi_smaller_than_tile():
          [1600, 1700, 1800, 1900]]
     ])
     # fmt: on
-    path = PurePosixPath(create_n5(data, chunk_size=Shape5D(c=2, y=4, x=4)))
-    ds = N5DataSource(path=path / "data", filesystem=OsFs("/"))
+    fs, path = create_n5(data, chunk_size=Shape5D(c=2, y=4, x=4))
+    assert not isinstance(fs, Exception)
+    ds = N5DataSource.try_load(path=path, filesystem=fs)
+    assert not isinstance(ds, Exception)
     smaller_than_tile = ds.retrieve(c=1, y=(0, 4), x=(0, 4))
     assert np.all(smaller_than_tile.raw("cyx") == expected_cyx)
 
@@ -153,8 +155,10 @@ def test_n5_datasource():
     ]).astype(np.uint8), axiskeys="yx")
     # fmt: on
 
-    path = PurePosixPath(create_n5(data, chunk_size=Shape5D(x=2, y=2)))
-    ds = N5DataSource(path=path / "data", filesystem=OsFs("/"))
+    fs, path = create_n5(data, chunk_size=Shape5D(x=2, y=2))
+    assert not isinstance(fs, Exception)
+    ds = N5DataSource.try_load(path=path, filesystem=fs)
+    assert not isinstance(ds, Exception), str(ds)
     assert ds.shape == data.shape
 
     # fmt: off
@@ -171,7 +175,7 @@ def test_n5_datasource():
 # def test_h5_datasource():
 #     data_2d = Array5D(np.arange(100).reshape(10, 10), axiskeys="yx")
 #     h5_path = create_h5(data_2d, axiskeys_style="vigra", chunk_shape=Shape5D(x=3, y=3))
-#     ds = H5DataSource(outer_path=h5_path, inner_path=PurePosixPath("/data"), filesystem=OsFs("/"))
+#     ds = H5DataSource(outer_path=h5_path, inner_path=PurePosixPath("/data"), filesystem=OsFs())
 #     assert ds.shape == data_2d.shape
 #     assert ds.tile_shape == Shape5D(x=3, y=3)
 
@@ -180,7 +184,7 @@ def test_n5_datasource():
 
 #     data_3d = Array5D(np.arange(10 * 10 * 10).reshape(10, 10, 10), axiskeys="zyx")
 #     h5_path = create_h5(data_3d, axiskeys_style="vigra", chunk_shape=Shape5D(x=3, y=3))
-#     ds = H5DataSource(outer_path=h5_path, inner_path=PurePosixPath("/data"), filesystem=OsFs("/"))
+#     ds = H5DataSource(outer_path=h5_path, inner_path=PurePosixPath("/data"), filesystem=OsFs())
 #     assert ds.shape == data_3d.shape
 #     assert ds.tile_shape == Shape5D(x=3, y=3)
 
@@ -190,7 +194,9 @@ def test_n5_datasource():
 
 
 def test_skimage_datasource_tiles():
-    bs = DataRoi(SkimageDataSource(path=png_image, filesystem=OsFs("/")))
+    fs = OsFs.create()
+    assert not isinstance(fs, Exception)
+    bs = DataRoi(SkimageDataSource(path=png_image, filesystem=fs))
     num_checked_tiles = 0
     for tile in bs.split(Shape5D(x=2, y=2)):
         if tile == Interval5D.zero(x=(0, 2), y=(0, 2)):
@@ -229,7 +235,9 @@ def test_neighboring_tiles():
 
         [0,   1,  2,    3,  4,  5,    6]], dtype=np.uint8), axiskeys="yx")
 
-    ds = SkimageDataSource(path=create_png(arr), filesystem=OsFs("/"))
+    fs = OsFs.create()
+    assert not isinstance(fs, Exception)
+    ds = SkimageDataSource(path=create_png(arr), filesystem=fs)
 
     fifties_slice = DataRoi(ds, x=(3, 6), y=(3, 6))
     expected_fifties_slice = Array5D(np.asarray([
@@ -386,7 +394,7 @@ def test_neighboring_tiles():
 #         offset = Point5D.zero()
 #         stack: List[H5DataSource] = []
 #         for outer_path in h5_outer_paths:
-#             stack.append(H5DataSource(outer_path=outer_path, inner_path=PurePosixPath("/data"), filesystem=OsFs("/"), location=offset))
+#             stack.append(H5DataSource(outer_path=outer_path, inner_path=PurePosixPath("/data"), filesystem=OsFs(), location=offset))
 #             offset += Point5D.zero(**{stack_axis: stack[-1].shape[stack_axis]})
 #         return stack
 

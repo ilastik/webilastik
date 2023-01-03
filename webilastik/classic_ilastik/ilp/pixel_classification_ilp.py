@@ -39,10 +39,8 @@ from webilastik.features.ilp_filter import IlpFilter
 from webilastik.datasource import DataSource, FsDataSource
 from webilastik.annotations import Annotation
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier, dump_to_temp_file, vigra_forest_to_h5_bytes
-from webilastik.filesystem import Filesystem
+from webilastik.filesystem import IFilesystem
 from webilastik.ui.applet.brushing_applet import Label
-from webilastik.utility.url import Protocol
-
 
 VIGRA_ILP_CLASSIFIER_FACTORY = textwrap.dedent(
         """
@@ -256,10 +254,15 @@ class IlpPixelClassificationGroup:
                     if color is None:
                         raise IlpParsingError(f"Could not find a label color for index {color_index}")
                     annotation_data: "np.ndarray[Any, np.dtype[np.uint8]]" = block_5d.color_filtered(color=color_5d).raw(axiskeys)
-                    annotation = Annotation(
+                    annotation_data_5d: Array5D = Array5D(
                         annotation_data.astype(np.dtype(bool)),
                         location=blockInterval.start,
                         axiskeys=axiskeys, # FIXME: what if the user changed the axiskeys in the data source?
+                    ).contracted_to_non_zero()
+                    annotation = Annotation(
+                        annotation_data_5d.raw(annotation_data_5d.axiskeys),
+                        location=annotation_data_5d.location,
+                        axiskeys=annotation_data_5d.axiskeys,
                         raw_data=raw_data,
                     )
 
@@ -363,8 +366,7 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
     def parse(
         cls,
         group: h5py.Group,
-        ilp_fs: Filesystem,
-        allowed_protocols: Sequence[Protocol] = ("http", "https")
+        ilp_fs: IFilesystem,
     ) -> "IlpPixelClassificationWorkflowGroup | Exception":
         workflowname = ensure_encoded_string(group, "workflowName")
         if workflowname != "Pixel Classification":
@@ -372,7 +374,7 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
 
         Input_Data = IlpInputDataGroup.parse(ensure_group(group, "Input Data"))
         raw_data_datasources_result = Input_Data.try_to_datasources(
-            role_name="Raw Data", ilp_fs=ilp_fs, ilp_path=PurePosixPath(group.file.filename), allowed_protocols=allowed_protocols
+            role_name="Raw Data", ilp_fs=ilp_fs, ilp_path=PurePosixPath(group.file.filename)
         )
         if isinstance(raw_data_datasources_result, Exception):
             return raw_data_datasources_result

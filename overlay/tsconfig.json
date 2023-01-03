@@ -20,6 +20,6 @@
     "target": "ES2018",
     "newLine": "LF",
     "typeRoots": [],
-    "module": "CommonJS"
+    "module": "CommonJS",
   }
 }

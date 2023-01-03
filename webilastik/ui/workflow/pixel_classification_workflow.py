@@ -15,19 +15,18 @@ from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 
 from webilastik.datasource import FsDataSource
 from webilastik.features.ilp_filter import IlpFilter
-from webilastik.filesystem import Filesystem
-from webilastik.filesystem.osfs import OsFs
+from webilastik.filesystem import IFilesystem
+from webilastik.filesystem.os_fs import OsFs
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet.brushing_applet import Label, WsBrushingApplet
 from webilastik.ui.applet.feature_selection_applet import WsFeatureSelectionApplet
 from webilastik.ui.applet.pixel_predictions_export_applet import WsPixelClassificationExportApplet
-from webilastik.ui.applet.ws_viewer_applet import WsViewerApplet
 from webilastik.ui.usage_error import UsageError
 from webilastik.ui.applet import UserPrompt
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.applet.ws_pixel_classification_applet import WsPixelClassificationApplet
 from webilastik.classic_ilastik.ilp.pixel_classification_ilp import IlpPixelClassificationWorkflowGroup
-from webilastik.utility.url import Protocol, Url
+from webilastik.utility.url import Url
 
 
 
@@ -104,14 +103,14 @@ class PixelClassificationWorkflow:
         on_async_change: Callable[[], None],
         executor: Executor,
         priority_executor: PriorityExecutor,
-        allowed_protocols: "Sequence[Protocol] | None" = None,
     ) -> "PixelClassificationWorkflow | Exception":
-        allowed_protocols = allowed_protocols or ("http", "https")
+        fs_result = OsFs.create()
+        if isinstance(fs_result, Exception):
+            return fs_result
         with h5py.File(ilp_path, "r") as f:
             parsing_result = IlpPixelClassificationWorkflowGroup.parse(
                 group=f,
-                ilp_fs=OsFs("/"),
-                allowed_protocols=allowed_protocols,
+                ilp_fs=fs_result,
             )
             if isinstance(parsing_result, Exception):
                 return parsing_result
@@ -134,7 +133,6 @@ class PixelClassificationWorkflow:
         on_async_change: Callable[[], None],
         executor: Executor,
         priority_executor: PriorityExecutor,
-        allowed_protocols: "Sequence[Protocol] | None" = None,
     ) -> "PixelClassificationWorkflow | Exception":
         tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5") # FIXME
         num_bytes_written = os.write(tmp_file_handle, ilp_bytes)
@@ -145,7 +143,6 @@ class PixelClassificationWorkflow:
             on_async_change=on_async_change,
             executor=executor,
             priority_executor=priority_executor,
-            allowed_protocols=allowed_protocols,
         )
         os.remove(tmp_file_path)
         return workflow
@@ -160,9 +157,12 @@ class PixelClassificationWorkflow:
     def get_ilp_contents(self) -> bytes:
         return self.to_ilp_workflow_group().to_h5_file_bytes()
 
-    def save_project(self, fs: Filesystem, path: PurePosixPath) -> int:
-        with fs.openbin(path.as_posix(), "w") as f:
-            return f.write(self.get_ilp_contents())
+    def save_project(self, fs: IFilesystem, path: PurePosixPath) -> int:
+        contents = self.get_ilp_contents()
+        save_result = fs.create_file(path=path, contents=contents)
+        if isinstance(save_result, Exception):
+            raise save_result #FIXME: return instead
+        return len(contents)
 
     def run_rpc(self, *, user_prompt: UserPrompt, applet_name: str, method_name: str, arguments: JsonObject) -> "UsageError | None":
         return self.wsapplets[applet_name].run_rpc(method_name=method_name, arguments=arguments, user_prompt=user_prompt)
@@ -193,18 +193,6 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             pixel_classifier=pixel_classifier,
         )
 
-        self.viewer_applet = WsViewerApplet(
-            name="viewer_applet",
-            allowed_protocols=set(["http", "https"]),
-            executor=priority_executor,
-            generational_classifier=self.pixel_classifier_applet.generational_pixel_classifier,
-            labels=self.brushing_applet.labels,
-            session_url=session_url,
-            on_async_change=on_async_change,
-        )
-
-        self.wsapplets[self.viewer_applet.name] = self.viewer_applet
-
     @staticmethod
     def from_pixel_classification_workflow(workflow: PixelClassificationWorkflow, session_url: Url) -> "WsPixelClassificationWorkflow":
         return WsPixelClassificationWorkflow(
@@ -224,15 +212,15 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         on_async_change: Callable[[], None],
         executor: Executor,
         priority_executor: PriorityExecutor,
-        allowed_protocols: "Sequence[Protocol] | None" = None,
         session_url: Url,
     ) -> "WsPixelClassificationWorkflow | Exception":
-        allowed_protocols = allowed_protocols or ("http", "https")
+        fs_result = OsFs.create()
+        if isinstance(fs_result, Exception):
+            return fs_result
         with h5py.File(ilp_path, "r") as f:
             parsing_result = IlpPixelClassificationWorkflowGroup.parse(
                 group=f,
-                ilp_fs=OsFs("/"),
-                allowed_protocols=allowed_protocols,
+                ilp_fs=fs_result,
             )
             if isinstance(parsing_result, Exception):
                 return parsing_result
@@ -255,7 +243,6 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         on_async_change: Callable[[], None],
         executor: Executor,
         priority_executor: PriorityExecutor,
-        allowed_protocols: "Sequence[Protocol] | None" = None,
         session_url: Url,
     ) -> "WsPixelClassificationWorkflow | Exception":
         tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5") # FIXME
@@ -267,7 +254,6 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             on_async_change=on_async_change,
             executor=executor,
             priority_executor=priority_executor,
-            allowed_protocols=allowed_protocols,
             session_url=session_url,
         )
         os.remove(tmp_file_path)

@@ -8,10 +8,10 @@ import {
 } from "../util/safe_serialization";
 import { JsonObject, JsonValue, toJsonValue } from "../util/serialization";
 
-function parse_as_int(value: JsonValue): number | Error {
+export function parse_as_int(value: JsonValue): number | Error {
   return ensureJsonNumber(value);
 }
-function parse_as_ColorDto(value: JsonValue): ColorDto | Error {
+export function parse_as_ColorDto(value: JsonValue): ColorDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -48,7 +48,7 @@ export class ColorDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "ColorDto",
+      "__class__": "ColorDto",
       r: this.r,
       g: this.g,
       b: this.b,
@@ -59,10 +59,10 @@ export class ColorDto {
   }
 }
 
-function parse_as_str(value: JsonValue): string | Error {
+export function parse_as_str(value: JsonValue): string | Error {
   return ensureJsonString(value);
 }
-function parse_as_LabelHeaderDto(value: JsonValue): LabelHeaderDto | Error {
+export function parse_as_LabelHeaderDto(value: JsonValue): LabelHeaderDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -93,7 +93,7 @@ export class LabelHeaderDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "LabelHeaderDto",
+      "__class__": "LabelHeaderDto",
       name: this.name,
       color: this.color.toJsonValue(),
     };
@@ -103,20 +103,26 @@ export class LabelHeaderDto {
   }
 }
 
-function parse_as_Literal_of__quote_precomputed_quote__endof_(value: JsonValue): "precomputed" | Error {
+export function parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_(
+  value: JsonValue,
+): "precomputed" | "n5" | Error {
   const tmp_0 = parse_as_str(value);
   if (!(tmp_0 instanceof Error) && tmp_0 === "precomputed") {
     return tmp_0;
   }
-  return Error(`Could not parse ${value} as 'precomputed'`);
+  const tmp_1 = parse_as_str(value);
+  if (!(tmp_1 instanceof Error) && tmp_1 === "n5") {
+    return tmp_1;
+  }
+  return Error(`Could not parse ${value} as 'precomputed' | 'n5'`);
 }
-function parse_as_None(value: JsonValue): undefined | Error {
+export function parse_as_None(value: JsonValue): undefined | Error {
   return ensureJsonUndefined(value);
 }
-function parse_as_Union_of_Literal_of__quote_precomputed_quote__endof_0None_endof_(
+export function parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_0None_endof_(
   value: JsonValue,
-): "precomputed" | undefined | Error {
-  const parsed_option_0 = parse_as_Literal_of__quote_precomputed_quote__endof_(value);
+): "precomputed" | "n5" | undefined | Error {
+  const parsed_option_0 = parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_(value);
   if (!(parsed_option_0 instanceof Error)) {
     return parsed_option_0;
   }
@@ -124,9 +130,9 @@ function parse_as_Union_of_Literal_of__quote_precomputed_quote__endof_0None_endo
   if (!(parsed_option_1 instanceof Error)) {
     return parsed_option_1;
   }
-  return Error(`Could not parse ${JSON.stringify(value)} into 'precomputed' | undefined`);
+  return Error(`Could not parse ${JSON.stringify(value)} into 'precomputed' | 'n5' | undefined`);
 }
-function parse_as_Literal_of__quote_http_quote_0_quote_https_quote_0_quote_file_quote_0_quote_memory_quote__endof_(
+export function parse_as_Literal_of__quote_http_quote_0_quote_https_quote_0_quote_file_quote_0_quote_memory_quote__endof_(
   value: JsonValue,
 ): "http" | "https" | "file" | "memory" | Error {
   const tmp_0 = parse_as_str(value);
@@ -147,7 +153,7 @@ function parse_as_Literal_of__quote_http_quote_0_quote_https_quote_0_quote_file_
   }
   return Error(`Could not parse ${value} as 'http' | 'https' | 'file' | 'memory'`);
 }
-function parse_as_Union_of_int0None_endof_(value: JsonValue): number | undefined | Error {
+export function parse_as_Union_of_int0None_endof_(value: JsonValue): number | undefined | Error {
   const parsed_option_0 = parse_as_int(value);
   if (!(parsed_option_0 instanceof Error)) {
     return parsed_option_0;
@@ -158,7 +164,7 @@ function parse_as_Union_of_int0None_endof_(value: JsonValue): number | undefined
   }
   return Error(`Could not parse ${JSON.stringify(value)} into number | undefined`);
 }
-function parse_as_Mapping_of_str0str_endof_(value: JsonValue): { [key: string]: string } | Error {
+export function parse_as_Mapping_of_str0str_endof_(value: JsonValue): { [key: string]: string } | Error {
   const valueObj = ensureJsonObject(value);
   if (valueObj instanceof Error) {
     return valueObj;
@@ -178,7 +184,7 @@ function parse_as_Mapping_of_str0str_endof_(value: JsonValue): { [key: string]: 
   }
   return out;
 }
-function parse_as_Union_of_Mapping_of_str0str_endof_0None_endof_(
+export function parse_as_Union_of_Mapping_of_str0str_endof_0None_endof_(
   value: JsonValue,
 ): { [key: string]: string } | undefined | Error {
   const parsed_option_0 = parse_as_Mapping_of_str0str_endof_(value);
@@ -191,7 +197,7 @@ function parse_as_Union_of_Mapping_of_str0str_endof_0None_endof_(
   }
   return Error(`Could not parse ${JSON.stringify(value)} into { [key: string]: string } | undefined`);
 }
-function parse_as_Union_of_str0None_endof_(value: JsonValue): string | undefined | Error {
+export function parse_as_Union_of_str0None_endof_(value: JsonValue): string | undefined | Error {
   const parsed_option_0 = parse_as_str(value);
   if (!(parsed_option_0 instanceof Error)) {
     return parsed_option_0;
@@ -202,7 +208,7 @@ function parse_as_Union_of_str0None_endof_(value: JsonValue): string | undefined
   }
   return Error(`Could not parse ${JSON.stringify(value)} into string | undefined`);
 }
-function parse_as_UrlDto(value: JsonValue): UrlDto | Error {
+export function parse_as_UrlDto(value: JsonValue): UrlDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -210,7 +216,7 @@ function parse_as_UrlDto(value: JsonValue): UrlDto | Error {
   if (valueObject["__class__"] != "UrlDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a UrlDto`);
   }
-  const temp_datascheme = parse_as_Union_of_Literal_of__quote_precomputed_quote__endof_0None_endof_(
+  const temp_datascheme = parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_0None_endof_(
     valueObject.datascheme,
   );
   if (temp_datascheme instanceof Error) return temp_datascheme;
@@ -242,7 +248,7 @@ function parse_as_UrlDto(value: JsonValue): UrlDto | Error {
 // Automatically generated via DataTransferObject for UrlDto
 // Do not edit!
 export class UrlDto {
-  public datascheme: "precomputed" | undefined;
+  public datascheme: "precomputed" | "n5" | undefined;
   public protocol: "http" | "https" | "file" | "memory";
   public hostname: string;
   public port: number | undefined;
@@ -250,7 +256,7 @@ export class UrlDto {
   public search: { [key: string]: string } | undefined;
   public fragment: string | undefined;
   constructor(_params: {
-    datascheme: "precomputed" | undefined;
+    datascheme: "precomputed" | "n5" | undefined;
     protocol: "http" | "https" | "file" | "memory";
     hostname: string;
     port: number | undefined;
@@ -268,7 +274,7 @@ export class UrlDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "UrlDto",
+      "__class__": "UrlDto",
       datascheme: toJsonValue(this.datascheme),
       protocol: this.protocol,
       hostname: this.hostname,
@@ -283,7 +289,7 @@ export class UrlDto {
   }
 }
 
-function parse_as_Point5DDto(value: JsonValue): Point5DDto | Error {
+export function parse_as_Point5DDto(value: JsonValue): Point5DDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -332,7 +338,7 @@ export class Point5DDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "Point5DDto",
+      "__class__": "Point5DDto",
       x: this.x,
       y: this.y,
       z: this.z,
@@ -345,7 +351,7 @@ export class Point5DDto {
   }
 }
 
-function parse_as_Shape5DDto(value: JsonValue): Shape5DDto | Error {
+export function parse_as_Shape5DDto(value: JsonValue): Shape5DDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -394,7 +400,7 @@ export class Shape5DDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "Shape5DDto",
+      "__class__": "Shape5DDto",
       x: this.x,
       y: this.y,
       z: this.z,
@@ -407,7 +413,7 @@ export class Shape5DDto {
   }
 }
 
-function parse_as_Interval5DDto(value: JsonValue): Interval5DDto | Error {
+export function parse_as_Interval5DDto(value: JsonValue): Interval5DDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -438,7 +444,7 @@ export class Interval5DDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "Interval5DDto",
+      "__class__": "Interval5DDto",
       start: this.start.toJsonValue(),
       stop: this.stop.toJsonValue(),
     };
@@ -448,7 +454,7 @@ export class Interval5DDto {
   }
 }
 
-function parse_as_OsfsDto(value: JsonValue): OsfsDto | Error {
+export function parse_as_OsfsDto(value: JsonValue): OsfsDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -456,25 +462,16 @@ function parse_as_OsfsDto(value: JsonValue): OsfsDto | Error {
   if (valueObject["__class__"] != "OsfsDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a OsfsDto`);
   }
-  const temp_path = parse_as_str(valueObject.path);
-  if (temp_path instanceof Error) return temp_path;
-  return new OsfsDto({
-    path: temp_path,
-  });
+  return new OsfsDto({});
 }
 // Automatically generated via DataTransferObject for OsfsDto
 // Do not edit!
 export class OsfsDto {
-  public path: string;
-  constructor(_params: {
-    path: string;
-  }) {
-    this.path = _params.path;
+  constructor(_params: {}) {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "OsfsDto",
-      path: this.path,
+      "__class__": "OsfsDto",
     };
   }
   public static fromJsonValue(value: JsonValue): OsfsDto | Error {
@@ -482,7 +479,9 @@ export class OsfsDto {
   }
 }
 
-function parse_as_Literal_of__quote_http_quote_0_quote_https_quote__endof_(value: JsonValue): "http" | "https" | Error {
+export function parse_as_Literal_of__quote_http_quote_0_quote_https_quote__endof_(
+  value: JsonValue,
+): "http" | "https" | Error {
   const tmp_0 = parse_as_str(value);
   if (!(tmp_0 instanceof Error) && tmp_0 === "http") {
     return tmp_0;
@@ -493,7 +492,7 @@ function parse_as_Literal_of__quote_http_quote_0_quote_https_quote__endof_(value
   }
   return Error(`Could not parse ${value} as 'http' | 'https'`);
 }
-function parse_as_HttpFsDto(value: JsonValue): HttpFsDto | Error {
+export function parse_as_HttpFsDto(value: JsonValue): HttpFsDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -542,7 +541,7 @@ export class HttpFsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "HttpFsDto",
+      "__class__": "HttpFsDto",
       protocol: this.protocol,
       hostname: this.hostname,
       port: toJsonValue(this.port),
@@ -555,7 +554,7 @@ export class HttpFsDto {
   }
 }
 
-function parse_as_BucketFSDto(value: JsonValue): BucketFSDto | Error {
+export function parse_as_BucketFSDto(value: JsonValue): BucketFSDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -565,30 +564,23 @@ function parse_as_BucketFSDto(value: JsonValue): BucketFSDto | Error {
   }
   const temp_bucket_name = parse_as_str(valueObject.bucket_name);
   if (temp_bucket_name instanceof Error) return temp_bucket_name;
-  const temp_prefix = parse_as_str(valueObject.prefix);
-  if (temp_prefix instanceof Error) return temp_prefix;
   return new BucketFSDto({
     bucket_name: temp_bucket_name,
-    prefix: temp_prefix,
   });
 }
 // Automatically generated via DataTransferObject for BucketFSDto
 // Do not edit!
 export class BucketFSDto {
   public bucket_name: string;
-  public prefix: string;
   constructor(_params: {
     bucket_name: string;
-    prefix: string;
   }) {
     this.bucket_name = _params.bucket_name;
-    this.prefix = _params.prefix;
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "BucketFSDto",
+      "__class__": "BucketFSDto",
       bucket_name: this.bucket_name,
-      prefix: this.prefix,
     };
   }
   public static fromJsonValue(value: JsonValue): BucketFSDto | Error {
@@ -596,7 +588,7 @@ export class BucketFSDto {
   }
 }
 
-function parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
+export function parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
   value: JsonValue,
 ): OsfsDto | HttpFsDto | BucketFSDto | Error {
   const parsed_option_0 = parse_as_OsfsDto(value);
@@ -613,7 +605,7 @@ function parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
   }
   return Error(`Could not parse ${JSON.stringify(value)} into OsfsDto | HttpFsDto | BucketFSDto`);
 }
-function parse_as_Tuple_of_int0int0int_endof_(value: JsonValue): [number, number, number] | Error {
+export function parse_as_Tuple_of_int0int0int_endof_(value: JsonValue): [number, number, number] | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
   const temp_0 = parse_as_int(arr[0]);
@@ -624,9 +616,9 @@ function parse_as_Tuple_of_int0int0int_endof_(value: JsonValue): [number, number
   if (temp_2 instanceof Error) return temp_2;
   return [temp_0, temp_1, temp_2];
 }
-function parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_float32_quote__endof_(
+export function parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
   value: JsonValue,
-): "uint8" | "uint16" | "uint32" | "uint64" | "float32" | Error {
+): "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32" | Error {
   const tmp_0 = parse_as_str(value);
   if (!(tmp_0 instanceof Error) && tmp_0 === "uint8") {
     return tmp_0;
@@ -644,12 +636,18 @@ function parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uin
     return tmp_3;
   }
   const tmp_4 = parse_as_str(value);
-  if (!(tmp_4 instanceof Error) && tmp_4 === "float32") {
+  if (!(tmp_4 instanceof Error) && tmp_4 === "int64") {
     return tmp_4;
   }
-  return Error(`Could not parse ${value} as 'uint8' | 'uint16' | 'uint32' | 'uint64' | 'float32'`);
+  const tmp_5 = parse_as_str(value);
+  if (!(tmp_5 instanceof Error) && tmp_5 === "float32") {
+    return tmp_5;
+  }
+  return Error(`Could not parse ${value} as 'uint8' | 'uint16' | 'uint32' | 'uint64' | 'int64' | 'float32'`);
 }
-function parse_as_Literal_of__quote_raw_quote_0_quote_jpeg_quote__endof_(value: JsonValue): "raw" | "jpeg" | Error {
+export function parse_as_Literal_of__quote_raw_quote_0_quote_jpeg_quote__endof_(
+  value: JsonValue,
+): "raw" | "jpeg" | Error {
   const tmp_0 = parse_as_str(value);
   if (!(tmp_0 instanceof Error) && tmp_0 === "raw") {
     return tmp_0;
@@ -660,7 +658,7 @@ function parse_as_Literal_of__quote_raw_quote_0_quote_jpeg_quote__endof_(value: 
   }
   return Error(`Could not parse ${value} as 'raw' | 'jpeg'`);
 }
-function parse_as_PrecomputedChunksDataSourceDto(value: JsonValue): PrecomputedChunksDataSourceDto | Error {
+export function parse_as_PrecomputedChunksDataSourceDto(value: JsonValue): PrecomputedChunksDataSourceDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -683,7 +681,7 @@ function parse_as_PrecomputedChunksDataSourceDto(value: JsonValue): PrecomputedC
   const temp_spatial_resolution = parse_as_Tuple_of_int0int0int_endof_(valueObject.spatial_resolution);
   if (temp_spatial_resolution instanceof Error) return temp_spatial_resolution;
   const temp_dtype =
-    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_float32_quote__endof_(
+    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
       valueObject.dtype,
     );
   if (temp_dtype instanceof Error) return temp_dtype;
@@ -711,7 +709,7 @@ export class PrecomputedChunksDataSourceDto {
   public interval: Interval5DDto;
   public tile_shape: Shape5DDto;
   public spatial_resolution: [number, number, number];
-  public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "float32";
+  public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
   public encoder: "raw" | "jpeg";
   constructor(_params: {
     url: UrlDto;
@@ -721,7 +719,7 @@ export class PrecomputedChunksDataSourceDto {
     interval: Interval5DDto;
     tile_shape: Shape5DDto;
     spatial_resolution: [number, number, number];
-    dtype: "uint8" | "uint16" | "uint32" | "uint64" | "float32";
+    dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
     encoder: "raw" | "jpeg";
   }) {
     this.url = _params.url;
@@ -736,7 +734,7 @@ export class PrecomputedChunksDataSourceDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "PrecomputedChunksDataSourceDto",
+      "__class__": "PrecomputedChunksDataSourceDto",
       url: this.url.toJsonValue(),
       filesystem: toJsonValue(this.filesystem),
       path: this.path,
@@ -753,7 +751,261 @@ export class PrecomputedChunksDataSourceDto {
   }
 }
 
-function parse_as_N5DataSourceDto(value: JsonValue): N5DataSourceDto | Error {
+export function parse_as_N5GzipCompressorDto(value: JsonValue): N5GzipCompressorDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["type"] != "gzip") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5GzipCompressorDto`);
+  }
+  const temp_level = parse_as_int(valueObject.level);
+  if (temp_level instanceof Error) return temp_level;
+  return new N5GzipCompressorDto({
+    level: temp_level,
+  });
+}
+// Automatically generated via DataTransferObject for N5GzipCompressorDto
+// Do not edit!
+export class N5GzipCompressorDto {
+  public level: number;
+  constructor(_params: {
+    level: number;
+  }) {
+    this.level = _params.level;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "type": "gzip",
+      level: this.level,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): N5GzipCompressorDto | Error {
+    return parse_as_N5GzipCompressorDto(value);
+  }
+}
+
+export function parse_as_N5Bzip2CompressorDto(value: JsonValue): N5Bzip2CompressorDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["type"] != "bzip2") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5Bzip2CompressorDto`);
+  }
+  const temp_blockSize = parse_as_int(valueObject.blockSize);
+  if (temp_blockSize instanceof Error) return temp_blockSize;
+  return new N5Bzip2CompressorDto({
+    blockSize: temp_blockSize,
+  });
+}
+// Automatically generated via DataTransferObject for N5Bzip2CompressorDto
+// Do not edit!
+export class N5Bzip2CompressorDto {
+  public blockSize: number;
+  constructor(_params: {
+    blockSize: number;
+  }) {
+    this.blockSize = _params.blockSize;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "type": "bzip2",
+      blockSize: this.blockSize,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): N5Bzip2CompressorDto | Error {
+    return parse_as_N5Bzip2CompressorDto(value);
+  }
+}
+
+export function parse_as_N5XzCompressorDto(value: JsonValue): N5XzCompressorDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["type"] != "xz") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5XzCompressorDto`);
+  }
+  const temp_preset = parse_as_int(valueObject.preset);
+  if (temp_preset instanceof Error) return temp_preset;
+  return new N5XzCompressorDto({
+    preset: temp_preset,
+  });
+}
+// Automatically generated via DataTransferObject for N5XzCompressorDto
+// Do not edit!
+export class N5XzCompressorDto {
+  public preset: number;
+  constructor(_params: {
+    preset: number;
+  }) {
+    this.preset = _params.preset;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "type": "xz",
+      preset: this.preset,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): N5XzCompressorDto | Error {
+    return parse_as_N5XzCompressorDto(value);
+  }
+}
+
+export function parse_as_N5RawCompressorDto(value: JsonValue): N5RawCompressorDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["type"] != "raw") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5RawCompressorDto`);
+  }
+  return new N5RawCompressorDto({});
+}
+// Automatically generated via DataTransferObject for N5RawCompressorDto
+// Do not edit!
+export class N5RawCompressorDto {
+  constructor(_params: {}) {
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "type": "raw",
+    };
+  }
+  public static fromJsonValue(value: JsonValue): N5RawCompressorDto | Error {
+    return parse_as_N5RawCompressorDto(value);
+  }
+}
+
+export function parse_as_Tuple_of_int0_varlen__endof_(value: JsonValue): Array<number> | Error {
+  const arr = ensureJsonArray(value);
+  if (arr instanceof Error) return arr;
+  const out: Array<number> = [];
+  for (let item of arr) {
+    let parsed_item = parse_as_int(item);
+    if (parsed_item instanceof Error) return parsed_item;
+    out.push(parsed_item);
+  }
+  return out;
+}
+export function parse_as_Tuple_of_str0_varlen__endof_(value: JsonValue): Array<string> | Error {
+  const arr = ensureJsonArray(value);
+  if (arr instanceof Error) return arr;
+  const out: Array<string> = [];
+  for (let item of arr) {
+    let parsed_item = parse_as_str(item);
+    if (parsed_item instanceof Error) return parsed_item;
+    out.push(parsed_item);
+  }
+  return out;
+}
+export function parse_as_Union_of_Tuple_of_str0_varlen__endof_0None_endof_(
+  value: JsonValue,
+): Array<string> | undefined | Error {
+  const parsed_option_0 = parse_as_Tuple_of_str0_varlen__endof_(value);
+  if (!(parsed_option_0 instanceof Error)) {
+    return parsed_option_0;
+  }
+  const parsed_option_1 = parse_as_None(value);
+  if (!(parsed_option_1 instanceof Error)) {
+    return parsed_option_1;
+  }
+  return Error(`Could not parse ${JSON.stringify(value)} into Array<string> | undefined`);
+}
+export function parse_as_Union_of_N5GzipCompressorDto0N5Bzip2CompressorDto0N5XzCompressorDto0N5RawCompressorDto_endof_(
+  value: JsonValue,
+): N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto | Error {
+  const parsed_option_0 = parse_as_N5GzipCompressorDto(value);
+  if (!(parsed_option_0 instanceof Error)) {
+    return parsed_option_0;
+  }
+  const parsed_option_1 = parse_as_N5Bzip2CompressorDto(value);
+  if (!(parsed_option_1 instanceof Error)) {
+    return parsed_option_1;
+  }
+  const parsed_option_2 = parse_as_N5XzCompressorDto(value);
+  if (!(parsed_option_2 instanceof Error)) {
+    return parsed_option_2;
+  }
+  const parsed_option_3 = parse_as_N5RawCompressorDto(value);
+  if (!(parsed_option_3 instanceof Error)) {
+    return parsed_option_3;
+  }
+  return Error(
+    `Could not parse ${
+      JSON.stringify(value)
+    } into N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto`,
+  );
+}
+export function parse_as_N5DatasetAttributesDto(value: JsonValue): N5DatasetAttributesDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "undefined") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5DatasetAttributesDto`);
+  }
+  const temp_dimensions = parse_as_Tuple_of_int0_varlen__endof_(valueObject.dimensions);
+  if (temp_dimensions instanceof Error) return temp_dimensions;
+  const temp_blockSize = parse_as_Tuple_of_int0_varlen__endof_(valueObject.blockSize);
+  if (temp_blockSize instanceof Error) return temp_blockSize;
+  const temp_axes = parse_as_Union_of_Tuple_of_str0_varlen__endof_0None_endof_(valueObject.axes);
+  if (temp_axes instanceof Error) return temp_axes;
+  const temp_dataType =
+    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
+      valueObject.dataType,
+    );
+  if (temp_dataType instanceof Error) return temp_dataType;
+  const temp_compression =
+    parse_as_Union_of_N5GzipCompressorDto0N5Bzip2CompressorDto0N5XzCompressorDto0N5RawCompressorDto_endof_(
+      valueObject.compression,
+    );
+  if (temp_compression instanceof Error) return temp_compression;
+  return new N5DatasetAttributesDto({
+    dimensions: temp_dimensions,
+    blockSize: temp_blockSize,
+    axes: temp_axes,
+    dataType: temp_dataType,
+    compression: temp_compression,
+  });
+}
+// Automatically generated via DataTransferObject for N5DatasetAttributesDto
+// Do not edit!
+export class N5DatasetAttributesDto {
+  public dimensions: Array<number>;
+  public blockSize: Array<number>;
+  public axes: Array<string> | undefined;
+  public dataType: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
+  public compression: N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto;
+  constructor(_params: {
+    dimensions: Array<number>;
+    blockSize: Array<number>;
+    axes: Array<string> | undefined;
+    dataType: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
+    compression: N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto;
+  }) {
+    this.dimensions = _params.dimensions;
+    this.blockSize = _params.blockSize;
+    this.axes = _params.axes;
+    this.dataType = _params.dataType;
+    this.compression = _params.compression;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      dimensions: this.dimensions.map((item) => item),
+      blockSize: this.blockSize.map((item) => item),
+      axes: toJsonValue(this.axes),
+      dataType: this.dataType,
+      compression: toJsonValue(this.compression),
+    };
+  }
+  public static fromJsonValue(value: JsonValue): N5DatasetAttributesDto | Error {
+    return parse_as_N5DatasetAttributesDto(value);
+  }
+}
+
+export function parse_as_N5DataSourceDto(value: JsonValue): N5DataSourceDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -774,10 +1026,17 @@ function parse_as_N5DataSourceDto(value: JsonValue): N5DataSourceDto | Error {
   const temp_spatial_resolution = parse_as_Tuple_of_int0int0int_endof_(valueObject.spatial_resolution);
   if (temp_spatial_resolution instanceof Error) return temp_spatial_resolution;
   const temp_dtype =
-    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_float32_quote__endof_(
+    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
       valueObject.dtype,
     );
   if (temp_dtype instanceof Error) return temp_dtype;
+  const temp_compressor =
+    parse_as_Union_of_N5GzipCompressorDto0N5Bzip2CompressorDto0N5XzCompressorDto0N5RawCompressorDto_endof_(
+      valueObject.compressor,
+    );
+  if (temp_compressor instanceof Error) return temp_compressor;
+  const temp_c_axiskeys_on_disk = parse_as_str(valueObject.c_axiskeys_on_disk);
+  if (temp_c_axiskeys_on_disk instanceof Error) return temp_c_axiskeys_on_disk;
   return new N5DataSourceDto({
     url: temp_url,
     filesystem: temp_filesystem,
@@ -786,6 +1045,8 @@ function parse_as_N5DataSourceDto(value: JsonValue): N5DataSourceDto | Error {
     tile_shape: temp_tile_shape,
     spatial_resolution: temp_spatial_resolution,
     dtype: temp_dtype,
+    compressor: temp_compressor,
+    c_axiskeys_on_disk: temp_c_axiskeys_on_disk,
   });
 }
 // Automatically generated via DataTransferObject for N5DataSourceDto
@@ -797,7 +1058,9 @@ export class N5DataSourceDto {
   public interval: Interval5DDto;
   public tile_shape: Shape5DDto;
   public spatial_resolution: [number, number, number];
-  public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "float32";
+  public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
+  public compressor: N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto;
+  public c_axiskeys_on_disk: string;
   constructor(_params: {
     url: UrlDto;
     filesystem: OsfsDto | HttpFsDto | BucketFSDto;
@@ -805,7 +1068,9 @@ export class N5DataSourceDto {
     interval: Interval5DDto;
     tile_shape: Shape5DDto;
     spatial_resolution: [number, number, number];
-    dtype: "uint8" | "uint16" | "uint32" | "uint64" | "float32";
+    dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
+    compressor: N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto;
+    c_axiskeys_on_disk: string;
   }) {
     this.url = _params.url;
     this.filesystem = _params.filesystem;
@@ -814,10 +1079,12 @@ export class N5DataSourceDto {
     this.tile_shape = _params.tile_shape;
     this.spatial_resolution = _params.spatial_resolution;
     this.dtype = _params.dtype;
+    this.compressor = _params.compressor;
+    this.c_axiskeys_on_disk = _params.c_axiskeys_on_disk;
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "N5DataSourceDto",
+      "__class__": "N5DataSourceDto",
       url: this.url.toJsonValue(),
       filesystem: toJsonValue(this.filesystem),
       path: this.path,
@@ -825,6 +1092,8 @@ export class N5DataSourceDto {
       tile_shape: this.tile_shape.toJsonValue(),
       spatial_resolution: [this.spatial_resolution[0], this.spatial_resolution[1], this.spatial_resolution[2]],
       dtype: this.dtype,
+      compressor: toJsonValue(this.compressor),
+      c_axiskeys_on_disk: this.c_axiskeys_on_disk,
     };
   }
   public static fromJsonValue(value: JsonValue): N5DataSourceDto | Error {
@@ -832,7 +1101,7 @@ export class N5DataSourceDto {
   }
 }
 
-function parse_as_SkimageDataSourceDto(value: JsonValue): SkimageDataSourceDto | Error {
+export function parse_as_SkimageDataSourceDto(value: JsonValue): SkimageDataSourceDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -853,7 +1122,7 @@ function parse_as_SkimageDataSourceDto(value: JsonValue): SkimageDataSourceDto |
   const temp_spatial_resolution = parse_as_Tuple_of_int0int0int_endof_(valueObject.spatial_resolution);
   if (temp_spatial_resolution instanceof Error) return temp_spatial_resolution;
   const temp_dtype =
-    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_float32_quote__endof_(
+    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
       valueObject.dtype,
     );
   if (temp_dtype instanceof Error) return temp_dtype;
@@ -876,7 +1145,7 @@ export class SkimageDataSourceDto {
   public interval: Interval5DDto;
   public tile_shape: Shape5DDto;
   public spatial_resolution: [number, number, number];
-  public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "float32";
+  public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
   constructor(_params: {
     url: UrlDto;
     filesystem: OsfsDto | HttpFsDto | BucketFSDto;
@@ -884,7 +1153,7 @@ export class SkimageDataSourceDto {
     interval: Interval5DDto;
     tile_shape: Shape5DDto;
     spatial_resolution: [number, number, number];
-    dtype: "uint8" | "uint16" | "uint32" | "uint64" | "float32";
+    dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
   }) {
     this.url = _params.url;
     this.filesystem = _params.filesystem;
@@ -896,7 +1165,7 @@ export class SkimageDataSourceDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "SkimageDataSourceDto",
+      "__class__": "SkimageDataSourceDto",
       url: this.url.toJsonValue(),
       filesystem: toJsonValue(this.filesystem),
       path: this.path,
@@ -911,7 +1180,7 @@ export class SkimageDataSourceDto {
   }
 }
 
-function parse_as_PrecomputedChunksSinkDto(value: JsonValue): PrecomputedChunksSinkDto | Error {
+export function parse_as_PrecomputedChunksSinkDto(value: JsonValue): PrecomputedChunksSinkDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -928,7 +1197,7 @@ function parse_as_PrecomputedChunksSinkDto(value: JsonValue): PrecomputedChunksS
   const temp_interval = parse_as_Interval5DDto(valueObject.interval);
   if (temp_interval instanceof Error) return temp_interval;
   const temp_dtype =
-    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_float32_quote__endof_(
+    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
       valueObject.dtype,
     );
   if (temp_dtype instanceof Error) return temp_dtype;
@@ -956,7 +1225,7 @@ export class PrecomputedChunksSinkDto {
   public path: string;
   public tile_shape: Shape5DDto;
   public interval: Interval5DDto;
-  public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "float32";
+  public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
   public scale_key: string;
   public resolution: [number, number, number];
   public encoding: "raw" | "jpeg";
@@ -965,7 +1234,7 @@ export class PrecomputedChunksSinkDto {
     path: string;
     tile_shape: Shape5DDto;
     interval: Interval5DDto;
-    dtype: "uint8" | "uint16" | "uint32" | "uint64" | "float32";
+    dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
     scale_key: string;
     resolution: [number, number, number];
     encoding: "raw" | "jpeg";
@@ -981,7 +1250,7 @@ export class PrecomputedChunksSinkDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "PrecomputedChunksSinkDto",
+      "__class__": "PrecomputedChunksSinkDto",
       filesystem: toJsonValue(this.filesystem),
       path: this.path,
       tile_shape: this.tile_shape.toJsonValue(),
@@ -997,159 +1266,7 @@ export class PrecomputedChunksSinkDto {
   }
 }
 
-function parse_as_N5GzipCompressorDto(value: JsonValue): N5GzipCompressorDto | Error {
-  const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
-    return valueObject;
-  }
-  if (valueObject["__class__"] != "N5GzipCompressorDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5GzipCompressorDto`);
-  }
-  const temp_level = parse_as_int(valueObject.level);
-  if (temp_level instanceof Error) return temp_level;
-  return new N5GzipCompressorDto({
-    level: temp_level,
-  });
-}
-// Automatically generated via DataTransferObject for N5GzipCompressorDto
-// Do not edit!
-export class N5GzipCompressorDto {
-  public level: number;
-  constructor(_params: {
-    level: number;
-  }) {
-    this.level = _params.level;
-  }
-  public toJsonValue(): JsonObject {
-    return {
-      __class__: "N5GzipCompressorDto",
-      level: this.level,
-    };
-  }
-  public static fromJsonValue(value: JsonValue): N5GzipCompressorDto | Error {
-    return parse_as_N5GzipCompressorDto(value);
-  }
-}
-
-function parse_as_N5Bzip2CompressorDto(value: JsonValue): N5Bzip2CompressorDto | Error {
-  const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
-    return valueObject;
-  }
-  if (valueObject["__class__"] != "N5Bzip2CompressorDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5Bzip2CompressorDto`);
-  }
-  const temp_blockSize = parse_as_int(valueObject.blockSize);
-  if (temp_blockSize instanceof Error) return temp_blockSize;
-  return new N5Bzip2CompressorDto({
-    blockSize: temp_blockSize,
-  });
-}
-// Automatically generated via DataTransferObject for N5Bzip2CompressorDto
-// Do not edit!
-export class N5Bzip2CompressorDto {
-  public blockSize: number;
-  constructor(_params: {
-    blockSize: number;
-  }) {
-    this.blockSize = _params.blockSize;
-  }
-  public toJsonValue(): JsonObject {
-    return {
-      __class__: "N5Bzip2CompressorDto",
-      blockSize: this.blockSize,
-    };
-  }
-  public static fromJsonValue(value: JsonValue): N5Bzip2CompressorDto | Error {
-    return parse_as_N5Bzip2CompressorDto(value);
-  }
-}
-
-function parse_as_N5XzCompressorDto(value: JsonValue): N5XzCompressorDto | Error {
-  const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
-    return valueObject;
-  }
-  if (valueObject["__class__"] != "N5XzCompressorDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5XzCompressorDto`);
-  }
-  const temp_preset = parse_as_int(valueObject.preset);
-  if (temp_preset instanceof Error) return temp_preset;
-  return new N5XzCompressorDto({
-    preset: temp_preset,
-  });
-}
-// Automatically generated via DataTransferObject for N5XzCompressorDto
-// Do not edit!
-export class N5XzCompressorDto {
-  public preset: number;
-  constructor(_params: {
-    preset: number;
-  }) {
-    this.preset = _params.preset;
-  }
-  public toJsonValue(): JsonObject {
-    return {
-      __class__: "N5XzCompressorDto",
-      preset: this.preset,
-    };
-  }
-  public static fromJsonValue(value: JsonValue): N5XzCompressorDto | Error {
-    return parse_as_N5XzCompressorDto(value);
-  }
-}
-
-function parse_as_N5RawCompressorDto(value: JsonValue): N5RawCompressorDto | Error {
-  const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
-    return valueObject;
-  }
-  if (valueObject["__class__"] != "N5RawCompressorDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5RawCompressorDto`);
-  }
-  return new N5RawCompressorDto({});
-}
-// Automatically generated via DataTransferObject for N5RawCompressorDto
-// Do not edit!
-export class N5RawCompressorDto {
-  constructor(_params: {}) {
-  }
-  public toJsonValue(): JsonObject {
-    return {
-      __class__: "N5RawCompressorDto",
-    };
-  }
-  public static fromJsonValue(value: JsonValue): N5RawCompressorDto | Error {
-    return parse_as_N5RawCompressorDto(value);
-  }
-}
-
-function parse_as_Union_of_N5GzipCompressorDto0N5Bzip2CompressorDto0N5XzCompressorDto0N5RawCompressorDto_endof_(
-  value: JsonValue,
-): N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto | Error {
-  const parsed_option_0 = parse_as_N5GzipCompressorDto(value);
-  if (!(parsed_option_0 instanceof Error)) {
-    return parsed_option_0;
-  }
-  const parsed_option_1 = parse_as_N5Bzip2CompressorDto(value);
-  if (!(parsed_option_1 instanceof Error)) {
-    return parsed_option_1;
-  }
-  const parsed_option_2 = parse_as_N5XzCompressorDto(value);
-  if (!(parsed_option_2 instanceof Error)) {
-    return parsed_option_2;
-  }
-  const parsed_option_3 = parse_as_N5RawCompressorDto(value);
-  if (!(parsed_option_3 instanceof Error)) {
-    return parsed_option_3;
-  }
-  return Error(
-    `Could not parse ${
-      JSON.stringify(value)
-    } into N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto`,
-  );
-}
-function parse_as_N5DataSinkDto(value: JsonValue): N5DataSinkDto | Error {
+export function parse_as_N5DataSinkDto(value: JsonValue): N5DataSinkDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1159,18 +1276,18 @@ function parse_as_N5DataSinkDto(value: JsonValue): N5DataSinkDto | Error {
   }
   const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.filesystem);
   if (temp_filesystem instanceof Error) return temp_filesystem;
-  const temp_outer_path = parse_as_str(valueObject.outer_path);
-  if (temp_outer_path instanceof Error) return temp_outer_path;
-  const temp_inner_path = parse_as_str(valueObject.inner_path);
-  if (temp_inner_path instanceof Error) return temp_inner_path;
+  const temp_path = parse_as_str(valueObject.path);
+  if (temp_path instanceof Error) return temp_path;
   const temp_interval = parse_as_Interval5DDto(valueObject.interval);
   if (temp_interval instanceof Error) return temp_interval;
   const temp_tile_shape = parse_as_Shape5DDto(valueObject.tile_shape);
   if (temp_tile_shape instanceof Error) return temp_tile_shape;
+  const temp_spatial_resolution = parse_as_Tuple_of_int0int0int_endof_(valueObject.spatial_resolution);
+  if (temp_spatial_resolution instanceof Error) return temp_spatial_resolution;
   const temp_c_axiskeys = parse_as_str(valueObject.c_axiskeys);
   if (temp_c_axiskeys instanceof Error) return temp_c_axiskeys;
   const temp_dtype =
-    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_float32_quote__endof_(
+    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
       valueObject.dtype,
     );
   if (temp_dtype instanceof Error) return temp_dtype;
@@ -1181,10 +1298,10 @@ function parse_as_N5DataSinkDto(value: JsonValue): N5DataSinkDto | Error {
   if (temp_compressor instanceof Error) return temp_compressor;
   return new N5DataSinkDto({
     filesystem: temp_filesystem,
-    outer_path: temp_outer_path,
-    inner_path: temp_inner_path,
+    path: temp_path,
     interval: temp_interval,
     tile_shape: temp_tile_shape,
+    spatial_resolution: temp_spatial_resolution,
     c_axiskeys: temp_c_axiskeys,
     dtype: temp_dtype,
     compressor: temp_compressor,
@@ -1194,40 +1311,40 @@ function parse_as_N5DataSinkDto(value: JsonValue): N5DataSinkDto | Error {
 // Do not edit!
 export class N5DataSinkDto {
   public filesystem: OsfsDto | HttpFsDto | BucketFSDto;
-  public outer_path: string;
-  public inner_path: string;
+  public path: string;
   public interval: Interval5DDto;
   public tile_shape: Shape5DDto;
+  public spatial_resolution: [number, number, number];
   public c_axiskeys: string;
-  public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "float32";
+  public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
   public compressor: N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto;
   constructor(_params: {
     filesystem: OsfsDto | HttpFsDto | BucketFSDto;
-    outer_path: string;
-    inner_path: string;
+    path: string;
     interval: Interval5DDto;
     tile_shape: Shape5DDto;
+    spatial_resolution: [number, number, number];
     c_axiskeys: string;
-    dtype: "uint8" | "uint16" | "uint32" | "uint64" | "float32";
+    dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
     compressor: N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto;
   }) {
     this.filesystem = _params.filesystem;
-    this.outer_path = _params.outer_path;
-    this.inner_path = _params.inner_path;
+    this.path = _params.path;
     this.interval = _params.interval;
     this.tile_shape = _params.tile_shape;
+    this.spatial_resolution = _params.spatial_resolution;
     this.c_axiskeys = _params.c_axiskeys;
     this.dtype = _params.dtype;
     this.compressor = _params.compressor;
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "N5DataSinkDto",
+      "__class__": "N5DataSinkDto",
       filesystem: toJsonValue(this.filesystem),
-      outer_path: this.outer_path,
-      inner_path: this.inner_path,
+      path: this.path,
       interval: this.interval.toJsonValue(),
       tile_shape: this.tile_shape.toJsonValue(),
+      spatial_resolution: [this.spatial_resolution[0], this.spatial_resolution[1], this.spatial_resolution[2]],
       c_axiskeys: this.c_axiskeys,
       dtype: this.dtype,
       compressor: toJsonValue(this.compressor),
@@ -1238,7 +1355,7 @@ export class N5DataSinkDto {
   }
 }
 
-function parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_(
+export function parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_(
   value: JsonValue,
 ): PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | Error {
   const parsed_option_0 = parse_as_PrecomputedChunksDataSourceDto(value);
@@ -1259,7 +1376,7 @@ function parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0Skimag
     } into PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto`,
   );
 }
-function parse_as_Tuple_of_Tuple_of_int0int0int_endof_0_varlen__endof_(
+export function parse_as_Tuple_of_Tuple_of_int0int0int_endof_0_varlen__endof_(
   value: JsonValue,
 ): Array<[number, number, number]> | Error {
   const arr = ensureJsonArray(value);
@@ -1272,7 +1389,7 @@ function parse_as_Tuple_of_Tuple_of_int0int0int_endof_0_varlen__endof_(
   }
   return out;
 }
-function parse_as_PixelAnnotationDto(value: JsonValue): PixelAnnotationDto | Error {
+export function parse_as_PixelAnnotationDto(value: JsonValue): PixelAnnotationDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1305,7 +1422,7 @@ export class PixelAnnotationDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "PixelAnnotationDto",
+      "__class__": "PixelAnnotationDto",
       raw_data: toJsonValue(this.raw_data),
       points: this.points.map((item) => [item[0], item[1], item[2]]),
     };
@@ -1315,7 +1432,7 @@ export class PixelAnnotationDto {
   }
 }
 
-function parse_as_RpcErrorDto(value: JsonValue): RpcErrorDto | Error {
+export function parse_as_RpcErrorDto(value: JsonValue): RpcErrorDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1340,7 +1457,7 @@ export class RpcErrorDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "RpcErrorDto",
+      "__class__": "RpcErrorDto",
       error: this.error,
     };
   }
@@ -1349,7 +1466,7 @@ export class RpcErrorDto {
   }
 }
 
-function parse_as_RecolorLabelParams(value: JsonValue): RecolorLabelParams | Error {
+export function parse_as_RecolorLabelParams(value: JsonValue): RecolorLabelParams | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1380,7 +1497,7 @@ export class RecolorLabelParams {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "RecolorLabelParams",
+      "__class__": "RecolorLabelParams",
       label_name: this.label_name,
       new_color: this.new_color.toJsonValue(),
     };
@@ -1390,7 +1507,7 @@ export class RecolorLabelParams {
   }
 }
 
-function parse_as_RenameLabelParams(value: JsonValue): RenameLabelParams | Error {
+export function parse_as_RenameLabelParams(value: JsonValue): RenameLabelParams | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1421,7 +1538,7 @@ export class RenameLabelParams {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "RenameLabelParams",
+      "__class__": "RenameLabelParams",
       old_name: this.old_name,
       new_name: this.new_name,
     };
@@ -1431,7 +1548,7 @@ export class RenameLabelParams {
   }
 }
 
-function parse_as_CreateLabelParams(value: JsonValue): CreateLabelParams | Error {
+export function parse_as_CreateLabelParams(value: JsonValue): CreateLabelParams | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1462,7 +1579,7 @@ export class CreateLabelParams {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "CreateLabelParams",
+      "__class__": "CreateLabelParams",
       label_name: this.label_name,
       color: this.color.toJsonValue(),
     };
@@ -1472,7 +1589,7 @@ export class CreateLabelParams {
   }
 }
 
-function parse_as_RemoveLabelParams(value: JsonValue): RemoveLabelParams | Error {
+export function parse_as_RemoveLabelParams(value: JsonValue): RemoveLabelParams | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1497,7 +1614,7 @@ export class RemoveLabelParams {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "RemoveLabelParams",
+      "__class__": "RemoveLabelParams",
       label_name: this.label_name,
     };
   }
@@ -1506,7 +1623,7 @@ export class RemoveLabelParams {
   }
 }
 
-function parse_as_AddPixelAnnotationParams(value: JsonValue): AddPixelAnnotationParams | Error {
+export function parse_as_AddPixelAnnotationParams(value: JsonValue): AddPixelAnnotationParams | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1537,7 +1654,7 @@ export class AddPixelAnnotationParams {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "AddPixelAnnotationParams",
+      "__class__": "AddPixelAnnotationParams",
       label_name: this.label_name,
       pixel_annotation: this.pixel_annotation.toJsonValue(),
     };
@@ -1547,7 +1664,7 @@ export class AddPixelAnnotationParams {
   }
 }
 
-function parse_as_RemovePixelAnnotationParams(value: JsonValue): RemovePixelAnnotationParams | Error {
+export function parse_as_RemovePixelAnnotationParams(value: JsonValue): RemovePixelAnnotationParams | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1578,7 +1695,7 @@ export class RemovePixelAnnotationParams {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "RemovePixelAnnotationParams",
+      "__class__": "RemovePixelAnnotationParams",
       label_name: this.label_name,
       pixel_annotation: this.pixel_annotation.toJsonValue(),
     };
@@ -1588,7 +1705,9 @@ export class RemovePixelAnnotationParams {
   }
 }
 
-function parse_as_Tuple_of_PixelAnnotationDto0_varlen__endof_(value: JsonValue): Array<PixelAnnotationDto> | Error {
+export function parse_as_Tuple_of_PixelAnnotationDto0_varlen__endof_(
+  value: JsonValue,
+): Array<PixelAnnotationDto> | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
   const out: Array<PixelAnnotationDto> = [];
@@ -1599,7 +1718,7 @@ function parse_as_Tuple_of_PixelAnnotationDto0_varlen__endof_(value: JsonValue):
   }
   return out;
 }
-function parse_as_LabelDto(value: JsonValue): LabelDto | Error {
+export function parse_as_LabelDto(value: JsonValue): LabelDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1636,7 +1755,7 @@ export class LabelDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "LabelDto",
+      "__class__": "LabelDto",
       name: this.name,
       color: this.color.toJsonValue(),
       annotations: this.annotations.map((item) => item.toJsonValue()),
@@ -1647,7 +1766,7 @@ export class LabelDto {
   }
 }
 
-function parse_as_Tuple_of_LabelDto0_varlen__endof_(value: JsonValue): Array<LabelDto> | Error {
+export function parse_as_Tuple_of_LabelDto0_varlen__endof_(value: JsonValue): Array<LabelDto> | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
   const out: Array<LabelDto> = [];
@@ -1658,7 +1777,7 @@ function parse_as_Tuple_of_LabelDto0_varlen__endof_(value: JsonValue): Array<Lab
   }
   return out;
 }
-function parse_as_BrushingAppletStateDto(value: JsonValue): BrushingAppletStateDto | Error {
+export function parse_as_BrushingAppletStateDto(value: JsonValue): BrushingAppletStateDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1683,7 +1802,7 @@ export class BrushingAppletStateDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "BrushingAppletStateDto",
+      "__class__": "BrushingAppletStateDto",
       labels: this.labels.map((item) => item.toJsonValue()),
     };
   }
@@ -1692,7 +1811,7 @@ export class BrushingAppletStateDto {
   }
 }
 
-function parse_as_ViewDto(value: JsonValue): ViewDto | Error {
+export function parse_as_ViewDto(value: JsonValue): ViewDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1723,7 +1842,7 @@ export class ViewDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "ViewDto",
+      "__class__": "ViewDto",
       name: this.name,
       url: this.url.toJsonValue(),
     };
@@ -1733,7 +1852,7 @@ export class ViewDto {
   }
 }
 
-function parse_as_DataView(value: JsonValue): DataView | Error {
+export function parse_as_DataView(value: JsonValue): DataView | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1764,7 +1883,7 @@ export class DataView {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "DataView",
+      "__class__": "DataView",
       name: this.name,
       url: this.url.toJsonValue(),
     };
@@ -1774,7 +1893,7 @@ export class DataView {
   }
 }
 
-function parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_(
+export function parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_(
   value: JsonValue,
 ): Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto> | Error {
   const arr = ensureJsonArray(value);
@@ -1789,7 +1908,7 @@ function parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceD
   }
   return out;
 }
-function parse_as_RawDataViewDto(value: JsonValue): RawDataViewDto | Error {
+export function parse_as_RawDataViewDto(value: JsonValue): RawDataViewDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1829,7 +1948,7 @@ export class RawDataViewDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "RawDataViewDto",
+      "__class__": "RawDataViewDto",
       name: this.name,
       url: this.url.toJsonValue(),
       datasources: this.datasources.map((item) => toJsonValue(item)),
@@ -1840,7 +1959,7 @@ export class RawDataViewDto {
   }
 }
 
-function parse_as_StrippedPrecomputedViewDto(value: JsonValue): StrippedPrecomputedViewDto | Error {
+export function parse_as_StrippedPrecomputedViewDto(value: JsonValue): StrippedPrecomputedViewDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1879,7 +1998,7 @@ export class StrippedPrecomputedViewDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "StrippedPrecomputedViewDto",
+      "__class__": "StrippedPrecomputedViewDto",
       name: this.name,
       url: this.url.toJsonValue(),
       datasource: toJsonValue(this.datasource),
@@ -1890,7 +2009,7 @@ export class StrippedPrecomputedViewDto {
   }
 }
 
-function parse_as_PredictionsViewDto(value: JsonValue): PredictionsViewDto | Error {
+export function parse_as_PredictionsViewDto(value: JsonValue): PredictionsViewDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1935,7 +2054,7 @@ export class PredictionsViewDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "PredictionsViewDto",
+      "__class__": "PredictionsViewDto",
       name: this.name,
       url: this.url.toJsonValue(),
       raw_data: toJsonValue(this.raw_data),
@@ -1947,7 +2066,7 @@ export class PredictionsViewDto {
   }
 }
 
-function parse_as_FailedViewDto(value: JsonValue): FailedViewDto | Error {
+export function parse_as_FailedViewDto(value: JsonValue): FailedViewDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -1984,7 +2103,7 @@ export class FailedViewDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "FailedViewDto",
+      "__class__": "FailedViewDto",
       name: this.name,
       url: this.url.toJsonValue(),
       error_message: this.error_message,
@@ -1995,7 +2114,7 @@ export class FailedViewDto {
   }
 }
 
-function parse_as_UnsupportedDatasetViewDto(value: JsonValue): UnsupportedDatasetViewDto | Error {
+export function parse_as_UnsupportedDatasetViewDto(value: JsonValue): UnsupportedDatasetViewDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -2026,7 +2145,7 @@ export class UnsupportedDatasetViewDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "UnsupportedDatasetViewDto",
+      "__class__": "UnsupportedDatasetViewDto",
       name: this.name,
       url: this.url.toJsonValue(),
     };
@@ -2036,7 +2155,7 @@ export class UnsupportedDatasetViewDto {
   }
 }
 
-function parse_as_Union_of_RawDataViewDto0StrippedPrecomputedViewDto0FailedViewDto0UnsupportedDatasetViewDto_endof_(
+export function parse_as_Union_of_RawDataViewDto0StrippedPrecomputedViewDto0FailedViewDto0UnsupportedDatasetViewDto_endof_(
   value: JsonValue,
 ): RawDataViewDto | StrippedPrecomputedViewDto | FailedViewDto | UnsupportedDatasetViewDto | Error {
   const parsed_option_0 = parse_as_RawDataViewDto(value);
@@ -2061,7 +2180,7 @@ function parse_as_Union_of_RawDataViewDto0StrippedPrecomputedViewDto0FailedViewD
     } into RawDataViewDto | StrippedPrecomputedViewDto | FailedViewDto | UnsupportedDatasetViewDto`,
   );
 }
-function parse_as_Tuple_of_Union_of_RawDataViewDto0StrippedPrecomputedViewDto0FailedViewDto0UnsupportedDatasetViewDto_endof_0_varlen__endof_(
+export function parse_as_Tuple_of_Union_of_RawDataViewDto0StrippedPrecomputedViewDto0FailedViewDto0UnsupportedDatasetViewDto_endof_0_varlen__endof_(
   value: JsonValue,
 ): Array<RawDataViewDto | StrippedPrecomputedViewDto | FailedViewDto | UnsupportedDatasetViewDto> | Error {
   const arr = ensureJsonArray(value);
@@ -2075,7 +2194,9 @@ function parse_as_Tuple_of_Union_of_RawDataViewDto0StrippedPrecomputedViewDto0Fa
   }
   return out;
 }
-function parse_as_Tuple_of_PredictionsViewDto0_varlen__endof_(value: JsonValue): Array<PredictionsViewDto> | Error {
+export function parse_as_Tuple_of_PredictionsViewDto0_varlen__endof_(
+  value: JsonValue,
+): Array<PredictionsViewDto> | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
   const out: Array<PredictionsViewDto> = [];
@@ -2086,7 +2207,7 @@ function parse_as_Tuple_of_PredictionsViewDto0_varlen__endof_(value: JsonValue):
   }
   return out;
 }
-function parse_as_Tuple_of_ColorDto0_varlen__endof_(value: JsonValue): Array<ColorDto> | Error {
+export function parse_as_Tuple_of_ColorDto0_varlen__endof_(value: JsonValue): Array<ColorDto> | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
   const out: Array<ColorDto> = [];
@@ -2097,7 +2218,7 @@ function parse_as_Tuple_of_ColorDto0_varlen__endof_(value: JsonValue): Array<Col
   }
   return out;
 }
-function parse_as_ViewerAppletStateDto(value: JsonValue): ViewerAppletStateDto | Error {
+export function parse_as_ViewerAppletStateDto(value: JsonValue): ViewerAppletStateDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -2143,7 +2264,7 @@ export class ViewerAppletStateDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "ViewerAppletStateDto",
+      "__class__": "ViewerAppletStateDto",
       frontend_timestamp: this.frontend_timestamp,
       data_views: this.data_views.map((item) => toJsonValue(item)),
       prediction_views: this.prediction_views.map((item) => item.toJsonValue()),
@@ -2155,7 +2276,7 @@ export class ViewerAppletStateDto {
   }
 }
 
-function parse_as_MakeDataViewParams(value: JsonValue): MakeDataViewParams | Error {
+export function parse_as_MakeDataViewParams(value: JsonValue): MakeDataViewParams | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -2186,7 +2307,7 @@ export class MakeDataViewParams {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "MakeDataViewParams",
+      "__class__": "MakeDataViewParams",
       view_name: this.view_name,
       url: this.url.toJsonValue(),
     };
@@ -2196,7 +2317,7 @@ export class MakeDataViewParams {
   }
 }
 
-function parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_failed_quote_0_quote_succeeded_quote__endof_(
+export function parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_failed_quote_0_quote_succeeded_quote__endof_(
   value: JsonValue,
 ): "pending" | "running" | "cancelled" | "failed" | "succeeded" | Error {
   const tmp_0 = parse_as_str(value);
@@ -2221,7 +2342,7 @@ function parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_
   }
   return Error(`Could not parse ${value} as 'pending' | 'running' | 'cancelled' | 'failed' | 'succeeded'`);
 }
-function parse_as_JobDto(value: JsonValue): JobDto | Error {
+export function parse_as_JobDto(value: JsonValue): JobDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -2279,7 +2400,7 @@ export class JobDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "JobDto",
+      "__class__": "JobDto",
       name: this.name,
       num_args: toJsonValue(this.num_args),
       uuid: this.uuid,
@@ -2293,7 +2414,7 @@ export class JobDto {
   }
 }
 
-function parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto_endof_(
+export function parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto_endof_(
   value: JsonValue,
 ): PrecomputedChunksSinkDto | N5DataSinkDto | Error {
   const parsed_option_0 = parse_as_PrecomputedChunksSinkDto(value);
@@ -2306,7 +2427,7 @@ function parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto_endof_(
   }
   return Error(`Could not parse ${JSON.stringify(value)} into PrecomputedChunksSinkDto | N5DataSinkDto`);
 }
-function parse_as_ExportJobDto(value: JsonValue): ExportJobDto | Error {
+export function parse_as_ExportJobDto(value: JsonValue): ExportJobDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -2370,7 +2491,7 @@ export class ExportJobDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "ExportJobDto",
+      "__class__": "ExportJobDto",
       name: this.name,
       num_args: toJsonValue(this.num_args),
       uuid: this.uuid,
@@ -2385,7 +2506,7 @@ export class ExportJobDto {
   }
 }
 
-function parse_as_OpenDatasinkJobDto(value: JsonValue): OpenDatasinkJobDto | Error {
+export function parse_as_OpenDatasinkJobDto(value: JsonValue): OpenDatasinkJobDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -2449,7 +2570,7 @@ export class OpenDatasinkJobDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "OpenDatasinkJobDto",
+      "__class__": "OpenDatasinkJobDto",
       name: this.name,
       num_args: toJsonValue(this.num_args),
       uuid: this.uuid,
@@ -2464,7 +2585,7 @@ export class OpenDatasinkJobDto {
   }
 }
 
-function parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_(
+export function parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_(
   value: JsonValue,
 ): ExportJobDto | OpenDatasinkJobDto | Error {
   const parsed_option_0 = parse_as_ExportJobDto(value);
@@ -2477,7 +2598,7 @@ function parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_(
   }
   return Error(`Could not parse ${JSON.stringify(value)} into ExportJobDto | OpenDatasinkJobDto`);
 }
-function parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_0_varlen__endof_(
+export function parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_0_varlen__endof_(
   value: JsonValue,
 ): Array<ExportJobDto | OpenDatasinkJobDto> | Error {
   const arr = ensureJsonArray(value);
@@ -2490,7 +2611,7 @@ function parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_0_varl
   }
   return out;
 }
-function parse_as_Tuple_of_LabelHeaderDto0_varlen__endof_(value: JsonValue): Array<LabelHeaderDto> | Error {
+export function parse_as_Tuple_of_LabelHeaderDto0_varlen__endof_(value: JsonValue): Array<LabelHeaderDto> | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
   const out: Array<LabelHeaderDto> = [];
@@ -2501,7 +2622,7 @@ function parse_as_Tuple_of_LabelHeaderDto0_varlen__endof_(value: JsonValue): Arr
   }
   return out;
 }
-function parse_as_Union_of_Tuple_of_LabelHeaderDto0_varlen__endof_0None_endof_(
+export function parse_as_Union_of_Tuple_of_LabelHeaderDto0_varlen__endof_0None_endof_(
   value: JsonValue,
 ): Array<LabelHeaderDto> | undefined | Error {
   const parsed_option_0 = parse_as_Tuple_of_LabelHeaderDto0_varlen__endof_(value);
@@ -2514,7 +2635,7 @@ function parse_as_Union_of_Tuple_of_LabelHeaderDto0_varlen__endof_0None_endof_(
   }
   return Error(`Could not parse ${JSON.stringify(value)} into Array<LabelHeaderDto> | undefined`);
 }
-function parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_0None_endof_(
+export function parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_0None_endof_(
   value: JsonValue,
 ): Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto> | undefined | Error {
   const parsed_option_0 =
@@ -2534,7 +2655,7 @@ function parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5Da
     } into Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto> | undefined`,
   );
 }
-function parse_as_PixelClassificationExportAppletStateDto(
+export function parse_as_PixelClassificationExportAppletStateDto(
   value: JsonValue,
 ): PixelClassificationExportAppletStateDto | Error {
   const valueObject = ensureJsonObject(value);
@@ -2580,7 +2701,7 @@ export class PixelClassificationExportAppletStateDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "PixelClassificationExportAppletStateDto",
+      "__class__": "PixelClassificationExportAppletStateDto",
       jobs: this.jobs.map((item) => toJsonValue(item)),
       populated_labels: toJsonValue(this.populated_labels),
       datasource_suggestions: toJsonValue(this.datasource_suggestions),
@@ -2591,10 +2712,10 @@ export class PixelClassificationExportAppletStateDto {
   }
 }
 
-function parse_as_float(value: JsonValue): number | Error {
+export function parse_as_float(value: JsonValue): number | Error {
   return ensureJsonNumber(value);
 }
-function parse_as_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_(
+export function parse_as_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_(
   value: JsonValue,
 ): "x" | "y" | "z" | Error {
   const tmp_0 = parse_as_str(value);
@@ -2611,7 +2732,7 @@ function parse_as_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__end
   }
   return Error(`Could not parse ${value} as 'x' | 'y' | 'z'`);
 }
-function parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
+export function parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
   value: JsonValue,
 ): "x" | "y" | "z" | undefined | Error {
   const parsed_option_0 = parse_as_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_(value);
@@ -2624,7 +2745,7 @@ function parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_q
   }
   return Error(`Could not parse ${JSON.stringify(value)} into 'x' | 'y' | 'z' | undefined`);
 }
-function parse_as_Literal_of__quote_GaussianSmoothing_quote_0_quote_LaplacianofGaussian_quote_0_quote_GaussianGradientMagnitude_quote_0_quote_DifferenceofGaussians_quote_0_quote_StructureTensorEigenvalues_quote_0_quote_HessianofGaussianEigenvalues_quote__endof_(
+export function parse_as_Literal_of__quote_GaussianSmoothing_quote_0_quote_LaplacianofGaussian_quote_0_quote_GaussianGradientMagnitude_quote_0_quote_DifferenceofGaussians_quote_0_quote_StructureTensorEigenvalues_quote_0_quote_HessianofGaussianEigenvalues_quote__endof_(
   value: JsonValue,
 ):
   | "Gaussian Smoothing"
@@ -2662,7 +2783,7 @@ function parse_as_Literal_of__quote_GaussianSmoothing_quote_0_quote_LaplacianofG
     `Could not parse ${value} as 'Gaussian Smoothing' | 'Laplacian of Gaussian' | 'Gaussian Gradient Magnitude' | 'Difference of Gaussians' | 'Structure Tensor Eigenvalues' | 'Hessian of Gaussian Eigenvalues'`,
   );
 }
-function parse_as_IlpFeatureExtractorDto(value: JsonValue): IlpFeatureExtractorDto | Error {
+export function parse_as_IlpFeatureExtractorDto(value: JsonValue): IlpFeatureExtractorDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -2716,7 +2837,7 @@ export class IlpFeatureExtractorDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "IlpFeatureExtractorDto",
+      "__class__": "IlpFeatureExtractorDto",
       ilp_scale: this.ilp_scale,
       axis_2d: toJsonValue(this.axis_2d),
       class_name: this.class_name,
@@ -2727,7 +2848,7 @@ export class IlpFeatureExtractorDto {
   }
 }
 
-function parse_as_Tuple_of_IlpFeatureExtractorDto0_varlen__endof_(
+export function parse_as_Tuple_of_IlpFeatureExtractorDto0_varlen__endof_(
   value: JsonValue,
 ): Array<IlpFeatureExtractorDto> | Error {
   const arr = ensureJsonArray(value);
@@ -2740,7 +2861,7 @@ function parse_as_Tuple_of_IlpFeatureExtractorDto0_varlen__endof_(
   }
   return out;
 }
-function parse_as_FeatureSelectionAppletStateDto(value: JsonValue): FeatureSelectionAppletStateDto | Error {
+export function parse_as_FeatureSelectionAppletStateDto(value: JsonValue): FeatureSelectionAppletStateDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -2767,7 +2888,7 @@ export class FeatureSelectionAppletStateDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "FeatureSelectionAppletStateDto",
+      "__class__": "FeatureSelectionAppletStateDto",
       feature_extractors: this.feature_extractors.map((item) => item.toJsonValue()),
     };
   }
@@ -2776,7 +2897,7 @@ export class FeatureSelectionAppletStateDto {
   }
 }
 
-function parse_as_AddFeatureExtractorsParamsDto(value: JsonValue): AddFeatureExtractorsParamsDto | Error {
+export function parse_as_AddFeatureExtractorsParamsDto(value: JsonValue): AddFeatureExtractorsParamsDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -2803,7 +2924,7 @@ export class AddFeatureExtractorsParamsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "AddFeatureExtractorsParamsDto",
+      "__class__": "AddFeatureExtractorsParamsDto",
       feature_extractors: this.feature_extractors.map((item) => item.toJsonValue()),
     };
   }
@@ -2812,7 +2933,7 @@ export class AddFeatureExtractorsParamsDto {
   }
 }
 
-function parse_as_RemoveFeatureExtractorsParamsDto(value: JsonValue): RemoveFeatureExtractorsParamsDto | Error {
+export function parse_as_RemoveFeatureExtractorsParamsDto(value: JsonValue): RemoveFeatureExtractorsParamsDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -2839,7 +2960,7 @@ export class RemoveFeatureExtractorsParamsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "RemoveFeatureExtractorsParamsDto",
+      "__class__": "RemoveFeatureExtractorsParamsDto",
       feature_extractors: this.feature_extractors.map((item) => item.toJsonValue()),
     };
   }
@@ -2848,7 +2969,7 @@ export class RemoveFeatureExtractorsParamsDto {
   }
 }
 
-function parse_as_Literal_of__quote_BOOT_FAIL_quote_0_quote_CANCELLED_quote_0_quote_COMPLETED_quote_0_quote_DEADLINE_quote_0_quote_FAILED_quote_0_quote_NODE_FAIL_quote_0_quote_OUT_OF_MEMORY_quote_0_quote_PENDING_quote_0_quote_PREEMPTED_quote_0_quote_RUNNING_quote_0_quote_REQUEUED_quote_0_quote_RESIZING_quote_0_quote_REVOKED_quote_0_quote_SUSPENDED_quote_0_quote_TIMEOUT_quote__endof_(
+export function parse_as_Literal_of__quote_BOOT_FAIL_quote_0_quote_CANCELLED_quote_0_quote_COMPLETED_quote_0_quote_DEADLINE_quote_0_quote_FAILED_quote_0_quote_NODE_FAIL_quote_0_quote_OUT_OF_MEMORY_quote_0_quote_PENDING_quote_0_quote_PREEMPTED_quote_0_quote_RUNNING_quote_0_quote_REQUEUED_quote_0_quote_RESIZING_quote_0_quote_REVOKED_quote_0_quote_SUSPENDED_quote_0_quote_TIMEOUT_quote__endof_(
   value: JsonValue,
 ):
   | "BOOT_FAIL"
@@ -2931,7 +3052,7 @@ function parse_as_Literal_of__quote_BOOT_FAIL_quote_0_quote_CANCELLED_quote_0_qu
     `Could not parse ${value} as 'BOOT_FAIL' | 'CANCELLED' | 'COMPLETED' | 'DEADLINE' | 'FAILED' | 'NODE_FAIL' | 'OUT_OF_MEMORY' | 'PENDING' | 'PREEMPTED' | 'RUNNING' | 'REQUEUED' | 'RESIZING' | 'REVOKED' | 'SUSPENDED' | 'TIMEOUT'`,
   );
 }
-function parse_as_ComputeSessionDto(value: JsonValue): ComputeSessionDto | Error {
+export function parse_as_ComputeSessionDto(value: JsonValue): ComputeSessionDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3019,7 +3140,7 @@ export class ComputeSessionDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "ComputeSessionDto",
+      "__class__": "ComputeSessionDto",
       start_time_utc_sec: toJsonValue(this.start_time_utc_sec),
       time_elapsed_sec: this.time_elapsed_sec,
       time_limit_minutes: this.time_limit_minutes,
@@ -3033,7 +3154,7 @@ export class ComputeSessionDto {
   }
 }
 
-function parse_as_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
+export function parse_as_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
   value: JsonValue,
 ): "LOCAL" | "CSCS" | "JUSUF" | Error {
   const tmp_0 = parse_as_str(value);
@@ -3050,10 +3171,10 @@ function parse_as_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF
   }
   return Error(`Could not parse ${value} as 'LOCAL' | 'CSCS' | 'JUSUF'`);
 }
-function parse_as_bool(value: JsonValue): boolean | Error {
+export function parse_as_bool(value: JsonValue): boolean | Error {
   return ensureJsonBoolean(value);
 }
-function parse_as_ComputeSessionStatusDto(value: JsonValue): ComputeSessionStatusDto | Error {
+export function parse_as_ComputeSessionStatusDto(value: JsonValue): ComputeSessionStatusDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3098,7 +3219,7 @@ export class ComputeSessionStatusDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "ComputeSessionStatusDto",
+      "__class__": "ComputeSessionStatusDto",
       compute_session: this.compute_session.toJsonValue(),
       hpc_site: this.hpc_site,
       session_url: this.session_url.toJsonValue(),
@@ -3110,7 +3231,7 @@ export class ComputeSessionStatusDto {
   }
 }
 
-function parse_as_CreateComputeSessionParamsDto(value: JsonValue): CreateComputeSessionParamsDto | Error {
+export function parse_as_CreateComputeSessionParamsDto(value: JsonValue): CreateComputeSessionParamsDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3143,7 +3264,7 @@ export class CreateComputeSessionParamsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "CreateComputeSessionParamsDto",
+      "__class__": "CreateComputeSessionParamsDto",
       session_duration_minutes: this.session_duration_minutes,
       hpc_site: this.hpc_site,
     };
@@ -3153,7 +3274,7 @@ export class CreateComputeSessionParamsDto {
   }
 }
 
-function parse_as_GetComputeSessionStatusParamsDto(value: JsonValue): GetComputeSessionStatusParamsDto | Error {
+export function parse_as_GetComputeSessionStatusParamsDto(value: JsonValue): GetComputeSessionStatusParamsDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3186,7 +3307,7 @@ export class GetComputeSessionStatusParamsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "GetComputeSessionStatusParamsDto",
+      "__class__": "GetComputeSessionStatusParamsDto",
       compute_session_id: this.compute_session_id,
       hpc_site: this.hpc_site,
     };
@@ -3196,7 +3317,7 @@ export class GetComputeSessionStatusParamsDto {
   }
 }
 
-function parse_as_CloseComputeSessionParamsDto(value: JsonValue): CloseComputeSessionParamsDto | Error {
+export function parse_as_CloseComputeSessionParamsDto(value: JsonValue): CloseComputeSessionParamsDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3229,7 +3350,7 @@ export class CloseComputeSessionParamsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "CloseComputeSessionParamsDto",
+      "__class__": "CloseComputeSessionParamsDto",
       compute_session_id: this.compute_session_id,
       hpc_site: this.hpc_site,
     };
@@ -3239,7 +3360,7 @@ export class CloseComputeSessionParamsDto {
   }
 }
 
-function parse_as_CloseComputeSessionResponseDto(value: JsonValue): CloseComputeSessionResponseDto | Error {
+export function parse_as_CloseComputeSessionResponseDto(value: JsonValue): CloseComputeSessionResponseDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3264,7 +3385,7 @@ export class CloseComputeSessionResponseDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "CloseComputeSessionResponseDto",
+      "__class__": "CloseComputeSessionResponseDto",
       compute_session_id: this.compute_session_id,
     };
   }
@@ -3273,7 +3394,7 @@ export class CloseComputeSessionResponseDto {
   }
 }
 
-function parse_as_ListComputeSessionsParamsDto(value: JsonValue): ListComputeSessionsParamsDto | Error {
+export function parse_as_ListComputeSessionsParamsDto(value: JsonValue): ListComputeSessionsParamsDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3300,7 +3421,7 @@ export class ListComputeSessionsParamsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "ListComputeSessionsParamsDto",
+      "__class__": "ListComputeSessionsParamsDto",
       hpc_site: this.hpc_site,
     };
   }
@@ -3309,7 +3430,7 @@ export class ListComputeSessionsParamsDto {
   }
 }
 
-function parse_as_Tuple_of_ComputeSessionStatusDto0_varlen__endof_(
+export function parse_as_Tuple_of_ComputeSessionStatusDto0_varlen__endof_(
   value: JsonValue,
 ): Array<ComputeSessionStatusDto> | Error {
   const arr = ensureJsonArray(value);
@@ -3322,7 +3443,7 @@ function parse_as_Tuple_of_ComputeSessionStatusDto0_varlen__endof_(
   }
   return out;
 }
-function parse_as_ListComputeSessionsResponseDto(value: JsonValue): ListComputeSessionsResponseDto | Error {
+export function parse_as_ListComputeSessionsResponseDto(value: JsonValue): ListComputeSessionsResponseDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3349,7 +3470,7 @@ export class ListComputeSessionsResponseDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "ListComputeSessionsResponseDto",
+      "__class__": "ListComputeSessionsResponseDto",
       compute_sessions_stati: this.compute_sessions_stati.map((item) => item.toJsonValue()),
     };
   }
@@ -3358,7 +3479,7 @@ export class ListComputeSessionsResponseDto {
   }
 }
 
-function parse_as_Tuple_of_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_0_varlen__endof_(
+export function parse_as_Tuple_of_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_0_varlen__endof_(
   value: JsonValue,
 ): Array<"LOCAL" | "CSCS" | "JUSUF"> | Error {
   const arr = ensureJsonArray(value);
@@ -3371,7 +3492,7 @@ function parse_as_Tuple_of_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_qu
   }
   return out;
 }
-function parse_as_GetAvailableHpcSitesResponseDto(value: JsonValue): GetAvailableHpcSitesResponseDto | Error {
+export function parse_as_GetAvailableHpcSitesResponseDto(value: JsonValue): GetAvailableHpcSitesResponseDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3399,7 +3520,7 @@ export class GetAvailableHpcSitesResponseDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "GetAvailableHpcSitesResponseDto",
+      "__class__": "GetAvailableHpcSitesResponseDto",
       available_sites: this.available_sites.map((item) => item),
     };
   }
@@ -3408,7 +3529,7 @@ export class GetAvailableHpcSitesResponseDto {
   }
 }
 
-function parse_as_CheckLoginResultDto(value: JsonValue): CheckLoginResultDto | Error {
+export function parse_as_CheckLoginResultDto(value: JsonValue): CheckLoginResultDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3433,7 +3554,7 @@ export class CheckLoginResultDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "CheckLoginResultDto",
+      "__class__": "CheckLoginResultDto",
       logged_in: this.logged_in,
     };
   }
@@ -3442,7 +3563,7 @@ export class CheckLoginResultDto {
   }
 }
 
-function parse_as_StartPixelProbabilitiesExportJobParamsDto(
+export function parse_as_StartPixelProbabilitiesExportJobParamsDto(
   value: JsonValue,
 ): StartPixelProbabilitiesExportJobParamsDto | Error {
   const valueObject = ensureJsonObject(value);
@@ -3477,7 +3598,7 @@ export class StartPixelProbabilitiesExportJobParamsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "StartPixelProbabilitiesExportJobParamsDto",
+      "__class__": "StartPixelProbabilitiesExportJobParamsDto",
       datasource: toJsonValue(this.datasource),
       datasink: toJsonValue(this.datasink),
     };
@@ -3487,7 +3608,7 @@ export class StartPixelProbabilitiesExportJobParamsDto {
   }
 }
 
-function parse_as_StartSimpleSegmentationExportJobParamsDto(
+export function parse_as_StartSimpleSegmentationExportJobParamsDto(
   value: JsonValue,
 ): StartSimpleSegmentationExportJobParamsDto | Error {
   const valueObject = ensureJsonObject(value);
@@ -3528,7 +3649,7 @@ export class StartSimpleSegmentationExportJobParamsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "StartSimpleSegmentationExportJobParamsDto",
+      "__class__": "StartSimpleSegmentationExportJobParamsDto",
       datasource: toJsonValue(this.datasource),
       datasink: toJsonValue(this.datasink),
       label_header: this.label_header.toJsonValue(),
@@ -3539,18 +3660,7 @@ export class StartSimpleSegmentationExportJobParamsDto {
   }
 }
 
-function parse_as_Union_of_HttpFsDto0BucketFSDto_endof_(value: JsonValue): HttpFsDto | BucketFSDto | Error {
-  const parsed_option_0 = parse_as_HttpFsDto(value);
-  if (!(parsed_option_0 instanceof Error)) {
-    return parsed_option_0;
-  }
-  const parsed_option_1 = parse_as_BucketFSDto(value);
-  if (!(parsed_option_1 instanceof Error)) {
-    return parsed_option_1;
-  }
-  return Error(`Could not parse ${JSON.stringify(value)} into HttpFsDto | BucketFSDto`);
-}
-function parse_as_LoadProjectParamsDto(value: JsonValue): LoadProjectParamsDto | Error {
+export function parse_as_LoadProjectParamsDto(value: JsonValue): LoadProjectParamsDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3558,7 +3668,7 @@ function parse_as_LoadProjectParamsDto(value: JsonValue): LoadProjectParamsDto |
   if (valueObject["__class__"] != "LoadProjectParamsDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a LoadProjectParamsDto`);
   }
-  const temp_fs = parse_as_Union_of_HttpFsDto0BucketFSDto_endof_(valueObject.fs);
+  const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.fs);
   if (temp_fs instanceof Error) return temp_fs;
   const temp_project_file_path = parse_as_str(valueObject.project_file_path);
   if (temp_project_file_path instanceof Error) return temp_project_file_path;
@@ -3570,10 +3680,10 @@ function parse_as_LoadProjectParamsDto(value: JsonValue): LoadProjectParamsDto |
 // Automatically generated via DataTransferObject for LoadProjectParamsDto
 // Do not edit!
 export class LoadProjectParamsDto {
-  public fs: HttpFsDto | BucketFSDto;
+  public fs: OsfsDto | HttpFsDto | BucketFSDto;
   public project_file_path: string;
   constructor(_params: {
-    fs: HttpFsDto | BucketFSDto;
+    fs: OsfsDto | HttpFsDto | BucketFSDto;
     project_file_path: string;
   }) {
     this.fs = _params.fs;
@@ -3581,7 +3691,7 @@ export class LoadProjectParamsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "LoadProjectParamsDto",
+      "__class__": "LoadProjectParamsDto",
       fs: toJsonValue(this.fs),
       project_file_path: this.project_file_path,
     };
@@ -3591,7 +3701,7 @@ export class LoadProjectParamsDto {
   }
 }
 
-function parse_as_SaveProjectParamsDto(value: JsonValue): SaveProjectParamsDto | Error {
+export function parse_as_SaveProjectParamsDto(value: JsonValue): SaveProjectParamsDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3599,7 +3709,7 @@ function parse_as_SaveProjectParamsDto(value: JsonValue): SaveProjectParamsDto |
   if (valueObject["__class__"] != "SaveProjectParamsDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a SaveProjectParamsDto`);
   }
-  const temp_fs = parse_as_Union_of_HttpFsDto0BucketFSDto_endof_(valueObject.fs);
+  const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.fs);
   if (temp_fs instanceof Error) return temp_fs;
   const temp_project_file_path = parse_as_str(valueObject.project_file_path);
   if (temp_project_file_path instanceof Error) return temp_project_file_path;
@@ -3611,10 +3721,10 @@ function parse_as_SaveProjectParamsDto(value: JsonValue): SaveProjectParamsDto |
 // Automatically generated via DataTransferObject for SaveProjectParamsDto
 // Do not edit!
 export class SaveProjectParamsDto {
-  public fs: HttpFsDto | BucketFSDto;
+  public fs: OsfsDto | HttpFsDto | BucketFSDto;
   public project_file_path: string;
   constructor(_params: {
-    fs: HttpFsDto | BucketFSDto;
+    fs: OsfsDto | HttpFsDto | BucketFSDto;
     project_file_path: string;
   }) {
     this.fs = _params.fs;
@@ -3622,7 +3732,7 @@ export class SaveProjectParamsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "SaveProjectParamsDto",
+      "__class__": "SaveProjectParamsDto",
       fs: toJsonValue(this.fs),
       project_file_path: this.project_file_path,
     };
@@ -3632,7 +3742,7 @@ export class SaveProjectParamsDto {
   }
 }
 
-function parse_as_GetDatasourcesFromUrlParamsDto(value: JsonValue): GetDatasourcesFromUrlParamsDto | Error {
+export function parse_as_GetDatasourcesFromUrlParamsDto(value: JsonValue): GetDatasourcesFromUrlParamsDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3657,7 +3767,7 @@ export class GetDatasourcesFromUrlParamsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "GetDatasourcesFromUrlParamsDto",
+      "__class__": "GetDatasourcesFromUrlParamsDto",
       url: this.url.toJsonValue(),
     };
   }
@@ -3666,7 +3776,45 @@ export class GetDatasourcesFromUrlParamsDto {
   }
 }
 
-function parse_as_GetDatasourcesFromUrlResponseDto(value: JsonValue): GetDatasourcesFromUrlResponseDto | Error {
+export function parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_0None_endof_(
+  value: JsonValue,
+):
+  | PrecomputedChunksDataSourceDto
+  | N5DataSourceDto
+  | SkimageDataSourceDto
+  | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto>
+  | undefined
+  | Error {
+  const parsed_option_0 = parse_as_PrecomputedChunksDataSourceDto(value);
+  if (!(parsed_option_0 instanceof Error)) {
+    return parsed_option_0;
+  }
+  const parsed_option_1 = parse_as_N5DataSourceDto(value);
+  if (!(parsed_option_1 instanceof Error)) {
+    return parsed_option_1;
+  }
+  const parsed_option_2 = parse_as_SkimageDataSourceDto(value);
+  if (!(parsed_option_2 instanceof Error)) {
+    return parsed_option_2;
+  }
+  const parsed_option_3 =
+    parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_(
+      value,
+    );
+  if (!(parsed_option_3 instanceof Error)) {
+    return parsed_option_3;
+  }
+  const parsed_option_4 = parse_as_None(value);
+  if (!(parsed_option_4 instanceof Error)) {
+    return parsed_option_4;
+  }
+  return Error(
+    `Could not parse ${
+      JSON.stringify(value)
+    } into PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto> | undefined`,
+  );
+}
+export function parse_as_GetDatasourcesFromUrlResponseDto(value: JsonValue): GetDatasourcesFromUrlResponseDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3675,7 +3823,7 @@ function parse_as_GetDatasourcesFromUrlResponseDto(value: JsonValue): GetDatasou
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a GetDatasourcesFromUrlResponseDto`);
   }
   const temp_datasources =
-    parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_0None_endof_(
+    parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_0None_endof_(
       valueObject.datasources,
     );
   if (temp_datasources instanceof Error) return temp_datasources;
@@ -3686,15 +3834,25 @@ function parse_as_GetDatasourcesFromUrlResponseDto(value: JsonValue): GetDatasou
 // Automatically generated via DataTransferObject for GetDatasourcesFromUrlResponseDto
 // Do not edit!
 export class GetDatasourcesFromUrlResponseDto {
-  public datasources: Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto> | undefined;
+  public datasources:
+    | PrecomputedChunksDataSourceDto
+    | N5DataSourceDto
+    | SkimageDataSourceDto
+    | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto>
+    | undefined;
   constructor(_params: {
-    datasources: Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto> | undefined;
+    datasources:
+      | PrecomputedChunksDataSourceDto
+      | N5DataSourceDto
+      | SkimageDataSourceDto
+      | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto>
+      | undefined;
   }) {
     this.datasources = _params.datasources;
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "GetDatasourcesFromUrlResponseDto",
+      "__class__": "GetDatasourcesFromUrlResponseDto",
       datasources: toJsonValue(this.datasources),
     };
   }
@@ -3703,7 +3861,9 @@ export class GetDatasourcesFromUrlResponseDto {
   }
 }
 
-function parse_as_CheckDatasourceCompatibilityParams(value: JsonValue): CheckDatasourceCompatibilityParams | Error {
+export function parse_as_CheckDatasourceCompatibilityParams(
+  value: JsonValue,
+): CheckDatasourceCompatibilityParams | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3731,7 +3891,7 @@ export class CheckDatasourceCompatibilityParams {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "CheckDatasourceCompatibilityParams",
+      "__class__": "CheckDatasourceCompatibilityParams",
       datasources: this.datasources.map((item) => toJsonValue(item)),
     };
   }
@@ -3740,7 +3900,7 @@ export class CheckDatasourceCompatibilityParams {
   }
 }
 
-function parse_as_Tuple_of_bool0_varlen__endof_(value: JsonValue): Array<boolean> | Error {
+export function parse_as_Tuple_of_bool0_varlen__endof_(value: JsonValue): Array<boolean> | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
   const out: Array<boolean> = [];
@@ -3751,7 +3911,9 @@ function parse_as_Tuple_of_bool0_varlen__endof_(value: JsonValue): Array<boolean
   }
   return out;
 }
-function parse_as_CheckDatasourceCompatibilityResponse(value: JsonValue): CheckDatasourceCompatibilityResponse | Error {
+export function parse_as_CheckDatasourceCompatibilityResponse(
+  value: JsonValue,
+): CheckDatasourceCompatibilityResponse | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
@@ -3776,11 +3938,93 @@ export class CheckDatasourceCompatibilityResponse {
   }
   public toJsonValue(): JsonObject {
     return {
-      __class__: "CheckDatasourceCompatibilityResponse",
+      "__class__": "CheckDatasourceCompatibilityResponse",
       compatible: this.compatible.map((item) => item),
     };
   }
   public static fromJsonValue(value: JsonValue): CheckDatasourceCompatibilityResponse | Error {
     return parse_as_CheckDatasourceCompatibilityResponse(value);
+  }
+}
+
+export function parse_as_ListFsDirRequest(value: JsonValue): ListFsDirRequest | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "ListFsDirRequest") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ListFsDirRequest`);
+  }
+  const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.fs);
+  if (temp_fs instanceof Error) return temp_fs;
+  const temp_path = parse_as_str(valueObject.path);
+  if (temp_path instanceof Error) return temp_path;
+  return new ListFsDirRequest({
+    fs: temp_fs,
+    path: temp_path,
+  });
+}
+// Automatically generated via DataTransferObject for ListFsDirRequest
+// Do not edit!
+export class ListFsDirRequest {
+  public fs: OsfsDto | HttpFsDto | BucketFSDto;
+  public path: string;
+  constructor(_params: {
+    fs: OsfsDto | HttpFsDto | BucketFSDto;
+    path: string;
+  }) {
+    this.fs = _params.fs;
+    this.path = _params.path;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "ListFsDirRequest",
+      fs: toJsonValue(this.fs),
+      path: this.path,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): ListFsDirRequest | Error {
+    return parse_as_ListFsDirRequest(value);
+  }
+}
+
+export function parse_as_ListFsDirResponse(value: JsonValue): ListFsDirResponse | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "ListFsDirResponse") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ListFsDirResponse`);
+  }
+  const temp_files = parse_as_Tuple_of_str0_varlen__endof_(valueObject.files);
+  if (temp_files instanceof Error) return temp_files;
+  const temp_directories = parse_as_Tuple_of_str0_varlen__endof_(valueObject.directories);
+  if (temp_directories instanceof Error) return temp_directories;
+  return new ListFsDirResponse({
+    files: temp_files,
+    directories: temp_directories,
+  });
+}
+// Automatically generated via DataTransferObject for ListFsDirResponse
+// Do not edit!
+export class ListFsDirResponse {
+  public files: Array<string>;
+  public directories: Array<string>;
+  constructor(_params: {
+    files: Array<string>;
+    directories: Array<string>;
+  }) {
+    this.files = _params.files;
+    this.directories = _params.directories;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "ListFsDirResponse",
+      files: this.files.map((item) => item),
+      directories: this.directories.map((item) => item),
+    };
+  }
+  public static fromJsonValue(value: JsonValue): ListFsDirResponse | Error {
+    return parse_as_ListFsDirResponse(value);
   }
 }

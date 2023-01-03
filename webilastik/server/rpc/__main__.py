@@ -81,7 +81,7 @@ class TsFromJsonValueFunction:
         super().__init__()
         self.name = make_serialization_function_name(prefix="parse_as_", py_hint=py_hint)
         self.full_code = (
-            f"function {self.name}(value: JsonValue): {ts_hint} | Error{{" + "\n" +
+            f"export function {self.name}(value: JsonValue): {ts_hint} | Error{{" + "\n" +
                 textwrap.indent(textwrap.dedent(code), prefix="    ") + "\n" +
             f"}}"
         )
@@ -284,21 +284,25 @@ class DtoHint(Hint):
 
     def __init__(self, hint: Any) -> None:
         assert DtoHint.is_dto_hint(hint)
-        self.message_generator_type = hint
+        self.message_generator_type: Type['DataTransferObject'] = hint
         self.field_annotations = {
             field_name: Hint.parse(raw_hint)
             for klass in reversed(hint.__mro__)
             for field_name, raw_hint in getattr(klass, "__annotations__", {}).items()
         }
+        tag_key = self.message_generator_type.tag_key()
+        tag_value = self.message_generator_type.tag_value()
+        tag_value_ts = "undefined" if tag_value is None else tag_value
+        class_name = self.message_generator_type.__name__
         super().__init__(
             ts_hint=self.message_generator_type.__name__,
             py_hint=self.message_generator_type.__name__,
             py_fromJsonValue_code="\n".join([
                 "from collections.abc import Mapping",
                 "if not isinstance(value, Mapping):",
-                f"    return MessageParsingError(f\"Could not parse {{json.dumps(value)}} as {self.message_generator_type.__name__}\")",
-                f"if value.get('__class__') != '{self.message_generator_type.__name__}':",
-                f"    return MessageParsingError(f\"Could not parse {{json.dumps(value)}} as {self.message_generator_type.__name__}\")",
+                f"    return MessageParsingError(f\"Could not parse {{json.dumps(value)}} as {class_name}\")",
+                f"if value.get('{tag_key}') != '{tag_value}':",
+                f"    return MessageParsingError(f\"Could not parse {{json.dumps(value)}} as {class_name}\")",
                 *list(itertools.chain(*(
                     [
                         f"tmp_{field_name} =  {hint.py_fromJsonValue_function.name}(value.get('{field_name}'))",
@@ -307,7 +311,7 @@ class DtoHint(Hint):
                     ]
                     for field_name, hint in self.field_annotations.items()
                 ))),
-                f"return {self.message_generator_type.__name__}(",
+                f"return {class_name}(",
                     *[f'{field_name}=tmp_{field_name},' for field_name in self.field_annotations.keys()],
                 ")"
             ]),
@@ -316,8 +320,8 @@ class DtoHint(Hint):
                 "if(valueObject instanceof Error){",
                 "    return valueObject;",
                 "}",
-               f"if (valueObject['__class__'] != '{self.message_generator_type.__name__}') {{",
-               f"    return Error(`Could not deserialize ${{JSON.stringify(valueObject)}} as a {self.message_generator_type.__name__}`);",
+               f"if (valueObject['{tag_key}'] != '{tag_value_ts}') {{",
+               f"    return Error(`Could not deserialize ${{JSON.stringify(valueObject)}} as a {class_name}`);",
                f"}}",
                 *list(itertools.chain(*(
                     [
@@ -326,7 +330,7 @@ class DtoHint(Hint):
                     ]
                     for field_name, hint in self.field_annotations.items()
                 ))),
-            f"return new {self.message_generator_type.__name__}({{",
+            f"return new {class_name}({{",
             *[f"    {field_name}: temp_{field_name}," for field_name in self.field_annotations.keys()],
             f"}})",
             ])
@@ -339,7 +343,7 @@ class DtoHint(Hint):
         self.ts_class_code = "\n".join([
         f"// Automatically generated via {DataTransferObject.__qualname__} for {self.message_generator_type.__qualname__}",
             "// Do not edit!",
-        f"export class {self.message_generator_type.__name__} {{",
+        f"export class {class_name} {{",
 
         *[f"    public {field_name}: {hint.ts_hint};" for field_name, hint in self.field_annotations.items()],
 
@@ -351,7 +355,7 @@ class DtoHint(Hint):
 
             "    public toJsonValue(): JsonObject{",
             "        return {",
-           f"            __class__: '{self.message_generator_type.__name__}',",
+           f"            '{tag_key}': '{tag_value}'," if tag_value is not None else "",
         *[f"            {field_name}: " + hint.to_ts_toJsonValue_expr(f"this.{field_name}") + "," for field_name, hint in self.field_annotations.items()],
             "        }",
             "    }",
@@ -366,7 +370,7 @@ class DtoHint(Hint):
         self.py_json_methods: str = "\n".join([
             "    def to_json_value(self) -> JsonObject:",
             "        return {",
-           f"            '__class__': '{self.message_generator_type.__name__}',",
+           f"            '{tag_key}': '{tag_value}'," if tag_value is not None else "",
         *[f"            '{field_name}': {hint.make_py_to_json_expr('self.' + field_name)}," for field_name, hint in self.field_annotations.items()],
             "        }",
             "",
