@@ -99,11 +99,12 @@ class N5GzipCompressorInput{
             step: 1
         })
     }
-    public getValue(): GzipCompressor{
-        return new GzipCompressor({level: this.numberInput.value})
+    public getValue(): GzipCompressor | undefined{
+        let level = this.numberInput.value
+        return level === undefined ? undefined : new GzipCompressor({level})
     }
-    public setValue(value: GzipCompressor){
-        this.numberInput.value = value.level
+    public setValue(value: GzipCompressor | undefined){
+        this.numberInput.value = value?.level
     }
 }
 
@@ -119,11 +120,12 @@ class N5Bzip2CompressorInput{
             step: 1
         })
     }
-    public getValue(): Bzip2Compressor{
-        return new Bzip2Compressor({compressionLevel: this.numberInput.value})
+    public getValue(): Bzip2Compressor | undefined{
+        let compressionLevel = this.numberInput.value
+        return compressionLevel === undefined ? undefined : new Bzip2Compressor({compressionLevel})
     }
-    public setValue(value: Bzip2Compressor){
-        this.numberInput.value = value.compressionLevel
+    public setValue(value: Bzip2Compressor | undefined){
+        this.numberInput.value = value?.compressionLevel
     }
 }
 
@@ -139,11 +141,12 @@ class N5XzCompressorInput{
             step: 1
         })
     }
-    public getValue(): XzCompressor{
-        return new XzCompressor({preset: this.numberInput.value})
+    public getValue(): XzCompressor | undefined{
+        let preset = this.numberInput.value;
+        return preset === undefined ? undefined : new XzCompressor({preset})
     }
-    public setValue(value: XzCompressor){
-        this.numberInput.value = value.preset
+    public setValue(value: XzCompressor | undefined){
+        this.numberInput.value = value?.preset
     }
 }
 
@@ -200,14 +203,15 @@ class N5DatasinkConfigWidget extends DatasinkInputForm{
         tile_shape: Shape5D,
     }): N5DataSink | undefined{
         const axiskeys = this.axisKeysInput.value
-        if(!axiskeys){
+        const compressor = this.compressorInput.getValue()
+        if(!axiskeys || !compressor){
             return undefined
         }
         return new N5DataSink({
             filesystem: params.filesystem,
             path: params.path,
             dtype: params.dtype,
-            compressor: this.compressorInput.getValue(),
+            compressor,
             c_axiskeys: axiskeys.join(""),
             interval: params.interval,
             resolution: params.resolution,

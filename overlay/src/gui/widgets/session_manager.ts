@@ -135,7 +135,7 @@ export class SessionManagerWidget{
                         return this.enableSessionAccquisitionControls({enabled: true})
                     }
                     let sessionDurationMinutes = this.sessionDurationInput.value
-                    if(Number.isNaN(sessionDurationMinutes)){
+                    if(sessionDurationMinutes === undefined){
                         new ErrorPopupWidget({message: `Bad session duration: ${this.sessionDurationInput.value}`})
                         return
                     }
@@ -278,7 +278,7 @@ export class SessionManagerWidget{
 
     private getWaitTimeout(): number | undefined{
         const timeoutMinutes = this.timeoutInput.value
-        if(Number.isNaN(timeoutMinutes)){
+        if(timeoutMinutes === undefined){
             new ErrorPopupWidget({message: `Bad timeout value: ${this.timeoutInput.value}`})
             return
         }
