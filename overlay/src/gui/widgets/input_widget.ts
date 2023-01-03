@@ -25,6 +25,10 @@ export abstract class InputWidget<IT extends InputType> extends Widget<"input">{
         this.required = params.required === undefined ? false : params.required
     }
 
+    public get disabled(): boolean{
+        return this.element.disabled
+    }
+
     public set disabled(val: boolean){
         this.element.disabled = val
         super.disabled = val

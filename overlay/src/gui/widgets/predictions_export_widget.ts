@@ -2,7 +2,7 @@ import { Applet } from '../../client/applets/applet';
 import { JsonValue } from '../../util/serialization';
 import { assertUnreachable, createFieldset } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
-import { BucketFs, Color, FsDataSource, FsDataSink, Session, DataSinkUnion, PrecomputedChunksSink, PrecomputedChunksDataSource, N5DataSource } from '../../client/ilastik';
+import { BucketFs, Color, FsDataSource, FsDataSink, Session, DataSinkUnion, PrecomputedChunksSink, PrecomputedChunksDataSource, N5DataSource, Shape5D } from '../../client/ilastik';
 import { CssClasses } from '../css_classes';
 import { ErrorPopupWidget } from './popup';
 import {
@@ -22,6 +22,8 @@ import { FileLocationPatternInputWidget } from './file_location_input';
 import { Button, Select } from './input_widget';
 import { Anchor, Div, Label, Paragraph, Span, Table, TableData, TableHeader, TableRow } from './widget';
 import { Url } from '../../util/parsed_url';
+import { BooleanInput } from './value_input_widget';
+import { Shape5DInputNoChannel } from './shape5d_input';
 
 const sink_creation_stati = ["pending", "running", "cancelled", "failed", "succeeded"] as const;
 export type SinkCreationStatus = typeof sink_creation_stati[number];
@@ -186,6 +188,8 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
     private labelToExportSelector: Select<LabelHeader> | undefined;
     private exportModeSelector: Select<"pixel probabilities" | "simple segmentation">;
     private datasourceListWidget: DataSourceListWidget;
+    private customTileShapeCheckbox: BooleanInput;
+    private tileShapeInput: Shape5DInputNoChannel
 
     public constructor({name, parentElement, session, help, viewer}: {
         name: string, parentElement: HTMLElement, session: Session, help: string[], viewer: Viewer
@@ -231,6 +235,16 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
         })
         const datasinkConfigWidget = new DatasinkConfigWidget({parentElement: datasinkFieldset})
 
+        new Paragraph({parentElement: this.element, children: [
+            new Label({parentElement: undefined, innerText: "Use Custom Tile Shape: "}),
+            this.customTileShapeCheckbox = new BooleanInput({parentElement: undefined, value: false, onChange: () => {
+                this.tileShapeInput.disabled = !this.customTileShapeCheckbox.value
+                tileShapeP.show(this.customTileShapeCheckbox.value)
+            }}),
+        ]})
+        let tileShapeP = new Paragraph({parentElement: this.element})
+        tileShapeP.show(this.customTileShapeCheckbox.value)
+        this.tileShapeInput = new Shape5DInputNoChannel({parentElement: tileShapeP.element, disabled: !this.customTileShapeCheckbox.value})
 
 
         new Paragraph({parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
@@ -270,13 +284,25 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                     if(!(datasource instanceof FsDataSource)){
                         continue
                     }
+                    let datasink_tile_shape: Shape5D
+                    if(this.customTileShapeCheckbox.value){
+                        const custom_tile_shape = this.tileShapeInput.getShape({c: numChannels})
+                        if(custom_tile_shape === undefined){
+                            new ErrorPopupWidget({message: "Custom tile shape is incomplete"})
+                            return
+                        }
+                        datasink_tile_shape = custom_tile_shape.clampedWith(datasource.shape)
+                    }else{
+                        datasink_tile_shape = datasource.tile_shape
+                    }
+
                     const datasink = datasinkConfigWidget.tryMakeDataSink({
                         filesystem: fileLocation.filesystem,
                         path: fileLocation.path,
                         dtype,
                         interval: datasource.interval.updated({c: [0, numChannels]}),
                         resolution: datasource.spatial_resolution,
-                        tile_shape: datasource.tile_shape.updated({c: numChannels})
+                        tile_shape: datasink_tile_shape.updated({c: numChannels}),
                     })
                     if(!datasource || !datasink){
                         new ErrorPopupWidget({message: "Missing export parameters"})

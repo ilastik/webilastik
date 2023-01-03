@@ -137,6 +137,22 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
     border: solid var(--default-button-border-thickness) var(--default-highlight-color);
 }
 
+.ItkAxisLengthField{
+    flex-grow: 1;
+    white-space: nowrap;
+}
+
+.ItkAxisLengthField .ItkCharacterInput{
+    width: 4em;
+    -moz-appearance: textfield;
+}
+/* Chrome, Safari, Edge, Opera */
+.ItkAxisLengthField input.ItkCharacterInput::-webkit-outer-spin-button,
+.ItkAxisLengthField input.ItkCharacterInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .ItkDisabled{
     filter: grayscale(70%);
     opacity: 0.5;

@@ -45,4 +45,5 @@ export enum CssClasses{
     ItkFolderWidget = "ItkFolderWidget",
     ItkRecenterButton = "ItkRecenterButton",
     ItkDatasourcesListContainer = "ItkDatasourcesListContainer",
+    ItkAxisLengthField = "ItkAxisLengthField",
 }

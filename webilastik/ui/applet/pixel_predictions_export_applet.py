@@ -163,8 +163,8 @@ class PixelClassificationExportApplet(StatelesApplet):
                 on_changed=self.on_async_change,
                 operator=operator,
                 sink_writer=result,
-                args=datasource.roi.get_datasource_tiles(), #FIXME: use sink tile_size
-                num_args=datasource.roi.get_num_tiles(tile_shape=datasource.tile_shape),
+                args=datasource.roi.split(block_shape=result.data_sink.tile_shape.updated(c=datasource.shape.c)),
+                num_args=datasource.roi.get_num_tiles(tile_shape=result.data_sink.tile_shape),
             ))
 
         _ = self._launch_open_datasink_job(
