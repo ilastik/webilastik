@@ -557,6 +557,16 @@ export class Shape5D extends Point5D{
         })
     }
 
+    public clampedWith(limits: Shape5D): Shape5D{
+        return new Shape5D({
+            x: Math.min(this.x, limits.x),
+            y: Math.min(this.y, limits.y),
+            z: Math.min(this.z, limits.z),
+            t: Math.min(this.t, limits.t),
+            c: Math.min(this.c, limits.c),
+        })
+    }
+
     public toInterval5D({offset=new Point5D({})}: {offset?: Point5D}): Interval5D{
         return new Interval5D({
             x: [offset.x, offset.x + this.x],
