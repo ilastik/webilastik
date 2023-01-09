@@ -1056,10 +1056,6 @@ def parse_as_N5DatasetAttributesDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as N5DatasetAttributesDto"
         )
-    if value.get("__class__") != "None":
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as N5DatasetAttributesDto"
-        )
     tmp_dimensions = parse_as_Tuple_of_int0_varlen__endof_(value.get("dimensions"))
     if isinstance(tmp_dimensions, MessageParsingError):
         return tmp_dimensions

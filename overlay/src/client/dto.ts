@@ -943,9 +943,6 @@ export function parse_as_N5DatasetAttributesDto(value: JsonValue): N5DatasetAttr
   if (valueObject instanceof Error) {
     return valueObject;
   }
-  if (valueObject["__class__"] != "undefined") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5DatasetAttributesDto`);
-  }
   const temp_dimensions = parse_as_Tuple_of_int0_varlen__endof_(valueObject.dimensions);
   if (temp_dimensions instanceof Error) return temp_dimensions;
   const temp_blockSize = parse_as_Tuple_of_int0_varlen__endof_(valueObject.blockSize);
