@@ -1,7 +1,7 @@
 # pyright: strict
 
 from dataclasses import dataclass
-from typing import Dict, Literal, Mapping, Tuple, Any, cast
+from typing import Dict, Literal, Mapping, Sequence, Tuple, Any, cast
 from pathlib import PurePosixPath
 import logging
 import io
@@ -14,7 +14,6 @@ from ndstructs.array5D import Array5D
 
 from webilastik.datasource import FsDataSource
 from webilastik.filesystem import FsFileNotFoundException, IFilesystem
-from webilastik.utility.url import Url
 from webilastik.server.rpc.dto import PrecomputedChunksDataSourceDto
 
 
@@ -59,11 +58,17 @@ def _try_get_int_attr(attr_name: str, element: ElementTree.Element) -> "int | Dz
 
 ImageFormat = Literal["jpeg", "jpg", "png"]
 
+@dataclass
 class DziSizeElement:
-    def __init__(self, Width: int, Height: int) -> None:
-        super().__init__()
-        self.Width = Width
-        self.Height = Height
+    Width: int
+    Height: int
+
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, DziSizeElement) and
+            self.Width == other.Width and
+            self.Height == other.Height
+        )
 
     @classmethod
     def from_element(cls, element: ElementTree.Element) -> "DziSizeElement | DziParsingException":
@@ -82,6 +87,15 @@ class DziImageElement:
     Overlap: int
     TileSize: int
     Size: DziSizeElement
+
+    def __eq__(self, other: object) -> bool:
+        return (
+            isinstance(other, DziImageElement) and
+            self.Format == other.Format and
+            self.Overlap == other.Overlap and
+            self.TileSize == other.TileSize and
+            self.Size == other.Size
+        )
 
     @classmethod
     def try_from_element(cls, element: ElementTree.Element) -> "DziImageElement | Exception":
@@ -116,6 +130,25 @@ class DziImageElement:
             Size=Size_result,
         )
 
+    @classmethod
+    def try_load(cls, filesystem: IFilesystem, path: PurePosixPath) -> "DziImageElement | Exception":
+        dzi_xml = filesystem.read_file(path)
+        if isinstance(dzi_xml, Exception):
+            return dzi_xml
+        try:
+            element = ET.fromstring(dzi_xml.decode("utf8")) # FIXME: utf8? it's a MS format, maybe something closer to utf16?
+        except Exception:
+            return DziParsingException(f"Could not parse data in {filesystem.geturl(path)} as XML")
+        return DziImageElement.try_from_element(element)
+
+    def to_string(self) -> str:
+        return f"""<?xml version="1.0" encoding="utf-8"?>
+            <Image TileSize="{self.TileSize}" Overlap="{self.Overlap}" Format="{self.Format}"
+                xmlns="http://schemas.microsoft.com/deepzoom/2008">
+                <Size Width="{self.Size.Width}" Height="{self.Size.Height}"/>
+            </Image>
+        """
+
 # Each resolution of the pyramid is called a level. Levels are counted from the 1x1 pixel as level 0.
 # Each level is the size 2(level)x2(level).
 # Each level is stored in a separate folder.
@@ -127,50 +160,95 @@ class DziImageElement:
 #         column is the column number of the tile (starting from 0 at left)
 #         format is the appropriate extension for the image format used – either JPEG or PNG.
 
-class DziLevelDataSource(FsDataSource):
-    def __init__(
-        self,
+@dataclass
+class DziLevel:
+    class __PrivateMarker:
+        pass
+
+    private_marker: __PrivateMarker
+    filesystem: IFilesystem
+    level_path: PurePosixPath
+    level_index: int
+    overlap: int
+    tile_shape: Shape5D
+    shape: Shape5D
+    full_shape: Shape5D
+    dtype: "np.dtype[Any]"
+    spatial_resolution: Tuple[int, int, int]
+    image_format: ImageFormat
+
+    @classmethod
+    def create(
+        cls,
         *,
         filesystem: IFilesystem,
         level_path: PurePosixPath,
         overlap: int,
         tile_shape: Shape5D,
-        interval: Interval5D,
+        shape: Shape5D,
+        full_shape: Shape5D,
         dtype: "np.dtype[Any]",
         spatial_resolution: Tuple[int, int, int] = (1,1,1),
         image_format: ImageFormat,
-    ):
-        super().__init__(
-            c_axiskeys_on_disk="yx" if interval.shape.c == 1 else "yxc",
+    ) -> "DziLevel | Exception":
+        level_index_result = cls.get_level_index_from_path(level_path)
+        if isinstance(level_index_result, Exception):
+            return level_index_result
+        return DziLevel(
+            private_marker=DziLevel.__PrivateMarker(),
             filesystem=filesystem,
-            path=level_path,
+            level_path=level_path,
+            level_index=level_index_result,
+            overlap=overlap,
             tile_shape=tile_shape,
+            shape=shape,
+            full_shape=full_shape,
             dtype=dtype,
-            interval=interval,
-            spatial_resolution=spatial_resolution, #FIXME: maybe delete this altogether?
+            spatial_resolution=spatial_resolution,
+            image_format=image_format,
         )
-        level_index = DziLevelDataSource.get_level_index_from_path(level_path)
-        assert not isinstance(level_index, Exception)
-        self.overlap = overlap
-        self.image_format = image_format
 
     @classmethod
-    def try_load_pyramid(
-        cls,
-        *,
-        filesystem: IFilesystem,
-        dzi_path: PurePosixPath,
-    ) -> "Mapping[int, DziLevelDataSource] | Exception":
-        dzi_xml = filesystem.read_file(dzi_path)
-        if isinstance(dzi_xml, Exception):
-            return dzi_xml
+    def supports_path(cls, path: PurePosixPath) -> bool:
+        if isinstance(cls.get_level_index_from_path(path), Exception):
+            return False
+        return path.parent.name.endswith("_files")
 
+    @classmethod
+    def get_level_index_from_path(cls, path: PurePosixPath) -> "int | Exception":
         try:
-            element = ET.fromstring(dzi_xml.decode("utf8")) # FIXME: utf8? it's a MS format, maybe something closer to utf16?
-        except Exception:
-            return DziParsingException(f"Could not parse data in {dzi_path} as XML")
+            return int(path.name)
+        except:
+            return Exception(f"Could not get path index from path {path}")
 
-        dzi_image_element = DziImageElement.try_from_element(element)
+    def get_tile_path(self, tile: Interval5D) -> PurePosixPath:
+        column = tile.x[0] // self.tile_shape.x
+        row = tile.y[0] // self.tile_shape.y
+        return self.level_path / f"{column}_{row}.{self.image_format}"
+
+    @property
+    def possible_dzi_paths(self) -> Sequence[PurePosixPath]:
+        return [
+            self.level_path.parent.parent / self.level_path.parent.name.replace("_files", suffix)
+            for suffix in (".dzi", ".xml")
+        ]
+
+class DziLevelDataSource(FsDataSource):
+    def __init__(self, *, level: DziLevel):
+        super().__init__(
+            c_axiskeys_on_disk="yx" if level.shape.c == 1 else "yxc",
+            filesystem=level.filesystem,
+            path=level.level_path,
+            tile_shape=level.tile_shape,
+            dtype=level.dtype,
+            interval=level.shape.to_interval5d(),
+            spatial_resolution=level.spatial_resolution, #FIXME: maybe delete this altogether?
+        )
+        self.level = level
+
+    @classmethod
+    def try_load_pyramid(cls, *, filesystem: IFilesystem, dzi_path: PurePosixPath) -> "Mapping[int, DziLevelDataSource] | Exception":
+        dzi_image_element = DziImageElement.try_load(filesystem=filesystem, path=dzi_path)
         if isinstance(dzi_image_element, Exception):
             return dzi_image_element
 
@@ -195,26 +273,26 @@ class DziLevelDataSource(FsDataSource):
         else:
             return Exception("Could not determine number of channels")
 
-        levels: Dict[int, DziLevelDataSource] = {}
+        datasources: Dict[int, DziLevelDataSource] = {}
         height = dzi_image_element.Size.Height
         width = dzi_image_element.Size.Width
         for i in reversed(range(num_levels)):
-            levels[i] = DziLevelDataSource(
+            level = DziLevel.create(
                 filesystem=filesystem,
                 level_path=dzi_path.parent / f"{dzi_path.stem}_files/{i}",
                 overlap=dzi_image_element.Overlap,
-                tile_shape=Shape5D(
-                    x=dzi_image_element.TileSize,
-                    y=dzi_image_element.TileSize,
-                    c=num_channels,
-                ),
+                tile_shape=Shape5D(x=dzi_image_element.TileSize, y=dzi_image_element.TileSize, c=num_channels),
                 dtype=np.dtype("uint8"),
-                interval=Shape5D(x=width, y=height, c=num_channels).to_interval5d(),
+                shape=Shape5D(x=width, y=height, c=num_channels),
                 image_format=dzi_image_element.Format,
+                full_shape=Shape5D(x=dzi_image_element.Size.Width, y=dzi_image_element.Size.Height, c=num_channels),
             )
+            if isinstance(level, Exception):
+                return level
+            datasources[i] = DziLevelDataSource(level=level)
             width = math.ceil(width / 2)
             height = math.ceil(height / 2)
-        return levels
+        return datasources
 
     @classmethod
     def try_load_level(
@@ -223,10 +301,9 @@ class DziLevelDataSource(FsDataSource):
         filesystem: IFilesystem,
         level_path: PurePosixPath,
     ) -> "DziLevelDataSource | Exception":
-        level_index = cls.get_level_index_from_path(level_path)
-        url = filesystem.geturl(path=level_path)
-        if not cls.supports_url(url) or isinstance(level_index, Exception):
-            return Exception(f"Unsupported url: {url}")
+        level_index = DziLevel.get_level_index_from_path(level_path)
+        if not DziLevel.supports_path(level_path) or isinstance(level_index, Exception):
+            return Exception(f"Unsupported url: {filesystem.geturl(path=level_path)}")
         possible_dzi_paths = [
             level_path.parent.parent / level_path.parent.name.replace("_files", suffix)
             for suffix in (".dzi", ".xml")
@@ -235,22 +312,12 @@ class DziLevelDataSource(FsDataSource):
             pyramid_result = cls.try_load_pyramid(filesystem=filesystem, dzi_path=dzi_path)
             if isinstance(pyramid_result , Exception):
                 continue
-            return pyramid_result.get(level_index, Exception(f"Level {level_index} does not exist in {url}"))
-        else:
-            return Exception(f"Could not open dzi file at any of {possible_dzi_paths}")
+            return pyramid_result.get(level_index, Exception(f"Level {level_index} does not exist in {filesystem.geturl(path=level_path)}"))
+        return Exception(f"Could not open dzi file at any of {possible_dzi_paths}")
 
     @classmethod
-    def get_level_index_from_path(cls, path: PurePosixPath) -> "int | Exception":
-        try:
-            return int(path.name)
-        except:
-            return Exception(f"Could not get path index from path {path}")
-
-    @classmethod
-    def supports_url(cls, url: Url) -> bool:
-        if isinstance(cls.get_level_index_from_path(url.path), Exception):
-            return False
-        return url.path.parent.name.endswith("_files")
+    def supports_path(cls, path: PurePosixPath) -> bool:
+        return DziLevel.supports_path(path)
 
     def to_dto(self) -> PrecomputedChunksDataSourceDto:
         raise Exception("FIXME")
@@ -268,14 +335,9 @@ class DziLevelDataSource(FsDataSource):
             self.url == other.url
         )
 
-    def get_tile_path(self, tile: Interval5D) -> PurePosixPath:
-        column = tile.x[0] // self.tile_shape.x
-        row = tile.y[0] // self.tile_shape.y
-        return self.path / f"{column}_{row}.{self.image_format}"
-
     def _get_tile(self, tile: Interval5D) -> Array5D:
         assert tile.is_tile(tile_shape=self.tile_shape, full_interval=self.interval, clamped=True), f"Bad tile: {tile}"
-        tile_path = self.get_tile_path(tile)
+        tile_path = self.level.get_tile_path(tile)
         raw_tile_bytes = self.filesystem.read_file(tile_path)
         if isinstance(raw_tile_bytes, FsFileNotFoundException):
             logger.warn(f"tile {tile} not found. Returning zeros")
@@ -292,5 +354,5 @@ class DziLevelDataSource(FsDataSource):
         return Array5D(
             raw_tile_array,
             axiskeys="yxc"[0:len(raw_tile_array.shape)],
-            location=tile.enlarged(radius=Point5D(x=self.overlap, y=self.overlap)).clamped(self.interval).start,
+            location=tile.enlarged(radius=Point5D(x=self.level.overlap, y=self.level.overlap)).clamped(self.interval).start,
         ).cut(interval=tile)
