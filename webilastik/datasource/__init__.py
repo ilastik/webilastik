@@ -12,7 +12,7 @@ import numpy as np
 from ndstructs.point5D import Shape5D, Interval5D, Point5D, SPAN
 from ndstructs.array5D import Array5D, SPAN_OVERRIDE, All
 from webilastik.filesystem import IFilesystem
-from webilastik.server.rpc.dto import FsDataSourceDto, PrecomputedChunksDataSourceDto, SkimageDataSourceDto
+from webilastik.server.rpc.dto import FsDataSourceDto, N5DataSourceDto, PrecomputedChunksDataSourceDto, SkimageDataSourceDto
 from webilastik.utility.url import Url
 from webilastik.utility.url import Url, Protocol
 from global_cache import global_cache
@@ -261,11 +261,14 @@ class FsDataSource(DataSource):
         from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
         from webilastik.datasource.n5_datasource import N5DataSource
         from webilastik.datasource.skimage_datasource import SkimageDataSource
+        from webilastik.datasource.deep_zoom_datasource import DziLevelDataSource
 
         if isinstance(message, PrecomputedChunksDataSourceDto):
             return PrecomputedChunksDataSource.from_dto(message)
         if isinstance(message, SkimageDataSourceDto):
             return SkimageDataSource.from_dto(message)
-        return N5DataSource.from_dto(message)
+        if isinstance(message, N5DataSourceDto):
+            return N5DataSource.from_dto(message)
+        return DziLevelDataSource.from_dto(message)
 
     _datasource_cache: ClassVar[Dict[Url, Sequence['FsDataSource']]] = {}

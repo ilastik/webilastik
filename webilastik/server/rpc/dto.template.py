@@ -108,6 +108,23 @@ class PrecomputedChunksDataSourceDto(DataTransferObject):
     encoder: Literal["raw", "jpeg"]
 
 @dataclass
+class DziLevelDto(DataTransferObject):
+    filesystem: FsDto
+    level_path: str
+    level_index: int
+    overlap: int
+    tile_shape: Shape5DDto
+    shape: Shape5DDto
+    full_shape: Shape5DDto
+    dtype: DtypeDto
+    spatial_resolution: Tuple[int, int, int]
+    image_format: Literal["jpeg", "jpg", "png"]
+
+@dataclass
+class DziLevelDataSourceDto(DataTransferObject):
+    level: DziLevelDto
+
+@dataclass
 class N5GzipCompressorDto(DataTransferObject):
     level: int
 
@@ -191,7 +208,7 @@ class SkimageDataSourceDto(DataTransferObject):
     dtype: DtypeDto
 
 
-FsDataSourceDto = Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto]
+FsDataSourceDto = Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto]
 
 ##################################################333
 
@@ -207,6 +224,10 @@ class PrecomputedChunksSinkDto(DataTransferObject):
     encoding: Literal["raw", "jpeg"]
 
 @dataclass
+class DziLevelSinkDto(DataTransferObject):
+    level: DziLevelDto
+
+@dataclass
 class N5DataSinkDto(DataTransferObject):
     filesystem: FsDto
     path: str
@@ -217,7 +238,7 @@ class N5DataSinkDto(DataTransferObject):
     dtype: DtypeDto
     compressor: N5CompressorDto
 
-DataSinkDto = Union[PrecomputedChunksSinkDto, N5DataSinkDto]
+DataSinkDto = Union[PrecomputedChunksSinkDto, N5DataSinkDto, DziLevelSinkDto]
 
 #################################################################
 

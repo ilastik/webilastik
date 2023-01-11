@@ -32,13 +32,16 @@ import {
     SkimageDataSourceDto,
     ListFsDirRequest,
     ListFsDirResponse,
-    parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_,
+    parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_,
     PixelAnnotationDto,
     N5Bzip2CompressorDto,
     N5GzipCompressorDto,
     N5RawCompressorDto,
     N5XzCompressorDto,
     N5DataSourceDto,
+    DziLevelDataSourceDto,
+    DziLevelDto,
+    DziLevelSinkDto,
 } from "./dto"
 
 export type HpcSiteName = ComputeSessionStatusDto["hpc_site"] //FIXME?
@@ -652,6 +655,8 @@ export class Interval5D{
 
 export type FsDataSourceDto = PixelAnnotationDto["raw_data"]; //FIXME: define this alias automatically
 
+export type DataSourceUnion = PrecomputedChunksDataSource | N5DataSource | SkimageDataSource | DziLevelDataSource
+
 export abstract class FsDataSource{
     public readonly url: Url
     public readonly filesystem: Filesystem
@@ -687,7 +692,7 @@ export abstract class FsDataSource{
         return this.url.raw
     }
 
-    public static fromDto(dto: FsDataSourceDto) : PrecomputedChunksDataSource | SkimageDataSource | N5DataSource{
+    public static fromDto(dto: FsDataSourceDto) : DataSourceUnion{
         if(dto instanceof PrecomputedChunksDataSourceDto){
             return PrecomputedChunksDataSource.fromDto(dto)
         }
@@ -697,11 +702,14 @@ export abstract class FsDataSource{
         if(dto instanceof N5DataSourceDto){
             return N5DataSource.fromDto(dto)
         }
+        if(dto instanceof DziLevelDataSourceDto){
+            return DziLevelDataSource.fromDto(dto)
+        }
         assertUnreachable(dto)
     }
 
     public static fromBase64(encoded: string): Error | ReturnType<typeof FsDataSource.fromDto>{
-        const dtoResult = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_(
+        const dtoResult = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
             JSON.parse(fromBase64(encoded))
         )
         if(dtoResult instanceof Error){
@@ -840,6 +848,100 @@ export class N5DataSource extends FsDataSource{
     }
 }
 
+class DziLevel{
+    public readonly filesystem: Filesystem
+    public readonly level_path: Path
+    public readonly level_index: number
+    public readonly overlap: number
+    public readonly tile_shape: Shape5D
+    public readonly shape: Shape5D
+    public readonly full_shape: Shape5D
+    public readonly dtype: DataType
+    public readonly spatial_resolution: [number, number, number]
+    public readonly image_format: "jpeg" | "jpg" | "png"
+
+    constructor(params: {
+        filesystem: Filesystem,
+        level_path: Path,
+        level_index: number,
+        overlap: number,
+        tile_shape: Shape5D,
+        shape: Shape5D,
+        full_shape: Shape5D,
+        dtype: DataType,
+        spatial_resolution: [number, number, number],
+        image_format: "jpeg" | "jpg" | "png",
+    }){
+        this.filesystem = params.filesystem
+        this.level_path = params.level_path
+        this.level_index = params.level_index
+        this.overlap = params.overlap
+        this.tile_shape = params.tile_shape
+        this.shape = params.shape
+        this.full_shape = params.full_shape
+        this.dtype = params.dtype
+        this.spatial_resolution = params.spatial_resolution
+        this.image_format = params.image_format
+    }
+
+    public static fromDto(dto: DziLevelDto){
+        return new this({
+            filesystem: Filesystem.fromDto(dto.filesystem),
+            level_path: Path.parse(dto.level_path),
+            level_index: dto.level_index,
+            overlap: dto.overlap,
+            tile_shape: Shape5D.fromDto(dto.tile_shape),
+            shape: Shape5D.fromDto(dto.shape),
+            full_shape: Shape5D.fromDto(dto.full_shape),
+            dtype: dto.dtype,
+            spatial_resolution: dto.spatial_resolution,
+            image_format: dto.image_format,
+        })
+    }
+
+    public toDto(): DziLevelDto{
+        return new DziLevelDto({
+            filesystem: this.filesystem.toDto(),
+            level_path: this.level_path.toDto(),
+            level_index: this.level_index,
+            overlap: this.overlap,
+            tile_shape: this.tile_shape.toDto(),
+            shape: this.shape.toDto(),
+            full_shape: this.full_shape.toDto(),
+            dtype: this.dtype,
+            spatial_resolution: this.spatial_resolution,
+            image_format: this.image_format,
+        })
+    }
+}
+
+export class DziLevelDataSource extends FsDataSource{
+    public readonly level: DziLevel
+
+    public constructor(level: DziLevel){
+        super({
+            dtype: level.dtype,
+            filesystem: level.filesystem,
+            interval: level.shape.toInterval5D({offset: undefined}),
+            path: level.level_path,
+            spatial_resolution: level.spatial_resolution,
+            tile_shape: level.tile_shape,
+            url: level.filesystem.getUrl(level.level_path)
+        })
+        this.level = level
+    }
+
+    public static fromDto(dto: DziLevelDataSourceDto) : DziLevelDataSource{
+        return new DziLevelDataSource(DziLevel.fromDto(dto.level))
+    }
+
+    public toDto(): DziLevelDataSourceDto{
+        return new DziLevelDataSourceDto({
+            level: this.level.toDto()
+        })
+    }
+}
+
 export abstract class Filesystem{
     public constructor(public readonly url: Url){}
 
@@ -957,7 +1059,7 @@ export class BucketFs extends Filesystem{
     }
 }
 
-export type DataSinkUnion = PrecomputedChunksSink | N5DataSink
+export type DataSinkUnion = PrecomputedChunksSink | N5DataSink | DziLevelSink
 
 export abstract class FsDataSink{
     public readonly filesystem: Filesystem
@@ -983,12 +1085,15 @@ export abstract class FsDataSink{
         this.resolution = params.resolution
     }
 
-    public static fromDto(message: PrecomputedChunksSinkDto | N5DataSinkDto): DataSinkUnion{
+    public static fromDto(message: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto): DataSinkUnion{
         if(message instanceof PrecomputedChunksSinkDto){
             return PrecomputedChunksSink.fromDto(message)
         }
         if(message instanceof N5DataSinkDto){
             return N5DataSink.fromDto(message)
+        }
+        if(message instanceof DziLevelSinkDto){
+            return DziLevelSink.fromDto(message)
         }
         assertUnreachable(message)
     }
@@ -1185,5 +1290,28 @@ export class N5DataSink extends FsDataSink{
             compressor: this.compressor,
             c_axiskeys: this.c_axiskeys,
         })
+    }
+}
+
+
+export class DziLevelSink extends FsDataSink{
+    public constructor(public readonly level: DziLevel){
+        super({
+            dtype: level.dtype,
+            filesystem: level.filesystem,
+            interval: level.shape.toInterval5D({offset: undefined}),
+            path: level.level_path,
+            resolution: level.spatial_resolution,
+            tile_shape: level.tile_shape,
+        })
+    }
+    public static fromDto(dto: DziLevelSinkDto): DziLevelSink{
+        return new DziLevelSink(DziLevel.fromDto(dto.level))
+    }
+    public toDto(): DziLevelSinkDto{
+        return new DziLevelSinkDto({level: this.level.toDto()})
+    }
+    public toDataSource(): DziLevelDataSource{
+        return new DziLevelDataSource(this.level)
     }
 }

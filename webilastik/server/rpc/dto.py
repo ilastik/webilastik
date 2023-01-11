@@ -800,6 +800,161 @@ class PrecomputedChunksDataSourceDto(DataTransferObject):
         return parse_as_PrecomputedChunksDataSourceDto(value)
 
 
+def parse_as_Literal_of__quote_jpeg_quote_0_quote_jpg_quote_0_quote_png_quote__endof_(
+    value: JsonValue,
+) -> "Literal['jpeg', 'jpg', 'png'] | MessageParsingError":
+    tmp_0 = parse_as_str(value)
+    if not isinstance(tmp_0, MessageParsingError) and tmp_0 == "jpeg":
+        return tmp_0
+    tmp_1 = parse_as_str(value)
+    if not isinstance(tmp_1, MessageParsingError) and tmp_1 == "jpg":
+        return tmp_1
+    tmp_2 = parse_as_str(value)
+    if not isinstance(tmp_2, MessageParsingError) and tmp_2 == "png":
+        return tmp_2
+    return MessageParsingError(
+        f"Could not parse {value} as Literal['jpeg', 'jpg', 'png']"
+    )
+
+
+def parse_as_DziLevelDto(value: JsonValue) -> "DziLevelDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as DziLevelDto"
+        )
+    if value.get("__class__") != "DziLevelDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as DziLevelDto"
+        )
+    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
+        value.get("filesystem")
+    )
+    if isinstance(tmp_filesystem, MessageParsingError):
+        return tmp_filesystem
+    tmp_level_path = parse_as_str(value.get("level_path"))
+    if isinstance(tmp_level_path, MessageParsingError):
+        return tmp_level_path
+    tmp_level_index = parse_as_int(value.get("level_index"))
+    if isinstance(tmp_level_index, MessageParsingError):
+        return tmp_level_index
+    tmp_overlap = parse_as_int(value.get("overlap"))
+    if isinstance(tmp_overlap, MessageParsingError):
+        return tmp_overlap
+    tmp_tile_shape = parse_as_Shape5DDto(value.get("tile_shape"))
+    if isinstance(tmp_tile_shape, MessageParsingError):
+        return tmp_tile_shape
+    tmp_shape = parse_as_Shape5DDto(value.get("shape"))
+    if isinstance(tmp_shape, MessageParsingError):
+        return tmp_shape
+    tmp_full_shape = parse_as_Shape5DDto(value.get("full_shape"))
+    if isinstance(tmp_full_shape, MessageParsingError):
+        return tmp_full_shape
+    tmp_dtype = parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
+        value.get("dtype")
+    )
+    if isinstance(tmp_dtype, MessageParsingError):
+        return tmp_dtype
+    tmp_spatial_resolution = parse_as_Tuple_of_int0int0int_endof_(
+        value.get("spatial_resolution")
+    )
+    if isinstance(tmp_spatial_resolution, MessageParsingError):
+        return tmp_spatial_resolution
+    tmp_image_format = parse_as_Literal_of__quote_jpeg_quote_0_quote_jpg_quote_0_quote_png_quote__endof_(
+        value.get("image_format")
+    )
+    if isinstance(tmp_image_format, MessageParsingError):
+        return tmp_image_format
+    return DziLevelDto(
+        filesystem=tmp_filesystem,
+        level_path=tmp_level_path,
+        level_index=tmp_level_index,
+        overlap=tmp_overlap,
+        tile_shape=tmp_tile_shape,
+        shape=tmp_shape,
+        full_shape=tmp_full_shape,
+        dtype=tmp_dtype,
+        spatial_resolution=tmp_spatial_resolution,
+        image_format=tmp_image_format,
+    )
+
+
+@dataclass
+class DziLevelDto(DataTransferObject):
+    filesystem: FsDto
+    level_path: str
+    level_index: int
+    overlap: int
+    tile_shape: Shape5DDto
+    shape: Shape5DDto
+    full_shape: Shape5DDto
+    dtype: DtypeDto
+    spatial_resolution: Tuple[int, int, int]
+    image_format: Literal["jpeg", "jpg", "png"]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "DziLevelDto",
+            "filesystem": convert_to_json_value(self.filesystem),
+            "level_path": self.level_path,
+            "level_index": self.level_index,
+            "overlap": self.overlap,
+            "tile_shape": self.tile_shape.to_json_value(),
+            "shape": self.shape.to_json_value(),
+            "full_shape": self.full_shape.to_json_value(),
+            "dtype": self.dtype,
+            "spatial_resolution": (
+                self.spatial_resolution[0],
+                self.spatial_resolution[1],
+                self.spatial_resolution[2],
+            ),
+            "image_format": self.image_format,
+        }
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "DziLevelDto | MessageParsingError":
+        return parse_as_DziLevelDto(value)
+
+
+def parse_as_DziLevelDataSourceDto(
+    value: JsonValue,
+) -> "DziLevelDataSourceDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as DziLevelDataSourceDto"
+        )
+    if value.get("__class__") != "DziLevelDataSourceDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as DziLevelDataSourceDto"
+        )
+    tmp_level = parse_as_DziLevelDto(value.get("level"))
+    if isinstance(tmp_level, MessageParsingError):
+        return tmp_level
+    return DziLevelDataSourceDto(
+        level=tmp_level,
+    )
+
+
+@dataclass
+class DziLevelDataSourceDto(DataTransferObject):
+    level: DziLevelDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "DziLevelDataSourceDto",
+            "level": self.level.to_json_value(),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "DziLevelDataSourceDto | MessageParsingError":
+        return parse_as_DziLevelDataSourceDto(value)
+
+
 def parse_as_N5GzipCompressorDto(
     value: JsonValue,
 ) -> "N5GzipCompressorDto | MessageParsingError":
@@ -1298,7 +1453,10 @@ class SkimageDataSourceDto(DataTransferObject):
 
 
 FsDataSourceDto = Union[
-    PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto
+    PrecomputedChunksDataSourceDto,
+    N5DataSourceDto,
+    SkimageDataSourceDto,
+    DziLevelDataSourceDto,
 ]
 
 
@@ -1392,6 +1550,44 @@ class PrecomputedChunksSinkDto(DataTransferObject):
         return parse_as_PrecomputedChunksSinkDto(value)
 
 
+def parse_as_DziLevelSinkDto(
+    value: JsonValue,
+) -> "DziLevelSinkDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as DziLevelSinkDto"
+        )
+    if value.get("__class__") != "DziLevelSinkDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as DziLevelSinkDto"
+        )
+    tmp_level = parse_as_DziLevelDto(value.get("level"))
+    if isinstance(tmp_level, MessageParsingError):
+        return tmp_level
+    return DziLevelSinkDto(
+        level=tmp_level,
+    )
+
+
+@dataclass
+class DziLevelSinkDto(DataTransferObject):
+    level: DziLevelDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "DziLevelSinkDto",
+            "level": self.level.to_json_value(),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "DziLevelSinkDto | MessageParsingError":
+        return parse_as_DziLevelSinkDto(value)
+
+
 def parse_as_N5DataSinkDto(value: JsonValue) -> "N5DataSinkDto | MessageParsingError":
     from collections.abc import Mapping
 
@@ -1480,12 +1676,12 @@ class N5DataSinkDto(DataTransferObject):
         return parse_as_N5DataSinkDto(value)
 
 
-DataSinkDto = Union[PrecomputedChunksSinkDto, N5DataSinkDto]
+DataSinkDto = Union[PrecomputedChunksSinkDto, N5DataSinkDto, DziLevelSinkDto]
 
 
-def parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_(
+def parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
     value: JsonValue,
-) -> "Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto] | MessageParsingError":
+) -> "Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto] | MessageParsingError":
     parsed_option_0 = parse_as_PrecomputedChunksDataSourceDto(value)
     if not isinstance(parsed_option_0, MessageParsingError):
         return parsed_option_0
@@ -1495,8 +1691,11 @@ def parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageData
     parsed_option_2 = parse_as_SkimageDataSourceDto(value)
     if not isinstance(parsed_option_2, MessageParsingError):
         return parsed_option_2
+    parsed_option_3 = parse_as_DziLevelDataSourceDto(value)
+    if not isinstance(parsed_option_3, MessageParsingError):
+        return parsed_option_3
     return MessageParsingError(
-        f"Could not parse {json.dumps(value)} into Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto]"
+        f"Could not parse {json.dumps(value)} into Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto]"
     )
 
 
@@ -1529,7 +1728,7 @@ def parse_as_PixelAnnotationDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as PixelAnnotationDto"
         )
-    tmp_raw_data = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_(
+    tmp_raw_data = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
         value.get("raw_data")
     )
     if isinstance(tmp_raw_data, MessageParsingError):
@@ -2048,18 +2247,23 @@ class DataView(ViewDto):
         return parse_as_DataView(value)
 
 
-def parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_(
+def parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
     value: JsonValue,
-) -> "Tuple[Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto], ...] | MessageParsingError":
+) -> "Tuple[Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto], ...] | MessageParsingError":
     if not isinstance(value, (list, tuple)):
         return MessageParsingError(
-            f"Could not parse Tuple[Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto], ...] from {json.dumps(value)}"
+            f"Could not parse Tuple[Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto], ...] from {json.dumps(value)}"
         )
     items: List[
-        Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto]
+        Union[
+            PrecomputedChunksDataSourceDto,
+            N5DataSourceDto,
+            SkimageDataSourceDto,
+            DziLevelDataSourceDto,
+        ]
     ] = []
     for item in value:
-        parsed = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_(
+        parsed = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
             item
         )
         if isinstance(parsed, MessageParsingError):
@@ -2085,7 +2289,7 @@ def parse_as_RawDataViewDto(value: JsonValue) -> "RawDataViewDto | MessageParsin
     tmp_url = parse_as_UrlDto(value.get("url"))
     if isinstance(tmp_url, MessageParsingError):
         return tmp_url
-    tmp_datasources = parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_(
+    tmp_datasources = parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
         value.get("datasources")
     )
     if isinstance(tmp_datasources, MessageParsingError):
@@ -2137,7 +2341,7 @@ def parse_as_StrippedPrecomputedViewDto(
     tmp_url = parse_as_UrlDto(value.get("url"))
     if isinstance(tmp_url, MessageParsingError):
         return tmp_url
-    tmp_datasource = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_(
+    tmp_datasource = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
         value.get("datasource")
     )
     if isinstance(tmp_datasource, MessageParsingError):
@@ -2187,7 +2391,7 @@ def parse_as_PredictionsViewDto(
     tmp_url = parse_as_UrlDto(value.get("url"))
     if isinstance(tmp_url, MessageParsingError):
         return tmp_url
-    tmp_raw_data = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_(
+    tmp_raw_data = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
         value.get("raw_data")
     )
     if isinstance(tmp_raw_data, MessageParsingError):
@@ -2596,17 +2800,20 @@ class JobDto(DataTransferObject):
         return parse_as_JobDto(value)
 
 
-def parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto_endof_(
+def parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto_endof_(
     value: JsonValue,
-) -> "Union[PrecomputedChunksSinkDto, N5DataSinkDto] | MessageParsingError":
+) -> "Union[PrecomputedChunksSinkDto, N5DataSinkDto, DziLevelSinkDto] | MessageParsingError":
     parsed_option_0 = parse_as_PrecomputedChunksSinkDto(value)
     if not isinstance(parsed_option_0, MessageParsingError):
         return parsed_option_0
     parsed_option_1 = parse_as_N5DataSinkDto(value)
     if not isinstance(parsed_option_1, MessageParsingError):
         return parsed_option_1
+    parsed_option_2 = parse_as_DziLevelSinkDto(value)
+    if not isinstance(parsed_option_2, MessageParsingError):
+        return parsed_option_2
     return MessageParsingError(
-        f"Could not parse {json.dumps(value)} into Union[PrecomputedChunksSinkDto, N5DataSinkDto]"
+        f"Could not parse {json.dumps(value)} into Union[PrecomputedChunksSinkDto, N5DataSinkDto, DziLevelSinkDto]"
     )
 
 
@@ -2641,8 +2848,10 @@ def parse_as_ExportJobDto(value: JsonValue) -> "ExportJobDto | MessageParsingErr
     tmp_error_message = parse_as_Union_of_str0None_endof_(value.get("error_message"))
     if isinstance(tmp_error_message, MessageParsingError):
         return tmp_error_message
-    tmp_datasink = parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto_endof_(
-        value.get("datasink")
+    tmp_datasink = (
+        parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto_endof_(
+            value.get("datasink")
+        )
     )
     if isinstance(tmp_datasink, MessageParsingError):
         return tmp_datasink
@@ -2711,8 +2920,10 @@ def parse_as_OpenDatasinkJobDto(
     tmp_error_message = parse_as_Union_of_str0None_endof_(value.get("error_message"))
     if isinstance(tmp_error_message, MessageParsingError):
         return tmp_error_message
-    tmp_datasink = parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto_endof_(
-        value.get("datasink")
+    tmp_datasink = (
+        parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto_endof_(
+            value.get("datasink")
+        )
     )
     if isinstance(tmp_datasink, MessageParsingError):
         return tmp_datasink
@@ -2810,10 +3021,10 @@ def parse_as_Union_of_Tuple_of_LabelHeaderDto0_varlen__endof_0None_endof_(
     )
 
 
-def parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_0None_endof_(
+def parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
     value: JsonValue,
-) -> "Union[Tuple[Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto], ...], None] | MessageParsingError":
-    parsed_option_0 = parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_(
+) -> "Union[Tuple[Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto], ...], None] | MessageParsingError":
+    parsed_option_0 = parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
         value
     )
     if not isinstance(parsed_option_0, MessageParsingError):
@@ -2822,7 +3033,7 @@ def parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSou
     if not isinstance(parsed_option_1, MessageParsingError):
         return parsed_option_1
     return MessageParsingError(
-        f"Could not parse {json.dumps(value)} into Union[Tuple[Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto], ...], None]"
+        f"Could not parse {json.dumps(value)} into Union[Tuple[Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto], ...], None]"
     )
 
 
@@ -2851,7 +3062,7 @@ def parse_as_PixelClassificationExportAppletStateDto(
     )
     if isinstance(tmp_populated_labels, MessageParsingError):
         return tmp_populated_labels
-    tmp_datasource_suggestions = parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_0None_endof_(
+    tmp_datasource_suggestions = parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
         value.get("datasource_suggestions")
     )
     if isinstance(tmp_datasource_suggestions, MessageParsingError):
@@ -3776,13 +3987,15 @@ def parse_as_StartPixelProbabilitiesExportJobParamsDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as StartPixelProbabilitiesExportJobParamsDto"
         )
-    tmp_datasource = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_(
+    tmp_datasource = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
         value.get("datasource")
     )
     if isinstance(tmp_datasource, MessageParsingError):
         return tmp_datasource
-    tmp_datasink = parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto_endof_(
-        value.get("datasink")
+    tmp_datasink = (
+        parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto_endof_(
+            value.get("datasink")
+        )
     )
     if isinstance(tmp_datasink, MessageParsingError):
         return tmp_datasink
@@ -3824,13 +4037,15 @@ def parse_as_StartSimpleSegmentationExportJobParamsDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as StartSimpleSegmentationExportJobParamsDto"
         )
-    tmp_datasource = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_(
+    tmp_datasource = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
         value.get("datasource")
     )
     if isinstance(tmp_datasource, MessageParsingError):
         return tmp_datasource
-    tmp_datasink = parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto_endof_(
-        value.get("datasink")
+    tmp_datasink = (
+        parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto_endof_(
+            value.get("datasink")
+        )
     )
     if isinstance(tmp_datasink, MessageParsingError):
         return tmp_datasink
@@ -3991,9 +4206,9 @@ class GetDatasourcesFromUrlParamsDto(DataTransferObject):
         return parse_as_GetDatasourcesFromUrlParamsDto(value)
 
 
-def parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_0None_endof_(
+def parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto0Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
     value: JsonValue,
-) -> "Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, Tuple[Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto], ...], None] | MessageParsingError":
+) -> "Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto, Tuple[Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto], ...], None] | MessageParsingError":
     parsed_option_0 = parse_as_PrecomputedChunksDataSourceDto(value)
     if not isinstance(parsed_option_0, MessageParsingError):
         return parsed_option_0
@@ -4003,16 +4218,19 @@ def parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageData
     parsed_option_2 = parse_as_SkimageDataSourceDto(value)
     if not isinstance(parsed_option_2, MessageParsingError):
         return parsed_option_2
-    parsed_option_3 = parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_(
-        value
-    )
+    parsed_option_3 = parse_as_DziLevelDataSourceDto(value)
     if not isinstance(parsed_option_3, MessageParsingError):
         return parsed_option_3
-    parsed_option_4 = parse_as_None(value)
+    parsed_option_4 = parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
+        value
+    )
     if not isinstance(parsed_option_4, MessageParsingError):
         return parsed_option_4
+    parsed_option_5 = parse_as_None(value)
+    if not isinstance(parsed_option_5, MessageParsingError):
+        return parsed_option_5
     return MessageParsingError(
-        f"Could not parse {json.dumps(value)} into Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, Tuple[Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto], ...], None]"
+        f"Could not parse {json.dumps(value)} into Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto, Tuple[Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto], ...], None]"
     )
 
 
@@ -4029,7 +4247,7 @@ def parse_as_GetDatasourcesFromUrlResponseDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as GetDatasourcesFromUrlResponseDto"
         )
-    tmp_datasources = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_0None_endof_(
+    tmp_datasources = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto0Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
         value.get("datasources")
     )
     if isinstance(tmp_datasources, MessageParsingError):
@@ -4069,7 +4287,7 @@ def parse_as_CheckDatasourceCompatibilityParams(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as CheckDatasourceCompatibilityParams"
         )
-    tmp_datasources = parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_(
+    tmp_datasources = parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
         value.get("datasources")
     )
     if isinstance(tmp_datasources, MessageParsingError):

@@ -751,6 +751,159 @@ export class PrecomputedChunksDataSourceDto {
   }
 }
 
+export function parse_as_Literal_of__quote_jpeg_quote_0_quote_jpg_quote_0_quote_png_quote__endof_(
+  value: JsonValue,
+): "jpeg" | "jpg" | "png" | Error {
+  const tmp_0 = parse_as_str(value);
+  if (!(tmp_0 instanceof Error) && tmp_0 === "jpeg") {
+    return tmp_0;
+  }
+  const tmp_1 = parse_as_str(value);
+  if (!(tmp_1 instanceof Error) && tmp_1 === "jpg") {
+    return tmp_1;
+  }
+  const tmp_2 = parse_as_str(value);
+  if (!(tmp_2 instanceof Error) && tmp_2 === "png") {
+    return tmp_2;
+  }
+  return Error(`Could not parse ${value} as 'jpeg' | 'jpg' | 'png'`);
+}
+export function parse_as_DziLevelDto(value: JsonValue): DziLevelDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "DziLevelDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a DziLevelDto`);
+  }
+  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.filesystem);
+  if (temp_filesystem instanceof Error) return temp_filesystem;
+  const temp_level_path = parse_as_str(valueObject.level_path);
+  if (temp_level_path instanceof Error) return temp_level_path;
+  const temp_level_index = parse_as_int(valueObject.level_index);
+  if (temp_level_index instanceof Error) return temp_level_index;
+  const temp_overlap = parse_as_int(valueObject.overlap);
+  if (temp_overlap instanceof Error) return temp_overlap;
+  const temp_tile_shape = parse_as_Shape5DDto(valueObject.tile_shape);
+  if (temp_tile_shape instanceof Error) return temp_tile_shape;
+  const temp_shape = parse_as_Shape5DDto(valueObject.shape);
+  if (temp_shape instanceof Error) return temp_shape;
+  const temp_full_shape = parse_as_Shape5DDto(valueObject.full_shape);
+  if (temp_full_shape instanceof Error) return temp_full_shape;
+  const temp_dtype =
+    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
+      valueObject.dtype,
+    );
+  if (temp_dtype instanceof Error) return temp_dtype;
+  const temp_spatial_resolution = parse_as_Tuple_of_int0int0int_endof_(valueObject.spatial_resolution);
+  if (temp_spatial_resolution instanceof Error) return temp_spatial_resolution;
+  const temp_image_format = parse_as_Literal_of__quote_jpeg_quote_0_quote_jpg_quote_0_quote_png_quote__endof_(
+    valueObject.image_format,
+  );
+  if (temp_image_format instanceof Error) return temp_image_format;
+  return new DziLevelDto({
+    filesystem: temp_filesystem,
+    level_path: temp_level_path,
+    level_index: temp_level_index,
+    overlap: temp_overlap,
+    tile_shape: temp_tile_shape,
+    shape: temp_shape,
+    full_shape: temp_full_shape,
+    dtype: temp_dtype,
+    spatial_resolution: temp_spatial_resolution,
+    image_format: temp_image_format,
+  });
+}
+// Automatically generated via DataTransferObject for DziLevelDto
+// Do not edit!
+export class DziLevelDto {
+  public filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+  public level_path: string;
+  public level_index: number;
+  public overlap: number;
+  public tile_shape: Shape5DDto;
+  public shape: Shape5DDto;
+  public full_shape: Shape5DDto;
+  public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
+  public spatial_resolution: [number, number, number];
+  public image_format: "jpeg" | "jpg" | "png";
+  constructor(_params: {
+    filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+    level_path: string;
+    level_index: number;
+    overlap: number;
+    tile_shape: Shape5DDto;
+    shape: Shape5DDto;
+    full_shape: Shape5DDto;
+    dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
+    spatial_resolution: [number, number, number];
+    image_format: "jpeg" | "jpg" | "png";
+  }) {
+    this.filesystem = _params.filesystem;
+    this.level_path = _params.level_path;
+    this.level_index = _params.level_index;
+    this.overlap = _params.overlap;
+    this.tile_shape = _params.tile_shape;
+    this.shape = _params.shape;
+    this.full_shape = _params.full_shape;
+    this.dtype = _params.dtype;
+    this.spatial_resolution = _params.spatial_resolution;
+    this.image_format = _params.image_format;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "DziLevelDto",
+      filesystem: toJsonValue(this.filesystem),
+      level_path: this.level_path,
+      level_index: this.level_index,
+      overlap: this.overlap,
+      tile_shape: this.tile_shape.toJsonValue(),
+      shape: this.shape.toJsonValue(),
+      full_shape: this.full_shape.toJsonValue(),
+      dtype: this.dtype,
+      spatial_resolution: [this.spatial_resolution[0], this.spatial_resolution[1], this.spatial_resolution[2]],
+      image_format: this.image_format,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): DziLevelDto | Error {
+    return parse_as_DziLevelDto(value);
+  }
+}
+
+export function parse_as_DziLevelDataSourceDto(value: JsonValue): DziLevelDataSourceDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "DziLevelDataSourceDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a DziLevelDataSourceDto`);
+  }
+  const temp_level = parse_as_DziLevelDto(valueObject.level);
+  if (temp_level instanceof Error) return temp_level;
+  return new DziLevelDataSourceDto({
+    level: temp_level,
+  });
+}
+// Automatically generated via DataTransferObject for DziLevelDataSourceDto
+// Do not edit!
+export class DziLevelDataSourceDto {
+  public level: DziLevelDto;
+  constructor(_params: {
+    level: DziLevelDto;
+  }) {
+    this.level = _params.level;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "DziLevelDataSourceDto",
+      level: this.level.toJsonValue(),
+    };
+  }
+  public static fromJsonValue(value: JsonValue): DziLevelDataSourceDto | Error {
+    return parse_as_DziLevelDataSourceDto(value);
+  }
+}
+
 export function parse_as_N5GzipCompressorDto(value: JsonValue): N5GzipCompressorDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
@@ -1263,6 +1416,40 @@ export class PrecomputedChunksSinkDto {
   }
 }
 
+export function parse_as_DziLevelSinkDto(value: JsonValue): DziLevelSinkDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "DziLevelSinkDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a DziLevelSinkDto`);
+  }
+  const temp_level = parse_as_DziLevelDto(valueObject.level);
+  if (temp_level instanceof Error) return temp_level;
+  return new DziLevelSinkDto({
+    level: temp_level,
+  });
+}
+// Automatically generated via DataTransferObject for DziLevelSinkDto
+// Do not edit!
+export class DziLevelSinkDto {
+  public level: DziLevelDto;
+  constructor(_params: {
+    level: DziLevelDto;
+  }) {
+    this.level = _params.level;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "DziLevelSinkDto",
+      level: this.level.toJsonValue(),
+    };
+  }
+  public static fromJsonValue(value: JsonValue): DziLevelSinkDto | Error {
+    return parse_as_DziLevelSinkDto(value);
+  }
+}
+
 export function parse_as_N5DataSinkDto(value: JsonValue): N5DataSinkDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
@@ -1352,9 +1539,9 @@ export class N5DataSinkDto {
   }
 }
 
-export function parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_(
+export function parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
   value: JsonValue,
-): PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | Error {
+): PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto | Error {
   const parsed_option_0 = parse_as_PrecomputedChunksDataSourceDto(value);
   if (!(parsed_option_0 instanceof Error)) {
     return parsed_option_0;
@@ -1367,10 +1554,14 @@ export function parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto
   if (!(parsed_option_2 instanceof Error)) {
     return parsed_option_2;
   }
+  const parsed_option_3 = parse_as_DziLevelDataSourceDto(value);
+  if (!(parsed_option_3 instanceof Error)) {
+    return parsed_option_3;
+  }
   return Error(
     `Could not parse ${
       JSON.stringify(value)
-    } into PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto`,
+    } into PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto`,
   );
 }
 export function parse_as_Tuple_of_Tuple_of_int0int0int_endof_0_varlen__endof_(
@@ -1394,9 +1585,10 @@ export function parse_as_PixelAnnotationDto(value: JsonValue): PixelAnnotationDt
   if (valueObject["__class__"] != "PixelAnnotationDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a PixelAnnotationDto`);
   }
-  const temp_raw_data = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_(
-    valueObject.raw_data,
-  );
+  const temp_raw_data =
+    parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
+      valueObject.raw_data,
+    );
   if (temp_raw_data instanceof Error) return temp_raw_data;
   const temp_points = parse_as_Tuple_of_Tuple_of_int0int0int_endof_0_varlen__endof_(valueObject.points);
   if (temp_points instanceof Error) return temp_points;
@@ -1408,10 +1600,10 @@ export function parse_as_PixelAnnotationDto(value: JsonValue): PixelAnnotationDt
 // Automatically generated via DataTransferObject for PixelAnnotationDto
 // Do not edit!
 export class PixelAnnotationDto {
-  public raw_data: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto;
+  public raw_data: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto;
   public points: Array<[number, number, number]>;
   constructor(_params: {
-    raw_data: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto;
+    raw_data: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto;
     points: Array<[number, number, number]>;
   }) {
     this.raw_data = _params.raw_data;
@@ -1890,16 +2082,18 @@ export class DataView {
   }
 }
 
-export function parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_(
+export function parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
   value: JsonValue,
-): Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto> | Error {
+): Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto> | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
-  const out: Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto> = [];
+  const out: Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto> =
+    [];
   for (let item of arr) {
-    let parsed_item = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_(
-      item,
-    );
+    let parsed_item =
+      parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
+        item,
+      );
     if (parsed_item instanceof Error) return parsed_item;
     out.push(parsed_item);
   }
@@ -1918,7 +2112,7 @@ export function parse_as_RawDataViewDto(value: JsonValue): RawDataViewDto | Erro
   const temp_url = parse_as_UrlDto(valueObject.url);
   if (temp_url instanceof Error) return temp_url;
   const temp_datasources =
-    parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_(
+    parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
       valueObject.datasources,
     );
   if (temp_datasources instanceof Error) return temp_datasources;
@@ -1933,11 +2127,13 @@ export function parse_as_RawDataViewDto(value: JsonValue): RawDataViewDto | Erro
 export class RawDataViewDto {
   public name: string;
   public url: UrlDto;
-  public datasources: Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto>;
+  public datasources: Array<
+    PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto
+  >;
   constructor(_params: {
     name: string;
     url: UrlDto;
-    datasources: Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto>;
+    datasources: Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>;
   }) {
     this.name = _params.name;
     this.url = _params.url;
@@ -1968,9 +2164,10 @@ export function parse_as_StrippedPrecomputedViewDto(value: JsonValue): StrippedP
   if (temp_name instanceof Error) return temp_name;
   const temp_url = parse_as_UrlDto(valueObject.url);
   if (temp_url instanceof Error) return temp_url;
-  const temp_datasource = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_(
-    valueObject.datasource,
-  );
+  const temp_datasource =
+    parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
+      valueObject.datasource,
+    );
   if (temp_datasource instanceof Error) return temp_datasource;
   return new StrippedPrecomputedViewDto({
     name: temp_name,
@@ -1983,11 +2180,11 @@ export function parse_as_StrippedPrecomputedViewDto(value: JsonValue): StrippedP
 export class StrippedPrecomputedViewDto {
   public name: string;
   public url: UrlDto;
-  public datasource: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto;
+  public datasource: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto;
   constructor(_params: {
     name: string;
     url: UrlDto;
-    datasource: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto;
+    datasource: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto;
   }) {
     this.name = _params.name;
     this.url = _params.url;
@@ -2018,9 +2215,10 @@ export function parse_as_PredictionsViewDto(value: JsonValue): PredictionsViewDt
   if (temp_name instanceof Error) return temp_name;
   const temp_url = parse_as_UrlDto(valueObject.url);
   if (temp_url instanceof Error) return temp_url;
-  const temp_raw_data = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_(
-    valueObject.raw_data,
-  );
+  const temp_raw_data =
+    parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
+      valueObject.raw_data,
+    );
   if (temp_raw_data instanceof Error) return temp_raw_data;
   const temp_classifier_generation = parse_as_int(valueObject.classifier_generation);
   if (temp_classifier_generation instanceof Error) return temp_classifier_generation;
@@ -2036,12 +2234,12 @@ export function parse_as_PredictionsViewDto(value: JsonValue): PredictionsViewDt
 export class PredictionsViewDto {
   public name: string;
   public url: UrlDto;
-  public raw_data: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto;
+  public raw_data: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto;
   public classifier_generation: number;
   constructor(_params: {
     name: string;
     url: UrlDto;
-    raw_data: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto;
+    raw_data: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto;
     classifier_generation: number;
   }) {
     this.name = _params.name;
@@ -2411,9 +2609,9 @@ export class JobDto {
   }
 }
 
-export function parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto_endof_(
+export function parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto_endof_(
   value: JsonValue,
-): PrecomputedChunksSinkDto | N5DataSinkDto | Error {
+): PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto | Error {
   const parsed_option_0 = parse_as_PrecomputedChunksSinkDto(value);
   if (!(parsed_option_0 instanceof Error)) {
     return parsed_option_0;
@@ -2422,7 +2620,13 @@ export function parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto_endof_(
   if (!(parsed_option_1 instanceof Error)) {
     return parsed_option_1;
   }
-  return Error(`Could not parse ${JSON.stringify(value)} into PrecomputedChunksSinkDto | N5DataSinkDto`);
+  const parsed_option_2 = parse_as_DziLevelSinkDto(value);
+  if (!(parsed_option_2 instanceof Error)) {
+    return parsed_option_2;
+  }
+  return Error(
+    `Could not parse ${JSON.stringify(value)} into PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto`,
+  );
 }
 export function parse_as_ExportJobDto(value: JsonValue): ExportJobDto | Error {
   const valueObject = ensureJsonObject(value);
@@ -2447,7 +2651,9 @@ export function parse_as_ExportJobDto(value: JsonValue): ExportJobDto | Error {
   if (temp_num_completed_steps instanceof Error) return temp_num_completed_steps;
   const temp_error_message = parse_as_Union_of_str0None_endof_(valueObject.error_message);
   if (temp_error_message instanceof Error) return temp_error_message;
-  const temp_datasink = parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto_endof_(valueObject.datasink);
+  const temp_datasink = parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto_endof_(
+    valueObject.datasink,
+  );
   if (temp_datasink instanceof Error) return temp_datasink;
   return new ExportJobDto({
     name: temp_name,
@@ -2468,7 +2674,7 @@ export class ExportJobDto {
   public status: "pending" | "running" | "cancelled" | "failed" | "succeeded";
   public num_completed_steps: number;
   public error_message: string | undefined;
-  public datasink: PrecomputedChunksSinkDto | N5DataSinkDto;
+  public datasink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto;
   constructor(_params: {
     name: string;
     num_args: number | undefined;
@@ -2476,7 +2682,7 @@ export class ExportJobDto {
     status: "pending" | "running" | "cancelled" | "failed" | "succeeded";
     num_completed_steps: number;
     error_message: string | undefined;
-    datasink: PrecomputedChunksSinkDto | N5DataSinkDto;
+    datasink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto;
   }) {
     this.name = _params.name;
     this.num_args = _params.num_args;
@@ -2526,7 +2732,9 @@ export function parse_as_OpenDatasinkJobDto(value: JsonValue): OpenDatasinkJobDt
   if (temp_num_completed_steps instanceof Error) return temp_num_completed_steps;
   const temp_error_message = parse_as_Union_of_str0None_endof_(valueObject.error_message);
   if (temp_error_message instanceof Error) return temp_error_message;
-  const temp_datasink = parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto_endof_(valueObject.datasink);
+  const temp_datasink = parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto_endof_(
+    valueObject.datasink,
+  );
   if (temp_datasink instanceof Error) return temp_datasink;
   return new OpenDatasinkJobDto({
     name: temp_name,
@@ -2547,7 +2755,7 @@ export class OpenDatasinkJobDto {
   public status: "pending" | "running" | "cancelled" | "failed" | "succeeded";
   public num_completed_steps: number;
   public error_message: string | undefined;
-  public datasink: PrecomputedChunksSinkDto | N5DataSinkDto;
+  public datasink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto;
   constructor(_params: {
     name: string;
     num_args: number | undefined;
@@ -2555,7 +2763,7 @@ export class OpenDatasinkJobDto {
     status: "pending" | "running" | "cancelled" | "failed" | "succeeded";
     num_completed_steps: number;
     error_message: string | undefined;
-    datasink: PrecomputedChunksSinkDto | N5DataSinkDto;
+    datasink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto;
   }) {
     this.name = _params.name;
     this.num_args = _params.num_args;
@@ -2632,11 +2840,14 @@ export function parse_as_Union_of_Tuple_of_LabelHeaderDto0_varlen__endof_0None_e
   }
   return Error(`Could not parse ${JSON.stringify(value)} into Array<LabelHeaderDto> | undefined`);
 }
-export function parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_0None_endof_(
+export function parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
   value: JsonValue,
-): Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto> | undefined | Error {
+):
+  | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
+  | undefined
+  | Error {
   const parsed_option_0 =
-    parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_(
+    parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
       value,
     );
   if (!(parsed_option_0 instanceof Error)) {
@@ -2649,7 +2860,7 @@ export function parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceD
   return Error(
     `Could not parse ${
       JSON.stringify(value)
-    } into Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto> | undefined`,
+    } into Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto> | undefined`,
   );
 }
 export function parse_as_PixelClassificationExportAppletStateDto(
@@ -2669,7 +2880,7 @@ export function parse_as_PixelClassificationExportAppletStateDto(
   );
   if (temp_populated_labels instanceof Error) return temp_populated_labels;
   const temp_datasource_suggestions =
-    parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_0None_endof_(
+    parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
       valueObject.datasource_suggestions,
     );
   if (temp_datasource_suggestions instanceof Error) return temp_datasource_suggestions;
@@ -2685,12 +2896,14 @@ export class PixelClassificationExportAppletStateDto {
   public jobs: Array<ExportJobDto | OpenDatasinkJobDto>;
   public populated_labels: Array<LabelHeaderDto> | undefined;
   public datasource_suggestions:
-    | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto>
+    | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
     | undefined;
   constructor(_params: {
     jobs: Array<ExportJobDto | OpenDatasinkJobDto>;
     populated_labels: Array<LabelHeaderDto> | undefined;
-    datasource_suggestions: Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto> | undefined;
+    datasource_suggestions:
+      | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
+      | undefined;
   }) {
     this.jobs = _params.jobs;
     this.populated_labels = _params.populated_labels;
@@ -3570,11 +3783,14 @@ export function parse_as_StartPixelProbabilitiesExportJobParamsDto(
   if (valueObject["__class__"] != "StartPixelProbabilitiesExportJobParamsDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a StartPixelProbabilitiesExportJobParamsDto`);
   }
-  const temp_datasource = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_(
-    valueObject.datasource,
-  );
+  const temp_datasource =
+    parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
+      valueObject.datasource,
+    );
   if (temp_datasource instanceof Error) return temp_datasource;
-  const temp_datasink = parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto_endof_(valueObject.datasink);
+  const temp_datasink = parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto_endof_(
+    valueObject.datasink,
+  );
   if (temp_datasink instanceof Error) return temp_datasink;
   return new StartPixelProbabilitiesExportJobParamsDto({
     datasource: temp_datasource,
@@ -3584,11 +3800,11 @@ export function parse_as_StartPixelProbabilitiesExportJobParamsDto(
 // Automatically generated via DataTransferObject for StartPixelProbabilitiesExportJobParamsDto
 // Do not edit!
 export class StartPixelProbabilitiesExportJobParamsDto {
-  public datasource: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto;
-  public datasink: PrecomputedChunksSinkDto | N5DataSinkDto;
+  public datasource: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto;
+  public datasink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto;
   constructor(_params: {
-    datasource: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto;
-    datasink: PrecomputedChunksSinkDto | N5DataSinkDto;
+    datasource: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto;
+    datasink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto;
   }) {
     this.datasource = _params.datasource;
     this.datasink = _params.datasink;
@@ -3615,11 +3831,14 @@ export function parse_as_StartSimpleSegmentationExportJobParamsDto(
   if (valueObject["__class__"] != "StartSimpleSegmentationExportJobParamsDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a StartSimpleSegmentationExportJobParamsDto`);
   }
-  const temp_datasource = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_(
-    valueObject.datasource,
-  );
+  const temp_datasource =
+    parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
+      valueObject.datasource,
+    );
   if (temp_datasource instanceof Error) return temp_datasource;
-  const temp_datasink = parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto_endof_(valueObject.datasink);
+  const temp_datasink = parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto_endof_(
+    valueObject.datasink,
+  );
   if (temp_datasink instanceof Error) return temp_datasink;
   const temp_label_header = parse_as_LabelHeaderDto(valueObject.label_header);
   if (temp_label_header instanceof Error) return temp_label_header;
@@ -3632,12 +3851,12 @@ export function parse_as_StartSimpleSegmentationExportJobParamsDto(
 // Automatically generated via DataTransferObject for StartSimpleSegmentationExportJobParamsDto
 // Do not edit!
 export class StartSimpleSegmentationExportJobParamsDto {
-  public datasource: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto;
-  public datasink: PrecomputedChunksSinkDto | N5DataSinkDto;
+  public datasource: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto;
+  public datasink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto;
   public label_header: LabelHeaderDto;
   constructor(_params: {
-    datasource: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto;
-    datasink: PrecomputedChunksSinkDto | N5DataSinkDto;
+    datasource: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto;
+    datasink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto;
     label_header: LabelHeaderDto;
   }) {
     this.datasource = _params.datasource;
@@ -3773,13 +3992,14 @@ export class GetDatasourcesFromUrlParamsDto {
   }
 }
 
-export function parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_0None_endof_(
+export function parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto0Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
   value: JsonValue,
 ):
   | PrecomputedChunksDataSourceDto
   | N5DataSourceDto
   | SkimageDataSourceDto
-  | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto>
+  | DziLevelDataSourceDto
+  | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
   | undefined
   | Error {
   const parsed_option_0 = parse_as_PrecomputedChunksDataSourceDto(value);
@@ -3794,21 +4014,25 @@ export function parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto
   if (!(parsed_option_2 instanceof Error)) {
     return parsed_option_2;
   }
-  const parsed_option_3 =
-    parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_(
-      value,
-    );
+  const parsed_option_3 = parse_as_DziLevelDataSourceDto(value);
   if (!(parsed_option_3 instanceof Error)) {
     return parsed_option_3;
   }
-  const parsed_option_4 = parse_as_None(value);
+  const parsed_option_4 =
+    parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
+      value,
+    );
   if (!(parsed_option_4 instanceof Error)) {
     return parsed_option_4;
+  }
+  const parsed_option_5 = parse_as_None(value);
+  if (!(parsed_option_5 instanceof Error)) {
+    return parsed_option_5;
   }
   return Error(
     `Could not parse ${
       JSON.stringify(value)
-    } into PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto> | undefined`,
+    } into PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto> | undefined`,
   );
 }
 export function parse_as_GetDatasourcesFromUrlResponseDto(value: JsonValue): GetDatasourcesFromUrlResponseDto | Error {
@@ -3820,7 +4044,7 @@ export function parse_as_GetDatasourcesFromUrlResponseDto(value: JsonValue): Get
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a GetDatasourcesFromUrlResponseDto`);
   }
   const temp_datasources =
-    parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_0None_endof_(
+    parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto0Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
       valueObject.datasources,
     );
   if (temp_datasources instanceof Error) return temp_datasources;
@@ -3835,14 +4059,16 @@ export class GetDatasourcesFromUrlResponseDto {
     | PrecomputedChunksDataSourceDto
     | N5DataSourceDto
     | SkimageDataSourceDto
-    | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto>
+    | DziLevelDataSourceDto
+    | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
     | undefined;
   constructor(_params: {
     datasources:
       | PrecomputedChunksDataSourceDto
       | N5DataSourceDto
       | SkimageDataSourceDto
-      | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto>
+      | DziLevelDataSourceDto
+      | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
       | undefined;
   }) {
     this.datasources = _params.datasources;
@@ -3869,7 +4095,7 @@ export function parse_as_CheckDatasourceCompatibilityParams(
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a CheckDatasourceCompatibilityParams`);
   }
   const temp_datasources =
-    parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto_endof_0_varlen__endof_(
+    parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
       valueObject.datasources,
     );
   if (temp_datasources instanceof Error) return temp_datasources;
@@ -3880,9 +4106,11 @@ export function parse_as_CheckDatasourceCompatibilityParams(
 // Automatically generated via DataTransferObject for CheckDatasourceCompatibilityParams
 // Do not edit!
 export class CheckDatasourceCompatibilityParams {
-  public datasources: Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto>;
+  public datasources: Array<
+    PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto
+  >;
   constructor(_params: {
-    datasources: Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto>;
+    datasources: Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>;
   }) {
     this.datasources = _params.datasources;
   }

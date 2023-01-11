@@ -14,7 +14,8 @@ from ndstructs.array5D import Array5D
 
 from webilastik.datasource import FsDataSource
 from webilastik.filesystem import FsFileNotFoundException, IFilesystem
-from webilastik.server.rpc.dto import PrecomputedChunksDataSourceDto
+from webilastik.server.rpc.dto import DziLevelDataSourceDto, DziLevelDto, Shape5DDto, dtype_to_dto
+from webilastik.filesystem import FsFileNotFoundException, IFilesystem, create_filesystem_from_message
 
 
 logger = logging.getLogger(__name__)
@@ -208,6 +209,39 @@ class DziLevel:
             image_format=image_format,
         )
 
+    def to_dto(self) -> DziLevelDto:
+        return DziLevelDto(
+            filesystem=self.filesystem.to_dto(),
+            level_path=self.level_path.as_posix(),
+            level_index=self.level_index,
+            overlap=self.overlap,
+            tile_shape=Shape5DDto.from_shape5d(self.tile_shape),
+            shape=Shape5DDto.from_shape5d(self.shape),
+            full_shape=Shape5DDto.from_shape5d(self.full_shape),
+            dtype=dtype_to_dto(self.dtype),
+            spatial_resolution=self.spatial_resolution,
+            image_format=self.image_format,
+        )
+
+    @classmethod
+    def from_dto(cls, dto: DziLevelDto) -> "DziLevel | Exception":
+        fs_result = create_filesystem_from_message(dto.filesystem)
+        if isinstance(fs_result, Exception):
+            return fs_result
+        return DziLevel(
+            private_marker=DziLevel.__PrivateMarker(),
+            filesystem=fs_result,
+            level_path=PurePosixPath(dto.level_path),
+            level_index=dto.level_index,
+            overlap=dto.overlap,
+            tile_shape=dto.tile_shape.to_shape5d(),
+            shape=dto.shape.to_shape5d(),
+            full_shape=dto.full_shape.to_shape5d(),
+            dtype=np.dtype(dto.dtype),
+            spatial_resolution=dto.spatial_resolution,
+            image_format=dto.image_format,
+        )
+
     @classmethod
     def supports_path(cls, path: PurePosixPath) -> bool:
         if isinstance(cls.get_level_index_from_path(path), Exception):
@@ -245,6 +279,18 @@ class DziLevelDataSource(FsDataSource):
             spatial_resolution=level.spatial_resolution, #FIXME: maybe delete this altogether?
         )
         self.level = level
+
+    def to_dto(self) -> DziLevelDataSourceDto:
+        return DziLevelDataSourceDto(
+            level=self.level.to_dto()
+        )
+
+    @staticmethod
+    def from_dto(dto: DziLevelDataSourceDto) -> "DziLevelDataSource | Exception":
+        level = DziLevel.from_dto(dto.level)
+        if isinstance(level, Exception):
+            return level
+        return DziLevelDataSource(level=level)
 
     @classmethod
     def try_load_pyramid(cls, *, filesystem: IFilesystem, dzi_path: PurePosixPath) -> "Mapping[int, DziLevelDataSource] | Exception":
@@ -318,13 +364,6 @@ class DziLevelDataSource(FsDataSource):
     @classmethod
     def supports_path(cls, path: PurePosixPath) -> bool:
         return DziLevel.supports_path(path)
-
-    def to_dto(self) -> PrecomputedChunksDataSourceDto:
-        raise Exception("FIXME")
-
-    @staticmethod
-    def from_dto(dto: PrecomputedChunksDataSourceDto) -> "Exception":
-        raise Exception("FIXME")
 
     def __hash__(self) -> int:
         return hash(self.url)
