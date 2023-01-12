@@ -4084,6 +4084,85 @@ export class GetDatasourcesFromUrlResponseDto {
   }
 }
 
+export function parse_as_GetFileSystemAndPathFromUrlParamsDto(
+  value: JsonValue,
+): GetFileSystemAndPathFromUrlParamsDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "GetFileSystemAndPathFromUrlParamsDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a GetFileSystemAndPathFromUrlParamsDto`);
+  }
+  const temp_url = parse_as_UrlDto(valueObject.url);
+  if (temp_url instanceof Error) return temp_url;
+  return new GetFileSystemAndPathFromUrlParamsDto({
+    url: temp_url,
+  });
+}
+// Automatically generated via DataTransferObject for GetFileSystemAndPathFromUrlParamsDto
+// Do not edit!
+export class GetFileSystemAndPathFromUrlParamsDto {
+  public url: UrlDto;
+  constructor(_params: {
+    url: UrlDto;
+  }) {
+    this.url = _params.url;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "GetFileSystemAndPathFromUrlParamsDto",
+      url: this.url.toJsonValue(),
+    };
+  }
+  public static fromJsonValue(value: JsonValue): GetFileSystemAndPathFromUrlParamsDto | Error {
+    return parse_as_GetFileSystemAndPathFromUrlParamsDto(value);
+  }
+}
+
+export function parse_as_GetFileSystemAndPathFromUrlResponseDto(
+  value: JsonValue,
+): GetFileSystemAndPathFromUrlResponseDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "GetFileSystemAndPathFromUrlResponseDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a GetFileSystemAndPathFromUrlResponseDto`);
+  }
+  const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.fs);
+  if (temp_fs instanceof Error) return temp_fs;
+  const temp_path = parse_as_str(valueObject.path);
+  if (temp_path instanceof Error) return temp_path;
+  return new GetFileSystemAndPathFromUrlResponseDto({
+    fs: temp_fs,
+    path: temp_path,
+  });
+}
+// Automatically generated via DataTransferObject for GetFileSystemAndPathFromUrlResponseDto
+// Do not edit!
+export class GetFileSystemAndPathFromUrlResponseDto {
+  public fs: OsfsDto | HttpFsDto | BucketFSDto;
+  public path: string;
+  constructor(_params: {
+    fs: OsfsDto | HttpFsDto | BucketFSDto;
+    path: string;
+  }) {
+    this.fs = _params.fs;
+    this.path = _params.path;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "GetFileSystemAndPathFromUrlResponseDto",
+      fs: toJsonValue(this.fs),
+      path: this.path,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): GetFileSystemAndPathFromUrlResponseDto | Error {
+    return parse_as_GetFileSystemAndPathFromUrlResponseDto(value);
+  }
+}
+
 export function parse_as_CheckDatasourceCompatibilityParams(
   value: JsonValue,
 ): CheckDatasourceCompatibilityParams | Error {

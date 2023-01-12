@@ -503,6 +503,15 @@ class GetDatasourcesFromUrlResponseDto(DataTransferObject):
 
 
 @dataclass
+class GetFileSystemAndPathFromUrlParamsDto(DataTransferObject):
+    url: UrlDto
+@dataclass
+class GetFileSystemAndPathFromUrlResponseDto(DataTransferObject):
+    fs: FsDto
+    path: str
+
+
+@dataclass
 class CheckDatasourceCompatibilityParams(DataTransferObject):
     datasources: Tuple[FsDataSourceDto, ...]
     # classifier_generation: int

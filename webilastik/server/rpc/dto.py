@@ -4274,6 +4274,88 @@ class GetDatasourcesFromUrlResponseDto(DataTransferObject):
         return parse_as_GetDatasourcesFromUrlResponseDto(value)
 
 
+def parse_as_GetFileSystemAndPathFromUrlParamsDto(
+    value: JsonValue,
+) -> "GetFileSystemAndPathFromUrlParamsDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as GetFileSystemAndPathFromUrlParamsDto"
+        )
+    if value.get("__class__") != "GetFileSystemAndPathFromUrlParamsDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as GetFileSystemAndPathFromUrlParamsDto"
+        )
+    tmp_url = parse_as_UrlDto(value.get("url"))
+    if isinstance(tmp_url, MessageParsingError):
+        return tmp_url
+    return GetFileSystemAndPathFromUrlParamsDto(
+        url=tmp_url,
+    )
+
+
+@dataclass
+class GetFileSystemAndPathFromUrlParamsDto(DataTransferObject):
+    url: UrlDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "GetFileSystemAndPathFromUrlParamsDto",
+            "url": self.url.to_json_value(),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "GetFileSystemAndPathFromUrlParamsDto | MessageParsingError":
+        return parse_as_GetFileSystemAndPathFromUrlParamsDto(value)
+
+
+def parse_as_GetFileSystemAndPathFromUrlResponseDto(
+    value: JsonValue,
+) -> "GetFileSystemAndPathFromUrlResponseDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as GetFileSystemAndPathFromUrlResponseDto"
+        )
+    if value.get("__class__") != "GetFileSystemAndPathFromUrlResponseDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as GetFileSystemAndPathFromUrlResponseDto"
+        )
+    tmp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(value.get("fs"))
+    if isinstance(tmp_fs, MessageParsingError):
+        return tmp_fs
+    tmp_path = parse_as_str(value.get("path"))
+    if isinstance(tmp_path, MessageParsingError):
+        return tmp_path
+    return GetFileSystemAndPathFromUrlResponseDto(
+        fs=tmp_fs,
+        path=tmp_path,
+    )
+
+
+@dataclass
+class GetFileSystemAndPathFromUrlResponseDto(DataTransferObject):
+    fs: FsDto
+    path: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "GetFileSystemAndPathFromUrlResponseDto",
+            "fs": convert_to_json_value(self.fs),
+            "path": self.path,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "GetFileSystemAndPathFromUrlResponseDto | MessageParsingError":
+        return parse_as_GetFileSystemAndPathFromUrlResponseDto(value)
+
+
 def parse_as_CheckDatasourceCompatibilityParams(
     value: JsonValue,
 ) -> "CheckDatasourceCompatibilityParams | MessageParsingError":

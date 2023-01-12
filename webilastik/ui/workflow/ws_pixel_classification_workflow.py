@@ -24,11 +24,11 @@ from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonO
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource, PrecomputedChunksInfo
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale
-from webilastik.filesystem import FsFileNotFoundException, FsIoException, IFilesystem, create_filesystem_from_message
+from webilastik.filesystem import FsFileNotFoundException, FsIoException, IFilesystem, create_filesystem_from_message, create_filesystem_from_url
 from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.server.util import get_encoded_datasource_from_url
-from webilastik.server.rpc.dto import GetDatasourcesFromUrlParamsDto, GetDatasourcesFromUrlResponseDto, ListFsDirRequest, ListFsDirResponse, LoadProjectParamsDto, MessageParsingError, RpcErrorDto, SaveProjectParamsDto
+from webilastik.server.rpc.dto import GetDatasourcesFromUrlParamsDto, GetDatasourcesFromUrlResponseDto, GetFileSystemAndPathFromUrlParamsDto, GetFileSystemAndPathFromUrlResponseDto, ListFsDirRequest, ListFsDirResponse, LoadProjectParamsDto, MessageParsingError, RpcErrorDto, SaveProjectParamsDto
 from webilastik.server.session_allocator import uncachable_json_response
 from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError
@@ -174,6 +174,10 @@ class WebIlastik:
                 self.get_datasources_from_url
             ),
             web.post(
+                "/try_get_fs_and_path_from_url",
+                self.try_get_fs_and_path_from_url
+            ),
+            web.post(
                 "/check_datasource_compatibility",
                 lambda request: self.workflow.pixel_classifier_applet.check_datasource_compatibility(request)
             ),
@@ -233,6 +237,26 @@ class WebIlastik:
             )
         return uncachable_json_response(
             GetDatasourcesFromUrlResponseDto(datasources=datasources_result.to_dto()).to_json_value(),
+            status=200,
+        )
+
+    async def try_get_fs_and_path_from_url(self, request: web.Request) -> web.Response:
+        params = GetFileSystemAndPathFromUrlParamsDto.from_json_value(await request.json())
+        if isinstance(params, MessageParsingError):
+            return  uncachable_json_response(RpcErrorDto(error="bad payload").to_json_value(), status=400)
+        url = Url.from_dto(params.url)
+
+        result = await asyncio.wrap_future(self.executor.submit(
+            create_filesystem_from_url, url=url,
+        ))
+        if isinstance(result, Exception):
+            return uncachable_json_response(RpcErrorDto(error=str(result)).to_json_value(), status=400)
+        fs, path = result
+        return uncachable_json_response(
+            GetFileSystemAndPathFromUrlResponseDto(
+                fs=fs.to_dto(),
+                path=path.as_posix(),
+            ).to_json_value(),
             status=200,
         )
 

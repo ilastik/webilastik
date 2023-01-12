@@ -42,6 +42,8 @@ import {
     DziLevelDataSourceDto,
     DziLevelDto,
     DziLevelSinkDto,
+    GetFileSystemAndPathFromUrlParamsDto,
+    GetFileSystemAndPathFromUrlResponseDto,
 } from "./dto"
 
 export type HpcSiteName = ComputeSessionStatusDto["hpc_site"] //FIXME?
@@ -383,6 +385,26 @@ export class Session{
             return responseDto.datasources.map(msg => FsDataSource.fromDto(msg))
         }
         return FsDataSource.fromDto(responseDto.datasources)
+    }
+
+    public async tryGetFsAndPathFromUrl(params: GetFileSystemAndPathFromUrlParamsDto): Promise<{fs: Filesystem, path: Path} | Error>{
+        //try_get_fs_and_path_from_url
+        let result = await fetchJson(this.sessionUrl.joinPath("try_get_fs_and_path_from_url").raw, {
+            method: "POST",
+            body: JSON.stringify(toJsonValue(params)),
+            cache: "no-store", //FIXME: why can't this be cached again? Nonces in URLs? Tokens in Filesystems?
+        })
+        if(result instanceof Error){
+            return result
+        }
+        const responseDto =  GetFileSystemAndPathFromUrlResponseDto.fromJsonValue(result);
+        if(responseDto instanceof Error){
+            return responseDto
+        }
+        return {
+            fs: Filesystem.fromDto(responseDto.fs),
+            path: Path.parse(responseDto.path),
+        }
     }
 
     public async listFsDir(params: ListFsDirRequest): Promise<ListFsDirResponse | Error> {
