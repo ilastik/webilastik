@@ -46,9 +46,10 @@ export class LiveFsTree{
         }
         return selected_nodes
     }
-
-    public getSelectedUrls(): Array<Url>{
-        return this.getSelectedNodes().map(node => this.fs.getUrl(node.path))
+    public getSelectedPaths(): Array<Path>{
+        return this.getSelectedNodes().map(node => node.path)
     }
-
+    public getSelectedUrls(): Array<Url>{
+        return this.getSelectedPaths().map(path => this.fs.getUrl(path))
+    }
 }
