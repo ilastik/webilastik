@@ -1,1 +1,0 @@
-javascript:(function(){var s=document.createElement("script");s.src="https://app.ilastik.org/api/js/inject_into_img.js"; s.onload=() => window.inject_ilastik_into_images(new URL("https://app.ilastik.org/api"), new URL("https://app.ilastik.org/api/css/main.css"));document.head.appendChild(s)})();
