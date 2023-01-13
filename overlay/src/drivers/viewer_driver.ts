@@ -47,6 +47,7 @@ export interface IViewerDriver{
     removeViewportsChangedHandler: (handler: () => void) => void;
     addDataChangedHandler: (handler: () => void) => void;
     removeDataChangedHandler: (handler: () => void) => void;
+    getContainerForWebilastikControls: () => HTMLElement | undefined;
 
     /**
      * Gets the IDataView being displayed, if any. This is usually somethingl like the "active tab" of a viewer

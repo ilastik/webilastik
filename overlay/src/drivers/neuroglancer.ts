@@ -1,5 +1,7 @@
 import { vec3, mat4, quat } from "gl-matrix"
 import { IViewportDriver, IViewerDriver } from "..";
+import { CssClasses } from "../gui/css_classes";
+import { Div } from "../gui/widgets/widget";
 import { getElementContentRect } from "../util/misc";
 import { Url } from "../util/parsed_url";
 import { INativeView } from "./viewer_driver";
@@ -88,6 +90,7 @@ const defaultShader = 'void main() {\n  emitGrayscale(toNormalized(getDataValue(
 
 export class NeuroglancerDriver implements IViewerDriver{
     private generation = 0
+    private containerForWebilastikControls: HTMLElement | undefined
 
     constructor(public readonly viewer: any){
         this.guessShader()
@@ -150,6 +153,17 @@ export class NeuroglancerDriver implements IViewerDriver{
     }
     public removeDataChangedHandler(handler: () => void){
         this.viewer.layerManager.layersChanged.remove(handler)
+    }
+    public getContainerForWebilastikControls(): HTMLElement | undefined{
+        if(!this.containerForWebilastikControls){
+            let ngContainer = document.querySelector("#neuroglancer-container")! as HTMLElement;
+            this.containerForWebilastikControls = new Div({
+                parentElement: undefined,
+                cssClasses: [CssClasses.ItkContainerForWebilastikControls]
+            }).element
+            ngContainer.parentElement!.insertBefore(this.containerForWebilastikControls, ngContainer)
+        }
+        return this.containerForWebilastikControls
     }
 
     refreshView(params: {native_view: INativeView, similar_url_hint?: string, channel_colors?: vec3[]}){

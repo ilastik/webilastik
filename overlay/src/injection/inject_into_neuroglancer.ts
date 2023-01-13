@@ -11,7 +11,6 @@ import { Url } from "../util/parsed_url";
     let viewer : any = (<any>window)["viewer"];
 
     const overlay_controls = new OverlayControls({
-        parentElement: document.body,
         viewer_driver: new NeuroglancerDriver(viewer),
         ilastikUrl: ilastikUrl ? Url.parse(ilastikUrl.toString()) : undefined,
     })
