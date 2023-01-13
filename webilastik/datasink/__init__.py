@@ -7,7 +7,7 @@ import numpy as np
 from ndstructs.point5D import Shape5D, Interval5D
 from ndstructs.array5D import Array5D
 from webilastik.filesystem import IFilesystem
-from webilastik.server.rpc.dto import DataSinkDto, PrecomputedChunksSinkDto
+from webilastik.server.rpc.dto import DataSinkDto, DziLevelSinkDto, PrecomputedChunksSinkDto
 from webilastik.utility.url import Url
 
 class IDataSinkWriter(Protocol):
@@ -44,6 +44,9 @@ class DataSink(ABC):
         if isinstance(message, PrecomputedChunksSinkDto):
             from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
             return PrecomputedChunksSink.from_dto(message)
+        if isinstance(message, DziLevelSinkDto):
+            from webilastik.datasink.deep_zoom_sink import DziLevelSink
+            return DziLevelSink.from_dto(message)
         from webilastik.datasink.n5_dataset_sink import N5DataSink
         return N5DataSink.from_dto(message)
 

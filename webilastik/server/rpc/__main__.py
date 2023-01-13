@@ -301,8 +301,11 @@ class DtoHint(Hint):
                 "from collections.abc import Mapping",
                 "if not isinstance(value, Mapping):",
                 f"    return MessageParsingError(f\"Could not parse {{json.dumps(value)}} as {class_name}\")",
-                f"if value.get('{tag_key}') != '{tag_value}':",
-                f"    return MessageParsingError(f\"Could not parse {{json.dumps(value)}} as {class_name}\")",
+
+                *([
+                    f"if value.get('{tag_key}') != '{tag_value}':",
+                    f"    return MessageParsingError(f\"Could not parse {{json.dumps(value)}} as {class_name}\")",
+                ] if tag_value is not None else []),
                 *list(itertools.chain(*(
                     [
                         f"tmp_{field_name} =  {hint.py_fromJsonValue_function.name}(value.get('{field_name}'))",
@@ -320,9 +323,11 @@ class DtoHint(Hint):
                 "if(valueObject instanceof Error){",
                 "    return valueObject;",
                 "}",
-               f"if (valueObject['{tag_key}'] != '{tag_value_ts}') {{",
-               f"    return Error(`Could not deserialize ${{JSON.stringify(valueObject)}} as a {class_name}`);",
-               f"}}",
+               *([
+                    f"if (valueObject['{tag_key}'] != '{tag_value_ts}') {{",
+                    f"    return Error(`Could not deserialize ${{JSON.stringify(valueObject)}} as a {class_name}`);",
+                    f"}}"
+               ] if tag_value is not None else []),
                 *list(itertools.chain(*(
                     [
                     f"const temp_{field_name} = {hint.ts_fromJsonValue_function.name}(valueObject.{field_name})",

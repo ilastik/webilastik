@@ -10,7 +10,7 @@ export class DataProxyFilePicker{
     element: Div;
 
     constructor(params: {
-        parentElement: HTMLElement,
+        parentElement: HTMLElement | undefined,
         session: Session,
         onOk: (liveFsTree: LiveFsTree) => void,
         okButtonValue?: string,

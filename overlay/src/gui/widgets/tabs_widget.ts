@@ -11,7 +11,7 @@ export class TabsWidget<WIDGET extends Widget<any>>{
     private _current: {label: string, widget: WIDGET};
 
     constructor(params: {
-        parentElement: HTMLElement,
+        parentElement: HTMLElement | undefined,
         tabBodyWidgets: Map<string, WIDGET>,
         onSwitch?: (label: string, activeWidget: WIDGET, allWidgets: Array<WIDGET>) => void,
     }){

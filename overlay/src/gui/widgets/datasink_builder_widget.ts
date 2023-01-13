@@ -242,7 +242,7 @@ export class DatasinkConfigWidget{
         dtype: DataType,
         resolution: [number, number, number],
         tile_shape: Shape5D,
-    }): PrecomputedChunksSink | N5DataSink | undefined{
+    }): DataSinkUnion | undefined{
         return this.tabs.current.widget.tryMakeDataSink(params)
     }
 }

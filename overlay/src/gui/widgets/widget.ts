@@ -114,6 +114,21 @@ export class Span extends ContainerWidget<"span">{
     }
 }
 
+export class Form extends ContainerWidget<"form">{
+    constructor(params: WidgetParams & {children?: Array<Widget<TagName>>}){
+        super({...params, tagName: "form"})
+    }
+
+    public preventSubmitWith(callback: () => void){
+        this.element.addEventListener("submit", (ev): false => {
+            ev.preventDefault()
+            ev.stopPropagation()
+            callback()
+            return false
+        })
+    }
+}
+
 export class Anchor extends ContainerWidget<"a">{
     constructor(params: WidgetParams & {
         children?: Array<Widget<TagName>>,

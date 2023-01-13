@@ -48,7 +48,10 @@ export class PopupWidget extends Div{
     public destroy(){
         this.background.destroy()
         super.destroy()
-        PopupWidget.popupStack.pop()
+        let popupIndex = PopupWidget.popupStack.indexOf(this)
+        if(popupIndex >= 0){
+            PopupWidget.popupStack.splice(popupIndex, 1)
+        }
         if(PopupWidget.popupStack.length > 0){
             PopupWidget.popupStack[PopupWidget.popupStack.length - 1].show(true)
         }

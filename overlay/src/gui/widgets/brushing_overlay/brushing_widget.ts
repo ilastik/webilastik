@@ -88,6 +88,7 @@ export class BrushingWidget{
             })
 
         viewer.addDataChangedHandler(() => this.handleViewerDataDisplayChange())
+        viewer.addViewportsChangedHandler(() => this.handleViewerDataDisplayChange())
         // this.setBrushingEnabled(false)
         this.handleViewerDataDisplayChange()
     }

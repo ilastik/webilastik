@@ -22,6 +22,17 @@
     --default-log-font-size: calc(var(--default-font-size) - 2px);
 }
 
+/* This is required for neuroglancer since the NG container is a direct child of body*/
+body{
+    display: flex;
+    flex-direction: row;
+}
+
+.ItkContainerForWebilastikControls{
+    display: inline-flex;
+}
+
+
 .ItkErrorText{
     color: var(--default-error-color);
 }
@@ -43,12 +54,10 @@
     padding: 0;
     background-color: var(--default-background-color);
     color: var(--default-text-color);
-    resize: both;
+    resize: horizontal;
     overflow: auto;
     max-width: 30em;
-    filter: drop-shadow(10px 10px 4px rgba(0,0,0, 0.3));
     user-select: none;
-    max-height: 80vh;
 }
 
 .ItkTable{
