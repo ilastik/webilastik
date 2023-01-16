@@ -1,11 +1,13 @@
 // import { ListFsDirRequest } from "../../client/dto";
-import { Session } from "../../client/ilastik";
-import { View, ViewUnion } from "../../viewer/view";
+import { PrecomputedChunksDataSource, Session } from "../../client/ilastik";
+import { Url } from "../../util/parsed_url";
+import { FailedView, RawDataView, View } from "../../viewer/view";
 import { Viewer } from "../../viewer/viewer";
 import { CollapsableWidget } from "./collapsable_applet_gui";
 import { DataProxyFilePicker } from "./data_proxy_file_picker";
 import { LiveFsTree } from "./live_fs_tree";
-import { ErrorPopupWidget, PopupWidget } from "./popup";
+import { PopupWidget } from "./popup";
+import { Anchor, Div, Paragraph, Span } from "./widget";
 
 export class DataSourceSelectionWidget{
     private element: HTMLDetailsElement;
@@ -35,15 +37,56 @@ export class DataSourceSelectionWidget{
         let viewPromises = liveFsTree.getSelectedUrls().map(url => View.tryOpen({
             name: url.path.name, url, session: this.session
         }))
-        const viewsToOpen = new Array<ViewUnion>();
+
+        let imageServiceHintWidget: Div | undefined = undefined
+        let errorMessageWidgets = new Array<Paragraph>();
+
+
         for(const viewPromise of viewPromises){
             const viewResult = await viewPromise;
-            if(viewResult instanceof Error){
-                new ErrorPopupWidget({message: `Could not open view: ${viewResult.message}`})
-                return
+            if(viewResult instanceof FailedView){
+                errorMessageWidgets.push(new Paragraph({
+                    parentElement: undefined, innerText: `Could not open view: ${viewResult.url}`
+                }))
+            }else if(viewResult instanceof RawDataView && viewResult.getDatasources()?.find(ds => !(ds instanceof PrecomputedChunksDataSource))){
+                errorMessageWidgets.push(new Paragraph({
+                    parentElement: undefined, innerText: `Unsupported format: ${viewResult.url}`
+                }))
+                imageServiceHintWidget = imageServiceHintWidget || new Div({parentElement: undefined, children: [
+                    new Paragraph({
+                        parentElement: undefined,
+                        children: [
+                            new Span({parentElement: undefined, innerText:
+                                `Only datasources in Neuroglancer's Precomputed Chunks format are supported in the viewer at this time ` +
+                                `(though you might still be able to use it in batch export).` +
+                                `You can try converting your images to the Precomputed Chunks format by using the `,
+                            }),
+                            new Anchor({
+                                parentElement: undefined,
+                                href: Url.parse('https://wiki.ebrains.eu/bin/view/Collabs/hbp-image-service-user-guide/'),
+                                rel: "noopener noreferrer",
+                                target: "_blank",
+                                children: [
+                                    new Span({parentElement: undefined, innerText: 'EBRAINS image service'})
+                                ]
+                            })
+                        ]
+                    })
+
+                ]})
+            }else{
+                this.viewer.openDataView(viewResult)
             }
-            viewsToOpen.push(viewResult)
         }
-        viewsToOpen.forEach(v => this.viewer.openDataView(v))
+
+        if(errorMessageWidgets.length > 0 || imageServiceHintWidget){
+            let popup = new PopupWidget("Errors when opening data sources", true)
+            if(imageServiceHintWidget){
+                popup.appendChild(imageServiceHintWidget)
+            }
+            for(const errorMsgWidget of errorMessageWidgets){
+                popup.appendChild(errorMsgWidget)
+            }
+        }
     }
 }
