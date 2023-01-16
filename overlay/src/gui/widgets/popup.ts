@@ -30,7 +30,7 @@ export class PopupWidget extends Div{
             text: title,
             widgetsRight: closable ?
                 [
-                    new Button({inputType: "button", text: "x", parentElement: undefined, onClick: () => this.destroy()})
+                    new Button({inputType: "button", text: "✖", parentElement: undefined, onClick: () => this.destroy()})
                 ] : []
         })
         this.contents = new Div({parentElement: this.element, cssClasses: [CssClasses.ItkPopupContents]})
