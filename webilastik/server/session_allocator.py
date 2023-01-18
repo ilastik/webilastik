@@ -131,8 +131,8 @@ def require_ebrains_login(
 
     return wrapper
 
-HpcSiteName = Literal["LOCAL", "CSCS", "JUSUF"]
-HPC_SITE_NAMES: Set[HpcSiteName] = set(["LOCAL", "CSCS", "JUSUF"])
+HpcSiteName = Literal["LOCAL_DASK", "LOCAL_PROCESS_POOL", "CSCS", "JUSUF"]
+HPC_SITE_NAMES: Set[HpcSiteName] = set(["LOCAL_DASK", "LOCAL_PROCESS_POOL", "CSCS", "JUSUF"])
 
 class SessionAllocator:
     def __init__(
@@ -144,7 +144,10 @@ class SessionAllocator:
         allow_local_sessions: bool = False,
     ):
         self.fernet = fernet
-        self.session_launchers: Dict[HpcSiteName, SshJobLauncher] = {} if not allow_local_sessions else {"LOCAL": LocalJobLauncher(fernet=fernet)}
+        self.session_launchers: Dict[HpcSiteName, SshJobLauncher] = {}
+        if allow_local_sessions:
+            self.session_launchers["LOCAL_DASK"] = LocalJobLauncher(fernet=fernet, executor_getter="dask")
+            self.session_launchers["LOCAL_PROCESS_POOL"] = LocalJobLauncher(fernet=fernet, executor_getter="default")
         self.session_launchers.update({
             "JUSUF": JusufSshJobLauncher(fernet=fernet),
             "CSCS": CscsSshJobLauncher(fernet=fernet),

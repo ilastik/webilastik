@@ -428,6 +428,7 @@ class LocalJobLauncher(SshJobLauncher):
     def __init__(
         self,
         *,
+        executor_getter: Literal["dask", "default"] = "default",
         user: Username = Username(getpass.getuser()),
         fernet: Fernet,
     ) -> None:
@@ -438,6 +439,7 @@ class LocalJobLauncher(SshJobLauncher):
             fernet=fernet,
         )
         self.sessions: Dict[NativeComputeSessionId, Tuple[ComputeSession, Popen[bytes]]] = {}
+        self.executor_getter = executor_getter
 
     def get_sbatch_launch_script(
         self,
@@ -512,13 +514,13 @@ class LocalJobLauncher(SshJobLauncher):
 
             PYTHONPATH="{webilastik_source_dir}"
             PYTHONPATH+=":{webilastik_source_dir}/ndstructs/"
-            PYTHONPATH+=":{webilastik_source_dir}/executor_getters/default/"
+            PYTHONPATH+=":{webilastik_source_dir}/executor_getters/{self.executor_getter}/"
             PYTHONPATH+=":{webilastik_source_dir}/caching/redis_cache/"
 
             export PYTHONPATH
             export REDIS_UNIX_SOCKET_PATH="{redis_unix_socket_path}"
 
-            "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py
+            {conda_env_dir / "bin/mpiexec -n 4" if self.executor_getter == "dask" else ""} "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py
 
             kill -2 $(cat {redis_pid_file})
             sleep 2
