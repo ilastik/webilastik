@@ -11,6 +11,8 @@ from ndstructs.utils.json_serializable import ensureJsonIntTripplet
 from webilastik.datasource import FsDataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksEncoder, PrecomputedChunksInfo
 from webilastik.filesystem import FsFileNotFoundException, IFilesystem, create_filesystem_from_message
+from webilastik.libebrains.user_credentials import EbrainsUserCredentials
+
 from webilastik.utility.url import Url
 from webilastik.server.rpc.dto import Interval5DDto, PrecomputedChunksDataSourceDto, Shape5DDto, dtype_to_dto
 
@@ -92,8 +94,11 @@ class PrecomputedChunksDataSource(FsDataSource):
         )
 
     @staticmethod
-    def from_dto(dto: PrecomputedChunksDataSourceDto) -> "PrecomputedChunksDataSource | Exception":
-        fs_result = create_filesystem_from_message(dto.filesystem)
+    def from_dto(
+        dto: PrecomputedChunksDataSourceDto,
+        ebrains_user_credentials: Optional[EbrainsUserCredentials],
+    ) -> "PrecomputedChunksDataSource | Exception":
+        fs_result = create_filesystem_from_message(dto.filesystem, ebrains_user_credentials=ebrains_user_credentials)
         if isinstance(fs_result, Exception):
             return fs_result
 

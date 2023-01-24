@@ -26,6 +26,9 @@ from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunk
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale
 from webilastik.filesystem import FsFileNotFoundException, FsIoException, IFilesystem, create_filesystem_from_message, create_filesystem_from_url
 from webilastik.filesystem.bucket_fs import BucketFs
+from webilastik.libebrains.oidc_client import OidcClient
+from webilastik.libebrains.user_credentials import EbrainsUserCredentials
+from webilastik.libebrains.user_token import UserToken
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.server.util import get_encoded_datasource_from_url
 from webilastik.server.rpc.dto import GetDatasourcesFromUrlParamsDto, GetDatasourcesFromUrlResponseDto, GetFileSystemAndPathFromUrlParamsDto, GetFileSystemAndPathFromUrlResponseDto, ListFsDirRequest, ListFsDirResponse, LoadProjectParamsDto, MessageParsingError, RpcErrorDto, SaveProjectParamsDto
@@ -126,6 +129,7 @@ class WebIlastik:
         max_duration_minutes: Minutes,
         session_url: Url,
         executor: Executor,
+        ebrains_user_credentials: Optional[EbrainsUserCredentials],
         ssl_context: Optional[ssl.SSLContext] = None
     ):
         super().__init__()
@@ -133,6 +137,7 @@ class WebIlastik:
         self.start_time_utc: Final[datetime.datetime] = datetime.datetime.now(datetime.timezone.utc)
         self.max_duration_minutes = max_duration_minutes
         self.session_url = session_url
+        self.ebrains_user_credentials = ebrains_user_credentials
         self.ssl_context = ssl_context
         self.websockets: List[web.WebSocketResponse] = []
         self._http_client_session: Optional[ClientSession] = None
@@ -144,7 +149,7 @@ class WebIlastik:
         self.workflow = WsPixelClassificationWorkflow(
             on_async_change=lambda: self.enqueue_user_interaction(user_interaction=lambda: None), #FIXME?
             executor=self.executor,
-            session_url=self.session_url,
+            ebrains_user_credentials=ebrains_user_credentials,
             priority_executor=self.priority_executor
         )
         self.app = web.Application()
@@ -200,7 +205,9 @@ class WebIlastik:
         params_result = ListFsDirRequest.from_json_value(await request.json())
         if isinstance(params_result, MessageParsingError):
             return uncachable_json_response(RpcErrorDto(error=str(params_result)).to_json_value(), status=400)
-        fs_result = create_filesystem_from_message(params_result.fs)
+        fs_result = create_filesystem_from_message(
+            params_result.fs, ebrains_user_credentials=self.ebrains_user_credentials
+        )
         if isinstance(fs_result, Exception):
             return uncachable_json_response(RpcErrorDto(error="Could not create filesystem").to_json_value(), status=400)
         items_result = fs_result.list_contents(path=PurePosixPath(params_result.path))
@@ -224,7 +231,7 @@ class WebIlastik:
         url = Url.from_dto(params.url)
 
         datasources_result = await asyncio.wrap_future(self.executor.submit(
-            try_get_datasources_from_url, url=url,
+            try_get_datasources_from_url, url=url, ebrains_user_credentials=self.ebrains_user_credentials,
         ))
         if isinstance(datasources_result, Exception):
             return uncachable_json_response(RpcErrorDto(error=str(datasources_result)).to_json_value(), status=400)
@@ -247,7 +254,7 @@ class WebIlastik:
         url = Url.from_dto(params.url)
 
         result = await asyncio.wrap_future(self.executor.submit(
-            create_filesystem_from_url, url=url,
+            create_filesystem_from_url, url=url, ebrains_user_credentials=self.ebrains_user_credentials
         ))
         if isinstance(result, Exception):
             return uncachable_json_response(RpcErrorDto(error=str(result)).to_json_value(), status=400)
@@ -362,7 +369,9 @@ class WebIlastik:
         params_result = SaveProjectParamsDto.from_json_value(payload)
         if isinstance(params_result, MessageParsingError):
             return web.Response(status=400, text=f"Bad payload")
-        fs_result = create_filesystem_from_message(params_result.fs)
+        fs_result = create_filesystem_from_message(
+            params_result.fs, ebrains_user_credentials=self.ebrains_user_credentials
+        ) # FIXME: run inside executor
         if isinstance(fs_result, Exception):
             return uncachable_json_response(RpcErrorDto(error=str(fs_result)).to_json_value(), status=400)
         file_path = PurePosixPath(params_result.project_file_path)
@@ -387,7 +396,9 @@ class WebIlastik:
         params_result = LoadProjectParamsDto.from_json_value(payload)
         if isinstance(params_result, MessageParsingError):
             return web.Response(status=400, text=f"Bad payload")
-        fs_result = create_filesystem_from_message(params_result.fs)
+        fs_result = create_filesystem_from_message(
+            params_result.fs, ebrains_user_credentials=self.ebrains_user_credentials
+        ) # FIXME: run inside executor
         if isinstance(fs_result, Exception):
             return uncachable_json_response(RpcErrorDto(error=str(fs_result)).to_json_value(), status=400)
         file_path = PurePosixPath(params_result.project_file_path)
@@ -407,6 +418,7 @@ class WebIlastik:
             executor=self.executor,
             priority_executor=self.priority_executor,
             session_url=self.session_url,
+            ebrains_user_credentials=self.ebrains_user_credentials,
         )
         if isinstance(new_workflow_result, Exception):
             return web.Response(status=400, text=f"Could not load project: {new_workflow_result}")
@@ -416,7 +428,9 @@ class WebIlastik:
 
     async def stripped_precomputed_info(self, request: web.Request) -> web.Response:
         """Serves a precomp info stripped of all but one scales"""
-        ds_result = get_encoded_datasource_from_url(match_info_key="encoded_datasource", request=request)
+        ds_result = get_encoded_datasource_from_url(
+            match_info_key="encoded_datasource", request=request, ebrains_user_credentials=self.ebrains_user_credentials
+        )
         if isinstance(ds_result, Exception):
             return uncachable_json_response(payload=f"Could not get data source from URL: {ds_result}", status=400)
         if not isinstance(ds_result, PrecomputedChunksDataSource):
@@ -449,7 +463,9 @@ class WebIlastik:
         zBegin = int(request.match_info.get("zBegin")) # type: ignore
         zEnd = int(request.match_info.get("zEnd")) # type: ignore
 
-        ds_result = get_encoded_datasource_from_url(match_info_key="encoded_datasource", request=request)
+        ds_result = get_encoded_datasource_from_url(
+            match_info_key="encoded_datasource", request=request, ebrains_user_credentials=self.ebrains_user_credentials
+        )
         if isinstance(ds_result, Exception):
             return uncachable_json_response(payload=f"Could not get data source from URL: {ds_result}", status=400)
         if not isinstance(ds_result, PrecomputedChunksDataSource):
@@ -475,7 +491,11 @@ class WebIlastik:
 
 if __name__ == '__main__':
     from webilastik.config import WorkflowConfig
-    workflow_config = WorkflowConfig.get()
+    workflow_config = WorkflowConfig.try_get_global()
+    if isinstance(workflow_config, Exception):
+        import sys
+        print("Could not load workflow configuration", file=sys.stdout)
+        exit(1)
 
     executor = get_executor(hint="server_tile_handler", max_workers=multiprocessing.cpu_count())
 
@@ -491,6 +511,7 @@ if __name__ == '__main__':
             executor=executor,
             max_duration_minutes=workflow_config.max_duration_minutes,
             session_url=workflow_config.session_url,
+            ebrains_user_credentials=workflow_config.ebrains_user_credentials,
         ).run(
             unix_socket_path=str(workflow_config.listen_socket),
         )

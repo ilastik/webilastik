@@ -5,6 +5,8 @@ from typing import Optional, Set, Iterable
 import enum
 import uuid
 
+from webilastik.server.rpc.dto import EbrainsOidcClientDto
+
 from ndstructs.utils.json_serializable import JsonValue, ensureJsonString
 
 from webilastik.utility.url import Url
@@ -57,6 +59,13 @@ class OidcClient:
         self.client_id: str = client_id
         self.client_secret: str = client_secret
         super().__init__()
+
+    def to_dto(self) -> EbrainsOidcClientDto:
+        return EbrainsOidcClientDto(client_id=self.client_id, client_secret=self.client_secret)
+
+    @classmethod
+    def from_dto(cls, dto: EbrainsOidcClientDto) -> "OidcClient":
+        return OidcClient(client_id=dto.client_id, client_secret=dto.client_secret)
 
     def create_user_login_url(self, *, redirect_uri: Url, scopes: Optional[Set["Scope"]] = None, state: Optional[str] = None) -> Url:
         scopes = scopes or set()

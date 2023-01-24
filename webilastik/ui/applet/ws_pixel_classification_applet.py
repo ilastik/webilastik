@@ -1,24 +1,49 @@
+from concurrent.futures import Executor
 from pathlib import PurePosixPath
-from typing import Optional, List
+from typing import Any, Callable, Mapping, Optional, List, Sequence
 import asyncio
 
 import numpy as np
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonBoolean
 from aiohttp import web
-from webilastik.classifiers.pixel_classifier import PixelClassifier
+from webilastik.annotations.annotation import Annotation, Color
+from webilastik.classifiers.pixel_classifier import PixelClassifier, VigraPixelClassifier
 
 from webilastik.datasource import DataRoi, FsDataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale, RawEncoder
+from webilastik.features.ilp_filter import IlpFilter
+from webilastik.libebrains.user_credentials import EbrainsUserCredentials
 from webilastik.server.util import get_encoded_datasource_from_url
 from webilastik.server.rpc import MessageParsingError
 from webilastik.server.rpc.dto import CheckDatasourceCompatibilityParams, CheckDatasourceCompatibilityResponse, RpcErrorDto
-from webilastik.ui.applet import CascadeError, UserPrompt
+from webilastik.ui.applet import AppletOutput, CascadeError, UserPrompt
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.usage_error import UsageError
 from webilastik.server.session_allocator import uncachable_json_response
 
 class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
+    def __init__(
+        self,
+        name: str,
+        *,
+        ebrains_user_credentials: Optional[EbrainsUserCredentials],
+        feature_extractors: AppletOutput[Sequence[IlpFilter]],
+        label_classes: AppletOutput[Mapping[Color, Sequence[Annotation]]],
+        executor: Executor,
+        on_async_change: Callable[[], Any],
+        pixel_classifier: "VigraPixelClassifier[IlpFilter] | None",
+    ):
+        self.ebrains_user_credentials = ebrains_user_credentials
+        super().__init__(
+            name=name,
+            feature_extractors=feature_extractors,
+            label_classes=label_classes,
+            executor=executor,
+            on_async_change=on_async_change,
+            pixel_classifier=pixel_classifier,
+        )
+
     def _get_json_state(self) -> JsonValue:
         with self.lock:
             state = self._state
@@ -48,7 +73,7 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
             return  uncachable_json_response(RpcErrorDto(error="bad payload").to_json_value(), status=400)
         datasources: List[FsDataSource] = []
         for dto in params.datasources:
-            ds = FsDataSource.try_from_message(dto)
+            ds = FsDataSource.try_from_message(dto, ebrains_user_credentials=self.ebrains_user_credentials)
             if isinstance(ds, Exception):
                 return uncachable_json_response(RpcErrorDto(error=str(ds)).to_json_value(), status=400)
             datasources.append(ds)
@@ -68,7 +93,9 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
         if not isinstance(classifier, PixelClassifier) :
             return web.json_response({"error": "Classifier is not ready yet"}, status=412)
 
-        ds_result = get_encoded_datasource_from_url(match_info_key="encoded_raw_data", request=request)
+        ds_result = get_encoded_datasource_from_url(
+            match_info_key="encoded_raw_data", request=request, ebrains_user_credentials=self.ebrains_user_credentials
+        )
         if isinstance(ds_result, Exception):
             return uncachable_json_response(payload=f"Could not get data source from URL: {ds_result}", status=400)
 
@@ -101,7 +128,9 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
         zBegin = int(request.match_info.get("zBegin")) # type: ignore
         zEnd = int(request.match_info.get("zEnd")) # type: ignore
 
-        ds_result = get_encoded_datasource_from_url(match_info_key="encoded_raw_data", request=request)
+        ds_result = get_encoded_datasource_from_url(
+            match_info_key="encoded_raw_data", request=request, ebrains_user_credentials=self.ebrains_user_credentials
+        )
         if isinstance(ds_result, Exception):
             return uncachable_json_response(payload=f"Could not get data source from URL: {ds_result}", status=400)
         datasource = ds_result

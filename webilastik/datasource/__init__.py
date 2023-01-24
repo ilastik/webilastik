@@ -12,9 +12,10 @@ import numpy as np
 from ndstructs.point5D import Shape5D, Interval5D, Point5D, SPAN
 from ndstructs.array5D import Array5D, SPAN_OVERRIDE, All
 from webilastik.filesystem import IFilesystem
+from webilastik.libebrains.user_credentials import EbrainsUserCredentials
+
 from webilastik.server.rpc.dto import FsDataSourceDto, N5DataSourceDto, PrecomputedChunksDataSourceDto, SkimageDataSourceDto
 from webilastik.utility.url import Url
-from webilastik.utility.url import Url, Protocol
 from global_cache import global_cache
 
 
@@ -256,7 +257,7 @@ class FsDataSource(DataSource):
     @staticmethod
     def try_from_message(
         message: FsDataSourceDto,
-        allowed_protocols: Sequence[Protocol] = ("http", "https"),
+        ebrains_user_credentials: Optional[EbrainsUserCredentials],
     ) -> "FsDataSource | Exception":
         from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
         from webilastik.datasource.n5_datasource import N5DataSource
@@ -264,11 +265,11 @@ class FsDataSource(DataSource):
         from webilastik.datasource.deep_zoom_datasource import DziLevelDataSource
 
         if isinstance(message, PrecomputedChunksDataSourceDto):
-            return PrecomputedChunksDataSource.from_dto(message)
+            return PrecomputedChunksDataSource.from_dto(message, ebrains_user_credentials=ebrains_user_credentials)
         if isinstance(message, SkimageDataSourceDto):
-            return SkimageDataSource.from_dto(message)
+            return SkimageDataSource.from_dto(message, ebrains_user_credentials=ebrains_user_credentials)
         if isinstance(message, N5DataSourceDto):
-            return N5DataSource.from_dto(message)
-        return DziLevelDataSource.from_dto(message)
+            return N5DataSource.from_dto(message, ebrains_user_credentials=ebrains_user_credentials)
+        return DziLevelDataSource.from_dto(message, ebrains_user_credentials=ebrains_user_credentials)
 
     _datasource_cache: ClassVar[Dict[Url, Sequence['FsDataSource']]] = {}

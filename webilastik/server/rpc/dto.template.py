@@ -12,17 +12,6 @@ from webilastik.server.rpc import DataTransferObject
 # class DataType(DataTransferObject):
 #     type_name: Literal["uint8", "uint16", "uint32", "uint64", "float32"]
 
-@dataclass
-class ColorDto(DataTransferObject):
-    r: int
-    g: int
-    b: int
-
-@dataclass
-class LabelHeaderDto(DataTransferObject):
-    name: str
-    color: ColorDto
-
 Protocol = Literal["http", "https", "file", "memory"]
 
 @dataclass
@@ -34,6 +23,52 @@ class UrlDto(DataTransferObject):
     path: str
     search: Optional[Mapping[str, str]]
     fragment: Optional[str]
+
+@dataclass
+class EbrainsOidcClientDto(DataTransferObject):
+    client_id: str
+    client_secret: str
+
+@dataclass
+class EbrainsUserTokenDto(DataTransferObject):
+    access_token: str
+    refresh_token: str
+
+@dataclass
+class EbrainsUserCredentialsDto(DataTransferObject):
+    user_token: EbrainsUserTokenDto
+    oidc_client: Optional[EbrainsOidcClientDto]
+
+@dataclass
+class SessionAllocatorConfigDto(DataTransferObject):
+    allow_local_fs: bool
+    ebrains_oidc_client: EbrainsOidcClientDto
+    allow_local_compute_sessions: bool
+    b64_fernet_key: str
+    external_url: UrlDto
+
+@dataclass
+class WorkflowConfigDto(DataTransferObject):
+    allow_local_fs: bool
+    ebrains_user_credentials: Optional[EbrainsUserCredentialsDto]
+    max_duration_minutes: int
+    listen_socket: str
+    session_url: UrlDto
+    #tunnel parameters
+    session_allocator_host: str
+    session_allocator_username: str
+    session_allocator_socket_path: str
+
+@dataclass
+class ColorDto(DataTransferObject):
+    r: int
+    g: int
+    b: int
+
+@dataclass
+class LabelHeaderDto(DataTransferObject):
+    name: str
+    color: ColorDto
 
 @dataclass
 class Point5DDto(DataTransferObject):

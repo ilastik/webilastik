@@ -7,6 +7,7 @@ from aiohttp.client import ClientSession
 from aiohttp.client_exceptions import ClientResponseError
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString, ensureOptional
 from webilastik.libebrains.oidc_client import OidcClient
+from webilastik.server.rpc.dto import EbrainsUserTokenDto
 
 from webilastik.libebrains.user_info import UserInfo
 from webilastik.ui.usage_error import UsageError
@@ -89,6 +90,14 @@ class UserToken:
             refresh_token=ensureJsonString(value_obj.get("refresh_token")),
         )
 
+    @classmethod
+    def from_dto(cls, dto: EbrainsUserTokenDto) -> "UserToken":
+        return UserToken(access_token=dto.access_token, refresh_token=dto.refresh_token)
+
+    def to_dto(self) -> EbrainsUserTokenDto:
+        return EbrainsUserTokenDto(access_token=self.access_token, refresh_token=self.refresh_token)
+
+    # FIXME: remove this
     def to_json_value(self) -> JsonObject:
         return {
             "access_token": self.access_token,

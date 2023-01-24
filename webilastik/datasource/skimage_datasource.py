@@ -11,6 +11,8 @@ from ndstructs.point5D import Interval5D, Point5D, Shape5D
 
 from webilastik.datasource import FsDataSource
 from webilastik.filesystem import IFilesystem, create_filesystem_from_message
+from webilastik.libebrains.user_credentials import EbrainsUserCredentials
+
 from webilastik.server.rpc.dto import Interval5DDto, Shape5DDto, SkimageDataSourceDto, dtype_to_dto
 
 class SkimageDataSource(FsDataSource):
@@ -59,8 +61,12 @@ class SkimageDataSource(FsDataSource):
         return path.suffix.lower() in (".png", ".jpg", ".jpeg", ".bmp", ".gif")
 
     @staticmethod
-    def from_dto(dto: SkimageDataSourceDto) -> "SkimageDataSource | Exception":
-        fs_result = create_filesystem_from_message(dto.filesystem)
+    def from_dto(
+        dto: SkimageDataSourceDto, ebrains_user_credentials: Optional[EbrainsUserCredentials]
+    ) -> "SkimageDataSource | Exception":
+        fs_result = create_filesystem_from_message(
+            dto.filesystem, ebrains_user_credentials=ebrains_user_credentials,
+        )
         if isinstance(fs_result, Exception):
             return fs_result
 

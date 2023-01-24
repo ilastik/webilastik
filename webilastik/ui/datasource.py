@@ -6,7 +6,8 @@ from webilastik.datasource import FsDataSource
 from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.filesystem import FsFileNotFoundException, create_filesystem_from_url
-from webilastik.libebrains.user_token import UserToken
+from webilastik.libebrains.user_credentials import EbrainsUserCredentials
+
 from webilastik.ui import parse_url
 from webilastik.ui.usage_error import UsageError
 
@@ -16,7 +17,7 @@ from webilastik.utility.url import Url
 def try_get_datasources_from_url(
     *,
     url: Union[Url, str],
-    ebrains_user_token: Optional[UserToken] = None,
+    ebrains_user_credentials: Optional[EbrainsUserCredentials],
 ) -> "FsDataSource | Tuple[FsDataSource, ...] | None | Exception":
     if isinstance(url, str):
         parsing_result = parse_url(url)
@@ -24,7 +25,7 @@ def try_get_datasources_from_url(
             return parsing_result
         url = parsing_result
 
-    fs_result = create_filesystem_from_url(url=url)
+    fs_result = create_filesystem_from_url(url=url, ebrains_user_credentials=ebrains_user_credentials)
     if isinstance(fs_result, Exception):
         return fs_result
     fs, path = fs_result

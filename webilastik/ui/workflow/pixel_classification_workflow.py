@@ -3,7 +3,7 @@
 from concurrent.futures import Executor
 import os
 from pathlib import Path, PurePosixPath
-from typing import Callable, Dict, Sequence, Set
+from typing import Callable, Dict, Optional, Sequence, Set
 import tempfile
 
 import h5py
@@ -17,6 +17,7 @@ from webilastik.datasource import FsDataSource
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.filesystem import IFilesystem
 from webilastik.filesystem.os_fs import OsFs
+from webilastik.libebrains.user_credentials import EbrainsUserCredentials
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet.brushing_applet import Label, WsBrushingApplet
 from webilastik.ui.applet.feature_selection_applet import WsFeatureSelectionApplet
@@ -37,6 +38,7 @@ class PixelClassificationWorkflow:
         on_async_change: Callable[[], None],
         executor: Executor,
         priority_executor: PriorityExecutor,
+        ebrains_user_credentials: Optional[EbrainsUserCredentials],
 
         feature_extractors: "Set[IlpFilter] | None" = None,
         labels: Sequence[Label] = (),
@@ -50,6 +52,7 @@ class PixelClassificationWorkflow:
 
         self.brushing_applet = WsBrushingApplet(
             name="brushing_applet",
+            ebrains_user_credentials=ebrains_user_credentials,
             labels=labels if len(labels) > 0 else [
                 Label(
                     name="Foreground",
@@ -70,6 +73,7 @@ class PixelClassificationWorkflow:
 
         self.pixel_classifier_applet = WsPixelClassificationApplet(
             "pixel_classification_applet",
+            ebrains_user_credentials=ebrains_user_credentials,
             feature_extractors=self.feature_selection_applet.feature_extractors,
             label_classes=self.brushing_applet.label_classes,
             executor=priority_executor,
@@ -79,6 +83,7 @@ class PixelClassificationWorkflow:
 
         self.export_applet = WsPixelClassificationExportApplet(
             name="export_applet",
+            ebrains_user_credentials=ebrains_user_credentials,
             priority_executor=priority_executor,
             operator=self.pixel_classifier_applet.pixel_classifier,
             datasource_suggestions=self.brushing_applet.datasources.transformed_with(
@@ -103,6 +108,7 @@ class PixelClassificationWorkflow:
         on_async_change: Callable[[], None],
         executor: Executor,
         priority_executor: PriorityExecutor,
+        ebrains_user_credentials: Optional[EbrainsUserCredentials],
     ) -> "PixelClassificationWorkflow | Exception":
         fs_result = OsFs.create()
         if isinstance(fs_result, Exception):
@@ -111,6 +117,7 @@ class PixelClassificationWorkflow:
             parsing_result = IlpPixelClassificationWorkflowGroup.parse(
                 group=f,
                 ilp_fs=fs_result,
+                ebrains_user_credentials=ebrains_user_credentials,
             )
             if isinstance(parsing_result, Exception):
                 return parsing_result
@@ -119,6 +126,7 @@ class PixelClassificationWorkflow:
                 on_async_change=on_async_change,
                 executor=executor,
                 priority_executor=priority_executor,
+                ebrains_user_credentials=ebrains_user_credentials,
 
                 feature_extractors=set(parsing_result.FeatureSelections.feature_extractors),
                 labels=parsing_result.PixelClassification.labels,
@@ -133,6 +141,7 @@ class PixelClassificationWorkflow:
         on_async_change: Callable[[], None],
         executor: Executor,
         priority_executor: PriorityExecutor,
+        ebrains_user_credentials: Optional[EbrainsUserCredentials],
     ) -> "PixelClassificationWorkflow | Exception":
         tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5") # FIXME
         num_bytes_written = os.write(tmp_file_handle, ilp_bytes)
@@ -143,6 +152,7 @@ class PixelClassificationWorkflow:
             on_async_change=on_async_change,
             executor=executor,
             priority_executor=priority_executor,
+            ebrains_user_credentials=ebrains_user_credentials,
         )
         os.remove(tmp_file_path)
         return workflow
@@ -178,7 +188,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         on_async_change: Callable[[], None],
         executor: Executor,
         priority_executor: PriorityExecutor,
-        session_url: Url,
+        ebrains_user_credentials: Optional[EbrainsUserCredentials],
 
         feature_extractors: "Set[IlpFilter] | None" = None,
         labels: Sequence[Label] = (),
@@ -187,6 +197,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         super().__init__(
             on_async_change=on_async_change,
             executor=executor,
+            ebrains_user_credentials=ebrains_user_credentials,
             priority_executor=priority_executor,
             feature_extractors=feature_extractors,
             labels=labels,
@@ -194,12 +205,14 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         )
 
     @staticmethod
-    def from_pixel_classification_workflow(workflow: PixelClassificationWorkflow, session_url: Url) -> "WsPixelClassificationWorkflow":
+    def from_pixel_classification_workflow(
+        workflow: PixelClassificationWorkflow, ebrains_user_credentials: Optional[EbrainsUserCredentials]
+    ) -> "WsPixelClassificationWorkflow":
         return WsPixelClassificationWorkflow(
             on_async_change=workflow.on_async_change,
             executor=workflow.executor,
+            ebrains_user_credentials=ebrains_user_credentials,
             priority_executor=workflow.priority_executor,
-            session_url=session_url,
             feature_extractors=set(workflow.feature_selection_applet.feature_extractors()),
             labels=workflow.brushing_applet.labels(),
             pixel_classifier=workflow.pixel_classifier_applet.pixel_classifier(),
@@ -211,6 +224,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         ilp_path: Path,
         on_async_change: Callable[[], None],
         executor: Executor,
+        ebrains_user_credentials: Optional[EbrainsUserCredentials],
         priority_executor: PriorityExecutor,
         session_url: Url,
     ) -> "WsPixelClassificationWorkflow | Exception":
@@ -227,6 +241,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         parsing_result = IlpPixelClassificationWorkflowGroup.parse(
             group=f,
             ilp_fs=fs_result,
+            ebrains_user_credentials=ebrains_user_credentials,
         )
         if isinstance(parsing_result, Exception):
             return parsing_result
@@ -234,11 +249,11 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             on_async_change=on_async_change,
             executor=executor,
             priority_executor=priority_executor,
+            ebrains_user_credentials=ebrains_user_credentials,
 
             feature_extractors=set(parsing_result.FeatureSelections.feature_extractors),
             labels=parsing_result.PixelClassification.labels,
             pixel_classifier=parsing_result.PixelClassification.classifier,
-            session_url=session_url,
         )
 
     @staticmethod
@@ -248,6 +263,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         on_async_change: Callable[[], None],
         executor: Executor,
         priority_executor: PriorityExecutor,
+        ebrains_user_credentials: Optional[EbrainsUserCredentials],
         session_url: Url,
     ) -> "WsPixelClassificationWorkflow | Exception":
         try:
@@ -262,6 +278,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             ilp_path=Path(tmp_file_path),
             on_async_change=on_async_change,
             executor=executor,
+            ebrains_user_credentials=ebrains_user_credentials,
             priority_executor=priority_executor,
             session_url=session_url,
         )

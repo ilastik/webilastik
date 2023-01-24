@@ -3,7 +3,7 @@
 from abc import abstractmethod
 import asyncio
 from subprocess import Popen
-from typing import Dict, Iterable, Literal, NewType, List, Set, Tuple
+from typing import Dict, Iterable, Literal, NewType, List, Optional, Set, Tuple
 import uuid
 import datetime
 import textwrap
@@ -18,10 +18,10 @@ from ndstructs.utils.json_serializable import ensureJsonObject, ensureJsonString
 from cryptography.fernet import Fernet
 from webilastik.config import WorkflowConfig
 
-from webilastik.libebrains.oidc_client import OidcClient
+from webilastik.libebrains.user_credentials import EbrainsUserCredentials
 from webilastik.libebrains.user_info import UserInfo
-from webilastik.libebrains.user_token import UserToken
 from webilastik.server.rpc.dto import ComputeSessionDto
+from webilastik.server.util import sanitize
 from webilastik.utility import ComputeNodes, Hostname, Minutes, NodeSeconds, Seconds, Username
 from webilastik.utility.url import Url
 
@@ -288,8 +288,7 @@ class SshJobLauncher:
         *,
         compute_session_id: uuid.UUID,
         allow_local_fs: bool,
-        ebrains_oidc_client: OidcClient,
-        ebrains_user_token: UserToken,
+        ebrains_user_credentials: Optional[EbrainsUserCredentials],
         max_duration_minutes: Minutes,
         session_url: Url,
         session_allocator_host: Hostname,
@@ -304,8 +303,7 @@ class SshJobLauncher:
         user_id: uuid.UUID,
         compute_session_id: uuid.UUID,
         allow_local_fs: bool,
-        ebrains_oidc_client: OidcClient,
-        ebrains_user_token: UserToken,
+        ebrains_user_credentials: Optional[EbrainsUserCredentials],
         max_duration_minutes: Minutes,
         session_url: Url,
         session_allocator_host: Hostname,
@@ -322,8 +320,7 @@ class SshJobLauncher:
             stdin=self.get_sbatch_launch_script(
                 compute_session_id=compute_session_id,
                 allow_local_fs=allow_local_fs,
-                ebrains_oidc_client=ebrains_oidc_client,
-                ebrains_user_token=ebrains_user_token,
+                ebrains_user_credentials=ebrains_user_credentials,
                 max_duration_minutes=max_duration_minutes,
                 session_url=session_url,
                 session_allocator_host=session_allocator_host,
@@ -446,8 +443,7 @@ class LocalJobLauncher(SshJobLauncher):
         *,
         compute_session_id: uuid.UUID,
         allow_local_fs: bool,
-        ebrains_oidc_client: OidcClient,
-        ebrains_user_token: UserToken,
+        ebrains_user_credentials: Optional[EbrainsUserCredentials],
         max_duration_minutes: Minutes,
         session_url: Url,
         session_allocator_host: Hostname,
@@ -457,8 +453,7 @@ class LocalJobLauncher(SshJobLauncher):
         working_dir = Path(f"/tmp/{compute_session_id}")
         job_config = WorkflowConfig(
             allow_local_fs=allow_local_fs,
-            ebrains_oidc_client=ebrains_oidc_client,
-            ebrains_user_token=ebrains_user_token,
+            ebrains_user_credentials=ebrains_user_credentials,
             max_duration_minutes=max_duration_minutes,
             listen_socket=working_dir / "to-master.sock",
             session_url=session_url,
@@ -466,15 +461,21 @@ class LocalJobLauncher(SshJobLauncher):
             session_allocator_username=session_allocator_username,
             session_allocator_socket_path=session_allocator_socket_path,
         )
-        webilastik_source_dir = Path(__file__).parent.parent.parent
-        redis_pid_file = f"{working_dir}/redis.pid"
-        redis_unix_socket_path = f"{working_dir}/redis.sock"
+        webilastik_source_dir = sanitize(Path(__file__).parent.parent.parent)
+        redis_pid_file = sanitize(working_dir / "redis.pid")
+        redis_unix_socket_path = sanitize(working_dir / "redis.sock")
         conda_env_dir = Path(os.path.realpath(sys.executable)).parent.parent
+        redis_server = sanitize(conda_env_dir / "bin/redis-server")
+        python_interpreter = sanitize(conda_env_dir / "bin/python")
+        mpi_exec = sanitize(conda_env_dir / "bin/mpiexec") + "-n 4"
+        dask_mpi = sanitize(conda_env_dir / "bin/dask-mpi")
+        scheduler_file = f"/tmp/dask_scheduler_{compute_session_id}.json"
+
 
         out = textwrap.dedent(textwrap.indent(f"""
             #!/bin/bash -l
 
-            {job_config.to_bash_exports()}
+            {job_config.to_bash_export()}
 
             set -xeu
             set -o pipefail
@@ -486,8 +487,8 @@ class LocalJobLauncher(SshJobLauncher):
             export OPENBLAS_NUM_THREADS=1
             export MKL_NUM_THREADS=1
 
-            test -x {conda_env_dir}/bin/redis-server
-            {conda_env_dir}/bin/redis-server \\
+            test -x {redis_server}
+            {redis_server} \\
                 --pidfile {redis_pid_file} \\
                 --unixsocket {redis_unix_socket_path} \\
                 --unixsocketperm 777 \\
@@ -520,7 +521,11 @@ class LocalJobLauncher(SshJobLauncher):
             export PYTHONPATH
             export REDIS_UNIX_SOCKET_PATH="{redis_unix_socket_path}"
 
-            {conda_env_dir / "bin/mpiexec -n 4" if self.executor_getter == "dask" else ""} "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py
+
+            {mpi_exec} {dask_mpi} --scheduler-file {scheduler_file}
+            sleep 5
+            export DASK_SCHEDULER_FILE={scheduler_file}
+            "{python_interpreter}" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py
 
             kill -2 $(cat {redis_pid_file})
             sleep 2
@@ -534,8 +539,7 @@ class LocalJobLauncher(SshJobLauncher):
         user_id: uuid.UUID,
         compute_session_id: uuid.UUID,
         allow_local_fs: bool,
-        ebrains_oidc_client: OidcClient,
-        ebrains_user_token: UserToken,
+        ebrains_user_credentials: Optional[EbrainsUserCredentials],
         max_duration_minutes: Minutes,
         session_url: Url,
         session_allocator_host: Hostname,
@@ -547,8 +551,7 @@ class LocalJobLauncher(SshJobLauncher):
             self.get_sbatch_launch_script(
                 compute_session_id=compute_session_id,
                 allow_local_fs=allow_local_fs,
-                ebrains_oidc_client=ebrains_oidc_client,
-                ebrains_user_token=ebrains_user_token,
+                ebrains_user_credentials=ebrains_user_credentials,
                 max_duration_minutes=max_duration_minutes,
                 session_url=session_url,
                 session_allocator_host=session_allocator_host,
@@ -625,8 +628,7 @@ class JusufSshJobLauncher(SshJobLauncher):
         *,
         compute_session_id: uuid.UUID,
         allow_local_fs: bool,
-        ebrains_oidc_client: OidcClient,
-        ebrains_user_token: UserToken,
+        ebrains_user_credentials: Optional[EbrainsUserCredentials],
         max_duration_minutes: Minutes,
         session_url: Url,
         session_allocator_host: Hostname,
@@ -636,8 +638,7 @@ class JusufSshJobLauncher(SshJobLauncher):
         working_dir = Path(f"$SCRATCH/{compute_session_id}")
         job_config = WorkflowConfig(
             allow_local_fs=allow_local_fs,
-            ebrains_oidc_client=ebrains_oidc_client,
-            ebrains_user_token=ebrains_user_token,
+            ebrains_user_credentials=ebrains_user_credentials,
             max_duration_minutes=max_duration_minutes,
             listen_socket=working_dir / "to-master.sock",
             session_url=session_url,
@@ -650,16 +651,20 @@ class JusufSshJobLauncher(SshJobLauncher):
         conda_env_dir = f"{home}/miniconda3/envs/webilastik"
         redis_pid_file = f"{working_dir}/redis.pid"
         redis_unix_socket_path = f"{working_dir}/redis.sock"
+        redis_num_threads = 6
+        ntasks = 10
+        webilastik_ntasks = ntasks - 1
+        cpus_per_webilastik_task = int((128 - redis_num_threads) / webilastik_ntasks)
 
         out = textwrap.dedent(textwrap.indent(f"""\
             #!/bin/bash -l
             #SBATCH --nodes=1
-            #SBATCH --ntasks=2
+            #SBATCH --ntasks={ntasks}
             #SBATCH --partition=batch
             #SBATCH --hint=nomultithread
 
             jutil env activate -p {self.account}
-            {job_config.to_bash_exports()}
+            {job_config.to_bash_export()}
 
             set -xeu
             set -o pipefail
@@ -671,14 +676,14 @@ class JusufSshJobLauncher(SshJobLauncher):
             mkdir {working_dir}
             cd {working_dir}
             # FIXME: download from github when possible
-            git clone --depth 1 --branch master {home}/webilastik.git {webilastik_source_dir}
+            git clone --depth 1 --branch experimental {home}/webilastik.git {webilastik_source_dir}
 
             # prevent numpy from spawning its own threads
             export OPENBLAS_NUM_THREADS=1
             export MKL_NUM_THREADS=1
 
             test -x {conda_env_dir}/bin/redis-server
-            srun -n 1 --overlap -u --cpu_bind=none --cpus-per-task 6 \\
+            srun -n 1 --overlap -u --cpu_bind=none --cpus-per-task {redis_num_threads} \\
                 {conda_env_dir}/bin/redis-server \\
                 --pidfile {redis_pid_file} \\
                 --unixsocket {redis_unix_socket_path} \\
@@ -705,14 +710,18 @@ class JusufSshJobLauncher(SshJobLauncher):
             fi
 
             PYTHONPATH="{webilastik_source_dir}"
-            PYTHONPATH+=":{webilastik_source_dir}/executor_getters/jusuf/"
+            PYTHONPATH+=":{webilastik_source_dir}/executor_getters/dask/"
             PYTHONPATH+=":{webilastik_source_dir}/caching/redis_cache/"
 
             export PYTHONPATH
             export REDIS_UNIX_SOCKET_PATH="{redis_unix_socket_path}"
 
-            srun -n 1 --overlap -u --cpus-per-task 120 \\
-                "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py \\
+            srun -n {webilastik_ntasks} --overlap -u --cpus-per-task {cpus_per_webilastik_task} \\
+                "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py &
+            WEBILASTIK_SRUN_PID=$!
+            sleep 15
+            pstree
+            wait $WEBILASTIK_SRUN_PID
 
             kill -2 $(cat {redis_pid_file}) #FXME: this only works because it's a single node
             sleep 2
@@ -735,8 +744,7 @@ class CscsSshJobLauncher(SshJobLauncher):
         *,
         compute_session_id: uuid.UUID,
         allow_local_fs: bool,
-        ebrains_oidc_client: OidcClient,
-        ebrains_user_token: UserToken,
+        ebrains_user_credentials: Optional[EbrainsUserCredentials],
         max_duration_minutes: Minutes,
         session_url: Url,
         session_allocator_host: Hostname,
@@ -746,8 +754,7 @@ class CscsSshJobLauncher(SshJobLauncher):
         working_dir = Path(f"$SCRATCH/{compute_session_id}")
         job_config = WorkflowConfig(
             allow_local_fs=allow_local_fs,
-            ebrains_oidc_client=ebrains_oidc_client,
-            ebrains_user_token=ebrains_user_token,
+            ebrains_user_credentials=ebrains_user_credentials,
             max_duration_minutes=max_duration_minutes,
             listen_socket=working_dir / "to-master.sock",
             session_url=session_url,
@@ -770,7 +777,7 @@ class CscsSshJobLauncher(SshJobLauncher):
             #SBATCH --hint=nomultithread
             #SBATCH --constraint=mc
 
-            {job_config.to_bash_exports()}
+            {job_config.to_bash_export()}
 
             set -xeu
             set -o pipefail

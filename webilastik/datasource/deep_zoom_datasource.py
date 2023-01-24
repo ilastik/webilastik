@@ -1,7 +1,7 @@
 # pyright: strict
 
 from dataclasses import dataclass
-from typing import Dict, Literal, Mapping, Sequence, Tuple, Any, cast
+from typing import Dict, Literal, Mapping, Optional, Sequence, Tuple, Any, cast
 from pathlib import PurePosixPath
 import logging
 import io
@@ -14,6 +14,8 @@ from ndstructs.array5D import Array5D
 
 from webilastik.datasource import FsDataSource
 from webilastik.filesystem import FsFileNotFoundException, IFilesystem
+from webilastik.libebrains.user_credentials import EbrainsUserCredentials
+
 from webilastik.server.rpc.dto import DziLevelDataSourceDto, DziLevelDto, Shape5DDto, dtype_to_dto
 from webilastik.filesystem import FsFileNotFoundException, IFilesystem, create_filesystem_from_message
 
@@ -224,8 +226,12 @@ class DziLevel:
         )
 
     @classmethod
-    def from_dto(cls, dto: DziLevelDto) -> "DziLevel | Exception":
-        fs_result = create_filesystem_from_message(dto.filesystem)
+    def from_dto(
+        cls, dto: DziLevelDto, ebrains_user_credentials: Optional[EbrainsUserCredentials]
+    ) -> "DziLevel | Exception":
+        fs_result = create_filesystem_from_message(
+            dto.filesystem, ebrains_user_credentials=ebrains_user_credentials
+        )
         if isinstance(fs_result, Exception):
             return fs_result
         return DziLevel(
@@ -286,8 +292,10 @@ class DziLevelDataSource(FsDataSource):
         )
 
     @staticmethod
-    def from_dto(dto: DziLevelDataSourceDto) -> "DziLevelDataSource | Exception":
-        level = DziLevel.from_dto(dto.level)
+    def from_dto(
+        dto: DziLevelDataSourceDto, ebrains_user_credentials: Optional[EbrainsUserCredentials]
+    ) -> "DziLevelDataSource | Exception":
+        level = DziLevel.from_dto(dto.level, ebrains_user_credentials=ebrains_user_credentials)
         if isinstance(level, Exception):
             return level
         return DziLevelDataSource(level=level)

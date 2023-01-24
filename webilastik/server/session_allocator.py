@@ -18,6 +18,7 @@ from cryptography.fernet import Fernet
 from ndstructs.utils.json_serializable import JsonValue
 
 from webilastik.libebrains.compute_session_launcher import CscsSshJobLauncher, JusufSshJobLauncher, LocalJobLauncher, Minutes, ComputeSession, SshJobLauncher
+from webilastik.libebrains.user_credentials import EbrainsUserCredentials
 from webilastik.libebrains.user_token import UserToken
 from webilastik.libebrains.oidc_client import OidcClient, Scope
 from webilastik.server.rpc.dto import (
@@ -141,10 +142,14 @@ class SessionAllocator:
         fernet: Fernet,
         external_url: Url,
         oidc_client: OidcClient,
+        ebrains_oidc_client: Optional[OidcClient],
+        allow_local_fs: bool = False,
         allow_local_sessions: bool = False,
     ):
         self.fernet = fernet
         self.session_launchers: Dict[HpcSiteName, SshJobLauncher] = {}
+        self.ebrains_oidc_client = ebrains_oidc_client
+        self.allow_local_fs = allow_local_fs
         if allow_local_sessions:
             self.session_launchers["LOCAL_DASK"] = LocalJobLauncher(fernet=fernet, executor_getter="dask")
             self.session_launchers["LOCAL_PROCESS_POOL"] = LocalJobLauncher(fernet=fernet, executor_getter="default")
@@ -317,14 +322,14 @@ class SessionAllocator:
 
             ###################################################################
 
-            server_config = SessionAllocatorConfig.get()
-
             session_result = await session_launcher.launch(
                 user_id=user_info.sub,
                 compute_session_id=compute_session_id,
-                allow_local_fs=server_config.allow_local_fs,
-                ebrains_oidc_client=server_config.ebrains_oidc_client,
-                ebrains_user_token=ebrains_login.user_token,
+                allow_local_fs=self.allow_local_fs,
+                ebrains_user_credentials=EbrainsUserCredentials(
+                    user_token=ebrains_login.user_token,
+                    oidc_client=self.oidc_client,
+                ),
                 max_duration_minutes=Minutes(params.session_duration_minutes),
                 session_allocator_host=Hostname("app.ilastik.org"),
                 session_allocator_username=Username(getpass.getuser()),
@@ -511,11 +516,17 @@ class SessionAllocator:
         web.run_app(self.app, port=port) #type: ignore
 
 if __name__ == '__main__':
-    server_config = SessionAllocatorConfig.get()
+    server_config = SessionAllocatorConfig.try_get_global()
+    if isinstance(server_config, Exception):
+        import sys
+        print("Could not get server configuration", file=sys.stderr)
+        exit(1)
 
     SessionAllocator(
         fernet=server_config.fernet,
         external_url=server_config.external_url,
         oidc_client=server_config.ebrains_oidc_client,
-        allow_local_sessions=server_config.allow_local_compute_sessions
+        allow_local_sessions=server_config.allow_local_compute_sessions,
+        allow_local_fs=server_config.allow_local_fs,
+        ebrains_oidc_client=server_config.ebrains_oidc_client,
     ).run(port=5000)

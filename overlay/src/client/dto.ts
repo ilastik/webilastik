@@ -8,101 +8,9 @@ import {
 } from "../util/safe_serialization";
 import { JsonObject, JsonValue, toJsonValue } from "../util/serialization";
 
-export function parse_as_int(value: JsonValue): number | Error {
-  return ensureJsonNumber(value);
-}
-export function parse_as_ColorDto(value: JsonValue): ColorDto | Error {
-  const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
-    return valueObject;
-  }
-  if (valueObject["__class__"] != "ColorDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ColorDto`);
-  }
-  const temp_r = parse_as_int(valueObject.r);
-  if (temp_r instanceof Error) return temp_r;
-  const temp_g = parse_as_int(valueObject.g);
-  if (temp_g instanceof Error) return temp_g;
-  const temp_b = parse_as_int(valueObject.b);
-  if (temp_b instanceof Error) return temp_b;
-  return new ColorDto({
-    r: temp_r,
-    g: temp_g,
-    b: temp_b,
-  });
-}
-// Automatically generated via DataTransferObject for ColorDto
-// Do not edit!
-export class ColorDto {
-  public r: number;
-  public g: number;
-  public b: number;
-  constructor(_params: {
-    r: number;
-    g: number;
-    b: number;
-  }) {
-    this.r = _params.r;
-    this.g = _params.g;
-    this.b = _params.b;
-  }
-  public toJsonValue(): JsonObject {
-    return {
-      "__class__": "ColorDto",
-      r: this.r,
-      g: this.g,
-      b: this.b,
-    };
-  }
-  public static fromJsonValue(value: JsonValue): ColorDto | Error {
-    return parse_as_ColorDto(value);
-  }
-}
-
 export function parse_as_str(value: JsonValue): string | Error {
   return ensureJsonString(value);
 }
-export function parse_as_LabelHeaderDto(value: JsonValue): LabelHeaderDto | Error {
-  const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
-    return valueObject;
-  }
-  if (valueObject["__class__"] != "LabelHeaderDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a LabelHeaderDto`);
-  }
-  const temp_name = parse_as_str(valueObject.name);
-  if (temp_name instanceof Error) return temp_name;
-  const temp_color = parse_as_ColorDto(valueObject.color);
-  if (temp_color instanceof Error) return temp_color;
-  return new LabelHeaderDto({
-    name: temp_name,
-    color: temp_color,
-  });
-}
-// Automatically generated via DataTransferObject for LabelHeaderDto
-// Do not edit!
-export class LabelHeaderDto {
-  public name: string;
-  public color: ColorDto;
-  constructor(_params: {
-    name: string;
-    color: ColorDto;
-  }) {
-    this.name = _params.name;
-    this.color = _params.color;
-  }
-  public toJsonValue(): JsonObject {
-    return {
-      "__class__": "LabelHeaderDto",
-      name: this.name,
-      color: this.color.toJsonValue(),
-    };
-  }
-  public static fromJsonValue(value: JsonValue): LabelHeaderDto | Error {
-    return parse_as_LabelHeaderDto(value);
-  }
-}
-
 export function parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_(
   value: JsonValue,
 ): "precomputed" | "n5" | Error {
@@ -152,6 +60,9 @@ export function parse_as_Literal_of__quote_http_quote_0_quote_https_quote_0_quot
     return tmp_3;
   }
   return Error(`Could not parse ${value} as 'http' | 'https' | 'file' | 'memory'`);
+}
+export function parse_as_int(value: JsonValue): number | Error {
+  return ensureJsonNumber(value);
 }
 export function parse_as_Union_of_int0None_endof_(value: JsonValue): number | undefined | Error {
   const parsed_option_0 = parse_as_int(value);
@@ -286,6 +197,394 @@ export class UrlDto {
   }
   public static fromJsonValue(value: JsonValue): UrlDto | Error {
     return parse_as_UrlDto(value);
+  }
+}
+
+export function parse_as_EbrainsOidcClientDto(value: JsonValue): EbrainsOidcClientDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "EbrainsOidcClientDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a EbrainsOidcClientDto`);
+  }
+  const temp_client_id = parse_as_str(valueObject.client_id);
+  if (temp_client_id instanceof Error) return temp_client_id;
+  const temp_client_secret = parse_as_str(valueObject.client_secret);
+  if (temp_client_secret instanceof Error) return temp_client_secret;
+  return new EbrainsOidcClientDto({
+    client_id: temp_client_id,
+    client_secret: temp_client_secret,
+  });
+}
+// Automatically generated via DataTransferObject for EbrainsOidcClientDto
+// Do not edit!
+export class EbrainsOidcClientDto {
+  public client_id: string;
+  public client_secret: string;
+  constructor(_params: {
+    client_id: string;
+    client_secret: string;
+  }) {
+    this.client_id = _params.client_id;
+    this.client_secret = _params.client_secret;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "EbrainsOidcClientDto",
+      client_id: this.client_id,
+      client_secret: this.client_secret,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): EbrainsOidcClientDto | Error {
+    return parse_as_EbrainsOidcClientDto(value);
+  }
+}
+
+export function parse_as_EbrainsUserTokenDto(value: JsonValue): EbrainsUserTokenDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "EbrainsUserTokenDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a EbrainsUserTokenDto`);
+  }
+  const temp_access_token = parse_as_str(valueObject.access_token);
+  if (temp_access_token instanceof Error) return temp_access_token;
+  const temp_refresh_token = parse_as_str(valueObject.refresh_token);
+  if (temp_refresh_token instanceof Error) return temp_refresh_token;
+  return new EbrainsUserTokenDto({
+    access_token: temp_access_token,
+    refresh_token: temp_refresh_token,
+  });
+}
+// Automatically generated via DataTransferObject for EbrainsUserTokenDto
+// Do not edit!
+export class EbrainsUserTokenDto {
+  public access_token: string;
+  public refresh_token: string;
+  constructor(_params: {
+    access_token: string;
+    refresh_token: string;
+  }) {
+    this.access_token = _params.access_token;
+    this.refresh_token = _params.refresh_token;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "EbrainsUserTokenDto",
+      access_token: this.access_token,
+      refresh_token: this.refresh_token,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): EbrainsUserTokenDto | Error {
+    return parse_as_EbrainsUserTokenDto(value);
+  }
+}
+
+export function parse_as_Union_of_EbrainsOidcClientDto0None_endof_(
+  value: JsonValue,
+): EbrainsOidcClientDto | undefined | Error {
+  const parsed_option_0 = parse_as_EbrainsOidcClientDto(value);
+  if (!(parsed_option_0 instanceof Error)) {
+    return parsed_option_0;
+  }
+  const parsed_option_1 = parse_as_None(value);
+  if (!(parsed_option_1 instanceof Error)) {
+    return parsed_option_1;
+  }
+  return Error(`Could not parse ${JSON.stringify(value)} into EbrainsOidcClientDto | undefined`);
+}
+export function parse_as_EbrainsUserCredentialsDto(value: JsonValue): EbrainsUserCredentialsDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "EbrainsUserCredentialsDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a EbrainsUserCredentialsDto`);
+  }
+  const temp_user_token = parse_as_EbrainsUserTokenDto(valueObject.user_token);
+  if (temp_user_token instanceof Error) return temp_user_token;
+  const temp_oidc_client = parse_as_Union_of_EbrainsOidcClientDto0None_endof_(valueObject.oidc_client);
+  if (temp_oidc_client instanceof Error) return temp_oidc_client;
+  return new EbrainsUserCredentialsDto({
+    user_token: temp_user_token,
+    oidc_client: temp_oidc_client,
+  });
+}
+// Automatically generated via DataTransferObject for EbrainsUserCredentialsDto
+// Do not edit!
+export class EbrainsUserCredentialsDto {
+  public user_token: EbrainsUserTokenDto;
+  public oidc_client: EbrainsOidcClientDto | undefined;
+  constructor(_params: {
+    user_token: EbrainsUserTokenDto;
+    oidc_client: EbrainsOidcClientDto | undefined;
+  }) {
+    this.user_token = _params.user_token;
+    this.oidc_client = _params.oidc_client;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "EbrainsUserCredentialsDto",
+      user_token: this.user_token.toJsonValue(),
+      oidc_client: toJsonValue(this.oidc_client),
+    };
+  }
+  public static fromJsonValue(value: JsonValue): EbrainsUserCredentialsDto | Error {
+    return parse_as_EbrainsUserCredentialsDto(value);
+  }
+}
+
+export function parse_as_bool(value: JsonValue): boolean | Error {
+  return ensureJsonBoolean(value);
+}
+export function parse_as_SessionAllocatorConfigDto(value: JsonValue): SessionAllocatorConfigDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "SessionAllocatorConfigDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a SessionAllocatorConfigDto`);
+  }
+  const temp_allow_local_fs = parse_as_bool(valueObject.allow_local_fs);
+  if (temp_allow_local_fs instanceof Error) return temp_allow_local_fs;
+  const temp_ebrains_oidc_client = parse_as_EbrainsOidcClientDto(valueObject.ebrains_oidc_client);
+  if (temp_ebrains_oidc_client instanceof Error) return temp_ebrains_oidc_client;
+  const temp_allow_local_compute_sessions = parse_as_bool(valueObject.allow_local_compute_sessions);
+  if (temp_allow_local_compute_sessions instanceof Error) return temp_allow_local_compute_sessions;
+  const temp_b64_fernet_key = parse_as_str(valueObject.b64_fernet_key);
+  if (temp_b64_fernet_key instanceof Error) return temp_b64_fernet_key;
+  const temp_external_url = parse_as_UrlDto(valueObject.external_url);
+  if (temp_external_url instanceof Error) return temp_external_url;
+  return new SessionAllocatorConfigDto({
+    allow_local_fs: temp_allow_local_fs,
+    ebrains_oidc_client: temp_ebrains_oidc_client,
+    allow_local_compute_sessions: temp_allow_local_compute_sessions,
+    b64_fernet_key: temp_b64_fernet_key,
+    external_url: temp_external_url,
+  });
+}
+// Automatically generated via DataTransferObject for SessionAllocatorConfigDto
+// Do not edit!
+export class SessionAllocatorConfigDto {
+  public allow_local_fs: boolean;
+  public ebrains_oidc_client: EbrainsOidcClientDto;
+  public allow_local_compute_sessions: boolean;
+  public b64_fernet_key: string;
+  public external_url: UrlDto;
+  constructor(_params: {
+    allow_local_fs: boolean;
+    ebrains_oidc_client: EbrainsOidcClientDto;
+    allow_local_compute_sessions: boolean;
+    b64_fernet_key: string;
+    external_url: UrlDto;
+  }) {
+    this.allow_local_fs = _params.allow_local_fs;
+    this.ebrains_oidc_client = _params.ebrains_oidc_client;
+    this.allow_local_compute_sessions = _params.allow_local_compute_sessions;
+    this.b64_fernet_key = _params.b64_fernet_key;
+    this.external_url = _params.external_url;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "SessionAllocatorConfigDto",
+      allow_local_fs: this.allow_local_fs,
+      ebrains_oidc_client: this.ebrains_oidc_client.toJsonValue(),
+      allow_local_compute_sessions: this.allow_local_compute_sessions,
+      b64_fernet_key: this.b64_fernet_key,
+      external_url: this.external_url.toJsonValue(),
+    };
+  }
+  public static fromJsonValue(value: JsonValue): SessionAllocatorConfigDto | Error {
+    return parse_as_SessionAllocatorConfigDto(value);
+  }
+}
+
+export function parse_as_Union_of_EbrainsUserCredentialsDto0None_endof_(
+  value: JsonValue,
+): EbrainsUserCredentialsDto | undefined | Error {
+  const parsed_option_0 = parse_as_EbrainsUserCredentialsDto(value);
+  if (!(parsed_option_0 instanceof Error)) {
+    return parsed_option_0;
+  }
+  const parsed_option_1 = parse_as_None(value);
+  if (!(parsed_option_1 instanceof Error)) {
+    return parsed_option_1;
+  }
+  return Error(`Could not parse ${JSON.stringify(value)} into EbrainsUserCredentialsDto | undefined`);
+}
+export function parse_as_WorkflowConfigDto(value: JsonValue): WorkflowConfigDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "WorkflowConfigDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a WorkflowConfigDto`);
+  }
+  const temp_allow_local_fs = parse_as_bool(valueObject.allow_local_fs);
+  if (temp_allow_local_fs instanceof Error) return temp_allow_local_fs;
+  const temp_ebrains_user_credentials = parse_as_Union_of_EbrainsUserCredentialsDto0None_endof_(
+    valueObject.ebrains_user_credentials,
+  );
+  if (temp_ebrains_user_credentials instanceof Error) return temp_ebrains_user_credentials;
+  const temp_max_duration_minutes = parse_as_int(valueObject.max_duration_minutes);
+  if (temp_max_duration_minutes instanceof Error) return temp_max_duration_minutes;
+  const temp_listen_socket = parse_as_str(valueObject.listen_socket);
+  if (temp_listen_socket instanceof Error) return temp_listen_socket;
+  const temp_session_url = parse_as_UrlDto(valueObject.session_url);
+  if (temp_session_url instanceof Error) return temp_session_url;
+  const temp_session_allocator_host = parse_as_str(valueObject.session_allocator_host);
+  if (temp_session_allocator_host instanceof Error) return temp_session_allocator_host;
+  const temp_session_allocator_username = parse_as_str(valueObject.session_allocator_username);
+  if (temp_session_allocator_username instanceof Error) return temp_session_allocator_username;
+  const temp_session_allocator_socket_path = parse_as_str(valueObject.session_allocator_socket_path);
+  if (temp_session_allocator_socket_path instanceof Error) return temp_session_allocator_socket_path;
+  return new WorkflowConfigDto({
+    allow_local_fs: temp_allow_local_fs,
+    ebrains_user_credentials: temp_ebrains_user_credentials,
+    max_duration_minutes: temp_max_duration_minutes,
+    listen_socket: temp_listen_socket,
+    session_url: temp_session_url,
+    session_allocator_host: temp_session_allocator_host,
+    session_allocator_username: temp_session_allocator_username,
+    session_allocator_socket_path: temp_session_allocator_socket_path,
+  });
+}
+// Automatically generated via DataTransferObject for WorkflowConfigDto
+// Do not edit!
+export class WorkflowConfigDto {
+  public allow_local_fs: boolean;
+  public ebrains_user_credentials: EbrainsUserCredentialsDto | undefined;
+  public max_duration_minutes: number;
+  public listen_socket: string;
+  public session_url: UrlDto;
+  public session_allocator_host: string;
+  public session_allocator_username: string;
+  public session_allocator_socket_path: string;
+  constructor(_params: {
+    allow_local_fs: boolean;
+    ebrains_user_credentials: EbrainsUserCredentialsDto | undefined;
+    max_duration_minutes: number;
+    listen_socket: string;
+    session_url: UrlDto;
+    session_allocator_host: string;
+    session_allocator_username: string;
+    session_allocator_socket_path: string;
+  }) {
+    this.allow_local_fs = _params.allow_local_fs;
+    this.ebrains_user_credentials = _params.ebrains_user_credentials;
+    this.max_duration_minutes = _params.max_duration_minutes;
+    this.listen_socket = _params.listen_socket;
+    this.session_url = _params.session_url;
+    this.session_allocator_host = _params.session_allocator_host;
+    this.session_allocator_username = _params.session_allocator_username;
+    this.session_allocator_socket_path = _params.session_allocator_socket_path;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "WorkflowConfigDto",
+      allow_local_fs: this.allow_local_fs,
+      ebrains_user_credentials: toJsonValue(this.ebrains_user_credentials),
+      max_duration_minutes: this.max_duration_minutes,
+      listen_socket: this.listen_socket,
+      session_url: this.session_url.toJsonValue(),
+      session_allocator_host: this.session_allocator_host,
+      session_allocator_username: this.session_allocator_username,
+      session_allocator_socket_path: this.session_allocator_socket_path,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): WorkflowConfigDto | Error {
+    return parse_as_WorkflowConfigDto(value);
+  }
+}
+
+export function parse_as_ColorDto(value: JsonValue): ColorDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "ColorDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ColorDto`);
+  }
+  const temp_r = parse_as_int(valueObject.r);
+  if (temp_r instanceof Error) return temp_r;
+  const temp_g = parse_as_int(valueObject.g);
+  if (temp_g instanceof Error) return temp_g;
+  const temp_b = parse_as_int(valueObject.b);
+  if (temp_b instanceof Error) return temp_b;
+  return new ColorDto({
+    r: temp_r,
+    g: temp_g,
+    b: temp_b,
+  });
+}
+// Automatically generated via DataTransferObject for ColorDto
+// Do not edit!
+export class ColorDto {
+  public r: number;
+  public g: number;
+  public b: number;
+  constructor(_params: {
+    r: number;
+    g: number;
+    b: number;
+  }) {
+    this.r = _params.r;
+    this.g = _params.g;
+    this.b = _params.b;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "ColorDto",
+      r: this.r,
+      g: this.g,
+      b: this.b,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): ColorDto | Error {
+    return parse_as_ColorDto(value);
+  }
+}
+
+export function parse_as_LabelHeaderDto(value: JsonValue): LabelHeaderDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "LabelHeaderDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a LabelHeaderDto`);
+  }
+  const temp_name = parse_as_str(valueObject.name);
+  if (temp_name instanceof Error) return temp_name;
+  const temp_color = parse_as_ColorDto(valueObject.color);
+  if (temp_color instanceof Error) return temp_color;
+  return new LabelHeaderDto({
+    name: temp_name,
+    color: temp_color,
+  });
+}
+// Automatically generated via DataTransferObject for LabelHeaderDto
+// Do not edit!
+export class LabelHeaderDto {
+  public name: string;
+  public color: ColorDto;
+  constructor(_params: {
+    name: string;
+    color: ColorDto;
+  }) {
+    this.name = _params.name;
+    this.color = _params.color;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "LabelHeaderDto",
+      name: this.name,
+      color: this.color.toJsonValue(),
+    };
+  }
+  public static fromJsonValue(value: JsonValue): LabelHeaderDto | Error {
+    return parse_as_LabelHeaderDto(value);
   }
 }
 
@@ -3384,9 +3683,6 @@ export function parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCES
     return tmp_3;
   }
   return Error(`Could not parse ${value} as 'LOCAL_DASK' | 'LOCAL_PROCESS_POOL' | 'CSCS' | 'JUSUF'`);
-}
-export function parse_as_bool(value: JsonValue): boolean | Error {
-  return ensureJsonBoolean(value);
 }
 export function parse_as_ComputeSessionStatusDto(value: JsonValue): ComputeSessionStatusDto | Error {
   const valueObject = ensureJsonObject(value);

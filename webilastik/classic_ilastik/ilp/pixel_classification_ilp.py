@@ -40,6 +40,8 @@ from webilastik.datasource import DataSource, FsDataSource
 from webilastik.annotations import Annotation
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier, dump_to_temp_file, vigra_forest_to_h5_bytes
 from webilastik.filesystem import IFilesystem
+from webilastik.libebrains.user_credentials import EbrainsUserCredentials
+
 from webilastik.ui.applet.brushing_applet import Label
 
 VIGRA_ILP_CLASSIFIER_FACTORY = textwrap.dedent(
@@ -367,6 +369,7 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
         cls,
         group: h5py.Group,
         ilp_fs: IFilesystem,
+        ebrains_user_credentials: Optional[EbrainsUserCredentials]
     ) -> "IlpPixelClassificationWorkflowGroup | Exception":
         workflowname = ensure_encoded_string(group, "workflowName")
         if workflowname != "Pixel Classification":
@@ -374,7 +377,7 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
 
         Input_Data = IlpInputDataGroup.parse(ensure_group(group, "Input Data"))
         raw_data_datasources_result = Input_Data.try_to_datasources(
-            role_name="Raw Data", ilp_fs=ilp_fs, ilp_path=PurePosixPath(group.file.filename)
+            role_name="Raw Data", ilp_fs=ilp_fs, ilp_path=PurePosixPath(group.file.filename), ebrains_user_credentials=ebrains_user_credentials
         )
         if isinstance(raw_data_datasources_result, Exception):
             return raw_data_datasources_result

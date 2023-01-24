@@ -1,4 +1,5 @@
 import io
+from typing import Optional
 
 import numpy as np
 from PIL import Image as PilImage
@@ -6,6 +7,8 @@ from ndstructs.array5D import Array5D
 
 from webilastik.datasink import FsDataSink, IDataSinkWriter
 from webilastik.datasource.deep_zoom_datasource import DziImageElement, DziLevel, DziLevelDataSource, DziSizeElement
+from webilastik.libebrains.user_credentials import EbrainsUserCredentials
+
 from webilastik.server.rpc.dto import DziLevelSinkDto
 from webilastik.datasink import FsDataSink
 
@@ -79,8 +82,10 @@ class DziLevelSink(FsDataSink):
         return DziLevelSinkDto(level=self.level.to_dto())
 
     @classmethod
-    def from_dto(cls, dto: DziLevelSinkDto) -> "DziLevelSink | Exception":
-        level = DziLevel.from_dto(dto.level)
+    def from_dto(
+        cls, dto: DziLevelSinkDto, ebrains_user_credentials: Optional[EbrainsUserCredentials]
+    ) -> "DziLevelSink | Exception":
+        level = DziLevel.from_dto(dto.level, ebrains_user_credentials=ebrains_user_credentials)
         if isinstance(level, Exception):
             return level
         return DziLevelSink(

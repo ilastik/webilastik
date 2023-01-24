@@ -1,13 +1,20 @@
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 import typing
-from typing import Sequence, Tuple
+from typing import Optional, Sequence, Tuple
+from webilastik.libebrains.user_credentials import EbrainsUserCredentials
+
+from webilastik.libebrains.oidc_client import OidcClient
+from webilastik.libebrains.user_token import UserToken
 
 from webilastik.server.rpc.dto import BucketFSDto, HttpFsDto, OsfsDto
 from webilastik.utility.url import Url
 
 
-def create_filesystem_from_message(message: "OsfsDto | HttpFsDto | BucketFSDto") -> "IFilesystem | Exception":
+def create_filesystem_from_message(
+    message: "OsfsDto | HttpFsDto | BucketFSDto",
+    ebrains_user_credentials: Optional[EbrainsUserCredentials],
+) -> "IFilesystem | Exception":
     # FIXME: Maybe register these via __init_subclass__?
     if isinstance(message, HttpFsDto):
         from webilastik.filesystem.http_fs import HttpFs
@@ -16,11 +23,17 @@ def create_filesystem_from_message(message: "OsfsDto | HttpFsDto | BucketFSDto")
         from webilastik.filesystem.os_fs import OsFs
         return OsFs.from_dto(message)
     if isinstance(message, BucketFSDto):
+        if ebrains_user_credentials is None:
+            return Exception(f"Can't access Ebrains bucket without a user login")
         from webilastik.filesystem.bucket_fs import BucketFs
-        return BucketFs.from_dto(message)
+        return BucketFs.from_dto(
+            message, ebrains_user_credentials=ebrains_user_credentials
+        )
 
 
-def create_filesystem_from_url(url: Url) -> "Tuple[IFilesystem, PurePosixPath] | Exception":
+def create_filesystem_from_url(
+    url: Url, ebrains_user_credentials: Optional[EbrainsUserCredentials]
+) -> "Tuple[IFilesystem, PurePosixPath] | Exception":
     if url.protocol == "file":
         from webilastik.filesystem.os_fs import OsFs
         fs_result  = OsFs.create()
@@ -29,7 +42,9 @@ def create_filesystem_from_url(url: Url) -> "Tuple[IFilesystem, PurePosixPath] |
         return (fs_result, url.path)
     from webilastik.filesystem.bucket_fs import BucketFs
     if BucketFs.recognizes(url):
-        return BucketFs.try_from_url(url)
+        if ebrains_user_credentials is None:
+            return Exception(f"Can't access Ebrains bucket without a user login")
+        return BucketFs.try_from_url(url, ebrains_user_credentials=ebrains_user_credentials)
     from webilastik.filesystem.http_fs import HttpFs
     return HttpFs.try_from_url(url)
 

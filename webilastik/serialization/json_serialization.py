@@ -1,4 +1,4 @@
-from typing import Any, Union, Mapping, Tuple, Protocol, List
+from typing import Any, Callable, TypeVar, Union, Mapping, Tuple, Protocol, List
 import json
 from collections.abc import Mapping
 
@@ -40,3 +40,19 @@ def parse_json(value: "str | bytes") -> "JsonValue | BadJsonException":
         return json.loads(value)
     except Exception:
         return BadJsonException(value)
+
+T = TypeVar("T")
+def parse_typed_json(*, raw_json: str, json_value_parser: Callable[[JsonValue], "T | Exception"]) -> "T | Exception":
+    json_value_result = parse_json(raw_json)
+    if isinstance(json_value_result, Exception):
+        return json_value_result
+    return json_value_parser(json_value_result)
+
+def parse_typed_json_from_env_var(*, var_name: str, json_value_parser: Callable[[JsonValue], "T | Exception"]) -> "T | Exception":
+    import os
+    env_var_name = "WEBILASTIK_SESSION_ALLOCATOR_CONFIG_JSON"
+    raw_json_str = os.environ.get(env_var_name)
+    if raw_json_str is None:
+        return Exception(f"{env_var_name} is not set")
+    return parse_typed_json(raw_json=raw_json_str, json_value_parser=json_value_parser)
+

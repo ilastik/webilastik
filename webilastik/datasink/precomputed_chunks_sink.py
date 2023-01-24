@@ -1,6 +1,6 @@
 from pathlib import PurePosixPath
 import json
-from typing import Any, Tuple, Literal
+from typing import Any, Optional, Tuple, Literal
 
 import numpy as np
 from ndstructs.point5D import Shape5D, Interval5D
@@ -10,6 +10,8 @@ from webilastik.datasink import FsDataSink, IDataSinkWriter
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale, PrecomputedChunksEncoder
 from webilastik.filesystem import IFilesystem, create_filesystem_from_message
+from webilastik.libebrains.user_credentials import EbrainsUserCredentials
+
 from webilastik.server.rpc.dto import Interval5DDto, PrecomputedChunksSinkDto, Shape5DDto
 from webilastik.utility.url import Url
 
@@ -152,8 +154,14 @@ class PrecomputedChunksSink(FsDataSink):
         )
 
     @classmethod
-    def from_dto(cls, message: PrecomputedChunksSinkDto) -> "PrecomputedChunksSink | Exception":
-        fs_result = create_filesystem_from_message(message.filesystem)
+    def from_dto(
+        cls,
+        message: PrecomputedChunksSinkDto,
+        ebrains_user_credentials: Optional[EbrainsUserCredentials],
+    ) -> "PrecomputedChunksSink | Exception":
+        fs_result = create_filesystem_from_message(
+            message.filesystem, ebrains_user_credentials=ebrains_user_credentials
+        )
         if isinstance(fs_result, Exception):
             return fs_result
         return PrecomputedChunksSink(

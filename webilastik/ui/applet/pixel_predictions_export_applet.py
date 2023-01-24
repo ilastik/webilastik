@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 import threading
-from typing import Any, Callable, Dict, Generic, Iterable, Sequence
+from typing import Any, Callable, Dict, Generic, Iterable, Optional, Sequence
 import uuid
 
 import numpy as np
@@ -13,6 +13,7 @@ from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.datasink import DataSink, IDataSinkWriter
 from webilastik.datasource import DataRoi, DataSource, FsDataSource
 from webilastik.features.ilp_filter import IlpFilter
+from webilastik.libebrains.user_credentials import EbrainsUserCredentials
 from webilastik.operator import IN, Operator
 from webilastik.scheduling.job import Job, JobSucceededCallback, PriorityExecutor
 from webilastik.serialization.json_serialization import JsonValue
@@ -116,12 +117,14 @@ class PixelClassificationExportApplet(StatelesApplet):
         name: str,
         on_async_change: Callable[[], Any],
         priority_executor: PriorityExecutor,
+        ebrains_user_credentials: Optional[EbrainsUserCredentials],
         operator: "AppletOutput[VigraPixelClassifier[IlpFilter] | None]",
         populated_labels: "AppletOutput[Sequence[Label] | None]",
         datasource_suggestions: "AppletOutput[Sequence[FsDataSource] | None]"
     ):
         self.on_async_change = on_async_change
         self.priority_executor = priority_executor
+        self.ebrains_user_credentials = ebrains_user_credentials
 
         self._in_operator = operator
         self._in_populated_labels = populated_labels
@@ -210,10 +213,10 @@ class WsPixelClassificationExportApplet(WsApplet, PixelClassificationExportApple
             params_result = StartPixelProbabilitiesExportJobParamsDto.from_json_value(arguments)
             if isinstance(params_result, MessageParsingError):
                 return UsageError(str(params_result)) #FIXME: this is a bug, not a usage error
-            datasource_result = FsDataSource.try_from_message(params_result.datasource)
+            datasource_result = FsDataSource.try_from_message(params_result.datasource, ebrains_user_credentials=self.ebrains_user_credentials)
             if isinstance(datasource_result, Exception):
                 return UsageError(str(datasource_result)) #FIXME: this is a bug, not a usage error
-            datasink_result = DataSink.create_from_message(params_result.datasink)
+            datasink_result = DataSink.create_from_message(params_result.datasink, ebrains_user_credentials=self.ebrains_user_credentials)
             if isinstance(datasink_result, Exception):
                 return UsageError(str(datasink_result)) #FIXME: may not be an usage error
             rpc_result = self.launch_pixel_probabilities_export_job(
@@ -223,10 +226,10 @@ class WsPixelClassificationExportApplet(WsApplet, PixelClassificationExportApple
             params_result = StartSimpleSegmentationExportJobParamsDto.from_json_value(arguments)
             if isinstance(params_result, MessageParsingError):
                 return UsageError(str(params_result)) #FIXME: this is a bug, not a usage error
-            datasource_result = FsDataSource.try_from_message(params_result.datasource)
+            datasource_result = FsDataSource.try_from_message(params_result.datasource, ebrains_user_credentials=self.ebrains_user_credentials)
             if isinstance(datasource_result, Exception):
                 return UsageError(str(datasource_result)) #FIXME: this is a bug, not a usage error
-            datasink_result = DataSink.create_from_message(params_result.datasink)
+            datasink_result = DataSink.create_from_message(params_result.datasink, ebrains_user_credentials=self.ebrains_user_credentials)
             if isinstance(datasink_result, Exception):
                 return UsageError(str(datasink_result)) #FIXME: may not be an usage error
 

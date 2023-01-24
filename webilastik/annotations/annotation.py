@@ -1,5 +1,5 @@
 from functools import partial
-from typing import List, Sequence, Tuple, Dict, Iterable, Sequence, Any
+from typing import List, Optional, Sequence, Tuple, Dict, Iterable, Sequence, Any
 
 import numpy as np
 from ndstructs.point5D import Interval5D, Point5D
@@ -8,6 +8,10 @@ from ndstructs.array5D import Array5D, All, ScalarData, StaticLine
 from webilastik.datasource import DataSource, DataRoi, FsDataSource
 from webilastik.features.feature_extractor import FeatureExtractor, FeatureData
 from executor_getter import get_executor
+from webilastik.libebrains.user_credentials import EbrainsUserCredentials
+
+from webilastik.libebrains.oidc_client import OidcClient
+from webilastik.libebrains.user_token import UserToken
 from webilastik.server.rpc.dto import ColorDto, MessageParsingError, PixelAnnotationDto
 from webilastik.utility.url import Protocol
 
@@ -168,9 +172,11 @@ class Annotation(ScalarData):
     def from_dto(
         cls,
         message: PixelAnnotationDto,
-        allowed_protocols: Sequence[Protocol] = ("http", "https"),
+        ebrains_user_credentials: Optional[EbrainsUserCredentials],
     ) -> "Annotation | Exception":
-        raw_data_result = FsDataSource.try_from_message(message.raw_data, allowed_protocols=allowed_protocols)
+        raw_data_result = FsDataSource.try_from_message(
+            message.raw_data, ebrains_user_credentials=ebrains_user_credentials
+        )
         if isinstance(raw_data_result, Exception):
             return raw_data_result
 

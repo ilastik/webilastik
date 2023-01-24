@@ -1,6 +1,7 @@
 # pyright: strict
 
-from typing import Dict, List, Sequence, Set, Tuple
+from typing import Dict, List, Optional, Sequence, Set, Tuple
+from webilastik.libebrains.user_credentials import EbrainsUserCredentials
 
 from webilastik.serialization.json_serialization import JsonObject, JsonValue
 import numpy as np
@@ -41,10 +42,11 @@ class Label:
         return len(self.annotations) == 0
 
 class BrushingApplet(Applet):
-    def __init__(self, name: str, labels: Sequence[Label]):
+    def __init__(self, name: str, *, labels: Sequence[Label], ebrains_user_credentials: Optional[EbrainsUserCredentials]):
         if len(labels) < 2:
             raise ValueError(f"Must have at least 2 labels")
         self._labels: List[Label] = list(labels)
+        self.ebrains_user_credentials = ebrains_user_credentials
         super().__init__(name=name)
 
     def take_snapshot(self) -> List[Label]:
@@ -146,19 +148,23 @@ class BrushingApplet(Applet):
 
 class WsBrushingApplet(WsApplet, BrushingApplet):
     @classmethod
-    def initial(cls, name: str) -> "WsBrushingApplet":
-        return WsBrushingApplet(name=name, labels=[
-            Label(
-                name="Foreground",
-                color=Color(r=np.uint8(255), g=np.uint8(0), b=np.uint8(0)),
-                annotations=[]
-            ),
-            Label(
-                name="Background",
-                color=Color(r=np.uint8(0), g=np.uint8(255), b=np.uint8(0)),
-                annotations=[]
-            ),
-        ])
+    def initial(cls, name: str, ebrains_user_credentials: Optional[EbrainsUserCredentials]) -> "WsBrushingApplet":
+        return WsBrushingApplet(
+            name=name,
+            labels=[
+                Label(
+                    name="Foreground",
+                    color=Color(r=np.uint8(255), g=np.uint8(0), b=np.uint8(0)),
+                    annotations=[]
+                ),
+                Label(
+                    name="Background",
+                    color=Color(r=np.uint8(0), g=np.uint8(255), b=np.uint8(0)),
+                    annotations=[]
+                ),
+            ],
+            ebrains_user_credentials=ebrains_user_credentials,
+        )
 
     def _get_json_state(self) -> JsonValue:
         return BrushingAppletStateDto(
@@ -217,7 +223,7 @@ class WsBrushingApplet(WsApplet, BrushingApplet):
             add_pixel_annotation_params = AddPixelAnnotationParams.from_json_value(arguments)
             if isinstance(add_pixel_annotation_params, MessageParsingError):
                 return UsageError(str(add_pixel_annotation_params)) # FIXME: this would be a bug, not an usage error
-            annotation_result = Annotation.from_dto(add_pixel_annotation_params.pixel_annotation)
+            annotation_result = Annotation.from_dto(add_pixel_annotation_params.pixel_annotation, ebrains_user_credentials=self.ebrains_user_credentials)
             if isinstance(annotation_result, Exception):
                 return UsageError(str(annotation_result)) # FIXME: this would be a bug, not an usage error
             return UsageError.check(self.add_annotation(
@@ -229,7 +235,7 @@ class WsBrushingApplet(WsApplet, BrushingApplet):
             remove_pixel_annotation_params = RemovePixelAnnotationParams.from_json_value(arguments)
             if isinstance(remove_pixel_annotation_params, MessageParsingError):
                 return UsageError(str(remove_pixel_annotation_params)) # FIXME: this would be a bug, not an usage error
-            annotation_result = Annotation.from_dto(remove_pixel_annotation_params.pixel_annotation)
+            annotation_result = Annotation.from_dto(remove_pixel_annotation_params.pixel_annotation, ebrains_user_credentials=self.ebrains_user_credentials)
             if isinstance(annotation_result, Exception):
                 return UsageError(str(annotation_result)) # FIXME: this would be a bug, not an usage error
             return UsageError.check(self.remove_annotation(

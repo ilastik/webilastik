@@ -9,6 +9,8 @@ from ndstructs.array5D import Array5D
 
 from webilastik.datasource.n5_attributes import N5Compressor, N5DatasetAttributes
 from webilastik.datasource import FsDataSource
+from webilastik.libebrains.user_credentials import EbrainsUserCredentials
+
 from webilastik.server.rpc.dto import Interval5DDto, N5DataSourceDto, Shape5DDto, dtype_to_dto
 
 class N5Block(Array5D):
@@ -119,8 +121,12 @@ class N5DataSource(FsDataSource):
         )
 
     @staticmethod
-    def from_dto(dto: N5DataSourceDto) -> "N5DataSource | Exception":
-        fs_result = create_filesystem_from_message(dto.filesystem)
+    def from_dto(
+        dto: N5DataSourceDto, ebrains_user_credentials: Optional[EbrainsUserCredentials]
+    ) -> "N5DataSource | Exception":
+        fs_result = create_filesystem_from_message(
+            dto.filesystem, ebrains_user_credentials=ebrains_user_credentials
+        )
         if isinstance(fs_result, Exception):
             return fs_result
 

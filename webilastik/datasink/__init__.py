@@ -7,6 +7,8 @@ import numpy as np
 from ndstructs.point5D import Shape5D, Interval5D
 from ndstructs.array5D import Array5D
 from webilastik.filesystem import IFilesystem
+from webilastik.libebrains.user_credentials import EbrainsUserCredentials
+
 from webilastik.server.rpc.dto import DataSinkDto, DziLevelSinkDto, PrecomputedChunksSinkDto
 from webilastik.utility.url import Url
 
@@ -40,15 +42,17 @@ class DataSink(ABC):
         pass
 
     @classmethod
-    def create_from_message(cls, message: DataSinkDto) -> "DataSink | Exception": #FIXME: add other sinks
+    def create_from_message(
+        cls, message: DataSinkDto, ebrains_user_credentials: Optional[EbrainsUserCredentials],
+    ) -> "DataSink | Exception": #FIXME: add other sinks
         if isinstance(message, PrecomputedChunksSinkDto):
             from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
-            return PrecomputedChunksSink.from_dto(message)
+            return PrecomputedChunksSink.from_dto(message, ebrains_user_credentials=ebrains_user_credentials)
         if isinstance(message, DziLevelSinkDto):
             from webilastik.datasink.deep_zoom_sink import DziLevelSink
-            return DziLevelSink.from_dto(message)
+            return DziLevelSink.from_dto(message, ebrains_user_credentials=ebrains_user_credentials)
         from webilastik.datasink.n5_dataset_sink import N5DataSink
-        return N5DataSink.from_dto(message)
+        return N5DataSink.from_dto(message, ebrains_user_credentials=ebrains_user_credentials)
 
     @abstractmethod
     def to_dto(self) -> DataSinkDto: #FIXME: add other sinks

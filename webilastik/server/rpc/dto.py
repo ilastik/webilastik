@@ -25,54 +25,7 @@ import numpy as np
 
 from webilastik.server.rpc import DataTransferObject
 
-
-def parse_as_int(value: JsonValue) -> "int | MessageParsingError":
-    if isinstance(value, int):
-        return value
-
-    return MessageParsingError(f"Could not parse {json.dumps(value)} as int")
-
-
-def parse_as_ColorDto(value: JsonValue) -> "ColorDto | MessageParsingError":
-    from collections.abc import Mapping
-
-    if not isinstance(value, Mapping):
-        return MessageParsingError(f"Could not parse {json.dumps(value)} as ColorDto")
-    if value.get("__class__") != "ColorDto":
-        return MessageParsingError(f"Could not parse {json.dumps(value)} as ColorDto")
-    tmp_r = parse_as_int(value.get("r"))
-    if isinstance(tmp_r, MessageParsingError):
-        return tmp_r
-    tmp_g = parse_as_int(value.get("g"))
-    if isinstance(tmp_g, MessageParsingError):
-        return tmp_g
-    tmp_b = parse_as_int(value.get("b"))
-    if isinstance(tmp_b, MessageParsingError):
-        return tmp_b
-    return ColorDto(
-        r=tmp_r,
-        g=tmp_g,
-        b=tmp_b,
-    )
-
-
-@dataclass
-class ColorDto(DataTransferObject):
-    r: int
-    g: int
-    b: int
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "ColorDto",
-            "r": self.r,
-            "g": self.g,
-            "b": self.b,
-        }
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "ColorDto | MessageParsingError":
-        return parse_as_ColorDto(value)
+Protocol = Literal["http", "https", "file", "memory"]
 
 
 def parse_as_str(value: JsonValue) -> "str | MessageParsingError":
@@ -80,51 +33,6 @@ def parse_as_str(value: JsonValue) -> "str | MessageParsingError":
         return value
 
     return MessageParsingError(f"Could not parse {json.dumps(value)} as str")
-
-
-def parse_as_LabelHeaderDto(value: JsonValue) -> "LabelHeaderDto | MessageParsingError":
-    from collections.abc import Mapping
-
-    if not isinstance(value, Mapping):
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as LabelHeaderDto"
-        )
-    if value.get("__class__") != "LabelHeaderDto":
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as LabelHeaderDto"
-        )
-    tmp_name = parse_as_str(value.get("name"))
-    if isinstance(tmp_name, MessageParsingError):
-        return tmp_name
-    tmp_color = parse_as_ColorDto(value.get("color"))
-    if isinstance(tmp_color, MessageParsingError):
-        return tmp_color
-    return LabelHeaderDto(
-        name=tmp_name,
-        color=tmp_color,
-    )
-
-
-@dataclass
-class LabelHeaderDto(DataTransferObject):
-    name: str
-    color: ColorDto
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "LabelHeaderDto",
-            "name": self.name,
-            "color": self.color.to_json_value(),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "LabelHeaderDto | MessageParsingError":
-        return parse_as_LabelHeaderDto(value)
-
-
-Protocol = Literal["http", "https", "file", "memory"]
 
 
 def parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_(
@@ -182,6 +90,13 @@ def parse_as_Literal_of__quote_http_quote_0_quote_https_quote_0_quote_file_quote
     return MessageParsingError(
         f"Could not parse {value} as Literal['http', 'https', 'file', 'memory']"
     )
+
+
+def parse_as_int(value: JsonValue) -> "int | MessageParsingError":
+    if isinstance(value, int):
+        return value
+
+    return MessageParsingError(f"Could not parse {json.dumps(value)} as int")
 
 
 def parse_as_Union_of_int0None_endof_(
@@ -317,6 +232,416 @@ class UrlDto(DataTransferObject):
     @classmethod
     def from_json_value(cls, value: JsonValue) -> "UrlDto | MessageParsingError":
         return parse_as_UrlDto(value)
+
+
+def parse_as_EbrainsOidcClientDto(
+    value: JsonValue,
+) -> "EbrainsOidcClientDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as EbrainsOidcClientDto"
+        )
+    if value.get("__class__") != "EbrainsOidcClientDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as EbrainsOidcClientDto"
+        )
+    tmp_client_id = parse_as_str(value.get("client_id"))
+    if isinstance(tmp_client_id, MessageParsingError):
+        return tmp_client_id
+    tmp_client_secret = parse_as_str(value.get("client_secret"))
+    if isinstance(tmp_client_secret, MessageParsingError):
+        return tmp_client_secret
+    return EbrainsOidcClientDto(
+        client_id=tmp_client_id,
+        client_secret=tmp_client_secret,
+    )
+
+
+@dataclass
+class EbrainsOidcClientDto(DataTransferObject):
+    client_id: str
+    client_secret: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "EbrainsOidcClientDto",
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "EbrainsOidcClientDto | MessageParsingError":
+        return parse_as_EbrainsOidcClientDto(value)
+
+
+def parse_as_EbrainsUserTokenDto(
+    value: JsonValue,
+) -> "EbrainsUserTokenDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as EbrainsUserTokenDto"
+        )
+    if value.get("__class__") != "EbrainsUserTokenDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as EbrainsUserTokenDto"
+        )
+    tmp_access_token = parse_as_str(value.get("access_token"))
+    if isinstance(tmp_access_token, MessageParsingError):
+        return tmp_access_token
+    tmp_refresh_token = parse_as_str(value.get("refresh_token"))
+    if isinstance(tmp_refresh_token, MessageParsingError):
+        return tmp_refresh_token
+    return EbrainsUserTokenDto(
+        access_token=tmp_access_token,
+        refresh_token=tmp_refresh_token,
+    )
+
+
+@dataclass
+class EbrainsUserTokenDto(DataTransferObject):
+    access_token: str
+    refresh_token: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "EbrainsUserTokenDto",
+            "access_token": self.access_token,
+            "refresh_token": self.refresh_token,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "EbrainsUserTokenDto | MessageParsingError":
+        return parse_as_EbrainsUserTokenDto(value)
+
+
+def parse_as_Union_of_EbrainsOidcClientDto0None_endof_(
+    value: JsonValue,
+) -> "Union[EbrainsOidcClientDto, None] | MessageParsingError":
+    parsed_option_0 = parse_as_EbrainsOidcClientDto(value)
+    if not isinstance(parsed_option_0, MessageParsingError):
+        return parsed_option_0
+    parsed_option_1 = parse_as_None(value)
+    if not isinstance(parsed_option_1, MessageParsingError):
+        return parsed_option_1
+    return MessageParsingError(
+        f"Could not parse {json.dumps(value)} into Union[EbrainsOidcClientDto, None]"
+    )
+
+
+def parse_as_EbrainsUserCredentialsDto(
+    value: JsonValue,
+) -> "EbrainsUserCredentialsDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as EbrainsUserCredentialsDto"
+        )
+    if value.get("__class__") != "EbrainsUserCredentialsDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as EbrainsUserCredentialsDto"
+        )
+    tmp_user_token = parse_as_EbrainsUserTokenDto(value.get("user_token"))
+    if isinstance(tmp_user_token, MessageParsingError):
+        return tmp_user_token
+    tmp_oidc_client = parse_as_Union_of_EbrainsOidcClientDto0None_endof_(
+        value.get("oidc_client")
+    )
+    if isinstance(tmp_oidc_client, MessageParsingError):
+        return tmp_oidc_client
+    return EbrainsUserCredentialsDto(
+        user_token=tmp_user_token,
+        oidc_client=tmp_oidc_client,
+    )
+
+
+@dataclass
+class EbrainsUserCredentialsDto(DataTransferObject):
+    user_token: EbrainsUserTokenDto
+    oidc_client: Optional[EbrainsOidcClientDto]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "EbrainsUserCredentialsDto",
+            "user_token": self.user_token.to_json_value(),
+            "oidc_client": convert_to_json_value(self.oidc_client),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "EbrainsUserCredentialsDto | MessageParsingError":
+        return parse_as_EbrainsUserCredentialsDto(value)
+
+
+def parse_as_bool(value: JsonValue) -> "bool | MessageParsingError":
+    if isinstance(value, bool):
+        return value
+
+    return MessageParsingError(f"Could not parse {json.dumps(value)} as bool")
+
+
+def parse_as_SessionAllocatorConfigDto(
+    value: JsonValue,
+) -> "SessionAllocatorConfigDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as SessionAllocatorConfigDto"
+        )
+    if value.get("__class__") != "SessionAllocatorConfigDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as SessionAllocatorConfigDto"
+        )
+    tmp_allow_local_fs = parse_as_bool(value.get("allow_local_fs"))
+    if isinstance(tmp_allow_local_fs, MessageParsingError):
+        return tmp_allow_local_fs
+    tmp_ebrains_oidc_client = parse_as_EbrainsOidcClientDto(
+        value.get("ebrains_oidc_client")
+    )
+    if isinstance(tmp_ebrains_oidc_client, MessageParsingError):
+        return tmp_ebrains_oidc_client
+    tmp_allow_local_compute_sessions = parse_as_bool(
+        value.get("allow_local_compute_sessions")
+    )
+    if isinstance(tmp_allow_local_compute_sessions, MessageParsingError):
+        return tmp_allow_local_compute_sessions
+    tmp_b64_fernet_key = parse_as_str(value.get("b64_fernet_key"))
+    if isinstance(tmp_b64_fernet_key, MessageParsingError):
+        return tmp_b64_fernet_key
+    tmp_external_url = parse_as_UrlDto(value.get("external_url"))
+    if isinstance(tmp_external_url, MessageParsingError):
+        return tmp_external_url
+    return SessionAllocatorConfigDto(
+        allow_local_fs=tmp_allow_local_fs,
+        ebrains_oidc_client=tmp_ebrains_oidc_client,
+        allow_local_compute_sessions=tmp_allow_local_compute_sessions,
+        b64_fernet_key=tmp_b64_fernet_key,
+        external_url=tmp_external_url,
+    )
+
+
+@dataclass
+class SessionAllocatorConfigDto(DataTransferObject):
+    allow_local_fs: bool
+    ebrains_oidc_client: EbrainsOidcClientDto
+    allow_local_compute_sessions: bool
+    b64_fernet_key: str
+    external_url: UrlDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "SessionAllocatorConfigDto",
+            "allow_local_fs": self.allow_local_fs,
+            "ebrains_oidc_client": self.ebrains_oidc_client.to_json_value(),
+            "allow_local_compute_sessions": self.allow_local_compute_sessions,
+            "b64_fernet_key": self.b64_fernet_key,
+            "external_url": self.external_url.to_json_value(),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "SessionAllocatorConfigDto | MessageParsingError":
+        return parse_as_SessionAllocatorConfigDto(value)
+
+
+def parse_as_Union_of_EbrainsUserCredentialsDto0None_endof_(
+    value: JsonValue,
+) -> "Union[EbrainsUserCredentialsDto, None] | MessageParsingError":
+    parsed_option_0 = parse_as_EbrainsUserCredentialsDto(value)
+    if not isinstance(parsed_option_0, MessageParsingError):
+        return parsed_option_0
+    parsed_option_1 = parse_as_None(value)
+    if not isinstance(parsed_option_1, MessageParsingError):
+        return parsed_option_1
+    return MessageParsingError(
+        f"Could not parse {json.dumps(value)} into Union[EbrainsUserCredentialsDto, None]"
+    )
+
+
+def parse_as_WorkflowConfigDto(
+    value: JsonValue,
+) -> "WorkflowConfigDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as WorkflowConfigDto"
+        )
+    if value.get("__class__") != "WorkflowConfigDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as WorkflowConfigDto"
+        )
+    tmp_allow_local_fs = parse_as_bool(value.get("allow_local_fs"))
+    if isinstance(tmp_allow_local_fs, MessageParsingError):
+        return tmp_allow_local_fs
+    tmp_ebrains_user_credentials = (
+        parse_as_Union_of_EbrainsUserCredentialsDto0None_endof_(
+            value.get("ebrains_user_credentials")
+        )
+    )
+    if isinstance(tmp_ebrains_user_credentials, MessageParsingError):
+        return tmp_ebrains_user_credentials
+    tmp_max_duration_minutes = parse_as_int(value.get("max_duration_minutes"))
+    if isinstance(tmp_max_duration_minutes, MessageParsingError):
+        return tmp_max_duration_minutes
+    tmp_listen_socket = parse_as_str(value.get("listen_socket"))
+    if isinstance(tmp_listen_socket, MessageParsingError):
+        return tmp_listen_socket
+    tmp_session_url = parse_as_UrlDto(value.get("session_url"))
+    if isinstance(tmp_session_url, MessageParsingError):
+        return tmp_session_url
+    tmp_session_allocator_host = parse_as_str(value.get("session_allocator_host"))
+    if isinstance(tmp_session_allocator_host, MessageParsingError):
+        return tmp_session_allocator_host
+    tmp_session_allocator_username = parse_as_str(
+        value.get("session_allocator_username")
+    )
+    if isinstance(tmp_session_allocator_username, MessageParsingError):
+        return tmp_session_allocator_username
+    tmp_session_allocator_socket_path = parse_as_str(
+        value.get("session_allocator_socket_path")
+    )
+    if isinstance(tmp_session_allocator_socket_path, MessageParsingError):
+        return tmp_session_allocator_socket_path
+    return WorkflowConfigDto(
+        allow_local_fs=tmp_allow_local_fs,
+        ebrains_user_credentials=tmp_ebrains_user_credentials,
+        max_duration_minutes=tmp_max_duration_minutes,
+        listen_socket=tmp_listen_socket,
+        session_url=tmp_session_url,
+        session_allocator_host=tmp_session_allocator_host,
+        session_allocator_username=tmp_session_allocator_username,
+        session_allocator_socket_path=tmp_session_allocator_socket_path,
+    )
+
+
+@dataclass
+class WorkflowConfigDto(DataTransferObject):
+    allow_local_fs: bool
+    ebrains_user_credentials: Optional[EbrainsUserCredentialsDto]
+    max_duration_minutes: int
+    listen_socket: str
+    session_url: UrlDto
+    # tunnel parameters
+    session_allocator_host: str
+    session_allocator_username: str
+    session_allocator_socket_path: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "WorkflowConfigDto",
+            "allow_local_fs": self.allow_local_fs,
+            "ebrains_user_credentials": convert_to_json_value(
+                self.ebrains_user_credentials
+            ),
+            "max_duration_minutes": self.max_duration_minutes,
+            "listen_socket": self.listen_socket,
+            "session_url": self.session_url.to_json_value(),
+            "session_allocator_host": self.session_allocator_host,
+            "session_allocator_username": self.session_allocator_username,
+            "session_allocator_socket_path": self.session_allocator_socket_path,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "WorkflowConfigDto | MessageParsingError":
+        return parse_as_WorkflowConfigDto(value)
+
+
+def parse_as_ColorDto(value: JsonValue) -> "ColorDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(f"Could not parse {json.dumps(value)} as ColorDto")
+    if value.get("__class__") != "ColorDto":
+        return MessageParsingError(f"Could not parse {json.dumps(value)} as ColorDto")
+    tmp_r = parse_as_int(value.get("r"))
+    if isinstance(tmp_r, MessageParsingError):
+        return tmp_r
+    tmp_g = parse_as_int(value.get("g"))
+    if isinstance(tmp_g, MessageParsingError):
+        return tmp_g
+    tmp_b = parse_as_int(value.get("b"))
+    if isinstance(tmp_b, MessageParsingError):
+        return tmp_b
+    return ColorDto(
+        r=tmp_r,
+        g=tmp_g,
+        b=tmp_b,
+    )
+
+
+@dataclass
+class ColorDto(DataTransferObject):
+    r: int
+    g: int
+    b: int
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "ColorDto",
+            "r": self.r,
+            "g": self.g,
+            "b": self.b,
+        }
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "ColorDto | MessageParsingError":
+        return parse_as_ColorDto(value)
+
+
+def parse_as_LabelHeaderDto(value: JsonValue) -> "LabelHeaderDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as LabelHeaderDto"
+        )
+    if value.get("__class__") != "LabelHeaderDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as LabelHeaderDto"
+        )
+    tmp_name = parse_as_str(value.get("name"))
+    if isinstance(tmp_name, MessageParsingError):
+        return tmp_name
+    tmp_color = parse_as_ColorDto(value.get("color"))
+    if isinstance(tmp_color, MessageParsingError):
+        return tmp_color
+    return LabelHeaderDto(
+        name=tmp_name,
+        color=tmp_color,
+    )
+
+
+@dataclass
+class LabelHeaderDto(DataTransferObject):
+    name: str
+    color: ColorDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "LabelHeaderDto",
+            "name": self.name,
+            "color": self.color.to_json_value(),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "LabelHeaderDto | MessageParsingError":
+        return parse_as_LabelHeaderDto(value)
 
 
 def parse_as_Point5DDto(value: JsonValue) -> "Point5DDto | MessageParsingError":
@@ -3541,13 +3866,6 @@ def parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote
     return MessageParsingError(
         f"Could not parse {value} as Literal['LOCAL_DASK', 'LOCAL_PROCESS_POOL', 'CSCS', 'JUSUF']"
     )
-
-
-def parse_as_bool(value: JsonValue) -> "bool | MessageParsingError":
-    if isinstance(value, bool):
-        return value
-
-    return MessageParsingError(f"Could not parse {json.dumps(value)} as bool")
 
 
 def parse_as_ComputeSessionStatusDto(

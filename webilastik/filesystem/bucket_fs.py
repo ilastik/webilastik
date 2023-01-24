@@ -1,5 +1,7 @@
+# pyright: strict
+
 import json
-from typing import Literal, Optional, Mapping, Final, Tuple, List
+from typing import Literal, Optional, Tuple, List
 from pathlib import PurePosixPath
 import time
 
@@ -7,52 +9,53 @@ import requests
 from ndstructs.utils.json_serializable import ensureJsonArray, ensureJsonObject, ensureJsonString
 
 from webilastik.filesystem import IFilesystem, FsIoException, FsFileNotFoundException, FsDirectoryContents
+from webilastik.libebrains.user_credentials import EbrainsUserCredentials
+
 from webilastik.utility.url import Url
 from webilastik.server.rpc.dto import BucketFSDto
 from webilastik.utility import Seconds
-from webilastik.utility.request import request as safe_request, ErrRequestCompletedAsFailure, ErrRequestCrashed
+from webilastik.utility.request import request as safe_request, ErrRequestCrashed
 
 _cscs_session = requests.Session()
 _data_proxy_session = requests.Session()
 
-def _requests_from_data_proxy(
-    method: Literal["get", "put", "delete"],
-    url: Url,
-    data: Optional[bytes],
-    refresh_on_401: bool = True,
-) -> "bytes | FsFileNotFoundException | Exception":
-    from webilastik.libebrains import global_user_login
-    response_result = safe_request(
-        session=_data_proxy_session,
-        method=method,
-        url=url,
-        data=data,
-        headers=global_user_login.get_global_login_token().as_auth_header(),
-    )
-    if isinstance(response_result, bytes):
-        return response_result
-    if isinstance(response_result, ErrRequestCrashed):
-        return response_result
-    if response_result.status_code == 404:
-        return FsFileNotFoundException(url.path) #FIXME
-    if response_result.status_code != 401 or not refresh_on_401:
-        return response_result
-    print(f"Asking to refresh token in BucketFS.........................")
-    refreshed_token_result = global_user_login.refresh_global_login_token()
-    if isinstance(refreshed_token_result, Exception):
-        return refreshed_token_result
-    print(f"Successfully refreshed token in BucketFS...................")
-    return _requests_from_data_proxy(
-        method=method, url=url, data=data, refresh_on_401=False
-    )
-
 class BucketFs(IFilesystem):
     API_URL = Url(protocol="https", hostname="data-proxy.ebrains.eu", path=PurePosixPath("/api/v1/buckets"))
 
-    def __init__(self, bucket_name: str):
+    def __init__(self, bucket_name: str, ebrains_user_credentials: EbrainsUserCredentials):
         self.bucket_name = bucket_name
         self.url = self.API_URL.concatpath(bucket_name)
+        self.ebrains_user_credentials = ebrains_user_credentials
         super().__init__()
+
+    def _requests_from_data_proxy(
+        self,
+        method: Literal["get", "put", "delete"],
+        url: Url,
+        data: Optional[bytes],
+        refresh_on_401: bool = True,
+    ) -> "bytes | FsFileNotFoundException | Exception":
+        response_result = safe_request(
+            session=_data_proxy_session,
+            method=method,
+            url=url,
+            data=data,
+            headers=self.ebrains_user_credentials.user_token.as_auth_header(),
+        )
+        if isinstance(response_result, bytes):
+            return response_result
+        if isinstance(response_result, ErrRequestCrashed):
+            return response_result
+        if response_result.status_code == 404:
+            return FsFileNotFoundException(url.path) #FIXME
+        if (response_result.status_code != 401) or (not refresh_on_401):
+            return response_result
+        print(f"Asking to refresh token in BucketFS.........................")
+        refresh_token_result = self.ebrains_user_credentials.refresh()
+        if isinstance(refresh_token_result, Exception):
+            return refresh_token_result
+        print(f"Successfully refreshed token in BucketFS...................")
+        return self._requests_from_data_proxy(method=method, url=url, data=data, refresh_on_401=False)
 
     @classmethod
     def recognizes(cls, url: Url) -> bool:
@@ -64,20 +67,22 @@ class BucketFs(IFilesystem):
         )
 
     @classmethod
-    def try_from_url(cls, url: Url) -> "Tuple[BucketFs, PurePosixPath] | Exception":
+    def try_from_url(cls, url: Url, ebrains_user_credentials: EbrainsUserCredentials) -> "Tuple[BucketFs, PurePosixPath] | Exception":
         if not cls.recognizes(url):
             return Exception(f"Url must be inside the data-proxy ({cls.API_URL}. Got {url}")
         bucket_name_part_index = len(cls.API_URL.path.parts)
         if len(url.path.parts) <= bucket_name_part_index:
             return Exception(f"Bad bucket url: {url}")
         return (
-            BucketFs(bucket_name=url.path.parts[bucket_name_part_index]),
+            BucketFs(
+                bucket_name=url.path.parts[bucket_name_part_index], ebrains_user_credentials=ebrains_user_credentials
+            ),
             PurePosixPath("/".join(url.path.parts[bucket_name_part_index + 1:]) or "/")
         )
 
     @classmethod
-    def from_dto(cls, dto: BucketFSDto) -> "BucketFs":
-        return BucketFs(bucket_name=dto.bucket_name)
+    def from_dto(cls, dto: BucketFSDto, ebrains_user_credentials: EbrainsUserCredentials) -> "BucketFs":
+        return BucketFs(bucket_name=dto.bucket_name, ebrains_user_credentials=ebrains_user_credentials)
 
     def to_dto(self) -> BucketFSDto:
         return BucketFSDto(bucket_name=self.bucket_name)
@@ -88,7 +93,7 @@ class BucketFs(IFilesystem):
             "prefix": "" if path.as_posix() == "/" else path.as_posix().lstrip("/").rstrip("/") + "/",
             "limit": str(limit)
         })
-        response = _requests_from_data_proxy(method="get", url=list_objects_path, data=None)
+        response = self._requests_from_data_proxy(method="get", url=list_objects_path, data=None)
         if isinstance(response, Exception):
             raise FsIoException(response)
         payload_obj = ensureJsonObject(json.loads(response)) #FIXME: use DTOs everywhere?
@@ -107,7 +112,7 @@ class BucketFs(IFilesystem):
         return FsDirectoryContents(files=files, directories=directories)
 
     def create_file(self, *, path: PurePosixPath, contents: bytes) -> "None | FsIoException":
-        response = _requests_from_data_proxy(method="put", url=self.url.concatpath(path), data=None)
+        response = self._requests_from_data_proxy(method="put", url=self.url.concatpath(path), data=None)
         if isinstance(response, Exception):
             return FsIoException(response)
         response_obj = ensureJsonObject(json.loads(response))
@@ -122,7 +127,7 @@ class BucketFs(IFilesystem):
 
     def get_swift_object_url(self, path: PurePosixPath) -> "Url | FsIoException | FsFileNotFoundException":
         file_url = self.url.concatpath(path).updated_with(extra_search={"redirect": "false"})
-        data_proxy_response = _requests_from_data_proxy(method="get", url=file_url, data=None)
+        data_proxy_response = self._requests_from_data_proxy(method="get", url=file_url, data=None)
         if isinstance(data_proxy_response, FsFileNotFoundException):
             return FsFileNotFoundException(path)
         if isinstance(data_proxy_response, Exception):
@@ -145,7 +150,7 @@ class BucketFs(IFilesystem):
         if isinstance(dir_contents_result, Exception):
             return dir_contents_result
 
-        deletion_response = _requests_from_data_proxy(method="delete", url=self.url.concatpath(path), data=None)
+        deletion_response = self._requests_from_data_proxy(method="delete", url=self.url.concatpath(path), data=None)
         #FIXME: what about not found?
         if isinstance(deletion_response, Exception):
             return FsIoException(deletion_response)

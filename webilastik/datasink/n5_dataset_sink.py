@@ -3,6 +3,8 @@ from pathlib import PurePosixPath
 import json
 import numpy as np
 from ndstructs.point5D import Interval5D, Shape5D
+from webilastik.libebrains.user_credentials import EbrainsUserCredentials
+
 
 from webilastik.server.rpc.dto import Interval5DDto, N5DataSinkDto, Shape5DDto, dtype_to_dto
 from webilastik.filesystem import IFilesystem, create_filesystem_from_message
@@ -118,8 +120,12 @@ class N5DataSink(DataSink):
         )
 
     @staticmethod
-    def from_dto(dto: N5DataSinkDto) -> "N5DataSink | Exception":
-        fs_result = create_filesystem_from_message(dto.filesystem)
+    def from_dto(
+        dto: N5DataSinkDto, ebrains_user_credentials: Optional[EbrainsUserCredentials]
+    ) -> "N5DataSink | Exception":
+        fs_result = create_filesystem_from_message(
+            dto.filesystem, ebrains_user_credentials=ebrains_user_credentials
+        )
         if isinstance(fs_result, Exception):
             return fs_result
         return N5DataSink(
