@@ -11,6 +11,7 @@ class _PrivateMarker:
 
 class OsFs(IFilesystem):
     def __init__(self, _marker: _PrivateMarker) -> None:
+        raise Exception("OsFs not allowed") #FIXME
         super().__init__()
 
     def _make_path(self, path: PurePosixPath) -> Path:
@@ -18,7 +19,10 @@ class OsFs(IFilesystem):
 
     @classmethod
     def create(cls) -> "OsFs | Exception":
-        return OsFs(_marker=_PrivateMarker())
+        try:
+            return OsFs(_marker=_PrivateMarker())
+        except Exception as e:
+            return e
 
     @classmethod
     def from_dto(cls, dto: OsfsDto) -> "OsFs | Exception":
