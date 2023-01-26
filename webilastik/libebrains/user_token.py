@@ -18,7 +18,7 @@ class UserToken:
         self,
         *,
         access_token: str,
-        refresh_token: str,
+        refresh_token: Optional[str],
     ):
         api_url = Url.parse("https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect")
         assert api_url is not None
@@ -48,6 +48,8 @@ class UserToken:
         return UserToken.from_json_value(data)
 
     async def async_refreshed(self, *, http_client_session: ClientSession, oidc_client: OidcClient) -> "UserToken | Exception":
+        if self.refresh_token is None:
+            return Exception(f"No refresh token available")
         resp = await http_client_session.request(
             method="post",
             url="https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect/token",
@@ -66,6 +68,8 @@ class UserToken:
         return UserToken.from_json_value(data)
 
     def refreshed(self, *, oidc_client: OidcClient) -> "UserToken | Exception":
+        if self.refresh_token is None:
+            return Exception(f"No refresh token available")
         resp = requests.post(
             "https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect/token",
             allow_redirects=False,
@@ -94,8 +98,8 @@ class UserToken:
     def from_dto(cls, dto: EbrainsUserTokenDto) -> "UserToken":
         return UserToken(access_token=dto.access_token, refresh_token=dto.refresh_token)
 
-    def to_dto(self) -> EbrainsUserTokenDto:
-        return EbrainsUserTokenDto(access_token=self.access_token, refresh_token=self.refresh_token)
+    # def to_dto(self) -> EbrainsUserTokenDto:
+    #     return EbrainsUserTokenDto(access_token=self.access_token, refresh_token=self.refresh_token)
 
     # FIXME: remove this
     def to_json_value(self) -> JsonObject:

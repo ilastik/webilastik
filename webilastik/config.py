@@ -8,6 +8,8 @@ from typing_extensions import Self
 
 from cryptography.fernet import Fernet
 from webilastik.libebrains.oidc_client import OidcClient
+from webilastik.libebrains.user_credentials import EbrainsUserCredentials
+from webilastik.libebrains.user_token import UserToken
 
 from webilastik.utility import get_env_var
 from webilastik.utility.url import Url
@@ -124,7 +126,14 @@ class EbrainsOidcClientConfig:
         super().__init__()
         self.client_id = client_id
         self.client_secret = client_secret
-        self.oidc_client = OidcClient(client_id=client_id.value, client_secret=client_secret.value)
+        self.client = OidcClient(client_id=client_id.value, client_secret=client_secret.value)
+
+    @classmethod
+    def from_oidc_client(cls, client: OidcClient) -> Self:
+        return EbrainsOidcClientConfig(
+            client_id=EBRAINS_OIDC_CLIENT_ID(client.client_id),
+            client_secret=EBRAINS_OIDC_CLIENT_SECRET(client.client_secret),
+        )
 
     @classmethod
     def try_get(cls) -> "EbrainsOidcClientConfig | None |  Exception":
@@ -175,6 +184,21 @@ class EbrainsUserCredentialsConfig:
         self.user_access_token = user_access_token
         self.user_refresh_token = user_refresh_token
         self.oidc_client = oidc_client
+        self.credentials = EbrainsUserCredentials(
+            user_token=UserToken(
+                access_token=self.user_access_token.value,
+                refresh_token=self.user_refresh_token and self.user_access_token.value,
+            ),
+            oidc_client=self.oidc_client and self.oidc_client.client,
+        )
+
+    @classmethod
+    def from_credentials(cls, credentials: EbrainsUserCredentials) -> "Self":
+        return EbrainsUserCredentialsConfig(
+            oidc_client=credentials.oidc_client and EbrainsOidcClientConfig.from_oidc_client(credentials.oidc_client),
+            user_access_token=EBRAINS_USER_ACCESS_TOKEN(credentials.user_token.access_token),
+            user_refresh_token=None if credentials.user_token.refresh_token is None else EBRAINS_USER_REFRESH_TOKEN(credentials.user_token.refresh_token),
+        )
 
     def to_bash_exports(self) -> List[str]:
         out = [self.user_access_token.to_bash_export()]

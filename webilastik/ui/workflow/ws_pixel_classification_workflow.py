@@ -491,32 +491,32 @@ class WebIlastik:
 
 if __name__ == '__main__':
     from webilastik.config import WorkflowConfig
-    workflow_config = WorkflowConfig.try_get_global()
-    if isinstance(workflow_config, Exception):
+    workflow_config_result = WorkflowConfig.require()
+    if isinstance(workflow_config_result, Exception):
         import sys
-        print("Could not load workflow configuration", file=sys.stdout)
+        print(f"Could not load workflow configuration: {workflow_config_result}", file=sys.stdout)
         exit(1)
 
     executor = get_executor(hint="server_tile_handler", max_workers=multiprocessing.cpu_count())
 
     server_context = ReverseSshTunnel(
-        remote_username=workflow_config.session_allocator_username,
-        remote_host=workflow_config.session_allocator_host,
-        remote_unix_socket=workflow_config.session_allocator_socket_path,
-        local_unix_socket=workflow_config.listen_socket,
+        remote_username=workflow_config_result.session_allocator_username.value,
+        remote_host=workflow_config_result.session_allocator_host.value,
+        remote_unix_socket=workflow_config_result.session_allocator_socket_path.value,
+        local_unix_socket=workflow_config_result.listen_socket.value,
     )
 
     with server_context:
         WebIlastik(
             executor=executor,
-            max_duration_minutes=workflow_config.max_duration_minutes,
-            session_url=workflow_config.session_url,
-            ebrains_user_credentials=workflow_config.ebrains_user_credentials,
+            max_duration_minutes=Minutes(workflow_config_result.max_duration_minutes.value),
+            session_url=workflow_config_result.session_url.value,
+            ebrains_user_credentials=workflow_config_result.ebrains_user_credentials and workflow_config_result.ebrains_user_credentials.credentials,
         ).run(
-            unix_socket_path=str(workflow_config.listen_socket),
+            unix_socket_path=str(workflow_config_result.listen_socket.value),
         )
     try:
-        os.remove(workflow_config.listen_socket)
+        os.remove(workflow_config_result.listen_socket.value)
     except FileNotFoundError:
         pass
 

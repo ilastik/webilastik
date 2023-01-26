@@ -71,19 +71,21 @@ class DebugLock:
         self.traceback = None
         self._lock.release()
 
+
+
 def get_env_var(
     *,
     var_name: str,
     parser: Callable[[str], "T | Exception"],
-    default: "T | None" = None,
+    default: "T | _Empty" = _Empty(),
 ) -> "T | Exception":
     raw_value = os.environ.get(var_name)
     if raw_value is None:
-        if default is not None:
+        if isinstance(default, _Empty):
+            return Exception(f"Environment variable {var_name} was not set")
+        else:
             print(f"Environment variable {var_name} not set. Defaulting to {default}", file=sys.stderr)
             return default
-        else:
-            return Exception(f"Environment variable {var_name} was not set")
 
     try:
         return parser(raw_value)
@@ -94,7 +96,7 @@ def get_env_var_or_exit(
     *,
     var_name: str,
     parser: Callable[[str], "T | Exception"],
-    default: "T | None" = None,
+    default: "T | _Empty" = _Empty(),
 ) -> "T":
     value = get_env_var(var_name=var_name, parser=parser, default=default)
     if isinstance(value, Exception):

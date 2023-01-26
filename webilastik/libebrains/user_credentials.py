@@ -1,4 +1,5 @@
 from typing import Optional
+from webilastik.serialization.json_serialization import parse_typed_json_from_env_var
 
 from webilastik.server.rpc.dto import EbrainsUserCredentialsDto
 from webilastik.libebrains.oidc_client import OidcClient
@@ -18,16 +19,3 @@ class EbrainsUserCredentials:
         if isinstance(refreshed_token_result, Exception):
             return refreshed_token_result
         self.user_token = refreshed_token_result
-
-    def to_dto(self) -> EbrainsUserCredentialsDto:
-        return EbrainsUserCredentialsDto(
-            oidc_client=None if self.oidc_client is None else self.oidc_client.to_dto(),
-            user_token=self.user_token.to_dto(),
-        )
-
-    @classmethod
-    def from_dto(cls, dto: EbrainsUserCredentialsDto) -> "EbrainsUserCredentials":
-        return EbrainsUserCredentials(
-            oidc_client=dto.oidc_client if dto.oidc_client is None else OidcClient.from_dto(dto.oidc_client),
-            user_token=UserToken.from_dto(dto.user_token),
-        )

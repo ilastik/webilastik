@@ -16,7 +16,7 @@ import os
 
 from ndstructs.utils.json_serializable import ensureJsonObject, ensureJsonString
 from cryptography.fernet import Fernet
-from webilastik.config import WorkflowConfig
+from webilastik.config import WEBILASTIK_ALLOW_LOCAL_FS, WEBILASTIK_WORKFLOW_LISTEN_SOCKET, WEBILASTIK_WORKFLOW_MAX_DURATION_MINUTES, WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_HOST, WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_SOCKET_PATH, WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_USERNAME, WEBILASTIK_WORKFLOW_SESSION_URL, EbrainsUserCredentialsConfig, WorkflowConfig
 
 from webilastik.libebrains.user_credentials import EbrainsUserCredentials
 from webilastik.libebrains.user_info import UserInfo
@@ -452,14 +452,14 @@ class LocalJobLauncher(SshJobLauncher):
     ) -> str:
         working_dir = Path(f"/tmp/{compute_session_id}")
         job_config = WorkflowConfig(
-            allow_local_fs=allow_local_fs,
-            ebrains_user_credentials=ebrains_user_credentials,
-            max_duration_minutes=max_duration_minutes,
-            listen_socket=working_dir / "to-master.sock",
-            session_url=session_url,
-            session_allocator_host=session_allocator_host,
-            session_allocator_username=session_allocator_username,
-            session_allocator_socket_path=session_allocator_socket_path,
+            allow_local_fs=WEBILASTIK_ALLOW_LOCAL_FS(allow_local_fs),
+            ebrains_user_credentials=ebrains_user_credentials and EbrainsUserCredentialsConfig.from_credentials(ebrains_user_credentials),
+            max_duration_minutes=WEBILASTIK_WORKFLOW_MAX_DURATION_MINUTES(max_duration_minutes.to_int()),
+            listen_socket=WEBILASTIK_WORKFLOW_LISTEN_SOCKET(working_dir / "to-master.sock"),
+            session_url=WEBILASTIK_WORKFLOW_SESSION_URL(session_url),
+            session_allocator_host=WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_HOST(session_allocator_host),
+            session_allocator_username=WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_USERNAME(session_allocator_username),
+            session_allocator_socket_path=WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_SOCKET_PATH(session_allocator_socket_path),
         )
         webilastik_source_dir = sanitize(Path(__file__).parent.parent.parent)
         redis_pid_file = sanitize(working_dir / "redis.pid")
@@ -475,7 +475,7 @@ class LocalJobLauncher(SshJobLauncher):
         out = textwrap.dedent(textwrap.indent(f"""
             #!/bin/bash -l
 
-            {job_config.to_bash_export()}
+            {"            ".join(job_config.to_bash_exports())}
 
             set -xeu
             set -o pipefail
@@ -637,14 +637,14 @@ class JusufSshJobLauncher(SshJobLauncher):
     ) -> str:
         working_dir = Path(f"$SCRATCH/{compute_session_id}")
         job_config = WorkflowConfig(
-            allow_local_fs=allow_local_fs,
-            ebrains_user_credentials=ebrains_user_credentials,
-            max_duration_minutes=max_duration_minutes,
-            listen_socket=working_dir / "to-master.sock",
-            session_url=session_url,
-            session_allocator_host=session_allocator_host,
-            session_allocator_username=session_allocator_username,
-            session_allocator_socket_path=session_allocator_socket_path,
+            allow_local_fs=WEBILASTIK_ALLOW_LOCAL_FS(allow_local_fs),
+            ebrains_user_credentials=ebrains_user_credentials and EbrainsUserCredentialsConfig.from_credentials(ebrains_user_credentials),
+            max_duration_minutes=WEBILASTIK_WORKFLOW_MAX_DURATION_MINUTES(max_duration_minutes.to_int()),
+            listen_socket=WEBILASTIK_WORKFLOW_LISTEN_SOCKET(working_dir / "to-master.sock"),
+            session_url=WEBILASTIK_WORKFLOW_SESSION_URL(session_url),
+            session_allocator_host=WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_HOST(session_allocator_host),
+            session_allocator_username=WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_USERNAME(session_allocator_username),
+            session_allocator_socket_path=WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_SOCKET_PATH(session_allocator_socket_path),
         )
         home="/p/home/jusers/webilastik/jusuf"
         webilastik_source_dir = f"{working_dir}/webilastik"
@@ -664,7 +664,7 @@ class JusufSshJobLauncher(SshJobLauncher):
             #SBATCH --hint=nomultithread
 
             jutil env activate -p {self.account}
-            {job_config.to_bash_export()}
+            {"            ".join(job_config.to_bash_exports())}
 
             set -xeu
             set -o pipefail
@@ -753,14 +753,14 @@ class CscsSshJobLauncher(SshJobLauncher):
     ) -> str:
         working_dir = Path(f"$SCRATCH/{compute_session_id}")
         job_config = WorkflowConfig(
-            allow_local_fs=allow_local_fs,
-            ebrains_user_credentials=ebrains_user_credentials,
-            max_duration_minutes=max_duration_minutes,
-            listen_socket=working_dir / "to-master.sock",
-            session_url=session_url,
-            session_allocator_host=session_allocator_host,
-            session_allocator_username=session_allocator_username,
-            session_allocator_socket_path=session_allocator_socket_path,
+            allow_local_fs=WEBILASTIK_ALLOW_LOCAL_FS(allow_local_fs),
+            ebrains_user_credentials=ebrains_user_credentials and EbrainsUserCredentialsConfig.from_credentials(ebrains_user_credentials),
+            max_duration_minutes=WEBILASTIK_WORKFLOW_MAX_DURATION_MINUTES(max_duration_minutes.to_int()),
+            listen_socket=WEBILASTIK_WORKFLOW_LISTEN_SOCKET(working_dir / "to-master.sock"),
+            session_url=WEBILASTIK_WORKFLOW_SESSION_URL(session_url),
+            session_allocator_host=WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_HOST(session_allocator_host),
+            session_allocator_username=WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_USERNAME(session_allocator_username),
+            session_allocator_socket_path=WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_SOCKET_PATH(session_allocator_socket_path),
         )
         home=f"/users/{self.user}"
         webilastik_source_dir = f"{working_dir}/webilastik"
@@ -777,7 +777,7 @@ class CscsSshJobLauncher(SshJobLauncher):
             #SBATCH --hint=nomultithread
             #SBATCH --constraint=mc
 
-            {job_config.to_bash_export()}
+            {"            ".join(job_config.to_bash_exports())}
 
             set -xeu
             set -o pipefail

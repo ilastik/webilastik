@@ -108,9 +108,10 @@ class EbrainsLogin:
         response.set_cookie(
             name=self.EBRAINS_USER_ACCESS_TOKEN_COOKIE_KEY, value=self.user_token.access_token, secure=True
         )
-        response.set_cookie(
-            name=self.EBRAINS_USER_REFRESH_TOKEN_COOKIE_KEY, value=self.user_token.refresh_token, secure=True
-        )
+        if self.user_token.refresh_token: #FIXME: delete refresh token cookie if there is none?
+            response.set_cookie(
+                name=self.EBRAINS_USER_REFRESH_TOKEN_COOKIE_KEY, value=self.user_token.refresh_token, secure=True
+            )
         return response
 
 
@@ -142,13 +143,11 @@ class SessionAllocator:
         fernet: Fernet,
         external_url: Url,
         oidc_client: OidcClient,
-        ebrains_oidc_client: Optional[OidcClient],
         allow_local_fs: bool = False,
         allow_local_sessions: bool = False,
     ):
         self.fernet = fernet
         self.session_launchers: Dict[HpcSiteName, SshJobLauncher] = {}
-        self.ebrains_oidc_client = ebrains_oidc_client
         self.allow_local_fs = allow_local_fs
         if allow_local_sessions:
             self.session_launchers["LOCAL_DASK"] = LocalJobLauncher(fernet=fernet, executor_getter="dask")
@@ -516,17 +515,16 @@ class SessionAllocator:
         web.run_app(self.app, port=port) #type: ignore
 
 if __name__ == '__main__':
-    server_config = SessionAllocatorConfig.try_get_global()
-    if isinstance(server_config, Exception):
+    server_config_result = SessionAllocatorConfig.require()
+    if isinstance(server_config_result, Exception):
         import sys
-        print("Could not get server configuration", file=sys.stderr)
+        print(f"Could not get server configuration: {server_config_result}", file=sys.stderr)
         exit(1)
 
     SessionAllocator(
-        fernet=server_config.fernet,
-        external_url=server_config.external_url,
-        oidc_client=server_config.ebrains_oidc_client,
-        allow_local_sessions=server_config.allow_local_compute_sessions,
-        allow_local_fs=server_config.allow_local_fs,
-        ebrains_oidc_client=server_config.ebrains_oidc_client,
+        fernet=server_config_result.fernet,
+        external_url=server_config_result.external_url.value,
+        allow_local_sessions=server_config_result.allow_local_compute_sessions.value,
+        allow_local_fs=server_config_result.allow_local_fs.value,
+        oidc_client=server_config_result.ebrains_oidc_client.client,
     ).run(port=5000)

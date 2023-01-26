@@ -1,5 +1,6 @@
 from typing import List
 from pathlib import PurePosixPath, Path
+from webilastik.config import WEBILASTIK_ALLOW_LOCAL_FS
 
 from webilastik.filesystem import IFilesystem, FsIoException, FsFileNotFoundException, FsDirectoryContents
 from webilastik.utility.url import Url
@@ -18,6 +19,11 @@ class OsFs(IFilesystem):
 
     @classmethod
     def create(cls) -> "OsFs | Exception":
+        allow_local_fs_config = WEBILASTIK_ALLOW_LOCAL_FS.try_get()
+        if isinstance(allow_local_fs_config, Exception):
+            return allow_local_fs_config
+        if allow_local_fs_config is None or allow_local_fs_config.value == False:
+            return Exception(f"Local filesystem is not allowed")
         return OsFs(_marker=_PrivateMarker())
 
     @classmethod
