@@ -16,7 +16,7 @@ COLOR_ESCAPE: Mapping[LogLevel, str] = {
     "error": "\033[31m",
     "warning": "\033[33m",
     "info": "\033[0m",
-    "debug": "\033[32m",
+    "debug": "\033[38;5;145m",
     "normal": "\033[0m",
 }
 
