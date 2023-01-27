@@ -11,6 +11,7 @@ import json
 import skimage.io # type: ignore
 from ndstructs.point5D import Shape5D, Interval5D, Point5D
 from ndstructs.array5D import Array5D
+from tests import run_all_tests
 
 from webilastik.datasource import DataRoi
 from webilastik.datasink.n5_dataset_sink import N5DataSink
@@ -23,6 +24,7 @@ from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.filesystem import IFilesystem
 from webilastik.filesystem.http_fs import HttpFs
 from webilastik.filesystem.os_fs import OsFs
+from webilastik.utility import eprint
 from webilastik.utility.url import Url
 
 # fmt: off
@@ -486,7 +488,7 @@ def test_dzi_datasource():
     )
     assert not isinstance(datasources, Exception), str(datasources)
     for i, ds in datasources.items():
-        print(f"{i} interval: {ds.interval}")
+        eprint(f"{i} interval: {ds.interval}", level="debug")
 
     directly_retrieved_level_10 = DziLevelDataSource.try_load_level(
         filesystem=fs, level_path=PurePosixPath("duomo/duomo_files/10"),
@@ -495,16 +497,11 @@ def test_dzi_datasource():
     for ds in [datasources[10], directly_retrieved_level_10]:
         out = Array5D.allocate(interval=ds.interval, dtype=np.dtype("uint8"))
         for tile in ds.roi.default_split():
-            print(f"&&&&&&&&&&&&& {tile}")
+            eprint(f"&&&&&&&&&&&&& {tile}", level="debug")
             tile_data = tile.retrieve()
             out.set(tile_data)
-        out.show_images()
+        # out.show_images()
 
 if __name__ == "__main__":
-    import inspect
     import sys
-    test_dzi_datasource()
-    # for item_name, item in inspect.getmembers(sys.modules[__name__]):
-    #     if inspect.isfunction(item) and item_name.startswith('test'):
-    #         print(f"Running test: {item_name}")
-    #         item()
+    run_all_tests(sys.modules[__name__])

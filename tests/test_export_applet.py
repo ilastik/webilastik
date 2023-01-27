@@ -13,7 +13,8 @@ from webilastik.ui.applet import StatelesApplet, applet_output
 from webilastik.ui.applet.brushing_applet import Label
 from webilastik.ui.applet.pixel_predictions_export_applet import PixelClassificationExportApplet
 
-from tests import SkipException, create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations, get_sample_c_cells_pixel_classifier
+from tests import SkipException, create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations, get_sample_c_cells_pixel_classifier, run_all_tests
+from webilastik.utility import eprint
 
 class DummyBrushingApplet(StatelesApplet):
     def __init__(self, name: str) -> None:
@@ -36,17 +37,14 @@ class DummyDatasourceApplet(StatelesApplet):
     def datasources(self) -> "Sequence[FsDataSource] | None":
         return None
 
-
-if __name__ == "__main__":
+def test_export_applet():
     executor = ThreadPoolExecutor(max_workers=4)
     priority_executor= PriorityExecutor(executor=executor, max_active_job_steps=2)
-
-
 
     pixel_classifier_applet = DummyPixelClassificationApplet("reader_applet")
     export_applet = PixelClassificationExportApplet(
         name="export_applet",
-        on_async_change=lambda: print(f"something_changed"),
+        on_async_change=lambda: eprint(f"something changed in export applet", level="debug"),
         priority_executor=priority_executor,
         operator=pixel_classifier_applet.classifier,
         populated_labels=DummyBrushingApplet("brushing_applet").labels,
@@ -72,15 +70,18 @@ if __name__ == "__main__":
     if isinstance(result, Exception):
         raise result
 
-    time.sleep(8)
+    time.sleep(2)
 
-    print(f"trying to shutdown JOB executor?")
+    eprint(f"trying to shutdown JOB executor?", level="debug")
     priority_executor.shutdown()
-    print(f"DONE shutting down JOB executor")
+    eprint(f"DONE shutting down JOB executor", level="debug")
 
-    print(f"trying to shutdown executor?")
+    eprint(f"trying to shutdown executor?", level="debug")
     executor.shutdown()
 
-    print(f"managed to shutdown executor, i think")
+    eprint(f"managed to shutdown executor, i think", level="debug")
 
 
+if __name__ == "__main__":
+    import sys
+    run_all_tests(sys.modules[__name__])

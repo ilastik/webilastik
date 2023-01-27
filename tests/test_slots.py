@@ -1,7 +1,11 @@
 # pyright: strict
 
 from typing import Any, Optional
-from webilastik.ui.applet import InertApplet, UserCancelled, CascadeOk, CascadeResult, AppletOutput, applet_output, Applet, NoSnapshotApplet, StatelesApplet, cascade, dummy_prompt, UserPrompt
+from tests import run_all_tests
+from webilastik.ui.applet import (
+    InertApplet,UserCancelled, CascadeOk, CascadeResult, AppletOutput, applet_output,
+    Applet, NoSnapshotApplet, StatelesApplet, cascade, dummy_prompt, UserPrompt
+)
 
 
 class InputIdentityApplet(NoSnapshotApplet, InertApplet):
@@ -265,3 +269,6 @@ def test_auto_update_on_user_interaction():
     assert a.num_changes() == 3
     assert b.out() == 3
 
+if __name__ == "__main__":
+    import sys
+    run_all_tests(sys.modules[__name__])

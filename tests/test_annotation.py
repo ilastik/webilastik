@@ -1,6 +1,6 @@
 from ndstructs.point5D import Point5D
 from webilastik.annotations import Annotation
-from tests import get_sample_c_cells_datasource
+from tests import get_sample_c_cells_datasource, run_all_tests
 from webilastik.annotations.annotation import Color
 
 import numpy as np
@@ -26,4 +26,5 @@ def test_collision_clearing():
 
 
 if __name__ == "__main__":
-    test_collision_clearing()
+    import sys
+    run_all_tests(sys.modules[__name__])

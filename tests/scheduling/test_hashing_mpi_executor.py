@@ -2,11 +2,20 @@ from concurrent.futures import wait as wait_futures
 import time
 import functools
 
+from tests import SkipException, run_all_tests
+
 def wait_then_echo(wait_time: int, x: int) -> int:
     time.sleep(wait_time)
     return x
 
 def test_hashing_mpi_executor():
+    try:
+        from mpi4py import MPI
+    except ImportError as e:
+        raise SkipException("mpi4py not installed") from e
+    if MPI.COMM_WORLD.size <= 1:
+        raise SkipException("bad MPI comm size. Maybe this isn't being run with mpiexec ?")
+
     from webilastik.scheduling.hashing_mpi_executor import HashingMpiExecutor
 
     executor = HashingMpiExecutor()
@@ -37,4 +46,5 @@ def test_hashing_mpi_executor():
 
 
 if __name__ == "__main__":
-    test_hashing_mpi_executor()
+    import sys
+    run_all_tests(sys.modules[__name__])

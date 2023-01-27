@@ -1,26 +1,22 @@
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 import time
-from concurrent.futures import ProcessPoolExecutor
 import json
 from typing import List
 
 import numpy as np
-from ndstructs.utils.json_serializable import JsonObject, ensureJsonArray, ensureJsonInt, ensureJsonObject
 
 from tests import TEST_OUTPUT_PATH, create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations
 from webilastik.datasource import DataRoi
-from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.features.ilp_filter import (
     IlpDifferenceOfGaussians, IlpGaussianGradientMagnitude, IlpGaussianSmoothing,
     IlpHessianOfGaussianEigenvalues, IlpLaplacianOfGaussian, IlpStructureTensorEigenvalues,
 )
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.filesystem.os_fs import OsFs
-from webilastik.libebrains.user_token import UserToken
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet import dummy_prompt
 from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
-from webilastik.utility.url import Protocol, Url
+from webilastik.utility import eprint
 from executor_getter import get_executor
 
 def wait_until_jobs_completed(workflow: PixelClassificationWorkflow, timeout: float = 50):
@@ -30,10 +26,9 @@ def wait_until_jobs_completed(workflow: PixelClassificationWorkflow, timeout: fl
         for job in export_state.jobs:
             num_args = job.num_args
             num_completed_steps = job.num_completed_steps
-            print("checkign,....")
-            print(f"job {num_args=}  {num_completed_steps=}")
+            eprint(f"job {num_args=}  {num_completed_steps=}", level="debug")
             if num_completed_steps < (num_args or float("inf")):
-                print(f"Jobs not done yet. Waiting...")
+                eprint(f"Jobs not done yet. Waiting...", level="debug")
                 time.sleep(wait_time)
                 timeout -= wait_time
                 break
@@ -47,7 +42,8 @@ def test_pixel_classification_workflow():
     priority_executor = PriorityExecutor(executor=executor, max_active_job_steps=8)
 
     workflow = PixelClassificationWorkflow(
-        on_async_change=lambda : print(json.dumps(workflow.export_applet._get_json_state(), indent=4)),
+        # on_async_change=lambda : eprint(json.dumps(workflow.export_applet._get_json_state(), indent=4), level="debug"),
+        on_async_change=lambda : None,
         executor=executor,
         priority_executor=priority_executor,
         ebrains_user_credentials=None,
@@ -91,8 +87,6 @@ def test_pixel_classification_workflow():
     assert classifier != None
 
 
-
-
     fs = OsFs.create()
     assert not isinstance(fs, Exception)
     project_path = TEST_OUTPUT_PATH / "my_project.ilp"
@@ -100,28 +94,24 @@ def test_pixel_classification_workflow():
 
     loaded_workflow = PixelClassificationWorkflow.from_ilp(
         ilp_path=Path(project_path),
-        on_async_change=lambda : print(json.dumps(workflow.export_applet._get_json_state(), indent=4)),
+        # on_async_change=lambda : eprint(json.dumps(workflow.export_applet._get_json_state(), indent=4), level="debug"),
+        on_async_change=lambda: None,
         executor=executor,
         priority_executor=priority_executor,
         ebrains_user_credentials=None,
     )
-    print(loaded_workflow)
     assert isinstance(loaded_workflow, PixelClassificationWorkflow)
-    print(f"Loaded workflow and state pixel aplet description is {loaded_workflow.pixel_classifier_applet._state.description}")
-
-
-
 
 
     # # calculate predictions on an entire data source
     raw_data_source = get_sample_c_cells_datasource()
     preds_future = executor.submit(classifier, raw_data_source.roi)
     local_predictions = preds_future.result()
-    local_predictions.as_uint8().show_channels()
+    # local_predictions.as_uint8().show_channels()
 
     # # calculate predictions on just a piece of arbitrary data
     exported_tile = executor.submit(classifier, DataRoi(datasource=raw_data_source, x=(100, 200), y=(100, 200)))
-    exported_tile.result().show_channels()
+    # exported_tile.result().show_channels()
 
 ###################################
 
@@ -139,16 +129,16 @@ def test_pixel_classification_workflow():
         name="pixel_classification_workflow__predictions__export.precomputed",
     )
 
-    print(f"Sending predictions job request??????")
+    eprint(f"Sending predictions job request??????", level="debug")
     result = workflow.export_applet.launch_pixel_probabilities_export_job(
         datasource=raw_data_source,
         datasink=predictions_export_datasink
     )
     assert result is None
 
-    print(f"---> Job successfully scheduled? Waiting for a while")
+    eprint(f"---> Job successfully scheduled? Waiting for a while", level="debug")
     wait_until_jobs_completed(workflow=workflow)
-    print(f"Done waiting. Checking outputs")
+    eprint(f"Done waiting. Checking outputs", level="debug")
 
     predictions_output = predictions_export_datasink.to_datasource()
     for tile in predictions_output.roi.get_datasource_tiles():
@@ -164,16 +154,16 @@ def test_pixel_classification_workflow():
         name="pixel_classification_workflow__segmentation__export.precomputed",
     )
 
-    print(f"Sending simple segmentation job request??????")
+    eprint(f"Sending simple segmentation job request??????", level="debug")
     result = workflow.export_applet.launch_simple_segmentation_export_job(
         datasource=raw_data_source,
         datasink=simple_segmentation_datasink,
         label_name=pixel_annotations[1].name,
     )
 
-    print(f"---> Job successfully scheduled? Waiting for a while")
+    eprint(f"---> Job successfully scheduled? Waiting for a while", level="debug")
     wait_until_jobs_completed(workflow=workflow)
-    print(f"Done waiting. Checking outputs")
+    eprint(f"Done waiting. Checking outputs", level="debug")
 
     segmentation_output_1 = simple_segmentation_datasink.to_datasource()
     for tile in segmentation_output_1.roi.get_datasource_tiles():

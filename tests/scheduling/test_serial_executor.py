@@ -1,3 +1,4 @@
+from tests import run_all_tests
 from webilastik.scheduling import SerialExecutor
 
 def test_serial_executor():
@@ -10,4 +11,5 @@ def test_serial_executor():
         assert results == [2,4,6,8,10]
 
 if __name__ == "__main__":
-    test_serial_executor()
+    import sys
+    run_all_tests(sys.modules[__name__])

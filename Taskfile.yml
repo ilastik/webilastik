@@ -329,6 +329,15 @@ tasks:
   deploy:
     deps: [deploy-to-hpcs, deploy-to-webilastik-server]
 
+  test:
+    deps: [generate-message-schemas]
+    env:
+      PYTHONPATH: ".:./ndstructs/:./caching/lru_cache/:./executor_getters/default/"
+      WEBILASTIK_ALLOW_LOCAL_FS: "true"
+      WEBILASTIK_ALLOW_LOCAL_COMPUTE_SESSIONS: "true"
+    cmds:
+      - find tests/ -type f -name "test_*.py" | parallel -L 1 -t --halt soon,fail=1 -I script_name python3 script_name
+
   clean:
     deps: [stop-local-server]
     cmds:

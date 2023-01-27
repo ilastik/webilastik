@@ -3,6 +3,7 @@ import time
 import os
 from typing import Any
 import uuid
+from tests import run_all_tests
 
 from webilastik.scheduling.job import Job, PriorityExecutor
 
@@ -57,4 +58,5 @@ def test_priority_executor():
         priority_executor.shutdown(wait=True)
 
 if __name__ == "__main__":
-    test_priority_executor()
+    import sys
+    run_all_tests(sys.modules[__name__])

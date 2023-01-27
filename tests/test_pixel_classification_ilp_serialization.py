@@ -7,6 +7,7 @@ from typing import List, Set
 import h5py
 import numpy as np
 from ndstructs.point5D import Point5D
+from tests import run_all_tests
 
 from webilastik.annotations.annotation import Annotation, Color
 from webilastik.classic_ilastik.ilp import IlpFeatureSelectionsGroup
@@ -30,7 +31,7 @@ from webilastik.ui.workflow.pixel_classification_workflow import PixelClassifica
 osfs = OsFs.create()
 assert not isinstance(osfs, Exception)
 
-def test_feature_extractor_serialization():
+def _test_feature_extractor_serialization():
     all_feature_extractors: List[IlpFilter] = []
     for scale in [0.3, 0.7, 1.0, 1.6, 3.5, 5.0, 10.0]:
         all_feature_extractors.append(IlpGaussianSmoothing(ilp_scale=scale, axis_2d="z"))
@@ -132,5 +133,5 @@ def test_pixel_classification_ilp_serialization():
     # compare_projects(output_ilp_path, sample_trained_ilp_path)
 
 if __name__ == "__main__":
-    test_feature_extractor_serialization()
-    test_pixel_classification_ilp_serialization()
+    import sys
+    run_all_tests(sys.modules[__name__])

@@ -1,6 +1,7 @@
 # pyright: strict
 
 from pathlib import PurePosixPath
+from tests import run_all_tests
 from webilastik.utility.url import Url
 
 def test_url_basics():
@@ -23,4 +24,5 @@ def test_url_basics():
     assert url3.search["b"]== '[1, 2, 3]'
 
 if __name__ == "__main__":
-    test_url_basics()
+    import sys
+    run_all_tests(sys.modules[__name__])

@@ -7,4 +7,5 @@ def test_pixel_classifier():
         _ = classifier(tile)#.show_channels()
 
 if __name__ == "__main__":
-    test_pixel_classifier()
+    import sys
+    tests.run_all_tests(sys.modules[__name__])

@@ -1,5 +1,5 @@
 #pyright: strict
-from tests import make_output_path
+from tests import make_output_path, run_all_tests
 from webilastik.filesystem.os_fs import OsFs
 from pathlib import PurePosixPath
 
@@ -129,9 +129,5 @@ def test_writing_to_offset_precomputed_chunks():
 
 
 if __name__ == "__main__":
-    import inspect
     import sys
-    for item_name, item in inspect.getmembers(sys.modules[__name__]):
-        if inspect.isfunction(item) and item_name.startswith('test'):
-            print(f"Running test: {item_name}")
-            item()
+    run_all_tests(sys.modules[__name__])

@@ -1,5 +1,6 @@
 from ndstructs.array5D import Array5D
 import numpy as np
+from tests import run_all_tests
 from webilastik.datasource.array_datasource import ArrayDataSource
 
 from webilastik.simple_segmenter import SimpleSegmenter
@@ -61,4 +62,5 @@ def test_simple_segmenter():
         assert np.all(seg.raw("cyx") == expected_seg.raw("cyx"))
 
 if __name__ == "__main__":
-    test_simple_segmenter()
+    import sys
+    run_all_tests(sys.modules[__name__])

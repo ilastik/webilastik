@@ -1,5 +1,6 @@
 from concurrent.futures.thread import ThreadPoolExecutor
 import time
+from tests import run_all_tests
 
 from webilastik.scheduling.job import PriorityExecutor, Job
 
@@ -27,4 +28,5 @@ def test_job():
     print(f"Called shutdown.")
 
 if __name__ == "__main__":
-    test_job()
+    import sys
+    run_all_tests(sys.modules[__name__])

@@ -21,7 +21,7 @@ import numpy as np
 from aiohttp.client_ws import ClientWebSocketResponse
 
 
-from tests import SkipException, create_precomputed_chunks_sink, get_sample_c_cells_pixel_annotations, get_sample_feature_extractors, get_test_output_bucket_fs
+from tests import SkipException, create_precomputed_chunks_sink, get_sample_c_cells_pixel_annotations, get_sample_feature_extractors, get_test_output_bucket_fs, run_all_tests
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.ui.datasource import try_get_datasources_from_url
@@ -53,6 +53,16 @@ async def read_server_status(websocket: ClientWebSocketResponse):
 async def main():
     ilastik_root_url = Url.parse("https://app.ilastik.org/")
     assert ilastik_root_url is not None
+
+    async with aiohttp.ClientSession() as session:
+        try:
+            response = await session.get(ilastik_root_url.concatpath("api/hello").raw)
+            if not response.ok:
+                raise SkipException(f"webilastik server is down")
+        except Exception as e:
+            raise SkipException(f"webilastik server could not be reached") from e
+
+
     data_url = Url.parse("precomputed://https://app.ilastik.org/public/images/c_cells_2.precomputed")
     assert data_url is not None
     datasources = try_get_datasources_from_url(url=data_url, ebrains_user_credentials=None)
@@ -224,6 +234,9 @@ async def main():
         global finished;
         finished = True
 
+def test_ws_pixel_classification_workflow():
+    asyncio.run(main())
 
-
-asyncio.run(main())
+if __name__ == "__main__":
+    import sys
+    run_all_tests(sys.modules[__name__])
