@@ -7,12 +7,13 @@ import numpy as np
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.datasource import FsDataSource
 from webilastik.features.ilp_filter import IlpFilter
+from webilastik.filesystem.os_fs import OsFs
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet import StatelesApplet, applet_output
 from webilastik.ui.applet.brushing_applet import Label
 from webilastik.ui.applet.pixel_predictions_export_applet import PixelClassificationExportApplet
 
-from tests import create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations, get_sample_c_cells_pixel_classifier
+from tests import SkipException, create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations, get_sample_c_cells_pixel_classifier
 
 class DummyBrushingApplet(StatelesApplet):
     def __init__(self, name: str) -> None:
@@ -50,17 +51,23 @@ if __name__ == "__main__":
         operator=pixel_classifier_applet.classifier,
         populated_labels=DummyBrushingApplet("brushing_applet").labels,
         datasource_suggestions=DummyDatasourceApplet(name="datasource propvider applet").datasources,
+        ebrains_user_credentials=None,
     )
 
+    output_fs = OsFs.create()
+    assert not isinstance(output_fs, Exception)
     datasource = get_sample_c_cells_datasource()
+    datasink_result = create_precomputed_chunks_sink(
+        shape=datasource.shape.updated(c=2),
+        dtype=np.dtype("float32"),
+        chunk_size=datasource.tile_shape,
+        fs=output_fs,
+        name="export_applet_output.precomputed"
+    )
 
     result = export_applet.launch_pixel_probabilities_export_job(
         datasource=get_sample_c_cells_datasource(),
-        datasink=create_precomputed_chunks_sink(
-            shape=datasource.shape.updated(c=2),
-            dtype=np.dtype("float32"),
-            chunk_size=datasource.tile_shape,
-        )
+        datasink=datasink_result,
     )
     if isinstance(result, Exception):
         raise result

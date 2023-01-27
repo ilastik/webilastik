@@ -1,7 +1,7 @@
 # pyright: reportUnusedImport=false
 from traceback import StackSummary
 import traceback
-from typing import Callable, Generic, Iterable, NewType, TypeVar
+from typing import Callable, Generic, Iterable, Literal, Mapping, NewType, TypeVar
 import threading
 import os
 import sys
@@ -9,6 +9,21 @@ from typing_extensions import Protocol, Self
 
 from ndstructs.utils.json_serializable import JsonObject, JsonValue
 import datetime
+
+LogLevel = Literal["error", "warning", "info", "debug", "normal"]
+
+COLOR_ESCAPE: Mapping[LogLevel, str] = {
+    "error": "\033[31m",
+    "warning": "\033[33m",
+    "info": "\033[0m",
+    "debug": "\033[32m",
+    "normal": "\033[0m",
+}
+
+def eprint(message: str, level: Literal["error", "warning", "info", "debug"] = "info"):
+    if not sys.stderr.isatty():
+        print(message, file=sys.stderr)
+    print(COLOR_ESCAPE[level], message, COLOR_ESCAPE["normal"])
 
 def get_now_string() -> str:
     now = datetime.datetime.now()

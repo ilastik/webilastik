@@ -56,6 +56,7 @@ def test_pixel_classification_ilp_serialization():
         sample_workflow_data = IlpPixelClassificationWorkflowGroup.parse(
             group=f,
             ilp_fs=osfs, #FIXME?
+            ebrains_user_credentials=None,
         )
         assert not isinstance(sample_workflow_data, Exception)
         with open(output_ilp_path, "wb") as rewritten:
@@ -66,6 +67,7 @@ def test_pixel_classification_ilp_serialization():
         reloaded_data = IlpPixelClassificationWorkflowGroup.parse(
             group=rewritten,
             ilp_fs=osfs,
+            ebrains_user_credentials=None,
         )
         assert not isinstance(reloaded_data, Exception)
 
@@ -97,6 +99,7 @@ def test_pixel_classification_ilp_serialization():
         priority_executor=priority_executor,
         ilp_path=output_ilp_path,
         on_async_change=lambda: None,
+        ebrains_user_credentials=None,
     )
     assert not isinstance(workflow, Exception)
     print(f"These are the deserialized brush strokes:")

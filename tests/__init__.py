@@ -1,11 +1,15 @@
+import subprocess
 from datetime import datetime
 import os
 from pathlib import Path, PurePosixPath
+import tempfile
 import time
-from typing import Any, Dict, Literal, Mapping, Dict, Sequence, Tuple
+from types import ModuleType
+from typing import Any, Dict, Final, Literal, Mapping, Dict, Sequence, Tuple
 import uuid
 import json
 from collections.abc import Mapping as MappingAbc
+import sys
 
 import h5py
 from h5py import AttributeManager
@@ -16,6 +20,7 @@ from ndstructs.utils.json_serializable import JsonObject, JsonValue
 
 from webilastik.annotations.annotation import Annotation, Color
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
+from webilastik.config import EbrainsUserCredentialsConfig
 from webilastik.datasink import FsDataSink
 from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
 from webilastik.datasource import FsDataSource
@@ -27,48 +32,57 @@ from webilastik.filesystem import IFilesystem
 from webilastik.filesystem.os_fs import OsFs
 from webilastik.filesystem.http_fs import HttpFs
 from webilastik.filesystem.bucket_fs import BucketFs
+from webilastik.libebrains.user_credentials import EbrainsUserCredentials
 from webilastik.libebrains.user_token import UserToken
 from webilastik.ui.applet.brushing_applet import Label
-from webilastik.libebrains.global_user_login import get_global_login_token
+from webilastik.utility import eprint, get_now_string
 
-def get_project_root_dir() -> PurePosixPath:
-    return PurePosixPath(__file__).parent.parent
+TEST_NAME: Final[str] = Path(sys.argv[0]).name
+TEST_TIMESTAMP: Final[str] = get_now_string()
+TEST_OUTPUT_DIR_NAME: Final[str] =  f"test__{TEST_NAME}__{TEST_TIMESTAMP}/"
+TEST_OUTPUT_PATH: Final[PurePosixPath] = PurePosixPath(tempfile.gettempdir()) / TEST_OUTPUT_DIR_NAME
+BUCKET_TEST_OUTPUT_PATH: Final[PurePosixPath] = PurePosixPath("/") / "webilastik_tests" / TEST_OUTPUT_DIR_NAME
+PROJECT_ROOT_DIR: Final[PurePosixPath] = PurePosixPath(
+    subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True).stdout.decode("utf8")[:-1]
+)
+SAMPLE_IMAGES_PATH = PROJECT_ROOT_DIR / "public/images"
 
-def get_project_test_dir() -> PurePosixPath:
-    return get_project_root_dir() / "tests"
+class SkipException(Exception):
+    pass
 
-def get_tmp_dir() -> PurePosixPath:
-    return get_project_test_dir() / "tmp"
-
-def create_tmp_dir(prefix: str) -> PurePosixPath:
-    path = get_tmp_dir() / f"prefix_{uuid.uuid4()}"
-    Path(path).mkdir(parents=True)
-    return path
+def make_output_path(*, rel_path: "PurePosixPath | str") -> PurePosixPath:
+    return TEST_OUTPUT_PATH / str(time.monotonic_ns()) / PurePosixPath(rel_path).as_posix().lstrip("/")
 
 def get_sample_c_cells_datasource() -> SkimageDataSource:
     fs = OsFs.create()
     assert not isinstance(fs, Exception)
     return SkimageDataSource(
-        filesystem=fs, path=PurePosixPath(get_project_root_dir()) / "public/images/c_cells_1.png"
+        filesystem=fs, path=SAMPLE_IMAGES_PATH / "c_cells_1.png"
     )
 
-def get_test_output_path() -> PurePosixPath:
-    test_dir_path = get_tmp_dir() / f"test-{time.monotonic()}/"
-    os.makedirs(test_dir_path, exist_ok=True)
-    return test_dir_path
+def get_ebrains_credentials() -> EbrainsUserCredentials:
+    credentials_config = EbrainsUserCredentialsConfig.try_get()
+    if isinstance(credentials_config, Exception):
+        raise credentials_config
+    if credentials_config is None:
+        raise SkipException("Ebrains user credentials are not set")
+    return credentials_config.credentials
 
-def get_test_output_bucket_fs() -> Tuple[BucketFs, PurePosixPath]:
-    now = datetime.now()
-    now_str = f"{now.year:02}y{now.month:02}m{now.day:02}d__{now.hour:02}h{now.minute:02}m{now.second:02}s"
-    return (BucketFs(bucket_name="hbp-image-service"), PurePosixPath(f"/test-{now_str}"))
+
+def get_test_output_bucket_fs() -> "BucketFs":
+    return BucketFs(bucket_name="hbp-image-service", ebrains_user_credentials=get_ebrains_credentials())
 
 def create_precomputed_chunks_sink(
-    *, shape: Shape5D, dtype: "np.dtype[Any]", chunk_size: Shape5D, fs: "OsFs | HttpFs | BucketFs | None" = None
-) -> PrecomputedChunksSink:
-    default_fs, path = get_test_output_bucket_fs()
+    *,
+    name: str,
+    shape: Shape5D,
+    dtype: "np.dtype[Any]",
+    chunk_size: Shape5D,
+    fs: "OsFs | BucketFs",
+) -> "PrecomputedChunksSink":
     return PrecomputedChunksSink(
-        filesystem=fs or default_fs,
-        path=path / f"{uuid.uuid4()}.precomputed",
+        filesystem=fs,
+        path=(TEST_OUTPUT_PATH if isinstance(fs, OsFs) else BUCKET_TEST_OUTPUT_PATH) / f"{name}.precomputed",
         dtype=dtype,
         scale_key=PurePosixPath("some_data"),
         encoding=RawEncoder(),
@@ -131,6 +145,17 @@ def get_sample_c_cells_pixel_classifier() -> VigraPixelClassifier[IlpFilter]:
         raise classifier_result
     return classifier_result
 
+def run_all_tests(module: ModuleType):
+    import inspect
+    import sys
+    for item_name, item in inspect.getmembers(module):
+        if not inspect.isfunction(item) or not item_name.startswith('test'):
+            continue
+        eprint(f"Running test: {item_name}")
+        try:
+            item()
+        except SkipException as skip_exception:
+            eprint(f"Skipping test {item_name}: {skip_exception}", level="warning")
 
 
 def compare_values(v1: Any, v2: Any) -> bool:

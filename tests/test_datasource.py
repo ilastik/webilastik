@@ -14,13 +14,16 @@ from ndstructs.array5D import Array5D
 
 from webilastik.datasource import DataRoi
 from webilastik.datasink.n5_dataset_sink import N5DataSink
+from webilastik.datasource.deep_zoom_datasource import DziLevelDataSource
 from webilastik.datasource.n5_datasource import N5DataSource
 from webilastik.datasource.n5_attributes import N5Compressor, RawCompressor
 from webilastik.datasource import DataSource
 from webilastik.datasource.array_datasource import ArrayDataSource
 from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.filesystem import IFilesystem
+from webilastik.filesystem.http_fs import HttpFs
 from webilastik.filesystem.os_fs import OsFs
+from webilastik.utility.url import Url
 
 # fmt: off
 raw = np.asarray([
@@ -476,10 +479,32 @@ def test_data_roi_get_tiles_can_clamp_to_datasource_tiles():
         assert expected_data == piece.retrieve()
     assert len(expected_slice_dict) == 0
 
+def test_dzi_datasource():
+    fs = HttpFs(protocol="https", hostname="openseadragon.github.io", path=PurePosixPath("/example-images"))
+    datasources = DziLevelDataSource.try_load_pyramid(
+        filesystem=fs, dzi_path=PurePosixPath("duomo/duomo.dzi")
+    )
+    assert not isinstance(datasources, Exception), str(datasources)
+    for i, ds in datasources.items():
+        print(f"{i} interval: {ds.interval}")
+
+    directly_retrieved_level_10 = DziLevelDataSource.try_load_level(
+        filesystem=fs, level_path=PurePosixPath("duomo/duomo_files/10"),
+    )
+    assert not isinstance(directly_retrieved_level_10, Exception)
+    for ds in [datasources[10], directly_retrieved_level_10]:
+        out = Array5D.allocate(interval=ds.interval, dtype=np.dtype("uint8"))
+        for tile in ds.roi.default_split():
+            print(f"&&&&&&&&&&&&& {tile}")
+            tile_data = tile.retrieve()
+            out.set(tile_data)
+        out.show_images()
+
 if __name__ == "__main__":
     import inspect
     import sys
-    for item_name, item in inspect.getmembers(sys.modules[__name__]):
-        if inspect.isfunction(item) and item_name.startswith('test'):
-            print(f"Running test: {item_name}")
-            item()
+    test_dzi_datasource()
+    # for item_name, item in inspect.getmembers(sys.modules[__name__]):
+    #     if inspect.isfunction(item) and item_name.startswith('test'):
+    #         print(f"Running test: {item_name}")
+    #         item()

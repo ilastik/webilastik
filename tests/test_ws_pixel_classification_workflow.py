@@ -1,10 +1,10 @@
 # pyright: reportUnusedCallResult=false
 
 import os
-from webilastik.config import WorkflowConfig
+import sys
+from webilastik.config import EbrainsUserCredentialsConfig
 
-from webilastik.datasource import DataSource
-from webilastik.server.rpc.dto import AddPixelAnnotationParams, LabelHeaderDto, StartPixelProbabilitiesExportJobParamsDto, StartSimpleSegmentationExportJobParamsDto
+from webilastik.server.rpc.dto import AddPixelAnnotationParams, StartPixelProbabilitiesExportJobParamsDto, StartSimpleSegmentationExportJobParamsDto
 # ensure requests will use the mkcert cert. Requests uses certifi by default, i think
 os.environ["REQUESTS_CA_BUNDLE"] = "/etc/ssl/certs/ca-certificates.crt"
 # ensure aiohttp will use the mkcert certts. I don't really know where it otherwise gets its certs from
@@ -21,7 +21,7 @@ import numpy as np
 from aiohttp.client_ws import ClientWebSocketResponse
 
 
-from tests import create_precomputed_chunks_sink, get_sample_c_cells_pixel_annotations, get_sample_feature_extractors
+from tests import SkipException, create_precomputed_chunks_sink, get_sample_c_cells_pixel_annotations, get_sample_feature_extractors, get_test_output_bucket_fs
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.ui.datasource import try_get_datasources_from_url
@@ -55,12 +55,15 @@ async def main():
     assert ilastik_root_url is not None
     data_url = Url.parse("precomputed://https://app.ilastik.org/public/images/c_cells_2.precomputed")
     assert data_url is not None
-    datasources = try_get_datasources_from_url(url=data_url)
+    datasources = try_get_datasources_from_url(url=data_url, ebrains_user_credentials=None)
     if isinstance(datasources, Exception):
         raise datasources
     assert isinstance(datasources, tuple)
     ds = datasources[0]
-    token = WorkflowConfig.get().ebrains_user_token
+    token = EbrainsUserCredentialsConfig.try_get()
+    if isinstance(token, (type(None), Exception)):
+        print(f"No ebrains token. Skipping", file=sys.stderr)
+        exit(0)
     assert isinstance(token, UserToken)
 
     async with aiohttp.ClientSession(
@@ -156,15 +159,12 @@ async def main():
             #         raw_data = np.frombuffer(tile_bytes, dtype=np.uint8).reshape(2, tile.shape.y, tile.shape.x)
             #         Array5D(raw_data, axiskeys="cyx").show_channels()
 
-            hbp_image_service_bucket_fs = BucketFs(
-                bucket_name="hbp-image-service",
-            )
-
             predictions_export_datasink = create_precomputed_chunks_sink(
                 shape=ds.shape.updated(c=2),
                 dtype=np.dtype("float32"),
                 chunk_size=ds.tile_shape.updated(c=2),
-                fs=hbp_image_service_bucket_fs,
+                name="predictions_export_datasink.precomputed",
+                fs=get_test_output_bucket_fs(),
             )
 
             print(f"Sending predictions job request??????")
@@ -184,7 +184,8 @@ async def main():
                 shape=ds.shape.updated(c=3),
                 dtype=np.dtype("uint8"),
                 chunk_size=ds.tile_shape.updated(c=3),
-                fs=hbp_image_service_bucket_fs
+                name="predictions_export_datasink.precomputed",
+                fs=get_test_output_bucket_fs(),
             )
 
             print(f"Sending simple segmentation job request??????")
