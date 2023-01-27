@@ -1,6 +1,6 @@
 # pyright: strict
 
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Callable, ClassVar, Mapping, Optional, Dict, Sequence, Any, List, Tuple, Type
 from datetime import datetime
 import textwrap
@@ -377,7 +377,10 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
 
         Input_Data = IlpInputDataGroup.parse(ensure_group(group, "Input Data"))
         raw_data_datasources_result = Input_Data.try_to_datasources(
-            role_name="Raw Data", ilp_fs=ilp_fs, ilp_path=PurePosixPath(group.file.filename), ebrains_user_credentials=ebrains_user_credentials
+            role_name="Raw Data",
+            ilp_fs=ilp_fs,
+            ilp_path=PurePosixPath(Path(group.file.filename).absolute()), #FIXME: will this work on windows? Probably not
+            ebrains_user_credentials=ebrains_user_credentials,
         )
         if isinstance(raw_data_datasources_result, Exception):
             return raw_data_datasources_result
