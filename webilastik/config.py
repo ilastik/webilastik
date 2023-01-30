@@ -213,7 +213,7 @@ class EbrainsUserCredentialsConfig:
     def to_env_vars(self) -> List[EnvVar]:
         out = [self.user_access_token.to_env_var()]
         if self.user_refresh_token:
-            out.append(self.user_access_token.to_env_var())
+            out.append(self.user_refresh_token.to_env_var())
         if self.oidc_client:
             out += self.oidc_client.to_env_vars()
         return out
