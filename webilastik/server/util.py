@@ -23,6 +23,3 @@ def get_encoded_datasource_from_url(
     if isinstance(datasource_dto, Exception):
         return datasource_dto
     return FsDataSource.try_from_message(datasource_dto, ebrains_user_credentials=ebrains_user_credentials)
-
-def sanitize(path: Path) -> str:
-    return "'" + path.as_posix() + "'"

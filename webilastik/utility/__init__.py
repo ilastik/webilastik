@@ -1,4 +1,5 @@
 # pyright: reportUnusedImport=false
+from pathlib import Path
 from traceback import StackSummary
 import traceback
 from typing import Callable, Generic, Iterable, Literal, Mapping, NewType, TypeVar
@@ -24,6 +25,9 @@ def eprint(message: str, level: Literal["error", "warning", "info", "debug"] = "
     if not sys.stderr.isatty():
         print(message, file=sys.stderr)
     print(COLOR_ESCAPE[level], message, COLOR_ESCAPE["normal"])
+
+def sanitize(path: Path) -> str:
+    return "'" + path.as_posix() + "'"
 
 def get_now_string() -> str:
     now = datetime.datetime.now()
