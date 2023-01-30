@@ -147,17 +147,10 @@ tasks:
            Server and frontend for the web version of ilastik
       SERVER_SYSTEMD_ENV_CONFS:
         sh: |-
-          python3 <<SERVER_CONFIG
-          from webilastik.config import SessionAllocatorConfig
-          from webilastik.utility.url import Url
-          print(
-            SessionAllocatorConfig.from_env(
-              allow_local_fs=False,
-              allow_local_compute_sessions=False,
-              external_url=Url.parse_or_raise('https://app.ilastik.org/')
-            ).to_systemd_environment_confs()
-          )
-          SERVER_CONFIG
+          WEBILASTIK_ALLOW_LOCAL_FS=false \
+          WEBILASTIK_ALLOW_LOCAL_COMPUTE_SESSIONS=false \
+          WEBILASTIK_EXTERNAL_URL=https://app.ilastik.org/ \
+          ./scripts/generate_session_allocator_systemd_env_configs.py
       SERVICE_FILE_CONTENTS: |-
         [Unit]
         Description=Webilastik session allocator server
@@ -238,17 +231,10 @@ tasks:
     vars:
       SERVER_SYSTEMD_ENV_CONFS:
         sh: |-
-          python3 <<SERVER_CONFIG
-          from webilastik.config import SessionAllocatorConfig
-          from webilastik.utility.url import Url
-          print(
-            SessionAllocatorConfig.from_env(
-              allow_local_fs=True,
-              allow_local_compute_sessions=True,
-              external_url=Url.parse_or_raise('https://app.ilastik.org/')
-            ).to_systemd_environment_confs()
-          )
-          SERVER_CONFIG
+          WEBILASTIK_ALLOW_LOCAL_FS=true \
+          WEBILASTIK_ALLOW_LOCAL_COMPUTE_SESSIONS=true \
+          WEBILASTIK_EXTERNAL_URL=https://app.ilastik.org/ \
+          ./scripts/generate_session_allocator_systemd_env_configs.py
     cmds: #this assumes an nginx like the one in webilastik.conf running already
       - echo "Ensuring that app.ilastik.org points to localhost"
       - getent hosts app.ilastik.org | awk '{ print $1 }' | grep -qE '^(127\.0\.0\.1|::1)$'

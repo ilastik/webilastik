@@ -14,6 +14,16 @@ from webilastik.libebrains.user_token import UserToken
 from webilastik.utility import get_env_var
 from webilastik.utility.url import Url
 
+@dataclass
+class EnvVar:
+    name: str
+    value: str
+
+    def to_bash_export(self) -> str:
+        return f"export {self.name}={self.value}"
+
+    def to_systemd_env_conf(self) -> str:
+        return f"Environment={self.name}={self.value}"
 
 T = TypeVar("T")
 @dataclass
@@ -49,8 +59,8 @@ class Config(ABC, Generic[T]):
     def to_bash_value(self) -> str:
         pass
 
-    def to_bash_export(self) -> str:
-        return f"export {self.__class__.__name__}={self.to_bash_value()}"
+    def to_env_var(self) -> EnvVar:
+        return EnvVar(name=self.__class__.__name__, value=self.to_bash_value())
 
 
 class BoolConfig(Config[bool]):
@@ -161,10 +171,10 @@ class EbrainsOidcClientConfig:
 
         return EbrainsOidcClientConfig(client_id=client_id_result, client_secret=client_secret_result)
 
-    def to_bash_exports(self) -> List[str]:
+    def to_env_vars(self) -> List[EnvVar]:
         return [
-            self.client_id.to_bash_export(),
-            self.client_secret.to_bash_export(),
+            self.client_id.to_env_var(),
+            self.client_secret.to_env_var(),
         ]
 
 
@@ -200,12 +210,12 @@ class EbrainsUserCredentialsConfig:
             user_refresh_token=None if credentials.user_token.refresh_token is None else EBRAINS_USER_REFRESH_TOKEN(credentials.user_token.refresh_token),
         )
 
-    def to_bash_exports(self) -> List[str]:
-        out = [self.user_access_token.to_bash_export()]
+    def to_env_vars(self) -> List[EnvVar]:
+        out = [self.user_access_token.to_env_var()]
         if self.user_refresh_token:
-            out.append(self.user_access_token.to_bash_export())
+            out.append(self.user_access_token.to_env_var())
         if self.oidc_client:
-            out += self.oidc_client.to_bash_exports()
+            out += self.oidc_client.to_env_vars()
         return out
 
     @classmethod
@@ -264,13 +274,13 @@ class SessionAllocatorConfig:
     fernet: Fernet
     external_url: WEBILASTIK_EXTERNAL_URL
 
-    def to_bash_exports(self) -> List[str]:
+    def to_env_vars(self) -> List[EnvVar]:
         return [
-            self.allow_local_fs.to_bash_export(),
-            self.allow_local_compute_sessions.to_bash_export(),
-            *self.ebrains_oidc_client.to_bash_exports(),
-            self.b64_fernet_key.to_bash_export(),
-            self.external_url.to_bash_export(),
+            self.allow_local_fs.to_env_var(),
+            self.allow_local_compute_sessions.to_env_var(),
+            *self.ebrains_oidc_client.to_env_vars(),
+            self.b64_fernet_key.to_env_var(),
+            self.external_url.to_env_var(),
         ]
 
     @classmethod
@@ -377,15 +387,15 @@ class WorkflowConfig:
             session_allocator_socket_path=session_allocator_socket_path_result,
         )
 
-    def to_bash_exports(self) -> List[str]:
+    def to_env_vars(self) -> List[EnvVar]:
         return [
-            self.allow_local_fs.to_bash_export(),
-            *([] if not self.ebrains_user_credentials else self.ebrains_user_credentials.to_bash_exports()),
-            self.max_duration_minutes.to_bash_export(),
-            self.listen_socket.to_bash_export(),
-            self.session_url.to_bash_export(),
-            self.session_allocator_host.to_bash_export(),
-            self.session_allocator_username.to_bash_export(),
-            self.session_allocator_socket_path.to_bash_export(),
+            self.allow_local_fs.to_env_var(),
+            *([] if not self.ebrains_user_credentials else self.ebrains_user_credentials.to_env_vars()),
+            self.max_duration_minutes.to_env_var(),
+            self.listen_socket.to_env_var(),
+            self.session_url.to_env_var(),
+            self.session_allocator_host.to_env_var(),
+            self.session_allocator_username.to_env_var(),
+            self.session_allocator_socket_path.to_env_var(),
         ]
 
