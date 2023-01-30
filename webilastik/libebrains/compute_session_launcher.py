@@ -21,9 +21,10 @@ from webilastik.config import WEBILASTIK_ALLOW_LOCAL_FS, WEBILASTIK_WORKFLOW_LIS
 from webilastik.libebrains.user_credentials import EbrainsUserCredentials
 from webilastik.libebrains.user_info import UserInfo
 from webilastik.server.rpc.dto import ComputeSessionDto
-from webilastik.server.util import sanitize
 from webilastik.utility import ComputeNodes, Hostname, Minutes, NodeSeconds, Seconds, Username
 from webilastik.utility.url import Url
+
+LF = "\n"
 
 ComputeSessionState = Literal[
     "BOOT_FAIL",
@@ -461,21 +462,26 @@ class LocalJobLauncher(SshJobLauncher):
             session_allocator_username=WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_USERNAME(session_allocator_username),
             session_allocator_socket_path=WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_SOCKET_PATH(session_allocator_socket_path),
         )
-        webilastik_source_dir = sanitize(Path(__file__).parent.parent.parent)
-        redis_pid_file = sanitize(working_dir / "redis.pid")
-        redis_unix_socket_path = sanitize(working_dir / "redis.sock")
+        webilastik_source_dir = Path(__file__).parent.parent.parent
+        redis_pid_file = working_dir / "redis.pid"
+        redis_unix_socket_path = working_dir / "redis.sock"
         conda_env_dir = Path(os.path.realpath(sys.executable)).parent.parent
-        redis_server = sanitize(conda_env_dir / "bin/redis-server")
-        python_interpreter = sanitize(conda_env_dir / "bin/python")
-        mpi_exec = sanitize(conda_env_dir / "bin/mpiexec") + "-n 4"
-        dask_mpi = sanitize(conda_env_dir / "bin/dask-mpi")
+        redis_server = conda_env_dir / "bin/redis-server"
+        python_interpreter = conda_env_dir / "bin/python"
+
+        mpi_exec = conda_env_dir.joinpath("bin/mpiexec").as_posix() + " -n 4"
+        dask_mpi = conda_env_dir / "bin/dask-mpi"
         scheduler_file = f"/tmp/dask_scheduler_{compute_session_id}.json"
+
+        server_script_launcher = python_interpreter.as_posix()
+        if self.executor_getter == "dask":
+            server_script_launcher = mpi_exec + " " + server_script_launcher
 
 
         out = textwrap.dedent(textwrap.indent(f"""
             #!/bin/bash -l
 
-            {"            ".join(v.to_bash_export() for v in job_config.to_env_vars())}
+            {LF.join(v.to_bash_export() for v in job_config.to_env_vars())}
 
             set -xeu
             set -o pipefail
@@ -522,10 +528,12 @@ class LocalJobLauncher(SshJobLauncher):
             export REDIS_UNIX_SOCKET_PATH="{redis_unix_socket_path}"
 
 
-            {mpi_exec} {dask_mpi} --scheduler-file {scheduler_file}
-            sleep 5
-            export DASK_SCHEDULER_FILE={scheduler_file}
-            "{python_interpreter}" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py
+            # {mpi_exec} {dask_mpi} --scheduler-file {scheduler_file}
+            # sleep 5
+            # export DASK_SCHEDULER_FILE={scheduler_file}
+            # "{python_interpreter}" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py
+
+            {server_script_launcher} {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py
 
             kill -2 $(cat {redis_pid_file})
             sleep 2
@@ -664,7 +672,7 @@ class JusufSshJobLauncher(SshJobLauncher):
             #SBATCH --hint=nomultithread
 
             jutil env activate -p {self.account}
-            {"            ".join(v.to_bash_export() for v in job_config.to_env_vars())}
+            {LF.join(v.to_bash_export() for v in job_config.to_env_vars())}
 
             set -xeu
             set -o pipefail
@@ -777,7 +785,7 @@ class CscsSshJobLauncher(SshJobLauncher):
             #SBATCH --hint=nomultithread
             #SBATCH --constraint=mc
 
-            {"            ".join(v.to_bash_export() for v in job_config.to_env_vars())}
+            {LF.join(v.to_bash_export() for v in job_config.to_env_vars())}
 
             set -xeu
             set -o pipefail
