@@ -718,7 +718,7 @@ class JusufSshJobLauncher(SshJobLauncher):
             fi
 
             PYTHONPATH="{webilastik_source_dir}"
-            PYTHONPATH+=":{webilastik_source_dir}/executor_getters/dask/"
+            PYTHONPATH+=":{webilastik_source_dir}/executor_getters/jusuf/"
             PYTHONPATH+=":{webilastik_source_dir}/caching/redis_cache/"
 
             export PYTHONPATH
