@@ -613,7 +613,7 @@ class LocalJobLauncher(SshJobLauncher):
 
 
 class JusufSshJobLauncher(SshJobLauncher):
-    def __init__(self, fernet: Fernet, executor_getter: Literal["jusuf", "dask"] = "jusuf") -> None:
+    def __init__(self, fernet: Fernet, executor_getter: Literal["jusuf", "dask"] = "jusuf", branch: Literal["master", "dev"] = "master") -> None:
         super().__init__(
             user=Username("webilastik"),
             hostname=Hostname("jusuf.fz-juelich.de"),
@@ -621,6 +621,7 @@ class JusufSshJobLauncher(SshJobLauncher):
             fernet=fernet,
         )
         self.executor_getter: Literal["jusuf", "dask"] = executor_getter
+        self.branch = branch
 
     def get_sbatch_launch_script(
         self,
@@ -682,7 +683,7 @@ class JusufSshJobLauncher(SshJobLauncher):
             mkdir {working_dir}
             cd {working_dir}
             # FIXME: download from github when possible
-            git clone --depth 1 --branch master {home}/webilastik.git {webilastik_source_dir}
+            git clone --depth 1 --branch {self.branch} {home}/webilastik.git {webilastik_source_dir}
 
             # prevent numpy from spawning its own threads
             export OPENBLAS_NUM_THREADS=1
