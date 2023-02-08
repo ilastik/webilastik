@@ -204,11 +204,26 @@ export class NeuroglancerDriver implements IViewerDriver{
         return false
     }
 
-    private openNewDataSource(params: {name: string, url: string, shader?: string}){
+    private openNewDataSource(params: {name: string, url: string, shader?: string, opacity?: number}){
         const newPredictionsLayer = this.viewer.layerSpecification.getLayer(
             params.name,
             {source: Url.parse(params.url).double_protocol_raw, shader: params.shader}
         );
+        let setOpacity = () => {
+            let layer = newPredictionsLayer.layer;
+            if(!layer){
+                return
+            }
+            let currentOpacity = layer.opacity?.value
+            if(typeof(currentOpacity) != "number"){
+                return
+            }
+            let targetOpacity = params.opacity === undefined ? 1.0 : params.opacity
+            layer.opacity.value = targetOpacity
+            newPredictionsLayer.layerChanged.remove(setOpacity)
+        }
+        newPredictionsLayer.layerChanged.add(setOpacity)
+
         this.viewer.layerSpecification.add(newPredictionsLayer);
     }
 
