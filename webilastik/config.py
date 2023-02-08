@@ -4,7 +4,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Generic, List, Literal, Optional, TypeVar
-from typing_extensions import Self
+from typing_extensions import Self, assert_never
+import ipaddress
+from ipaddress import IPv4Address, IPv6Address
 
 from cryptography.fernet import Fernet
 from webilastik.libebrains.oidc_client import OidcClient
@@ -113,6 +115,17 @@ class UrlConfig(Config[Url]):
     def to_bash_value(self) -> str:
         return self.value.raw
 
+
+class IpConfig(Config["IPv4Address | IPv6Address"]):
+    @classmethod
+    def try_parse(cls, value: str) -> "IPv4Address | IPv6Address | Exception":
+        try:
+            return ipaddress.ip_address(value)
+        except ValueError as e:
+            return e
+
+    def to_bash_value(self) -> str:
+        return str(self.value)
 
 
 class WEBILASTIK_ALLOW_LOCAL_FS(BoolConfig):
@@ -318,6 +331,118 @@ class SessionAllocatorConfig:
             external_url=external_url_result,
         )
 
+
+class REDIS_CACHE_IP_ADDRESS(IpConfig):
+    pass
+class REDIS_CACHE_PORT(IntConfig):
+    pass
+
+@dataclass
+class RedisCacheTcpConfig:
+    ip: REDIS_CACHE_IP_ADDRESS
+    port: REDIS_CACHE_PORT
+
+    def to_redis_cmd_line_opts(self) -> List[str]:
+        return [
+            f"--bind {self.ip.value}",
+            f"--port {self.port}",
+        ]
+
+    @classmethod
+    def try_get(cls) -> "Self | None | Exception":
+        ip_result = REDIS_CACHE_IP_ADDRESS.try_get()
+        if isinstance(ip_result, Exception):
+            return ip_result
+
+        port_result = REDIS_CACHE_PORT.try_get()
+        if isinstance(port_result, Exception):
+            return port_result
+
+        if ip_result:
+            if not port_result:
+                return Exception(f"Missing configuration for {REDIS_CACHE_PORT.__name__}")
+            return RedisCacheTcpConfig(ip=ip_result, port=port_result)
+        if port_result:
+            if not ip_result:
+                return Exception(f"Missing configuration for {REDIS_CACHE_IP_ADDRESS.__name__}")
+            return RedisCacheTcpConfig(ip=ip_result, port=port_result)
+        return None
+
+    def to_env_vars(self) -> List[EnvVar]:
+        return [self.ip.to_env_var(), self.port.to_env_var()]
+
+class REDIS_CACHE_UNIX_SOCKET_PATH(PathConfig):
+    def to_redis_cmd_line_opts(self) -> List[str]:
+        return [
+            f"--unixsocket {self.value}",
+            "--unixsocketperm 777",
+            "--port 0",
+        ]
+
+@dataclass
+class RedisCacheConfig:
+    config: "RedisCacheTcpConfig | REDIS_CACHE_UNIX_SOCKET_PATH"
+
+    @classmethod
+    def try_get(cls) -> "Self | None | Exception":
+        tcp_config_result = RedisCacheTcpConfig.try_get()
+        unix_socket_path_result = REDIS_CACHE_UNIX_SOCKET_PATH.try_get()
+        if isinstance(tcp_config_result, Exception):
+            return tcp_config_result
+        if isinstance(unix_socket_path_result, Exception):
+            return unix_socket_path_result
+        if tcp_config_result is not None and unix_socket_path_result is not None:
+            return Exception(f"Bad Redis configuration: Trying to configure redis for listening both TCP and Unix socket")
+        config = tcp_config_result or unix_socket_path_result
+        if config is None:
+            return None
+        return RedisCacheConfig(config=config)
+
+    def to_redis_cmd_line_opts(self) -> List[str]:
+        return self.config.to_redis_cmd_line_opts()
+
+    def to_env_vars(self) -> List[EnvVar]:
+        if isinstance(self.config, REDIS_CACHE_UNIX_SOCKET_PATH):
+            return [self.config.to_env_var()]
+        else:
+            return self.config.to_env_vars()
+
+class WEBILASTIK_LRU_CACHE_MAX_SIZE(IntConfig):
+    pass
+
+@dataclass
+class GlobalCacheConfig:
+    config: "RedisCacheConfig | WEBILASTIK_LRU_CACHE_MAX_SIZE"
+
+    @property
+    def cache_implementation_name(self) -> str:
+        if isinstance(self.config, RedisCacheConfig):
+            return "redis_cache"
+        if isinstance(self.config, WEBILASTIK_LRU_CACHE_MAX_SIZE): #pyright: ignore [reportUnnecessaryIsInstance]
+            return "lru_cache"
+        assert_never(self.config)
+
+    @classmethod
+    def require(cls) -> "Self | Exception":
+        lru_cache_size_result = WEBILASTIK_LRU_CACHE_MAX_SIZE.try_get()
+        if isinstance(lru_cache_size_result, Exception):
+            return lru_cache_size_result
+        redis_cache_config_result = RedisCacheConfig.try_get()
+        if isinstance(redis_cache_config_result, Exception):
+            return redis_cache_config_result
+        if lru_cache_size_result and redis_cache_config_result:
+            return Exception(f"trying to configure multiple caches at once")
+        config = lru_cache_size_result or redis_cache_config_result
+        if config is None:
+            return Exception(f"No configuration for global cache found")
+        return GlobalCacheConfig(config=config)
+
+    def to_env_vars(self) -> List[EnvVar]:
+        if isinstance(self.config, WEBILASTIK_LRU_CACHE_MAX_SIZE):
+            return [self.config.to_env_var()]
+        return self.config.to_env_vars()
+
+
 class WEBILASTIK_WORKFLOW_MAX_DURATION_MINUTES(IntConfig):
     pass
 class WEBILASTIK_WORKFLOW_LISTEN_SOCKET(PathConfig):
@@ -330,6 +455,10 @@ class WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_USERNAME(StringConfig):
     pass
 class WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_SOCKET_PATH(PathConfig):
     pass
+class WEBILASTIK_WORKFLOW_PROJECT_ROOT_DIR(PathConfig):
+    pass
+class WEBILASTIK_WORKFLOW_CONDA_ENV_DIR(PathConfig):
+    pass
 @dataclass
 class WorkflowConfig:
     allow_local_fs: WEBILASTIK_ALLOW_LOCAL_FS
@@ -341,6 +470,8 @@ class WorkflowConfig:
     session_allocator_host: WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_HOST
     session_allocator_username: WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_USERNAME
     session_allocator_socket_path: WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_SOCKET_PATH
+
+    global_cache_config: GlobalCacheConfig
 
     @classmethod
     def require(cls) -> "WorkflowConfig | Exception":
@@ -376,6 +507,11 @@ class WorkflowConfig:
         if isinstance(session_allocator_socket_path_result, Exception):
             return session_allocator_socket_path_result
 
+        global_cache_config_result = GlobalCacheConfig.require()
+        if isinstance(global_cache_config_result, Exception):
+            return global_cache_config_result
+
+
         return WorkflowConfig(
             allow_local_fs=allow_local_fs_result,
             ebrains_user_credentials=ebrains_user_credentials_result,
@@ -385,6 +521,7 @@ class WorkflowConfig:
             session_allocator_host=session_alocator_host_result,
             session_allocator_username=session_allocator_username_result,
             session_allocator_socket_path=session_allocator_socket_path_result,
+            global_cache_config=global_cache_config_result,
         )
 
     def to_env_vars(self) -> List[EnvVar]:
@@ -397,5 +534,6 @@ class WorkflowConfig:
             self.session_allocator_host.to_env_var(),
             self.session_allocator_username.to_env_var(),
             self.session_allocator_socket_path.to_env_var(),
+            *self.global_cache_config.to_env_vars(),
         ]
 

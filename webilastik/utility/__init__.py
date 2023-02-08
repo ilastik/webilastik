@@ -6,7 +6,7 @@ from typing import Callable, Generic, Iterable, Literal, Mapping, NewType, TypeV
 import threading
 import os
 import sys
-from typing_extensions import Protocol, Self
+from typing_extensions import Never, Protocol, Self
 
 from ndstructs.utils.json_serializable import JsonObject, JsonValue
 import datetime
