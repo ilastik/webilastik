@@ -421,27 +421,29 @@ class ComputeSessionDto(DataTransferObject):
         "TIMEOUT",
     ]
 
+HpcSiteName = Literal["LOCAL_DASK", "LOCAL_PROCESS_POOL", "CSCS", "JUSUF"]
+
 @dataclass
 class ComputeSessionStatusDto(DataTransferObject):
     compute_session: ComputeSessionDto
-    hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
+    hpc_site: HpcSiteName
     session_url: UrlDto
     connected: bool
 
 @dataclass
 class CreateComputeSessionParamsDto(DataTransferObject):
     session_duration_minutes: int
-    hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
+    hpc_site: HpcSiteName
 
 @dataclass
 class GetComputeSessionStatusParamsDto(DataTransferObject):
     compute_session_id: str
-    hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
+    hpc_site: HpcSiteName
 
 @dataclass
 class CloseComputeSessionParamsDto(DataTransferObject):
     compute_session_id: str
-    hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
+    hpc_site: HpcSiteName
 
 @dataclass
 class CloseComputeSessionResponseDto(DataTransferObject):
@@ -449,7 +451,7 @@ class CloseComputeSessionResponseDto(DataTransferObject):
 
 @dataclass
 class ListComputeSessionsParamsDto(DataTransferObject):
-    hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
+    hpc_site: HpcSiteName
 
 @dataclass
 class ListComputeSessionsResponseDto(DataTransferObject):
@@ -457,7 +459,7 @@ class ListComputeSessionsResponseDto(DataTransferObject):
 
 @dataclass
 class GetAvailableHpcSitesResponseDto(DataTransferObject):
-    available_sites: Tuple[Literal["LOCAL", "CSCS", "JUSUF"], ...]
+    available_sites: Tuple[HpcSiteName, ...]
 
 #############################################################3
 

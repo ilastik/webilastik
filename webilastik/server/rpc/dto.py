@@ -3520,20 +3520,26 @@ class ComputeSessionDto(DataTransferObject):
         return parse_as_ComputeSessionDto(value)
 
 
-def parse_as_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
+HpcSiteName = Literal["LOCAL_DASK", "LOCAL_PROCESS_POOL", "CSCS", "JUSUF"]
+
+
+def parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
     value: JsonValue,
-) -> "Literal['LOCAL', 'CSCS', 'JUSUF'] | MessageParsingError":
+) -> "Literal['LOCAL_DASK', 'LOCAL_PROCESS_POOL', 'CSCS', 'JUSUF'] | MessageParsingError":
     tmp_0 = parse_as_str(value)
-    if not isinstance(tmp_0, MessageParsingError) and tmp_0 == "LOCAL":
+    if not isinstance(tmp_0, MessageParsingError) and tmp_0 == "LOCAL_DASK":
         return tmp_0
     tmp_1 = parse_as_str(value)
-    if not isinstance(tmp_1, MessageParsingError) and tmp_1 == "CSCS":
+    if not isinstance(tmp_1, MessageParsingError) and tmp_1 == "LOCAL_PROCESS_POOL":
         return tmp_1
     tmp_2 = parse_as_str(value)
-    if not isinstance(tmp_2, MessageParsingError) and tmp_2 == "JUSUF":
+    if not isinstance(tmp_2, MessageParsingError) and tmp_2 == "CSCS":
         return tmp_2
+    tmp_3 = parse_as_str(value)
+    if not isinstance(tmp_3, MessageParsingError) and tmp_3 == "JUSUF":
+        return tmp_3
     return MessageParsingError(
-        f"Could not parse {value} as Literal['LOCAL', 'CSCS', 'JUSUF']"
+        f"Could not parse {value} as Literal['LOCAL_DASK', 'LOCAL_PROCESS_POOL', 'CSCS', 'JUSUF']"
     )
 
 
@@ -3560,7 +3566,7 @@ def parse_as_ComputeSessionStatusDto(
     tmp_compute_session = parse_as_ComputeSessionDto(value.get("compute_session"))
     if isinstance(tmp_compute_session, MessageParsingError):
         return tmp_compute_session
-    tmp_hpc_site = parse_as_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
+    tmp_hpc_site = parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
         value.get("hpc_site")
     )
     if isinstance(tmp_hpc_site, MessageParsingError):
@@ -3582,7 +3588,7 @@ def parse_as_ComputeSessionStatusDto(
 @dataclass
 class ComputeSessionStatusDto(DataTransferObject):
     compute_session: ComputeSessionDto
-    hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
+    hpc_site: HpcSiteName
     session_url: UrlDto
     connected: bool
 
@@ -3618,7 +3624,7 @@ def parse_as_CreateComputeSessionParamsDto(
     tmp_session_duration_minutes = parse_as_int(value.get("session_duration_minutes"))
     if isinstance(tmp_session_duration_minutes, MessageParsingError):
         return tmp_session_duration_minutes
-    tmp_hpc_site = parse_as_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
+    tmp_hpc_site = parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
         value.get("hpc_site")
     )
     if isinstance(tmp_hpc_site, MessageParsingError):
@@ -3632,7 +3638,7 @@ def parse_as_CreateComputeSessionParamsDto(
 @dataclass
 class CreateComputeSessionParamsDto(DataTransferObject):
     session_duration_minutes: int
-    hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
+    hpc_site: HpcSiteName
 
     def to_json_value(self) -> JsonObject:
         return {
@@ -3664,7 +3670,7 @@ def parse_as_GetComputeSessionStatusParamsDto(
     tmp_compute_session_id = parse_as_str(value.get("compute_session_id"))
     if isinstance(tmp_compute_session_id, MessageParsingError):
         return tmp_compute_session_id
-    tmp_hpc_site = parse_as_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
+    tmp_hpc_site = parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
         value.get("hpc_site")
     )
     if isinstance(tmp_hpc_site, MessageParsingError):
@@ -3678,7 +3684,7 @@ def parse_as_GetComputeSessionStatusParamsDto(
 @dataclass
 class GetComputeSessionStatusParamsDto(DataTransferObject):
     compute_session_id: str
-    hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
+    hpc_site: HpcSiteName
 
     def to_json_value(self) -> JsonObject:
         return {
@@ -3710,7 +3716,7 @@ def parse_as_CloseComputeSessionParamsDto(
     tmp_compute_session_id = parse_as_str(value.get("compute_session_id"))
     if isinstance(tmp_compute_session_id, MessageParsingError):
         return tmp_compute_session_id
-    tmp_hpc_site = parse_as_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
+    tmp_hpc_site = parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
         value.get("hpc_site")
     )
     if isinstance(tmp_hpc_site, MessageParsingError):
@@ -3724,7 +3730,7 @@ def parse_as_CloseComputeSessionParamsDto(
 @dataclass
 class CloseComputeSessionParamsDto(DataTransferObject):
     compute_session_id: str
-    hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
+    hpc_site: HpcSiteName
 
     def to_json_value(self) -> JsonObject:
         return {
@@ -3791,7 +3797,7 @@ def parse_as_ListComputeSessionsParamsDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as ListComputeSessionsParamsDto"
         )
-    tmp_hpc_site = parse_as_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
+    tmp_hpc_site = parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
         value.get("hpc_site")
     )
     if isinstance(tmp_hpc_site, MessageParsingError):
@@ -3803,7 +3809,7 @@ def parse_as_ListComputeSessionsParamsDto(
 
 @dataclass
 class ListComputeSessionsParamsDto(DataTransferObject):
-    hpc_site: Literal["LOCAL", "CSCS", "JUSUF"]
+    hpc_site: HpcSiteName
 
     def to_json_value(self) -> JsonObject:
         return {
@@ -3878,16 +3884,16 @@ class ListComputeSessionsResponseDto(DataTransferObject):
         return parse_as_ListComputeSessionsResponseDto(value)
 
 
-def parse_as_Tuple_of_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_0_varlen__endof_(
+def parse_as_Tuple_of_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_0_varlen__endof_(
     value: JsonValue,
-) -> "Tuple[Literal['LOCAL', 'CSCS', 'JUSUF'], ...] | MessageParsingError":
+) -> "Tuple[Literal['LOCAL_DASK', 'LOCAL_PROCESS_POOL', 'CSCS', 'JUSUF'], ...] | MessageParsingError":
     if not isinstance(value, (list, tuple)):
         return MessageParsingError(
-            f"Could not parse Tuple[Literal['LOCAL', 'CSCS', 'JUSUF'], ...] from {json.dumps(value)}"
+            f"Could not parse Tuple[Literal['LOCAL_DASK', 'LOCAL_PROCESS_POOL', 'CSCS', 'JUSUF'], ...] from {json.dumps(value)}"
         )
-    items: List[Literal["LOCAL", "CSCS", "JUSUF"]] = []
+    items: List[Literal["LOCAL_DASK", "LOCAL_PROCESS_POOL", "CSCS", "JUSUF"]] = []
     for item in value:
-        parsed = parse_as_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
+        parsed = parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
             item
         )
         if isinstance(parsed, MessageParsingError):
@@ -3909,7 +3915,7 @@ def parse_as_GetAvailableHpcSitesResponseDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as GetAvailableHpcSitesResponseDto"
         )
-    tmp_available_sites = parse_as_Tuple_of_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_0_varlen__endof_(
+    tmp_available_sites = parse_as_Tuple_of_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_0_varlen__endof_(
         value.get("available_sites")
     )
     if isinstance(tmp_available_sites, MessageParsingError):
@@ -3921,7 +3927,7 @@ def parse_as_GetAvailableHpcSitesResponseDto(
 
 @dataclass
 class GetAvailableHpcSitesResponseDto(DataTransferObject):
-    available_sites: Tuple[Literal["LOCAL", "CSCS", "JUSUF"], ...]
+    available_sites: Tuple[HpcSiteName, ...]
 
     def to_json_value(self) -> JsonObject:
         return {

@@ -3364,22 +3364,26 @@ export class ComputeSessionDto {
   }
 }
 
-export function parse_as_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
+export function parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
   value: JsonValue,
-): "LOCAL" | "CSCS" | "JUSUF" | Error {
+): "LOCAL_DASK" | "LOCAL_PROCESS_POOL" | "CSCS" | "JUSUF" | Error {
   const tmp_0 = parse_as_str(value);
-  if (!(tmp_0 instanceof Error) && tmp_0 === "LOCAL") {
+  if (!(tmp_0 instanceof Error) && tmp_0 === "LOCAL_DASK") {
     return tmp_0;
   }
   const tmp_1 = parse_as_str(value);
-  if (!(tmp_1 instanceof Error) && tmp_1 === "CSCS") {
+  if (!(tmp_1 instanceof Error) && tmp_1 === "LOCAL_PROCESS_POOL") {
     return tmp_1;
   }
   const tmp_2 = parse_as_str(value);
-  if (!(tmp_2 instanceof Error) && tmp_2 === "JUSUF") {
+  if (!(tmp_2 instanceof Error) && tmp_2 === "CSCS") {
     return tmp_2;
   }
-  return Error(`Could not parse ${value} as 'LOCAL' | 'CSCS' | 'JUSUF'`);
+  const tmp_3 = parse_as_str(value);
+  if (!(tmp_3 instanceof Error) && tmp_3 === "JUSUF") {
+    return tmp_3;
+  }
+  return Error(`Could not parse ${value} as 'LOCAL_DASK' | 'LOCAL_PROCESS_POOL' | 'CSCS' | 'JUSUF'`);
 }
 export function parse_as_bool(value: JsonValue): boolean | Error {
   return ensureJsonBoolean(value);
@@ -3394,9 +3398,10 @@ export function parse_as_ComputeSessionStatusDto(value: JsonValue): ComputeSessi
   }
   const temp_compute_session = parse_as_ComputeSessionDto(valueObject.compute_session);
   if (temp_compute_session instanceof Error) return temp_compute_session;
-  const temp_hpc_site = parse_as_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
-    valueObject.hpc_site,
-  );
+  const temp_hpc_site =
+    parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
+      valueObject.hpc_site,
+    );
   if (temp_hpc_site instanceof Error) return temp_hpc_site;
   const temp_session_url = parse_as_UrlDto(valueObject.session_url);
   if (temp_session_url instanceof Error) return temp_session_url;
@@ -3413,12 +3418,12 @@ export function parse_as_ComputeSessionStatusDto(value: JsonValue): ComputeSessi
 // Do not edit!
 export class ComputeSessionStatusDto {
   public compute_session: ComputeSessionDto;
-  public hpc_site: "LOCAL" | "CSCS" | "JUSUF";
+  public hpc_site: "LOCAL_DASK" | "LOCAL_PROCESS_POOL" | "CSCS" | "JUSUF";
   public session_url: UrlDto;
   public connected: boolean;
   constructor(_params: {
     compute_session: ComputeSessionDto;
-    hpc_site: "LOCAL" | "CSCS" | "JUSUF";
+    hpc_site: "LOCAL_DASK" | "LOCAL_PROCESS_POOL" | "CSCS" | "JUSUF";
     session_url: UrlDto;
     connected: boolean;
   }) {
@@ -3451,9 +3456,10 @@ export function parse_as_CreateComputeSessionParamsDto(value: JsonValue): Create
   }
   const temp_session_duration_minutes = parse_as_int(valueObject.session_duration_minutes);
   if (temp_session_duration_minutes instanceof Error) return temp_session_duration_minutes;
-  const temp_hpc_site = parse_as_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
-    valueObject.hpc_site,
-  );
+  const temp_hpc_site =
+    parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
+      valueObject.hpc_site,
+    );
   if (temp_hpc_site instanceof Error) return temp_hpc_site;
   return new CreateComputeSessionParamsDto({
     session_duration_minutes: temp_session_duration_minutes,
@@ -3464,10 +3470,10 @@ export function parse_as_CreateComputeSessionParamsDto(value: JsonValue): Create
 // Do not edit!
 export class CreateComputeSessionParamsDto {
   public session_duration_minutes: number;
-  public hpc_site: "LOCAL" | "CSCS" | "JUSUF";
+  public hpc_site: "LOCAL_DASK" | "LOCAL_PROCESS_POOL" | "CSCS" | "JUSUF";
   constructor(_params: {
     session_duration_minutes: number;
-    hpc_site: "LOCAL" | "CSCS" | "JUSUF";
+    hpc_site: "LOCAL_DASK" | "LOCAL_PROCESS_POOL" | "CSCS" | "JUSUF";
   }) {
     this.session_duration_minutes = _params.session_duration_minutes;
     this.hpc_site = _params.hpc_site;
@@ -3494,9 +3500,10 @@ export function parse_as_GetComputeSessionStatusParamsDto(value: JsonValue): Get
   }
   const temp_compute_session_id = parse_as_str(valueObject.compute_session_id);
   if (temp_compute_session_id instanceof Error) return temp_compute_session_id;
-  const temp_hpc_site = parse_as_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
-    valueObject.hpc_site,
-  );
+  const temp_hpc_site =
+    parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
+      valueObject.hpc_site,
+    );
   if (temp_hpc_site instanceof Error) return temp_hpc_site;
   return new GetComputeSessionStatusParamsDto({
     compute_session_id: temp_compute_session_id,
@@ -3507,10 +3514,10 @@ export function parse_as_GetComputeSessionStatusParamsDto(value: JsonValue): Get
 // Do not edit!
 export class GetComputeSessionStatusParamsDto {
   public compute_session_id: string;
-  public hpc_site: "LOCAL" | "CSCS" | "JUSUF";
+  public hpc_site: "LOCAL_DASK" | "LOCAL_PROCESS_POOL" | "CSCS" | "JUSUF";
   constructor(_params: {
     compute_session_id: string;
-    hpc_site: "LOCAL" | "CSCS" | "JUSUF";
+    hpc_site: "LOCAL_DASK" | "LOCAL_PROCESS_POOL" | "CSCS" | "JUSUF";
   }) {
     this.compute_session_id = _params.compute_session_id;
     this.hpc_site = _params.hpc_site;
@@ -3537,9 +3544,10 @@ export function parse_as_CloseComputeSessionParamsDto(value: JsonValue): CloseCo
   }
   const temp_compute_session_id = parse_as_str(valueObject.compute_session_id);
   if (temp_compute_session_id instanceof Error) return temp_compute_session_id;
-  const temp_hpc_site = parse_as_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
-    valueObject.hpc_site,
-  );
+  const temp_hpc_site =
+    parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
+      valueObject.hpc_site,
+    );
   if (temp_hpc_site instanceof Error) return temp_hpc_site;
   return new CloseComputeSessionParamsDto({
     compute_session_id: temp_compute_session_id,
@@ -3550,10 +3558,10 @@ export function parse_as_CloseComputeSessionParamsDto(value: JsonValue): CloseCo
 // Do not edit!
 export class CloseComputeSessionParamsDto {
   public compute_session_id: string;
-  public hpc_site: "LOCAL" | "CSCS" | "JUSUF";
+  public hpc_site: "LOCAL_DASK" | "LOCAL_PROCESS_POOL" | "CSCS" | "JUSUF";
   constructor(_params: {
     compute_session_id: string;
-    hpc_site: "LOCAL" | "CSCS" | "JUSUF";
+    hpc_site: "LOCAL_DASK" | "LOCAL_PROCESS_POOL" | "CSCS" | "JUSUF";
   }) {
     this.compute_session_id = _params.compute_session_id;
     this.hpc_site = _params.hpc_site;
@@ -3612,9 +3620,10 @@ export function parse_as_ListComputeSessionsParamsDto(value: JsonValue): ListCom
   if (valueObject["__class__"] != "ListComputeSessionsParamsDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ListComputeSessionsParamsDto`);
   }
-  const temp_hpc_site = parse_as_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
-    valueObject.hpc_site,
-  );
+  const temp_hpc_site =
+    parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
+      valueObject.hpc_site,
+    );
   if (temp_hpc_site instanceof Error) return temp_hpc_site;
   return new ListComputeSessionsParamsDto({
     hpc_site: temp_hpc_site,
@@ -3623,9 +3632,9 @@ export function parse_as_ListComputeSessionsParamsDto(value: JsonValue): ListCom
 // Automatically generated via DataTransferObject for ListComputeSessionsParamsDto
 // Do not edit!
 export class ListComputeSessionsParamsDto {
-  public hpc_site: "LOCAL" | "CSCS" | "JUSUF";
+  public hpc_site: "LOCAL_DASK" | "LOCAL_PROCESS_POOL" | "CSCS" | "JUSUF";
   constructor(_params: {
-    hpc_site: "LOCAL" | "CSCS" | "JUSUF";
+    hpc_site: "LOCAL_DASK" | "LOCAL_PROCESS_POOL" | "CSCS" | "JUSUF";
   }) {
     this.hpc_site = _params.hpc_site;
   }
@@ -3689,14 +3698,17 @@ export class ListComputeSessionsResponseDto {
   }
 }
 
-export function parse_as_Tuple_of_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_0_varlen__endof_(
+export function parse_as_Tuple_of_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_0_varlen__endof_(
   value: JsonValue,
-): Array<"LOCAL" | "CSCS" | "JUSUF"> | Error {
+): Array<"LOCAL_DASK" | "LOCAL_PROCESS_POOL" | "CSCS" | "JUSUF"> | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
-  const out: Array<"LOCAL" | "CSCS" | "JUSUF"> = [];
+  const out: Array<"LOCAL_DASK" | "LOCAL_PROCESS_POOL" | "CSCS" | "JUSUF"> = [];
   for (let item of arr) {
-    let parsed_item = parse_as_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(item);
+    let parsed_item =
+      parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
+        item,
+      );
     if (parsed_item instanceof Error) return parsed_item;
     out.push(parsed_item);
   }
@@ -3711,7 +3723,7 @@ export function parse_as_GetAvailableHpcSitesResponseDto(value: JsonValue): GetA
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a GetAvailableHpcSitesResponseDto`);
   }
   const temp_available_sites =
-    parse_as_Tuple_of_Literal_of__quote_LOCAL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_0_varlen__endof_(
+    parse_as_Tuple_of_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_0_varlen__endof_(
       valueObject.available_sites,
     );
   if (temp_available_sites instanceof Error) return temp_available_sites;
@@ -3722,9 +3734,9 @@ export function parse_as_GetAvailableHpcSitesResponseDto(value: JsonValue): GetA
 // Automatically generated via DataTransferObject for GetAvailableHpcSitesResponseDto
 // Do not edit!
 export class GetAvailableHpcSitesResponseDto {
-  public available_sites: Array<"LOCAL" | "CSCS" | "JUSUF">;
+  public available_sites: Array<"LOCAL_DASK" | "LOCAL_PROCESS_POOL" | "CSCS" | "JUSUF">;
   constructor(_params: {
-    available_sites: Array<"LOCAL" | "CSCS" | "JUSUF">;
+    available_sites: Array<"LOCAL_DASK" | "LOCAL_PROCESS_POOL" | "CSCS" | "JUSUF">;
   }) {
     this.available_sites = _params.available_sites;
   }
