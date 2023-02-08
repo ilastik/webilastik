@@ -4,6 +4,7 @@ from abc import abstractmethod
 import asyncio
 from subprocess import Popen
 from typing import Dict, Iterable, Literal, NewType, List, Set, Tuple
+from typing_extensions import assert_never
 import uuid
 import datetime
 import textwrap
@@ -612,13 +613,14 @@ class LocalJobLauncher(SshJobLauncher):
 
 
 class JusufSshJobLauncher(SshJobLauncher):
-    def __init__(self, fernet: Fernet) -> None:
+    def __init__(self, fernet: Fernet, executor_getter: Literal["jusuf", "dask"] = "jusuf") -> None:
         super().__init__(
             user=Username("webilastik"),
             hostname=Hostname("jusuf.fz-juelich.de"),
             account="icei-hbp-2022-0010",
             fernet=fernet,
         )
+        self.executor_getter: Literal["jusuf", "dask"] = executor_getter
 
     def get_sbatch_launch_script(
         self,
@@ -648,8 +650,17 @@ class JusufSshJobLauncher(SshJobLauncher):
         home="/p/home/jusers/webilastik/jusuf"
         webilastik_source_dir = f"{working_dir}/webilastik"
         conda_env_dir = f"{home}/miniconda3/envs/webilastik"
+        python_executable = f"{conda_env_dir}/bin/python"
         redis_pid_file = f"{working_dir}/redis.pid"
         redis_unix_socket_path = f"{working_dir}/redis.sock"
+
+        if self.executor_getter == "jusuf":
+            workflow_slurm_prefix = "srun -n 1 --overlap -u --cpus-per-task 120"
+        elif self.executor_getter == "dask":
+            workflow_slurm_prefix = "srun -n 10 --overlap -u --cpus-per-task 10"
+        else:
+            assert_never(self.executor_getter)
+
 
         out = textwrap.dedent(textwrap.indent(f"""\
             #!/bin/bash -l
@@ -705,14 +716,13 @@ class JusufSshJobLauncher(SshJobLauncher):
             fi
 
             PYTHONPATH="{webilastik_source_dir}"
-            PYTHONPATH+=":{webilastik_source_dir}/executor_getters/jusuf/"
+            PYTHONPATH+=":{webilastik_source_dir}/executor_getters/{self.executor_getter}/"
             PYTHONPATH+=":{webilastik_source_dir}/caching/redis_cache/"
 
             export PYTHONPATH
             export REDIS_UNIX_SOCKET_PATH="{redis_unix_socket_path}"
 
-            srun -n 1 --overlap -u --cpus-per-task 120 \\
-                "{conda_env_dir}/bin/python" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py \\
+            {workflow_slurm_prefix} "{python_executable}" {webilastik_source_dir}/webilastik/ui/workflow/ws_pixel_classification_workflow.py
 
             kill -2 $(cat {redis_pid_file}) #FXME: this only works because it's a single node
             sleep 2
