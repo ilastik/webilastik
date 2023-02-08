@@ -4,18 +4,20 @@ import functools
 import os
 import sys
 
+from webilastik.config import WEBILASTIK_LRU_CACHE_MAX_SIZE
+from webilastik.utility import eprint
+
 P = ParamSpec("P")
 T = TypeVar("T", bound=Callable[..., Any])
 
-ENV_VAR_NAME = "LRU_CACHE_MAX_SIZE"
-DEFAULT_SIZE = 128
-_max_size_env_var = os.environ.get(ENV_VAR_NAME)
-if _max_size_env_var is None:
-    print(f"{ENV_VAR_NAME} was not set, defaulting to {DEFAULT_SIZE}", file=sys.stderr)
-    _maxsize = DEFAULT_SIZE
+_cache_size_config = WEBILASTIK_LRU_CACHE_MAX_SIZE.try_get()
+if isinstance(_cache_size_config, Exception):
+    eprint(f"Bad configuration: {_cache_size_config}")
+    exit(1)
+if _cache_size_config is None:
+   _cache_size: int = 128
 else:
-    print(f"Setting lru_cache maxsize to {_max_size_env_var}", file=sys.stderr)
-    _maxsize = int(_max_size_env_var)
+    _cache_size: int = _cache_size_config.value
 
 def global_cache(func: T) -> T:
-    return functools.lru_cache(maxsize=_maxsize)(func) #type: ignore
+    return functools.lru_cache(maxsize=_cache_size)(func) #type: ignore

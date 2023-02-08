@@ -1,35 +1,33 @@
-from typing import Any, Callable, Tuple, TypeVar
-from typing_extensions import ParamSpec
+from typing import Any, Callable, TypeVar
+from typing_extensions import ParamSpec, assert_never
 import pickle
 from functools import wraps
-from pathlib import Path
-import sys
-import os
 
 import redis
+from webilastik.config import RedisCacheConfig, REDIS_CACHE_UNIX_SOCKET_PATH, RedisCacheTcpConfig
 
-from webilastik.utility import get_env_var_or_exit
+from webilastik.utility import eprint
 
-P = ParamSpec("P")
 T = TypeVar("T", bound=Callable[..., Any])
 
-def parse_ip_port(value: str) -> Tuple[str, int]:
-    ip_str, port = value.split(":")
-    return ip_str, int(port)
+_redis_config_result = RedisCacheConfig.try_get()
+if isinstance(_redis_config_result, Exception):
+    eprint(f"Error getting redis configuration: {_redis_config_result}")
+    exit(1)
+if isinstance(_redis_config_result, type(None)):
+    eprint(f"Missing redis configuration")
+    exit(1)
 
-REDIS_HOST_PORT = os.environ.get("REDIS_HOST_PORT")
-if REDIS_HOST_PORT is not None:
-    redis_host, port_str = REDIS_HOST_PORT.split(":")
-    redis_factory = lambda: redis.Redis(host=redis_host, port=int(port_str))
+if isinstance(_redis_config_result.config, REDIS_CACHE_UNIX_SOCKET_PATH):
+    socket_path = _redis_config_result.config.value
+    redis_factory = lambda: redis.Redis(unix_socket_path=str(socket_path))
+elif isinstance(_redis_config_result.config, RedisCacheTcpConfig):
+    redis_host_str = str(_redis_config_result.config.ip.value)
+    redis_port = _redis_config_result.config.port.value
+    redis_factory = lambda: redis.Redis(host=redis_host_str, port=redis_port)
 else:
-    REDIS_UNIX_SOCKET_PATH = get_env_var_or_exit(var_name="REDIS_UNIX_SOCKET_PATH", parser=Path)
-    if not REDIS_UNIX_SOCKET_PATH.exists():
-        print(f"Redis socket path {REDIS_UNIX_SOCKET_PATH} does not exist", file=sys.stderr)
-        exit(1)
-    if not REDIS_UNIX_SOCKET_PATH.is_socket():
-        print(f"Redis socket path {REDIS_UNIX_SOCKET_PATH} is not a socket", file=sys.stderr)
-        exit(1)
-    redis_factory = lambda: redis.Redis(unix_socket_path=str(REDIS_UNIX_SOCKET_PATH))
+    assert_never(_redis_config_result.config)
+
 
 def _redis_cache(func: T) -> T: #FIXME: use Callabe[P, OUT] ?
     @wraps(func)
