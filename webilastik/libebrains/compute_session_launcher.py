@@ -13,16 +13,18 @@ from pathlib import Path
 import getpass
 import sys
 import os
+from executor_getters.dask import executor_getter
 
 from ndstructs.utils.json_serializable import ensureJsonObject, ensureJsonString
 from cryptography.fernet import Fernet
-from webilastik.config import WEBILASTIK_ALLOW_LOCAL_FS, WEBILASTIK_WORKFLOW_LISTEN_SOCKET, WEBILASTIK_WORKFLOW_MAX_DURATION_MINUTES, WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_HOST, WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_SOCKET_PATH, WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_USERNAME, WEBILASTIK_WORKFLOW_SESSION_URL, EbrainsUserCredentialsConfig, WorkflowConfig
+from webilastik.config import REDIS_CACHE_UNIX_SOCKET_PATH, WEBILASTIK_ALLOW_LOCAL_FS, WEBILASTIK_WORKFLOW_LISTEN_SOCKET, WEBILASTIK_WORKFLOW_MAX_DURATION_MINUTES, WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_HOST, WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_SOCKET_PATH, WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_USERNAME, WEBILASTIK_WORKFLOW_SESSION_URL, EbrainsUserCredentialsConfig, GlobalCacheConfig, RedisCacheConfig, WorkflowConfig
 
 from webilastik.libebrains.user_credentials import EbrainsUserCredentials
 from webilastik.libebrains.user_info import UserInfo
 from webilastik.server.rpc.dto import ComputeSessionDto
 from webilastik.utility import ComputeNodes, Hostname, Minutes, NodeSeconds, Seconds, Username
 from webilastik.utility.url import Url
+from webilastik.webilastik_process_launcher import WebilastikWorkflowInvocation
 
 LF = "\n"
 
@@ -623,13 +625,16 @@ class LocalJobLauncher(SshJobLauncher):
 
 
 class JusufSshJobLauncher(SshJobLauncher):
-    def __init__(self, fernet: Fernet) -> None:
+    def __init__(
+        self, *, fernet: Fernet, executor_getter: Literal["jusuf", "dask"] = "jusuf"
+    ) -> None:
         super().__init__(
             user=Username("webilastik"),
             hostname=Hostname("jusuf.fz-juelich.de"),
             account="icei-hbp-2022-0010",
             fernet=fernet,
         )
+        self.executor_getter = executor_getter
 
     def get_sbatch_launch_script(
         self,
@@ -641,9 +646,45 @@ class JusufSshJobLauncher(SshJobLauncher):
         session_url: Url,
         session_allocator_host: Hostname,
         session_allocator_username: Username,
-        session_allocator_socket_path: Path
+        session_allocator_socket_path: Path,
     ) -> str:
         working_dir = Path(f"$SCRATCH/{compute_session_id}")
+        home=Path("/p/home/jusers/webilastik/jusuf")
+        webilastik_source_dir = f"{working_dir}/webilastik"
+
+        conda_env_dir = f"{home}/miniconda3/envs/webilastik"
+        python = f"{conda_env_dir}/bin/python"
+        dask_scheduler = f"{conda_env_dir}/bin/dask-scheduler"
+        dask_worker = f"{conda_env_dir}/bin/dask-worker"
+
+        redis_ntasks = 1
+        redis_num_threads = 6
+        ntasks = 10
+
+
+        if self.executor_getter == "jusuf":
+            webilastik_ntasks = ntasks - redis_ntasks
+            cpus_per_webilastik_task = (128 - redis_num_threads) // webilastik_ntasks
+            launch_code = [
+                f"srun -n {webilastik_ntasks} --overlap -u --cpus-per-task {cpus_per_webilastik_task} {python} {workflow_main} &"
+            ]
+        elif self.executor_getter == "dask":
+            dask_scheduler_cpus = 8
+            workflow_main_cpus = 8
+            scheduler_tasks = 1
+            main_ntasks = 1
+            num_workers = ntasks - redis_ntasks - scheduler_tasks - main_ntasks
+            cpus_per_worker = (128 - redis_num_threads - dask_scheduler_cpus - workflow_main_cpus) // num_workers
+
+            launch_code = [
+                f"srun -n 1 --overlap -u --cpu_bind=none {dask_scheduler} &",
+                f"srun -n {ntasks - 2} --overlap -u --cpu_bind=none {dask_worker} &",
+                f"srun -n 1 --overlap -u --cpus-per-task {cpus_per_webilastik_task} {python} {workflow_main} &",
+            ]
+
+        global_cache_config = GlobalCacheConfig(RedisCacheConfig(
+            config=REDIS_CACHE_UNIX_SOCKET_PATH(working_dir / "redis.sock")
+        ))
         job_config = WorkflowConfig(
             allow_local_fs=WEBILASTIK_ALLOW_LOCAL_FS(allow_local_fs),
             ebrains_user_credentials=ebrains_user_credentials and EbrainsUserCredentialsConfig.from_credentials(ebrains_user_credentials),
@@ -653,16 +694,19 @@ class JusufSshJobLauncher(SshJobLauncher):
             session_allocator_host=WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_HOST(session_allocator_host),
             session_allocator_username=WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_USERNAME(session_allocator_username),
             session_allocator_socket_path=WEBILASTIK_WORKFLOW_SESSION_ALLOCATOR_SOCKET_PATH(session_allocator_socket_path),
+            global_cache_config=global_cache_config
         )
-        home="/p/home/jusers/webilastik/jusuf"
-        webilastik_source_dir = f"{working_dir}/webilastik"
-        conda_env_dir = f"{home}/miniconda3/envs/webilastik"
-        redis_pid_file = f"{working_dir}/redis.pid"
-        redis_unix_socket_path = f"{working_dir}/redis.sock"
-        redis_num_threads = 6
-        ntasks = 10
-        webilastik_ntasks = ntasks - 1
-        cpus_per_webilastik_task = int((128 - redis_num_threads) / webilastik_ntasks)
+        workflow_invocation = WebilastikWorkflowInvocation(
+            working_dir=working_dir,
+            conda_env=Path("/p/home/jusers/webilastik/jusuf"),
+            executor_getter="jusuf",
+            global_cache_config=global_cache_config,
+            process_launcher_prefix=f"srun -n {webilastik_ntasks} --overlap -u --cpus-per-task {cpus_per_webilastik_task}"
+        )
+
+
+
+
 
         out = textwrap.dedent(textwrap.indent(f"""\
             #!/bin/bash -l
@@ -718,7 +762,7 @@ class JusufSshJobLauncher(SshJobLauncher):
             fi
 
             PYTHONPATH="{webilastik_source_dir}"
-            PYTHONPATH+=":{webilastik_source_dir}/executor_getters/jusuf/"
+            PYTHONPATH+=":{webilastik_source_dir}/executor_getters/{self.executor_getter}/"
             PYTHONPATH+=":{webilastik_source_dir}/caching/redis_cache/"
 
             export PYTHONPATH
