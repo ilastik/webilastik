@@ -12,7 +12,7 @@ import { Anchor, Div, Paragraph, Span } from "./widget";
 export class DataSourceSelectionWidget{
     private element: HTMLDetailsElement;
     private session: Session;
-    private viewer: any;
+    private viewer: Viewer;
 
     constructor(params: {
         parentElement: HTMLElement, session: Session, viewer: Viewer
