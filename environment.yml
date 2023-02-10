@@ -15,7 +15,7 @@ dependencies:
   - aiohttp
   - requests
   - redis
-  - redis-py
+  - redis-py=4.4.2
   - cryptography
   - defusedxml
   - pip
