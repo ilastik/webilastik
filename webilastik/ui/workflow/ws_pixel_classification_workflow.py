@@ -8,10 +8,11 @@ import multiprocessing
 import os
 import signal
 import asyncio
+import tempfile
 from typing import Callable, Final, List, Optional
 import json
 import ssl
-from pathlib import PurePosixPath
+from pathlib import PurePosixPath, Path
 import traceback
 import datetime
 
@@ -26,6 +27,7 @@ from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunk
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale
 from webilastik.filesystem import FsFileNotFoundException, FsIoException, IFilesystem, create_filesystem_from_message, create_filesystem_from_url
 from webilastik.filesystem.bucket_fs import BucketFs
+from webilastik.filesystem.os_fs import OsFs
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.server.util import get_encoded_datasource_from_url
 from webilastik.server.rpc.dto import GetDatasourcesFromUrlParamsDto, GetDatasourcesFromUrlResponseDto, GetFileSystemAndPathFromUrlParamsDto, GetFileSystemAndPathFromUrlResponseDto, ListFsDirRequest, ListFsDirResponse, LoadProjectParamsDto, MessageParsingError, RpcErrorDto, SaveProjectParamsDto
@@ -81,8 +83,19 @@ class RPCPayload:
 def do_save_project(filesystem: IFilesystem, file_path: PurePosixPath, workflow_contents: bytes) -> "None | FsIoException":
     return filesystem.create_file(path=file_path, contents=workflow_contents)
 
-def do_load_project_bytes(filesystem: IFilesystem, file_path: PurePosixPath) -> "bytes | FsFileNotFoundException | FsIoException":
-    return filesystem.read_file(path=file_path)
+def download_project_bytes(filesystem: IFilesystem, ilp_path: PurePosixPath) -> "Path | FsFileNotFoundException | FsIoException":
+    if isinstance(filesystem, OsFs):
+        return Path(ilp_path) # FIXME: windows?
+    tmp_file_handle, tmp_ilp_path = tempfile.mkstemp(suffix=".ilp") # FIXME
+    ilp_bytes_result = filesystem.read_file(ilp_path)
+    if isinstance(ilp_bytes_result, Exception):
+        return ilp_bytes_result
+    try:
+        _ = os.write(tmp_file_handle, ilp_bytes_result)
+    except Exception:
+        return FsIoException("Failed writing ilp file")
+    os.close(tmp_file_handle)
+    return Path(tmp_ilp_path)
 
 class WebIlastik:
     @property
@@ -394,15 +407,19 @@ class WebIlastik:
         if len(file_path.parts) == 0 or ".." in file_path.parts:
             return web.Response(status=400, text=f"Bad project file path: {file_path}")
 
-        ilp_bytes_result = await asyncio.wrap_future(self.executor.submit(
-            do_load_project_bytes,
+        temp_ilp_path = await asyncio.wrap_future(self.executor.submit(
+            download_project_bytes,
             filesystem=fs_result,
-            file_path=file_path,
+            ilp_path=file_path,
         ))
-        if isinstance(ilp_bytes_result, Exception):
-            return uncachable_json_response({"error": str(ilp_bytes_result)}, status=404)
-        new_workflow_result = WsPixelClassificationWorkflow.load_from_ilp_bytes(
-            ilp_bytes=ilp_bytes_result,
+        if isinstance(temp_ilp_path, Exception):
+            return uncachable_json_response({"error": str(temp_ilp_path)}, status=404)
+
+        # FIXME: reading the ilp can make some requests that couild be slow, so this should somehow
+        # be run inside an executor
+        new_workflow_result = WsPixelClassificationWorkflow.load_from_ilp(
+            original_ilp_fs=fs_result,
+            temp_ilp_path=temp_ilp_path,
             on_async_change=lambda: self.enqueue_user_interaction(user_interaction=lambda: None), #FIXME?
             executor=self.executor,
             priority_executor=self.priority_executor,

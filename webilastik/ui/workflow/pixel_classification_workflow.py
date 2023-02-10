@@ -1,10 +1,8 @@
 # pyright: strict
 
 from concurrent.futures import Executor
-import os
 from pathlib import Path, PurePosixPath
 from typing import Callable, Dict, Sequence, Set
-import tempfile
 
 import h5py
 import numpy as np
@@ -16,7 +14,6 @@ from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.datasource import FsDataSource
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.filesystem import IFilesystem
-from webilastik.filesystem.os_fs import OsFs
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet.brushing_applet import Label, WsBrushingApplet
 from webilastik.ui.applet.feature_selection_applet import WsFeatureSelectionApplet
@@ -99,18 +96,15 @@ class PixelClassificationWorkflow:
     def from_ilp(
         cls,
         *,
-        ilp_path: Path,
+        original_ilp_fs: IFilesystem,
+        temp_ilp_path: Path,
         on_async_change: Callable[[], None],
         executor: Executor,
         priority_executor: PriorityExecutor,
     ) -> "PixelClassificationWorkflow | Exception":
-        fs_result = OsFs.create()
-        if isinstance(fs_result, Exception):
-            return fs_result
-        with h5py.File(ilp_path, "r") as f:
+        with h5py.File(temp_ilp_path, "r") as f:
             parsing_result = IlpPixelClassificationWorkflowGroup.parse(
-                group=f,
-                ilp_fs=fs_result,
+                group=f, ilp_fs=original_ilp_fs,
             )
             if isinstance(parsing_result, Exception):
                 return parsing_result
@@ -124,28 +118,6 @@ class PixelClassificationWorkflow:
                 labels=parsing_result.PixelClassification.labels,
                 pixel_classifier=parsing_result.PixelClassification.classifier,
             )
-
-    @classmethod
-    def from_ilp_bytes(
-        cls,
-        *,
-        ilp_bytes: bytes,
-        on_async_change: Callable[[], None],
-        executor: Executor,
-        priority_executor: PriorityExecutor,
-    ) -> "PixelClassificationWorkflow | Exception":
-        tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5") # FIXME
-        num_bytes_written = os.write(tmp_file_handle, ilp_bytes)
-        assert num_bytes_written == len(ilp_bytes)
-        os.close(tmp_file_handle)
-        workflow =  PixelClassificationWorkflow.from_ilp(
-            ilp_path=Path(tmp_file_path),
-            on_async_change=on_async_change,
-            executor=executor,
-            priority_executor=priority_executor,
-        )
-        os.remove(tmp_file_path)
-        return workflow
 
     def to_ilp_workflow_group(self) -> IlpPixelClassificationWorkflowGroup:
         return IlpPixelClassificationWorkflowGroup.create(
@@ -208,25 +180,21 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
     @staticmethod
     def load_from_ilp(
         *,
-        ilp_path: Path,
+        original_ilp_fs: IFilesystem,
+        temp_ilp_path: Path,
         on_async_change: Callable[[], None],
         executor: Executor,
         priority_executor: PriorityExecutor,
         session_url: Url,
     ) -> "WsPixelClassificationWorkflow | Exception":
-        fs_result = OsFs.create()
-        if isinstance(fs_result, Exception):
-            return fs_result
-
         try:
-            f = h5py.File(ilp_path, "r")
+            f = h5py.File(temp_ilp_path, "r")
         except Exception as e:
             print(e)
             return Exception(f"Could not open ilp file")
 
         parsing_result = IlpPixelClassificationWorkflowGroup.parse(
-            group=f,
-            ilp_fs=fs_result,
+            group=f, ilp_fs=original_ilp_fs,
         )
         if isinstance(parsing_result, Exception):
             return parsing_result
@@ -240,34 +208,3 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             pixel_classifier=parsing_result.PixelClassification.classifier,
             session_url=session_url,
         )
-
-    @staticmethod
-    def load_from_ilp_bytes(
-        *,
-        ilp_bytes: bytes,
-        on_async_change: Callable[[], None],
-        executor: Executor,
-        priority_executor: PriorityExecutor,
-        session_url: Url,
-    ) -> "WsPixelClassificationWorkflow | Exception":
-        try:
-            tmp_file_handle, tmp_file_path = tempfile.mkstemp(suffix=".h5") # FIXME
-            num_bytes_written = os.write(tmp_file_handle, ilp_bytes)
-            assert num_bytes_written == len(ilp_bytes)
-            os.close(tmp_file_handle)
-        except Exception as e:
-            print(e)
-            return Exception(f"Error processing ilp bytes")
-        workflow =  WsPixelClassificationWorkflow.load_from_ilp(
-            ilp_path=Path(tmp_file_path),
-            on_async_change=on_async_change,
-            executor=executor,
-            priority_executor=priority_executor,
-            session_url=session_url,
-        )
-        try:
-            os.remove(tmp_file_path)
-        except Exception as e:
-            print(e)
-        return workflow
-
