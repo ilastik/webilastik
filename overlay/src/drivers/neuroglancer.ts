@@ -69,6 +69,11 @@ class Layer{
         return !this.managedLayer.visible
     }
 
+    public get opacity(): number{
+        let opacity = this.managedLayer.layer?.opacity?.value
+        return opacity === undefined ? 1 : opacity
+    }
+
     public get fragmentShader(): string{
         return this.managedLayer.layer.fragmentMain.value
     }
@@ -177,16 +182,16 @@ export class NeuroglancerDriver implements IViewerDriver{
                 shader = similar_layers[0].fragmentShader
             }
         }
-        this.refreshLayer({name: params.native_view.name, url: params.native_view.url, shader})
+        this.refreshLayer({name: params.native_view.name, url: params.native_view.url, shader, opacity: params.native_view.opacity})
     }
 
     closeView(params: { native_view: INativeView; }){
         this.dropLayer(params.native_view.name)
     }
 
-    private refreshLayer({name, url, shader}: {name: string, url: string, shader?: string}){
+    private refreshLayer({name, url, shader, opacity}: {name: string, url: string, shader?: string, opacity: number}){
         this.dropLayer(name)
-        this.openNewDataSource({name, url: Url.parse(url).double_protocol_raw, shader})
+        this.openNewDataSource({name, url: Url.parse(url).double_protocol_raw, shader, opacity})
     }
 
     private getLayerManager(): any {
@@ -204,7 +209,7 @@ export class NeuroglancerDriver implements IViewerDriver{
         return false
     }
 
-    private openNewDataSource(params: {name: string, url: string, shader?: string, opacity?: number}){
+    private openNewDataSource(params: {name: string, url: string, shader?: string, opacity: number}){
         const newPredictionsLayer = this.viewer.layerSpecification.getLayer(
             params.name,
             {source: Url.parse(params.url).double_protocol_raw, shader: params.shader}
@@ -218,8 +223,7 @@ export class NeuroglancerDriver implements IViewerDriver{
             if(typeof(currentOpacity) != "number"){
                 return
             }
-            let targetOpacity = params.opacity === undefined ? 1.0 : params.opacity
-            layer.opacity.value = targetOpacity
+            layer.opacity.value = params.opacity
             newPredictionsLayer.layerChanged.remove(setOpacity)
         }
         newPredictionsLayer.layerChanged.add(setOpacity)
@@ -252,7 +256,7 @@ export class NeuroglancerDriver implements IViewerDriver{
     }
 
     public getOpenDataViews(): Array<INativeView>{
-        return this.getImageLayers().map(layer => ({name: layer.name, url: layer.sourceUrl}))
+        return this.getImageLayers().map(layer => ({name: layer.name, url: layer.sourceUrl, opacity: layer.opacity}))
     }
 
     public getDataViewOnDisplay(): INativeView | undefined{
@@ -261,6 +265,7 @@ export class NeuroglancerDriver implements IViewerDriver{
             .map(layer => ({
                 name: layer.name,
                 url: layer.sourceUrl,
+                opacity: layer.opacity || 1,
             }))[0];
     }
 

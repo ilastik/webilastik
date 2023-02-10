@@ -35,7 +35,7 @@ export class DataSourceSelectionWidget{
 
     private tryOpenViews = async (liveFsTree: LiveFsTree) => {
         let viewPromises = liveFsTree.getSelectedUrls().map(url => View.tryOpen({
-            name: url.path.name, url, session: this.session
+            name: url.path.name, url, session: this.session, opacity: 1.0,
         }))
 
         let imageServiceHintWidget: Div | undefined = undefined

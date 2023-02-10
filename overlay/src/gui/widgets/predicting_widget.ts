@@ -1,6 +1,7 @@
 import { Applet } from "../../client/applets/applet";
 import { CheckDatasourceCompatibilityParams, CheckDatasourceCompatibilityResponse } from "../../client/dto";
 import { Color, FsDataSource, Session } from "../../client/ilastik";
+import { HashMap } from "../../util/hashmap";
 import { assertUnreachable } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
 import { ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonObject, ensureJsonString, JsonValue } from "../../util/serialization";
@@ -144,11 +145,13 @@ export class PredictingWidget extends Applet<State>{
         let stalePredictionViews = new Array<PredictionsView>();
         let validPredictionViews = new Array<PredictionsView>();
         let predictionRawDataSources = new Map<string, FsDataSource>();
+        let customPredictionOpacities: HashMap<FsDataSource, number, string> = new HashMap();
         for(let view of this.viewer.getViews()){
             if(view instanceof UnsupportedDatasetView || view instanceof FailedView){
                 continue
             }
             if(view instanceof PredictionsView){
+                customPredictionOpacities.set(view.raw_data, view.opacity)
                 if(
                     view.classifierGeneration != this.state.generation ||
                     this.state.channel_colors.length != view.channel_colors.length ||
@@ -191,7 +194,6 @@ export class PredictingWidget extends Applet<State>{
                 return
             }
         }
-
         if(predictionRawDataSources.size == 0){
             // console.log(`(${compatCheckGeneration}) DONE: No remaining raw data needing predictions.`)
             return
@@ -219,13 +221,17 @@ export class PredictingWidget extends Applet<State>{
                 continue
             }
             console.log(`(${compatCheckGeneration}) WORK: Opening predictions for ${ds.url}`);
+            // FIXME: this works on the first trigger, but then adding or removing views re-trigger this callback
+            // which operate on a viewer environment that isn't yet aware of the set opacity
+            let opacity = customPredictionOpacities.get(ds)
             this.viewer.openDataView(
                 new PredictionsView({
                     classifierGeneration: this.state.generation,
                     name: `predicting on ${name}`,
                     raw_data: ds,
                     session: this.session,
-                    channel_colors: this.state.channel_colors.slice()
+                    channel_colors: this.state.channel_colors.slice(),
+                    opacity: opacity === undefined ? 0.5 : opacity,
                 })
             )
             if(compatCheckGeneration != this.compatCheckGeneration){

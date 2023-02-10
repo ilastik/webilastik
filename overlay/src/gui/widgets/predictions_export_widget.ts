@@ -378,7 +378,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
 
         new_state.jobs.forEach(job => {
             const row = job.toTableRow((datasource) => {
-                this.viewer.openDataViewFromDataSource(datasource)
+                this.viewer.openDataViewFromDataSource({datasource, opacity: 1.0})
             })
             new TableRow({parentElement: jobsTable, children: [row.name, row.progress]})
         })
