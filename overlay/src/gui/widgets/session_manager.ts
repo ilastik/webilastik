@@ -159,12 +159,15 @@ export class SessionManagerWidget{
 
                     const startupConfigs = StartupConfigs.tryFromWindowLocation()
                     if(startupConfigs instanceof Error){
-                        new ErrorPopupWidget({message: `Could not get startup configs from current URL: ${startupConfigs}`})
+                        new ErrorPopupWidget({message: `Could not get startup configs from current URL: ${startupConfigs.message}`})
                         return this.onNewSession({sessionResult})
+                    }
+                    if(startupConfigs.project_file_url instanceof Error){
+                        new ErrorPopupWidget({message: `Could get project url from current page url: ${startupConfigs.project_file_url.message}`})
                     }
 
                     let projectLocation: {fs: Filesystem, path: Path} | undefined = undefined;
-                    if(startupConfigs.project_file_url){
+                    if(startupConfigs.project_file_url instanceof Url){
                         let projectLocationResult = await PopupWidget.WaitPopup({
                             title: "Interpreting project ilp URL...",
                             operation: sessionResult.tryGetFsAndPathFromUrl(new GetFileSystemAndPathFromUrlParamsDto({url: startupConfigs.project_file_url.toDto()})),
@@ -175,7 +178,7 @@ export class SessionManagerWidget{
                             projectLocation = projectLocationResult
                         }
                     }
-                    this.onNewSession({sessionResult, projectLocation, defaultBucketName: startupConfigs.ebrains_bucket_name})
+                    this.onNewSession({sessionResult, projectLocation, defaultBucketName: startupConfigs.effectiveBucketName})
                 }})
             ]
         })
@@ -365,7 +368,7 @@ export class SessionManagerWidget{
             parentElement: this.workflowContainer,
             viewer_driver: this.viewerDriver,
             defaultBucketName,
-            projectLocation: projectLocation
+            projectLocation: projectLocation,
         })
         this.sessionIdField.value = sessionResult.sessionId
         this.reminaningTimeContainer.show(true)
