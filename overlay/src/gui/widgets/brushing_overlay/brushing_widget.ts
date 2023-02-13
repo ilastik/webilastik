@@ -79,7 +79,7 @@ export class BrushingWidget{
                 session,
                 applet_name,
                 gl: this.gl,
-                onDataSourceClicked: async (datasource) => this.viewer.openDataViewFromDataSource(datasource),
+                onDataSourceClicked: async (datasource) => this.viewer.openDataViewFromDataSource({datasource, opacity: 1.0}),
                 onLabelSelected: () => {
                     if(!this.brushingEnabledCheckbox.disabled){
                         this.setBrushingEnabled(true)
@@ -142,6 +142,7 @@ export class BrushingWidget{
                         datasource,
                         name: datasource.getDisplayString(),
                         session: this.session,
+                        opacity: 1.0,
                     })
                     this.viewer.openDataView(stripped_view)
                 },

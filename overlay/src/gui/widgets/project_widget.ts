@@ -14,29 +14,45 @@ import { LiveFsTree } from "./live_fs_tree";
 import { UrlInput } from "./value_input_widget";
 
 
+async function guiTryLoadProject(session: Session, fs: Filesystem, path: Path){
+    let result = await PopupWidget.WaitPopup({
+        title: "Loading project file...",
+        operation: session.loadProject(new LoadProjectParamsDto({
+            fs: fs.toDto(),  project_file_path: path.toDto()
+        }))
+    })
+    if(result instanceof Error){
+        new ErrorPopupWidget({message: `Could not open project: ${result.message}`})
+    }
+    return result
+}
+
 export class ProjectLoaderWidget{
-    private readonly session: Session;
     onSuccess: () => void;
 
     constructor(params: {
         parentElement: HTMLElement | undefined,
         session: Session,
+        defaultBucketName: string,
         onSuccess: () => void,
     }){
-        this.session = params.session
         this.onSuccess = params.onSuccess
 
         let dataProxyFilePickerContainer = new Div({parentElement: params.parentElement})
         new DataProxyFilePicker({
             parentElement: dataProxyFilePickerContainer.element, //FIXME
             session: params.session,
+            defaultBucketName: params.defaultBucketName,
             onOk: (liveFsTree: LiveFsTree) => {
                 let paths = liveFsTree.getSelectedPaths()
                 if(paths.length != 1){
                     new ErrorPopupWidget({message: "Please select one project file"})
                     return
                 }
-                this.tryLoadProject(liveFsTree.fs, paths[0])
+                if(guiTryLoadProject(params.session, liveFsTree.fs, paths[0]) instanceof Error){
+                    return
+                }
+                this.onSuccess()
             },
             okButtonValue: "Open",
         })
@@ -65,7 +81,10 @@ export class ProjectLoaderWidget{
                 new ErrorPopupWidget({message: "Could not interpret URL"})
                 return
             }
-            this.tryLoadProject(result.fs, result.path)
+            if(guiTryLoadProject(params.session, result.fs, result.path) instanceof Error){
+                return
+            }
+            this.onSuccess()
         })
 
         new TabsWidget({
@@ -78,20 +97,6 @@ export class ProjectLoaderWidget{
             ])
         })
     }
-
-    private async tryLoadProject(fs: Filesystem, path: Path){
-        let result = await PopupWidget.WaitPopup({
-            title: "Loading project file...",
-            operation: this.session.loadProject(new LoadProjectParamsDto({
-                fs: fs.toDto(),  project_file_path: path.toDto()
-            }))
-        })
-        if(result instanceof Error){
-            new ErrorPopupWidget({message: `Could not open project: ${result.message}`})
-        }else{
-            this.onSuccess()
-        }
-    }
 }
 
 export class ProjectWidget{
@@ -99,9 +104,16 @@ export class ProjectWidget{
     private readonly session: Session;
     private savedPath: Path | undefined
     private readonly defaultPath: Path;
+    private readonly defaultBucketName: string;
 
-    constructor(params: {parentElement: HTMLElement, session: Session}){
+    constructor(params: {
+        parentElement: HTMLElement,
+        session: Session,
+        projectLocation?: {fs: Filesystem, path: Path},
+        defaultBucketName: string,
+    }){
         this.session = params.session
+        this.defaultBucketName = params.defaultBucketName;
         this.defaultPath = Path.parse(`/MyProject_${dateToSafeString(params.session.startTime || new Date())}.ilp`)
         this.containerWidget = new CollapsableWidget({display_name: "Project", parentElement: params.parentElement})
         new Paragraph({parentElement: this.containerWidget.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
@@ -109,7 +121,10 @@ export class ProjectWidget{
             new Button({inputType: "button", parentElement: undefined, text: "Load Project", onClick: () => {
                 let popup = new PopupWidget("Select a project file to load", true)
                 new ProjectLoaderWidget({
-                    parentElement: popup.element, session: params.session, onSuccess: () => popup.destroy()
+                    parentElement: popup.element,
+                    session: params.session,
+                    defaultBucketName: this.defaultBucketName,
+                    onSuccess: () => popup.destroy(),
                 })
             }}),
             new Button({inputType: "button", parentElement: undefined, text: "Download Project", onClick: () => {
@@ -121,13 +136,17 @@ export class ProjectWidget{
                     ilp_form.submit()
             }}),
         ]})
+
+        if(params.projectLocation){
+            guiTryLoadProject(this.session, params.projectLocation.fs, params.projectLocation.path)
+        }
     }
     private popupSaveProject = () => {
         const popup = new PopupWidget("Save Project", true);
         const fileLocationInput = new FileLocationInputWidget({
             parentElement: popup.element,
             filesystemChoices: ["data-proxy"],
-            defaultBucketName: "hbp-image-service",
+            defaultBucketName: this.defaultBucketName,
             defaultPath: this.savedPath || this.defaultPath,
         })
         new Paragraph({parentElement: popup.element, children: [

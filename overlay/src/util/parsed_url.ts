@@ -128,7 +128,7 @@ export class Url implements IJsonable{
         this.path = params.path
         this.search = params.search || new Map<string, string>()
         this.hash = params.hash
-        this.schemeless_raw = `${this.protocol}://${this.host}${this.path.raw}`
+        this.schemeless_raw = `${this.protocol}://${this.host}${encodeURI(this.path.raw)}`
 
         if(this.search.size > 0){
             const encoded_search = "?" + Array.from(this.search)
@@ -248,6 +248,14 @@ export class Url implements IJsonable{
             search: search,
             hash: groups["hash"]
         })
+    }
+
+    public static safe_parse(url: string): Url | Error{
+        try{
+            return Url.parse(url)
+        }catch(e){
+            return Error(`${e.message}`)
+        }
     }
 
     public updatedWith(params: {

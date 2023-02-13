@@ -8,25 +8,27 @@ import { Div, Label, Paragraph } from "./widget";
 
 export class DataProxyFilePicker{
     element: Div;
+    private bucketNameInput: TextInput;
+
 
     constructor(params: {
         parentElement: HTMLElement | undefined,
         session: Session,
+        defaultBucketName: string,
         onOk: (liveFsTree: LiveFsTree) => void,
         okButtonValue?: string,
         onCancel?: () => void,
     }){
-        let bucketNameInput: TextInput;
         this.element = new Div({parentElement: params.parentElement, children: [
             new Paragraph({parentElement: undefined, cssClasses: [CssClasses.ItkInputParagraph], children: [
                 new Label({parentElement: undefined, innerText: "Bucket name: "}),
-                bucketNameInput = new TextInput({parentElement: undefined, value: "hbp-image-service"})
+                this.bucketNameInput = new TextInput({parentElement: undefined, value: params.defaultBucketName})
             ]})
         ]})
 
         new Paragraph({parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
             new Button({inputType: "button", text: "Open file tree", parentElement: undefined, onClick: () => {
-                const bucketName = bucketNameInput.value
+                const bucketName = this.bucketNameInput.value
                 if(!bucketName){
                     new ErrorPopupWidget({message: "Please enter a bucket name"})
                     return
@@ -53,5 +55,9 @@ export class DataProxyFilePicker{
                 ]})
             }})
         ]})
+    }
+
+    public get bucketName(): string | undefined{
+        return this.bucketNameInput.value
     }
 }

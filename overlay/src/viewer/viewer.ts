@@ -43,7 +43,7 @@ export class Viewer{
             }
         })
 
-        this.driver.addDataChangedHandler(this.synchronizeWithNativeViews)
+        this.driver.addViewportsChangedHandler(this.synchronizeWithNativeViews)
         this.synchronizeWithNativeViews()
     }
 
@@ -61,16 +61,17 @@ export class Viewer{
     }
 
     public synchronizeWithNativeViews = async () => {
-        let nativeViews = this.driver.getOpenDataViews().map(nv => ({name: nv.name, url: Url.parse(nv.url)}))
+        let nativeViews = this.driver.getOpenDataViews().map(nv => ({name: nv.name, url: Url.parse(nv.url), opacity: nv.opacity}))
         const new_views = new HashMap<Url, ViewUnion, string>();
         const dataViewsGeneration = this.dataViewsGeneration = this.dataViewsGeneration + 1;
-        for(const {name, url} of nativeViews){
+        for(const {name, url, opacity} of nativeViews){
             const cached_view = this.cached_views.get(url)
             if(cached_view !== undefined){
                 new_views.set(url, cached_view)
+                cached_view.opacity = opacity
                 continue
             }
-            const dataView = await View.tryOpen({name: name, url: url, session: this.session})
+            const dataView = await View.tryOpen({name: name, url: url, session: this.session, opacity})
             if(!this.cached_views.has(dataView.url) || this.cached_views.get(dataView.url) instanceof FailedView){
                 this.cached_views.set(dataView.url, dataView)
             }
@@ -110,6 +111,14 @@ export class Viewer{
         this.onDataChangedHandlers.push(handler)
     }
 
+    public removeDataChangedHandler(handler: () => void){
+        let handlerIndex = this.onDataChangedHandlers.indexOf(handler)
+        if(handlerIndex != -1){
+            this.onDataChangedHandlers.splice(handlerIndex, 1)
+            this.driver.removeDataChangedHandler(handler)
+        }
+    }
+
     public openDataView(view: ViewUnion){
         this.cached_views.set(view.url, view)
         this.driver.refreshView({
@@ -118,9 +127,9 @@ export class Viewer{
         })
     }
 
-    public async openDataViewFromDataSource(datasource: FsDataSource){
+    public async openDataViewFromDataSource({datasource, opacity}: {datasource: FsDataSource, opacity: number}){
         let name = datasource.url.path.name + " " + datasource.resolutionString
-        const dataViewResult = await DataView.tryOpen({name, session: this.session, url: datasource.url})
+        const dataViewResult = await DataView.tryOpen({name, session: this.session, url: datasource.url, opacity})
         if(dataViewResult instanceof Error){
             new ErrorPopupWidget({message: `Could not create a view for ${datasource.url}: ${dataViewResult.message}`})
             return

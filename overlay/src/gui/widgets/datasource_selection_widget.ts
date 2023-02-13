@@ -15,7 +15,7 @@ export class DataSourceSelectionWidget{
     private viewer: Viewer;
 
     constructor(params: {
-        parentElement: HTMLElement, session: Session, viewer: Viewer
+        parentElement: HTMLElement, session: Session, viewer: Viewer, defaultBucketName: string,
     }){
         this.element = new CollapsableWidget({
             display_name: "Data Sources", parentElement: params.parentElement
@@ -26,6 +26,7 @@ export class DataSourceSelectionWidget{
         new DataProxyFilePicker({
             parentElement: this.element,
             session: params.session,
+            defaultBucketName: params.defaultBucketName,
             onOk: (liveFsTree: LiveFsTree) => PopupWidget.WaitPopup({
                 title: "Loading data sources...", operation: this.tryOpenViews(liveFsTree)
             }),
@@ -35,7 +36,7 @@ export class DataSourceSelectionWidget{
 
     private tryOpenViews = async (liveFsTree: LiveFsTree) => {
         let viewPromises = liveFsTree.getSelectedUrls().map(url => View.tryOpen({
-            name: url.path.name, url, session: this.session
+            name: url.path.name, url, session: this.session, opacity: 1.0,
         }))
 
         let imageServiceHintWidget: Div | undefined = undefined
