@@ -1,4 +1,4 @@
-import { Session } from "../client/ilastik";
+import { Filesystem, Session } from "../client/ilastik";
 import { IViewerDriver } from "../drivers/viewer_driver";
 import { createElement, removeElement } from "../util/misc";
 import { BrushingWidget } from "./widgets/brushing_overlay/brushing_widget";
@@ -7,6 +7,7 @@ import { Viewer } from "../viewer/viewer";
 import { PredictionsExportWidget } from "./widgets/predictions_export_widget";
 import { ProjectWidget } from "./widgets/project_widget";
 import { DataSourceSelectionWidget } from "./widgets/datasource_selection_widget";
+import { Path } from "../util/parsed_url";
 
 export class ReferencePixelClassificationWorkflowGui{
     public readonly element: HTMLElement
@@ -19,18 +20,23 @@ export class ReferencePixelClassificationWorkflowGui{
     public readonly viewer: Viewer;
     public readonly data_selection_widget: DataSourceSelectionWidget;
 
-    public constructor({parentElement, session, viewer_driver}: {
+    public constructor({parentElement, session, viewer_driver, projectLocation, defaultBucketName}: {
         parentElement: HTMLElement,
         session: Session,
         viewer_driver: IViewerDriver,
+        projectLocation?: {fs: Filesystem, path: Path},
+        defaultBucketName?: string,
     }){
+        defaultBucketName = defaultBucketName || "hbp-image-service;"
         this.session = session
         this.element = createElement({tagName: "div", parentElement, cssClasses: ["ReferencePixelClassificationWorkflowGui"]})
         this.viewer = new Viewer({driver: viewer_driver, session})
 
-        this.project_widget = new ProjectWidget({parentElement: this.element, session})
+        this.project_widget = new ProjectWidget({parentElement: this.element, session, projectLocation, defaultBucketName})
 
-        this.data_selection_widget = new DataSourceSelectionWidget({parentElement: this.element, session, viewer: this.viewer});
+        this.data_selection_widget = new DataSourceSelectionWidget({
+            parentElement: this.element, session, viewer: this.viewer, defaultBucketName
+        });
 
         this.feature_selection_applet = new FeatureSelectionWidget({
             name: "feature_selection_applet",
@@ -73,6 +79,7 @@ export class ReferencePixelClassificationWorkflowGui{
             parentElement: this.element,
             session: this.session,
             viewer: this.viewer,
+            defaultBucketName,
             help: [
                 ("Once you trained your pixel classifier with the previous applets, you can apply it to other datasets " +
                 "or even the same dataset that was used to do the training on."),

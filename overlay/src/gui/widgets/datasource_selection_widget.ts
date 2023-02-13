@@ -15,7 +15,7 @@ export class DataSourceSelectionWidget{
     private viewer: Viewer;
 
     constructor(params: {
-        parentElement: HTMLElement, session: Session, viewer: Viewer
+        parentElement: HTMLElement, session: Session, viewer: Viewer, defaultBucketName: string,
     }){
         this.element = new CollapsableWidget({
             display_name: "Data Sources", parentElement: params.parentElement
@@ -26,6 +26,7 @@ export class DataSourceSelectionWidget{
         new DataProxyFilePicker({
             parentElement: this.element,
             session: params.session,
+            defaultBucketName: params.defaultBucketName,
             onOk: (liveFsTree: LiveFsTree) => PopupWidget.WaitPopup({
                 title: "Loading data sources...", operation: this.tryOpenViews(liveFsTree)
             }),

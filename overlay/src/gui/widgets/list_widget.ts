@@ -84,6 +84,7 @@ export class DataSourceFetchError extends Error{
 export class DataSourceListWidget extends Div{
     listWidget: ListWidget<FsDataSource | DataSourceFetchError>;
     session: Session;
+    private defaultBucketName: string;
 
     constructor(params: {
         parentElement: HTMLElement,
@@ -91,8 +92,10 @@ export class DataSourceListWidget extends Div{
         onItemRemoved?: (value: FsDataSource | DataSourceFetchError) => void,
         items?: Array<FsDataSource | DataSourceFetchError>,
         session: Session,
+        defaultBucketName: string,
     }){
         super({parentElement: params.parentElement, cssClasses: [CssClasses.ItkDataSourceListWidget]})
+        this.defaultBucketName = params.defaultBucketName
         new Div({parentElement: this, cssClasses: [CssClasses.ItkDatasourcesListContainer], children: [
             this.listWidget = new ListWidget({...params, parentElement: undefined, itemRenderer: params.itemRenderer || this.renderDataSourceOrError})
         ]})
@@ -111,10 +114,14 @@ export class DataSourceListWidget extends Div{
 
     private openFilePicker = () => {
         const popup = PopupWidget.ClosablePopup({title: "Select datasets from Data Proxy"})
-        new DataProxyFilePicker({
+        const filePicker = new DataProxyFilePicker({
             parentElement: popup.element,
             session: this.session,
-            onOk: (liveFsTree: LiveFsTree) => this.addDataSourcesFromUrls(liveFsTree.getSelectedUrls()),
+            defaultBucketName: this.defaultBucketName,
+            onOk: (liveFsTree: LiveFsTree) => {
+                this.defaultBucketName = filePicker.bucketName || this.defaultBucketName;
+                this.addDataSourcesFromUrls(liveFsTree.getSelectedUrls());
+            },
             okButtonValue: "Add",
         })
     }

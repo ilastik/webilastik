@@ -191,8 +191,8 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
     private customTileShapeCheckbox: BooleanInput;
     private tileShapeInput: Shape5DInputNoChannel
 
-    public constructor({name, parentElement, session, help, viewer}: {
-        name: string, parentElement: HTMLElement, session: Session, help: string[], viewer: Viewer
+    public constructor({name, parentElement, session, help, viewer, defaultBucketName}: {
+        name: string, parentElement: HTMLElement, session: Session, help: string[], viewer: Viewer, defaultBucketName: string
     }){
         super({
             name,
@@ -224,12 +224,14 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
         this.labelSelectorContainer.show(false)
 
         const datasourceFieldset = createFieldset({parentElement: this.element, legend: "Input Datasets:"})
-        this.datasourceListWidget = new DataSourceListWidget({parentElement: datasourceFieldset, session: this.session})
+        this.datasourceListWidget = new DataSourceListWidget({
+            parentElement: datasourceFieldset, session: this.session, defaultBucketName
+        })
 
         const datasinkFieldset = createFieldset({legend: "Output: ", parentElement: this.element})
         const fileLocationInputWidget = new FileLocationPatternInputWidget({
             parentElement: datasinkFieldset,
-            defaultBucketName: "hbp-image-service",
+            defaultBucketName,
             defaultPathPattern: "/ilastik_exports/{timestamp}/{name}_{output_type}",
             filesystemChoices: ["data-proxy"]
         })

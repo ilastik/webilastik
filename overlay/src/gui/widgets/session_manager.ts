@@ -1,8 +1,8 @@
 import { IViewerDriver } from "../..";
-import { HpcSiteName, Session } from "../../client/ilastik";
-import { CreateComputeSessionParamsDto, GetComputeSessionStatusParamsDto } from "../../client/dto";
+import { Filesystem, HpcSiteName, Session, StartupConfigs } from "../../client/ilastik";
+import { CreateComputeSessionParamsDto, GetComputeSessionStatusParamsDto, GetFileSystemAndPathFromUrlParamsDto } from "../../client/dto";
 import { createElement, createInputParagraph, secondsToTimeDeltaString } from "../../util/misc";
-import { Url } from "../../util/parsed_url";
+import { Path, Url } from "../../util/parsed_url";
 import { ReferencePixelClassificationWorkflowGui } from "../reference_pixel_classification_workflow";
 import { CollapsableWidget } from "./collapsable_applet_gui";
 import { ErrorPopupWidget, PopupWidget } from "./popup";
@@ -153,7 +153,29 @@ export class SessionManagerWidget{
                         onUsageError: (message) => {new ErrorPopupWidget({message: message})},
                         autoCloseOnTimeout: true,
                     })
-                    this.onNewSession(sessionResult)
+                    if(sessionResult instanceof Error){
+                        return this.onNewSession({sessionResult})
+                    }
+
+                    const startupConfigs = StartupConfigs.tryFromWindowLocation()
+                    if(startupConfigs instanceof Error){
+                        new ErrorPopupWidget({message: `Could not get startup configs from current URL: ${startupConfigs}`})
+                        return this.onNewSession({sessionResult})
+                    }
+
+                    let projectLocation: {fs: Filesystem, path: Path} | undefined = undefined;
+                    if(startupConfigs.project_file_url){
+                        let projectLocationResult = await PopupWidget.WaitPopup({
+                            title: "Interpreting project ilp URL...",
+                            operation: sessionResult.tryGetFsAndPathFromUrl(new GetFileSystemAndPathFromUrlParamsDto({url: startupConfigs.project_file_url.toDto()})),
+                        });
+                        if(projectLocationResult instanceof Error){
+                            new ErrorPopupWidget({message: `Could not interpret url {FIXME} as a valid location`})
+                        }else{
+                            projectLocation = projectLocationResult
+                        }
+                    }
+                    this.onNewSession({sessionResult, projectLocation, defaultBucketName: startupConfigs.ebrains_bucket_name})
                 }})
             ]
         })
@@ -195,7 +217,7 @@ export class SessionManagerWidget{
                         onProgress: (message) => this.logMessage(message),
                         autoCloseOnTimeout: false,
                     })
-                    this.onNewSession(sessionResult)
+                    this.onNewSession({sessionResult})
                 }
             })
         ]})
@@ -319,7 +341,15 @@ export class SessionManagerWidget{
         return undefined
     }
 
-    private onNewSession(sessionResult: Session | Error){
+    private onNewSession({
+        sessionResult,
+        projectLocation,
+        defaultBucketName,
+    }: {
+        sessionResult: Session | Error,
+        projectLocation?: {fs: Filesystem, path: Path,},
+        defaultBucketName?: string,
+    }){
         if(sessionResult instanceof Error){
             this.logMessage(sessionResult.message)
             this.enableSessionAccquisitionControls({enabled: true})
@@ -331,7 +361,11 @@ export class SessionManagerWidget{
         this.session = sessionResult
         this.workflow?.element.parentElement?.removeChild(this.workflow.element)
         this.workflow = new ReferencePixelClassificationWorkflowGui({
-            session: sessionResult, parentElement: this.workflowContainer, viewer_driver: this.viewerDriver
+            session: sessionResult,
+            parentElement: this.workflowContainer,
+            viewer_driver: this.viewerDriver,
+            defaultBucketName,
+            projectLocation: projectLocation
         })
         this.sessionIdField.value = sessionResult.sessionId
         this.reminaningTimeContainer.show(true)
