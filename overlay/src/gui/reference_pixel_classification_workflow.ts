@@ -27,7 +27,7 @@ export class ReferencePixelClassificationWorkflowGui{
         projectLocation?: {fs: Filesystem, path: Path},
         defaultBucketName?: string,
     }){
-        defaultBucketName = defaultBucketName || "hbp-image-service;"
+        defaultBucketName = defaultBucketName || "hbp-image-service"
         this.session = session
         this.element = createElement({tagName: "div", parentElement, cssClasses: ["ReferencePixelClassificationWorkflowGui"]})
         this.viewer = new Viewer({driver: viewer_driver, session})
