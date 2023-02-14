@@ -96,12 +96,21 @@ const defaultShader = 'void main() {\n  emitGrayscale(toNormalized(getDataValue(
 export class NeuroglancerDriver implements IViewerDriver{
     private generation = 0
     private containerForWebilastikControls: HTMLElement | undefined
+    private readonly suppressMouseWheel = (ev: WheelEvent) => {
+        if (!ev.ctrlKey && ev.target == document.querySelector('.neuroglancer-rendered-data-panel.neuroglancer-panel.neuroglancer-noselect')!){
+            ev.stopPropagation();
+            ev.stopImmediatePropagation();
+            console.log("Mouse wheel event caught!!!");
+        }
+    }
+    private trackedElement: HTMLElement;
 
     constructor(public readonly viewer: any){
         this.guessShader()
         // this.addDataChangedHandler(() => console.log("driver: Layers changed!"))
         // this.addViewportsChangedHandler(() => console.log("driver: Viewports changed!"))
         this.addDataChangedHandler(this.guessShader)
+        this.trackedElement = document.querySelector("#neuroglancer-container canvas")! //FIXME: double-check selector
     }
 
     private guessShader = async () => {
@@ -122,7 +131,7 @@ export class NeuroglancerDriver implements IViewerDriver{
         }
     }
     getTrackedElement() : HTMLElement{
-        return document.querySelector("canvas")! //FIXME: double-check selector
+        return this.trackedElement
     }
     getViewportDrivers(): Array<IViewportDriver>{
         const panels = Array(...document.querySelectorAll(".neuroglancer-panel")) as Array<HTMLElement>;
@@ -146,6 +155,15 @@ export class NeuroglancerDriver implements IViewerDriver{
         return [new NeuroglancerViewportDriver(this, panels[0], orientation_offsets.get(layout.replace("-3d", ""))!)]
     }
 
+    public enableZScrolling(enable: boolean): void{
+        if(enable){
+            console.log("Enabling Z scrolling....")
+            window.removeEventListener("wheel", this.suppressMouseWheel, true)
+        }else{
+            console.log("Disabling Z scrolling....")
+            window.addEventListener("wheel", this.suppressMouseWheel, true)
+        }
+    }
     public addViewportsChangedHandler(handler: () => void){
         this.viewer.display.changed.add(handler)
     }

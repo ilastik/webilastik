@@ -44,6 +44,7 @@ export class Viewer{
         })
 
         this.driver.addViewportsChangedHandler(this.synchronizeWithNativeViews)
+        this.updateZScrolling()
         this.synchronizeWithNativeViews()
     }
 
@@ -61,6 +62,7 @@ export class Viewer{
     }
 
     public synchronizeWithNativeViews = async () => {
+        console.log("Synchronizing with native views............")
         let nativeViews = this.driver.getOpenDataViews().map(nv => ({name: nv.name, url: Url.parse(nv.url), opacity: nv.opacity}))
         const new_views = new HashMap<Url, ViewUnion, string>();
         const dataViewsGeneration = this.dataViewsGeneration = this.dataViewsGeneration + 1;
@@ -81,8 +83,15 @@ export class Viewer{
             new_views.set(dataView.url, dataView)
         }
         this.views = new_views;
+        this.updateZScrolling()
         for(const handler of this.onDataChangedHandlers){
             handler()
+        }
+    }
+
+    private updateZScrolling(){
+        if(this.driver.enableZScrolling){
+            this.driver.enableZScrolling(this.getVolume()[2] > 1)
         }
     }
 
@@ -150,5 +159,8 @@ export class Viewer{
         this.recenterButton.destroy()
         this.onViewportsChangedHandlers.forEach(handler => this.driver.removeViewportsChangedHandler(handler))
         this.driver.removeDataChangedHandler(this.synchronizeWithNativeViews)
+        if(this.driver.enableZScrolling){
+            this.driver.enableZScrolling(true)
+        }
     }
 }
