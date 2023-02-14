@@ -36,28 +36,16 @@ export class Viewer{
                 if(!this.driver.snapTo){
                     return
                 }
-                let activeView = this.getActiveView()
-                if(!activeView){
+                let activeDataSource = this.getBiggestActiveDatasource();
+                if(!activeDataSource){
                     return
                 }
-                let activeDataSource: FsDataSource
-                if(activeView instanceof DataView){
-                    let datasources = activeView.getDatasources()
-                    if(!datasources){
-                        return
-                    }
-                    datasources.sort((a,b) => a.shape.volume - b.shape.volume)
-                    activeDataSource = datasources[0]
-                }else{
-                    activeDataSource = activeView.raw_data
-                }
 
-                const position_uvw = vec3.create();
-                vec3.div(position_uvw, activeDataSource.shape.toXyzVec3(), vec3.fromValues(2,2,2)),
-                vec3.mul(position_uvw, position_uvw, activeDataSource.spatial_resolution),
+                const position_vx = vec3.create();
+                vec3.div(position_vx, activeDataSource.shape.toXyzVec3(), vec3.fromValues(2,2,2)),
 
                 this.driver.snapTo({
-                    position_uvw, orientation_uvw: quat.identity(quat.create()),
+                    position_vx, voxel_size_nm: activeDataSource.spatial_resolution, orientation_w: quat.identity(quat.create()),
                 })
             }
         })
@@ -108,9 +96,30 @@ export class Viewer{
         }
     }
 
+    private getBiggestActiveDatasource(): FsDataSource | undefined{
+        let activeView = this.getActiveView()
+        if(!activeView){
+            return
+        }
+        if(activeView instanceof DataView){
+            let datasources = activeView.getDatasources()
+            if(!datasources){
+                return
+            }
+            datasources.sort((a,b) => b.shape.volume - a.shape.volume)
+            return datasources[0]
+        }else{
+            return activeView.raw_data
+        }
+    }
+
     private updateZScrolling(){
         if(this.driver.enableZScrolling){
-            this.driver.enableZScrolling(this.getVolume()[2] > 1)
+            let activeDataSource = this.getBiggestActiveDatasource()
+            if(!activeDataSource){
+                return
+            }
+            this.driver.enableZScrolling(activeDataSource.shape.z > 1)
         }
     }
 

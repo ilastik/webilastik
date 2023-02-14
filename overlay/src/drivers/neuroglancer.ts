@@ -287,12 +287,15 @@ export class NeuroglancerDriver implements IViewerDriver{
             }))[0];
     }
 
-    public snapTo(pose: {position_uvw?: vec3, orientation_uvw?: quat}): void{
-        if(pose.orientation_uvw !== undefined){
-            this.viewer.navigationState.pose.position.setVoxelCoordinates(pose.position_uvw)
-        }
-        if(pose.orientation_uvw !== undefined){
-            this.viewer.navigationState.pose.orientation.restoreState(pose.orientation_uvw)
-        }
+    public snapTo(params: {position_vx: vec3, orientation_w: quat, voxel_size_nm: vec3}): void{
+        this.viewer.navigationState.pose.restoreState({
+            position: {
+                voxelSize: Array.from(params.voxel_size_nm),
+                spatialCoordinates: Array.from(
+                    vec3.multiply(vec3.create(), params.position_vx, params.voxel_size_nm)
+                ),
+            },
+            orientation: Array.from(params.orientation_w),
+        })
     }
 }
