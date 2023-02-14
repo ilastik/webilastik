@@ -643,6 +643,14 @@ export class Shape5D extends Point5D{
             c: [offset.c, offset.c + this.c],
         })
     }
+
+    public toXyzVec3(): vec3{
+        return vec3.fromValues(this.x, this.y, this.z)
+    }
+
+    public get volume(): number{
+        return this.x * this.y * this.z
+    }
 }
 
 export class Interval5D{

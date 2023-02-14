@@ -36,9 +36,28 @@ export class Viewer{
                 if(!this.driver.snapTo){
                     return
                 }
+                let activeView = this.getActiveView()
+                if(!activeView){
+                    return
+                }
+                let activeDataSource: FsDataSource
+                if(activeView instanceof DataView){
+                    let datasources = activeView.getDatasources()
+                    if(!datasources){
+                        return
+                    }
+                    datasources.sort((a,b) => a.shape.volume - b.shape.volume)
+                    activeDataSource = datasources[0]
+                }else{
+                    activeDataSource = activeView.raw_data
+                }
+
+                const position_uvw = vec3.create();
+                vec3.div(position_uvw, activeDataSource.shape.toXyzVec3(), vec3.fromValues(2,2,2)),
+                vec3.mul(position_uvw, position_uvw, activeDataSource.spatial_resolution),
+
                 this.driver.snapTo({
-                    position_uvw: vec3.div(vec3.create(), this.getVolume(), vec3.fromValues(2,2,2)),
-                    orientation_uvw: quat.identity(quat.create()),
+                    position_uvw, orientation_uvw: quat.identity(quat.create()),
                 })
             }
         })
