@@ -89,18 +89,23 @@ class Layer{
     public async getNumChannels(): Promise<number>{
         return this.managedLayer.layer.multiscaleSource.then((mss: any) => mss.numChannels)
     }
+
+    public async is3D(): Promise<boolean>{
+        return this.managedLayer.layer.multiscaleSource.then((mss: any) => mss.scales[0].size[2] > 1)
+    }
 }
 
 const defaultShader = 'void main() {\n  emitGrayscale(toNormalized(getDataValue()));\n}\n'
 
 export class NeuroglancerDriver implements IViewerDriver{
     private generation = 0
+    private zScrollGeneration = 0
+
     private containerForWebilastikControls: HTMLElement | undefined
     private readonly suppressMouseWheel = (ev: WheelEvent) => {
         if (!ev.ctrlKey && ev.target == document.querySelector('.neuroglancer-rendered-data-panel.neuroglancer-panel.neuroglancer-noselect')!){
             ev.stopPropagation();
             ev.stopImmediatePropagation();
-            console.log("Mouse wheel event caught!!!");
         }
     }
     private trackedElement: HTMLElement;
@@ -108,7 +113,20 @@ export class NeuroglancerDriver implements IViewerDriver{
     constructor(public readonly viewer: any){
         this.guessShader()
         // this.addDataChangedHandler(() => console.log("driver: Layers changed!"))
-        // this.addViewportsChangedHandler(() => console.log("driver: Viewports changed!"))
+        this.addViewportsChangedHandler(async () => {
+            const zScrollGeneration = this.zScrollGeneration = this.zScrollGeneration + 1
+            for(const is3dPromise of this.getImageLayers().map(layer => layer.is3D())){
+                const is3D = await is3dPromise;
+                if(zScrollGeneration != this.zScrollGeneration){
+                    return
+                }
+                if(is3D){
+                    this.enableZScrolling(true)
+                    return
+                }
+            }
+            this.enableZScrolling(false)
+        })
         this.addDataChangedHandler(this.guessShader)
         this.trackedElement = document.querySelector("#neuroglancer-container canvas")! //FIXME: double-check selector
     }
@@ -155,12 +173,10 @@ export class NeuroglancerDriver implements IViewerDriver{
         return [new NeuroglancerViewportDriver(this, panels[0], orientation_offsets.get(layout.replace("-3d", ""))!)]
     }
 
-    public enableZScrolling(enable: boolean): void{
+    private enableZScrolling(enable: boolean): void{
         if(enable){
-            console.log("Enabling Z scrolling....")
             window.removeEventListener("wheel", this.suppressMouseWheel, true)
         }else{
-            console.log("Disabling Z scrolling....")
             window.addEventListener("wheel", this.suppressMouseWheel, true)
         }
     }

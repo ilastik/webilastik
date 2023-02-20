@@ -63,8 +63,6 @@ export interface IViewerDriver{
     getOpenDataViews(): Array<INativeView>;
 
     snapTo?: (params: {position_vx: vec3, orientation_w: quat, voxel_size_nm: vec3}) => void;
-
-    enableZScrolling?: (enable: boolean) => void;
 }
 
 /**

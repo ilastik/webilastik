@@ -51,7 +51,6 @@ export class Viewer{
         })
 
         this.driver.addViewportsChangedHandler(this.synchronizeWithNativeViews)
-        this.updateZScrolling()
         this.synchronizeWithNativeViews()
     }
 
@@ -90,7 +89,6 @@ export class Viewer{
             new_views.set(dataView.url, dataView)
         }
         this.views = new_views;
-        this.updateZScrolling()
         for(const handler of this.onDataChangedHandlers){
             handler()
         }
@@ -110,16 +108,6 @@ export class Viewer{
             return datasources[0]
         }else{
             return activeView.raw_data
-        }
-    }
-
-    private updateZScrolling(){
-        if(this.driver.enableZScrolling){
-            let activeDataSource = this.getBiggestActiveDatasource()
-            if(!activeDataSource){
-                return
-            }
-            this.driver.enableZScrolling(activeDataSource.shape.z > 1)
         }
     }
 
@@ -187,8 +175,5 @@ export class Viewer{
         this.recenterButton.destroy()
         this.onViewportsChangedHandlers.forEach(handler => this.driver.removeViewportsChangedHandler(handler))
         this.driver.removeDataChangedHandler(this.synchronizeWithNativeViews)
-        if(this.driver.enableZScrolling){
-            this.driver.enableZScrolling(true)
-        }
     }
 }
