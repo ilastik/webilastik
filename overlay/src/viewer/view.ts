@@ -10,11 +10,13 @@ export abstract class View{
     public readonly name: string;
     public readonly url: Url;
     public opacity: number;
+    public visible: boolean;
 
-    constructor(params: {name: string, url: Url, opacity: number}){
+    constructor(params: {name: string, url: Url, opacity: number, visible: boolean}){
         this.name = params.name
         this.url = params.url
         this.opacity = params.opacity
+        this.visible = params.visible
     }
 
     public toNative(name?: string): INativeView{
@@ -22,10 +24,13 @@ export abstract class View{
             name: name || this.name,
             url: this.url.updatedWith({search: new Map(), hash: ""}).raw,
             opacity: this.opacity,
+            visible: this.visible,
         }
     }
 
-    public static async tryOpen(params: {name: string, url: Url, session: Session, opacity: number}): Promise<ViewUnion>{
+    public static async tryOpen(params: {
+        name: string, url: Url, session: Session, opacity: number, visible: boolean
+    }): Promise<ViewUnion>{
         const strippedViewResult = await StrippedPrecomputedView.tryFromUrl(params)
         if(strippedViewResult instanceof Error){
             return new FailedView({...params, errorMessage: strippedViewResult.message})
@@ -46,7 +51,7 @@ export abstract class View{
         // }
 
 
-        const rawDataViewResult = await RawDataView.tryFromUrl({session: params.session, url: params.url, name: params.name, opacity: params.opacity})
+        const rawDataViewResult = await RawDataView.tryFromUrl(params)
         if(rawDataViewResult === undefined){
             return new UnsupportedDatasetView({...params})
         }
@@ -64,7 +69,9 @@ export abstract class DataView extends View{
 
 export class RawDataView extends DataView{
     public readonly datasources: FsDataSource[]
-    constructor(params: {name: string, url: Url, datasources: Array<FsDataSource>, opacity: number}){
+    constructor(params: {
+        name: string, url: Url, datasources: Array<FsDataSource>, opacity: number, visible: boolean
+    }){
         const url = params.datasources.find(ds => ds instanceof PrecomputedChunksDataSource) ?
             params.url.updatedWith({datascheme: "precomputed"}) :
             params.url
@@ -76,7 +83,9 @@ export class RawDataView extends DataView{
         return this.datasources.slice()
     }
 
-    public static async tryFromUrl(params: {session: Session, name: string, url: Url, opacity: number}): Promise<RawDataView | undefined | Error>{
+    public static async tryFromUrl(params: {
+        session: Session, name: string, url: Url, opacity: number, visible: boolean
+    }): Promise<RawDataView | undefined | Error>{
         const datasources_result = await params.session.getDatasourcesFromUrl(
             new GetDatasourcesFromUrlParamsDto({url: params.url.toDto()})
         )
@@ -84,10 +93,8 @@ export class RawDataView extends DataView{
             return datasources_result
         }
         return new RawDataView({
-            name: params.name,
-            url: params.url,
+            ...params,
             datasources: datasources_result instanceof Array ? datasources_result : [datasources_result],
-            opacity: params.opacity,
         })
     }
 }
@@ -98,13 +105,14 @@ export class StrippedPrecomputedView extends DataView{
     )
     public readonly datasource: FsDataSource
 
-    public constructor(params: {name: string, session: Session, datasource: PrecomputedChunksDataSource, opacity: number}){
+    public constructor(params: {
+        name: string, session: Session, datasource: PrecomputedChunksDataSource, opacity: number, visible: boolean
+    }){
         super({
-            name: params.name,
+            ...params,
             url: params.session.sessionUrl.updatedWith({
                 datascheme: "precomputed",
             }).joinPath(`stripped_precomputed/datasource=${params.datasource.toBase64()}`),
-            opacity: params.opacity,
         })
         this.datasource = params.datasource
     }
@@ -130,12 +138,17 @@ export class StrippedPrecomputedView extends DataView{
         return new Error(`Expected Precomputed Chunks in encoded datasource, got ${ds}`)
     }
 
-    public static async tryFromUrl(params: {name: string, url: Url, session: Session, opacity: number}): Promise<StrippedPrecomputedView | undefined | Error>{
+    public static async tryFromUrl(params: {
+        name: string, url: Url, session: Session, opacity: number, visible: boolean
+    }): Promise<StrippedPrecomputedView | undefined | Error>{
         const datasource_result = this.extractDatasourceFromUrl(params.url)
         if(datasource_result instanceof Error || datasource_result === undefined){
             return datasource_result
         }
-        return new StrippedPrecomputedView({name: params.name, datasource: datasource_result, session: params.session, opacity: params.opacity})
+        return new StrippedPrecomputedView({
+            ...params,
+            datasource: datasource_result,
+        })
     }
 }
 
@@ -148,7 +161,13 @@ export class PredictionsView extends View{
     public readonly channel_colors: Color[];
 
     public constructor(params:{
-        name: string, session: Session, raw_data: FsDataSource, classifierGeneration: number, channel_colors: Color[], opacity: number,
+        name: string,
+        session: Session,
+        raw_data: FsDataSource,
+        classifierGeneration: number,
+        channel_colors: Color[],
+        opacity: number,
+        visible: boolean,
     }){
         super({
             name: params.name,
@@ -156,6 +175,7 @@ export class PredictionsView extends View{
                 datascheme: "precomputed" // FIXME: this assumes neuroglancer as the viewer
             }).joinPath(`predictions/raw_data=${params.raw_data.toBase64()}/generation=${params.classifierGeneration}`),
             opacity: params.opacity,
+            visible: params.visible,
         })
         this.raw_data = params.raw_data
         this.classifierGeneration = params.classifierGeneration
@@ -180,6 +200,20 @@ export class PredictionsView extends View{
         return {raw_data: raw_data_result, classifierGeneration}
     }
 
+    public hasSameDataAs(other: PredictionsView): boolean{
+        return this.raw_data.equals(other.raw_data) && this.classifierGeneration == other.classifierGeneration
+    }
+
+    public isStale(params: {
+        classifierGeneration: number, dataView: RawDataView | StrippedPrecomputedView | undefined
+    }): boolean{
+        if(this.classifierGeneration != this.classifierGeneration || !params.dataView){
+            return false
+        }
+        let datasource = params.dataView instanceof RawDataView ? params.dataView.datasources[0] : params.dataView.datasource
+        return !this.raw_data.equals(datasource)
+    }
+
     // public static async tryFromUrl(params:{name: string, url: Url, session: Session}): Promise<PredictionsView | undefined | Error>{
     //     const urlParamsResult = this.extractUrlParams(params.url)
     //     if(urlParamsResult instanceof Error || urlParamsResult === undefined){
@@ -200,7 +234,9 @@ export class UnsupportedDatasetView extends DataView{
 
 export class FailedView extends DataView{
     public readonly errorMessage: string;
-    public constructor(params: {name: string, url: Url, errorMessage: string, opacity: number}){
+    public constructor(params: {
+        name: string, url: Url, errorMessage: string, opacity: number, visible: boolean
+    }){
         super(params)
         this.errorMessage = params.errorMessage
     }

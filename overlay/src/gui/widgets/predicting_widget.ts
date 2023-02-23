@@ -1,11 +1,9 @@
 import { Applet } from "../../client/applets/applet";
 import { CheckDatasourceCompatibilityParams, CheckDatasourceCompatibilityResponse } from "../../client/dto";
 import { Color, FsDataSource, Session } from "../../client/ilastik";
-import { HashMap } from "../../util/hashmap";
-import { assertUnreachable } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
 import { ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonObject, ensureJsonString, JsonValue } from "../../util/serialization";
-import { FailedView, PredictionsView, RawDataView, StrippedPrecomputedView, UnsupportedDatasetView } from "../../viewer/view";
+import { PredictionsView, RawDataView, ViewUnion } from "../../viewer/view";
 import { Viewer } from "../../viewer/viewer";
 import { CssClasses } from "../css_classes";
 import { Button } from "./input_widget";
@@ -53,7 +51,6 @@ export class PredictingWidget extends Applet<State>{
     public readonly element: Div
     private classifierDescriptionDisplay: Paragraph
     private liveUpdateCheckbox: BooleanInput
-    private compatCheckGeneration = 0;
     private state: State = {
         generation: -1,
         description: "waiting for inputs",
@@ -74,7 +71,7 @@ export class PredictingWidget extends Applet<State>{
             },
         })
         this.viewer = viewer
-        viewer.addDataChangedHandler(() => this.refreshPredictions())
+        viewer.addViewportsChangedHandler(() => this.refreshPredictions())
         this.session = session
 
         this.element = new Div({parentElement, children: [
@@ -94,13 +91,13 @@ export class PredictingWidget extends Applet<State>{
         ]})
     }
 
-    public async checkDatasourceCompatibility(datasources: FsDataSource[]): Promise<boolean[] | Error>{
+    public async checkDatasourceCompatibility(datasource: FsDataSource): Promise<boolean | Error>{
         let response = await fetch(
             this.session.sessionUrl.joinPath("check_datasource_compatibility").raw,
             {
                 method: "POST",
                 body: JSON.stringify(new CheckDatasourceCompatibilityParams({
-                    datasources: datasources.map(ds => ds.toDto())
+                    datasources: [datasource.toDto()]
                 }).toJsonValue())
             }
         )
@@ -111,13 +108,13 @@ export class PredictingWidget extends Applet<State>{
         if(compatibilities instanceof Error){
             return compatibilities
         }
-        return compatibilities.compatible
+        return compatibilities.compatible[0]
     }
 
     private closePredictionViews(){
         this.viewer.getViews().forEach(view => {
             if(view instanceof PredictionsView){
-                this.viewer.closeView(view)
+                this.viewer.reconfigure({toClose: [view]}) //FIXME?
             }
         })
     }
@@ -138,106 +135,53 @@ export class PredictingWidget extends Applet<State>{
         }
     }
 
-    private async refreshPredictions(){
-        const compatCheckGeneration = this.compatCheckGeneration = this.compatCheckGeneration + 1
-        // console.log(`(${compatCheckGeneration}) INFO: Starting new refreshPredictions`)
+    private candidatePredictionsView: PredictionsView | undefined = undefined;
+    private refreshPredictions = async () => {
+        const dataView = this.viewer.getFirstDataView()
+        const currentPredictionsView = this.viewer.getPredictionView()
 
-        let stalePredictionViews = new Array<PredictionsView>();
-        let validPredictionViews = new Array<PredictionsView>();
-        let predictionRawDataSources = new Map<string, FsDataSource>();
-        let customPredictionOpacities: HashMap<FsDataSource, number, string> = new HashMap();
-        for(let view of this.viewer.getViews()){
-            if(view instanceof UnsupportedDatasetView || view instanceof FailedView){
-                continue
+        const toOpen: ViewUnion[] = []
+        const toClose: ViewUnion[] = []
+
+        if(currentPredictionsView && currentPredictionsView.isStale({classifierGeneration: this.state.generation, dataView})){
+            toClose.push(currentPredictionsView)
+        }
+
+        if(dataView && this.state.description == "ready"){
+            let rawData: FsDataSource;
+            if(dataView instanceof RawDataView){
+                rawData = dataView.datasources[0]
+            }else{
+                rawData = dataView.datasource
             }
-            if(view instanceof PredictionsView){
-                customPredictionOpacities.set(view.raw_data, view.opacity)
-                if(
-                    view.classifierGeneration != this.state.generation ||
-                    this.state.channel_colors.length != view.channel_colors.length ||
-                    !view.channel_colors.every((color, idx) => color.equals(this.state.channel_colors[idx]))
-                ){
-                    stalePredictionViews.push(view)
-                }else{
-                    validPredictionViews.push(view)
+            let predictonsOpacity = 0.5
+
+            let newPredictionsView = new PredictionsView({
+                classifierGeneration: this.state.generation,
+                name: `predicting on ${dataView.name}`,
+                raw_data: rawData,
+                session: this.session,
+                channel_colors: this.state.channel_colors.slice(),
+                opacity: predictonsOpacity,
+                visible: true,
+            })
+            if(!this.candidatePredictionsView || !newPredictionsView.hasSameDataAs(this.candidatePredictionsView)){
+                this.candidatePredictionsView = newPredictionsView
+                const rawDataIsCompatible = await this.checkDatasourceCompatibility(rawData);
+                if(this.candidatePredictionsView != newPredictionsView){
+                    console.log(`refreshPredictions went stale after async`)
+                    return
                 }
-                continue
-            }
-            if(view instanceof RawDataView){
-                const datasources = view.getDatasources()
-                if(!datasources || datasources.length != 1){
-                    continue
+                if(rawDataIsCompatible === true){ //FIXME
+                    console.log(`PredictingWidget: Will open this: ${newPredictionsView.url.raw}`)
+                    toOpen.push(newPredictionsView)
                 }
-                const datasource = datasources[0]
-                predictionRawDataSources.set(view.name + " " + datasource.resolutionString, datasource)
-                continue
-            }
-            if(view instanceof StrippedPrecomputedView){
-                predictionRawDataSources.set(view.name, view.datasource)
-                continue
-            }
-            assertUnreachable(view)
-        }
-
-        for(const [name, rawDataSource] of Array.from(predictionRawDataSources.entries())){
-            if(validPredictionViews.find(prediction_view => prediction_view.raw_data.equals(rawDataSource))){
-                // console.log(`(${compatCheckGeneration}) INFO: No need to open predictions for ${rawDataSource.url}`)
-                predictionRawDataSources.delete(name)
             }
         }
 
-        for(const view of stalePredictionViews){
-            // console.log(`(${compatCheckGeneration}) WORK: Closing predictions view for ${view.raw_data.url}`)
-            this.viewer.closeView(view)
-            if(compatCheckGeneration != this.compatCheckGeneration){
-                // console.log(`(${compatCheckGeneration}) ABORTING (closing old preds): function recursed from events`)
-                return
-            }
-        }
-        if(predictionRawDataSources.size == 0){
-            // console.log(`(${compatCheckGeneration}) DONE: No remaining raw data needing predictions.`)
-            return
-        }
-
-        if(this.state.description != "ready"){
-            // console.log(`(${compatCheckGeneration}) DONE: Classifier is not ready, not opening predictions.`)
-            return
-        }
-
-        const compatibilities = await this.checkDatasourceCompatibility(Array.from(predictionRawDataSources.values()))
-        if(compatCheckGeneration != this.compatCheckGeneration){
-            // console.log(`(${compatCheckGeneration}) ABORTING: Predicting widget hook went stale.`)
-            return
-        }
-        if(compatibilities instanceof Error){
-            // console.log(`(${compatCheckGeneration}) ABORTING: Error when checking datasource compatibilities: ${compatibilities.message}`)
-            return
-        }
-
-        let rawDataSourceIndex = 0
-        for(const [name, ds] of predictionRawDataSources.entries()){
-            if(!compatibilities[rawDataSourceIndex++]){
-                console.log(`(${compatCheckGeneration}) SKIP: incompatible raw data: ${ds.url}`)
-                continue
-            }
-            console.log(`(${compatCheckGeneration}) WORK: Opening predictions for ${ds.url}`);
-            // FIXME: this works on the first trigger, but then adding or removing views re-trigger this callback
-            // which operate on a viewer environment that isn't yet aware of the set opacity
-            let opacity = customPredictionOpacities.get(ds)
-            this.viewer.openDataView(
-                new PredictionsView({
-                    classifierGeneration: this.state.generation,
-                    name: `predicting on ${name}`,
-                    raw_data: ds,
-                    session: this.session,
-                    channel_colors: this.state.channel_colors.slice(),
-                    opacity: opacity === undefined ? 0.5 : opacity,
-                })
-            )
-            if(compatCheckGeneration != this.compatCheckGeneration){
-                console.log(`(${compatCheckGeneration}) ABORTING (opening new preds): function recursed from events`)
-                return
-            }
+        // this.candidatePredictionsView = undefined
+        if(toOpen.length > 0 || toClose.length > 0){
+            this.viewer.reconfigure({toOpen, toClose})
         }
     }
 

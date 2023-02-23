@@ -7,16 +7,14 @@ import { Button } from "../gui/widgets/input_widget";
 import { ErrorPopupWidget } from "../gui/widgets/popup";
 import { HashMap } from "../util/hashmap";
 import { Url } from "../util/parsed_url";
-import { View, PredictionsView, DataView, FailedView, ViewUnion } from "./view";
+import { PredictionsView, DataView, ViewUnion, RawDataView, StrippedPrecomputedView } from "./view";
 
 
 export class Viewer{
     public readonly driver: IViewerDriver;
     public readonly session: Session;
 
-    private readonly cached_views = new HashMap<Url, ViewUnion, string>();
     private views = new HashMap<Url, ViewUnion, string>();
-    private dataViewsGeneration = 0;
     private recenterButton: Button<"button">;
     private onViewportsChangedHandlers: Array<() => void> = []
     private onDataChangedHandlers: Array<() => void> = []
@@ -49,9 +47,14 @@ export class Viewer{
                 })
             }
         })
+        this.driver.addViewportsChangedHandler(this.viewportsChangedHandler)
+    }
 
-        this.driver.addViewportsChangedHandler(this.synchronizeWithNativeViews)
-        this.synchronizeWithNativeViews()
+    private viewportsChangedHandler = () => {
+        console.log(`VIEWER: viewportsChangedHandler is firing`)
+        for(const handler of this.onViewportsChangedHandlers){
+            handler()
+        }
     }
 
     public getVolume(): vec3{
@@ -65,33 +68,6 @@ export class Viewer{
             }
         }
         return max
-    }
-
-    public synchronizeWithNativeViews = async () => {
-        console.log("Synchronizing with native views............")
-        let nativeViews = this.driver.getOpenDataViews().map(nv => ({name: nv.name, url: Url.parse(nv.url), opacity: nv.opacity}))
-        const new_views = new HashMap<Url, ViewUnion, string>();
-        const dataViewsGeneration = this.dataViewsGeneration = this.dataViewsGeneration + 1;
-        for(const {name, url, opacity} of nativeViews){
-            const cached_view = this.cached_views.get(url)
-            if(cached_view !== undefined){
-                new_views.set(url, cached_view)
-                cached_view.opacity = opacity
-                continue
-            }
-            const dataView = await View.tryOpen({name: name, url: url, session: this.session, opacity})
-            if(!this.cached_views.has(dataView.url) || this.cached_views.get(dataView.url) instanceof FailedView){
-                this.cached_views.set(dataView.url, dataView)
-            }
-            if(this.dataViewsGeneration != dataViewsGeneration){
-                return
-            }
-            new_views.set(dataView.url, dataView)
-        }
-        this.views = new_views;
-        for(const handler of this.onDataChangedHandlers){
-            handler()
-        }
     }
 
     private getBiggestActiveDatasource(): FsDataSource | undefined{
@@ -115,10 +91,6 @@ export class Viewer{
         return [...this.views.values()]
     }
 
-    public closeView(view: View){
-        this.driver.closeView({native_view: view.toNative()})
-    }
-
     public getViewportDrivers(): Array<IViewportDriver>{
         return this.driver.getViewportDrivers()
     }
@@ -132,6 +104,14 @@ export class Viewer{
         this.driver.addViewportsChangedHandler(handler)
     }
 
+    public removeViewportsChangedHandler(handler: () => void){
+        let handlerIndex = this.onViewportsChangedHandlers.indexOf(handler)
+        if(handlerIndex != -1){
+            this.onViewportsChangedHandlers.splice(handlerIndex, 1)
+            this.driver.removeViewportsChangedHandler(handler)
+        }
+    }
+
     public addDataChangedHandler(handler: () => void){
         this.onDataChangedHandlers.push(handler)
     }
@@ -140,26 +120,71 @@ export class Viewer{
         let handlerIndex = this.onDataChangedHandlers.indexOf(handler)
         if(handlerIndex != -1){
             this.onDataChangedHandlers.splice(handlerIndex, 1)
-            this.driver.removeDataChangedHandler(handler)
         }
     }
 
-    public openDataView(view: ViewUnion){
-        this.cached_views.set(view.url, view)
-        this.driver.refreshView({
-            native_view: view.toNative(),
-            channel_colors: view instanceof PredictionsView ? view.channel_colors.map(c => c.vec3i) : undefined
-        })
+    public reconfigure(views: {toOpen?: ViewUnion[], toClose?: ViewUnion[]}){
+        if((!views.toOpen || views.toOpen.length == 0) && (!views.toClose || views.toClose.length == 0)){
+            return
+        }
+        console.log(`VIEWER: disabling viewportsChangedHandler`)
+        this.driver.removeViewportsChangedHandler(this.viewportsChangedHandler)
+        try{
+            for(const view of views.toOpen || []){
+                if(this.views.get(view.url)){
+                    continue
+                }
+                this.views.set(view.url, view)
+                this.driver.refreshView({
+                    native_view: view.toNative(),
+                    channel_colors: view instanceof PredictionsView ? view.channel_colors.map(c => c.vec3i) : undefined
+                })
+            }
+            for(const view of views.toClose || []){
+                if(!this.views.delete(view.url)){
+                    continue
+                }
+                this.driver.closeView({native_view: view.toNative()})
+                if(!(view instanceof RawDataView) && !(view instanceof StrippedPrecomputedView)){
+                    continue
+                }
+                let predictionsRawData: FsDataSource
+                if(view instanceof StrippedPrecomputedView){
+                    predictionsRawData = view.datasource
+                }else if(view instanceof RawDataView && view.datasources.length == 1){
+                    predictionsRawData = view.datasources[0]
+                }else{
+                    continue
+                }
+                for(const v of this.getViews()){
+                    if(v instanceof PredictionsView && v.raw_data.equals(predictionsRawData)){
+                        console.log(`VIEWER: auto-closing predictions view: ${v.url.raw}`)
+                        this.driver.closeView({native_view: v.toNative()})
+                        break
+                    }
+                }
+            }
+        }finally{
+            console.log(`VIEWER: re-enabling viewportsChangedHandler`)
+            this.driver.addViewportsChangedHandler(this.viewportsChangedHandler)
+        }
+        console.log(`VIEWER: firing data-changed handlers`)
+        for(const handler of this.onDataChangedHandlers){
+            handler()
+        }
+        this.viewportsChangedHandler()
     }
 
-    public async openDataViewFromDataSource({datasource, opacity}: {datasource: FsDataSource, opacity: number}){
+    public async openDataViewFromDataSource({datasource, opacity, visible}: {
+        datasource: FsDataSource, opacity: number, visible: boolean
+    }){
         let name = datasource.url.path.name + " " + datasource.resolutionString
-        const dataViewResult = await DataView.tryOpen({name, session: this.session, url: datasource.url, opacity})
+        const dataViewResult = await DataView.tryOpen({name, session: this.session, url: datasource.url, opacity, visible})
         if(dataViewResult instanceof Error){
             new ErrorPopupWidget({message: `Could not create a view for ${datasource.url}: ${dataViewResult.message}`})
             return
         }
-        this.openDataView(dataViewResult)
+        this.reconfigure({toOpen: [dataViewResult]})
     }
 
     public getActiveView(): ViewUnion | undefined{
@@ -171,9 +196,30 @@ export class Viewer{
         return this.views.get(viewUrl)
     }
 
+    public getFirstDataView(): RawDataView | StrippedPrecomputedView | undefined{
+        for(let view of this.views.values()){
+            if(!view.visible){
+                continue
+            }
+            if(view instanceof StrippedPrecomputedView || view instanceof RawDataView && view.datasources.length == 1){
+                return view
+            }
+        }
+        return undefined
+    }
+
+    public getPredictionView(): PredictionsView | undefined{
+        for(let view of this.views.values()){
+            if(view instanceof PredictionsView){
+                return view
+            }
+        }
+        return undefined
+    }
+
     public destroy(){
         this.recenterButton.destroy()
         this.onViewportsChangedHandlers.forEach(handler => this.driver.removeViewportsChangedHandler(handler))
-        this.driver.removeDataChangedHandler(this.synchronizeWithNativeViews)
+        this.driver.removeViewportsChangedHandler(this.viewportsChangedHandler)
     }
 }

@@ -8,6 +8,7 @@ export interface INativeView{
     name: string,
     url: string,
     opacity: number,
+    visible: boolean,
 }
 
 /**

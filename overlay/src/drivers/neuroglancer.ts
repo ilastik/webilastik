@@ -290,7 +290,9 @@ export class NeuroglancerDriver implements IViewerDriver{
     }
 
     public getOpenDataViews(): Array<INativeView>{
-        return this.getImageLayers().map(layer => ({name: layer.name, url: layer.sourceUrl, opacity: layer.opacity}))
+        return this.getImageLayers().map(layer => ({
+            name: layer.name, url: layer.sourceUrl, opacity: layer.opacity, visible: !layer.hidden
+        }))
     }
 
     public getDataViewOnDisplay(): INativeView | undefined{
@@ -300,6 +302,7 @@ export class NeuroglancerDriver implements IViewerDriver{
                 name: layer.name,
                 url: layer.sourceUrl,
                 opacity: layer.opacity || 1,
+                visible: !layer.hidden,
             }))[0];
     }
 
