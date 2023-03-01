@@ -1,21 +1,31 @@
 import { mat4, quat, vec3 } from "gl-matrix";
+import { Session, FsDataSource, Color } from "../client/ilastik";
+import { Url } from "../util/parsed_url";
 
 
 /**
  * A data source from a viewer. Usually
  */
 export interface INativeView{
-    name: string,
-    url: string,
-    opacity: number,
-    visible: boolean,
+    getName(): string
+    getUrl(): Url
+    getOpacity(): number
+    getVisible(): boolean
+    setVisible(visible: boolean): void
+    close(): void;
+    reconfigure(params: {
+        url?: Url,
+        opacity?: number,
+        isVisible?: boolean,
+        channelColors?: Color[]
+    }): void;
+    // setProperties(props: {name?: string, opacity?: number, visible?: boolean}): void;
 }
-
 /**
  * Represents glue code with Basic functionality that any viewer must implement to be able to be used by
  * the ilastik overlay.
  */
-export interface IViewerDriver{
+export interface IViewerDriver<VIEW extends INativeView>{
     /**
      * @returns an array of all viewport drivers corresponding to the currently visible
      * viewports of the viewer. See IViewportDriver for more details
@@ -28,22 +38,28 @@ export interface IViewerDriver{
      */
     getTrackedElement: () => HTMLElement;
 
-    /**
-     * Opens data at params.native_view.url (preferably in a 'tab' named params.native_view.name) or refreshes that tab
-     * if the url is already open.
-     * @param params.url - the url to open or refresh
-     * @param params.name - a hint of the name to be used for this data
-     * @param params.channel_colors - a hint on how to interpret the channels of the data incoming from params.url
-     * This is particulary useful for pixel prediction urls, since each channel has the color of a brush stroke
-     */
-    refreshView: (params: {native_view: INativeView, similar_url_hint?: string, channel_colors?: vec3[]}) => void;
+    openDataSource(params: {
+        session: Session,
+        datasource: FsDataSource,
+        name: string,
+        opacity: number,
+        isVisible: boolean,
+        channelColors?: Color[],
+    }): Promise<VIEW | Error>;
 
+
+    openUrl(params: {
+        url: Url,
+        name: string,
+        opacity: number,
+        isVisible: boolean,
+        channelColors?: Color[],
+    }): Promise<VIEW | Error>;
 
     /**
      * Closes the view
      */
-    closeView: (params: {native_view: INativeView}) => void;
-
+    closeView: (view: VIEW) => void;
 
     addViewportsChangedHandler: (handler: () => void) => void;
     removeViewportsChangedHandler: (handler: () => void) => void;
@@ -56,12 +72,12 @@ export interface IViewerDriver{
      *
      * @returns The IDataView representing the data source currently being actively viewed, if any
      */
-    getDataViewOnDisplay(): INativeView | undefined;
+    getDataViewOnDisplay(): VIEW | undefined;
 
     /**
      * @returns an array of `IDataView`s representing all data sources currently opened by the viewer
      */
-    getOpenDataViews(): Array<INativeView>;
+    getOpenDataViews(): Array<VIEW>;
 
     snapTo?: (params: {position_vx: vec3, orientation_w: quat, voxel_size_nm: vec3}) => void;
 }

@@ -1,5 +1,6 @@
 import { vec3, mat4, quat } from "gl-matrix"
 import { IViewportDriver, IViewerDriver } from "..";
+import { Color, FsDataSource, PrecomputedChunksDataSource, Session } from "../client/ilastik";
 import { CssClasses } from "../gui/css_classes";
 import { Div } from "../gui/widgets/widget";
 import { getElementContentRect } from "../util/misc";
@@ -53,23 +54,30 @@ export class NeuroglancerViewportDriver implements IViewportDriver{
     })
 }
 
-class Layer{
+class Layer implements INativeView{
     constructor(private readonly managedLayer: any){
         if(managedLayer.layer === undefined){
             throw `UNDEFINED LAYER!`
         }
     }
 
-    public get name(): string{
+    public getName(): string{
         return this.managedLayer.name
     }
 
-    public get hidden(): boolean{
+    public getHidden(): boolean{
         //a layer might be hidden but not really "visible", because it can be behind other opaque layers
         return !this.managedLayer.visible
     }
 
-    public get opacity(): number{
+    public getVisible(): boolean{
+        return !this.getHidden()
+    }
+    public setVisible(visible: boolean){
+        this.managedLayer.setVisible(visible)
+    }
+
+    public getOpacity(): number{
         let opacity = this.managedLayer.layer?.opacity?.value
         return opacity === undefined ? 1 : opacity
     }
@@ -82,8 +90,9 @@ class Layer{
         this.managedLayer.layer.fragmentMain.value = shader
     }
 
-    public get sourceUrl(): string{
-        return this.managedLayer.sourceUrl.replace(/\bgs:\/\//, "https://storage.googleapis.com/")
+    public getUrl(): Url{
+        const rawUrl = this.managedLayer.sourceUrl.replace(/\bgs:\/\//, "https://storage.googleapis.com/")
+        return Url.parse(rawUrl)
     }
 
     public async getNumChannels(): Promise<number>{
@@ -93,11 +102,53 @@ class Layer{
     public async is3D(): Promise<boolean>{
         return this.managedLayer.layer.multiscaleSource.then((mss: any) => mss.scales[0].size[2] > 1)
     }
+
+    public close(){
+        this.managedLayer.manager.layerManager.removeManagedLayer(this.managedLayer)
+    }
+
+    public static makeShader(channelColors: Array<Color>): string{
+        let color_lines = channelColors.map((color, idx) => {
+            return `vec3 color${idx} = vec3(${color.vec3f[0]}, ${color.vec3f[1]}, ${color.vec3f[2]}) * toNormalized(getDataValue(${idx}));`
+        })
+        let colors_to_mix = channelColors.map((_, idx) => `color${idx}`)
+
+        return [
+            "void main() {",
+            "    " + color_lines.join("\n    "),
+            "    emitRGBA(",
+            `        vec4(${colors_to_mix.join(' + ')}, 1.0)`,
+            "    );",
+            "}",
+        ].join("\n")
+    }
+
+    public reconfigure(params: {
+        url?: Url,
+        opacity?: number,
+        isVisible?: boolean,
+        channelColors?: Color[],
+    }){
+        let state = {...this.managedLayer.layer.toJSON()}
+        if(params.url){
+            state.url = params.url.double_protocol_raw
+        }
+        if(params.opacity !== undefined){
+            state.opacity = params.opacity
+        }
+        if(params.channelColors !== undefined){
+            state.shader = Layer.makeShader(params.channelColors)
+        }
+        this.managedLayer.layer.restoreState(state)
+        if(params.isVisible !== undefined){
+            this.managedLayer.setVisible(params.isVisible)
+        }
+    }
 }
 
 const defaultShader = 'void main() {\n  emitGrayscale(toNormalized(getDataValue()));\n}\n'
 
-export class NeuroglancerDriver implements IViewerDriver{
+export class NeuroglancerDriver implements IViewerDriver<Layer>{
     private generation = 0
     private zScrollGeneration = 0
 
@@ -115,7 +166,7 @@ export class NeuroglancerDriver implements IViewerDriver{
         // this.addDataChangedHandler(() => console.log("driver: Layers changed!"))
         this.addViewportsChangedHandler(async () => {
             const zScrollGeneration = this.zScrollGeneration = this.zScrollGeneration + 1
-            for(const is3dPromise of this.getImageLayers().map(layer => layer.is3D())){
+            for(const is3dPromise of this.getOpenDataViews().map(layer => layer.is3D())){
                 const is3D = await is3dPromise;
                 if(zScrollGeneration != this.zScrollGeneration){
                     return
@@ -133,7 +184,7 @@ export class NeuroglancerDriver implements IViewerDriver{
 
     private guessShader = async () => {
         const generation = this.generation += 1
-        for(let layer of this.getImageLayers()){
+        for(let layer of this.getOpenDataViews()){
             if(layer.fragmentShader != defaultShader){
                 continue
             }
@@ -205,64 +256,68 @@ export class NeuroglancerDriver implements IViewerDriver{
         return this.containerForWebilastikControls
     }
 
-    refreshView(params: {native_view: INativeView, similar_url_hint?: string, channel_colors?: vec3[]}){
-        let shader: string | undefined = undefined;
-        let similar_url_hint = params.similar_url_hint && Url.parse(params.similar_url_hint).double_protocol_raw
-        if(params.channel_colors !== undefined){
-            shader = this.makePredictionsShader(params.channel_colors)
-        }else if(similar_url_hint !== undefined){
-            const similar_layers = this.getImageLayers().filter(layer => layer.sourceUrl == similar_url_hint)
-            if(similar_layers.length > 0){
-                shader = similar_layers[0].fragmentShader
-            }
-        }
-        this.refreshLayer({name: params.native_view.name, url: params.native_view.url, shader, opacity: params.native_view.opacity})
-    }
-
-    closeView(params: { native_view: INativeView; }){
-        this.dropLayer(params.native_view.name)
-    }
-
-    private refreshLayer({name, url, shader, opacity}: {name: string, url: string, shader?: string, opacity: number}){
-        this.dropLayer(name)
-        this.openNewDataSource({name, url: Url.parse(url).double_protocol_raw, shader, opacity})
+    closeView(layer: Layer){
+        this.getLayerManager().removeManagedLayer(layer);
     }
 
     private getLayerManager(): any {
         return this.viewer.layerSpecification.layerManager;
     }
 
-    private dropLayer(name: string): boolean{
-        const layerManager = this.getLayerManager();
-        const predictionsLayer = layerManager.getLayerByName(name);
 
-        if(predictionsLayer !== undefined){
-            layerManager.removeManagedLayer(predictionsLayer);
-            return true
+    public async openDataSource(params: {
+        session: Session,
+        datasource: FsDataSource,
+        name: string,
+        opacity: number,
+        isVisible: boolean,
+        channelColors: Color[],
+    }): Promise<Layer | Error>{
+        const datasource = params.datasource
+        if(!(datasource instanceof PrecomputedChunksDataSource)){
+            return new Error(`Datasource type not supported: ${datasource.url.double_protocol_raw}`)
         }
-        return false
+        return this.openUrl({...params, url: datasource.getStrippedUrl(params.session)})
     }
 
-    private openNewDataSource(params: {name: string, url: string, shader?: string, opacity: number}){
-        const newPredictionsLayer = this.viewer.layerSpecification.getLayer(
-            params.name,
-            {source: Url.parse(params.url).double_protocol_raw, shader: params.shader}
-        );
-        let setOpacity = () => {
-            let layer = newPredictionsLayer.layer;
-            if(!layer){
-                return
-            }
-            let currentOpacity = layer.opacity?.value
-            if(typeof(currentOpacity) != "number"){
-                return
-            }
-            layer.opacity.value = params.opacity
-            newPredictionsLayer.layerChanged.remove(setOpacity)
+    public async openUrl(params: {
+        url: Url,
+        name: string,
+        opacity: number,
+        isVisible: boolean,
+        channelColors?: Color[],
+    }): Promise<Layer | Error>{
+        let shader: string | undefined = undefined;
+        if(params.channelColors !== undefined){
+            shader = Layer.makeShader(params.channelColors)
         }
-        newPredictionsLayer.layerChanged.add(setOpacity)
+        return new Promise(resolve => {
+            const newPredictionsLayer = this.viewer.layerSpecification.getLayer(
+                params.name,
+                {
+                    source: params.url.double_protocol_raw,
+                    shader,
+                    visible: params.isVisible,
+                }
+            );
+            let setOpacity = () => {
+                let layer = newPredictionsLayer.layer;
+                if(!layer){
+                    return
+                }
+                let currentOpacity = layer.opacity?.value
+                if(typeof(currentOpacity) != "number"){
+                    return
+                }
+                layer.opacity.value = params.opacity
+                newPredictionsLayer.layerChanged.remove(setOpacity)
+                debugger //check if layer is actually a "managed layer"
+                resolve(new Layer(layer))
+            }
+            newPredictionsLayer.layerChanged.add(setOpacity)
 
-        this.viewer.layerSpecification.add(newPredictionsLayer);
+            this.viewer.layerSpecification.add(newPredictionsLayer);
+        })
     }
 
     private makePredictionsShader(channel_colors: Array<vec3>): string{
@@ -281,7 +336,7 @@ export class NeuroglancerDriver implements IViewerDriver{
             ].join("\n")
     }
 
-    public getImageLayers() : Array<Layer>{
+    public getOpenDataViews() : Array<Layer>{
         return Array.from(this.viewer.layerManager.layerSet)
         .filter((managedLayer: any) => {
             return managedLayer.layer && managedLayer.layer.constructor.name == "ImageUserLayer" && managedLayer.sourceUrl //FIXME?
@@ -289,21 +344,8 @@ export class NeuroglancerDriver implements IViewerDriver{
         .map((managedLayer: any) : Layer => new Layer(managedLayer));
     }
 
-    public getOpenDataViews(): Array<INativeView>{
-        return this.getImageLayers().map(layer => ({
-            name: layer.name, url: layer.sourceUrl, opacity: layer.opacity, visible: !layer.hidden
-        }))
-    }
-
-    public getDataViewOnDisplay(): INativeView | undefined{
-        return this.getImageLayers()
-            .filter(layer => !layer.hidden)
-            .map(layer => ({
-                name: layer.name,
-                url: layer.sourceUrl,
-                opacity: layer.opacity || 1,
-                visible: !layer.hidden,
-            }))[0];
+    public getDataViewOnDisplay(): Layer | undefined{
+        return this.getOpenDataViews().filter(layer => layer.getVisible())[0];
     }
 
     public snapTo(params: {position_vx: vec3, orientation_w: quat, voxel_size_nm: vec3}): void{

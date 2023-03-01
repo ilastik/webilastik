@@ -1,9 +1,9 @@
 import { Applet } from "../../client/applets/applet";
 import { CheckDatasourceCompatibilityParams, CheckDatasourceCompatibilityResponse } from "../../client/dto";
 import { Color, FsDataSource, Session } from "../../client/ilastik";
+import { INativeView } from "../../drivers/viewer_driver";
 import { Path } from "../../util/parsed_url";
 import { ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonObject, ensureJsonString, JsonValue } from "../../util/serialization";
-import { PredictionsView, RawDataView, ViewUnion } from "../../viewer/view";
 import { Viewer } from "../../viewer/viewer";
 import { CssClasses } from "../css_classes";
 import { Button } from "./input_widget";
@@ -44,8 +44,8 @@ function deserializeState(value: JsonValue): State{
     }
 }
 
-export class PredictingWidget extends Applet<State>{
-    public readonly viewer: Viewer;
+export class PredictingWidget<VIEW extends INativeView> extends Applet<State>{
+    public readonly viewer: Viewer<VIEW>;
     public readonly session: Session
 
     public readonly element: Div
@@ -58,7 +58,7 @@ export class PredictingWidget extends Applet<State>{
         live_update: false,
     }
 
-    constructor({session, viewer, parentElement}: {session: Session, viewer: Viewer, parentElement: HTMLElement}){
+    constructor({session, viewer, parentElement}: {session: Session, viewer: Viewer<VIEW>, parentElement: HTMLElement}){
         super({
             deserializer: deserializeState,
             name: "pixel_classification_applet",
@@ -112,11 +112,7 @@ export class PredictingWidget extends Applet<State>{
     }
 
     private closePredictionViews(){
-        this.viewer.getViews().forEach(view => {
-            if(view instanceof PredictionsView){
-                this.viewer.reconfigure({toClose: [view]}) //FIXME?
-            }
-        })
+        this.viewer.getLaneWidgets().forEach(lane => lane.closePredictions())
     }
 
     private showInfo(description: ClassifierDescription){
@@ -135,53 +131,12 @@ export class PredictingWidget extends Applet<State>{
         }
     }
 
-    private candidatePredictionsView: PredictionsView | undefined = undefined;
     private refreshPredictions = async () => {
-        const dataView = this.viewer.getFirstDataView()
-        const currentPredictionsView = this.viewer.getPredictionView()
-
-        const toOpen: ViewUnion[] = []
-        const toClose: ViewUnion[] = []
-
-        if(currentPredictionsView && currentPredictionsView.isStale({classifierGeneration: this.state.generation, dataView})){
-            toClose.push(currentPredictionsView)
-        }
-
-        if(dataView && this.state.description == "ready"){
-            let rawData: FsDataSource;
-            if(dataView instanceof RawDataView){
-                rawData = dataView.datasources[0]
-            }else{
-                rawData = dataView.datasource
-            }
-            let predictonsOpacity = 0.5
-
-            let newPredictionsView = new PredictionsView({
+        for(const lane of this.viewer.getLaneWidgets()){
+            lane.refreshPredictons({
                 classifierGeneration: this.state.generation,
-                name: `predicting on ${dataView.name}`,
-                raw_data: rawData,
-                session: this.session,
-                channel_colors: this.state.channel_colors.slice(),
-                opacity: predictonsOpacity,
-                visible: true,
+                channelColors: this.state.channel_colors
             })
-            if(!this.candidatePredictionsView || !newPredictionsView.hasSameDataAs(this.candidatePredictionsView)){
-                this.candidatePredictionsView = newPredictionsView
-                const rawDataIsCompatible = await this.checkDatasourceCompatibility(rawData);
-                if(this.candidatePredictionsView != newPredictionsView){
-                    console.log(`refreshPredictions went stale after async`)
-                    return
-                }
-                if(rawDataIsCompatible === true){ //FIXME
-                    console.log(`PredictingWidget: Will open this: ${newPredictionsView.url.raw}`)
-                    toOpen.push(newPredictionsView)
-                }
-            }
-        }
-
-        // this.candidatePredictionsView = undefined
-        if(toOpen.length > 0 || toClose.length > 0){
-            this.viewer.reconfigure({toOpen, toClose})
         }
     }
 

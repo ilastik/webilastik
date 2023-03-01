@@ -1,30 +1,178 @@
 // import { vec3 } from "gl-matrix";
-import { quat, vec3 } from "gl-matrix";
-import { FsDataSource, Session } from "../client/ilastik";
-import { IViewerDriver, IViewportDriver } from "../drivers/viewer_driver";
+// import { quat, vec3 } from "gl-matrix";
+import { Color, FsDataSource, Session } from "../client/ilastik";
+import { INativeView, IViewerDriver, IViewportDriver } from "../drivers/viewer_driver";
 import { CssClasses } from "../gui/css_classes";
 import { Button } from "../gui/widgets/input_widget";
 import { ErrorPopupWidget } from "../gui/widgets/popup";
-import { HashMap } from "../util/hashmap";
-import { Url } from "../util/parsed_url";
-import { PredictionsView, DataView, ViewUnion, RawDataView, StrippedPrecomputedView } from "./view";
+// import { ErrorPopupWidget } from "../gui/widgets/popup";
+import { ContainerWidget, Div, Paragraph, Span } from "../gui/widgets/widget";
+import { generationalAwait, StaleResult, uuidv4 } from "../util/misc";
+// import { PredictionsView, DataView, ViewUnion, RawDataView, StrippedPrecomputedView } from "./view";
 
+export class LaneWidget<VIEW extends INativeView>{
+    private session: Session;
+    private driver: IViewerDriver<VIEW>;
 
-export class Viewer{
-    public readonly driver: IViewerDriver;
+    private rawDataView: VIEW;
+    private rawData: FsDataSource
+
+    private predictionsView: VIEW | undefined
+    private classifierGeneration = -1
+    private predictionChannelColors?: Color[]
+
+    public readonly element: Paragraph;
+    protected nameWidget: Span;
+    protected visibilityButton: Button<"button">;
+    private _isVisible: boolean
+
+    public get isVisible(): boolean{
+        return this._isVisible
+    }
+
+    private constructor(params: {
+        driver: IViewerDriver<VIEW>,
+        session: Session,
+        name: string,
+        parentElement: ContainerWidget<any>,
+        rawData: FsDataSource,
+        rawDataView: VIEW,
+        isVisible: boolean,
+        onVisibilityChanged: (lane: LaneWidget<VIEW>) => void,
+        onViewDeleted: (lane: LaneWidget<VIEW>) => void,
+    }){
+        this.driver = params.driver
+        this.session = params.session
+        this.rawData = params.rawData
+        this.rawDataView = params.rawDataView
+        this._isVisible = params.isVisible
+        this.element = new Paragraph({parentElement: params.parentElement, children: [
+            this.nameWidget = new Span({
+                parentElement: undefined, innerText: params.name, title: this.rawData.url.raw
+            }),
+            this.visibilityButton = new Button({inputType: "button", text: this.rawDataView.getVisible() ? "👁️" : "🫥", parentElement: undefined, onClick: () => {
+                let isVisible = !this.rawDataView.getVisible()
+                this.rawDataView.reconfigure({isVisible})
+                this.predictionsView?.reconfigure({isVisible})
+                this.visibilityButton.text = isVisible ? "👁️" : "🫥"
+                params.onVisibilityChanged(this)
+            }}),
+            new Button({inputType: "button", text: "✖", parentElement: undefined, onClick: () => {
+                this.destroy()
+                params.onViewDeleted(this)
+            }})
+        ]})
+    }
+
+    public closePredictions(){
+        this.predictionsView?.close()
+    }
+
+    public reconfigure(params: {
+        isVisible?: boolean,
+        predictionsOpacity?: number,
+        predictionChannelColors?: Color[],
+    }){
+        this._isVisible = params.isVisible === undefined ? this.isVisible : params.isVisible
+        this.rawDataView.reconfigure({})
+        this.predictionsView?.reconfigure({
+            channelColors: params.predictionChannelColors,
+            opacity: params.predictionsOpacity,
+        })
+    }
+
+    public static async open<VIEW extends INativeView>(params: {
+        driver: IViewerDriver<VIEW>,
+        session: Session,
+        name: string,
+        parentElement: ContainerWidget<any>,
+        rawData: FsDataSource,
+        predictionsView?: VIEW,
+        isVisible: boolean,
+        onVisibilityChanged: (lane: LaneWidget<VIEW>) => void,
+        onViewDeleted: (lane: LaneWidget<VIEW>) => void,
+    }): Promise<LaneWidget<VIEW> | Error>{
+        const nativeViewResult = await params.driver.openDataSource({
+            datasource: params.rawData,
+            name: uuidv4(),
+            opacity: 1,
+            session: params.session,
+            isVisible: params.isVisible,
+        })
+        if(nativeViewResult instanceof Error){
+            return nativeViewResult
+        }
+        return new this({
+            ...params,
+            rawDataView: nativeViewResult
+        })
+    }
+
+    public async refreshPredictons(params: {classifierGeneration: number, channelColors?: Color[]}){
+        if(this.classifierGeneration >= params.classifierGeneration){
+            return
+        }
+        const predictionsUrl = this.session.sessionUrl
+            .updatedWith({datascheme: "precomputed"})
+            .joinPath(`predictions/raw_data=${this.rawData.toBase64()}/generation=${params.classifierGeneration}`)
+        if(this.predictionsView){
+            this.predictionsView.reconfigure({
+                url: predictionsUrl,
+                channelColors: params.channelColors || this.predictionChannelColors,
+            })
+            return
+        }
+        let nativeViewResult = await generationalAwait({
+            setGen: () => {this.classifierGeneration = params.classifierGeneration},
+            getGen: () => this.classifierGeneration,
+            promise: this.driver.openUrl({
+                name: `predictions for ${this.rawDataView.getName()}`,
+                url: predictionsUrl,
+                opacity: 0.5,
+                isVisible: this.isVisible,
+                channelColors: params.channelColors,
+            })
+        })
+        if(nativeViewResult instanceof StaleResult){
+            if(!(nativeViewResult.result instanceof Error)){
+                nativeViewResult.result.close()
+            }
+            return
+        }
+        if(nativeViewResult instanceof Error){
+            new ErrorPopupWidget({message: nativeViewResult.message})
+            return
+        }
+        this.predictionsView = nativeViewResult
+    }
+
+    public destroy(){
+        this.element.destroy()
+        this.rawDataView.close()
+        this.predictionsView?.close()
+    }
+}
+
+export class Viewer<VIEW extends INativeView>{
+    public readonly driver: IViewerDriver<VIEW>;
     public readonly session: Session;
 
-    private views = new HashMap<Url, ViewUnion, string>();
     private recenterButton: Button<"button">;
     private onViewportsChangedHandlers: Array<() => void> = []
     private onDataChangedHandlers: Array<() => void> = []
 
+    private laneWidgetsContainer: Div;
+    private laneWidgets: LaneWidget<VIEW>[] = []
+
     public constructor(params: {
-        driver: IViewerDriver,
+        driver: IViewerDriver<VIEW>,
         session: Session,
+        parentElement: HTMLElement
     }){
         this.session = params.session
         this.driver = params.driver
+
+        this.laneWidgetsContainer = new Div({parentElement: params.parentElement})
         this.recenterButton = new Button({
             inputType: "button",
             parentElement: document.body,
@@ -34,17 +182,17 @@ export class Viewer{
                 if(!this.driver.snapTo){
                     return
                 }
-                let activeDataSource = this.getBiggestActiveDatasource();
-                if(!activeDataSource){
-                    return
-                }
+                // let activeDataSource = this.getBiggestActiveDatasource();
+                // if(!activeDataSource){
+                //     return
+                // }
 
-                const position_vx = vec3.create();
-                vec3.div(position_vx, activeDataSource.shape.toXyzVec3(), vec3.fromValues(2,2,2)),
+                // const position_vx = vec3.create();
+                // vec3.div(position_vx, activeDataSource.shape.toXyzVec3(), vec3.fromValues(2,2,2)),
 
-                this.driver.snapTo({
-                    position_vx, voxel_size_nm: activeDataSource.spatial_resolution, orientation_w: quat.identity(quat.create()),
-                })
+                // this.driver.snapTo({
+                //     position_vx, voxel_size_nm: activeDataSource.spatial_resolution, orientation_w: quat.identity(quat.create()),
+                // })
             }
         })
         this.driver.addViewportsChangedHandler(this.viewportsChangedHandler)
@@ -57,38 +205,8 @@ export class Viewer{
         }
     }
 
-    public getVolume(): vec3{
-        let max = vec3.fromValues(0,0,0)
-        for(let dv of this.views.values()){
-            if(dv instanceof PredictionsView){ //FIXME: would be better if we didn't need this knowledge
-                continue
-            }
-            for(let datasource of (dv.getDatasources() || [])){
-                vec3.max(max, max, vec3.fromValues(datasource.shape.x, datasource.shape.y, datasource.shape.z))
-            }
-        }
-        return max
-    }
-
-    private getBiggestActiveDatasource(): FsDataSource | undefined{
-        let activeView = this.getActiveView()
-        if(!activeView){
-            return
-        }
-        if(activeView instanceof DataView){
-            let datasources = activeView.getDatasources()
-            if(!datasources){
-                return
-            }
-            datasources.sort((a,b) => b.shape.volume - a.shape.volume)
-            return datasources[0]
-        }else{
-            return activeView.raw_data
-        }
-    }
-
-    public getViews(): Array<ViewUnion>{
-        return [...this.views.values()]
+    public getLaneWidgets(): Array<LaneWidget<VIEW>>{
+        return this.laneWidgets.slice()
     }
 
     public getViewportDrivers(): Array<IViewportDriver>{
@@ -123,95 +241,31 @@ export class Viewer{
         }
     }
 
-    public reconfigure(views: {toOpen?: ViewUnion[], toClose?: ViewUnion[]}){
-        if((!views.toOpen || views.toOpen.length == 0) && (!views.toClose || views.toClose.length == 0)){
-            return
+    public async openLane(params:{
+        rawData: FsDataSource,
+        name: string,
+        opacity: number,
+        isVisible: boolean,
+    }): Promise<LaneWidget<VIEW> | Error>{
+        const viewWidgetResult = await LaneWidget.open({
+            ...params,
+            session: this.session,
+            driver: this.driver,
+            parentElement: this.laneWidgetsContainer,
+            onVisibilityChanged: () => {}, //FIXME
+            onViewDeleted: () => {}, //FIXME
+        })
+        if(viewWidgetResult instanceof Error){
+            return viewWidgetResult
         }
-        console.log(`VIEWER: disabling viewportsChangedHandler`)
-        this.driver.removeViewportsChangedHandler(this.viewportsChangedHandler)
-        try{
-            for(const view of views.toOpen || []){
-                if(this.views.get(view.url)){
-                    continue
-                }
-                this.views.set(view.url, view)
-                this.driver.refreshView({
-                    native_view: view.toNative(),
-                    channel_colors: view instanceof PredictionsView ? view.channel_colors.map(c => c.vec3i) : undefined
-                })
-            }
-            for(const view of views.toClose || []){
-                if(!this.views.delete(view.url)){
-                    continue
-                }
-                this.driver.closeView({native_view: view.toNative()})
-                if(!(view instanceof RawDataView) && !(view instanceof StrippedPrecomputedView)){
-                    continue
-                }
-                let predictionsRawData: FsDataSource
-                if(view instanceof StrippedPrecomputedView){
-                    predictionsRawData = view.datasource
-                }else if(view instanceof RawDataView && view.datasources.length == 1){
-                    predictionsRawData = view.datasources[0]
-                }else{
-                    continue
-                }
-                for(const v of this.getViews()){
-                    if(v instanceof PredictionsView && v.raw_data.equals(predictionsRawData)){
-                        console.log(`VIEWER: auto-closing predictions view: ${v.url.raw}`)
-                        this.driver.closeView({native_view: v.toNative()})
-                        break
-                    }
-                }
-            }
-        }finally{
-            console.log(`VIEWER: re-enabling viewportsChangedHandler`)
-            this.driver.addViewportsChangedHandler(this.viewportsChangedHandler)
-        }
-        console.log(`VIEWER: firing data-changed handlers`)
-        for(const handler of this.onDataChangedHandlers){
-            handler()
-        }
-        this.viewportsChangedHandler()
+        this.laneWidgets.push(viewWidgetResult)
+        return viewWidgetResult
     }
 
-    public async openDataViewFromDataSource({datasource, opacity, visible}: {
-        datasource: FsDataSource, opacity: number, visible: boolean
-    }){
-        let name = datasource.url.path.name + " " + datasource.resolutionString
-        const dataViewResult = await DataView.tryOpen({name, session: this.session, url: datasource.url, opacity, visible})
-        if(dataViewResult instanceof Error){
-            new ErrorPopupWidget({message: `Could not create a view for ${datasource.url}: ${dataViewResult.message}`})
-            return
-        }
-        this.reconfigure({toOpen: [dataViewResult]})
-    }
-
-    public getActiveView(): ViewUnion | undefined{
-        const native_view = this.driver.getDataViewOnDisplay()
-        if(native_view === undefined){
-            return undefined
-        }
-        let viewUrl = Url.parse(native_view.url)
-        return this.views.get(viewUrl)
-    }
-
-    public getFirstDataView(): RawDataView | StrippedPrecomputedView | undefined{
-        for(let view of this.views.values()){
-            if(!view.visible){
-                continue
-            }
-            if(view instanceof StrippedPrecomputedView || view instanceof RawDataView && view.datasources.length == 1){
-                return view
-            }
-        }
-        return undefined
-    }
-
-    public getPredictionView(): PredictionsView | undefined{
-        for(let view of this.views.values()){
-            if(view instanceof PredictionsView){
-                return view
+    public getActiveLaneWidget(): LaneWidget<VIEW> | undefined{
+        for(const widget of this.getLaneWidgets()){
+            if(widget.isVisible){
+                return widget
             }
         }
         return undefined
@@ -219,6 +273,7 @@ export class Viewer{
 
     public destroy(){
         this.recenterButton.destroy()
+        this.laneWidgetsContainer.destroy()
         this.onViewportsChangedHandlers.forEach(handler => this.driver.removeViewportsChangedHandler(handler))
         this.driver.removeViewportsChangedHandler(this.viewportsChangedHandler)
     }

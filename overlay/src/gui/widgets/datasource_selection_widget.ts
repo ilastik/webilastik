@@ -1,7 +1,8 @@
 // import { ListFsDirRequest } from "../../client/dto";
+import { GetDatasourcesFromUrlParamsDto } from "../../client/dto";
 import { PrecomputedChunksDataSource, Session } from "../../client/ilastik";
+import { INativeView } from "../../drivers/viewer_driver";
 import { Url } from "../../util/parsed_url";
-import { FailedView, RawDataView, View } from "../../viewer/view";
 import { Viewer } from "../../viewer/viewer";
 import { CollapsableWidget } from "./collapsable_applet_gui";
 import { DataProxyFilePicker } from "./data_proxy_file_picker";
@@ -9,13 +10,13 @@ import { LiveFsTree } from "./live_fs_tree";
 import { PopupWidget } from "./popup";
 import { Anchor, Div, Paragraph, Span } from "./widget";
 
-export class DataSourceSelectionWidget{
+export class DataSourceSelectionWidget<VIEW extends INativeView>{
     private element: HTMLDetailsElement;
     private session: Session;
-    private viewer: Viewer;
+    private viewer: Viewer<VIEW>;
 
     constructor(params: {
-        parentElement: HTMLElement, session: Session, viewer: Viewer, defaultBucketName: string,
+        parentElement: HTMLElement, session: Session, viewer: Viewer<VIEW>, defaultBucketName: string,
     }){
         this.element = new CollapsableWidget({
             display_name: "Data Sources", parentElement: params.parentElement
@@ -35,9 +36,11 @@ export class DataSourceSelectionWidget{
     }
 
     private tryOpenViews = async (liveFsTree: LiveFsTree) => {
-        let viewPromises = liveFsTree.getSelectedUrls().map(url => View.tryOpen({
-            name: url.path.name, url, session: this.session, opacity: 1.0, visible: true,
-        }))
+        let viewPromises = liveFsTree.getSelectedUrls().map(url => this.session.getDatasourcesFromUrl(
+            new GetDatasourcesFromUrlParamsDto({
+                url: url.toDto(),
+            }))
+        )
 
         let imageServiceHintWidget: Div | undefined = undefined
         let errorMessageWidgets = new Array<Paragraph>();
@@ -45,13 +48,13 @@ export class DataSourceSelectionWidget{
 
         for(const viewPromise of viewPromises){
             const viewResult = await viewPromise;
-            if(viewResult instanceof FailedView){
+            if(viewResult instanceof Error){
                 errorMessageWidgets.push(new Paragraph({
-                    parentElement: undefined, innerText: `Could not open view: ${viewResult.url}`
+                    parentElement: undefined, innerText: `Could not open view: ${viewResult.message}`
                 }))
-            }else if(viewResult instanceof RawDataView && viewResult.getDatasources()?.find(ds => !(ds instanceof PrecomputedChunksDataSource))){
+            }else if(viewResult instanceof Array && viewResult.find(ds => !(ds instanceof PrecomputedChunksDataSource))){
                 errorMessageWidgets.push(new Paragraph({
-                    parentElement: undefined, innerText: `Unsupported format: ${viewResult.url}`
+                    parentElement: undefined, innerText: `Unsupported format: ${viewResult.map(ds => ds.url).join(", ")}`
                 }))
                 imageServiceHintWidget = imageServiceHintWidget || new Div({parentElement: undefined, children: [
                     new Paragraph({
@@ -76,7 +79,21 @@ export class DataSourceSelectionWidget{
 
                 ]})
             }else{
-                this.viewer.reconfigure({toOpen: [viewResult]})
+                if(viewResult instanceof Array){
+                    console.log("FXIME! Ask user to select resolution!")
+                    continue
+                }
+                if(viewResult === undefined){
+                    console.log("FXIME! Deal with undefined!!! Or just remove it altogether")
+                    continue
+                }
+                console.log(`FIXME: add resolution to vie name?`)
+                this.viewer.openLane({
+                    name: `${viewResult.url.name}`,
+                    opacity: 1,
+                    isVisible: true,
+                    rawData: viewResult
+                })
             }
         }
 

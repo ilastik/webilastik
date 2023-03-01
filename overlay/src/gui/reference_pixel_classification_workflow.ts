@@ -1,5 +1,5 @@
 import { Filesystem, Session } from "../client/ilastik";
-import { IViewerDriver } from "../drivers/viewer_driver";
+import { INativeView, IViewerDriver } from "../drivers/viewer_driver";
 import { createElement, removeElement } from "../util/misc";
 import { BrushingWidget } from "./widgets/brushing_overlay/brushing_widget";
 import { FeatureSelectionWidget } from "./widgets/feature_selection";
@@ -9,7 +9,7 @@ import { ProjectWidget } from "./widgets/project_widget";
 import { DataSourceSelectionWidget } from "./widgets/datasource_selection_widget";
 import { Path } from "../util/parsed_url";
 
-export class ReferencePixelClassificationWorkflowGui{
+export class ReferencePixelClassificationWorkflowGui<VIEW extends INativeView>{
     public readonly element: HTMLElement
     public readonly project_widget: ProjectWidget;
     public readonly feature_selection_applet: FeatureSelectionWidget
@@ -23,14 +23,14 @@ export class ReferencePixelClassificationWorkflowGui{
     public constructor({parentElement, session, viewer_driver, projectLocation, defaultBucketName}: {
         parentElement: HTMLElement,
         session: Session,
-        viewer_driver: IViewerDriver,
+        viewer_driver: IViewerDriver<VIEW>,
         projectLocation?: {fs: Filesystem, path: Path},
         defaultBucketName?: string,
     }){
         defaultBucketName = defaultBucketName || "hbp-image-service"
         this.session = session
         this.element = createElement({tagName: "div", parentElement, cssClasses: ["ReferencePixelClassificationWorkflowGui"]})
-        this.viewer = new Viewer({driver: viewer_driver, session})
+        this.viewer = new Viewer({driver: viewer_driver, session, parentElement: this.element}) //FIXME
 
         this.project_widget = new ProjectWidget({parentElement: this.element, session, projectLocation, defaultBucketName})
 

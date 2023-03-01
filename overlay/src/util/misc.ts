@@ -363,6 +363,20 @@ export async function awaitStalable<T>(params: {referenceKey: string, callable: 
     return result
 }
 
+export async function generationalAwait<T>(params: {
+    promise: Promise<T>,
+    getGen: () => number,
+    setGen: () => void
+}): Promise<T | StaleResult<T>>{
+    params.setGen()
+    const gen = params.getGen();
+    const result = await params.promise;
+    if(params.getGen() != gen){
+        return new StaleResult(result)
+    }
+    return result
+}
+
 export function createTable<T extends {[key: string]: string}>(
     params: {
         parentElement: HTMLElement,
