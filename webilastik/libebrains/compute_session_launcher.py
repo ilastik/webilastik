@@ -656,9 +656,9 @@ class JusufSshJobLauncher(SshJobLauncher):
         redis_unix_socket_path = f"{working_dir}/redis.sock"
 
         if self.executor_getter == "jusuf":
-            workflow_slurm_prefix = "srun -n 1 --overlap -u --cpus-per-task 120"
+            workflow_slurm_prefix = "srun -n 1 --overlap -u --cpus-per-task 120 --threads-per-core=1"
         elif self.executor_getter == "dask":
-            workflow_slurm_prefix = "srun -n 10 --overlap -u --cpus-per-task 10"
+            workflow_slurm_prefix = "srun -n 10 --overlap -u --cpus-per-task 10 --threads-per-core=1"
         else:
             assert_never(self.executor_getter)
 
@@ -677,6 +677,7 @@ class JusufSshJobLauncher(SshJobLauncher):
             set -o pipefail
 
             module load git
+            module load Stages/2022
             module load GCC/11.2.0
             module load OpenMPI/4.1.2
 
@@ -690,7 +691,7 @@ class JusufSshJobLauncher(SshJobLauncher):
             export MKL_NUM_THREADS=1
 
             test -x {conda_env_dir}/bin/redis-server
-            srun -n 1 --overlap -u --cpu_bind=none --cpus-per-task 6 \\
+            srun -n 1 --overlap -u --cpu_bind=none --cpus-per-task 6 --threads-per-core=1 \\
                 {conda_env_dir}/bin/redis-server \\
                 --pidfile {redis_pid_file} \\
                 --unixsocket {redis_unix_socket_path} \\
