@@ -70,7 +70,7 @@ export class PredictingWidget extends Applet<State>{
             },
         })
         this.viewer = viewer
-        viewer.addViewportsChangedHandler(() => this.refreshPredictions())
+        viewer.addDataChangedHandler(() => this.refreshPredictions())
         this.session = session
 
         this.element = new Div({parentElement, children: [

@@ -132,7 +132,7 @@ class Layer{
         return [
             "void main() {",
             "    " + color_lines.join("\n    "),
-            "    emitRGBA(",
+            "    emit(",
             `        vec4(${colors_to_mix.join(' + ')}, ${opacity.toFixed(3)})`,
             "    );",
             "}",

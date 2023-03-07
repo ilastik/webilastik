@@ -1,9 +1,9 @@
 import { Color, FsDataSource, PrecomputedChunksDataSource, Session } from "../../client/ilastik";
 import { INativeView, IViewerDriver } from "../../drivers/viewer_driver";
+import { uuidv4 } from "../../util/misc";
 import { Url } from "../../util/parsed_url";
 import { Button } from "./input_widget";
-import { ToggleVisibilityButton } from "./toggle_visibility_button";
-import { BooleanInput, RangeInput } from "./value_input_widget";
+import { BooleanInput } from "./value_input_widget";
 import { ContainerWidget, Div, Label, Paragraph, Span } from "./widget";
 
 class LayerWidget{
@@ -11,7 +11,7 @@ class LayerWidget{
 
     public readonly element: Div;
     private readonly visibilityInput: BooleanInput;
-    private readonly opacitySlider: any;
+    // private readonly opacitySlider: RangeInput;
 
     public constructor(params: {
         parentElement: ContainerWidget<any> | undefined,
@@ -32,19 +32,23 @@ class LayerWidget{
             }
         })
 
-        new ToggleVisibilityButton({
-            parentElement: this.element,
-            text: "⚙",
-            subject: new Div({
-                parentElement: this.element,
-                children: [
-                    new Label({parentElement: undefined, innerText: "opacity: "}),
-                    this.opacitySlider = new RangeInput({parentElement: undefined, min: 0, max: 1, value: 0.5, step: 0.05, onChange: () => {
-                        this.nativeView.reconfigure({opacity: this.opacitySlider.value})
-                    }})
-                ]
-            })
-        })
+        // new ToggleVisibilityButton({
+        //     parentElement: this.element,
+        //     text: "⚙",
+        //     subject: new Div({
+        //         parentElement: this.element,
+        //         children: [
+        //             new Label({parentElement: undefined, innerText: "opacity: "}),
+        //             this.opacitySlider = new RangeInput({parentElement: undefined, min: 0, max: 1, value: 0.5, step: 0.05, onChange: () => {
+        //                 this.nativeView.reconfigure({opacity: this.opacitySlider.value})
+        //             }})
+        //         ]
+        //     })
+        // })
+    }
+
+    public enableVisibilityControls(enable: boolean){
+        this.visibilityInput.disabled = !enable
     }
 
     public get isVisible(): boolean{
@@ -53,6 +57,7 @@ class LayerWidget{
 
     public destroy(){
         this.nativeView.close()
+        this.element.destroy()
     }
 }
 
@@ -89,7 +94,7 @@ export class RawDataLayerWidget extends LayerWidget{
         }
         const nativeView = await params.driver.openUrl({
             isVisible: true,
-            name: `raw_${params.datasource.url.name}`,
+            name: `raw_${params.datasource.url.name}_${uuidv4()}`,
             url: params.datasource.getStrippedUrl(params.session),
             channelColors,
             opacity,
@@ -150,7 +155,7 @@ export class PredictionsLayerWidget extends LayerWidget{
             channelColors: params.channelColors,
             opacity,
             isVisible: true,
-            name: `preds_for_${params.rawData.url.name}`
+            name: `preds_for_${params.rawData.url.name}__${params.classifierGeneration}`
         })
         if(nativeView instanceof Error){
             return nativeView
@@ -209,20 +214,23 @@ export class PixelClassificationLaneWidget{
     }){
         this.element = new Div({parentElement: params.parentElement, children: [
             new Paragraph({parentElement: undefined, children: [
-                new Span({parentElement: undefined, innerText: params.name})
+                new Span({parentElement: undefined, innerText: params.name}),
+                new Label({parentElement: undefined, innerText: "👁️ "}),
+                this.visibilityInput = new BooleanInput({
+                    parentElement: undefined,
+                    value: params.isVisible,
+                    onClick: () => {
+                        this.setVisible(this.visibilityInput.value)
+                        params.onVisibilityChanged()
+                    }
+                }),
+                new Button({inputType: "button", text: "✖", parentElement: undefined, onClick: () => {
+                    this.destroy()
+                    params.onDestroyed()
+                }}),
             ]}),
-            new Button({inputType: "button", text: "✖", parentElement: undefined, onClick: () => {
-                this.destroy()
-                params.onDestroyed()
-            }}),
-            this.visibilityInput = new BooleanInput({
-                parentElement: undefined,
-                value: params.isVisible,
-                onClick: () => {
-                    this.setVisible(this.visibilityInput.value)
-                    params.onVisibilityChanged()
-                }
-            })
+
+
         ]})
 
         this.rawDataWidget = params.rawDataWidget
@@ -287,6 +295,8 @@ export class PixelClassificationLaneWidget{
             this.predictionsWidget?.nativeView.reconfigure({isVisible: false})
         }
         this.visibilityInput.value = isVisible
+        this.rawDataWidget.enableVisibilityControls(isVisible)
+        this.predictionsWidget?.enableVisibilityControls(isVisible)
     }
 
     public async refreshPredictions(params: {
@@ -316,9 +326,11 @@ export class PixelClassificationLaneWidget{
             this.predictionsWidget instanceof PredictionsLayerWidget &&
             this.predictionsWidget.classifierGeneration > predictionsLayerWidget.classifierGeneration
         ){
+            predictionsLayerWidget.destroy()
             return undefined
         }
         this.predictionsWidget = predictionsLayerWidget
+        this.setVisible(this.isVisible)
         return undefined
     }
 
