@@ -1,31 +1,44 @@
 import { mat4, quat, vec3 } from "gl-matrix";
 import { Session, FsDataSource, Color } from "../client/ilastik";
-import { Url } from "../util/parsed_url";
-
 
 /**
  * A data source from a viewer. Usually
  */
 export interface INativeView{
-    getName(): string
-    getUrl(): Url
-    getOpacity(): number
-    getVisible(): boolean
-    setVisible(visible: boolean): void
+    getName(): unknown;
+    // getName(): string
+    // getUrl(): Url
+    // getOpacity(): number
+    // getVisible(): boolean
+    // setVisible(visible: boolean): void
     close(): void;
     reconfigure(params: {
-        url?: Url,
-        opacity?: number,
         isVisible?: boolean,
-        channelColors?: Color[]
+        channelColors?: Color[],
+        opacity?: number
     }): void;
     // setProperties(props: {name?: string, opacity?: number, visible?: boolean}): void;
+}
+
+export interface IRawDataView extends INativeView{
+    readonly datasource: FsDataSource;
+}
+
+export interface IPredictionsView extends INativeView{
+    readonly rawData: FsDataSource;
+
+    reconfigure(params: {
+        source?: {session: Session, classifierGeneration: number},
+        isVisible?: boolean | undefined,
+        channelColors?: Color[],
+        opacity?: number
+    }): void;
 }
 /**
  * Represents glue code with Basic functionality that any viewer must implement to be able to be used by
  * the ilastik overlay.
  */
-export interface IViewerDriver<VIEW extends INativeView>{
+export interface IViewerDriver{
     /**
      * @returns an array of all viewport drivers corresponding to the currently visible
      * viewports of the viewer. See IViewportDriver for more details
@@ -42,43 +55,24 @@ export interface IViewerDriver<VIEW extends INativeView>{
         session: Session,
         datasource: FsDataSource,
         name: string,
-        opacity: number,
         isVisible: boolean,
         channelColors?: Color[],
-    }): Promise<VIEW | Error>;
+        opacity?: number,
+    }): IRawDataView | Error;
 
-
-    openUrl(params: {
-        url: Url,
+    openPixelPredictions(params: {
+        session: Session,
+        rawData: FsDataSource,
+        classifierGeneration: number,
+        channelColors: Color[],
+        opacity: number,
+        isVisible: boolean,
         name: string,
-        opacity: number,
-        isVisible: boolean,
-        channelColors?: Color[],
-    }): Promise<VIEW | Error>;
-
-    /**
-     * Closes the view
-     */
-    closeView: (view: VIEW) => void;
-
+    }): IPredictionsView | Error;
+    enable3dNavigation(enable: boolean): void;
     addViewportsChangedHandler: (handler: () => void) => void;
     removeViewportsChangedHandler: (handler: () => void) => void;
-    addDataChangedHandler: (handler: () => void) => void;
-    removeDataChangedHandler: (handler: () => void) => void;
     getContainerForWebilastikControls: () => HTMLElement | undefined;
-
-    /**
-     * Gets the IDataView being displayed, if any. This is usually somethingl like the "active tab" of a viewer
-     *
-     * @returns The IDataView representing the data source currently being actively viewed, if any
-     */
-    getDataViewOnDisplay(): VIEW | undefined;
-
-    /**
-     * @returns an array of `IDataView`s representing all data sources currently opened by the viewer
-     */
-    getOpenDataViews(): Array<VIEW>;
-
     snapTo?: (params: {position_vx: vec3, orientation_w: quat, voxel_size_nm: vec3}) => void;
 }
 

@@ -1,22 +1,18 @@
 import { quat, vec3 } from "gl-matrix"
 import { BrushStroke } from "../../.."
-import { Color, FsDataSource, PrecomputedChunksDataSource, Session } from "../../../client/ilastik"
+import { Color, FsDataSource, Session } from "../../../client/ilastik"
 import { createElement, removeElement } from "../../../util/misc"
 import { CollapsableWidget } from "../collapsable_applet_gui"
-import { PopupSelect } from "../selector_widget"
 import { BrushingOverlay } from "./brushing_overlay"
 import { BrushelBoxRenderer } from "./brush_boxes_renderer"
 import { BrushingApplet } from "./brush_strokes_container"
 import { Viewer } from "../../../viewer/viewer"
 import { PredictingWidget } from "../predicting_widget";
-import { PredictionsView, StrippedPrecomputedView } from "../../../viewer/view"
-import { ErrorPopupWidget } from "../popup"
 import { BooleanInput } from "../value_input_widget"
-import { INativeView } from "../../../drivers/viewer_driver"
 
 
-export class BrushingWidget<VIEW extends INativeView>{
-    public readonly viewer: Viewer<VIEW>
+export class BrushingWidget{
+    public readonly viewer: Viewer
     public readonly element: HTMLElement
     private readonly status_display: HTMLElement
     private readonly resolutionSelectionContainer: HTMLElement
@@ -30,7 +26,7 @@ export class BrushingWidget<VIEW extends INativeView>{
     public readonly gl: WebGL2RenderingContext
     public readonly canvas: HTMLCanvasElement
     private brushingApplet: BrushingApplet
-    private predictingWidget: PredictingWidget<VIEW>
+    private predictingWidget: PredictingWidget
     private brushStrokeRenderer: BrushelBoxRenderer
 
     constructor({
@@ -43,7 +39,7 @@ export class BrushingWidget<VIEW extends INativeView>{
         applet_name: string,
         session: Session,
         parentElement: HTMLElement,
-        viewer: Viewer<VIEW>,
+        viewer: Viewer,
         help: string[],
     }){
         this.session = session
@@ -81,7 +77,7 @@ export class BrushingWidget<VIEW extends INativeView>{
                 applet_name,
                 gl: this.gl,
                 onDataSourceClicked: async (rawData) => this.viewer.openLane({
-                    name: rawData.url.name, rawData, opacity: 1.0, isVisible: true
+                    name: rawData.url.name, rawData, isVisible: true
                 }),
                 onLabelSelected: () => {
                     if(!this.brushingEnabledCheckbox.disabled){
@@ -174,7 +170,7 @@ export class BrushingWidget<VIEW extends INativeView>{
         if(lane === undefined){
             return this.setMode({name: "no data"})
         }
-        return this.setMode({name: "training", trainingDatasource: lane.raw_data})
+        return this.setMode({name: "training", trainingDatasource: lane.rawData})
     }
 
     public destroy(){

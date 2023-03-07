@@ -1,7 +1,6 @@
 // import { ListFsDirRequest } from "../../client/dto";
 import { GetDatasourcesFromUrlParamsDto } from "../../client/dto";
 import { PrecomputedChunksDataSource, Session } from "../../client/ilastik";
-import { INativeView } from "../../drivers/viewer_driver";
 import { Url } from "../../util/parsed_url";
 import { Viewer } from "../../viewer/viewer";
 import { CollapsableWidget } from "./collapsable_applet_gui";
@@ -10,13 +9,13 @@ import { LiveFsTree } from "./live_fs_tree";
 import { PopupWidget } from "./popup";
 import { Anchor, Div, Paragraph, Span } from "./widget";
 
-export class DataSourceSelectionWidget<VIEW extends INativeView>{
+export class DataSourceSelectionWidget{
     private element: HTMLDetailsElement;
     private session: Session;
-    private viewer: Viewer<VIEW>;
+    private viewer: Viewer;
 
     constructor(params: {
-        parentElement: HTMLElement, session: Session, viewer: Viewer<VIEW>, defaultBucketName: string,
+        parentElement: HTMLElement, session: Session, viewer: Viewer, defaultBucketName: string,
     }){
         this.element = new CollapsableWidget({
             display_name: "Data Sources", parentElement: params.parentElement
@@ -47,7 +46,7 @@ export class DataSourceSelectionWidget<VIEW extends INativeView>{
 
 
         for(const viewPromise of viewPromises){
-            const viewResult = await viewPromise;
+            let viewResult = await viewPromise;
             if(viewResult instanceof Error){
                 errorMessageWidgets.push(new Paragraph({
                     parentElement: undefined, innerText: `Could not open view: ${viewResult.message}`
@@ -80,17 +79,48 @@ export class DataSourceSelectionWidget<VIEW extends INativeView>{
                 ]})
             }else{
                 if(viewResult instanceof Array){
-                    console.log("FXIME! Ask user to select resolution!")
-                    continue
+                    if(viewResult.length == 1){
+                        viewResult = viewResult[0]
+                    }else{
+                        console.log("FXIME! Ask user to select resolution!")
+                        continue
+                    }
                 }
                 if(viewResult === undefined){
                     console.log("FXIME! Deal with undefined!!! Or just remove it altogether")
+                    // createElement({tagName: "label", innerHTML: "Select a voxel size to annotate on:", parentElement: this.resolutionSelectionContainer});
+                    // new PopupSelect<FsDataSource>({
+                    //     popupTitle: "Select a voxel size to annotate on",
+                    //     parentElement: this.resolutionSelectionContainer,
+                    //     options: mode.datasources,
+                    //     optionRenderer: (args) => {
+                    //         let datasource = args.option
+                    //         return createElement({
+                    //             tagName: "span",
+                    //             parentElement: args.parentElement,
+                    //             innerText: datasource.resolutionString
+                    //         })
+                    //     },
+                    //     onChange: async (datasource) => {
+                    //         if(!(datasource instanceof PrecomputedChunksDataSource)){
+                    //             new ErrorPopupWidget({message: "Can't handle this type of datasource yet"})
+                    //             return
+                    //         }
+                    //         let stripped_view = new StrippedPrecomputedView({
+                    //             datasource,
+                    //             name: datasource.getDisplayString(),
+                    //             session: this.session,
+                    //             opacity: 1.0,
+                    //             visible: true,
+                    //         })
+                    //         this.viewer.reconfigure({toOpen: [stripped_view]})
+                    //     },
+                    // })
                     continue
                 }
                 console.log(`FIXME: add resolution to vie name?`)
                 this.viewer.openLane({
                     name: `${viewResult.url.name}`,
-                    opacity: 1,
                     isVisible: true,
                     rawData: viewResult
                 })

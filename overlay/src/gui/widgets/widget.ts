@@ -74,6 +74,10 @@ export abstract class Widget<T extends TagName>{
         this.element.style.display = show ? "" : "none"
     }
 
+    public isHidden(): boolean{
+        return this.element.style.display == "none"
+    }
+
     public addCssClass(klass: CssClasses){
         this.element.classList.add(klass)
     }
@@ -103,8 +107,20 @@ export abstract class ContainerWidget<T extends keyof HTMLElementTagNameMap> ext
         this.element.appendChild(child.element)
     }
 
+    public insertBefore(params: {newChild: Widget<TagName>, anchor: Widget<TagName>}){
+        this.element.insertBefore(params.newChild.element, params.anchor.element)
+    }
+
     public clear(){
         this.element.innerHTML = ""
+    }
+}
+
+export class VerticalContainer extends ContainerWidget<"div">{
+    constructor(params: {parentElement: ContainerWidget<any>}){
+        super({tagName: "div", parentElement: params.parentElement})
+        this.element.style.display = "flex"
+        this.element.style.flexDirection = "column"
     }
 }
 

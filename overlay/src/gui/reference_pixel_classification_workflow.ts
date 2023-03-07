@@ -1,5 +1,5 @@
 import { Filesystem, Session } from "../client/ilastik";
-import { INativeView, IViewerDriver } from "../drivers/viewer_driver";
+import { IViewerDriver } from "../drivers/viewer_driver";
 import { createElement, removeElement } from "../util/misc";
 import { BrushingWidget } from "./widgets/brushing_overlay/brushing_widget";
 import { FeatureSelectionWidget } from "./widgets/feature_selection";
@@ -9,7 +9,7 @@ import { ProjectWidget } from "./widgets/project_widget";
 import { DataSourceSelectionWidget } from "./widgets/datasource_selection_widget";
 import { Path } from "../util/parsed_url";
 
-export class ReferencePixelClassificationWorkflowGui<VIEW extends INativeView>{
+export class ReferencePixelClassificationWorkflowGui{
     public readonly element: HTMLElement
     public readonly project_widget: ProjectWidget;
     public readonly feature_selection_applet: FeatureSelectionWidget
@@ -23,7 +23,7 @@ export class ReferencePixelClassificationWorkflowGui<VIEW extends INativeView>{
     public constructor({parentElement, session, viewer_driver, projectLocation, defaultBucketName}: {
         parentElement: HTMLElement,
         session: Session,
-        viewer_driver: IViewerDriver<VIEW>,
+        viewer_driver: IViewerDriver,
         projectLocation?: {fs: Filesystem, path: Path},
         defaultBucketName?: string,
     }){

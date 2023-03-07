@@ -4,7 +4,7 @@ import { CssClasses } from "../css_classes";
 import { InlineCss } from "../../util/misc";
 
 
-export type InputType = "button" | "text" | "search" | "checkbox" | "submit" | "url" | "radio" | "number" | "color";
+export type InputType = "button" | "text" | "search" | "checkbox" | "submit" | "url" | "radio" | "number" | "color" | "range";
 
 export type InputWidgetParams = {
     parentElement:HTMLElement | ContainerWidget<any> | undefined,

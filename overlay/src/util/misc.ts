@@ -347,6 +347,8 @@ export function show_if_changed(key: string, value: any, suffix = ""){
     }
 }
 
+export class Cancelled{}
+
 export class StaleResult<T>{
     constructor(public readonly result: T){}
 }
@@ -365,13 +367,18 @@ export async function awaitStalable<T>(params: {referenceKey: string, callable: 
 
 export async function generationalAwait<T>(params: {
     promise: Promise<T>,
+    proposedGen: number,
     getGen: () => number,
-    setGen: () => void
-}): Promise<T | StaleResult<T>>{
-    params.setGen()
-    const gen = params.getGen();
+    setGen: (gen: number) => void
+}): Promise<T | StaleResult<T> | Cancelled>{
+    console.log(`Proposed generation is ${params.proposedGen}`)
+    const previousGen = params.getGen();
+    if(params.proposedGen <= previousGen){
+        return new Cancelled()
+    }
+    params.setGen(params.proposedGen)
     const result = await params.promise;
-    if(params.getGen() != gen){
+    if(params.proposedGen < params.getGen()){
         return new StaleResult(result)
     }
     return result

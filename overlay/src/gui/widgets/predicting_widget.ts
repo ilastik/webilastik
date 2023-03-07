@@ -1,7 +1,6 @@
 import { Applet } from "../../client/applets/applet";
 import { CheckDatasourceCompatibilityParams, CheckDatasourceCompatibilityResponse } from "../../client/dto";
 import { Color, FsDataSource, Session } from "../../client/ilastik";
-import { INativeView } from "../../drivers/viewer_driver";
 import { Path } from "../../util/parsed_url";
 import { ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonObject, ensureJsonString, JsonValue } from "../../util/serialization";
 import { Viewer } from "../../viewer/viewer";
@@ -44,8 +43,8 @@ function deserializeState(value: JsonValue): State{
     }
 }
 
-export class PredictingWidget<VIEW extends INativeView> extends Applet<State>{
-    public readonly viewer: Viewer<VIEW>;
+export class PredictingWidget extends Applet<State>{
+    public readonly viewer: Viewer;
     public readonly session: Session
 
     public readonly element: Div
@@ -58,7 +57,7 @@ export class PredictingWidget<VIEW extends INativeView> extends Applet<State>{
         live_update: false,
     }
 
-    constructor({session, viewer, parentElement}: {session: Session, viewer: Viewer<VIEW>, parentElement: HTMLElement}){
+    constructor({session, viewer, parentElement}: {session: Session, viewer: Viewer, parentElement: HTMLElement}){
         super({
             deserializer: deserializeState,
             name: "pixel_classification_applet",
@@ -132,10 +131,15 @@ export class PredictingWidget<VIEW extends INativeView> extends Applet<State>{
     }
 
     private refreshPredictions = async () => {
+        if(this.state.description != "ready"){
+            this.closePredictionViews()
+            return
+        }
         for(const lane of this.viewer.getLaneWidgets()){
-            lane.refreshPredictons({
+            lane.refreshPredictions({
                 classifierGeneration: this.state.generation,
-                channelColors: this.state.channel_colors
+                channelColors: this.state.channel_colors,
+                session: this.session,
             })
         }
     }
