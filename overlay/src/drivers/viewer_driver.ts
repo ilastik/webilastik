@@ -1,5 +1,6 @@
 import { mat4, quat, vec3 } from "gl-matrix";
-import { Session, FsDataSource, Color } from "../client/ilastik";
+import { Color } from "../client/ilastik";
+import { Url } from "../util/parsed_url";
 
 /**
  * A data source from a viewer. Usually
@@ -13,27 +14,14 @@ export interface INativeView{
     // setVisible(visible: boolean): void
     close(): void;
     reconfigure(params: {
+        url?: Url,
         isVisible?: boolean,
         channelColors?: Color[],
-        opacity?: number
+        opacity?: number,
     }): void;
     // setProperties(props: {name?: string, opacity?: number, visible?: boolean}): void;
 }
 
-export interface IRawDataView extends INativeView{
-    readonly datasource: FsDataSource;
-}
-
-export interface IPredictionsView extends INativeView{
-    readonly rawData: FsDataSource;
-
-    reconfigure(params: {
-        source?: {session: Session, classifierGeneration: number},
-        isVisible?: boolean | undefined,
-        channelColors?: Color[],
-        opacity?: number
-    }): void;
-}
 /**
  * Represents glue code with Basic functionality that any viewer must implement to be able to be used by
  * the ilastik overlay.
@@ -51,24 +39,14 @@ export interface IViewerDriver{
      */
     getTrackedElement: () => HTMLElement;
 
-    openDataSource(params: {
-        session: Session,
-        datasource: FsDataSource,
+    openUrl(params: {
         name: string,
+        url: Url,
         isVisible: boolean,
         channelColors?: Color[],
         opacity?: number,
-    }): IRawDataView | Error;
+    }): Promise<INativeView | Error>;
 
-    openPixelPredictions(params: {
-        session: Session,
-        rawData: FsDataSource,
-        classifierGeneration: number,
-        channelColors: Color[],
-        opacity: number,
-        isVisible: boolean,
-        name: string,
-    }): IPredictionsView | Error;
     enable3dNavigation(enable: boolean): void;
     addViewportsChangedHandler: (handler: () => void) => void;
     removeViewportsChangedHandler: (handler: () => void) => void;

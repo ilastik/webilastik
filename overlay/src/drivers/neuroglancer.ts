@@ -1,11 +1,10 @@
 import { vec3, mat4, quat } from "gl-matrix"
 import { IViewportDriver, IViewerDriver } from "..";
-import { Color, FsDataSource, PrecomputedChunksDataSource, Session } from "../client/ilastik";
+import { Color } from "../client/ilastik";
 import { CssClasses } from "../gui/css_classes";
 import { Div } from "../gui/widgets/widget";
 import { getElementContentRect } from "../util/misc";
 import { Url } from "../util/parsed_url";
-import { INativeView, IPredictionsView, IRawDataView } from "./viewer_driver";
 
 type NeuroglancerLayout = "4panel" | "xy" | "xy-3d" | "xz" | "xz-3d" | "yz" | "yz-3d";
 
@@ -54,33 +53,28 @@ export class NeuroglancerViewportDriver implements IViewportDriver{
     })
 }
 
-abstract class Layer{
-    public readonly viewer: any;
+interface NgManagedLayer{}
+
+
+
+class Layer{
     private managedLayer: any;
     private channelColors: Color[];
     private opacity: number;
 
     public constructor(params: {
-        viewer: any,
-        url: Url,
         name: string,
         isVisible: boolean,
         channelColors: Color[],
         opacity: number,
+        managedLayer: NgManagedLayer,
     }){
-        this.viewer = params.viewer
-        let shader: string = Layer.makeShader({channelColors: params.channelColors, opacity: params.opacity})
-        this.managedLayer = this.viewer.layerSpecification.getLayer(
-            params.name,
-            {
-                source: params.url.double_protocol_raw,
-                shader,
-                visible: params.isVisible,
-            }
-        );
-        this.viewer.layerSpecification.add(this.managedLayer);
+        this.managedLayer = params.managedLayer
         this.channelColors = params.channelColors
         this.opacity = params.opacity
+        this.reconfigure({
+            isVisible: params.isVisible, channelColors: params.channelColors, opacity: params.opacity
+        })
     }
 
     public getName(): string{
@@ -145,7 +139,7 @@ abstract class Layer{
         ].join("\n")
     }
 
-    protected do_reconfigure(params: {
+    public reconfigure(params: {
         url?: Url,
         isVisible?: boolean,
         channelColors?: Color[],
@@ -165,87 +159,6 @@ abstract class Layer{
         if(params.isVisible !== undefined){
             this.managedLayer.setVisible(params.isVisible)
         }
-    }
-}
-
-export class RawDataLayer extends Layer implements INativeView, IRawDataView{
-    public readonly datasource: PrecomputedChunksDataSource;
-
-    constructor(params: {
-        viewer: any,
-        session: Session,
-        datasource: PrecomputedChunksDataSource,
-        name: string,
-        isVisible: boolean,
-        channelColors?: Color[],
-        opacity?: number,
-    }){
-        let {channelColors, opacity} = params
-        opacity = opacity === undefined ? 1 : opacity
-        if(!channelColors){
-            if(params.datasource.shape.c == 3){
-                channelColors = [
-                    new Color({r: 255, g: 0, b: 0}), new Color({r: 0, g: 255, b: 0}), new Color({r: 0, g: 0, b: 255}),
-                ]
-            }else{
-                channelColors = []
-                for(let i=0; i<params.datasource.shape.c; i++){
-                    channelColors.push(new Color({r: 255, g: 255, b: 255})) //FIXME
-                }
-            }
-        }
-        super({
-            ...params, channelColors, opacity, url: params.datasource.getStrippedUrl(params.session)
-        })
-        this.datasource = params.datasource
-    }
-
-    public reconfigure(params: {
-        isVisible?: boolean,
-        rendering?: {channelColors: Color[], opacity: number}
-    }){
-        return this.do_reconfigure(params)
-    }
-}
-
-export class PredictionsLayer extends Layer implements INativeView, IPredictionsView{
-    readonly rawData: FsDataSource;
-
-    constructor(params: {
-        viewer: any,
-        session: Session,
-        rawData: FsDataSource,
-        classifierGeneration: number,
-        channelColors: Color[],
-        opacity: number,
-        isVisible: boolean,
-        name: string,
-    }){
-        super({
-            ...params,
-            url: params.session.sessionUrl
-                .updatedWith({datascheme: "precomputed"})
-                .joinPath(`predictions/raw_data=${params.rawData.toBase64()}/generation=${params.classifierGeneration}`),
-            viewer: params.viewer,
-        })
-        this.rawData = params.rawData
-    }
-
-    public reconfigure(params: {
-        source?: {session: Session, classifierGeneration: number},
-        isVisible?: boolean | undefined,
-        channelColors?: Color[],
-        opacity?: number
-    }){
-        let url: Url | undefined = undefined;
-        let source = params.source;
-        if(source){
-            //FIXME: duplicate code
-            url = source.session.sessionUrl
-                .updatedWith({datascheme: "precomputed"})
-                .joinPath(`predictions/raw_data=${this.rawData.toBase64()}/generation=${source.classifierGeneration}`)
-        }
-        return this.do_reconfigure({...params, url})
     }
 }
 
@@ -303,13 +216,6 @@ export class NeuroglancerDriver implements IViewerDriver{
     public removeViewportsChangedHandler(handler: () => void){
         this.viewer.display.changed.remove(handler)
     }
-
-    public addDataChangedHandler(handler: () => void){
-        this.viewer.layerManager.layersChanged.add(handler)
-    }
-    public removeDataChangedHandler(handler: () => void){
-        this.viewer.layerManager.layersChanged.remove(handler)
-    }
     public getContainerForWebilastikControls(): HTMLElement | undefined{
         if(!this.containerForWebilastikControls){
             let ngContainer = document.querySelector("#neuroglancer-container")! as HTMLElement;
@@ -322,40 +228,26 @@ export class NeuroglancerDriver implements IViewerDriver{
         return this.containerForWebilastikControls
     }
 
-    closeView(layer: Layer){
-        this.getLayerManager().removeManagedLayer(layer);
-    }
-
-    private getLayerManager(): any {
-        return this.viewer.layerSpecification.layerManager;
-    }
-
-    public openDataSource(params: {
-        session: Session,
-        datasource: FsDataSource,
+    public async openUrl(params: {
+        url: Url,
         name: string,
         isVisible: boolean,
-        rendering?: {channelColors: Color[], opacity: number},
-    }): RawDataLayer | Error{
-        const datasource = params.datasource
-        if(!(datasource instanceof PrecomputedChunksDataSource)){
-            return new Error(`Datasource type not supported: ${datasource.url.double_protocol_raw}`)
-        }
-        return new RawDataLayer({...params, datasource, viewer: this.viewer})
-    }
-
-    public openPixelPredictions(params: {
-        session: Session,
-        rawData: FsDataSource,
-        classifierGeneration: number,
         channelColors: Color[],
         opacity: number,
-        isVisible: boolean,
-        name: string,
-    }): PredictionsLayer | Error{
-        return new PredictionsLayer({
-            ...params,
-            viewer: this.viewer,
+    }): Promise<Layer | Error>{
+        const managedLayer = this.viewer.layerSpecification.getLayer(
+            params.name, {source: params.url.double_protocol_raw}
+        );
+        this.viewer.layerSpecification.add(managedLayer);
+        return new Promise(resolve => {
+            const waitUntilLayerExists = () => {
+                if(managedLayer.layer){
+                    console.log(`LAYER ${params.name} BECOMES READY!!!`)
+                    this.removeViewportsChangedHandler(waitUntilLayerExists)
+                    resolve(new Layer({...params, managedLayer}))
+                }
+            }
+            this.addViewportsChangedHandler(waitUntilLayerExists)
         })
     }
 

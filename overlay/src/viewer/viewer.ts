@@ -106,7 +106,7 @@ export class Viewer{
         name: string,
         isVisible: boolean,
     }): Promise<PixelClassificationLaneWidget | Error>{
-        const laneResult = PixelClassificationLaneWidget.create({
+        const laneResult = await PixelClassificationLaneWidget.create({
             session: this.session,
             driver: this.driver,
             parentElement: this.element,

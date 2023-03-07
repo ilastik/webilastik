@@ -1,12 +1,13 @@
-import { Color, FsDataSource, Session } from "../../client/ilastik";
-import { INativeView, IPredictionsView, IRawDataView, IViewerDriver } from "../../drivers/viewer_driver";
+import { Color, FsDataSource, PrecomputedChunksDataSource, Session } from "../../client/ilastik";
+import { INativeView, IViewerDriver } from "../../drivers/viewer_driver";
+import { Url } from "../../util/parsed_url";
 import { Button } from "./input_widget";
 import { ToggleVisibilityButton } from "./toggle_visibility_button";
 import { BooleanInput, RangeInput } from "./value_input_widget";
 import { ContainerWidget, Div, Label, Paragraph, Span } from "./widget";
 
-class LayerWidget<VIEW extends INativeView>{
-    public readonly nativeView: VIEW;
+class LayerWidget{
+    public readonly nativeView: INativeView;
 
     public readonly element: Div;
     private readonly visibilityInput: BooleanInput;
@@ -14,17 +15,18 @@ class LayerWidget<VIEW extends INativeView>{
 
     public constructor(params: {
         parentElement: ContainerWidget<any> | undefined,
-        isVisible: boolean,
-        nativeView: VIEW,
+        nativeView: INativeView,
+        name: string,
     }){
         this.nativeView = params.nativeView
 
         this.element = new Div({parentElement: params.parentElement})
 
+        new Label({parentElement: this.element, innerText: params.name})
         new Label({parentElement: this.element, innerText: "👁️ "})
         this.visibilityInput = new BooleanInput({
             parentElement: this.element,
-            value: params.isVisible,
+            value: true,
             onClick: () => {
                 this.nativeView.reconfigure({isVisible: this.visibilityInput.value})
             }
@@ -54,17 +56,152 @@ class LayerWidget<VIEW extends INativeView>{
     }
 }
 
+export class RawDataLayerWidget extends LayerWidget{
+    public readonly datasource: PrecomputedChunksDataSource;
+
+    constructor(params: {
+        parentElement: ContainerWidget<any> | undefined,
+        datasource: PrecomputedChunksDataSource,
+        opacity: number,
+        nativeView: INativeView,
+    }){
+        super({...params, name: "Raw Data"})
+        this.datasource = params.datasource
+    }
+
+    public static async create(params: {
+        parentElement: ContainerWidget<any> | undefined,
+        driver: IViewerDriver,
+        session: Session,
+        datasource: PrecomputedChunksDataSource,
+    }): Promise<RawDataLayerWidget | Error>{
+        const opacity = 1
+        let channelColors: Color[] = []
+        if(params.datasource.shape.c == 3){
+            channelColors = [
+                new Color({r: 255, g: 0, b: 0}), new Color({r: 0, g: 255, b: 0}), new Color({r: 0, g: 0, b: 255}),
+            ]
+        }else{
+            channelColors = []
+            for(let i=0; i<params.datasource.shape.c; i++){
+                channelColors.push(new Color({r: 255, g: 255, b: 255})) //FIXME
+            }
+        }
+        const nativeView = await params.driver.openUrl({
+            isVisible: true,
+            name: `raw_${params.datasource.url.name}`,
+            url: params.datasource.getStrippedUrl(params.session),
+            channelColors,
+            opacity,
+        })
+        if(nativeView instanceof Error){
+            return nativeView
+        }
+        return new RawDataLayerWidget({
+            ...params,
+            opacity,
+            nativeView,
+        })
+    }
+
+    public reconfigure(params: {
+        isVisible?: boolean,
+        channelColors?: Color[],
+        opacity?: number
+    }){
+        return this.nativeView.reconfigure({
+            isVisible: params.isVisible,
+            channelColors: params.channelColors,
+            opacity: params.opacity,
+        })
+    }
+}
+
+export class PredictionsLayerWidget extends LayerWidget{
+    readonly rawData: FsDataSource;
+    private _classifierGeneration: number;
+
+    constructor(params: {
+        parentElement: ContainerWidget<any>,
+        rawData: FsDataSource,
+        classifierGeneration: number,
+        channelColors: Color[],
+        opacity: number,
+        nativeView: INativeView,
+    }){
+        super({...params, name: "Pixel Predictions"})
+        this.rawData = params.rawData
+        this._classifierGeneration = params.classifierGeneration
+    }
+
+    public static async create(params: {
+        parentElement: ContainerWidget<any>,
+        driver: IViewerDriver,
+        session: Session,
+        rawData: FsDataSource,
+        classifierGeneration: number,
+        channelColors: Color[],
+    }): Promise<PredictionsLayerWidget | Error>{
+        const opacity = 0.5
+        const nativeView = await params.driver.openUrl({
+            url: params.session.sessionUrl
+                .updatedWith({datascheme: "precomputed"})
+                .joinPath(`predictions/raw_data=${params.rawData.toBase64()}/generation=${params.classifierGeneration}`),
+            channelColors: params.channelColors,
+            opacity,
+            isVisible: true,
+            name: `preds_for_${params.rawData.url.name}`
+        })
+        if(nativeView instanceof Error){
+            return nativeView
+        }
+        return new PredictionsLayerWidget({
+            opacity,
+            nativeView,
+            channelColors: params.channelColors,
+            classifierGeneration: params.classifierGeneration,
+            parentElement: params.parentElement,
+            rawData: params.rawData,
+        })
+    }
+
+    public get classifierGeneration(): number{
+        return this._classifierGeneration
+    }
+
+    public reconfigure(params: {
+        source?: {session: Session, classifierGeneration: number},
+        isVisible?: boolean | undefined,
+        channelColors?: Color[],
+        opacity?: number
+    }){
+        if(params.source && params.source.classifierGeneration < this._classifierGeneration){
+            return
+        }
+        this._classifierGeneration = params.source?.classifierGeneration || this._classifierGeneration
+        let url: Url | undefined = undefined;
+        let source = params.source;
+        if(source){
+            //FIXME: duplicate code
+            url = source.session.sessionUrl
+                .updatedWith({datascheme: "precomputed"})
+                .joinPath(`predictions/raw_data=${this.rawData.toBase64()}/generation=${source.classifierGeneration}`)
+        }
+        return this.nativeView.reconfigure({...params, url})
+    }
+}
+
 export class PixelClassificationLaneWidget{
     private element: Div;
-    private predictionsWidget: LayerWidget<IPredictionsView> | undefined = undefined
+    private predictionsWidget: PredictionsLayerWidget | undefined = undefined
+    private rawDataWidget: RawDataLayerWidget;
     private driver: IViewerDriver;
-    private rawDataWidget: LayerWidget<IRawDataView>;
     private readonly visibilityInput: BooleanInput;
 
     private constructor(params: {
         parentElement: ContainerWidget<any>,
         name: string,
-        rawDataNativeView: IRawDataView,
+        rawDataWidget: RawDataLayerWidget,
         driver: IViewerDriver,
         isVisible: boolean,
         onDestroyed: () => void,
@@ -88,26 +225,57 @@ export class PixelClassificationLaneWidget{
             })
         ]})
 
-        this.rawDataWidget = new LayerWidget({
-            isVisible: true,
-            nativeView: params.rawDataNativeView,
-            parentElement: this.element,
-        })
+        this.rawDataWidget = params.rawDataWidget
+        this.element.appendChild(params.rawDataWidget.element) //FIXME?
 
         this.driver = params.driver
         this.setVisible(params.isVisible)
     }
 
+    public static async create(params: {
+        session: Session,
+        driver: IViewerDriver,
+        parentElement: ContainerWidget<any>,
+        rawData: FsDataSource,
+        isVisible: boolean,
+        name: string,
+        onDestroyed: () => void,
+        onVisibilityChanged: () => void,
+    }): Promise<PixelClassificationLaneWidget | Error>{
+        if(!(params.rawData instanceof PrecomputedChunksDataSource)){
+            return new Error(`Unsupported datasource type `) //FIXME: maybe driver sould determine this
+        }
+        let rawDataWidget = await RawDataLayerWidget.create({
+            datasource: params.rawData,
+            driver: params.driver,
+            parentElement: undefined,
+            session: params.session,
+        })
+        if(rawDataWidget instanceof Error){
+            return rawDataWidget
+        }
+        return new PixelClassificationLaneWidget({
+            driver: params.driver,
+            isVisible: params.isVisible,
+            name: params.name,
+            onDestroyed: params.onDestroyed,
+            onVisibilityChanged: params.onVisibilityChanged,
+            parentElement: params.parentElement,
+            rawDataWidget,
+        })
+    }
+
     public destroy(){
         this.rawDataWidget.destroy()
         this.predictionsWidget?.destroy()
+        this.element.destroy()
     }
 
     public get isVisible(): boolean{
         return this.visibilityInput.value
     }
     public get rawData(): FsDataSource{
-        return this.rawDataWidget.nativeView.datasource
+        return this.rawDataWidget.datasource
     }
 
     public setVisible(isVisible: boolean){
@@ -121,63 +289,36 @@ export class PixelClassificationLaneWidget{
         this.visibilityInput.value = isVisible
     }
 
-    public static create(params: {
-        session: Session,
-        driver: IViewerDriver,
-        parentElement: ContainerWidget<any>,
-        rawData: FsDataSource,
-        isVisible: boolean,
-        name: string,
-        onDestroyed: () => void,
-        onVisibilityChanged: () => void,
-    }): PixelClassificationLaneWidget | Error{
-        let rawDataNativeViewResult = params.driver.openDataSource({
-            session: params.session,
-            datasource: params.rawData,
-            isVisible: params.isVisible,
-            name: `raw_data__${params.rawData.url.name}`
-        })
-        if(rawDataNativeViewResult instanceof Error){
-            return rawDataNativeViewResult
-        }
-        return new PixelClassificationLaneWidget({
-            driver: params.driver,
-            parentElement: params.parentElement,
-            name: params.name,
-            rawDataNativeView: rawDataNativeViewResult,
-            isVisible: params.isVisible,
-            onDestroyed: params.onDestroyed,
-            onVisibilityChanged: params.onVisibilityChanged,
-        })
-    }
-
-    public refreshPredictions(params: {
+    public async refreshPredictions(params: {
         session: Session, classifierGeneration: number, channelColors: Color[]
-    }): Error | undefined{
-        if(this.predictionsWidget){
-            this.predictionsWidget.nativeView.reconfigure({
+    }): Promise<Error | undefined>{
+        const predictionsSnapshot = this.predictionsWidget
+        if(predictionsSnapshot instanceof PredictionsLayerWidget){
+            predictionsSnapshot.reconfigure({
                 source: {classifierGeneration: params.classifierGeneration, session: params.session},
                 channelColors: params.channelColors
             })
             return
         }
-        const predictionsNativeViewResult = this.driver.openPixelPredictions({
+        const predictionsLayerWidget = await PredictionsLayerWidget.create({
+            parentElement: this.element, //FIXME?
             session: params.session,
             channelColors: params.channelColors,
             classifierGeneration: params.classifierGeneration,
-            isVisible: true,
-            name: `predictions_for_${this.rawDataWidget.nativeView.datasource.url.name}`,
-            opacity: 0.5,
-            rawData: this.rawDataWidget.nativeView.datasource,
+            rawData: this.rawData,
+            driver: this.driver,
         })
-        if(predictionsNativeViewResult instanceof Error){
-            return predictionsNativeViewResult
+        if(predictionsLayerWidget instanceof Error){
+            return predictionsLayerWidget //FIXME: then what?
         }
-        this.predictionsWidget = new LayerWidget({
-            isVisible: true,
-            nativeView: predictionsNativeViewResult,
-            parentElement: this.element,
-        })
+        //check if we've been called while we were awaiting
+        if(
+            this.predictionsWidget instanceof PredictionsLayerWidget &&
+            this.predictionsWidget.classifierGeneration > predictionsLayerWidget.classifierGeneration
+        ){
+            return undefined
+        }
+        this.predictionsWidget = predictionsLayerWidget
         return undefined
     }
 
