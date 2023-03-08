@@ -23,7 +23,6 @@ from webilastik.ui.applet import UserPrompt
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.applet.ws_pixel_classification_applet import WsPixelClassificationApplet
 from webilastik.classic_ilastik.ilp.pixel_classification_ilp import IlpPixelClassificationWorkflowGroup
-from webilastik.utility.url import Url
 
 
 
@@ -150,7 +149,6 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         on_async_change: Callable[[], None],
         executor: Executor,
         priority_executor: PriorityExecutor,
-        session_url: Url,
 
         feature_extractors: "Set[IlpFilter] | None" = None,
         labels: Sequence[Label] = (),
@@ -166,12 +164,11 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         )
 
     @staticmethod
-    def from_pixel_classification_workflow(workflow: PixelClassificationWorkflow, session_url: Url) -> "WsPixelClassificationWorkflow":
+    def from_pixel_classification_workflow(workflow: PixelClassificationWorkflow) -> "WsPixelClassificationWorkflow":
         return WsPixelClassificationWorkflow(
             on_async_change=workflow.on_async_change,
             executor=workflow.executor,
             priority_executor=workflow.priority_executor,
-            session_url=session_url,
             feature_extractors=set(workflow.feature_selection_applet.feature_extractors()),
             labels=workflow.brushing_applet.labels(),
             pixel_classifier=workflow.pixel_classifier_applet.pixel_classifier(),
@@ -185,7 +182,6 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         on_async_change: Callable[[], None],
         executor: Executor,
         priority_executor: PriorityExecutor,
-        session_url: Url,
     ) -> "WsPixelClassificationWorkflow | Exception":
         try:
             f = h5py.File(temp_ilp_path, "r")
@@ -206,5 +202,4 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             feature_extractors=set(parsing_result.FeatureSelections.feature_extractors),
             labels=parsing_result.PixelClassification.labels,
             pixel_classifier=parsing_result.PixelClassification.classifier,
-            session_url=session_url,
         )
