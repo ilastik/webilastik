@@ -3,7 +3,6 @@ import { IViewerDriver } from "../drivers/viewer_driver";
 import { createElement, removeElement } from "../util/misc";
 import { BrushingWidget } from "./widgets/brushing_overlay/brushing_widget";
 import { FeatureSelectionWidget } from "./widgets/feature_selection";
-import { Viewer } from "../viewer/viewer";
 import { PredictionsExportWidget } from "./widgets/predictions_export_widget";
 import { ProjectWidget } from "./widgets/project_widget";
 import { DataSourceSelectionWidget } from "./widgets/datasource_selection_widget";
@@ -17,7 +16,6 @@ export class ReferencePixelClassificationWorkflowGui{
     public readonly exporter_applet: PredictionsExportWidget;
 
     public readonly session: Session;
-    public readonly viewer: Viewer;
     public readonly data_selection_widget: DataSourceSelectionWidget;
 
     public constructor({parentElement, session, viewer_driver, projectLocation, defaultBucketName}: {
@@ -30,12 +28,11 @@ export class ReferencePixelClassificationWorkflowGui{
         defaultBucketName = defaultBucketName || "hbp-image-service"
         this.session = session
         this.element = createElement({tagName: "div", parentElement, cssClasses: ["ReferencePixelClassificationWorkflowGui"]})
-        this.viewer = new Viewer({driver: viewer_driver, session, parentElement: this.element}) //FIXME
 
         this.project_widget = new ProjectWidget({parentElement: this.element, session, projectLocation, defaultBucketName})
 
         this.data_selection_widget = new DataSourceSelectionWidget({
-            parentElement: this.element, session, viewer: this.viewer, defaultBucketName
+            parentElement: this.element, session, viewer_driver, defaultBucketName
         });
 
         this.feature_selection_applet = new FeatureSelectionWidget({
@@ -57,7 +54,7 @@ export class ReferencePixelClassificationWorkflowGui{
             applet_name: "brushing_applet",
             session: this.session,
             parentElement: this.element,
-            viewer: this.viewer,
+            viewer: this.data_selection_widget.viewer,
             help: [
                 ("In order to classify the pixels of an image into different classes (e.g.: 'foreground' and 'background') " +
                 "ilastik needs you to provide it with samples of each class. "),
@@ -78,7 +75,7 @@ export class ReferencePixelClassificationWorkflowGui{
             name: "export_applet",
             parentElement: this.element,
             session: this.session,
-            viewer: this.viewer,
+            viewer: this.data_selection_widget.viewer,
             defaultBucketName,
             help: [
                 ("Once you trained your pixel classifier with the previous applets, you can apply it to other datasets " +
@@ -106,7 +103,7 @@ export class ReferencePixelClassificationWorkflowGui{
     public destroy(){
         //FIXME: close predictions and stuff
         this.brushing_widget.destroy()
-        this.viewer.destroy()
+        this.data_selection_widget.destroy()
         removeElement(this.element)
     }
 }

@@ -1,6 +1,7 @@
 // import { ListFsDirRequest } from "../../client/dto";
 import { GetDatasourcesFromUrlParamsDto } from "../../client/dto";
 import { PrecomputedChunksDataSource, Session } from "../../client/ilastik";
+import { IViewerDriver } from "../../drivers/viewer_driver";
 import { Url } from "../../util/parsed_url";
 import { Viewer } from "../../viewer/viewer";
 import { CollapsableWidget } from "./collapsable_applet_gui";
@@ -12,16 +13,16 @@ import { Anchor, Div, Paragraph, Span } from "./widget";
 export class DataSourceSelectionWidget{
     private element: HTMLDetailsElement;
     private session: Session;
-    private viewer: Viewer;
+    public readonly viewer: Viewer;
+    public readonly lanesContainer: Div;
 
     constructor(params: {
-        parentElement: HTMLElement, session: Session, viewer: Viewer, defaultBucketName: string,
+        parentElement: HTMLElement, session: Session, defaultBucketName: string, viewer_driver: IViewerDriver
     }){
         this.element = new CollapsableWidget({
             display_name: "Data Sources", parentElement: params.parentElement
         }).element
         this.session = params.session
-        this.viewer = params.viewer
 
         new DataProxyFilePicker({
             parentElement: this.element,
@@ -32,6 +33,16 @@ export class DataSourceSelectionWidget{
             }),
             okButtonValue: "Open",
         })
+
+        this.lanesContainer = new Div({parentElement: this.element})
+        this.viewer = new Viewer({
+            driver: params.viewer_driver, session: params.session, parentElement: this.element
+        })
+    }
+
+    public destroy(){
+        this.viewer.destroy()
+        // this.element.destroy()
     }
 
     private tryOpenViews = async (liveFsTree: LiveFsTree) => {
