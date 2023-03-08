@@ -2,15 +2,16 @@ import { Color, FsDataSource, PrecomputedChunksDataSource, Session } from "../..
 import { INativeView, IViewerDriver } from "../../drivers/viewer_driver";
 import { uuidv4 } from "../../util/misc";
 import { Url } from "../../util/parsed_url";
+import { CssClasses } from "../css_classes";
 import { Button } from "./input_widget";
-import { BooleanInput } from "./value_input_widget";
+import { ToggleButton } from "./value_input_widget";
 import { ContainerWidget, Div, Label, Paragraph, Span } from "./widget";
 
 class LayerWidget{
     public readonly nativeView: INativeView;
 
     public readonly element: Div;
-    private readonly visibilityInput: BooleanInput;
+    private readonly visibilityInput: ToggleButton;
     // private readonly opacitySlider: RangeInput;
 
     public constructor(params: {
@@ -20,11 +21,11 @@ class LayerWidget{
     }){
         this.nativeView = params.nativeView
 
-        this.element = new Div({parentElement: params.parentElement})
+        this.element = new Div({parentElement: params.parentElement, cssClasses: [CssClasses.ItkLaneLayerWidget]})
 
         new Label({parentElement: this.element, innerText: params.name})
-        new Label({parentElement: this.element, innerText: "👁️ "})
-        this.visibilityInput = new BooleanInput({
+        this.visibilityInput = new ToggleButton({
+            text: "👁️",
             parentElement: this.element,
             value: true,
             onClick: () => {
@@ -201,7 +202,7 @@ export class PixelClassificationLaneWidget{
     private predictionsWidget: PredictionsLayerWidget | undefined = undefined
     private rawDataWidget: RawDataLayerWidget;
     private driver: IViewerDriver;
-    private readonly visibilityInput: BooleanInput;
+    private readonly visibilityInput: ToggleButton;
 
     private constructor(params: {
         parentElement: ContainerWidget<any>,
@@ -212,12 +213,12 @@ export class PixelClassificationLaneWidget{
         onDestroyed: (lane: PixelClassificationLaneWidget) => void,
         onVisibilityChanged: (lane: PixelClassificationLaneWidget) => void,
     }){
-        this.element = new Div({parentElement: params.parentElement, children: [
+        this.element = new Div({parentElement: params.parentElement, cssClasses: [CssClasses.ItkLaneWidget], children: [
             new Paragraph({parentElement: undefined, children: [
                 new Span({parentElement: undefined, innerText: params.name}),
-                new Label({parentElement: undefined, innerText: "👁️ "}),
-                this.visibilityInput = new BooleanInput({
+                this.visibilityInput = new ToggleButton({
                     parentElement: undefined,
+                    text: "👁️",
                     value: params.isVisible,
                     onClick: () => {
                         this.setVisible(this.visibilityInput.value)
@@ -230,8 +231,9 @@ export class PixelClassificationLaneWidget{
                 }}),
             ]}),
 
-
         ]})
+
+
 
         this.rawDataWidget = params.rawDataWidget
         this.element.appendChild(params.rawDataWidget.element) //FIXME?
@@ -322,12 +324,12 @@ export class PixelClassificationLaneWidget{
             return predictionsLayerWidget //FIXME: then what?
         }
         //check if we've been called while we were awaiting
-        if(
-            this.predictionsWidget instanceof PredictionsLayerWidget &&
-            this.predictionsWidget.classifierGeneration > predictionsLayerWidget.classifierGeneration
-        ){
-            predictionsLayerWidget.destroy()
-            return undefined
+        if(this.predictionsWidget instanceof PredictionsLayerWidget){
+            if(this.predictionsWidget.classifierGeneration > predictionsLayerWidget.classifierGeneration){
+                console.log("Discarding older prediction update!")
+                predictionsLayerWidget.destroy()
+                return undefined
+            }
         }
         this.predictionsWidget = predictionsLayerWidget
         this.setVisible(this.isVisible)
