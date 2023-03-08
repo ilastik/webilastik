@@ -47,4 +47,5 @@ export enum CssClasses{
     ItkDatasourcesListContainer = "ItkDatasourcesListContainer",
     ItkAxisLengthField = "ItkAxisLengthField",
     ItkContainerForWebilastikControls = "ItkContainerForWebilastikControls",
+    ItkButtonDepressed = "ItkButtonDepressed",
 }
