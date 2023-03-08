@@ -113,11 +113,24 @@ export class Viewer{
             isVisible: params.isVisible,
             name: params.name,
             rawData: params.rawData,
-            onVisibilityChanged: () => {}, //FIXME
-            onDestroyed: () => {}, //FIXME
+            onVisibilityChanged: (lane) => {
+                const otherLanes = this.laneWidgets.filter(lw => lw != lane)
+                if(lane.isVisible){
+                    otherLanes.forEach(lw => lw.setVisible(false))
+                }else{
+                    otherLanes[0]?.setVisible(true)
+                }
+            },
+            onDestroyed: (lane) => {
+                this.laneWidgets.splice(this.laneWidgets.indexOf(lane), 1)
+                this.laneWidgets[0]?.setVisible(true)
+            },
         })
         if(laneResult instanceof Error){
             return laneResult
+        }
+        for(const lane of this.laneWidgets){
+            lane.setVisible(false)
         }
         this.laneWidgets.push(laneResult)
         return laneResult

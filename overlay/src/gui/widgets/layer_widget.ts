@@ -209,8 +209,8 @@ export class PixelClassificationLaneWidget{
         rawDataWidget: RawDataLayerWidget,
         driver: IViewerDriver,
         isVisible: boolean,
-        onDestroyed: () => void,
-        onVisibilityChanged: () => void,
+        onDestroyed: (lane: PixelClassificationLaneWidget) => void,
+        onVisibilityChanged: (lane: PixelClassificationLaneWidget) => void,
     }){
         this.element = new Div({parentElement: params.parentElement, children: [
             new Paragraph({parentElement: undefined, children: [
@@ -221,12 +221,12 @@ export class PixelClassificationLaneWidget{
                     value: params.isVisible,
                     onClick: () => {
                         this.setVisible(this.visibilityInput.value)
-                        params.onVisibilityChanged()
+                        params.onVisibilityChanged(this)
                     }
                 }),
                 new Button({inputType: "button", text: "✖", parentElement: undefined, onClick: () => {
                     this.destroy()
-                    params.onDestroyed()
+                    params.onDestroyed(this)
                 }}),
             ]}),
 
@@ -247,8 +247,8 @@ export class PixelClassificationLaneWidget{
         rawData: FsDataSource,
         isVisible: boolean,
         name: string,
-        onDestroyed: () => void,
-        onVisibilityChanged: () => void,
+        onDestroyed: (lane: PixelClassificationLaneWidget) => void,
+        onVisibilityChanged: (lane: PixelClassificationLaneWidget) => void,
     }): Promise<PixelClassificationLaneWidget | Error>{
         if(!(params.rawData instanceof PrecomputedChunksDataSource)){
             return new Error(`Unsupported datasource type `) //FIXME: maybe driver sould determine this
