@@ -8,7 +8,7 @@ import { CollapsableWidget } from "./collapsable_applet_gui";
 import { DataProxyFilePicker } from "./data_proxy_file_picker";
 import { LiveFsTree } from "./live_fs_tree";
 import { PopupWidget } from "./popup";
-import { Anchor, Div, Paragraph, Span } from "./widget";
+import { Anchor, Div, Label, Paragraph, Span } from "./widget";
 
 export class DataSourceSelectionWidget{
     private element: HTMLDetailsElement;
@@ -35,6 +35,7 @@ export class DataSourceSelectionWidget{
         })
 
         this.lanesContainer = new Div({parentElement: this.element})
+        new Label({parentElement: this.element, innerText: "Data Sources:"})
         this.viewer = new Viewer({
             driver: params.viewer_driver, session: params.session, parentElement: this.element
         })

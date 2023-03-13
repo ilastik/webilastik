@@ -346,3 +346,23 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
     max-height: 10em;
     overflow: auto;
 }
+
+.ItkLaneWidget{
+    padding: 0.3em;
+    border: solid 1px var(--default-highlight-color);
+    border-bottom: none;
+    margin-left: 1em;
+}
+
+.ItkLaneWidget:last-child{
+    border-bottom: solid 1px var(--default-highlight-color);
+}
+
+.ItkLaneWidget > p{
+    margin: 0;
+}
+
+.ItkLaneWidget label{
+    font-size: calc(var(--default-font-size) - 1px);
+    margin-left: 2em;
+}
