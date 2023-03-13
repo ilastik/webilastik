@@ -70,7 +70,8 @@ export class PredictingWidget extends Applet<State>{
             },
         })
         this.viewer = viewer
-        viewer.addDataChangedHandler(() => this.refreshPredictions())
+        // viewer.addDataChangedHandler(() => this.refreshPredictions())
+        viewer.addViewportsChangedHandler(() => this.refreshPredictions())
         this.session = session
 
         this.element = new Div({parentElement, children: [
@@ -136,6 +137,9 @@ export class PredictingWidget extends Applet<State>{
             return
         }
         for(const lane of this.viewer.getLaneWidgets()){
+            if(!lane.isVisible){
+                continue
+            }
             lane.refreshPredictions({
                 classifierGeneration: this.state.generation,
                 channelColors: this.state.channel_colors,

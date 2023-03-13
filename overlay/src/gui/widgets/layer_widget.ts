@@ -126,6 +126,8 @@ export class RawDataLayerWidget extends LayerWidget{
 export class PredictionsLayerWidget extends LayerWidget{
     readonly rawData: FsDataSource;
     private _classifierGeneration: number;
+    private channelColors: Color[]
+
 
     constructor(params: {
         parentElement: ContainerWidget<any>,
@@ -138,6 +140,7 @@ export class PredictionsLayerWidget extends LayerWidget{
         super({...params, name: "Pixel Predictions"})
         this.rawData = params.rawData
         this._classifierGeneration = params.classifierGeneration
+        this.channelColors = params.channelColors
     }
 
     public static async create(params: {
@@ -147,6 +150,7 @@ export class PredictionsLayerWidget extends LayerWidget{
         rawData: FsDataSource,
         classifierGeneration: number,
         channelColors: Color[],
+        isVisible: boolean,
     }): Promise<PredictionsLayerWidget | Error>{
         const opacity = 0.5
         const nativeView = await params.driver.openUrl({
@@ -155,7 +159,7 @@ export class PredictionsLayerWidget extends LayerWidget{
                 .joinPath(`predictions/raw_data=${params.rawData.toBase64()}/generation=${params.classifierGeneration}`),
             channelColors: params.channelColors,
             opacity,
-            isVisible: true,
+            isVisible: params.isVisible,
             name: `preds_for_${params.rawData.url.name}__${params.classifierGeneration}`
         })
         if(nativeView instanceof Error){
@@ -177,22 +181,31 @@ export class PredictionsLayerWidget extends LayerWidget{
 
     public reconfigure(params: {
         source?: {session: Session, classifierGeneration: number},
-        isVisible?: boolean | undefined,
+        // isVisible?: boolean | undefined,
         channelColors?: Color[],
-        opacity?: number
+        // opacity?: number
     }){
         if(params.source && params.source.classifierGeneration < this._classifierGeneration){
             return
         }
-        this._classifierGeneration = params.source?.classifierGeneration || this._classifierGeneration
-        let url: Url | undefined = undefined;
-        let source = params.source;
-        if(source){
-            //FIXME: duplicate code
-            url = source.session.sessionUrl
-                .updatedWith({datascheme: "precomputed"})
-                .joinPath(`predictions/raw_data=${this.rawData.toBase64()}/generation=${source.classifierGeneration}`)
+
+        // let isVisible = params.isVisible === undefined ? this.isVisible : params.isVisible
+        let channelColors = params.channelColors || this.channelColors
+        // let opacity = params.opacity === undefined ? this.opacity : params.opacity
+
+        if(
+            // isVisible === this.isVisible &&
+            channelColors.length == this.channelColors.length &&
+            channelColors.every((color, idx) => color.equals(this.channelColors[idx]))
+        ){
+            return
         }
+        this.channelColors = channelColors
+
+        this._classifierGeneration = params.source?.classifierGeneration || this._classifierGeneration
+        let url: Url | undefined = params.source && params.source.session.sessionUrl
+            .updatedWith({datascheme: "precomputed"})
+            .joinPath(`predictions/raw_data=${this.rawData.toBase64()}/generation=${params.source.classifierGeneration}`)
         return this.nativeView.reconfigure({...params, url})
     }
 }
@@ -319,6 +332,7 @@ export class PixelClassificationLaneWidget{
             classifierGeneration: params.classifierGeneration,
             rawData: this.rawData,
             driver: this.driver,
+            isVisible: this.isVisible
         })
         if(predictionsLayerWidget instanceof Error){
             return predictionsLayerWidget //FIXME: then what?
@@ -326,9 +340,10 @@ export class PixelClassificationLaneWidget{
         //check if we've been called while we were awaiting
         if(this.predictionsWidget instanceof PredictionsLayerWidget){
             if(this.predictionsWidget.classifierGeneration > predictionsLayerWidget.classifierGeneration){
-                console.log("Discarding older prediction update!")
                 predictionsLayerWidget.destroy()
                 return undefined
+            }else{
+                this.predictionsWidget.destroy()
             }
         }
         this.predictionsWidget = predictionsLayerWidget
