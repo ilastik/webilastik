@@ -132,8 +132,10 @@ class Layer{
         return [
             "void main() {",
             "    " + color_lines.join("\n    "),
-            "    emit(",
-            `        vec4(${colors_to_mix.join(' + ')}, ${opacity.toFixed(3)})`,
+            "    emitRGB(",
+            `        //vec4(${colors_to_mix.join(' + ')}, ${opacity.toFixed(3)})`,
+            `        //vec4(${colors_to_mix.join(' + ')}, 1.0)`,
+            `        ${colors_to_mix.join(' + ')}`,
             "    );",
             "}",
         ].join("\n")
