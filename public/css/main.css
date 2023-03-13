@@ -118,11 +118,12 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
 }
 
 .ItkButton:active, .ItkButtonDepressed{
-    border-top: solid var(--default-button-border-thickness) var(--default-highlight-dark-color);
-    border-left: solid var(--default-button-border-thickness) var(--default-highlight-dark-color);
-    box-shadow: inset 6px 6px 4px 0px rgb(0 0 0 / 25%);
-    border-bottom: solid var(--default-button-border-thickness) var(--default-highlight-bright-color);
-    border-right: solid var(--default-button-border-thickness) var(--default-highlight-bright-color);
+    border-top: solid var(--default-button-border-thickness) #300e00;
+    border-left: solid var(--default-button-border-thickness) #300e00;
+    /*FIXME: use global CSS variables instead of hardcoding here*/
+    box-shadow: inset 3px 3px 4px 0px rgb(0 0 0 / 45%);
+    border-bottom: solid var(--default-button-border-thickness) #a53000;
+    border-right: solid var(--default-button-border-thickness) #a53000;
 }
 
 .ItkRecenterButton{
