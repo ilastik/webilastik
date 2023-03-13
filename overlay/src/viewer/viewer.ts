@@ -148,6 +148,9 @@ export class Viewer{
     public destroy(){
         this.recenterButton.destroy()
         this.element.destroy()
+        for(const laneWidget of this.laneWidgets){
+            laneWidget.destroy()
+        }
         this.onViewportsChangedHandlers.forEach(handler => this.driver.removeViewportsChangedHandler(handler))
         this.driver.removeViewportsChangedHandler(this.viewportsChangedHandler)
     }
