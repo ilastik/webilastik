@@ -236,7 +236,7 @@ export class NeuroglancerDriver implements IViewerDriver{
         opacity: number,
     }): Promise<Layer | Error>{
         const managedLayer = this.viewer.layerSpecification.getLayer(
-            params.name, {source: params.url.double_protocol_raw}
+            params.name, {source: params.url.double_protocol_raw, visible: params.isVisible}
         );
         this.viewer.layerSpecification.add(managedLayer);
         return new Promise(resolve => {
