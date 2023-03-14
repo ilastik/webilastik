@@ -1,11 +1,13 @@
 // import { ListFsDirRequest } from "../../client/dto";
 import { GetDatasourcesFromUrlParamsDto } from "../../client/dto";
-import { PrecomputedChunksDataSource, Session } from "../../client/ilastik";
+import { FsDataSource, PrecomputedChunksDataSource, Session } from "../../client/ilastik";
 import { IViewerDriver } from "../../drivers/viewer_driver";
 import { Url } from "../../util/parsed_url";
 import { Viewer } from "../../viewer/viewer";
+import { CssClasses } from "../css_classes";
 import { CollapsableWidget } from "./collapsable_applet_gui";
 import { DataProxyFilePicker } from "./data_proxy_file_picker";
+import { Button } from "./input_widget";
 import { LiveFsTree } from "./live_fs_tree";
 import { PopupWidget } from "./popup";
 import { Anchor, Div, Label, Paragraph, Span } from "./widget";
@@ -47,105 +49,70 @@ export class DataSourceSelectionWidget{
     }
 
     private tryOpenViews = async (liveFsTree: LiveFsTree) => {
-        let viewPromises = liveFsTree.getSelectedUrls().map(url => this.session.getDatasourcesFromUrl(
+        let selectedUrls = liveFsTree.getSelectedUrls()
+        let viewPromises = selectedUrls.map(url => this.session.getDatasourcesFromUrl(
             new GetDatasourcesFromUrlParamsDto({
                 url: url.toDto(),
             }))
         )
 
-        let imageServiceHintWidget: Div | undefined = undefined
-        let errorMessageWidgets = new Array<Paragraph>();
+        let errorMessages: string[] = []
+        let unsupportedUrls: Url[] = []
 
+        for(let i = 0; i < selectedUrls.length; i++){
+            let url = selectedUrls[i]
+            let viewPromise = viewPromises[i]
 
-        for(const viewPromise of viewPromises){
             let viewResult = await viewPromise;
             if(viewResult instanceof Error){
-                errorMessageWidgets.push(new Paragraph({
-                    parentElement: undefined, innerText: `Could not open view: ${viewResult.message}`
-                }))
-            }else if(viewResult instanceof Array && viewResult.find(ds => !(ds instanceof PrecomputedChunksDataSource))){
-                errorMessageWidgets.push(new Paragraph({
-                    parentElement: undefined, innerText: `Unsupported format: ${viewResult.map(ds => ds.url).join(", ")}`
-                }))
-                imageServiceHintWidget = imageServiceHintWidget || new Div({parentElement: undefined, children: [
-                    new Paragraph({
-                        parentElement: undefined,
-                        children: [
-                            new Span({parentElement: undefined, innerText:
-                                `Only datasources in Neuroglancer's Precomputed Chunks format are supported in the viewer at this time ` +
-                                `(though you might still be able to use it in batch export).` +
-                                `You can try converting your images to the Precomputed Chunks format by using the `,
-                            }),
-                            new Anchor({
-                                parentElement: undefined,
-                                href: Url.parse('https://wiki.ebrains.eu/bin/view/Collabs/hbp-image-service-user-guide/'),
-                                rel: "noopener noreferrer",
-                                target: "_blank",
-                                children: [
-                                    new Span({parentElement: undefined, innerText: 'EBRAINS image service'})
-                                ]
-                            })
-                        ]
-                    })
-
-                ]})
+                errorMessages.push(`Could not open view: ${viewResult.message}`)
+            }else if(viewResult === undefined){
+                console.log("FIXME: handle undefined datasource? Maybe just don't have undefined at all?")
             }else{
-                if(viewResult instanceof Array){
-                    if(viewResult.length == 1){
-                        viewResult = viewResult[0]
-                    }else{
-                        console.log("FXIME! Ask user to select resolution!")
-                        continue
-                    }
-                }
-                if(viewResult === undefined){
-                    console.log("FXIME! Deal with undefined!!! Or just remove it altogether")
-                    // createElement({tagName: "label", innerHTML: "Select a voxel size to annotate on:", parentElement: this.resolutionSelectionContainer});
-                    // new PopupSelect<FsDataSource>({
-                    //     popupTitle: "Select a voxel size to annotate on",
-                    //     parentElement: this.resolutionSelectionContainer,
-                    //     options: mode.datasources,
-                    //     optionRenderer: (args) => {
-                    //         let datasource = args.option
-                    //         return createElement({
-                    //             tagName: "span",
-                    //             parentElement: args.parentElement,
-                    //             innerText: datasource.resolutionString
-                    //         })
-                    //     },
-                    //     onChange: async (datasource) => {
-                    //         if(!(datasource instanceof PrecomputedChunksDataSource)){
-                    //             new ErrorPopupWidget({message: "Can't handle this type of datasource yet"})
-                    //             return
-                    //         }
-                    //         let stripped_view = new StrippedPrecomputedView({
-                    //             datasource,
-                    //             name: datasource.getDisplayString(),
-                    //             session: this.session,
-                    //             opacity: 1.0,
-                    //             visible: true,
-                    //         })
-                    //         this.viewer.reconfigure({toOpen: [stripped_view]})
-                    //     },
-                    // })
+                const datasources: FsDataSource[] = viewResult instanceof Array ? viewResult : [viewResult]
+                if(datasources.find(ds => !(ds instanceof PrecomputedChunksDataSource))){
+                    errorMessages.push(`Unsupported datasources from ${url.raw}`)
+                    unsupportedUrls.push(url)
                     continue
                 }
-                console.log(`FIXME: add resolution to vie name?`)
+
+                const selectedResolution: FsDataSource = datasources.length == 1 ? datasources[0] : await PopupWidget.AsyncDialog({
+                    title: "Select a resolution",
+                    fillInPopup: (params: {popup: PopupWidget, resolve: (result: FsDataSource) => void}) => {
+                        for(const ds of datasources){
+                            const p = new Paragraph({parentElement: params.popup.element})
+                            new Button({inputType: "button", parentElement: p, text: ds.resolutionString, onClick: () => params.resolve(ds)})
+                        }
+                    }
+                })
+
                 this.viewer.openLane({
-                    name: `${viewResult.url.name}`,
+                    name: `${selectedResolution.url.name}`,
                     isVisible: true,
-                    rawData: viewResult
+                    rawData: selectedResolution,
                 })
             }
         }
 
-        if(errorMessageWidgets.length > 0 || imageServiceHintWidget){
+        if(unsupportedUrls.length > 0 || errorMessages.length > 0){
             let popup = new PopupWidget("Errors when opening data sources", true)
-            if(imageServiceHintWidget){
-                popup.appendChild(imageServiceHintWidget)
+            for(const errorMsg of errorMessages){
+                new Paragraph({parentElement: popup.element, innerText: errorMsg, cssClasses: [CssClasses.ItkErrorText]})
             }
-            for(const errorMsgWidget of errorMessageWidgets){
-                popup.appendChild(errorMsgWidget)
+            if(unsupportedUrls.length > 0){
+                const p = new Paragraph({parentElement: popup.element})
+                new Span({parentElement: p, innerText:
+                    `Only datasources in Neuroglancer's Precomputed Chunks format are supported in the viewer at this time ` +
+                    `(though you might still be able to use it in batch export).` +
+                    `You can try converting your images to the Precomputed Chunks format by using the `,
+                }),
+                new Anchor({
+                    parentElement: p,
+                    href: Url.parse('https://wiki.ebrains.eu/bin/view/Collabs/hbp-image-service-user-guide/'),
+                    rel: "noopener noreferrer",
+                    target: "_blank",
+                    children: [new Span({parentElement: undefined, innerText: 'EBRAINS image service'})],
+                })
             }
         }
     }

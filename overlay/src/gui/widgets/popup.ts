@@ -88,6 +88,22 @@ export class PopupWidget extends Div{
         return result
     }
 
+    public static async AsyncDialog<RESULT>(params: {
+        title: string,
+        fillInPopup: (params: {popup: PopupWidget, resolve: (result: RESULT) => void}) => void,
+    }): Promise<RESULT>{
+        return new Promise<RESULT>(resolve => {
+            let popup = new PopupWidget(params.title);
+            params.fillInPopup({
+                popup,
+                resolve: (result: RESULT) => {
+                    popup.destroy()
+                    resolve(result)
+                }
+            })
+        })
+    }
+
 }
 
 export class ErrorPopupWidget extends PopupWidget{
