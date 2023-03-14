@@ -101,6 +101,22 @@ export class Viewer{
         }
     }
 
+    public handleLaneVisibilityChange(changedLane: PixelClassificationLaneWidget){
+        const otherLanes = this.laneWidgets.filter(lw => lw != changedLane)
+        let visibleLane: PixelClassificationLaneWidget | undefined;
+        if(changedLane.isVisible){
+            visibleLane = changedLane
+            otherLanes.forEach(lw => lw.setVisible(false))
+        }else{
+            otherLanes[0]?.setVisible(true)
+            visibleLane = otherLanes[0]
+        }
+
+        if(visibleLane){
+            this.driver.enable3dNavigation(visibleLane.rawData.shape.z > 1)
+        }
+    }
+
     public async openLane(params:{
         rawData: FsDataSource,
         name: string,
@@ -113,26 +129,18 @@ export class Viewer{
             isVisible: params.isVisible,
             name: params.name,
             rawData: params.rawData,
-            onVisibilityChanged: (lane) => {
-                const otherLanes = this.laneWidgets.filter(lw => lw != lane)
-                if(lane.isVisible){
-                    otherLanes.forEach(lw => lw.setVisible(false))
-                }else{
-                    otherLanes[0]?.setVisible(true)
-                }
-            },
+            onVisibilityChanged: (lane) => this.handleLaneVisibilityChange(lane),
             onDestroyed: (lane) => {
-                this.laneWidgets.splice(this.laneWidgets.indexOf(lane), 1)
-                this.laneWidgets[0]?.setVisible(true)
+                let laneIndex = this.laneWidgets.indexOf(lane);
+                (this.laneWidgets[laneIndex + 1] || this.laneWidgets[laneIndex - 1])?.setVisible(true)
+                this.laneWidgets.splice(laneIndex, 1)
             },
         })
         if(laneResult instanceof Error){
             return laneResult
         }
-        for(const lane of this.laneWidgets){
-            lane.setVisible(false)
-        }
         this.laneWidgets.push(laneResult)
+        this.handleLaneVisibilityChange(laneResult)
         return laneResult
     }
 
