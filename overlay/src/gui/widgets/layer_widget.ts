@@ -318,7 +318,7 @@ export class PixelClassificationLaneWidget{
     public setVisible(isVisible: boolean){
         if(isVisible){
             this.rawDataWidget.nativeView.reconfigure({isVisible: this.rawDataWidget.isVisible})
-            this.predictionsWidget?.nativeView.reconfigure({isVisible: this.rawDataWidget.isVisible})
+            this.predictionsWidget?.nativeView.reconfigure({isVisible: this.predictionsWidget.isVisible})
         }else{
             this.rawDataWidget.nativeView.reconfigure({isVisible: false})
             this.predictionsWidget?.nativeView.reconfigure({isVisible: false})
