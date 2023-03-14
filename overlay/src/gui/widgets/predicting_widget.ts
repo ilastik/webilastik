@@ -1,8 +1,8 @@
 import { Applet } from "../../client/applets/applet";
-import { CheckDatasourceCompatibilityParams, CheckDatasourceCompatibilityResponse } from "../../client/dto";
-import { Color, FsDataSource, Session } from "../../client/ilastik";
+import { CheckDatasourceCompatibilityParams, CheckDatasourceCompatibilityResponse, Shape5DDto } from "../../client/dto";
+import { Color, FsDataSource, Session, Shape5D } from "../../client/ilastik";
 import { Path } from "../../util/parsed_url";
-import { ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonObject, ensureJsonString, JsonValue } from "../../util/serialization";
+import { ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonObject, ensureJsonString, ensureOptional, JsonValue } from "../../util/serialization";
 import { Viewer } from "../../viewer/viewer";
 import { CssClasses } from "../css_classes";
 import { Button } from "./input_widget";
@@ -19,11 +19,13 @@ export function ensureClassifierDescription(value: string): ClassifierDescriptio
     return variant
 }
 
+ //FIXME: use DTOs
 type State = {
     generation: number,
     description: ClassifierDescription,
     live_update: boolean,
     channel_colors: Array<Color>,
+    minInputShape: Shape5D | undefined,
 }
 
 function deserializeState(value: JsonValue): State{
@@ -39,7 +41,17 @@ function deserializeState(value: JsonValue): State{
                 g: ensureJsonNumber(color_obj["g"]),
                 b: ensureJsonNumber(color_obj["b"]),
             })
-        })
+        }),
+        minInputShape: ensureOptional(
+            (v) => {
+                const dto = Shape5DDto.fromJsonValue(v)
+                if(dto instanceof Error){
+                    throw `FIXME: bad payload from server`
+                }
+                return Shape5D.fromDto(dto)
+            },
+            obj["minInputShape"]
+        )
     }
 }
 
@@ -55,6 +67,7 @@ export class PredictingWidget extends Applet<State>{
         description: "waiting for inputs",
         channel_colors: [],
         live_update: false,
+        minInputShape: undefined,
     }
 
     constructor({session, viewer, parentElement}: {session: Session, viewer: Viewer, parentElement: HTMLElement}){
@@ -137,6 +150,10 @@ export class PredictingWidget extends Applet<State>{
             return
         }
         for(const lane of this.viewer.getLaneWidgets()){
+            if(lane.rawData.shape.c != this.state.minInputShape!.c){
+                lane.closePredictions()
+                continue
+            }
             if(!lane.isVisible){
                 continue
             }
