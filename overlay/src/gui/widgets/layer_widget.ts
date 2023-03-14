@@ -65,6 +65,32 @@ class LayerWidget{
 export class RawDataLayerWidget extends LayerWidget{
     public readonly datasource: PrecomputedChunksDataSource;
 
+    //colors by Sasha Trubetskoy: https://sashamaps.net/docs/resources/20-colors/
+    public static readonly colorMap = [
+        new Color({r: 230, g: 25, b: 75}),
+        new Color({r: 60, g: 180, b: 75}),
+        new Color({r: 255, g: 225, b: 25}),
+        new Color({r: 0, g: 130, b: 200}),
+        new Color({r: 245, g: 130, b: 48}),
+        new Color({r: 145, g: 30, b: 180}),
+        new Color({r: 70, g: 240, b: 240}),
+        new Color({r: 240, g: 50, b: 230}),
+        new Color({r: 210, g: 245, b: 60}),
+        new Color({r: 250, g: 190, b: 212}),
+        new Color({r: 0, g: 128, b: 128}),
+        new Color({r: 220, g: 190, b: 255}),
+        new Color({r: 170, g: 110, b: 40}),
+        new Color({r: 255, g: 250, b: 200}),
+        new Color({r: 128, g: 0, b: 0}),
+        new Color({r: 170, g: 255, b: 195}),
+        new Color({r: 128, g: 128, b: 0}),
+        new Color({r: 255, g: 215, b: 180}),
+        new Color({r: 0, g: 0, b: 128}),
+        new Color({r: 128, g: 128, b: 128}),
+        new Color({r: 255, g: 255, b: 255}),
+        new Color({r: 0, g: 0, b: 0}),
+    ]
+
     constructor(params: {
         parentElement: ContainerWidget<any> | undefined,
         datasource: PrecomputedChunksDataSource,
@@ -82,16 +108,13 @@ export class RawDataLayerWidget extends LayerWidget{
         datasource: PrecomputedChunksDataSource,
     }): Promise<RawDataLayerWidget | Error>{
         const opacity = 1
-        let channelColors: Color[] = []
+        let channelColors: Color[]
         if(params.datasource.shape.c == 3){
             channelColors = [
                 new Color({r: 255, g: 0, b: 0}), new Color({r: 0, g: 255, b: 0}), new Color({r: 0, g: 0, b: 255}),
             ]
         }else{
-            channelColors = []
-            for(let i=0; i<params.datasource.shape.c; i++){
-                channelColors.push(new Color({r: 255, g: 255, b: 255})) //FIXME
-            }
+            channelColors = this.colorMap.slice(0, params.datasource.shape.c)
         }
         const nativeView = await params.driver.openUrl({
             isVisible: true,
