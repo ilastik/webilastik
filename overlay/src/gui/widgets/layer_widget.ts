@@ -126,8 +126,7 @@ export class RawDataLayerWidget extends LayerWidget{
 export class PredictionsLayerWidget extends LayerWidget{
     readonly rawData: FsDataSource;
     private _classifierGeneration: number;
-    private channelColors: Color[]
-
+    public channelColors: Color[]
 
     constructor(params: {
         parentElement: ContainerWidget<any>,
@@ -181,27 +180,9 @@ export class PredictionsLayerWidget extends LayerWidget{
 
     public reconfigure(params: {
         source?: {session: Session, classifierGeneration: number},
-        // isVisible?: boolean | undefined,
         channelColors?: Color[],
-        // opacity?: number
     }){
-        if(params.source && params.source.classifierGeneration < this._classifierGeneration){
-            return
-        }
-
-        // let isVisible = params.isVisible === undefined ? this.isVisible : params.isVisible
-        let channelColors = params.channelColors || this.channelColors
-        // let opacity = params.opacity === undefined ? this.opacity : params.opacity
-
-        if(
-            // isVisible === this.isVisible &&
-            channelColors.length == this.channelColors.length &&
-            channelColors.every((color, idx) => color.equals(this.channelColors[idx]))
-        ){
-            return
-        }
-        this.channelColors = channelColors
-
+        this.channelColors = params.channelColors || this.channelColors
         this._classifierGeneration = params.source?.classifierGeneration || this._classifierGeneration
         let url: Url | undefined = params.source && params.source.session.sessionUrl
             .updatedWith({datascheme: "precomputed"})
@@ -210,12 +191,47 @@ export class PredictionsLayerWidget extends LayerWidget{
     }
 }
 
+export class PredictionsParams{
+    public readonly classifierGeneration: number
+    public readonly channelColors: Color[]
+    public constructor(params: {classifierGeneration: number, channelColors: Color[]}){
+        this.classifierGeneration = params.classifierGeneration
+        this.channelColors = params.channelColors
+    }
+
+    public hasSameColorsAs(other: PredictionsParams | PredictionsLayerWidget){
+        return this.channelColors.length == other.channelColors.length &&
+            this.channelColors.every((color, idx) => color.equals(other.channelColors[idx]))
+    }
+
+    public equals(other: PredictionsParams | PredictionsLayerWidget): boolean{
+        return this.classifierGeneration == other.classifierGeneration && this.hasSameColorsAs(other)
+    }
+
+    public supersedes(old: PredictionsParams | PredictionsLayerWidget): boolean{
+        if(this.classifierGeneration > old.classifierGeneration){
+            return true
+        }
+        if(this.classifierGeneration < old.classifierGeneration){
+            return false
+        }
+        return !this.hasSameColorsAs(old)
+    }
+}
+
 export class PixelClassificationLaneWidget{
     private element: Div;
-    private predictionsWidget: PredictionsLayerWidget | undefined = undefined
     private rawDataWidget: RawDataLayerWidget;
     private driver: IViewerDriver;
     private readonly visibilityInput: ToggleButton;
+
+    private _predictionsWidget: PredictionsLayerWidget | undefined | PredictionsParams = undefined
+    private get predictionsWidget(): PredictionsLayerWidget | undefined{
+        if(this._predictionsWidget instanceof PredictionsLayerWidget){
+            return this._predictionsWidget
+        }
+        return undefined
+    }
 
     private constructor(params: {
         parentElement: ContainerWidget<any>,
@@ -245,8 +261,6 @@ export class PixelClassificationLaneWidget{
             ]}),
 
         ]})
-
-
 
         this.rawDataWidget = params.rawDataWidget
         this.element.appendChild(params.rawDataWidget.element) //FIXME?
@@ -317,7 +331,13 @@ export class PixelClassificationLaneWidget{
     public async refreshPredictions(params: {
         session: Session, classifierGeneration: number, channelColors: Color[]
     }): Promise<Error | undefined>{
-        const predictionsSnapshot = this.predictionsWidget
+        const predictionParams = new PredictionsParams(params)
+        const predictionsSnapshot = this._predictionsWidget
+
+        if(predictionsSnapshot !== undefined && !predictionParams.supersedes(predictionsSnapshot)){
+            return
+        }
+
         if(predictionsSnapshot instanceof PredictionsLayerWidget){
             predictionsSnapshot.reconfigure({
                 source: {classifierGeneration: params.classifierGeneration, session: params.session},
@@ -325,6 +345,8 @@ export class PixelClassificationLaneWidget{
             })
             return
         }
+
+        this._predictionsWidget = predictionParams
         const predictionsLayerWidget = await PredictionsLayerWidget.create({
             parentElement: this.element, //FIXME?
             session: params.session,
@@ -334,25 +356,25 @@ export class PixelClassificationLaneWidget{
             driver: this.driver,
             isVisible: this.isVisible
         })
-        if(predictionsLayerWidget instanceof Error){
-            return predictionsLayerWidget //FIXME: then what?
-        }
         //check if we've been called while we were awaiting
-        if(this.predictionsWidget instanceof PredictionsLayerWidget){
-            if(this.predictionsWidget.classifierGeneration > predictionsLayerWidget.classifierGeneration){
+        if(this._predictionsWidget !== predictionParams){
+            if(!(predictionsLayerWidget instanceof Error)){
                 predictionsLayerWidget.destroy()
-                return undefined
-            }else{
-                this.predictionsWidget.destroy()
             }
+            return undefined
         }
-        this.predictionsWidget = predictionsLayerWidget
+
+        if(predictionsLayerWidget instanceof Error){
+            this._predictionsWidget = undefined
+            return
+        }
+        this._predictionsWidget = predictionsLayerWidget
         this.setVisible(this.isVisible)
         return undefined
     }
 
     public closePredictions(){
         this.predictionsWidget?.destroy()
-        this.predictionsWidget = undefined
+        this._predictionsWidget = undefined
     }
 }
