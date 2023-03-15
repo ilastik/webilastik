@@ -1,7 +1,7 @@
 import { AxesKeys, AxisKey, BucketFs, Color, HttpFs } from "../../client/ilastik";
 import { Path, Url } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
-import { InputType, InputWidget, InputWidgetParams, Select } from "./input_widget";
+import { Button, InputType, InputWidget, InputWidgetParams, Select } from "./input_widget";
 import { ContainerWidget, Span, TagName } from "./widget";
 
 export type ValueInputWidgetParams<V> = InputWidgetParams & {
@@ -197,7 +197,14 @@ export class BooleanInput extends ValueInputWidget<boolean, "checkbox">{
         value?: boolean,
         valueExplanations?: {on: string, off: string},
     }){
-        super({...params, inputType: "checkbox"})
+
+        let onClick = (ev: MouseEvent) => {
+            this.value = this.element.checked //FIXME? this is just to update description text
+            if(params.onClick){
+                params.onClick(ev)
+            }
+        }
+        super({...params, inputType: "checkbox", onClick})
         this.valueExplanations = params.valueExplanations || {on: "", off: ""}
         this.valueExplanationSpan = new Span({parentElement: params.parentElement, cssClasses: [CssClasses.InfoText]})
         this.value  = params.value === undefined ? false : params.value
@@ -210,6 +217,34 @@ export class BooleanInput extends ValueInputWidget<boolean, "checkbox">{
     public set value(val: boolean){
         this.element.checked = val
         this.valueExplanationSpan.setInnerText(this.valueExplanations[val ? "on" : "off"])
+    }
+}
+
+export class ToggleButton extends Button<"button">{
+    private pressed: boolean
+    constructor(params: InputWidgetParams & {text: string, value: boolean}){
+        let onClick = (ev: MouseEvent) => {
+            this.value = !this.pressed
+            if(params.onClick){
+                params.onClick(ev)
+            }
+        }
+        super({...params, onClick, inputType: "button"})
+        this.pressed  = params.value
+        this.value = params.value
+    }
+
+    public get value(): boolean{
+        return this.pressed
+    }
+
+    public set value(val: boolean){
+        this.pressed = val
+        if(val){
+            this.addCssClass(CssClasses.ItkButtonDepressed)
+        }else{
+            this.removeCssClass(CssClasses.ItkButtonDepressed)
+        }
     }
 }
 
@@ -286,5 +321,22 @@ export class AxesKeysInput extends Span{
         this.axisLabel2.value = value[2]
         this.axisLabel3.value = value[3]
         this.axisLabel4.value = value[4]
+    }
+}
+
+export class RangeInput extends ValueInputWidget<number, "range">{
+    constructor(params: ValueInputWidgetParams<number> & {value: number, min: number, max: number, step: number}){
+        super({...params, inputType: "range"})
+        this.element.min = params.min.toString()
+        this.element.max = params.max.toString()
+        this.element.step = params.step.toString()
+        this.value = params.value
+    }
+
+    public get value(): number {
+        return parseFloat(this.raw)
+    }
+    public set value(val: number) {
+        this.raw = val.toString()
     }
 }

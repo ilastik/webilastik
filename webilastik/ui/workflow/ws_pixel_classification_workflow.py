@@ -157,7 +157,6 @@ class WebIlastik:
         self.workflow = WsPixelClassificationWorkflow(
             on_async_change=lambda: self.enqueue_user_interaction(user_interaction=lambda: None), #FIXME?
             executor=self.executor,
-            session_url=self.session_url,
             priority_executor=self.priority_executor
         )
         self.app = web.Application()
@@ -423,7 +422,6 @@ class WebIlastik:
             on_async_change=lambda: self.enqueue_user_interaction(user_interaction=lambda: None), #FIXME?
             executor=self.executor,
             priority_executor=self.priority_executor,
-            session_url=self.session_url,
         )
         if isinstance(new_workflow_result, Exception):
             return web.Response(status=400, text=f"Could not load project: {new_workflow_result}")

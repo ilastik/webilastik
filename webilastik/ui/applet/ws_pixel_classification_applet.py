@@ -5,13 +5,13 @@ import asyncio
 import numpy as np
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonBoolean
 from aiohttp import web
-from webilastik.classifiers.pixel_classifier import PixelClassifier
+from webilastik.classifiers.pixel_classifier import PixelClassifier, VigraPixelClassifier
 
 from webilastik.datasource import DataRoi, FsDataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale, RawEncoder
 from webilastik.server.util import get_encoded_datasource_from_url
 from webilastik.server.rpc import MessageParsingError
-from webilastik.server.rpc.dto import CheckDatasourceCompatibilityParams, CheckDatasourceCompatibilityResponse, RpcErrorDto
+from webilastik.server.rpc.dto import CheckDatasourceCompatibilityParams, CheckDatasourceCompatibilityResponse, RpcErrorDto, Shape5DDto
 from webilastik.ui.applet import CascadeError, UserPrompt
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
 from webilastik.ui.applet.ws_applet import WsApplet
@@ -24,12 +24,17 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
             state = self._state
             label_classes = self._in_label_classes()
 
+        minInputShape: Optional[Shape5DDto] = None
+        if isinstance(state.classifier, VigraPixelClassifier):
+            minInputShape = Shape5DDto.from_shape5d(state.classifier.minInputShape)
+
         return {
             "generation": state.generation,
             "description": state.description,
             "live_update": state.live_update,
             # vigra will output only as many channels as number of values in the samples, so empty labels are a problem
             "channel_colors": tuple(color.to_dto().to_json_value() for color, annotations in label_classes.items() if len(annotations) > 0),
+            "minInputShape": None if minInputShape is None else minInputShape.to_json_value(),
         }
 
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:

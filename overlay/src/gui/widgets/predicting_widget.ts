@@ -1,11 +1,8 @@
 import { Applet } from "../../client/applets/applet";
-import { CheckDatasourceCompatibilityParams, CheckDatasourceCompatibilityResponse } from "../../client/dto";
-import { Color, FsDataSource, Session } from "../../client/ilastik";
-import { HashMap } from "../../util/hashmap";
-import { assertUnreachable } from "../../util/misc";
+import { CheckDatasourceCompatibilityParams, CheckDatasourceCompatibilityResponse, Shape5DDto } from "../../client/dto";
+import { Color, FsDataSource, Session, Shape5D } from "../../client/ilastik";
 import { Path } from "../../util/parsed_url";
-import { ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonObject, ensureJsonString, JsonValue } from "../../util/serialization";
-import { FailedView, PredictionsView, RawDataView, StrippedPrecomputedView, UnsupportedDatasetView } from "../../viewer/view";
+import { ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonObject, ensureJsonString, ensureOptional, JsonValue } from "../../util/serialization";
 import { Viewer } from "../../viewer/viewer";
 import { CssClasses } from "../css_classes";
 import { Button } from "./input_widget";
@@ -22,11 +19,13 @@ export function ensureClassifierDescription(value: string): ClassifierDescriptio
     return variant
 }
 
+ //FIXME: use DTOs
 type State = {
     generation: number,
     description: ClassifierDescription,
     live_update: boolean,
     channel_colors: Array<Color>,
+    minInputShape: Shape5D | undefined,
 }
 
 function deserializeState(value: JsonValue): State{
@@ -42,7 +41,17 @@ function deserializeState(value: JsonValue): State{
                 g: ensureJsonNumber(color_obj["g"]),
                 b: ensureJsonNumber(color_obj["b"]),
             })
-        })
+        }),
+        minInputShape: ensureOptional(
+            (v) => {
+                const dto = Shape5DDto.fromJsonValue(v)
+                if(dto instanceof Error){
+                    throw `FIXME: bad payload from server`
+                }
+                return Shape5D.fromDto(dto)
+            },
+            obj["minInputShape"]
+        )
     }
 }
 
@@ -53,12 +62,12 @@ export class PredictingWidget extends Applet<State>{
     public readonly element: Div
     private classifierDescriptionDisplay: Paragraph
     private liveUpdateCheckbox: BooleanInput
-    private compatCheckGeneration = 0;
     private state: State = {
         generation: -1,
         description: "waiting for inputs",
         channel_colors: [],
         live_update: false,
+        minInputShape: undefined,
     }
 
     constructor({session, viewer, parentElement}: {session: Session, viewer: Viewer, parentElement: HTMLElement}){
@@ -74,7 +83,8 @@ export class PredictingWidget extends Applet<State>{
             },
         })
         this.viewer = viewer
-        viewer.addDataChangedHandler(() => this.refreshPredictions())
+        // viewer.addDataChangedHandler(() => this.refreshPredictions())
+        viewer.addViewportsChangedHandler(() => this.refreshPredictions())
         this.session = session
 
         this.element = new Div({parentElement, children: [
@@ -94,13 +104,13 @@ export class PredictingWidget extends Applet<State>{
         ]})
     }
 
-    public async checkDatasourceCompatibility(datasources: FsDataSource[]): Promise<boolean[] | Error>{
+    public async checkDatasourceCompatibility(datasource: FsDataSource): Promise<boolean | Error>{
         let response = await fetch(
             this.session.sessionUrl.joinPath("check_datasource_compatibility").raw,
             {
                 method: "POST",
                 body: JSON.stringify(new CheckDatasourceCompatibilityParams({
-                    datasources: datasources.map(ds => ds.toDto())
+                    datasources: [datasource.toDto()]
                 }).toJsonValue())
             }
         )
@@ -111,15 +121,11 @@ export class PredictingWidget extends Applet<State>{
         if(compatibilities instanceof Error){
             return compatibilities
         }
-        return compatibilities.compatible
+        return compatibilities.compatible[0]
     }
 
     private closePredictionViews(){
-        this.viewer.getViews().forEach(view => {
-            if(view instanceof PredictionsView){
-                this.viewer.closeView(view)
-            }
-        })
+        this.viewer.getLaneWidgets().forEach(lane => lane.closePredictions())
     }
 
     private showInfo(description: ClassifierDescription){
@@ -138,106 +144,24 @@ export class PredictingWidget extends Applet<State>{
         }
     }
 
-    private async refreshPredictions(){
-        const compatCheckGeneration = this.compatCheckGeneration = this.compatCheckGeneration + 1
-        // console.log(`(${compatCheckGeneration}) INFO: Starting new refreshPredictions`)
-
-        let stalePredictionViews = new Array<PredictionsView>();
-        let validPredictionViews = new Array<PredictionsView>();
-        let predictionRawDataSources = new Map<string, FsDataSource>();
-        let customPredictionOpacities: HashMap<FsDataSource, number, string> = new HashMap();
-        for(let view of this.viewer.getViews()){
-            if(view instanceof UnsupportedDatasetView || view instanceof FailedView){
-                continue
-            }
-            if(view instanceof PredictionsView){
-                customPredictionOpacities.set(view.raw_data, view.opacity)
-                if(
-                    view.classifierGeneration != this.state.generation ||
-                    this.state.channel_colors.length != view.channel_colors.length ||
-                    !view.channel_colors.every((color, idx) => color.equals(this.state.channel_colors[idx]))
-                ){
-                    stalePredictionViews.push(view)
-                }else{
-                    validPredictionViews.push(view)
-                }
-                continue
-            }
-            if(view instanceof RawDataView){
-                const datasources = view.getDatasources()
-                if(!datasources || datasources.length != 1){
-                    continue
-                }
-                const datasource = datasources[0]
-                predictionRawDataSources.set(view.name + " " + datasource.resolutionString, datasource)
-                continue
-            }
-            if(view instanceof StrippedPrecomputedView){
-                predictionRawDataSources.set(view.name, view.datasource)
-                continue
-            }
-            assertUnreachable(view)
-        }
-
-        for(const [name, rawDataSource] of Array.from(predictionRawDataSources.entries())){
-            if(validPredictionViews.find(prediction_view => prediction_view.raw_data.equals(rawDataSource))){
-                // console.log(`(${compatCheckGeneration}) INFO: No need to open predictions for ${rawDataSource.url}`)
-                predictionRawDataSources.delete(name)
-            }
-        }
-
-        for(const view of stalePredictionViews){
-            // console.log(`(${compatCheckGeneration}) WORK: Closing predictions view for ${view.raw_data.url}`)
-            this.viewer.closeView(view)
-            if(compatCheckGeneration != this.compatCheckGeneration){
-                // console.log(`(${compatCheckGeneration}) ABORTING (closing old preds): function recursed from events`)
-                return
-            }
-        }
-        if(predictionRawDataSources.size == 0){
-            // console.log(`(${compatCheckGeneration}) DONE: No remaining raw data needing predictions.`)
-            return
-        }
-
+    private refreshPredictions = async () => {
         if(this.state.description != "ready"){
-            // console.log(`(${compatCheckGeneration}) DONE: Classifier is not ready, not opening predictions.`)
+            this.closePredictionViews()
             return
         }
-
-        const compatibilities = await this.checkDatasourceCompatibility(Array.from(predictionRawDataSources.values()))
-        if(compatCheckGeneration != this.compatCheckGeneration){
-            // console.log(`(${compatCheckGeneration}) ABORTING: Predicting widget hook went stale.`)
-            return
-        }
-        if(compatibilities instanceof Error){
-            // console.log(`(${compatCheckGeneration}) ABORTING: Error when checking datasource compatibilities: ${compatibilities.message}`)
-            return
-        }
-
-        let rawDataSourceIndex = 0
-        for(const [name, ds] of predictionRawDataSources.entries()){
-            if(!compatibilities[rawDataSourceIndex++]){
-                console.log(`(${compatCheckGeneration}) SKIP: incompatible raw data: ${ds.url}`)
+        for(const lane of this.viewer.getLaneWidgets()){
+            if(lane.rawData.shape.c != this.state.minInputShape!.c){
+                lane.closePredictions()
                 continue
             }
-            console.log(`(${compatCheckGeneration}) WORK: Opening predictions for ${ds.url}`);
-            // FIXME: this works on the first trigger, but then adding or removing views re-trigger this callback
-            // which operate on a viewer environment that isn't yet aware of the set opacity
-            let opacity = customPredictionOpacities.get(ds)
-            this.viewer.openDataView(
-                new PredictionsView({
-                    classifierGeneration: this.state.generation,
-                    name: `predicting on ${name}`,
-                    raw_data: ds,
-                    session: this.session,
-                    channel_colors: this.state.channel_colors.slice(),
-                    opacity: opacity === undefined ? 0.5 : opacity,
-                })
-            )
-            if(compatCheckGeneration != this.compatCheckGeneration){
-                console.log(`(${compatCheckGeneration}) ABORTING (opening new preds): function recursed from events`)
-                return
+            if(!lane.isVisible){
+                continue
             }
+            lane.refreshPredictions({
+                classifierGeneration: this.state.generation,
+                channelColors: this.state.channel_colors,
+                session: this.session,
+            })
         }
     }
 

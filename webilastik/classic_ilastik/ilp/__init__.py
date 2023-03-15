@@ -201,8 +201,6 @@ def ensure_optional(ensurer: Callable[[h5py.Group, str], T], group: h5py.Group, 
 
 def populate_h5_group(group: h5py.Group, data: IlpGroup) -> None:
     for key, value in data.items():
-        if value is None:
-            continue
         if isinstance(value, AbcMapping):
             subgroup = group.create_group(key)
             populate_h5_group(subgroup, value)

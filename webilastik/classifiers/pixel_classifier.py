@@ -14,7 +14,7 @@ from numpy import ndarray, dtype, float32
 from vigra.learning import RandomForest as VigraRandomForest
 
 from ndstructs.array5D import Array5D
-from ndstructs.point5D import Interval5D
+from ndstructs.point5D import Interval5D, Shape5D
 from webilastik.features.feature_extractor import FeatureExtractor
 from webilastik.features.feature_extractor import FeatureExtractorCollection
 from webilastik.annotations import Annotation, Color
@@ -188,6 +188,7 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         forest_h5_bytes: "Sequence[VigraForestH5Bytes]",
         num_input_channels: int,
         num_classes: int,
+        minInputShape: Shape5D
     ):
         super().__init__(
             num_classes=num_classes, feature_extractors=feature_extractors, num_input_channels=num_input_channels
@@ -195,6 +196,7 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         self.forest_h5_bytes: Final[Sequence[VigraForestH5Bytes]] = forest_h5_bytes
         self.forests: Final[Sequence[VigraRandomForest]] = [h5_bytes_to_vigra_forest(forest_bytes) for forest_bytes in forest_h5_bytes]
         self.num_trees: Final[int] = sum(f.treeCount() for f in self.forests)
+        self.minInputShape = minInputShape
 
     def get_expected_dtype(self, input_dtype: "dtype[Any]") -> "dtype[float32]":
         return np.dtype("float32")
@@ -228,6 +230,7 @@ class VigraPixelClassifier(PixelClassifier[FE]):
             forest_h5_bytes=forests_bytes,
             num_input_channels=training_data_result.num_input_channels,
             num_classes=training_data_result.num_classes,
+            minInputShape=Shape5D(c=training_data_result.num_input_channels)
         )
 
 
@@ -270,6 +273,7 @@ class VigraPixelClassifier(PixelClassifier[FE]):
             "num_input_channels": self.num_input_channels,
             "num_classes": self.num_classes,
             "forest_h5_bytes": self.forest_h5_bytes,
+            "minInputShape": self.minInputShape
         }
 
     def __setstate__(self, data):
@@ -278,4 +282,5 @@ class VigraPixelClassifier(PixelClassifier[FE]):
             forest_h5_bytes=data["forest_h5_bytes"],
             num_input_channels=data["num_input_channels"],
             num_classes=data["num_classes"],
+            minInputShape=data["minInputShape"],
         )

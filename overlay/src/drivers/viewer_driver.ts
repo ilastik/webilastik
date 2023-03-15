@@ -1,13 +1,25 @@
 import { mat4, quat, vec3 } from "gl-matrix";
-
+import { Color } from "../client/ilastik";
+import { Url } from "../util/parsed_url";
 
 /**
  * A data source from a viewer. Usually
  */
 export interface INativeView{
-    name: string,
-    url: string,
-    opacity: number,
+    getName(): unknown;
+    // getName(): string
+    // getUrl(): Url
+    // getOpacity(): number
+    // getVisible(): boolean
+    // setVisible(visible: boolean): void
+    close(): void;
+    reconfigure(params: {
+        url?: Url,
+        isVisible?: boolean,
+        channelColors?: Color[],
+        opacity?: number,
+    }): void;
+    // setProperties(props: {name?: string, opacity?: number, visible?: boolean}): void;
 }
 
 /**
@@ -27,41 +39,18 @@ export interface IViewerDriver{
      */
     getTrackedElement: () => HTMLElement;
 
-    /**
-     * Opens data at params.native_view.url (preferably in a 'tab' named params.native_view.name) or refreshes that tab
-     * if the url is already open.
-     * @param params.url - the url to open or refresh
-     * @param params.name - a hint of the name to be used for this data
-     * @param params.channel_colors - a hint on how to interpret the channels of the data incoming from params.url
-     * This is particulary useful for pixel prediction urls, since each channel has the color of a brush stroke
-     */
-    refreshView: (params: {native_view: INativeView, similar_url_hint?: string, channel_colors?: vec3[]}) => void;
+    openUrl(params: {
+        name: string,
+        url: Url,
+        isVisible: boolean,
+        channelColors?: Color[],
+        opacity?: number,
+    }): Promise<INativeView | Error>;
 
-
-    /**
-     * Closes the view
-     */
-    closeView: (params: {native_view: INativeView}) => void;
-
-
+    enable3dNavigation(enable: boolean): void;
     addViewportsChangedHandler: (handler: () => void) => void;
     removeViewportsChangedHandler: (handler: () => void) => void;
-    addDataChangedHandler: (handler: () => void) => void;
-    removeDataChangedHandler: (handler: () => void) => void;
     getContainerForWebilastikControls: () => HTMLElement | undefined;
-
-    /**
-     * Gets the IDataView being displayed, if any. This is usually somethingl like the "active tab" of a viewer
-     *
-     * @returns The IDataView representing the data source currently being actively viewed, if any
-     */
-    getDataViewOnDisplay(): INativeView | undefined;
-
-    /**
-     * @returns an array of `IDataView`s representing all data sources currently opened by the viewer
-     */
-    getOpenDataViews(): Array<INativeView>;
-
     snapTo?: (params: {position_vx: vec3, orientation_w: quat, voxel_size_nm: vec3}) => void;
 }
 

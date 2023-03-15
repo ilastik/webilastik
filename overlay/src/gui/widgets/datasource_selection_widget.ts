@@ -1,27 +1,30 @@
 // import { ListFsDirRequest } from "../../client/dto";
-import { PrecomputedChunksDataSource, Session } from "../../client/ilastik";
+import { GetDatasourcesFromUrlParamsDto } from "../../client/dto";
+import { FsDataSource, PrecomputedChunksDataSource, Session } from "../../client/ilastik";
+import { IViewerDriver } from "../../drivers/viewer_driver";
 import { Url } from "../../util/parsed_url";
-import { FailedView, RawDataView, View } from "../../viewer/view";
 import { Viewer } from "../../viewer/viewer";
+import { CssClasses } from "../css_classes";
 import { CollapsableWidget } from "./collapsable_applet_gui";
 import { DataProxyFilePicker } from "./data_proxy_file_picker";
+import { Button } from "./input_widget";
 import { LiveFsTree } from "./live_fs_tree";
 import { PopupWidget } from "./popup";
-import { Anchor, Div, Paragraph, Span } from "./widget";
+import { Anchor, Div, Label, Paragraph, Span } from "./widget";
 
 export class DataSourceSelectionWidget{
     private element: HTMLDetailsElement;
     private session: Session;
-    private viewer: Viewer;
+    public readonly viewer: Viewer;
+    public readonly lanesContainer: Div;
 
     constructor(params: {
-        parentElement: HTMLElement, session: Session, viewer: Viewer, defaultBucketName: string,
+        parentElement: HTMLElement, session: Session, defaultBucketName: string, viewer_driver: IViewerDriver
     }){
         this.element = new CollapsableWidget({
             display_name: "Data Sources", parentElement: params.parentElement
         }).element
         this.session = params.session
-        this.viewer = params.viewer
 
         new DataProxyFilePicker({
             parentElement: this.element,
@@ -32,61 +35,84 @@ export class DataSourceSelectionWidget{
             }),
             okButtonValue: "Open",
         })
+
+        this.lanesContainer = new Div({parentElement: this.element})
+        new Label({parentElement: this.element, innerText: "Data Sources:"})
+        this.viewer = new Viewer({
+            driver: params.viewer_driver, session: params.session, parentElement: this.element
+        })
+    }
+
+    public destroy(){
+        this.viewer.destroy()
+        // this.element.destroy()
     }
 
     private tryOpenViews = async (liveFsTree: LiveFsTree) => {
-        let viewPromises = liveFsTree.getSelectedUrls().map(url => View.tryOpen({
-            name: url.path.name, url, session: this.session, opacity: 1.0,
-        }))
+        let selectedUrls = liveFsTree.getSelectedUrls()
+        let viewPromises = selectedUrls.map(url => this.session.getDatasourcesFromUrl(
+            new GetDatasourcesFromUrlParamsDto({
+                url: url.toDto(),
+            }))
+        )
 
-        let imageServiceHintWidget: Div | undefined = undefined
-        let errorMessageWidgets = new Array<Paragraph>();
+        let errorMessages: string[] = []
+        let unsupportedUrls: Url[] = []
 
+        for(let i = 0; i < selectedUrls.length; i++){
+            let url = selectedUrls[i]
+            let viewPromise = viewPromises[i]
 
-        for(const viewPromise of viewPromises){
-            const viewResult = await viewPromise;
-            if(viewResult instanceof FailedView){
-                errorMessageWidgets.push(new Paragraph({
-                    parentElement: undefined, innerText: `Could not open view: ${viewResult.url}`
-                }))
-            }else if(viewResult instanceof RawDataView && viewResult.getDatasources()?.find(ds => !(ds instanceof PrecomputedChunksDataSource))){
-                errorMessageWidgets.push(new Paragraph({
-                    parentElement: undefined, innerText: `Unsupported format: ${viewResult.url}`
-                }))
-                imageServiceHintWidget = imageServiceHintWidget || new Div({parentElement: undefined, children: [
-                    new Paragraph({
-                        parentElement: undefined,
-                        children: [
-                            new Span({parentElement: undefined, innerText:
-                                `Only datasources in Neuroglancer's Precomputed Chunks format are supported in the viewer at this time ` +
-                                `(though you might still be able to use it in batch export).` +
-                                `You can try converting your images to the Precomputed Chunks format by using the `,
-                            }),
-                            new Anchor({
-                                parentElement: undefined,
-                                href: Url.parse('https://wiki.ebrains.eu/bin/view/Collabs/hbp-image-service-user-guide/'),
-                                rel: "noopener noreferrer",
-                                target: "_blank",
-                                children: [
-                                    new Span({parentElement: undefined, innerText: 'EBRAINS image service'})
-                                ]
-                            })
-                        ]
-                    })
-
-                ]})
+            let viewResult = await viewPromise;
+            if(viewResult instanceof Error){
+                errorMessages.push(`Could not open view: ${viewResult.message}`)
+            }else if(viewResult === undefined){
+                console.log("FIXME: handle undefined datasource? Maybe just don't have undefined at all?")
             }else{
-                this.viewer.openDataView(viewResult)
+                const datasources: FsDataSource[] = viewResult instanceof Array ? viewResult : [viewResult]
+                if(datasources.find(ds => !(ds instanceof PrecomputedChunksDataSource))){
+                    errorMessages.push(`Unsupported datasources from ${url.raw}`)
+                    unsupportedUrls.push(url)
+                    continue
+                }
+
+                const selectedResolution: FsDataSource = datasources.length == 1 ? datasources[0] : await PopupWidget.AsyncDialog({
+                    title: "Select a resolution",
+                    fillInPopup: (params: {popup: PopupWidget, resolve: (result: FsDataSource) => void}) => {
+                        for(const ds of datasources){
+                            const p = new Paragraph({parentElement: params.popup.element})
+                            new Button({inputType: "button", parentElement: p, text: ds.resolutionString, onClick: () => params.resolve(ds)})
+                        }
+                    }
+                })
+
+                this.viewer.openLane({
+                    name: `${selectedResolution.url.name}`,
+                    isVisible: true,
+                    rawData: selectedResolution,
+                })
             }
         }
 
-        if(errorMessageWidgets.length > 0 || imageServiceHintWidget){
+        if(unsupportedUrls.length > 0 || errorMessages.length > 0){
             let popup = new PopupWidget("Errors when opening data sources", true)
-            if(imageServiceHintWidget){
-                popup.appendChild(imageServiceHintWidget)
+            for(const errorMsg of errorMessages){
+                new Paragraph({parentElement: popup.element, innerText: errorMsg, cssClasses: [CssClasses.ItkErrorText]})
             }
-            for(const errorMsgWidget of errorMessageWidgets){
-                popup.appendChild(errorMsgWidget)
+            if(unsupportedUrls.length > 0){
+                const p = new Paragraph({parentElement: popup.element})
+                new Span({parentElement: p, innerText:
+                    `Only datasources in Neuroglancer's Precomputed Chunks format are supported in the viewer at this time ` +
+                    `(though you might still be able to use it in batch export).` +
+                    `You can try converting your images to the Precomputed Chunks format by using the `,
+                }),
+                new Anchor({
+                    parentElement: p,
+                    href: Url.parse('https://wiki.ebrains.eu/bin/view/Collabs/hbp-image-service-user-guide/'),
+                    rel: "noopener noreferrer",
+                    target: "_blank",
+                    children: [new Span({parentElement: undefined, innerText: 'EBRAINS image service'})],
+                })
             }
         }
     }

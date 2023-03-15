@@ -9,6 +9,7 @@ import io
 
 import h5py
 import numpy as np
+import sys
 import vigra
 from numpy import ndarray, dtype, int64
 from vigra.vigranumpycore import AxisTags
@@ -287,11 +288,13 @@ class IlpPixelClassificationGroup:
             feature_names = ensure_encoded_string_list(ClassifierForests, "feature_names")
             feature_extractors, expected_num_channels = cls.ilp_filters_and_expected_num_channels_from_names(feature_names)
 
+            print(f"Warning: setting classifier minINputShape to {Shape5D(c=expected_num_channels)}", file=sys.stderr)
             classifier = VigraPixelClassifier(
                 feature_extractors=feature_extractors,
                 forest_h5_bytes=[vigra_forest_to_h5_bytes(forest) for forest in forests],
                 num_classes=len([label for label in label_classes.values() if not label.is_empty()]),
                 num_input_channels=expected_num_channels,
+                minInputShape=Shape5D(c=expected_num_channels) #FIXME
             )
         else:
             classifier = None

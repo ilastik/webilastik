@@ -1,16 +1,13 @@
 import { quat, vec3 } from "gl-matrix"
 import { BrushStroke } from "../../.."
-import { Color, FsDataSource, PrecomputedChunksDataSource, Session } from "../../../client/ilastik"
+import { Color, FsDataSource, Session } from "../../../client/ilastik"
 import { createElement, removeElement } from "../../../util/misc"
 import { CollapsableWidget } from "../collapsable_applet_gui"
-import { PopupSelect } from "../selector_widget"
 import { BrushingOverlay } from "./brushing_overlay"
 import { BrushelBoxRenderer } from "./brush_boxes_renderer"
 import { BrushingApplet } from "./brush_strokes_container"
 import { Viewer } from "../../../viewer/viewer"
 import { PredictingWidget } from "../predicting_widget";
-import { UnsupportedDatasetView, FailedView, PredictionsView, StrippedPrecomputedView } from "../../../viewer/view"
-import { ErrorPopupWidget } from "../popup"
 import { BooleanInput } from "../value_input_widget"
 
 
@@ -79,7 +76,9 @@ export class BrushingWidget{
                 session,
                 applet_name,
                 gl: this.gl,
-                onDataSourceClicked: async (datasource) => this.viewer.openDataViewFromDataSource({datasource, opacity: 1.0}),
+                onDataSourceClicked: async (rawData) => this.viewer.openLane({
+                    name: rawData.url.name, rawData, isVisible: true
+                }),
                 onLabelSelected: () => {
                     if(!this.brushingEnabledCheckbox.disabled){
                         this.setBrushingEnabled(true)
@@ -100,8 +99,6 @@ export class BrushingWidget{
 
     private setMode(
         mode: {name: "training", trainingDatasource: FsDataSource} |
-              {name: "selecting resolution", datasources: FsDataSource[]} |
-              {name: "error", message: string} |
               {name:"no data"}
     ){
         const lastBrushingEnabledValue = this.brushingEnabledCheckbox.value
@@ -117,36 +114,6 @@ export class BrushingWidget{
 
         if(mode.name == "no data"){
             //noop
-        }else if(mode.name == "error"){
-            this.showStatus(mode.message)
-        }else if(mode.name == "selecting resolution"){
-            createElement({tagName: "label", innerHTML: "Select a voxel size to annotate on:", parentElement: this.resolutionSelectionContainer});
-            new PopupSelect<FsDataSource>({
-                popupTitle: "Select a voxel size to annotate on",
-                parentElement: this.resolutionSelectionContainer,
-                options: mode.datasources,
-                optionRenderer: (args) => {
-                    let datasource = args.option
-                    return createElement({
-                        tagName: "span",
-                        parentElement: args.parentElement,
-                        innerText: datasource.resolutionString
-                    })
-                },
-                onChange: async (datasource) => {
-                    if(!(datasource instanceof PrecomputedChunksDataSource)){
-                        new ErrorPopupWidget({message: "Can't handle this type of datasource yet"})
-                        return
-                    }
-                    let stripped_view = new StrippedPrecomputedView({
-                        datasource,
-                        name: datasource.getDisplayString(),
-                        session: this.session,
-                        opacity: 1.0,
-                    })
-                    this.viewer.openDataView(stripped_view)
-                },
-            })
         }else if(mode.name == "training"){
             this.brushingEnabledCheckbox.disabled = false
             this.canvas.style.display = "block"
@@ -199,29 +166,11 @@ export class BrushingWidget{
     }
 
     private async handleViewerDataDisplayChange(){
-        const view = this.viewer.getActiveView()
-        if(view === undefined){
+        const lane = this.viewer.getActiveLaneWidget()
+        if(lane === undefined){
             return this.setMode({name: "no data"})
         }
-        if(view instanceof Error){ //FIXME: remove this? or return error from viewer?
-            return this.setMode({name: "error", message: view.message})
-        }
-        if(view instanceof UnsupportedDatasetView){
-            return this.setMode({name: "error", message: `Unsupported data: ${view.url}`})
-        }
-        if(view instanceof FailedView){
-            return this.setMode({name: "error", message: `Failed opening data: ${view.url}`})
-        }
-        if(view instanceof PredictionsView){
-            return this.setMode({name: "training", trainingDatasource: view.raw_data})
-        }
-        if(view instanceof StrippedPrecomputedView){
-            return this.setMode({name:"training", trainingDatasource: view.datasource})
-        }
-        if(view.datasources.length == 1){
-            return this.setMode({name: "training", trainingDatasource: view.datasources[0]})
-        }
-        this.setMode({name: "selecting resolution", datasources: view.datasources})
+        return this.setMode({name: "training", trainingDatasource: lane.rawData})
     }
 
     public destroy(){

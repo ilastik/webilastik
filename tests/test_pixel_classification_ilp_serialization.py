@@ -25,7 +25,7 @@ from webilastik.filesystem.os_fs import OsFs
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet import dummy_prompt
 from webilastik.utility.url import Protocol
-from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
+from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow, WsPixelClassificationWorkflow
 
 osfs = OsFs.create()
 assert not isinstance(osfs, Exception)
@@ -93,10 +93,11 @@ def test_pixel_classification_ilp_serialization():
     some_executor = ProcessPoolExecutor(max_workers=2)
     priority_executor = PriorityExecutor(executor=some_executor, max_active_job_steps=2)
     workflow = PixelClassificationWorkflow.from_ilp(
+        original_ilp_fs=osfs,
+        temp_ilp_path=output_ilp_path,
+        on_async_change=lambda: None,
         executor=some_executor,
         priority_executor=priority_executor,
-        ilp_path=output_ilp_path,
-        on_async_change=lambda: None,
     )
     assert not isinstance(workflow, Exception)
     print(f"These are the deserialized brush strokes:")

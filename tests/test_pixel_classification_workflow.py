@@ -99,7 +99,8 @@ def test_pixel_classification_workflow():
     _ = workflow.save_project(fs=fs, path=test_output_path / "blas.ilp")
 
     loaded_workflow = PixelClassificationWorkflow.from_ilp(
-        ilp_path=Path(test_output_path / "blas.ilp"),
+        original_ilp_fs=fs,
+        temp_ilp_path=Path(test_output_path / "blas.ilp"),
         on_async_change=lambda : print(json.dumps(workflow.export_applet._get_json_state(), indent=4)),
         executor=executor,
         priority_executor=priority_executor,
@@ -115,12 +116,12 @@ def test_pixel_classification_workflow():
     # # calculate predictions on an entire data source
     raw_data_source = get_sample_c_cells_datasource()
     preds_future = executor.submit(classifier, raw_data_source.roi)
-    local_predictions = preds_future.result()
-    # local_predictions.as_uint8().show_channels()
+    _local_predictions = preds_future.result()
+    # _local_predictions.as_uint8().show_channels()
 
     # # calculate predictions on just a piece of arbitrary data
-    exported_tile = executor.submit(classifier, DataRoi(datasource=raw_data_source, x=(100, 200), y=(100, 200)))
-    # exported_tile.result().show_channels()
+    _exported_tile = executor.submit(classifier, DataRoi(datasource=raw_data_source, x=(100, 200), y=(100, 200)))
+    # _exported_tile.result().show_channels()
 
 ###################################
 
