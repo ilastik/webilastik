@@ -7,7 +7,8 @@ dependencies:
   - numpy
   - fastfilters
   - lemon
-  - vigra
+  - vigra=1.11.1
+  - imath=3.1.6
   - scikit-image
   - scikit-learn
   - h5py=3.7
