@@ -42,8 +42,6 @@ class Label:
 
 class BrushingApplet(Applet):
     def __init__(self, name: str, labels: Sequence[Label]):
-        if len(labels) < 2:
-            raise ValueError(f"Must have at least 2 labels")
         self._labels: List[Label] = list(labels)
         super().__init__(name=name)
 
