@@ -2,6 +2,7 @@ name: webilastik
 channels:
   - ilastik-forge
   - conda-forge
+  - pkgs/main
 dependencies:
   - python>=3.8
   - numpy
