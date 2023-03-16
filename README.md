@@ -80,9 +80,11 @@ This project contains an npm project in `./overlay`, which can be used to build 
 
 # Building
  - Install build dependencies:
+    - [mpich](https://www.mpich.org/downloads/) is required to create the conda env
     - [conda-pack](https://conda.github.io/conda-pack/) (for wrapping the conda environment)
     - [go-task](https://taskfile.dev/installation) (make-like application to build the targets in Taskfile.yml)
-    - npm (for building neuroglancer and the overlay)
+    - npm (for building neuroglancer and the overlay; may also be an easy way to get go-task)
+    - You may need to downgrade node to v12.22.12. This is probably easiest using [nvm](https://github.com/nvm-sh/nvm) or [asdf](https://github.com/asdf-vm/asdf-nodejs)
  - Grab the oidc client json from Ebrains:
     - Go to https://lab.ch.ebrains.eu/hub/user-redirect/lab/tree/shared/Collaboratory%20Community%20Apps/Managing%20an%20OpenID%20Connect%20client%20-%20V2.ipynb
     - Grab the output of `Fetching your OIDC client settings` and save it somewhere
@@ -100,6 +102,7 @@ This project contains an npm project in `./overlay`, which can be used to build 
 ## Local dev server
 Even the local server needs Nginx to be running. This is because webilastik allocates worker sessions for the users, and those sessions can be running in remote worker servers. These worker sessions create SSH tunnels on the main server, and nginx will redirect session requests into those tunnels sockets.
 
+- Create the conda env `mamba env create -n webilastik -f environment.yml`
 - Install nginx
 - Add `webilastik.conf` to nginx configuration:
     ```
@@ -118,10 +121,25 @@ Even the local server needs Nginx to be running. This is because webilastik allo
         #ssl_certificate_key /etc/webilastik/cert-key.pem;
         ```
 - Restart nginx after SSL is configured: `sudo systemctl restart nginx.service`
-
+- nginx will run under the user `www-data`. You need to modify some permissions around this user:
+  - Your user needs to be able to ssh into www-data
+    - `sudo apt install openssh-server`
+    - `ssh-keygen -t ed25519 -C "www-data@localhost"` to [generate keys](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent)
+    - `sudo touch /var/www/.ssh/authorized_keys`
+    - Paste the contents of `~/.ssh/id_ed25519.pub` into `/var/www/.ssh/authorized_keys`
+    - You may need to `sudo chown -R www-data:www-data /var/www/.ssh`
+    - Execute `sudo -u www-data -g www-data ssh www-data@localhost echo success` to test, and confirm to add the host to known_hosts
+  - [Permission to access](https://superuser.com/questions/19318/how-can-i-give-write-access-of-a-folder-to-all-users-in-linux) files in the `/build` subdirectory of the webilastik repo
+    - Add the `www-data` user to your own user group: `sudo usermod -a -G youruser www-data`
+    - If nginx ends up having permission issues later (403 forbidden), try `sudo chgrp -R www-data /path/to/webilastik/build && sudo chmod -R g+w /path/to/webilastik/build`
+  - Restart nginx: `sudo systemctl restart nginx.service`
+- Additional requirements for starting the server with `task`:
+  - Generate any [Fernet key](https://stackoverflow.com/questions/44432945/generating-own-key-with-python-fernet) to use as value for the WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY environment variable
+  - Populate other requested environment variables with dummy values
+  - Required for `stop-local-server`:
+    - Set up [passwordless sudo](https://askubuntu.com/questions/147241/execute-sudo-without-password/147265#147265) for your user
+    - Install [silversearcher-ag](https://github.com/ggreer/the_silver_searcher) and [black](https://github.com/psf/black) (e.g. from apt)
+    - Install [deno](https://deno.land/manual@v1.31.3/getting_started/installation)
 - Run the "dev" server locally: `task start-local-server`. This task will do some basic checking to see if you have completed the previous steps before attempting to run the server. It will fire the server using `systemctl` to better emulate production behavior, but it will output to the current `tty` so that you don't have to wait for the buffered output while debugging. You can stop the server by running `task stop-local-server`.
-
-## Testing it out:
-
-Once your server is up, just go to https://app.ilastik.org/
-
+- Debugging problems with this task may be easier if it does not run parallelised: `task start-local-server --concurrency=1`; you may also find helpful messages why nginx cannot start using `sudo journalctl -u webilastik.service`
+- Once your server is up, open https://app.ilastik.org/ in a browser. You will most likely be warned that the page is not trustworthy (because the certificate is self-signed), in which case you should confirm to create an exception for this page.
