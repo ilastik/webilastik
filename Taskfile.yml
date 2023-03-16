@@ -233,6 +233,8 @@ tasks:
   start-local-server:
     deps: [stop-local-server, create-deb-tree]
     vars:
+      CURRENT_USERNAME:
+        sh: whoami
       SERVER_SYSTEMD_ENV_CONFS:
         sh: |-
           python3 <<SERVER_CONFIG
@@ -274,6 +276,8 @@ tasks:
         sudo sh -c "echo '
 
         [Service]
+        User={{.CURRENT_USERNAME}}
+        Group={{.CURRENT_USERNAME}}
         TTYPath=$(tty)
         StandardOutput=tty
         StandardError=inherit
