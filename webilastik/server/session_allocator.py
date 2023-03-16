@@ -204,7 +204,7 @@ class SessionAllocator:
 
     @require_ebrains_login
     async def login_then_open_viewer(self, ebrains_login: EbrainsLogin, request: web.Request) -> web.Response:
-        redirect_url = get_requested_url(request).updated_with(path=PurePosixPath("/public/nehuba/index.html"))
+        redirect_url = get_requested_url(request).updated_with(path=PurePosixPath("/public/nehuba/index.html"), hash_='!%7B"layout":"xy"%7D')
         raise web.HTTPFound(location=redirect_url.raw)
 
     def _make_compute_session_url(self, compute_session_id: uuid.UUID) -> Url:
