@@ -2,7 +2,6 @@
 # pyright: reportUnusedCallResult=false
 
 from functools import wraps
-import getpass
 import json
 from typing import Any, Callable, Coroutine, Dict, List, Literal, NoReturn, Optional, Set
 from pathlib import Path, PurePosixPath
@@ -327,7 +326,7 @@ class SessionAllocator:
                 ebrains_user_token=ebrains_login.user_token,
                 max_duration_minutes=Minutes(params.session_duration_minutes),
                 session_allocator_host=Hostname("app.ilastik.org"),
-                session_allocator_username=Username(getpass.getuser()),
+                session_allocator_username=Username("www-data"),#Username(getpass.getuser()),
                 session_allocator_socket_path=Path(f"/tmp/to-session-{compute_session_id}"),
                 session_url=self._make_compute_session_url(compute_session_id=compute_session_id),
             )
