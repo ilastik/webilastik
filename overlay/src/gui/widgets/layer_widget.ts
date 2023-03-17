@@ -113,6 +113,8 @@ export class RawDataLayerWidget extends LayerWidget{
             channelColors = [
                 new Color({r: 255, g: 0, b: 0}), new Color({r: 0, g: 255, b: 0}), new Color({r: 0, g: 0, b: 255}),
             ]
+        }else if(params.datasource.shape.c == 1){
+            channelColors = [new Color({r: 255, g: 255, b: 255})]
         }else{
             channelColors = this.colorMap.slice(0, params.datasource.shape.c)
         }
