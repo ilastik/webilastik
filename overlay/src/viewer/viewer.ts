@@ -1,5 +1,6 @@
 // import { vec3 } from "gl-matrix";
 // import { quat, vec3 } from "gl-matrix";
+import { quat, vec3 } from "gl-matrix";
 import { FsDataSource, Session } from "../client/ilastik";
 import { IViewerDriver, IViewportDriver } from "../drivers/viewer_driver";
 import { CssClasses } from "../gui/css_classes";
@@ -39,20 +40,17 @@ export class Viewer{
             cssClasses: [CssClasses.ItkRecenterButton],
             text: "Recenter",
             onClick: () => {
-                if(!this.driver.snapTo){
+                let activeDataSource = this.getActiveLaneWidget()?.rawData
+                if(!this.driver.snapTo || !activeDataSource){
                     return
                 }
-                // let activeDataSource = this.getBiggestActiveDatasource();
-                // if(!activeDataSource){
-                //     return
-                // }
 
-                // const position_vx = vec3.create();
-                // vec3.div(position_vx, activeDataSource.shape.toXyzVec3(), vec3.fromValues(2,2,2)),
+                const position_vx = vec3.create();
+                vec3.div(position_vx, activeDataSource.shape.toXyzVec3(), vec3.fromValues(2,2,2)),
 
-                // this.driver.snapTo({
-                //     position_vx, voxel_size_nm: activeDataSource.spatial_resolution, orientation_w: quat.identity(quat.create()),
-                // })
+                this.driver.snapTo({
+                    position_vx, voxel_size_nm: activeDataSource.spatial_resolution, orientation_w: quat.identity(quat.create()),
+                })
             }
         })
         this.driver.addViewportsChangedHandler(this.viewportsChangedHandler)

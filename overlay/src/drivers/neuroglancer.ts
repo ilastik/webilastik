@@ -3,7 +3,7 @@ import { IViewportDriver, IViewerDriver } from "..";
 import { Color } from "../client/ilastik";
 import { CssClasses } from "../gui/css_classes";
 import { Div } from "../gui/widgets/widget";
-import { getElementContentRect } from "../util/misc";
+import { createElement, getElementContentRect } from "../util/misc";
 import { Url } from "../util/parsed_url";
 
 type NeuroglancerLayout = "4panel" | "xy" | "xy-3d" | "xz" | "xz-3d" | "yz" | "yz-3d";
@@ -206,9 +206,18 @@ export class NeuroglancerDriver implements IViewerDriver{
     }
 
     public enable3dNavigation(enable: boolean): void{
+        const styleElementClassName = "neuroglancer_driver__hide_layout_controls";
         if(enable){
             window.removeEventListener("wheel", this.suppressMouseWheel, true)
+            document.head.querySelector("." + styleElementClassName)?.remove()
         }else{
+            createElement({
+                tagName: "style",
+                parentElement: document.head,
+                cssClasses: [styleElementClassName],
+                innerText: ".neuroglancer-data-panel-layout-controls{ display: none }"
+            })
+            this.viewer.layout.restoreState("xy")
             window.addEventListener("wheel", this.suppressMouseWheel, true)
         }
     }
