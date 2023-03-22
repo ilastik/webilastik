@@ -1,12 +1,13 @@
 import json
-from typing import Literal, Optional, Mapping, Final, Tuple, List
-from pathlib import PurePosixPath
+from typing import Iterator, Literal, Optional, Mapping, Final, Tuple, List
+from pathlib import Path, PurePosixPath
 import time
 
 import requests
 from ndstructs.utils.json_serializable import ensureJsonArray, ensureJsonObject, ensureJsonString
 
 from webilastik.filesystem import IFilesystem, FsIoException, FsFileNotFoundException, FsDirectoryContents
+from webilastik.filesystem.http_fs import HttpFs
 from webilastik.utility.url import Url
 from webilastik.server.rpc.dto import BucketFSDto
 from webilastik.utility import Seconds
@@ -166,3 +167,23 @@ class BucketFs(IFilesystem):
 
     def geturl(self, path: PurePosixPath) -> Url:
         return self.url.concatpath(path)
+
+    def download_to_disk(
+        self, *, source: PurePosixPath, destination: Path, chunk_size: int
+    ) -> Iterator["Exception | float"]:
+        cscs_url_result = self.get_swift_object_url(path=source)
+        if isinstance(cscs_url_result, Exception):
+            yield cscs_url_result
+            return
+        if cscs_url_result.protocol == "file" or cscs_url_result.protocol == "memory":
+           yield Exception(f"Unexpected cscs URL: {cscs_url_result.raw}")
+           return
+        cscs_httpfs = HttpFs(
+            protocol=cscs_url_result.protocol,
+            hostname=cscs_url_result.hostname,
+            path=PurePosixPath("/"),
+            port=cscs_url_result.port,
+            search=cscs_url_result.search,
+        )
+        yield from cscs_httpfs.download_to_disk(source=cscs_url_result.path, destination=destination, chunk_size=chunk_size)
+
