@@ -292,30 +292,6 @@ class SessionAllocator:
 
             compute_session_id = uuid.uuid4()
 
-            #############################################################
-            # import subprocess
-            # print(f">>>>>>>>>>>>>> Opening tunnel to app.ilastik.org....")
-            # _tunnel_process = subprocess.run(
-            #     [
-            #         "ssh", "-fnNT",
-            #         "-oBatchMode=yes",
-            #         "-oExitOnForwardFailure=yes",
-            #         "-oControlPersist=yes",
-            #         "-M", "-S", f"/tmp/session-{compute_session_id}.control",
-            #         "-L", f"/tmp/to-session-{compute_session_id}:/tmp/to-session-{compute_session_id}",
-            #         f"www-data@148.187.149.187",
-            #     ],
-            # )
-            # await asyncio.sleep(1)
-            # print(f"<<<<<<<<<<<<< Hopefully it worked? sesion id is {compute_session_id}")
-            # if _tunnel_process.returncode != 0 or not Path(f"/tmp/to-session-{compute_session_id}").exists():
-            #     return uncachable_json_response(
-            #         RpcErrorDto(error="Could not forward ports i think").to_json_value(),
-            #         status=500
-            #     )
-
-            ###################################################################
-
             server_config = SessionAllocatorConfig.get()
 
             session_result = await session_launcher.launch(
@@ -326,7 +302,7 @@ class SessionAllocator:
                 ebrains_user_token=ebrains_login.user_token,
                 max_duration_minutes=Minutes(params.session_duration_minutes),
                 session_allocator_host=Hostname("app.ilastik.org"),
-                session_allocator_username=Username("www-data"),#Username(getpass.getuser()),
+                session_allocator_username=Username("www-data"),
                 session_allocator_socket_path=Path(f"/tmp/to-session-{compute_session_id}"),
                 session_url=self._make_compute_session_url(compute_session_id=compute_session_id),
             )
@@ -377,31 +353,6 @@ class SessionAllocator:
             )
 
         session_url = self._make_compute_session_url(compute_session_id=compute_session_id)
-
-        #################################################################################
-        # import subprocess
-        # print(f">>>>>>>>>>>>>> Checking if tunnel socket exists on app.ilastik.org....")
-        # tunnel_exists_check = subprocess.run(
-        #     [
-        #         "ssh",
-        #         "-T",
-        #         "-oBatchMode=yes",
-        #         f"www-data@148.187.149.187",
-        #         "ls", f"/tmp/to-session-{compute_session_id}"
-        #     ],
-        # )
-        # if tunnel_exists_check.returncode != 0:
-        #     print(f"Tunnel was not ready in web server")
-        #     return uncachable_json_response(
-        #         ComputeSessionStatusDto(
-        #             compute_session=session_result.to_dto(),
-        #             session_url=session_url.to_dto(),
-        #             connected=False,
-        #             hpc_site=params.hpc_site
-        #         ).to_json_value(),
-        #         status=200
-        #     )
-        ##################################################################################
 
         return uncachable_json_response(
             ComputeSessionStatusDto(
