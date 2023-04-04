@@ -55,12 +55,11 @@ export class NeuroglancerViewportDriver implements IViewportDriver{
 
 interface NgManagedLayer{}
 
-
-
 class Layer{
     private managedLayer: any;
     private channelColors: Color[];
     private opacity: number;
+    private viewerDriver: NeuroglancerDriver;
 
     public constructor(params: {
         name: string,
@@ -68,10 +67,12 @@ class Layer{
         channelColors: Color[],
         opacity: number,
         managedLayer: NgManagedLayer,
+        viewerDriver: NeuroglancerDriver,
     }){
         this.managedLayer = params.managedLayer
         this.channelColors = params.channelColors
         this.opacity = params.opacity
+        this.viewerDriver = params.viewerDriver
         this.reconfigure({
             isVisible: params.isVisible, channelColors: params.channelColors, opacity: params.opacity
         })
@@ -148,23 +149,36 @@ class Layer{
         opacity?: number,
     }){
         this.channelColors = params.channelColors || this.channelColors
-        this.opacity = params.opacity === undefined ? this.opacity : params.opacity
+        this.opacity = params.opacity === undefined ? this.opacity : params.opacity;
 
-        let state = {...this.managedLayer.layer.toJSON()}
+
+
+        let viewerState = this.viewerDriver.getState()
+        let layerState = viewerState.layers.find(ls => ls.name == this.getName())!
         if(params.url){
-            state.url = params.url.double_protocol_raw
+            layerState.url = params.url.double_protocol_raw
         }
 
-        state.shader = Layer.makeShader({channelColors: this.channelColors, opacity: this.opacity})
-
-        this.managedLayer.layer.restoreState(state)
+        layerState.shader = Layer.makeShader({channelColors: this.channelColors, opacity: this.opacity})
         if(params.isVisible !== undefined){
-            this.managedLayer.setVisible(params.isVisible)
+            layerState.visible = params.isVisible
         }
+        this.viewerDriver.setState(viewerState)
     }
 }
 
 // const defaultShader = 'void main() {\n  emitGrayscale(toNormalized(getDataValue()));\n}\n'
+
+type LayerRawState = {
+    name: string,
+    url: string,
+    visible?: boolean,
+    shader?: string,
+}
+
+interface ViewerState{
+    layers: Array<LayerRawState>
+}
 
 export class NeuroglancerDriver implements IViewerDriver{
     private containerForWebilastikControls: HTMLElement | undefined
@@ -178,6 +192,14 @@ export class NeuroglancerDriver implements IViewerDriver{
 
     constructor(public readonly viewer: any){
         this.trackedElement = document.querySelector("#neuroglancer-container canvas")! //FIXME: double-check selector
+    }
+
+    getState(): ViewerState{
+        return this.viewer.state.toJSON()
+    }
+
+    setState(state: ViewerState){
+        this.viewer.state.restoreState(state)
     }
 
     getTrackedElement() : HTMLElement{
@@ -246,16 +268,29 @@ export class NeuroglancerDriver implements IViewerDriver{
         channelColors: Color[],
         opacity: number,
     }): Promise<Layer | Error>{
-        const managedLayer = this.viewer.layerSpecification.getLayer(
-            params.name, {source: params.url.double_protocol_raw, visible: params.isVisible}
-        );
-        this.viewer.layerSpecification.add(managedLayer);
+        let viewerState = this.viewer.state.toJSON();
+        viewerState.layers = viewerState.layers || [];
+        let newLayerIndex: number = viewerState.layers.length
+        viewerState.layers.push({
+            type: "image",
+            source: params.url.double_protocol_raw,
+            tab: "rendering",
+            opacity: 1,
+            channelDimensions: {
+              "c^": [1, ""] //FIXME: what does this do?
+            },
+            name: params.name,
+            visible: params.isVisible,
+        });
+
+        this.viewer.state.restoreState(viewerState);
+        const managedLayer = this.viewer.layerManager.managedLayers[newLayerIndex]
         return new Promise(resolve => {
             const waitUntilLayerExists = () => {
                 if(managedLayer.layer){
                     console.log(`LAYER ${params.name} BECOMES READY!!!`)
                     this.removeViewportsChangedHandler(waitUntilLayerExists)
-                    resolve(new Layer({...params, managedLayer}))
+                    resolve(new Layer({...params, managedLayer, viewerDriver: this}))
                 }
             }
             this.addViewportsChangedHandler(waitUntilLayerExists)
