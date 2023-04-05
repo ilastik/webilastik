@@ -11,6 +11,7 @@ dependencies:
   - imath=3.1.6
   - scikit-image
   - scikit-learn
+  - scipy=1.9.1
   - h5py=3.7
   - typing_extensions
   - aiohttp
