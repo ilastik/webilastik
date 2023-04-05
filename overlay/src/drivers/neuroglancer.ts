@@ -24,7 +24,10 @@ export class NeuroglancerViewportDriver implements IViewportDriver{
         const ng_position_obj = this.viewer.navigationState.pose.position
         //old neuroglancers do not have the "value" key
         //FIXME: check if this is in Nm and not finest-voxel-space
-        const position_uvw = "value" in ng_position_obj ? ng_position_obj.value : ng_position_obj.spatialCoordinates
+        const position_uvw = vec3.scale(
+            vec3.create(),
+            ng_position_obj.value, this.viewer.navigationState.zoomFactor.curCanonicalVoxelPhysicalSize * 1e9
+        )
         return {
             position_uvw: position_uvw as vec3,
             orientation_uvw: quat.normalize(orientation_uvw, orientation_uvw),
@@ -34,8 +37,12 @@ export class NeuroglancerViewportDriver implements IViewportDriver{
         return mat4.fromScaling(mat4.create(), vec3.fromValues(1, -1, -1))
     }
     public getZoomInPixelsPerNm(): number{
+        const finest_voxel_size_in_nm = this.viewer.navigationState.zoomFactor.curCanonicalVoxelPhysicalSize * 1e9
+        const finest_voxels_per_viewport_pixel = this.viewer.navigationState.zoomFactor.value
+        const nm_per_viewport_pixel = finest_voxel_size_in_nm * finest_voxels_per_viewport_pixel;
+
         //FIXME: check if this is acually in Nm and not in finest-voxel-units
-        return 1 / this.viewer.navigationState.zoomFactor.value
+        return 1 / nm_per_viewport_pixel
     }
     public getGeometry = () => {
         const panelContentRect = getElementContentRect(this.panel)
