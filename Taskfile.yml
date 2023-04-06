@@ -96,7 +96,7 @@ tasks:
   compile-neuroglancer:
     deps: [install-neuroglancer-dependencies]
     dir: "{{.NEUROGLANCER_GIT_DIR}}"
-    sources: ["{{.NEUROGLANCER_GIT_DIR}}/**/*"]
+    sources: ["{{.NEUROGLANCER_GIT_DIR}}/**/*", "{{.NEUROGLANCER_GIT_DIR}}/src/**/*"]
     generates: ["{{.NEUROGLANCER_BUNDLE_PATH}}"]
     env:
       ILASTIK_URL: https://app.ilastik.org/ #needed for 'npm run build-with-ilastik-overlay'
