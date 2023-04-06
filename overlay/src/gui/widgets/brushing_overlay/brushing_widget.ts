@@ -118,6 +118,7 @@ export class BrushingWidget{
             this.brushingEnabledCheckbox.disabled = false
             this.canvas.style.display = "block"
             let overlay = this.overlay = new BrushingOverlay({
+                datasource: mode.trainingDatasource,
                 gl: this.gl,
                 trackedElement: this.viewer.getTrackedElement(),
                 viewport_drivers: this.viewer.getViewportDrivers(),

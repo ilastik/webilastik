@@ -3,7 +3,7 @@ import { IViewportDriver, IViewerDriver } from "..";
 import { Color } from "../client/ilastik";
 import { CssClasses } from "../gui/css_classes";
 import { Div } from "../gui/widgets/widget";
-import { createElement, getElementContentRect } from "../util/misc";
+import { changeOrientationBase, createElement, getElementContentRect } from "../util/misc";
 import { Url } from "../util/parsed_url";
 
 type NeuroglancerLayout = "4panel" | "xy" | "xy-3d" | "xz" | "xz-3d" | "yz" | "yz-3d";
@@ -17,32 +17,39 @@ export class NeuroglancerViewportDriver implements IViewportDriver{
     ){
         this.viewer = viewer_driver.viewer
     }
-    public getCameraPoseInUvwSpace = () => {
+    public getCameraPose_uvw = () => {
         const orientation_uvw = quat.multiply(
             quat.create(), this.viewer.navigationState.pose.orientation.orientation, this.orientation_offset
         )
-        const ng_position_obj = this.viewer.navigationState.pose.position
-        //old neuroglancers do not have the "value" key
-        //FIXME: check if this is in Nm and not finest-voxel-space
-        const position_uvw = vec3.scale(
-            vec3.create(),
-            ng_position_obj.value, this.viewer.navigationState.zoomFactor.curCanonicalVoxelPhysicalSize * 1e9
-        )
-        return {
-            position_uvw: position_uvw as vec3,
-            orientation_uvw: quat.normalize(orientation_uvw, orientation_uvw),
-        }
+        quat.normalize(orientation_uvw, orientation_uvw);
+        const position_uvw = vec3.clone(this.viewer.navigationState.pose.position.value)
+        return {position_uvw, orientation_uvw}
     }
-    public getUvwToWorldMatrix(): mat4{
-        return mat4.fromScaling(mat4.create(), vec3.fromValues(1, -1, -1))
+    public getUnitSize_nm(): vec3{
+        //FIXME: couldn't the voxels be unisotropic?
+        let length_in_nm = this.viewer.navigationState.zoomFactor.curCanonicalVoxelPhysicalSize * 1e9
+        return vec3.fromValues(length_in_nm, length_in_nm, length_in_nm)
     }
-    public getZoomInPixelsPerNm(): number{
-        const finest_voxel_size_in_nm = this.viewer.navigationState.zoomFactor.curCanonicalVoxelPhysicalSize * 1e9
-        const finest_voxels_per_viewport_pixel = this.viewer.navigationState.zoomFactor.value
-        const nm_per_viewport_pixel = finest_voxel_size_in_nm * finest_voxels_per_viewport_pixel;
+    public getVoxelScale({voxelSizeInNm}: {voxelSizeInNm: vec3}): vec3{
+        return vec3.div(vec3.create(), voxelSizeInNm, this.getUnitSize_nm());
+    }
+    public getCameraPose_w = (params: {voxelSizeInNm: vec3}) => {
+        let cameraPose_uvw = this.getCameraPose_uvw()
+        let uvw_to_w = this.getUvwToWorldMatrix(params)
 
-        //FIXME: check if this is acually in Nm and not in finest-voxel-units
-        return 1 / nm_per_viewport_pixel
+        let cameraPosition_w = vec3.transformMat4(vec3.create(), cameraPose_uvw.position_uvw, uvw_to_w);
+        let cameraOrientation_w = changeOrientationBase(cameraPose_uvw.orientation_uvw, uvw_to_w);
+
+        return {position_w: cameraPosition_w, orientation_w: cameraOrientation_w}
+    }
+    public getUvwToWorldMatrix(params: {voxelSizeInNm: vec3}): mat4{
+        const voxelScale = this.getVoxelScale(params);
+        const scaling: vec3 = vec3.mul(vec3.create(), voxelScale, vec3.fromValues(1, -1, -1));
+        return mat4.fromScaling(mat4.create(), scaling)
+    }
+    public getZoomInPixelsPerVoxel(params: {voxelSizeInNm: vec3}): number{
+        const voxelScale = this.getVoxelScale(params)
+        return voxelScale[0] / this.viewer.navigationState.zoomFactor.value //FIXME: maybe pick the smallest? idk
     }
     public getGeometry = () => {
         const panelContentRect = getElementContentRect(this.panel)

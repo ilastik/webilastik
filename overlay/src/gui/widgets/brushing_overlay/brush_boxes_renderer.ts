@@ -110,7 +110,6 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
     private readonly u_world_to_clip__location: UniformLocation;
     private readonly u_clip_to_world__location: UniformLocation;
     private readonly a_offset_vx__location: AttributeLocation;
-    private readonly u_brush_resolution__location: UniformLocation;
     private readonly color__location: UniformLocation | undefined;
 
     constructor({gl, debugColors=false, highlightCrossSection, onlyCrossSection}: {
@@ -124,8 +123,6 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
 
                 in vec3 a_vert_pos_o; //box vertex, different for every vertex
                 in vec3 a_offset_vx; //voxel coordinates (cube)
-
-                uniform vec3 u_brush_resolution;
 
                 uniform mat4 u_voxel_to_world;
                 uniform mat4 u_world_to_clip;
@@ -141,13 +138,10 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
                 ${debugColors ? `out vec3 color;` : ``}
 
                 void main(){
-                    vec3 voxel_shape_vx = vec3(1,1,1);
-                    vec3 voxel_shape_uvw = voxel_shape_vx * u_brush_resolution;
-                    vec3 voxel_shape_w = abs(u_voxel_to_world * vec4(voxel_shape_uvw, 0)).xyz;
+                    vec3 voxel_shape_w = abs(u_voxel_to_world * vec4(1,1,1, 0)).xyz;
 
                     vec3 box_center_vx = a_offset_vx + vec3(0.5, 0.5, 0.5); // 0.5 -> center of the voxel
-                    vec3 box_center_uvw = box_center_vx * u_brush_resolution;
-                    vec4 box_center_w = u_voxel_to_world * vec4(box_center_uvw, 1.0);
+                    vec4 box_center_w = u_voxel_to_world * vec4(box_center_vx, 1.0);
                     vec4 box_center_c = u_world_to_clip * box_center_w;
 
                     vec3 vert_pos_w = (a_vert_pos_o * voxel_shape_w) + box_center_w.xyz; //apply voxel_to_world just to the offset so faces don't flip
@@ -166,7 +160,6 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
                 precision highp float;
 
                 uniform mat4 u_voxel_to_world;
-                uniform vec3 u_brush_resolution;
 
                 ${debugColors ? `in` : `uniform`} vec3 color;
                 in vec3 v_dist_vert_proj_to_box_center_w;
@@ -175,7 +168,7 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
                 out highp vec4 outf_color;
 
                 void main(){
-                    vec3 voxel_shape_w = abs(u_voxel_to_world * vec4(u_brush_resolution, 0)).xyz; // w=0 because this is a distance, not a point
+                    vec3 voxel_shape_w = abs(u_voxel_to_world * vec4(1,1,1, 0)).xyz; // w=0 because this is a distance, not a point
                     vec3 dist = (voxel_shape_w / 2.0) - abs(v_dist_vert_proj_to_box_center_w);
                     bool projected_point_is_inside_cube_but_not_on_face = all( greaterThan(dist, vec3(0,0,0)) );
                     bool projected_point_is_on_face = dist == vec3(0,0,0);
@@ -202,7 +195,6 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
         this.u_world_to_clip__location = this.getUniformLocation("u_world_to_clip")
         this.u_clip_to_world__location = this.getUniformLocation("u_clip_to_world")
         this.a_offset_vx__location = this.getAttribLocation("a_offset_vx")
-        this.u_brush_resolution__location = this.getUniformLocation("u_brush_resolution")
         this.color__location = debugColors ? undefined : this.getUniformLocation("color")
 
     }
@@ -246,7 +238,6 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
                 if(this.color__location !== undefined){
                     this.uniform3fv(this.color__location, color.vec3f)
                 }
-                this.uniform3fv(this.u_brush_resolution__location, brush_stroke.resolution)
                 brush_stroke.positions_buffer.useAsInstacedAttribute({vao: this.vao, location: this.a_offset_vx__location, attributeDivisor: 1})
                 this.gl.drawArraysInstanced( //instance-draw a bunch of cubes, one cube for each voxel in the brush stroke
                 /*mode=*/this.box.getDrawingMode(),

@@ -88,17 +88,18 @@ export interface IViewportDriver{
     /**
      * @returns the camera position and orientation in data space
      */
-    getCameraPoseInUvwSpace(): {position_uvw: vec3, orientation_uvw: quat};
+    getCameraPose_uvw(): {position_uvw: vec3, orientation_uvw: quat};
+    getCameraPose_w(params: {voxelSizeInNm: vec3}): {position_w: vec3, orientation_w: quat};
 
     /**
      * @returns a mat4 that converts from voxel to worlkd space. Scaling part must have at least one axis set to 1
      */
-    getUvwToWorldMatrix(): mat4;
+    getUvwToWorldMatrix(params: {voxelSizeInNm: vec3}): mat4;
 
     /**
      * @returns orthogonal zoom; must be positive. Describes how many pixels (the smallest dimension of) one voxel should occupy on screen
      */
-    getZoomInPixelsPerNm(): number;
+    getZoomInPixelsPerVoxel(params: {voxelSizeInNm: vec3}): number;
 
     /**
      * Moves the viewport camera over to pose

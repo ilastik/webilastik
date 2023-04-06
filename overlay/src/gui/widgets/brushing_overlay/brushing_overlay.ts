@@ -1,13 +1,13 @@
-import { mat4, quat, vec3 } from 'gl-matrix'
+import { mat4, vec3 } from 'gl-matrix'
 import { BrushRenderer } from './brush_renderer'
 // import { BrushShaderProgram } from './brush_stroke'
 import { OrthoCamera } from './camera'
 // import { PerspectiveCamera } from './camera'
 import { ClearConfig, RenderParams, ScissorConfig } from '../../../gl/gl'
-import { changeOrientationBase, coverContents, insertAfter, removeElement } from '../../../util/misc'
+import { coverContents, insertAfter, removeElement } from '../../../util/misc'
 import { IViewportDriver } from '../../../drivers/viewer_driver'
 import { IBrushStrokeHandler, BrushStroke } from './brush_stroke'
-import { Color } from '../../../client/ilastik'
+import { Color, FsDataSource } from '../../../client/ilastik'
 
 
 export class OverlayViewport{
@@ -15,16 +15,20 @@ export class OverlayViewport{
     public readonly canvas: HTMLCanvasElement
     public readonly viewport_driver: IViewportDriver
     public readonly element: HTMLElement
+    private readonly datasource: FsDataSource
 
     public constructor({
+        datasource,
         viewport_driver,
         brush_stroke_handler,
         gl,
     }: {
+        datasource: FsDataSource,
         viewport_driver: IViewportDriver,
         brush_stroke_handler: IBrushStrokeHandler,
         gl: WebGL2RenderingContext,
     }){
+        this.datasource = datasource
         this.viewport_driver = viewport_driver
         this.gl = gl
         this.canvas = this.gl.canvas as HTMLCanvasElement
@@ -52,7 +56,7 @@ export class OverlayViewport{
         this.element.addEventListener("mousedown", (mouseDownEvent: MouseEvent) => {
             let currentBrushStroke = brush_stroke_handler.handleNewBrushStroke({
                 start_position_uvw: this.getMouseUvwPosition(mouseDownEvent),
-                camera_orientation_uvw: viewport_driver.getCameraPoseInUvwSpace().orientation_uvw,
+                camera_orientation_uvw: viewport_driver.getCameraPose_uvw().orientation_uvw,
             })
 
             let scribbleHandler = (mouseMoveEvent: MouseEvent) => {
@@ -80,26 +84,14 @@ export class OverlayViewport{
         }
     }
 
-    public getCameraPoseInWorldSpace(): {position_w: vec3, orientation_w: quat}{
-        const pose_uvw = this.viewport_driver.getCameraPoseInUvwSpace()
-        const uvw_to_world = this.viewport_driver.getUvwToWorldMatrix()
-        return {
-            position_w: vec3.transformMat4(
-                vec3.create(), pose_uvw.position_uvw, uvw_to_world
-            ),
-            orientation_w: changeOrientationBase(pose_uvw.orientation_uvw, uvw_to_world),
-        }
-    }
-
     public getCamera(): OrthoCamera{
-        // - left, right, top, bottom, near and far are measured in nm;
         // - pixelsPerVoxel determines the zoom/field of view;
         // - near and far have to be such that a voxel in any orientation would fit between them;
-        const pixels_per_nm = this.viewport_driver.getZoomInPixelsPerNm()
+        const pixels_per_voxel = this.viewport_driver.getZoomInPixelsPerVoxel({voxelSizeInNm: this.datasource.spatial_resolution})
         // const voxel_diagonal_length = vec3.length(mat4.getScaling(vec3.create(), this.viewport_driver.getVoxelToWorldMatrix()))
-        const viewport_width_in_voxels = this.element.scrollWidth / pixels_per_nm
-        const viewport_height_in_voxels = this.element.scrollHeight / pixels_per_nm
-        const camera_pose_w = this.getCameraPoseInWorldSpace()
+        const viewport_width_in_voxels = this.element.scrollWidth / pixels_per_voxel
+        const viewport_height_in_voxels = this.element.scrollHeight / pixels_per_voxel
+        const camera_pose_w = this.viewport_driver.getCameraPose_w({voxelSizeInNm: this.datasource.spatial_resolution})
         return new OrthoCamera({
             left: -viewport_width_in_voxels / 2,
             right: viewport_width_in_voxels / 2,
@@ -131,7 +123,10 @@ export class OverlayViewport{
     }
 
     public getMouseUvwPosition(ev: MouseEvent): vec3{
-        const world_to_uvw = mat4.invert(mat4.create(), this.viewport_driver.getUvwToWorldMatrix())
+        const world_to_uvw = mat4.invert(
+            mat4.create(),
+            this.viewport_driver.getUvwToWorldMatrix({voxelSizeInNm: this.datasource.spatial_resolution})
+        )
         let position_w = this.getMouseWorldPosition(ev)
         let position_uvw = vec3.transformMat4(vec3.create(), position_w, world_to_uvw)
         // console.log(`DataPosition(nm): ${vecToString(position_uvw)} ======================`)
@@ -158,7 +153,7 @@ export class OverlayViewport{
         renderer.render({
             brush_strokes: brushStrokes,
             camera: this.getCamera(),
-            voxelToWorld: this.viewport_driver.getUvwToWorldMatrix(),
+            voxelToWorld: this.viewport_driver.getUvwToWorldMatrix({voxelSizeInNm: this.datasource.spatial_resolution}),
             renderParams: new RenderParams({
                 scissorConfig: new ScissorConfig({
                     x: viewport_geometry.left,
@@ -188,11 +183,13 @@ export class BrushingOverlay{
     private brushing_enabled: boolean = false
 
     public constructor({
+        datasource,
         trackedElement,
         viewport_drivers,
         brush_stroke_handler,
         gl,
     }: {
+        datasource: FsDataSource,
         trackedElement: HTMLElement,
         viewport_drivers: Array<IViewportDriver>,
         brush_stroke_handler: IBrushStrokeHandler,
@@ -203,7 +200,7 @@ export class BrushingOverlay{
         this.gl = gl
         this.element = gl.canvas as HTMLCanvasElement;
         this.viewports = viewport_drivers.map((viewport_driver) => {
-            const viewport = new OverlayViewport({brush_stroke_handler: this.brush_stroke_handler, viewport_driver, gl: this.gl})
+            const viewport = new OverlayViewport({datasource, brush_stroke_handler: this.brush_stroke_handler, viewport_driver, gl: this.gl})
             viewport.setBrushingEnabled(this.brushing_enabled)
             return viewport
         })
