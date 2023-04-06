@@ -219,6 +219,24 @@ tasks:
       - echo 2>&1 '[INFO] Copying nehuba to public dir'
       - cp -r {{.NEUROGLANCER_BUILD_PATH}} {{.DEB_TREE_PATH}}/opt/webilastik/public/nehuba
 
+  copy-overlay-to-public:
+    deps: [compile-neuroglancer, compile-overlay]
+    cmds:
+      - mkdir -p {{.DEB_TREE_PATH}}/opt/webilastik/public/js/
+      - echo 2>&1 '[INFO] Syncing overlay bundle to public dir. Files transferred:'
+      - rsync -r --info=name {{.OVERLAY_DIR}}/build/ {{.DEB_TREE_PATH}}/opt/webilastik/public/js/
+
+      - mkdir -p {{.DEB_TREE_PATH}}/opt/webilastik/public/nehuba/
+      - echo 2>&1 '[INFO] Syncing nehuba to public dir. Files transferred:'
+      - rsync -r --info=name {{.NEUROGLANCER_BUILD_PATH}}/ {{.DEB_TREE_PATH}}/opt/webilastik/public/nehuba/
+
+  start-frontend:
+    deps: [copy-overlay-to-public]
+    cmds:
+      - sudo ln -s {{.DEB_TREE_PATH}}/opt/webilastik /opt/webilastik  &> /dev/null || true
+      - echo 2>&1 '[INFO] Linked the build directory, {{.DEB_TREE_PATH}}/opt/webilastik to the web-accessible /opt/webilastik.'
+      - echo 2>&1 '[INFO] If the webilastik nginx is running, you can access the page at https://app.ilastik.org/public/html/welcome.html'
+
   create-deb-package:
     deps: [create-deb-tree]
     sources:
