@@ -49,7 +49,8 @@ export class DataSourceSelectionWidget{
     }
 
     private tryOpenViews = async (liveFsTree: LiveFsTree) => {
-        let selectedUrls = liveFsTree.getSelectedUrls()
+        console.log(liveFsTree);
+        let selectedUrls = [Url.parse('precomputed://https://app.ilastik.org/public/images/c_cells_2.precomputed/')]
         let viewPromises = selectedUrls.map(url => this.session.getDatasourcesFromUrl(
             new GetDatasourcesFromUrlParamsDto({
                 url: url.toDto(),
