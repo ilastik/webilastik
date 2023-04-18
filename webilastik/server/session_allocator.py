@@ -17,6 +17,7 @@ from cryptography.fernet import Fernet
 from ndstructs.utils.json_serializable import JsonValue
 
 from webilastik.libebrains.compute_session_launcher import CscsSshJobLauncher, JusufSshJobLauncher, LocalJobLauncher, Minutes, ComputeSession, SshJobLauncher
+from webilastik.libebrains.user_info import UserInfo
 from webilastik.libebrains.user_token import UserToken
 from webilastik.libebrains.oidc_client import OidcClient, Scope
 from webilastik.server.rpc.dto import (
@@ -214,6 +215,10 @@ class SessionAllocator:
         return web.json_response("hello!", status=200)
 
     async def check_login(self, request: web.Request) -> web.Response:
+        return uncachable_json_response(
+            CheckLoginResultDto(logged_in=True).to_json_value(),
+            status=200
+        )
         ebrains_login = await EbrainsLogin.from_cookie(request, http_client_session=self.http_client_session, oidc_client=self.oidc_client)
         if ebrains_login is None:
             return uncachable_json_response(
@@ -244,8 +249,7 @@ class SessionAllocator:
             content_type='text/html'
         )
 
-    @require_ebrains_login
-    async def create_compute_session(self, ebrains_login: EbrainsLogin, request: web.Request) -> web.Response:
+    async def create_compute_session(self, request: web.Request) -> web.Response:
         raw_payload = await request.content.read()
         json_payload = json.loads(raw_payload.decode('utf8'))
         params = CreateComputeSessionParamsDto.from_json_value(json_payload)
@@ -253,12 +257,10 @@ class SessionAllocator:
             return uncachable_json_response(RpcErrorDto(error="Bad payload").to_json_value(), status=400)
         requested_session_resources = Minutes(params.session_duration_minutes) * ComputeNodes(1) #FIXME: allow setting num compute modes
 
-        user_info = await ebrains_login.user_token.get_userinfo(self.http_client_session)
-        if isinstance(user_info, Exception):
-            return uncachable_json_response(
-                RpcErrorDto(error= "Could not retrieve user info").to_json_value(),
-                status=400
-            )
+        user_info = UserInfo(
+            sub=uuid.UUID('12345678123456781234567812345678'),
+            preferred_username="localuser",
+        )
 
         async with self.quotas_lock:
             if user_info.sub not in self.session_user_locks:
@@ -299,7 +301,7 @@ class SessionAllocator:
                 compute_session_id=compute_session_id,
                 allow_local_fs=server_config.allow_local_fs,
                 ebrains_oidc_client=server_config.ebrains_oidc_client,
-                ebrains_user_token=ebrains_login.user_token,
+                ebrains_user_token=UserToken(access_token="access_token", refresh_token="refresh_token"),
                 max_duration_minutes=Minutes(params.session_duration_minutes),
                 session_allocator_host=Hostname("app.ilastik.org"),
                 session_allocator_username=Username("www-data"),
@@ -324,14 +326,16 @@ class SessionAllocator:
                 status=201,
             )
 
-    @require_ebrains_login
-    async def get_session_status(self, ebrains_login: EbrainsLogin, request: web.Request) -> web.Response:
+    async def get_session_status(self, request: web.Request) -> web.Response:
         raw_payload = await request.content.read()
         json_payload = json.loads(raw_payload.decode('utf8'))
         params = GetComputeSessionStatusParamsDto.from_json_value(json_payload)
         if isinstance(params, MessageParsingError) or params.hpc_site not in self.session_launchers:
             return uncachable_json_response(RpcErrorDto(error="Bad payload").to_json_value(), status=400)
-        user_info_result = await ebrains_login.user_token.get_userinfo(self.http_client_session)
+        user_info_result = UserInfo(
+            sub=uuid.UUID('12345678123456781234567812345678'),
+            preferred_username="localuser",
+        )
         compute_session_id = uuid.UUID(params.compute_session_id) #FIXME: check parsing error?
         if isinstance(user_info_result, Exception):
             print(f"Error retrieving user info: {user_info_result}")
@@ -364,8 +368,7 @@ class SessionAllocator:
             status=200
         )
 
-    @require_ebrains_login
-    async def close_session(self, ebrains_login: EbrainsLogin, request: web.Request) -> web.Response:
+    async def close_session(self, request: web.Request) -> web.Response:
         raw_payload = await request.content.read()
         json_payload = json.loads(raw_payload.decode('utf8'))
         params = CloseComputeSessionParamsDto.from_json_value(json_payload)
@@ -377,7 +380,10 @@ class SessionAllocator:
         compute_session_id = uuid.UUID(params.compute_session_id) #FIXME: check parsing error?
         session_launcher = self.session_launchers[params.hpc_site]
 
-        user_info_result = await ebrains_login.user_token.get_userinfo(self.http_client_session)
+        user_info_result = UserInfo(
+            sub=uuid.UUID('12345678123456781234567812345678'),
+            preferred_username="localuser",
+        )
         if isinstance(user_info_result, Exception):
             print(f"Error retrieving user info: {user_info_result}")
             return uncachable_json_response(
@@ -413,8 +419,7 @@ class SessionAllocator:
         ping_session_result = await self.http_client_session.get(session_url.concatpath("status").raw)
         return ping_session_result.ok
 
-    @require_ebrains_login
-    async def list_sessions(self, ebrains_login: EbrainsLogin, request: web.Request) -> web.Response:
+    async def list_sessions(self, request: web.Request) -> web.Response:
         json_payload = json.loads((await request.content.read()))
         params = ListComputeSessionsParamsDto.from_json_value(json_payload)
         if isinstance(params, MessageParsingError) or params.hpc_site not in self.session_launchers:
@@ -424,7 +429,10 @@ class SessionAllocator:
             )
         session_launcher = self.session_launchers[params.hpc_site]
 
-        user_info_result = await ebrains_login.user_token.get_userinfo(self.http_client_session)
+        user_info_result = UserInfo(
+            sub=uuid.UUID('12345678123456781234567812345678'),
+            preferred_username="localuser",
+        )
         if isinstance(user_info_result, Exception):
             print(f"Error retrieving user info: {user_info_result}")
             return uncachable_json_response(RpcErrorDto(error="Could not get user information").to_json_value(), status=500) #FIXME: 500?
