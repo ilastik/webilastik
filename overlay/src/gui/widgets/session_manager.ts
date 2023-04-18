@@ -149,16 +149,19 @@ export class SessionManagerWidget{
                             hpc_site: this.hpcSiteInput.value,
                             session_duration_minutes: sessionDurationMinutes,
                         }),
-                        onProgress: (message) => this.logMessage(message),
+                        onProgress: (message) => this.logMessage('[Create] '+message),
                         onUsageError: (message) => {new ErrorPopupWidget({message: message})},
                         autoCloseOnTimeout: true,
                     })
                     if(sessionResult instanceof Error){
+                        this.logMessage("session result is error")
                         return this.onNewSession({sessionResult})
                     }
+                    this.logMessage("Session created, getting StartupConfigs")
 
                     const startupConfigs = StartupConfigs.tryFromWindowLocation()
                     if(startupConfigs instanceof Error){
+                        this.logMessage("Startupconfigs is error")
                         new ErrorPopupWidget({message: `Could not get startup configs from current URL: ${startupConfigs.message}`})
                         return this.onNewSession({sessionResult})
                     }

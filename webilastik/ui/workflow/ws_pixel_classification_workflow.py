@@ -348,7 +348,9 @@ class WebIlastik:
         for websocket in self.websockets[:]:
             try:
                 # FIXME: do all sockets at once
+                logger.info(f'updating remote with: {stringified_payload[:150]}...')
                 await websocket.send_str(stringified_payload)
+                logger.info(f'Remote updated')
             except ConnectionResetError as e:
                 logger.error(f"Got an exception while updating remote:\n{e}\n\nRemoving websocket...")
                 self.websockets.remove(websocket)

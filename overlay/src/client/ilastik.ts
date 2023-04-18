@@ -320,17 +320,19 @@ export class Session{
             return sessionStatusMsg
         }
         onProgress(`Successfully requested a session! Waiting for it to be ready...`)
-        return Session.load({
+        let a = Session.load({
             ilastikUrl: params.ilastikUrl,
             getStatusRpcParams: new GetComputeSessionStatusParamsDto({
                 compute_session_id: sessionStatusMsg.compute_session.compute_session_id,
                 hpc_site: params.rpcParams.hpc_site,
             }),
             timeout_minutes: params.timeout_minutes,
-            onProgress,
+            onProgress: (message) => onProgress('[Load] '+message),
             onUsageError: params.onUsageError,
             autoCloseOnTimeout: params.autoCloseOnTimeout,
         })
+        onProgress(`Load finished`)
+        return a
     }
 
     public static async load(params: {
@@ -368,10 +370,13 @@ export class Session{
             return new Promise((resolve) => {
                 let websocket = session.websocket
                 let resolveThenClean = () => {
+                    onProgress("[websocket] resolving websocket")
                     resolve(session)
                     websocket.removeEventListener("open", resolveThenClean)
+                    onProgress("[websocket] resolved")
                 }
                 websocket.addEventListener("open", resolveThenClean)
+                onProgress("websocket now waiting to open")
             })
         }
         onProgress(`Timed out waiting for session ${params.getStatusRpcParams.compute_session_id}`)
