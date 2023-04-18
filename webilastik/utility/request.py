@@ -21,7 +21,7 @@ def request(
     headers: "Mapping[str, str] | None" = None,
 ) -> "bytes | ErrRequestCompletedAsFailure | ErrRequestCrashed":
     try:
-        response = session.request(method=method, url=url.schemeless_raw, data=data, headers=headers)
+        response = session.request(method=method, url=url.schemeless_raw, data=data, headers=headers, verify=False)
         if not response.ok:
             return ErrRequestCompletedAsFailure(response.status_code)
         return response.content

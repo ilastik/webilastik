@@ -179,7 +179,9 @@ class SessionAllocator:
     @property
     def http_client_session(self) -> ClientSession:
         if self._http_client_session is None:
-            self._http_client_session = aiohttp.ClientSession()
+            self._http_client_session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(
+                verify_ssl=False,
+            ))
         return self._http_client_session
 
     async def get_ebrains_token(self, request: web.Request) -> web.Response:
@@ -303,7 +305,7 @@ class SessionAllocator:
                 ebrains_oidc_client=server_config.ebrains_oidc_client,
                 ebrains_user_token=UserToken(access_token="access_token", refresh_token="refresh_token"),
                 max_duration_minutes=Minutes(params.session_duration_minutes),
-                session_allocator_host=Hostname("app.ilastik.org"),
+                session_allocator_host=Hostname(self.external_url.host),
                 session_allocator_username=Username("www-data"),
                 session_allocator_socket_path=Path(f"/tmp/to-session-{compute_session_id}"),
                 session_url=self._make_compute_session_url(compute_session_id=compute_session_id),
