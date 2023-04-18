@@ -25,7 +25,7 @@ from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonO
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource, PrecomputedChunksInfo
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale
-from webilastik.filesystem import FsFileNotFoundException, FsIoException, IFilesystem, create_filesystem_from_message, create_filesystem_from_url
+from webilastik.filesystem import FsIoException, IFilesystem, create_filesystem_from_message, create_filesystem_from_url
 from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.filesystem.os_fs import OsFs
 from webilastik.scheduling.job import PriorityExecutor
@@ -121,7 +121,7 @@ class WebIlastik:
                 traceback_messages = traceback.format_exc()
                 error_message = f"Unhandled Exception: {e}\n\n{traceback_messages}"
                 logger.error(error_message)
-            self._update_clients(error_message=error_message)
+            self.async_update_client_workflow_state(error_message=error_message)
         self.loop.call_soon_threadsafe(lambda: self.loop.create_task(do_rpc()))
 
     async def close_websockets(self, app: Application):
@@ -310,7 +310,7 @@ class WebIlastik:
         _ = await websocket.prepare(request)
         self.websockets.append(websocket)
         logger.debug(f"JUST STABILISHED A NEW CONNECTION!!!! {len(self.websockets)}")
-        self._update_clients() # when a new client connects, send it the current state
+        self.async_update_client_workflow_state() # when a new client connects, send it the current state
         async for msg in websocket:
             if msg.type == aiohttp.WSMsgType.TEXT:
                 if msg.data == 'close':
@@ -332,7 +332,7 @@ class WebIlastik:
                 except Exception:
                     import traceback
                     traceback.print_exc()
-                    self._update_clients() # restore last known good state of offending client
+                    self.async_update_client_workflow_state() # restore last known good state of offending client
             elif msg.type == aiohttp.WSMsgType.BINARY:
                 logger.error(f'Unexpected binary message')
             elif msg.type == aiohttp.WSMsgType.ERROR:
@@ -343,7 +343,7 @@ class WebIlastik:
         logger.info('websocket connection closed')
         return websocket
 
-    async def do_update(self, payload: JsonValue):
+    async def send_json_to_all_clients(self, payload: JsonValue):
         stringified_payload = json.dumps(payload)
         for websocket in self.websockets[:]:
             try:
@@ -353,12 +353,12 @@ class WebIlastik:
                 logger.error(f"Got an exception while updating remote:\n{e}\n\nRemoving websocket...")
                 self.websockets.remove(websocket)
 
-    def _update_clients(self, error_message: Optional[str] = None):
+    def async_update_client_workflow_state(self, error_message: Optional[str] = None):
         loop = self.app.loop # FIXME?
         if error_message is not None:
-            loop.create_task(self.do_update({"error": error_message}))
+            loop.create_task(self.send_json_to_all_clients({"error": error_message}))
         payload = self.workflow.get_json_state()
-        loop.create_task(self.do_update(payload))
+        loop.create_task(self.send_json_to_all_clients(payload))
 
     async def download_project_as_ilp(self, request: web.Request):
         return web.Response(
@@ -426,7 +426,7 @@ class WebIlastik:
         if isinstance(new_workflow_result, Exception):
             return web.Response(status=400, text=f"Could not load project: {new_workflow_result}")
         self.workflow = new_workflow_result
-        self._update_clients()
+        self.async_update_client_workflow_state()
         return web.Response(status=200, text=f"Project saved to {fs_result.geturl(file_path)}")
 
     async def stripped_precomputed_info(self, request: web.Request) -> web.Response:
