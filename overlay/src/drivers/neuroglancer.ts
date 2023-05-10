@@ -17,14 +17,6 @@ export class NeuroglancerViewportDriver implements IViewportDriver{
     ){
         this.viewer = viewer_driver.viewer
     }
-    public getCameraPose_uvw = () => {
-        const orientation_uvw = quat.multiply(
-            quat.create(), this.viewer.navigationState.pose.orientation.orientation, this.orientation_offset
-        )
-        quat.normalize(orientation_uvw, orientation_uvw);
-        const position_uvw = vec3.clone(this.viewer.navigationState.pose.position.value)
-        return {position_uvw, orientation_uvw}
-    }
     public getUnitSize_nm(): vec3{
         //FIXME: couldn't the voxels be unisotropic?
         let length_in_nm = this.viewer.navigationState.zoomFactor.curCanonicalVoxelPhysicalSize * 1e9
@@ -33,12 +25,17 @@ export class NeuroglancerViewportDriver implements IViewportDriver{
     public getVoxelScale({voxelSizeInNm}: {voxelSizeInNm: vec3}): vec3{
         return vec3.div(vec3.create(), voxelSizeInNm, this.getUnitSize_nm());
     }
-    public getCameraPose_w = (params: {voxelSizeInNm: vec3}) => {
-        let cameraPose_uvw = this.getCameraPose_uvw()
-        let uvw_to_w = this.getUvwToWorldMatrix(params)
+    public getCameraPose_w = () => {
+        const orientation_uvw = quat.multiply(
+            quat.create(), this.viewer.navigationState.pose.orientation.orientation, this.orientation_offset
+        )
+        quat.normalize(orientation_uvw, orientation_uvw);
+        const position_uvw = vec3.clone(this.viewer.navigationState.pose.position.value)
 
-        let cameraPosition_w = vec3.transformMat4(vec3.create(), cameraPose_uvw.position_uvw, uvw_to_w);
-        let cameraOrientation_w = changeOrientationBase(cameraPose_uvw.orientation_uvw, uvw_to_w);
+        let uvw_to_w = this.getUvwToWorldMatrix({voxelSizeInNm: this.getUnitSize_nm()})
+
+        let cameraPosition_w = vec3.transformMat4(vec3.create(), position_uvw, uvw_to_w);
+        let cameraOrientation_w = changeOrientationBase(orientation_uvw, uvw_to_w);
 
         return {position_w: cameraPosition_w, orientation_w: cameraOrientation_w}
     }
@@ -47,9 +44,8 @@ export class NeuroglancerViewportDriver implements IViewportDriver{
         const scaling: vec3 = vec3.mul(vec3.create(), voxelScale, vec3.fromValues(1, -1, -1));
         return mat4.fromScaling(mat4.create(), scaling)
     }
-    public getZoomInPixelsPerVoxel(params: {voxelSizeInNm: vec3}): number{
-        const voxelScale = this.getVoxelScale(params)
-        return voxelScale[0] / this.viewer.navigationState.zoomFactor.value //FIXME: maybe pick the smallest? idk
+    public getZoomInWorldUnitsPerPixel(): number{
+        return this.viewer.navigationState.zoomFactor.value //FIXME: maybe pick the smallest? idk
     }
     public getGeometry = () => {
         const panelContentRect = getElementContentRect(this.panel)

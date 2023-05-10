@@ -1,4 +1,4 @@
-import { mat4, vec3 } from 'gl-matrix'
+import { mat4, quat, vec3 } from 'gl-matrix'
 import { BrushRenderer } from './brush_renderer'
 // import { BrushShaderProgram } from './brush_stroke'
 import { OrthoCamera } from './camera'
@@ -56,7 +56,7 @@ export class OverlayViewport{
         this.element.addEventListener("mousedown", (mouseDownEvent: MouseEvent) => {
             let currentBrushStroke = brush_stroke_handler.handleNewBrushStroke({
                 start_position_uvw: this.getMouseUvwPosition(mouseDownEvent),
-                camera_orientation_uvw: viewport_driver.getCameraPose_uvw().orientation_uvw,
+                camera_orientation_uvw: quat.create()//FIXME!!! viewport_driver.getCameraPose_uvw().orientation_uvw,
             })
 
             let scribbleHandler = (mouseMoveEvent: MouseEvent) => {
@@ -87,18 +87,18 @@ export class OverlayViewport{
     public getCamera(): OrthoCamera{
         // - pixelsPerVoxel determines the zoom/field of view;
         // - near and far have to be such that a voxel in any orientation would fit between them;
-        const pixels_per_voxel = this.viewport_driver.getZoomInPixelsPerVoxel({voxelSizeInNm: this.datasource.spatial_resolution})
+        const world_units_per_pixel = this.viewport_driver.getZoomInWorldUnitsPerPixel()
         // const voxel_diagonal_length = vec3.length(mat4.getScaling(vec3.create(), this.viewport_driver.getVoxelToWorldMatrix()))
-        const viewport_width_in_voxels = this.element.scrollWidth / pixels_per_voxel
-        const viewport_height_in_voxels = this.element.scrollHeight / pixels_per_voxel
-        const camera_pose_w = this.viewport_driver.getCameraPose_w({voxelSizeInNm: this.datasource.spatial_resolution})
+        const viewport_width_w = this.element.scrollWidth * world_units_per_pixel;
+        const viewport_height_w = this.element.scrollHeight * world_units_per_pixel;
+        const camera_pose_w = this.viewport_driver.getCameraPose_w(/*{voxelSizeInNm: this.datasource.spatial_resolution}*/)
         return new OrthoCamera({
-            left: -viewport_width_in_voxels / 2,
-            right: viewport_width_in_voxels / 2,
+            left: -viewport_width_w / 2,
+            right: viewport_width_w / 2,
             near: -1000,//-voxel_diagonal_length,
             far: 1000,//voxel_diagonal_length,
-            bottom: -viewport_height_in_voxels / 2,
-            top: viewport_height_in_voxels / 2,
+            bottom: -viewport_height_w / 2,
+            top: viewport_height_w / 2,
             position: camera_pose_w.position_w,
             orientation: camera_pose_w.orientation_w,
         })
