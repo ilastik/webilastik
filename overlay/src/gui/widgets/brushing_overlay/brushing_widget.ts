@@ -28,6 +28,7 @@ export class BrushingWidget{
     private brushingApplet: BrushingApplet
     private predictingWidget: PredictingWidget
     private brushStrokeRenderer: BrushelBoxRenderer
+    private readonly toggleBrushingKeyHandler: (e: KeyboardEvent) => void
 
     constructor({
         applet_name,
@@ -63,13 +64,19 @@ export class BrushingWidget{
             createElement({tagName: "label", parentElement: brushingEnabledParagraph, innerText: "Enable Brushing: "})
             this.brushingEnabledCheckbox = new BooleanInput({
                 parentElement: brushingEnabledParagraph,
-                title: "Enable to draw annotations by clicking and dragging. Disable to use the viewer's controls to navigate over the data.",
+                title: "(B) Enable to draw annotations by clicking and dragging. Disable to use the viewer's controls to navigate over the data.",
                 valueExplanations: {on: "Navigating is disabled", off: "Navigating is enabled"},
                 disabled: true,
                 onClick: () => {
                     this.setBrushingEnabled(this.brushingEnabledCheckbox.value)
                 }
             })
+            this.toggleBrushingKeyHandler = (e: KeyboardEvent) => {
+                if(e.key == "b"){
+                    this.setBrushingEnabled(!this.brushingEnabledCheckbox.value)
+                }
+            }
+            window.addEventListener("keyup", this.toggleBrushingKeyHandler)
 
             this.brushingApplet = new BrushingApplet({
                 parentElement: this.trainingWidget,
@@ -175,6 +182,7 @@ export class BrushingWidget{
     }
 
     public destroy(){
+        window.removeEventListener("keyup", this.toggleBrushingKeyHandler)
         window.cancelAnimationFrame(this.animationRequestId)
         this.overlay?.destroy()
         removeElement(this.gl.canvas as HTMLElement) //FIXME?
