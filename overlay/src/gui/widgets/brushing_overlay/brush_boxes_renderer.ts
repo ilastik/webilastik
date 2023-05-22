@@ -5,6 +5,7 @@ import { VertexArrayObject, BufferUsageHint } from "../../../gl/buffer";
 import { RenderParams } from "../../../gl/gl";
 import { ShaderProgram, VertexShader, FragmentShader, UniformLocation, AttributeLocation } from "../../../gl/shader";
 import { TriangleArray } from "../../../gl/vertex_primitives";
+import { Mat4 } from "../../../util/ooglmatrix";
 import { BrushRenderer } from "./brush_renderer"
 import { Camera } from "./camera"
 
@@ -211,7 +212,7 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
     }: {
         brush_strokes: Array<[Color, BrushStroke[]]>,
         camera: Camera,
-        voxelToWorld: mat4,
+        voxelToWorld: Mat4<"voxel", "world">,
         renderParams?: RenderParams
     }){
         renderParams.use(this.gl)
@@ -222,8 +223,8 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
             vao: this.vao, location: this.getAttribLocation("a_vert_pos_o")
         })
 
-        let u_voxel_to_world = mat4.clone(voxelToWorld);
-        this.uniformMatrix4fv(this.u_voxel_to_world__location, u_voxel_to_world);
+        let u_voxel_to_world = voxelToWorld.clone();
+        this.uniformMatrix4fv(this.u_voxel_to_world__location, u_voxel_to_world.raw);
 
         // show_if_changed("u_voxel_to_world", mat4.str(u_voxel_to_world))
 

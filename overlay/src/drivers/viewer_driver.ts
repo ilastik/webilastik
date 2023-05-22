@@ -1,5 +1,6 @@
-import { mat4, quat, vec3 } from "gl-matrix";
+import { quat, vec3 } from "gl-matrix";
 import { Color } from "../client/ilastik";
+import { Mat4, Quat, Vec3 } from "../util/ooglmatrix";
 import { Url } from "../util/parsed_url";
 
 /**
@@ -85,16 +86,9 @@ export interface IViewportInjectionParams{
 export interface IViewportDriver{
     getGeometry(): IViewportGeometry;
 
-    /**
-     * @returns the camera position and orientation in data space
-     */
-    // getCameraPose_uvw(): {position_uvw: vec3, orientation_uvw: quat};
-    getCameraPose_w(/*params: {voxelSizeInNm: vec3}*/): {position_w: vec3, orientation_w: quat};
+    getCameraPose(): {position: Vec3<"world">, orientation: Quat<"world">};
 
-    /**
-     * @returns a mat4 that converts from voxel to worlkd space. Scaling part must have at least one axis set to 1
-     */
-    getUvwToWorldMatrix(params: {voxelSizeInNm: vec3}): mat4;
+    getVoxelToWorldMatrix(params: {voxelSizeInNm: vec3}): Mat4<"voxel", "world">;
 
     getZoomInWorldUnitsPerPixel(): number;
 

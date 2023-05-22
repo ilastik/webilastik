@@ -3,6 +3,7 @@ import { Color, FsDataSource } from "../../../client/ilastik";
 import { PixelAnnotationDto } from "../../../client/dto";
 import { VecAttributeBuffer, BufferUsageHint } from "../../../gl/buffer";
 import { VertexArray } from "../../../gl/vertex_primitives";
+import { Quat, Vec3 } from "../../../util/ooglmatrix";
 // import { vec3ToString } from "./utils";
 
 export class BrushStroke extends VertexArray{
@@ -41,21 +42,21 @@ export class BrushStroke extends VertexArray{
         return this.getVertRef(this.num_points - 1)
     }
 
-    public interpolate_until_point_uvw(point_uvw: vec3){
-        let previous_point_uvw = this.getVertRef(this.num_points - 1)
-        let delta_uvw = vec3.subtract(vec3.create(), point_uvw, previous_point_uvw)
-        let num_steps = Math.max(Math.abs(delta_uvw[0]), Math.abs(delta_uvw[1]), Math.abs(delta_uvw[2]))
+    public interpolate_until_point_uvw(point_uvw: Vec3<"voxel">){
+        let previous_point_uvw = new Vec3<"voxel">(this.getVertRef(this.num_points - 1))
+        let delta_uvw = point_uvw.minus(previous_point_uvw)
+        let num_steps = delta_uvw.getMaxAbsCoord()
 
-        let step_increment_uvw = vec3.div(vec3.create(), delta_uvw, vec3.fromValues(num_steps, num_steps, num_steps))
+        let step_increment_uvw = delta_uvw.scale(1/num_steps)
         for(let i=1; i < num_steps; i++){
-            let interpolated_point_uvw =  vec3.fromValues(
-                Math.floor(previous_point_uvw[0] + step_increment_uvw[0] * i),
-                Math.floor(previous_point_uvw[1] + step_increment_uvw[1] * i),
-                Math.floor(previous_point_uvw[2] + step_increment_uvw[2] * i),
-            )
-            this.try_add_point_uvw(interpolated_point_uvw)
+            let interpolated_point_uvw =  new Vec3<"voxel">(vec3.fromValues(
+                Math.floor(previous_point_uvw.x + step_increment_uvw.x * i),
+                Math.floor(previous_point_uvw.y + step_increment_uvw.y * i),
+                Math.floor(previous_point_uvw.z + step_increment_uvw.z * i),
+            ))
+            this.try_add_point_uvw(interpolated_point_uvw.raw)
         }
-        this.try_add_point_uvw(point_uvw) //Ensure last point is present
+        this.try_add_point_uvw(point_uvw.raw) //Ensure last point is present
     }
 
     public try_add_point_uvw(point_uvw: vec3): boolean{
@@ -114,6 +115,6 @@ export class BrushStroke extends VertexArray{
 export type IStagingBrushStroke = {stroke: BrushStroke, color: Color}
 
 export interface IBrushStrokeHandler{
-    handleNewBrushStroke: (params: {start_position_uvw: vec3, camera_orientation_uvw: quat}) => BrushStroke,
+    handleNewBrushStroke: (params: {start_position: Vec3<"voxel">, camera_orientation: Quat<"voxel">}) => BrushStroke,
     handleFinishedBrushStroke: (stagingStroke: BrushStroke) => any,
 }
