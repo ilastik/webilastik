@@ -85,7 +85,6 @@ export class OverlayViewport{
     }
 
     public getCamera(): OrthoCamera{
-        // - pixelsPerVoxel determines the zoom/field of view;
         // - near and far have to be such that a voxel in any orientation would fit between them;
         const world_units_per_pixel = this.viewport_driver.getZoomInWorldUnitsPerPixel()
         // const voxel_diagonal_length = vec3.length(mat4.getScaling(vec3.create(), this.viewport_driver.getVoxelToWorldMatrix()))
