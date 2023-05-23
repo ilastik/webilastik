@@ -18,14 +18,6 @@ export class NeuroglancerViewportDriver implements IViewportDriver{
     ){
         this.viewer = viewer_driver.viewer
     }
-    public getUnitSize_nm(): vec3{
-        //FIXME: couldn't the voxels be unisotropic?
-        let length_in_nm = this.viewer.navigationState.zoomFactor.curCanonicalVoxelPhysicalSize * 1e9
-        return vec3.fromValues(length_in_nm, length_in_nm, length_in_nm)
-    }
-    public getVoxelScale({voxelSizeInNm}: {voxelSizeInNm: vec3}): vec3{
-        return vec3.div(vec3.create(), voxelSizeInNm, this.getUnitSize_nm());
-    }
     public getCameraPose = (): {position: Vec3<"world">, orientation: Quat<"world">} => {
         const orientation_uvw = new Quat<"voxel">(quat.multiply(
             quat.create(), this.viewer.navigationState.pose.orientation.orientation, this.orientation_offset
@@ -34,7 +26,7 @@ export class NeuroglancerViewportDriver implements IViewportDriver{
             vec3.clone(this.viewer.navigationState.pose.position.value)
         )
 
-        let uvw_to_w = this.getVoxelToWorldMatrix({voxelSizeInNm: this.getUnitSize_nm()})
+        let uvw_to_w = this.getVoxelToWorldMatrix({voxelSizeInNm: this.viewer_driver.getUnitSize_nm()})
 
         let cameraPosition_w = position_uvw.transformedWith(uvw_to_w);
         let cameraOrientation_w = orientation_uvw.relativeToBase(uvw_to_w);
@@ -42,7 +34,7 @@ export class NeuroglancerViewportDriver implements IViewportDriver{
         return {position: cameraPosition_w, orientation: cameraOrientation_w}
     }
     public getVoxelToWorldMatrix(params: {voxelSizeInNm: vec3}): Mat4<"voxel", "world">{
-        const voxelScale = this.getVoxelScale(params);
+        const voxelScale = this.viewer_driver.getVoxelScale(params);
         const scaling: vec3 = vec3.mul(vec3.create(), voxelScale, vec3.fromValues(1, -1, -1));
         return Mat4.fromScaling(scaling)
     }
@@ -190,6 +182,15 @@ export class NeuroglancerDriver implements IViewerDriver{
         this.trackedElement = document.querySelector("#neuroglancer-container canvas")! //FIXME: double-check selector
     }
 
+    public getUnitSize_nm(): vec3{
+        //FIXME: couldn't the voxels be unisotropic?
+        let length_in_nm = this.viewer.navigationState.zoomFactor.curCanonicalVoxelPhysicalSize * 1e9
+        return vec3.fromValues(length_in_nm, length_in_nm, length_in_nm)
+    }
+    public getVoxelScale({voxelSizeInNm}: {voxelSizeInNm: vec3}): vec3{
+        return vec3.div(vec3.create(), voxelSizeInNm, this.getUnitSize_nm());
+    }
+
     getState(): ViewerState{
         return this.viewer.state.toJSON()
     }
@@ -205,7 +206,7 @@ export class NeuroglancerDriver implements IViewerDriver{
     getTrackedElement() : HTMLElement{
         return this.trackedElement
     }
-    getViewportDrivers(): Array<IViewportDriver>{
+    getViewportDrivers(): Array<NeuroglancerViewportDriver>{
         const panels = Array(...document.querySelectorAll(".neuroglancer-panel")) as Array<HTMLElement>;
         if(panels.length == 0){
             return []
@@ -295,15 +296,15 @@ export class NeuroglancerDriver implements IViewerDriver{
         })
     }
 
-    public snapTo(params: {position_vx: vec3, orientation_w: quat, voxel_size_nm: vec3}): void{
-        this.viewer.navigationState.pose.restoreState({
-            position: {
-                voxelSize: Array.from(params.voxel_size_nm),
-                spatialCoordinates: Array.from(
-                    vec3.multiply(vec3.create(), params.position_vx, params.voxel_size_nm)
-                ),
-            },
-            orientation: Array.from(params.orientation_w),
-        })
+    public snapTo(params: {position_w: Vec3<"world">, orientation_w: Quat<"world">}): void{
+        const {position_w, orientation_w} = params;
+
+        const worldToSmallestVoxel = Mat4.fromScaling(vec3.fromValues(1, -1, -1)).inverted() //FIXME?
+        const viewer_pos = position_w.transformedWith(worldToSmallestVoxel) //viewer position is _not_ in world space
+
+        this.viewer.navigationState.pose.position.restoreState([viewer_pos.x, viewer_pos.y, viewer_pos.z])
+        this.viewer.navigationState.pose.orientation.restoreState(
+            [orientation_w.raw[0], orientation_w.raw[1], orientation_w.raw[2], orientation_w.raw[3]]
+        )
     }
 }

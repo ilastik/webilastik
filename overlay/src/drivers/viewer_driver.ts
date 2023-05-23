@@ -52,7 +52,7 @@ export interface IViewerDriver{
     addViewportsChangedHandler: (handler: () => void) => void;
     removeViewportsChangedHandler: (handler: () => void) => void;
     getContainerForWebilastikControls: () => HTMLElement | undefined;
-    snapTo?: (params: {position_vx: vec3, orientation_w: quat, voxel_size_nm: vec3}) => void;
+    snapTo?: (params: {position_w: Vec3<"world">, orientation_w: Quat<"world">}) => void;
 }
 
 /**
