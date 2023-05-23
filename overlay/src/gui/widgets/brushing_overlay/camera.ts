@@ -1,4 +1,5 @@
 import { mat3, mat4, quat, ReadonlyVec3, vec3 } from "gl-matrix";
+import { Mat4 } from "../../../util/ooglmatrix";
 
 export const forward_c = vec3.fromValues( 0,  0, -1);
 export const    left_c = vec3.fromValues(-1,  0,  0);
@@ -120,6 +121,10 @@ export class OrthoCamera extends Camera{
     }){
         super({position, orientation})
         this.reconfigure({left, right, bottom, top, near, far})
+    }
+
+    public getClipToWorld(): Mat4<"ndc", "world">{
+        return new Mat4(this.clip_to_world)
     }
 
     public reconfigure({left, right, bottom, top, near, far, position, orientation}: {

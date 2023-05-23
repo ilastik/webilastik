@@ -1,4 +1,3 @@
-import { quat, vec3 } from "gl-matrix"
 import { BrushStroke } from "../../.."
 import { Color, FsDataSource, Session } from "../../../client/ilastik"
 import { createElement, removeElement } from "../../../util/misc"
@@ -9,6 +8,7 @@ import { BrushingApplet } from "./brush_strokes_container"
 import { Viewer } from "../../../viewer/viewer"
 import { PredictingWidget } from "../predicting_widget";
 import { BooleanInput } from "../value_input_widget"
+import { Vec3, Quat } from "../../../util/ooglmatrix"
 
 
 export class BrushingWidget{
@@ -28,6 +28,7 @@ export class BrushingWidget{
     private brushingApplet: BrushingApplet
     private predictingWidget: PredictingWidget
     private brushStrokeRenderer: BrushelBoxRenderer
+    private readonly toggleBrushingKeyHandler: (e: KeyboardEvent) => void
 
     constructor({
         applet_name,
@@ -63,13 +64,19 @@ export class BrushingWidget{
             createElement({tagName: "label", parentElement: brushingEnabledParagraph, innerText: "Enable Brushing: "})
             this.brushingEnabledCheckbox = new BooleanInput({
                 parentElement: brushingEnabledParagraph,
-                title: "Enable to draw annotations by clicking and dragging. Disable to use the viewer's controls to navigate over the data.",
+                title: "(B) Enable to draw annotations by clicking and dragging. Disable to use the viewer's controls to navigate over the data.",
                 valueExplanations: {on: "Navigating is disabled", off: "Navigating is enabled"},
                 disabled: true,
                 onClick: () => {
                     this.setBrushingEnabled(this.brushingEnabledCheckbox.value)
                 }
             })
+            this.toggleBrushingKeyHandler = (e: KeyboardEvent) => {
+                if(e.key == "b"){
+                    this.setBrushingEnabled(!this.brushingEnabledCheckbox.value)
+                }
+            }
+            window.addEventListener("keyup", this.toggleBrushingKeyHandler)
 
             this.brushingApplet = new BrushingApplet({
                 parentElement: this.trainingWidget,
@@ -118,16 +125,17 @@ export class BrushingWidget{
             this.brushingEnabledCheckbox.disabled = false
             this.canvas.style.display = "block"
             let overlay = this.overlay = new BrushingOverlay({
+                datasource: mode.trainingDatasource,
                 gl: this.gl,
                 trackedElement: this.viewer.getTrackedElement(),
                 viewport_drivers: this.viewer.getViewportDrivers(),
                 brush_stroke_handler: {
-                    handleNewBrushStroke: (params: {start_position_uvw: vec3, camera_orientation_uvw: quat}) => {
+                    handleNewBrushStroke: (params: {start_position: Vec3<"voxel">, camera_orientation: Quat<"voxel">}) => {
                         this.stagingStroke = BrushStroke.create({
                             gl: this.gl,
-                            start_postition_uvw: params.start_position_uvw, //FIXME put scale somewhere
+                            start_postition_uvw: params.start_position.raw, //FIXME put scale somewhere
                             annotated_data_source: mode.trainingDatasource,
-                            camera_orientation: params.camera_orientation_uvw, //FIXME: realy data space? rename param in BrushStroke?
+                            camera_orientation: params.camera_orientation.raw, //FIXME: realy data space? rename param in BrushStroke?
                         })
                         return this.stagingStroke
                     },
@@ -174,6 +182,7 @@ export class BrushingWidget{
     }
 
     public destroy(){
+        window.removeEventListener("keyup", this.toggleBrushingKeyHandler)
         window.cancelAnimationFrame(this.animationRequestId)
         this.overlay?.destroy()
         removeElement(this.gl.canvas as HTMLElement) //FIXME?

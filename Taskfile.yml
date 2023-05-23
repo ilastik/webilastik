@@ -16,7 +16,7 @@ vars:
   DEB_PKG_PATH: "{{.BUILD_DIR}}/{{.PKG_NAME}}.deb"
   REMOTE_PACKAGE_PATH: "/home/ubuntu/{{.PKG_NAME}}.deb"
   NEUROGLANCER_GIT_DIR: "{{.BUILD_DIR}}/neuroglancer"
-  NEUROGLANCER_BUILD_PATH: "{{.NEUROGLANCER_GIT_DIR}}/dist/dev"
+  NEUROGLANCER_BUILD_PATH: "{{.NEUROGLANCER_GIT_DIR}}/dist/min"
   NEUROGLANCER_BUNDLE_PATH: "{{.NEUROGLANCER_BUILD_PATH}}/main.bundle.js"
   OVERLAY_DIR: "{{.PROJECT_ROOT}}/overlay"
   OVERLAY_BUNDLE_PATH: "{{.OVERLAY_DIR}}/build/inject_into_neuroglancer.js"
@@ -75,8 +75,7 @@ tasks:
     deps: [create-neuroglancer-git-dir]
     dir: "{{.NEUROGLANCER_GIT_DIR}}"
     vars:
-      COMMIT_HASH: "bde4142999831aaf2d4f394f717d98d7cc404b40"
-      # COMMIT_HASH: "with-ilastik-overlay"
+      COMMIT_HASH: "a95e9f3ae60dcaf86e2f14ae4daf821c30baa911"
     cmds:
       - git clone https://github.com/ilastik/neuroglancer . && git fetch
       - git checkout {{.COMMIT_HASH}}

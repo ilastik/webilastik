@@ -1,6 +1,5 @@
 // import { vec3 } from "gl-matrix";
 // import { quat, vec3 } from "gl-matrix";
-import { quat, vec3 } from "gl-matrix";
 import { FsDataSource, Session } from "../client/ilastik";
 import { IViewerDriver, IViewportDriver } from "../drivers/viewer_driver";
 import { CssClasses } from "../gui/css_classes";
@@ -8,6 +7,7 @@ import { Button } from "../gui/widgets/input_widget";
 import { PixelClassificationLaneWidget } from "../gui/widgets/layer_widget";
 // import { ErrorPopupWidget } from "../gui/widgets/popup";
 import { Div } from "../gui/widgets/widget";
+import { Quat, Vec3 } from "../util/ooglmatrix";
 // import { PredictionsView, DataView, ViewUnion, RawDataView, StrippedPrecomputedView } from "./view";
 
 
@@ -45,11 +45,16 @@ export class Viewer{
                     return
                 }
 
-                const position_vx = vec3.create();
-                vec3.div(position_vx, activeDataSource.shape.toXyzVec3(), vec3.fromValues(2,2,2)),
+
+                const dataset_center_voxel = new Vec3<"voxel">(activeDataSource.shape.toXyzVec3()).scale(0.5)
+                const dataset_center_world = dataset_center_voxel.transformedWith(
+                    //FIXME: assumes first viewport is special. The architecture assumes independent viewports but in NG they are locked
+                    //to each other
+                    this.driver.getViewportDrivers()[0].getVoxelToWorldMatrix({voxelSizeInNm: activeDataSource.spatial_resolution})
+                )
 
                 this.driver.snapTo({
-                    position_vx, voxel_size_nm: activeDataSource.spatial_resolution, orientation_w: quat.identity(quat.create()),
+                    position_w: dataset_center_world, orientation_w: Quat.identity<"world">(),
                 })
             }
         })

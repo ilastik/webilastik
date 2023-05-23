@@ -1,5 +1,6 @@
-from typing import Dict, Literal, Optional, Mapping, Final, Tuple
-from pathlib import PurePosixPath
+from typing import Dict, Iterator, Literal, Optional, Mapping, Final, Tuple
+from pathlib import PurePosixPath, Path
+import sys
 
 import requests
 
@@ -110,3 +111,26 @@ class HttpFs(IFilesystem):
 
     def geturl(self, path: PurePosixPath) -> Url:
         return self.base.concatpath(path)
+
+    def download_to_disk(
+        self, *, source: PurePosixPath, destination: Path, chunk_size: int
+    ) -> Iterator["Exception | float"]:
+        url = self.base.concatpath(source)
+        try:
+            with open(destination, "wb") as f:
+                with requests.get(url.raw, stream=True) as r:
+                    content_length = int(r.headers['content-length'])
+                    total_bytes_written = 0
+                    for chunk  in r.iter_content(chunk_size=chunk_size, decode_unicode=False):
+                        chunk_bytes: bytes = chunk
+                        bytes_written = f.write(chunk_bytes)
+                        if len(chunk_bytes) != bytes_written:
+                            yield Exception(f"Error writing to disk when downloading {url.raw}")
+                        else:
+                            total_bytes_written += bytes_written
+                            yield total_bytes_written / content_length
+
+        except Exception as e:
+            print(f"Error while downloading file: {e}", file=sys.stderr)
+            yield Exception(f"Error downloading file at {url.raw}")
+

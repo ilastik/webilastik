@@ -6,6 +6,7 @@ import { DrawingMode, RenderParams } from "../../../gl/gl"
 import { FragmentShader, ShaderProgram, UniformLocation, VertexShader } from "../../../gl/shader"
 import { BrushStroke } from "./brush_stroke"
 import { Color } from "../../../client/ilastik"
+import { Mat4 } from "../../../util/ooglmatrix"
 
 
 export class BrushelLinesRenderer extends ShaderProgram implements BrushRenderer{
@@ -56,14 +57,14 @@ export class BrushelLinesRenderer extends ShaderProgram implements BrushRenderer
     }: {
         brush_strokes: Array<[Color, BrushStroke[]]>,
         camera: Camera,
-        voxelToWorld: mat4,
+        voxelToWorld: Mat4<"voxel", "world">,
         renderParams?: RenderParams
     }){
         renderParams.use(this.gl)
         this.use()
         this.vao.bind()
 
-        let u_voxel_to_clip = mat4.multiply(mat4.create(), camera.world_to_clip, voxelToWorld);
+        let u_voxel_to_clip = mat4.multiply(mat4.create(), camera.world_to_clip, voxelToWorld.raw);
         this.uniformMatrix4fv(this.u_voxel_to_clip__location, u_voxel_to_clip);
 
         let a_offset_vx_location = this.getAttribLocation("a_offset_vx");

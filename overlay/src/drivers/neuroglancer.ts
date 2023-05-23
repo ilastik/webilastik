@@ -1,9 +1,10 @@
-import { vec3, mat4, quat } from "gl-matrix"
+import { vec3, quat } from "gl-matrix"
 import { IViewportDriver, IViewerDriver } from "..";
 import { Color } from "../client/ilastik";
 import { CssClasses } from "../gui/css_classes";
 import { Div } from "../gui/widgets/widget";
 import { createElement, getElementContentRect } from "../util/misc";
+import { Mat4, Quat, Vec3 } from "../util/ooglmatrix";
 import { Url } from "../util/parsed_url";
 
 type NeuroglancerLayout = "4panel" | "xy" | "xy-3d" | "xz" | "xz-3d" | "yz" | "yz-3d";
@@ -17,25 +18,28 @@ export class NeuroglancerViewportDriver implements IViewportDriver{
     ){
         this.viewer = viewer_driver.viewer
     }
-    public getCameraPoseInUvwSpace = () => {
-        const orientation_uvw = quat.multiply(
+    public getCameraPose = (): {position: Vec3<"world">, orientation: Quat<"world">} => {
+        const orientation_uvw = new Quat<"voxel">(quat.multiply(
             quat.create(), this.viewer.navigationState.pose.orientation.orientation, this.orientation_offset
+        ))
+        const position_uvw = new Vec3<"voxel">(
+            vec3.clone(this.viewer.navigationState.pose.position.value)
         )
-        const ng_position_obj = this.viewer.navigationState.pose.position
-        //old neuroglancers do not have the "value" key
-        //FIXME: check if this is in Nm and not finest-voxel-space
-        const position_uvw = "value" in ng_position_obj ? ng_position_obj.value : ng_position_obj.spatialCoordinates
-        return {
-            position_uvw: position_uvw as vec3,
-            orientation_uvw: quat.normalize(orientation_uvw, orientation_uvw),
-        }
+
+        let uvw_to_w = this.getVoxelToWorldMatrix({voxelSizeInNm: this.viewer_driver.getUnitSize_nm()})
+
+        let cameraPosition_w = position_uvw.transformedWith(uvw_to_w);
+        let cameraOrientation_w = orientation_uvw.relativeToBase(uvw_to_w);
+
+        return {position: cameraPosition_w, orientation: cameraOrientation_w}
     }
-    public getUvwToWorldMatrix(): mat4{
-        return mat4.fromScaling(mat4.create(), vec3.fromValues(1, -1, -1))
+    public getVoxelToWorldMatrix(params: {voxelSizeInNm: vec3}): Mat4<"voxel", "world">{
+        const voxelScale = this.viewer_driver.getVoxelScale(params);
+        const scaling: vec3 = vec3.mul(vec3.create(), voxelScale, vec3.fromValues(1, -1, -1));
+        return Mat4.fromScaling(scaling)
     }
-    public getZoomInPixelsPerNm(): number{
-        //FIXME: check if this is acually in Nm and not in finest-voxel-units
-        return 1 / this.viewer.navigationState.zoomFactor.value
+    public getZoomInWorldUnitsPerPixel(): number{
+        return this.viewer.navigationState.zoomFactor.value //FIXME: maybe pick the smallest? idk
     }
     public getGeometry = () => {
         const panelContentRect = getElementContentRect(this.panel)
@@ -53,74 +57,58 @@ export class NeuroglancerViewportDriver implements IViewportDriver{
     })
 }
 
-interface NgManagedLayer{}
-
-
 
 class Layer{
-    private managedLayer: any;
     private channelColors: Color[];
     private opacity: number;
+    private viewerDriver: NeuroglancerDriver;
+    private readonly name: string;
 
     public constructor(params: {
         name: string,
         isVisible: boolean,
         channelColors: Color[],
         opacity: number,
-        managedLayer: NgManagedLayer,
+        viewerDriver: NeuroglancerDriver,
     }){
-        this.managedLayer = params.managedLayer
+        this.name = params.name
         this.channelColors = params.channelColors
         this.opacity = params.opacity
+        this.viewerDriver = params.viewerDriver
         this.reconfigure({
             isVisible: params.isVisible, channelColors: params.channelColors, opacity: params.opacity
         })
     }
 
+    public getState(): LayerRawState{
+        return this.viewerDriver.getState().layers.find(ls => ls.name == this.name)!
+    }
+
     public getName(): string{
-        return this.managedLayer.name
+        return this.name
     }
 
-    public getHidden(): boolean{
-        //a layer might be hidden but not really "visible", because it can be behind other opaque layers
-        return !this.managedLayer.visible
-    }
-
-    public getVisible(): boolean{
-        return !this.getHidden()
-    }
     public setVisible(visible: boolean){
-        this.managedLayer.setVisible(visible)
+        this.reconfigure({isVisible: visible})
     }
 
-    public getOpacity(): number{
-        let opacity = this.managedLayer.layer?.opacity?.value
-        return opacity === undefined ? 1 : opacity
-    }
-
-    public get fragmentShader(): string{
-        return this.managedLayer.layer.fragmentMain.value
-    }
-
-    public set fragmentShader(shader: string){
-        this.managedLayer.layer.fragmentMain.value = shader
-    }
-
-    public getUrl(): Url{
-        const rawUrl = this.managedLayer.sourceUrl.replace(/\bgs:\/\//, "https://storage.googleapis.com/")
-        return Url.parse(rawUrl)
+    public getManagedLayer(): any{
+        return this.viewerDriver.getManagedLayer(this.name)
     }
 
     public async getNumChannels(): Promise<number>{
-        return this.managedLayer.layer.multiscaleSource.then((mss: any) => mss.numChannels)
-    }
-
-    public async is3D(): Promise<boolean>{
-        return this.managedLayer.layer.multiscaleSource.then((mss: any) => mss.scales[0].size[2] > 1)
+        return this.getManagedLayer().layer.multiscaleSource.then((mss: any) => mss.numChannels)
     }
 
     public close(){
-        this.managedLayer.manager.layerManager.removeManagedLayer(this.managedLayer)
+        // from neuroglancer/layer.ts
+        const managedLayer = this.getManagedLayer()
+        if (!managedLayer || managedLayer.wasDisposed){
+            return;
+        }
+        for (const layerManager of managedLayer.containers) {
+          layerManager.removeManagedLayer(managedLayer);
+        }
     }
 
     public static makeShader({channelColors, opacity}: {channelColors: Array<Color>, opacity: number}): string{
@@ -148,23 +136,37 @@ class Layer{
         opacity?: number,
     }){
         this.channelColors = params.channelColors || this.channelColors
-        this.opacity = params.opacity === undefined ? this.opacity : params.opacity
+        this.opacity = params.opacity === undefined ? this.opacity : params.opacity;
 
-        let state = {...this.managedLayer.layer.toJSON()}
+
+
+        let viewerState = this.viewerDriver.getState()
+        let layerState = viewerState.layers.find(l => l.name == this.name)!
         if(params.url){
-            state.url = params.url.double_protocol_raw
+            layerState.url = params.url.double_protocol_raw
         }
 
-        state.shader = Layer.makeShader({channelColors: this.channelColors, opacity: this.opacity})
-
-        this.managedLayer.layer.restoreState(state)
+        layerState.shader = Layer.makeShader({channelColors: this.channelColors, opacity: this.opacity})
+        console.log(`This is the actual shader I wanted to use: \n ${layerState.shader}`)
         if(params.isVisible !== undefined){
-            this.managedLayer.setVisible(params.isVisible)
+            layerState.visible = params.isVisible
         }
+        this.viewerDriver.setState(viewerState)
     }
 }
 
 // const defaultShader = 'void main() {\n  emitGrayscale(toNormalized(getDataValue()));\n}\n'
+
+type LayerRawState = {
+    name: string,
+    url: string,
+    visible?: boolean,
+    shader?: string,
+}
+
+interface ViewerState{
+    layers: Array<LayerRawState>
+}
 
 export class NeuroglancerDriver implements IViewerDriver{
     private containerForWebilastikControls: HTMLElement | undefined
@@ -180,10 +182,31 @@ export class NeuroglancerDriver implements IViewerDriver{
         this.trackedElement = document.querySelector("#neuroglancer-container canvas")! //FIXME: double-check selector
     }
 
+    public getUnitSize_nm(): vec3{
+        //FIXME: couldn't the voxels be unisotropic?
+        let length_in_nm = this.viewer.navigationState.zoomFactor.curCanonicalVoxelPhysicalSize * 1e9
+        return vec3.fromValues(length_in_nm, length_in_nm, length_in_nm)
+    }
+    public getVoxelScale({voxelSizeInNm}: {voxelSizeInNm: vec3}): vec3{
+        return vec3.div(vec3.create(), voxelSizeInNm, this.getUnitSize_nm());
+    }
+
+    getState(): ViewerState{
+        return this.viewer.state.toJSON()
+    }
+
+    getManagedLayer(name: string): any{
+        return this.viewer.layerManager.managedLayers.find((ml: any) => ml.name == name)
+    }
+
+    setState(state: ViewerState){
+        this.viewer.state.restoreState(state)
+    }
+
     getTrackedElement() : HTMLElement{
         return this.trackedElement
     }
-    getViewportDrivers(): Array<IViewportDriver>{
+    getViewportDrivers(): Array<NeuroglancerViewportDriver>{
         const panels = Array(...document.querySelectorAll(".neuroglancer-panel")) as Array<HTMLElement>;
         if(panels.length == 0){
             return []
@@ -246,31 +269,42 @@ export class NeuroglancerDriver implements IViewerDriver{
         channelColors: Color[],
         opacity: number,
     }): Promise<Layer | Error>{
-        const managedLayer = this.viewer.layerSpecification.getLayer(
-            params.name, {source: params.url.double_protocol_raw, visible: params.isVisible}
-        );
-        this.viewer.layerSpecification.add(managedLayer);
+        let viewerState = this.viewer.state.toJSON();
+        viewerState.layers = viewerState.layers || [];
+        viewerState.layers.push({
+            type: "image",
+            source: params.url.double_protocol_raw,
+            tab: "rendering",
+            opacity: 1,
+            channelDimensions: {
+              "c^": [1, ""] //FIXME: what does this do?
+            },
+            name: params.name,
+            visible: params.isVisible,
+        });
+
+        this.setState(viewerState);
         return new Promise(resolve => {
             const waitUntilLayerExists = () => {
-                if(managedLayer.layer){
+                if(this.getManagedLayer(params.name).layer){
                     console.log(`LAYER ${params.name} BECOMES READY!!!`)
                     this.removeViewportsChangedHandler(waitUntilLayerExists)
-                    resolve(new Layer({...params, managedLayer}))
+                    resolve(new Layer({...params, viewerDriver: this}))
                 }
             }
             this.addViewportsChangedHandler(waitUntilLayerExists)
         })
     }
 
-    public snapTo(params: {position_vx: vec3, orientation_w: quat, voxel_size_nm: vec3}): void{
-        this.viewer.navigationState.pose.restoreState({
-            position: {
-                voxelSize: Array.from(params.voxel_size_nm),
-                spatialCoordinates: Array.from(
-                    vec3.multiply(vec3.create(), params.position_vx, params.voxel_size_nm)
-                ),
-            },
-            orientation: Array.from(params.orientation_w),
-        })
+    public snapTo(params: {position_w: Vec3<"world">, orientation_w: Quat<"world">}): void{
+        const {position_w, orientation_w} = params;
+
+        const worldToSmallestVoxel = Mat4.fromScaling(vec3.fromValues(1, -1, -1)).inverted() //FIXME?
+        const viewer_pos = position_w.transformedWith(worldToSmallestVoxel) //viewer position is _not_ in world space
+
+        this.viewer.navigationState.pose.position.restoreState([viewer_pos.x, viewer_pos.y, viewer_pos.z])
+        this.viewer.navigationState.pose.orientation.restoreState(
+            [orientation_w.raw[0], orientation_w.raw[1], orientation_w.raw[2], orientation_w.raw[3]]
+        )
     }
 }
