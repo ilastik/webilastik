@@ -26,9 +26,10 @@ class DziLevelWriter(IDataSinkWriter):
         assert tile.is_tile(tile_shape=self._data_sink.tile_shape, full_interval=self._data_sink.interval, clamped=True), f"Bad tile: {tile}"
         chunk_path = self._data_sink.dzi_image.get_tile_path(level_path=self._data_sink.path, tile=data.interval)
 
-        out_image = PilImage.fromarray(data.raw("yxc").astype(np.uint8)) # type: ignore
+        raw_axiskeys = "yxc" if data.shape.c > 1 else "yx"
+        out_image = PilImage.fromarray(data.raw(raw_axiskeys).astype(np.uint8)) # type: ignore
         out_file = io.BytesIO()
-        out_image.save(out_file, self._data_sink.dzi_image.Format)
+        out_image.save(out_file, self._data_sink.dzi_image.Format.replace("jpg", "jpeg"))
         _ = out_file.seek(0)
         contents = out_file.read() # FIXME: read() ?
 
