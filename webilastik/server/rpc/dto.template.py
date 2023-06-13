@@ -346,7 +346,7 @@ class JobDto(DataTransferObject):
     name: str
     num_args: Optional[int]
     uuid: str
-    status: Literal["pending", "running", "cancelled", "failed", "succeeded"]
+    status: Literal["pending", "running", "cancelled", "completed"]
     num_completed_steps: int
     error_message: Optional[str]
 

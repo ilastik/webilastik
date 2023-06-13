@@ -2512,9 +2512,9 @@ export class MakeDataViewParams {
   }
 }
 
-export function parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_failed_quote_0_quote_succeeded_quote__endof_(
+export function parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
   value: JsonValue,
-): "pending" | "running" | "cancelled" | "failed" | "succeeded" | Error {
+): "pending" | "running" | "cancelled" | "completed" | Error {
   const tmp_0 = parse_as_str(value);
   if (!(tmp_0 instanceof Error) && tmp_0 === "pending") {
     return tmp_0;
@@ -2528,14 +2528,10 @@ export function parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0
     return tmp_2;
   }
   const tmp_3 = parse_as_str(value);
-  if (!(tmp_3 instanceof Error) && tmp_3 === "failed") {
+  if (!(tmp_3 instanceof Error) && tmp_3 === "completed") {
     return tmp_3;
   }
-  const tmp_4 = parse_as_str(value);
-  if (!(tmp_4 instanceof Error) && tmp_4 === "succeeded") {
-    return tmp_4;
-  }
-  return Error(`Could not parse ${value} as 'pending' | 'running' | 'cancelled' | 'failed' | 'succeeded'`);
+  return Error(`Could not parse ${value} as 'pending' | 'running' | 'cancelled' | 'completed'`);
 }
 export function parse_as_JobDto(value: JsonValue): JobDto | Error {
   const valueObject = ensureJsonObject(value);
@@ -2552,7 +2548,7 @@ export function parse_as_JobDto(value: JsonValue): JobDto | Error {
   const temp_uuid = parse_as_str(valueObject.uuid);
   if (temp_uuid instanceof Error) return temp_uuid;
   const temp_status =
-    parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_failed_quote_0_quote_succeeded_quote__endof_(
+    parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
       valueObject.status,
     );
   if (temp_status instanceof Error) return temp_status;
@@ -2575,14 +2571,14 @@ export class JobDto {
   public name: string;
   public num_args: number | undefined;
   public uuid: string;
-  public status: "pending" | "running" | "cancelled" | "failed" | "succeeded";
+  public status: "pending" | "running" | "cancelled" | "completed";
   public num_completed_steps: number;
   public error_message: string | undefined;
   constructor(_params: {
     name: string;
     num_args: number | undefined;
     uuid: string;
-    status: "pending" | "running" | "cancelled" | "failed" | "succeeded";
+    status: "pending" | "running" | "cancelled" | "completed";
     num_completed_steps: number;
     error_message: string | undefined;
   }) {
@@ -2643,7 +2639,7 @@ export function parse_as_ExportJobDto(value: JsonValue): ExportJobDto | Error {
   const temp_uuid = parse_as_str(valueObject.uuid);
   if (temp_uuid instanceof Error) return temp_uuid;
   const temp_status =
-    parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_failed_quote_0_quote_succeeded_quote__endof_(
+    parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
       valueObject.status,
     );
   if (temp_status instanceof Error) return temp_status;
@@ -2671,7 +2667,7 @@ export class ExportJobDto {
   public name: string;
   public num_args: number | undefined;
   public uuid: string;
-  public status: "pending" | "running" | "cancelled" | "failed" | "succeeded";
+  public status: "pending" | "running" | "cancelled" | "completed";
   public num_completed_steps: number;
   public error_message: string | undefined;
   public datasink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto;
@@ -2679,7 +2675,7 @@ export class ExportJobDto {
     name: string;
     num_args: number | undefined;
     uuid: string;
-    status: "pending" | "running" | "cancelled" | "failed" | "succeeded";
+    status: "pending" | "running" | "cancelled" | "completed";
     num_completed_steps: number;
     error_message: string | undefined;
     datasink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto;
@@ -2724,7 +2720,7 @@ export function parse_as_OpenDatasinkJobDto(value: JsonValue): OpenDatasinkJobDt
   const temp_uuid = parse_as_str(valueObject.uuid);
   if (temp_uuid instanceof Error) return temp_uuid;
   const temp_status =
-    parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_failed_quote_0_quote_succeeded_quote__endof_(
+    parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
       valueObject.status,
     );
   if (temp_status instanceof Error) return temp_status;
@@ -2752,7 +2748,7 @@ export class OpenDatasinkJobDto {
   public name: string;
   public num_args: number | undefined;
   public uuid: string;
-  public status: "pending" | "running" | "cancelled" | "failed" | "succeeded";
+  public status: "pending" | "running" | "cancelled" | "completed";
   public num_completed_steps: number;
   public error_message: string | undefined;
   public datasink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto;
@@ -2760,7 +2756,7 @@ export class OpenDatasinkJobDto {
     name: string;
     num_args: number | undefined;
     uuid: string;
-    status: "pending" | "running" | "cancelled" | "failed" | "succeeded";
+    status: "pending" | "running" | "cancelled" | "completed";
     num_completed_steps: number;
     error_message: string | undefined;
     datasink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto;

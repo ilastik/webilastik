@@ -14,7 +14,7 @@ from webilastik.datasink import DataSink, IDataSinkWriter
 from webilastik.datasource import DataRoi, DataSource, FsDataSource
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.operator import IN, Operator
-from webilastik.scheduling.job import Job, JobSucceededCallback, PriorityExecutor
+from webilastik.scheduling.job import Job, JobCompletedCallback, PriorityExecutor
 from webilastik.serialization.json_serialization import JsonValue
 from webilastik.server.rpc.dto import (
     MessageParsingError,
@@ -45,7 +45,7 @@ def _open_datasink(ds: DataSink) -> "IDataSinkWriter | Exception":
     return ds.open()
 
 
-class _ExportJob(Job[DataRoi, None]):
+class _ExportJob(Job[None]):
     def __init__(
         self,
         *,
@@ -60,15 +60,13 @@ class _ExportJob(Job[DataRoi, None]):
             name=name,
             target=_ExportTask(operator=operator, sink_writer=sink_writer),
             on_progress=lambda job_id, step_index: on_changed(),
-            on_success=lambda job_id, result: on_changed(),
-            on_failure=lambda exception: on_changed(),
+            on_complete=lambda job_id, result: on_changed(),
             args=args,
             num_args=num_args
         )
         self.sink_writer = sink_writer
 
     def to_dto(self) -> ExportJobDto:
-        error_message: "str | None" = None
         with self.job_lock:
             return ExportJobDto(
                 name=self.name,
@@ -76,28 +74,27 @@ class _ExportJob(Job[DataRoi, None]):
                 uuid=str(self.uuid),
                 status=self._status,
                 num_completed_steps=self.num_completed_steps,
-                error_message=error_message,
+                error_message=self.error_message,
                 datasink=self.sink_writer.data_sink.to_dto()
             )
 
-class _OpenDatasinkJob(Job[DataSink, "IDataSinkWriter | Exception"]):
+class _OpenDatasinkJob(Job["IDataSinkWriter | Exception"]):
     def __init__(
         self,
         *,
-        on_complete: JobSucceededCallback["IDataSinkWriter | Exception"],
+        on_complete: JobCompletedCallback["IDataSinkWriter | Exception"],
         datasink: DataSink,
     ):
         super().__init__(
             name="Creating datasink",
             target=_open_datasink,
-            on_success=on_complete,
+            on_complete=on_complete,
             args=[datasink],
             num_args=1
         )
         self.datasink = datasink
 
     def to_dto(self) -> ExportJobDto:
-        error_message: "str | None" = None
         with self.job_lock:
             return ExportJobDto(
                 name=self.name,
@@ -105,7 +102,7 @@ class _OpenDatasinkJob(Job[DataSink, "IDataSinkWriter | Exception"]):
                 uuid=str(self.uuid),
                 status=self._status,
                 num_completed_steps=self.num_completed_steps,
-                error_message=error_message,
+                error_message=self.error_message,
                 datasink=self.datasink.to_dto()
             )
 

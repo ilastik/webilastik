@@ -56,7 +56,7 @@ abstract class Job{
     public readonly name: string;
     public readonly num_args: number | undefined;
     public readonly uuid: string;
-    public readonly status: "pending" | "running" | "cancelled" | "failed" | "succeeded";
+    public readonly status: "pending" | "running" | "cancelled" | "completed";
     public readonly num_completed_steps: number;
     public readonly error_message: string | undefined;
     public readonly datasink: DataSinkUnion;
@@ -65,7 +65,7 @@ abstract class Job{
         name: string,
         num_args: number | undefined,
         uuid: string,
-        status: "pending" | "running" | "cancelled" | "failed" | "succeeded",
+        status: "pending" | "running" | "cancelled" | "completed",
         num_completed_steps: number,
         error_message: string | undefined,
         datasink: DataSinkUnion,
@@ -95,7 +95,7 @@ abstract class Job{
         assertUnreachable(dto)
     }
     private makeProgressDisplay(openInViewer: (datasource: DataSourceUnion) => void): TableData{
-        if(this.status == "pending" || this.status == "cancelled" || this.status == "failed"){
+        if(this.status == "pending" || this.status == "cancelled"){
             return new TableData({parentElement: undefined, innerText: this.status})
         }
         if(this.status == "running"){
@@ -104,7 +104,12 @@ abstract class Job{
                 innerText: this.num_args === undefined ? "unknwown" : `${Math.round(this.num_completed_steps / this.num_args * 100)}%`
             })
         }
-        if(this.status == "succeeded"){
+        if(this.status == "completed"){
+            if(this.error_message){
+                let td = new TableData({parentElement: undefined, innerText: "failed"})
+                td.element.title = this.error_message
+                return td
+            }
             let out = new TableData({parentElement: undefined, innerText: "100%"})
             if(this.datasink.filesystem instanceof BucketFs){
                 out.clear()

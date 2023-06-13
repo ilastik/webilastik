@@ -2715,9 +2715,9 @@ class MakeDataViewParams(DataTransferObject):
         return parse_as_MakeDataViewParams(value)
 
 
-def parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_failed_quote_0_quote_succeeded_quote__endof_(
+def parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
     value: JsonValue,
-) -> "Literal['pending', 'running', 'cancelled', 'failed', 'succeeded'] | MessageParsingError":
+) -> "Literal['pending', 'running', 'cancelled', 'completed'] | MessageParsingError":
     tmp_0 = parse_as_str(value)
     if not isinstance(tmp_0, MessageParsingError) and tmp_0 == "pending":
         return tmp_0
@@ -2728,13 +2728,10 @@ def parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cance
     if not isinstance(tmp_2, MessageParsingError) and tmp_2 == "cancelled":
         return tmp_2
     tmp_3 = parse_as_str(value)
-    if not isinstance(tmp_3, MessageParsingError) and tmp_3 == "failed":
+    if not isinstance(tmp_3, MessageParsingError) and tmp_3 == "completed":
         return tmp_3
-    tmp_4 = parse_as_str(value)
-    if not isinstance(tmp_4, MessageParsingError) and tmp_4 == "succeeded":
-        return tmp_4
     return MessageParsingError(
-        f"Could not parse {value} as Literal['pending', 'running', 'cancelled', 'failed', 'succeeded']"
+        f"Could not parse {value} as Literal['pending', 'running', 'cancelled', 'completed']"
     )
 
 
@@ -2754,7 +2751,7 @@ def parse_as_JobDto(value: JsonValue) -> "JobDto | MessageParsingError":
     tmp_uuid = parse_as_str(value.get("uuid"))
     if isinstance(tmp_uuid, MessageParsingError):
         return tmp_uuid
-    tmp_status = parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_failed_quote_0_quote_succeeded_quote__endof_(
+    tmp_status = parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
         value.get("status")
     )
     if isinstance(tmp_status, MessageParsingError):
@@ -2780,7 +2777,7 @@ class JobDto(DataTransferObject):
     name: str
     num_args: Optional[int]
     uuid: str
-    status: Literal["pending", "running", "cancelled", "failed", "succeeded"]
+    status: Literal["pending", "running", "cancelled", "completed"]
     num_completed_steps: int
     error_message: Optional[str]
 
@@ -2837,7 +2834,7 @@ def parse_as_ExportJobDto(value: JsonValue) -> "ExportJobDto | MessageParsingErr
     tmp_uuid = parse_as_str(value.get("uuid"))
     if isinstance(tmp_uuid, MessageParsingError):
         return tmp_uuid
-    tmp_status = parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_failed_quote_0_quote_succeeded_quote__endof_(
+    tmp_status = parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
         value.get("status")
     )
     if isinstance(tmp_status, MessageParsingError):
@@ -2909,7 +2906,7 @@ def parse_as_OpenDatasinkJobDto(
     tmp_uuid = parse_as_str(value.get("uuid"))
     if isinstance(tmp_uuid, MessageParsingError):
         return tmp_uuid
-    tmp_status = parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_failed_quote_0_quote_succeeded_quote__endof_(
+    tmp_status = parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
         value.get("status")
     )
     if isinstance(tmp_status, MessageParsingError):
