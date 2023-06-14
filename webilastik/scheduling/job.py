@@ -16,14 +16,14 @@ from webilastik.utility import PeekableIterator
 IN = TypeVar("IN", covariant=True)
 OUT = TypeVar("OUT")
 
-class JobProgressCallback(Protocol):
-    def __call__(self, job_id: uuid.UUID, step_index: int) -> Any:
-        ...
+JOB_STEP_RESULT = TypeVar("JOB_STEP_RESULT", contravariant=True)
 
-JOB_RESULT = TypeVar("JOB_RESULT", contravariant=True)
+JobStatus = Literal["pending", "running", "cancelled", "completed"]
 
-class JobCompletedCallback(Protocol[JOB_RESULT]):
-    def __call__(self, job_id: uuid.UUID, result: JOB_RESULT) -> Any:
+class JobProgressCallback(Protocol[JOB_STEP_RESULT]):
+    def __call__(
+        self, *, job_id: uuid.UUID, job_status: JobStatus, step_index: int, step_result: JOB_STEP_RESULT
+    ) -> Any:
         ...
 
 
@@ -33,8 +33,7 @@ class Job(Generic[OUT]):
         *,
         name: str,
         target: Callable[[IN], OUT],
-        on_progress: "JobProgressCallback | None" = None,
-        on_complete: "JobCompletedCallback[OUT] | None" = None,
+        on_progress: "JobProgressCallback[OUT] | None" = None,
         args: Iterable[IN],
         num_args: "int | None" = None,
     ):
@@ -42,17 +41,15 @@ class Job(Generic[OUT]):
         self.creation_time = time.time()
         self.name = name
         self.target = target
-        self.on_progress: "JobProgressCallback | None" = on_progress
-        self.on_complete = on_complete
+        self.on_progress: "JobProgressCallback[OUT] | None" = on_progress
         self.num_args: "int | None" = num_args or (len(args) if isinstance(args, Sized) else None)
         self.args: PeekableIterator[IN] = PeekableIterator(args)
-        self.error_message: "str | None" = None
 
         self.uuid: uuid.UUID = uuid.uuid4()
         self.num_completed_steps = 0
         self.num_dispatched_steps = 0
         self.job_lock = threading.Lock()
-        self._status: Literal["pending", "running", "cancelled", "completed"] = "pending"
+        self._status: JobStatus = "pending"
 
     def _done(self) -> bool:
         return self._status == "cancelled" or self._status == "completed"
@@ -76,13 +73,9 @@ class Job(Generic[OUT]):
                     return
                 if not self.args.has_next() and self.num_dispatched_steps == self.num_completed_steps:
                     self._status = "completed"
-                    result = future.result()
-                    self.error_message = str(result) if isinstance(result, Exception) else None # FIXME: stop peeking into result type
-
+                job_status = self._status
             if self.on_progress:
-                self.on_progress(self.uuid, step_index)
-            if self._status == "completed" and self.on_complete:
-                self.on_complete(self.uuid, future.result())
+                self.on_progress(job_id=self.uuid, job_status=job_status, step_index=step_index, step_result=future.result())
 
         future = executor.submit(self.target, step_arg)
         future.add_done_callback(step_done_callback)
