@@ -3,6 +3,8 @@ from pathlib import PurePosixPath
 from dataclasses import dataclass
 import math
 
+from webilastik.server.rpc.dto import DziImageElementDto, DziSizeElementDto
+
 from ndstructs.point5D import Interval5D, Shape5D
 from xml.etree import ElementTree
 import defusedxml.ElementTree as DefusedET # type: ignore
@@ -72,6 +74,13 @@ class DziSizeElement:
             return Height_result
         return DziSizeElement(Width=Width_result, Height=Height_result)
 
+    @classmethod
+    def from_dto(cls, dto: DziSizeElementDto) -> "DziSizeElement":
+        return DziSizeElement(Height=dto.Height, Width=dto.Width)
+
+    def to_dto(self) -> DziSizeElementDto:
+        return DziSizeElementDto(Height=self.Height, Width=self.Width)
+
 # Each resolution of the pyramid is called a level. Levels are counted from the 1x1 pixel as level 0.
 # Each level is the size 2(level)x2(level).
 # Each level is stored in a separate folder.
@@ -82,7 +91,6 @@ class DziSizeElement:
 #         row is the row number of the tile (starting from 0 at top)
 #         column is the column number of the tile (starting from 0 at left)
 #         format is the appropriate extension for the image format used – either JPEG or PNG.
-@dataclass
 class DziImageElement:
     def __init__(self, *, Format: ImageFormat, Overlap: int, TileSize: int, Size: DziSizeElement) -> None:
         self.Format: Final[ImageFormat] = Format
@@ -103,6 +111,23 @@ class DziImageElement:
             height = math.ceil(height / 2)
 
         super().__init__()
+
+    @classmethod
+    def from_dto(cls, dto: DziImageElementDto) -> "DziImageElement":
+        return DziImageElement(
+            Format=dto.Format,
+            Overlap=dto.Overlap,
+            Size=DziSizeElement.from_dto(dto.Size),
+            TileSize=dto.TileSize,
+        )
+
+    def to_dto(self) -> DziImageElementDto:
+        return DziImageElementDto(
+            Format=self.Format,
+            Overlap=self.Overlap,
+            Size=self.Size.to_dto(),
+            TileSize=self.TileSize,
+        )
 
     def __eq__(self, other: object) -> bool:
         return (
