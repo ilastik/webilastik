@@ -1,6 +1,6 @@
 import io
 from pathlib import PurePosixPath
-from typing import List, Literal, Sequence
+from typing import List, Literal, Sequence, cast
 
 import numpy as np
 from PIL import Image as PilImage
@@ -8,7 +8,7 @@ from ndstructs.array5D import Array5D
 
 from webilastik.datasink import FsDataSink, IDataSinkWriter
 from webilastik.datasource.deep_zoom_datasource import DziImageElement, DziLevelDataSource
-from webilastik.filesystem import FsIoException, IFilesystem
+from webilastik.filesystem import FsIoException, IFilesystem, create_filesystem_from_message
 from webilastik.server.rpc.dto import DziLevelSinkDto
 from webilastik.datasink import FsDataSink
 
@@ -52,6 +52,7 @@ class DziLevelSink(FsDataSink):
     ):
         self.dzi_image = dzi_image
         self.level_index = level_index
+        self.xml_path = xml_path
         super().__init__(
             filesystem=filesystem,
             path=DziImageElement.make_level_path(xml_path=xml_path, level_index=level_index),
@@ -60,13 +61,12 @@ class DziLevelSink(FsDataSink):
             interval=dzi_image.get_shape(level_index=level_index, num_channels=num_channels).to_interval5d(),
         )
 
-    def open(self) -> "Exception | DziLevelWriter":
+    def open(self) -> "DziLevelWriter":
         return DziLevelWriter(data_sink=self)
 
     @classmethod
     def create_pyramid(
         cls,
-        *,
         filesystem: IFilesystem,
         xml_path: PurePosixPath,
         dzi_image: DziImageElement,
@@ -100,15 +100,26 @@ class DziLevelSink(FsDataSink):
         raise Exception(f"FIXME")
 
     def to_dto(self) -> DziLevelSinkDto:
-        raise NotImplementedError #FIXME
-        # return DziLevelSinkDto(level=self.level.to_dto())
+        num_channels = cast(Literal[1, 3], self.shape.c)
+        return DziLevelSinkDto(
+            dzi_image=self.dzi_image.to_dto(),
+            filesystem=self.filesystem.to_dto(),
+            level_index=self.level_index,
+            num_channels=num_channels,
+            xml_path=self.xml_path.as_posix(),
+        )
 
     @classmethod
     def from_dto(cls, dto: DziLevelSinkDto) -> "DziLevelSink | Exception":
-        raise NotImplementedError #FIXME
-        # level = DziLevel.from_dto(dto.level)
-        # if isinstance(level, Exception):
-        #     return level
-        # return DziLevelSink(
-        #     level=level
-        # )
+        fs_result = create_filesystem_from_message(dto.filesystem)
+        if isinstance(fs_result, Exception):
+            return fs_result
+
+        return DziLevelSink(
+            dzi_image=DziImageElement.from_dto(dto.dzi_image),
+            filesystem=fs_result,
+            level_index=dto.level_index,
+            num_channels=dto.num_channels,
+            xml_path=PurePosixPath(dto.xml_path),
+            private_marker=cls.__PrivateMarker(),
+        )
