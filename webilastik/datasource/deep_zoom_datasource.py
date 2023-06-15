@@ -36,6 +36,7 @@ class DziLevelDataSource(FsDataSource):
     ):
         self.dzi_image = dzi_image
         self.level_index = level_index
+        self.xml_path = xml_path
         super().__init__(
             c_axiskeys_on_disk="yx" if num_channels == 1 else "yxc",
             filesystem=filesystem,
