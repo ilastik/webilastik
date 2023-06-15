@@ -223,9 +223,31 @@ class PrecomputedChunksSinkDto(DataTransferObject):
     resolution: Tuple[int, int, int]
     encoding: Literal["raw", "jpeg"]
 
+#####################################################
+
+ImageFormatDto = Literal["jpeg", "jpg", "png"]
+
+@dataclass
+class DziSizeElementDto(DataTransferObject):
+    Width: int
+    Height: int
+
+@dataclass
+class DziImageElementDto(DataTransferObject):
+    Format: ImageFormatDto
+    Overlap: int
+    TileSize: int
+    Size: DziSizeElementDto
+
 @dataclass
 class DziLevelSinkDto(DataTransferObject):
-    level: DziLevelDto
+    filesystem: FsDto
+    xml_path: str
+    dzi_image: DziImageElementDto
+    num_channels: Literal[1, 3]
+    level_index: int
+
+#################################################
 
 @dataclass
 class N5DataSinkDto(DataTransferObject):

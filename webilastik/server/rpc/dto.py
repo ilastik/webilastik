@@ -1550,6 +1550,123 @@ class PrecomputedChunksSinkDto(DataTransferObject):
         return parse_as_PrecomputedChunksSinkDto(value)
 
 
+ImageFormatDto = Literal["jpeg", "jpg", "png"]
+
+
+def parse_as_DziSizeElementDto(
+    value: JsonValue,
+) -> "DziSizeElementDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as DziSizeElementDto"
+        )
+    if value.get("__class__") != "DziSizeElementDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as DziSizeElementDto"
+        )
+    tmp_Width = parse_as_int(value.get("Width"))
+    if isinstance(tmp_Width, MessageParsingError):
+        return tmp_Width
+    tmp_Height = parse_as_int(value.get("Height"))
+    if isinstance(tmp_Height, MessageParsingError):
+        return tmp_Height
+    return DziSizeElementDto(
+        Width=tmp_Width,
+        Height=tmp_Height,
+    )
+
+
+@dataclass
+class DziSizeElementDto(DataTransferObject):
+    Width: int
+    Height: int
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "DziSizeElementDto",
+            "Width": self.Width,
+            "Height": self.Height,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "DziSizeElementDto | MessageParsingError":
+        return parse_as_DziSizeElementDto(value)
+
+
+def parse_as_DziImageElementDto(
+    value: JsonValue,
+) -> "DziImageElementDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as DziImageElementDto"
+        )
+    if value.get("__class__") != "DziImageElementDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as DziImageElementDto"
+        )
+    tmp_Format = parse_as_Literal_of__quote_jpeg_quote_0_quote_jpg_quote_0_quote_png_quote__endof_(
+        value.get("Format")
+    )
+    if isinstance(tmp_Format, MessageParsingError):
+        return tmp_Format
+    tmp_Overlap = parse_as_int(value.get("Overlap"))
+    if isinstance(tmp_Overlap, MessageParsingError):
+        return tmp_Overlap
+    tmp_TileSize = parse_as_int(value.get("TileSize"))
+    if isinstance(tmp_TileSize, MessageParsingError):
+        return tmp_TileSize
+    tmp_Size = parse_as_DziSizeElementDto(value.get("Size"))
+    if isinstance(tmp_Size, MessageParsingError):
+        return tmp_Size
+    return DziImageElementDto(
+        Format=tmp_Format,
+        Overlap=tmp_Overlap,
+        TileSize=tmp_TileSize,
+        Size=tmp_Size,
+    )
+
+
+@dataclass
+class DziImageElementDto(DataTransferObject):
+    Format: ImageFormatDto
+    Overlap: int
+    TileSize: int
+    Size: DziSizeElementDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "DziImageElementDto",
+            "Format": self.Format,
+            "Overlap": self.Overlap,
+            "TileSize": self.TileSize,
+            "Size": self.Size.to_json_value(),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "DziImageElementDto | MessageParsingError":
+        return parse_as_DziImageElementDto(value)
+
+
+def parse_as_Literal_of_103_endof_(
+    value: JsonValue,
+) -> "Literal[1, 3] | MessageParsingError":
+    tmp_0 = parse_as_int(value)
+    if not isinstance(tmp_0, MessageParsingError) and tmp_0 == 1:
+        return tmp_0
+    tmp_1 = parse_as_int(value)
+    if not isinstance(tmp_1, MessageParsingError) and tmp_1 == 3:
+        return tmp_1
+    return MessageParsingError(f"Could not parse {value} as Literal[1, 3]")
+
+
 def parse_as_DziLevelSinkDto(
     value: JsonValue,
 ) -> "DziLevelSinkDto | MessageParsingError":
@@ -1563,22 +1680,48 @@ def parse_as_DziLevelSinkDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as DziLevelSinkDto"
         )
-    tmp_level = parse_as_DziLevelDto(value.get("level"))
-    if isinstance(tmp_level, MessageParsingError):
-        return tmp_level
+    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
+        value.get("filesystem")
+    )
+    if isinstance(tmp_filesystem, MessageParsingError):
+        return tmp_filesystem
+    tmp_xml_path = parse_as_str(value.get("xml_path"))
+    if isinstance(tmp_xml_path, MessageParsingError):
+        return tmp_xml_path
+    tmp_dzi_image = parse_as_DziImageElementDto(value.get("dzi_image"))
+    if isinstance(tmp_dzi_image, MessageParsingError):
+        return tmp_dzi_image
+    tmp_num_channels = parse_as_Literal_of_103_endof_(value.get("num_channels"))
+    if isinstance(tmp_num_channels, MessageParsingError):
+        return tmp_num_channels
+    tmp_level_index = parse_as_int(value.get("level_index"))
+    if isinstance(tmp_level_index, MessageParsingError):
+        return tmp_level_index
     return DziLevelSinkDto(
-        level=tmp_level,
+        filesystem=tmp_filesystem,
+        xml_path=tmp_xml_path,
+        dzi_image=tmp_dzi_image,
+        num_channels=tmp_num_channels,
+        level_index=tmp_level_index,
     )
 
 
 @dataclass
 class DziLevelSinkDto(DataTransferObject):
-    level: DziLevelDto
+    filesystem: FsDto
+    xml_path: str
+    dzi_image: DziImageElementDto
+    num_channels: Literal[1, 3]
+    level_index: int
 
     def to_json_value(self) -> JsonObject:
         return {
             "__class__": "DziLevelSinkDto",
-            "level": self.level.to_json_value(),
+            "filesystem": convert_to_json_value(self.filesystem),
+            "xml_path": self.xml_path,
+            "dzi_image": self.dzi_image.to_json_value(),
+            "num_channels": self.num_channels,
+            "level_index": self.level_index,
         }
 
     @classmethod

@@ -1416,6 +1416,115 @@ export class PrecomputedChunksSinkDto {
   }
 }
 
+export function parse_as_DziSizeElementDto(value: JsonValue): DziSizeElementDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "DziSizeElementDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a DziSizeElementDto`);
+  }
+  const temp_Width = parse_as_int(valueObject.Width);
+  if (temp_Width instanceof Error) return temp_Width;
+  const temp_Height = parse_as_int(valueObject.Height);
+  if (temp_Height instanceof Error) return temp_Height;
+  return new DziSizeElementDto({
+    Width: temp_Width,
+    Height: temp_Height,
+  });
+}
+// Automatically generated via DataTransferObject for DziSizeElementDto
+// Do not edit!
+export class DziSizeElementDto {
+  public Width: number;
+  public Height: number;
+  constructor(_params: {
+    Width: number;
+    Height: number;
+  }) {
+    this.Width = _params.Width;
+    this.Height = _params.Height;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "DziSizeElementDto",
+      Width: this.Width,
+      Height: this.Height,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): DziSizeElementDto | Error {
+    return parse_as_DziSizeElementDto(value);
+  }
+}
+
+export function parse_as_DziImageElementDto(value: JsonValue): DziImageElementDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "DziImageElementDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a DziImageElementDto`);
+  }
+  const temp_Format = parse_as_Literal_of__quote_jpeg_quote_0_quote_jpg_quote_0_quote_png_quote__endof_(
+    valueObject.Format,
+  );
+  if (temp_Format instanceof Error) return temp_Format;
+  const temp_Overlap = parse_as_int(valueObject.Overlap);
+  if (temp_Overlap instanceof Error) return temp_Overlap;
+  const temp_TileSize = parse_as_int(valueObject.TileSize);
+  if (temp_TileSize instanceof Error) return temp_TileSize;
+  const temp_Size = parse_as_DziSizeElementDto(valueObject.Size);
+  if (temp_Size instanceof Error) return temp_Size;
+  return new DziImageElementDto({
+    Format: temp_Format,
+    Overlap: temp_Overlap,
+    TileSize: temp_TileSize,
+    Size: temp_Size,
+  });
+}
+// Automatically generated via DataTransferObject for DziImageElementDto
+// Do not edit!
+export class DziImageElementDto {
+  public Format: "jpeg" | "jpg" | "png";
+  public Overlap: number;
+  public TileSize: number;
+  public Size: DziSizeElementDto;
+  constructor(_params: {
+    Format: "jpeg" | "jpg" | "png";
+    Overlap: number;
+    TileSize: number;
+    Size: DziSizeElementDto;
+  }) {
+    this.Format = _params.Format;
+    this.Overlap = _params.Overlap;
+    this.TileSize = _params.TileSize;
+    this.Size = _params.Size;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "DziImageElementDto",
+      Format: this.Format,
+      Overlap: this.Overlap,
+      TileSize: this.TileSize,
+      Size: this.Size.toJsonValue(),
+    };
+  }
+  public static fromJsonValue(value: JsonValue): DziImageElementDto | Error {
+    return parse_as_DziImageElementDto(value);
+  }
+}
+
+export function parse_as_Literal_of_103_endof_(value: JsonValue): 1 | 3 | Error {
+  const tmp_0 = parse_as_int(value);
+  if (!(tmp_0 instanceof Error) && tmp_0 === 1) {
+    return tmp_0;
+  }
+  const tmp_1 = parse_as_int(value);
+  if (!(tmp_1 instanceof Error) && tmp_1 === 3) {
+    return tmp_1;
+  }
+  return Error(`Could not parse ${value} as 1 | 3`);
+}
 export function parse_as_DziLevelSinkDto(value: JsonValue): DziLevelSinkDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
@@ -1424,25 +1533,53 @@ export function parse_as_DziLevelSinkDto(value: JsonValue): DziLevelSinkDto | Er
   if (valueObject["__class__"] != "DziLevelSinkDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a DziLevelSinkDto`);
   }
-  const temp_level = parse_as_DziLevelDto(valueObject.level);
-  if (temp_level instanceof Error) return temp_level;
+  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.filesystem);
+  if (temp_filesystem instanceof Error) return temp_filesystem;
+  const temp_xml_path = parse_as_str(valueObject.xml_path);
+  if (temp_xml_path instanceof Error) return temp_xml_path;
+  const temp_dzi_image = parse_as_DziImageElementDto(valueObject.dzi_image);
+  if (temp_dzi_image instanceof Error) return temp_dzi_image;
+  const temp_num_channels = parse_as_Literal_of_103_endof_(valueObject.num_channels);
+  if (temp_num_channels instanceof Error) return temp_num_channels;
+  const temp_level_index = parse_as_int(valueObject.level_index);
+  if (temp_level_index instanceof Error) return temp_level_index;
   return new DziLevelSinkDto({
-    level: temp_level,
+    filesystem: temp_filesystem,
+    xml_path: temp_xml_path,
+    dzi_image: temp_dzi_image,
+    num_channels: temp_num_channels,
+    level_index: temp_level_index,
   });
 }
 // Automatically generated via DataTransferObject for DziLevelSinkDto
 // Do not edit!
 export class DziLevelSinkDto {
-  public level: DziLevelDto;
+  public filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+  public xml_path: string;
+  public dzi_image: DziImageElementDto;
+  public num_channels: 1 | 3;
+  public level_index: number;
   constructor(_params: {
-    level: DziLevelDto;
+    filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+    xml_path: string;
+    dzi_image: DziImageElementDto;
+    num_channels: 1 | 3;
+    level_index: number;
   }) {
-    this.level = _params.level;
+    this.filesystem = _params.filesystem;
+    this.xml_path = _params.xml_path;
+    this.dzi_image = _params.dzi_image;
+    this.num_channels = _params.num_channels;
+    this.level_index = _params.level_index;
   }
   public toJsonValue(): JsonObject {
     return {
       "__class__": "DziLevelSinkDto",
-      level: this.level.toJsonValue(),
+      filesystem: toJsonValue(this.filesystem),
+      xml_path: this.xml_path,
+      dzi_image: this.dzi_image.toJsonValue(),
+      num_channels: this.num_channels,
+      level_index: this.level_index,
     };
   }
   public static fromJsonValue(value: JsonValue): DziLevelSinkDto | Error {
