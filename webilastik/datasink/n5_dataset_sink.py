@@ -5,7 +5,7 @@ import numpy as np
 from ndstructs.point5D import Interval5D, Shape5D
 
 from webilastik.server.rpc.dto import Interval5DDto, N5DataSinkDto, Shape5DDto, dtype_to_dto
-from webilastik.filesystem import IFilesystem, create_filesystem_from_message
+from webilastik.filesystem import FsIoException, IFilesystem, create_filesystem_from_message
 
 from ndstructs.array5D import Array5D
 
@@ -22,17 +22,15 @@ class N5Writer(IDataSinkWriter):
     def data_sink(self) -> "N5DataSink":
         return self._data_sink
 
-    def write(self, data: Array5D) -> None:
+    def write(self, data: Array5D) -> "FsIoException | None":
         tile = N5Block.fromArray5D(data)
         tile_path = self._data_sink.path / self._data_sink.attributes.get_tile_path(data.interval)
-        writing_result = self._data_sink.filesystem.create_file(
+        return self._data_sink.filesystem.create_file(
             path=tile_path,
             contents=tile.to_n5_bytes(
                 axiskeys=self._data_sink.attributes.c_axiskeys, compression=self._data_sink.attributes.compression
             )
         )
-        if isinstance(writing_result, Exception):
-            raise writing_result #FIXME: return instead
 
 class N5DataSink(DataSink):
     def __init__(

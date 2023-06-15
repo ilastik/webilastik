@@ -87,7 +87,8 @@ def create_n5(
     assert not isinstance(sink_writer, Exception)
 
     for tile in array.split(chunk_size):
-        sink_writer.write(tile)
+        writing_result = sink_writer.write(tile)
+        assert not isinstance(writing_result, Exception)
     return (fs, path)
 
 

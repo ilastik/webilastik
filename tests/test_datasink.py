@@ -38,7 +38,8 @@ def test_n5_datasink():
     sink_writer = sink.open()
     assert not isinstance(sink_writer, Exception)
     for tile in DataRoi(datasource).split(sink.tile_shape):
-        sink_writer.write(tile.retrieve())
+        writing_result = sink_writer.write(tile.retrieve())
+        assert not isinstance(writing_result, Exception)
 
     n5ds = N5DataSource.try_load(filesystem=sink.filesystem, path=sink.path)
     assert not isinstance(n5ds, Exception), str(n5ds)
@@ -65,7 +66,8 @@ def test_distributed_n5_datasink():
 
     for idx, piece in enumerate(DataRoi(datasource).default_split()):
         sink = sink_writers[idx % len(sink_writers)]
-        sink.write(piece.retrieve())
+        writing_result = sink.write(piece.retrieve())
+        assert not isinstance(writing_result, Exception)
 
     n5ds = N5DataSource.try_load(filesystem=filesystem, path=path)
     assert not isinstance(n5ds, Exception), str(n5ds)
@@ -93,7 +95,8 @@ def test_writing_to_precomputed_chunks():
         raise creation_result
 
     for tile in datasource.roi.get_datasource_tiles():
-        creation_result.write(tile.retrieve())
+        writing_result = creation_result.write(tile.retrieve())
+        assert not isinstance(writing_result, Exception)
 
     precomp_datasource = datasink.to_datasource()
     reloaded_data = precomp_datasource.retrieve()
@@ -125,7 +128,8 @@ def test_writing_to_offset_precomputed_chunks():
         raise creation_result
 
     for tile in datasource.roi.get_datasource_tiles():
-        creation_result.write(tile.retrieve())
+        writing_result = creation_result.write(tile.retrieve())
+        assert not isinstance(writing_result, Exception)
 
     precomp_datasource = datasink.to_datasource()
 

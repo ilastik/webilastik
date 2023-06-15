@@ -14,7 +14,7 @@ class IDataSinkWriter(Protocol):
     @property
     def data_sink(self) -> "DataSink":
         ...
-    def write(self, data: Array5D):
+    def write(self, data: Array5D) -> "None | Exception":
         ...
 
 class DataSink(ABC):

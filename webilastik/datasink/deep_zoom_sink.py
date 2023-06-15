@@ -8,7 +8,7 @@ from ndstructs.array5D import Array5D
 
 from webilastik.datasink import FsDataSink, IDataSinkWriter
 from webilastik.datasource.deep_zoom_datasource import DziImageElement, DziLevelDataSource
-from webilastik.filesystem import IFilesystem
+from webilastik.filesystem import FsIoException, IFilesystem
 from webilastik.server.rpc.dto import DziLevelSinkDto
 from webilastik.datasink import FsDataSink
 
@@ -21,7 +21,7 @@ class DziLevelWriter(IDataSinkWriter):
     def data_sink(self) -> "DziLevelSink":
         return self._data_sink
 
-    def write(self, data: Array5D):
+    def write(self, data: Array5D) -> "None | FsIoException":
         tile = data.interval
         assert tile.is_tile(tile_shape=self._data_sink.tile_shape, full_interval=self._data_sink.interval, clamped=True), f"Bad tile: {tile}"
         chunk_path = self._data_sink.dzi_image.get_tile_path(level_path=self._data_sink.path, tile=data.interval)
@@ -33,9 +33,7 @@ class DziLevelWriter(IDataSinkWriter):
         _ = out_file.seek(0)
         contents = out_file.read() # FIXME: read() ?
 
-        result = self._data_sink.filesystem.create_file(path=chunk_path, contents=contents)
-        if isinstance(result, Exception):
-            raise result #FIXME
+        return self._data_sink.filesystem.create_file(path=chunk_path, contents=contents)
 
 
 class DziLevelSink(FsDataSink):
