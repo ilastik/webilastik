@@ -5,8 +5,8 @@ from concurrent.futures import Future
 import numpy as np
 from ndstructs.point5D import Point5D
 from ndstructs.array5D import Array5D
-from ndstructs.utils.json_serializable import IJsonable
 
+from webilastik.serialization.json_serialization import IJsonable
 from webilastik.datasource import DataSource, DataRoi
 from webilastik.operator import Operator
 from executor_getter import get_executor
