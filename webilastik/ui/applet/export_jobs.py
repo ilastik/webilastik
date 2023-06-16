@@ -7,6 +7,7 @@ from pathlib import PurePosixPath
 from typing import Literal, cast, Any, Callable, Sequence, TypeVar, Iterable, Generic
 from functools import partial
 import uuid
+from pathlib import Path
 
 from ndstructs.point5D import Interval5D, Point5D
 from ndstructs.array5D import Array5D
@@ -250,3 +251,38 @@ class CreateDziPyramid(FallibleJob["Sequence[DziLevelSink] | Exception"]):
                 error_message=self.error_message,
                 datasink=None, # pyright: ignore #FIXME
             )
+
+
+class ZipDirectory(FallibleJob["None | Exception"]):
+    def __init__(
+        self,
+        *,
+        name: str,
+        output_path: Path,
+        directory: Path,
+        on_progress: "JobProgressCallback[Exception | None] | None" = None,
+    ):
+        super().__init__(
+            name=name,
+            target=partial(ZipDirectory.zip_directory, output_path),
+            on_progress=on_progress,
+            args=[directory],
+            num_args=1,
+        )
+
+    @classmethod
+    def zip_directory(cls, output_path: Path, directory: Path) -> "None | Exception":
+        from zipfile import ZipFile, ZIP_STORED
+        try:
+            with ZipFile(output_path, mode="w", compresslevel=ZIP_STORED) as zip_file:
+                def write_to_zip(path: Path):
+                    if path.is_dir():
+                        for p in path.iterdir():
+                            write_to_zip(p)
+                    else:
+                        arcname = path.relative_to(directory)
+                        print(f"Writing {path} as {arcname}")
+                        zip_file.write(path, arcname=arcname.as_posix())
+                write_to_zip(directory)
+        except Exception as e:
+            return e
