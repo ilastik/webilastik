@@ -61,7 +61,7 @@ class IFilesystem(typing.Protocol):
     def geturl(self, path: PurePosixPath) -> Url:
         ...
     def exists(self, path: PurePosixPath) -> "bool | FsIoException":
-        listing_result = self.list_contents(path)
+        listing_result = self.list_contents(path.parent)
         if isinstance(listing_result, Exception):
             return listing_result
         return path in listing_result.files or path in listing_result.directories
