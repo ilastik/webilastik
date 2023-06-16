@@ -376,13 +376,24 @@ class JobDto(DataTransferObject):
 class ExportJobDto(JobDto):
     datasink: DataSinkDto
 
+
 @dataclass
 class OpenDatasinkJobDto(JobDto):
     datasink: DataSinkDto
 
 @dataclass
+class CreateDziPyramidJobDto(JobDto):
+    pass
+
+@dataclass
+class ZipJobDto(JobDto):
+    pass
+
+ExportJobDtoUnion = Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto]
+
+@dataclass
 class PixelClassificationExportAppletStateDto(DataTransferObject):
-    jobs: Tuple[Union[ExportJobDto, OpenDatasinkJobDto], ...]
+    jobs: Tuple[ExportJobDtoUnion, ...]
     populated_labels: Optional[Tuple[LabelHeaderDto, ...]]
     datasource_suggestions: Optional[Tuple[FsDataSourceDto, ...]]
 

@@ -3,7 +3,7 @@
 from functools import partial
 from pathlib import PurePosixPath, Path
 import threading
-from typing import Any, Callable, Dict, Sequence, TypeVar
+from typing import Any, Callable, Dict, Sequence, TypeVar, Union
 import uuid
 
 import numpy as np
@@ -30,12 +30,14 @@ from webilastik.server.rpc.dto import (
 )
 from webilastik.simple_segmenter import SimpleSegmenter
 from webilastik.ui.applet import AppletOutput, StatelesApplet, UserPrompt
-from webilastik.ui.applet.export_jobs import CreateDziPyramid, DownscaleDatasource, ExportJob, FallibleJob, OpenDatasinkJob, ZipDirectory
+from webilastik.ui.applet.export_jobs import CreateDziPyramid, DownscaleDatasource, ExportJob, OpenDatasinkJob, ZipDirectory
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.usage_error import UsageError
 from webilastik.ui.applet.brushing_applet import Label
 
 JOB_OUT = TypeVar("JOB_OUT")
+
+ExportJobUnion = Union[ExportJob, OpenDatasinkJob, CreateDziPyramid, DownscaleDatasource, ZipDirectory]
 
 class PixelClassificationExportApplet(StatelesApplet):
     def __init__(
@@ -55,7 +57,7 @@ class PixelClassificationExportApplet(StatelesApplet):
         self._in_populated_labels = populated_labels
         self._in_datasource_suggestions = datasource_suggestions
 
-        self._jobs: Dict[uuid.UUID, FallibleJob[Any]] = {}
+        self._jobs: Dict[uuid.UUID, ExportJobUnion] = {}
         self._lock = threading.Lock()
         super().__init__(name=name)
 
@@ -63,7 +65,7 @@ class PixelClassificationExportApplet(StatelesApplet):
         with self._lock:
             del self._jobs[job_id]
 
-    def _launch_job(self, job: FallibleJob[Any]):
+    def _launch_job(self, job: ExportJobUnion):
         self.priority_executor.submit_job(job)
         with self._lock:
             self._jobs[job.uuid] = job

@@ -2923,9 +2923,153 @@ export class OpenDatasinkJobDto {
   }
 }
 
-export function parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_(
+export function parse_as_CreateDziPyramidJobDto(value: JsonValue): CreateDziPyramidJobDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "CreateDziPyramidJobDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a CreateDziPyramidJobDto`);
+  }
+  const temp_name = parse_as_str(valueObject.name);
+  if (temp_name instanceof Error) return temp_name;
+  const temp_num_args = parse_as_Union_of_int0None_endof_(valueObject.num_args);
+  if (temp_num_args instanceof Error) return temp_num_args;
+  const temp_uuid = parse_as_str(valueObject.uuid);
+  if (temp_uuid instanceof Error) return temp_uuid;
+  const temp_status =
+    parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
+      valueObject.status,
+    );
+  if (temp_status instanceof Error) return temp_status;
+  const temp_num_completed_steps = parse_as_int(valueObject.num_completed_steps);
+  if (temp_num_completed_steps instanceof Error) return temp_num_completed_steps;
+  const temp_error_message = parse_as_Union_of_str0None_endof_(valueObject.error_message);
+  if (temp_error_message instanceof Error) return temp_error_message;
+  return new CreateDziPyramidJobDto({
+    name: temp_name,
+    num_args: temp_num_args,
+    uuid: temp_uuid,
+    status: temp_status,
+    num_completed_steps: temp_num_completed_steps,
+    error_message: temp_error_message,
+  });
+}
+// Automatically generated via DataTransferObject for CreateDziPyramidJobDto
+// Do not edit!
+export class CreateDziPyramidJobDto {
+  public name: string;
+  public num_args: number | undefined;
+  public uuid: string;
+  public status: "pending" | "running" | "cancelled" | "completed";
+  public num_completed_steps: number;
+  public error_message: string | undefined;
+  constructor(_params: {
+    name: string;
+    num_args: number | undefined;
+    uuid: string;
+    status: "pending" | "running" | "cancelled" | "completed";
+    num_completed_steps: number;
+    error_message: string | undefined;
+  }) {
+    this.name = _params.name;
+    this.num_args = _params.num_args;
+    this.uuid = _params.uuid;
+    this.status = _params.status;
+    this.num_completed_steps = _params.num_completed_steps;
+    this.error_message = _params.error_message;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "CreateDziPyramidJobDto",
+      name: this.name,
+      num_args: toJsonValue(this.num_args),
+      uuid: this.uuid,
+      status: this.status,
+      num_completed_steps: this.num_completed_steps,
+      error_message: toJsonValue(this.error_message),
+    };
+  }
+  public static fromJsonValue(value: JsonValue): CreateDziPyramidJobDto | Error {
+    return parse_as_CreateDziPyramidJobDto(value);
+  }
+}
+
+export function parse_as_ZipJobDto(value: JsonValue): ZipJobDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "ZipJobDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ZipJobDto`);
+  }
+  const temp_name = parse_as_str(valueObject.name);
+  if (temp_name instanceof Error) return temp_name;
+  const temp_num_args = parse_as_Union_of_int0None_endof_(valueObject.num_args);
+  if (temp_num_args instanceof Error) return temp_num_args;
+  const temp_uuid = parse_as_str(valueObject.uuid);
+  if (temp_uuid instanceof Error) return temp_uuid;
+  const temp_status =
+    parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
+      valueObject.status,
+    );
+  if (temp_status instanceof Error) return temp_status;
+  const temp_num_completed_steps = parse_as_int(valueObject.num_completed_steps);
+  if (temp_num_completed_steps instanceof Error) return temp_num_completed_steps;
+  const temp_error_message = parse_as_Union_of_str0None_endof_(valueObject.error_message);
+  if (temp_error_message instanceof Error) return temp_error_message;
+  return new ZipJobDto({
+    name: temp_name,
+    num_args: temp_num_args,
+    uuid: temp_uuid,
+    status: temp_status,
+    num_completed_steps: temp_num_completed_steps,
+    error_message: temp_error_message,
+  });
+}
+// Automatically generated via DataTransferObject for ZipJobDto
+// Do not edit!
+export class ZipJobDto {
+  public name: string;
+  public num_args: number | undefined;
+  public uuid: string;
+  public status: "pending" | "running" | "cancelled" | "completed";
+  public num_completed_steps: number;
+  public error_message: string | undefined;
+  constructor(_params: {
+    name: string;
+    num_args: number | undefined;
+    uuid: string;
+    status: "pending" | "running" | "cancelled" | "completed";
+    num_completed_steps: number;
+    error_message: string | undefined;
+  }) {
+    this.name = _params.name;
+    this.num_args = _params.num_args;
+    this.uuid = _params.uuid;
+    this.status = _params.status;
+    this.num_completed_steps = _params.num_completed_steps;
+    this.error_message = _params.error_message;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "ZipJobDto",
+      name: this.name,
+      num_args: toJsonValue(this.num_args),
+      uuid: this.uuid,
+      status: this.status,
+      num_completed_steps: this.num_completed_steps,
+      error_message: toJsonValue(this.error_message),
+    };
+  }
+  public static fromJsonValue(value: JsonValue): ZipJobDto | Error {
+    return parse_as_ZipJobDto(value);
+  }
+}
+
+export function parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_(
   value: JsonValue,
-): ExportJobDto | OpenDatasinkJobDto | Error {
+): ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto | Error {
   const parsed_option_0 = parse_as_ExportJobDto(value);
   if (!(parsed_option_0 instanceof Error)) {
     return parsed_option_0;
@@ -2934,16 +3078,28 @@ export function parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_(
   if (!(parsed_option_1 instanceof Error)) {
     return parsed_option_1;
   }
-  return Error(`Could not parse ${JSON.stringify(value)} into ExportJobDto | OpenDatasinkJobDto`);
+  const parsed_option_2 = parse_as_CreateDziPyramidJobDto(value);
+  if (!(parsed_option_2 instanceof Error)) {
+    return parsed_option_2;
+  }
+  const parsed_option_3 = parse_as_ZipJobDto(value);
+  if (!(parsed_option_3 instanceof Error)) {
+    return parsed_option_3;
+  }
+  return Error(
+    `Could not parse ${
+      JSON.stringify(value)
+    } into ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto`,
+  );
 }
-export function parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_0_varlen__endof_(
+export function parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_0_varlen__endof_(
   value: JsonValue,
-): Array<ExportJobDto | OpenDatasinkJobDto> | Error {
+): Array<ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto> | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
-  const out: Array<ExportJobDto | OpenDatasinkJobDto> = [];
+  const out: Array<ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto> = [];
   for (let item of arr) {
-    let parsed_item = parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_(item);
+    let parsed_item = parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_(item);
     if (parsed_item instanceof Error) return parsed_item;
     out.push(parsed_item);
   }
@@ -3006,7 +3162,10 @@ export function parse_as_PixelClassificationExportAppletStateDto(
   if (valueObject["__class__"] != "PixelClassificationExportAppletStateDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a PixelClassificationExportAppletStateDto`);
   }
-  const temp_jobs = parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_0_varlen__endof_(valueObject.jobs);
+  const temp_jobs =
+    parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_0_varlen__endof_(
+      valueObject.jobs,
+    );
   if (temp_jobs instanceof Error) return temp_jobs;
   const temp_populated_labels = parse_as_Union_of_Tuple_of_LabelHeaderDto0_varlen__endof_0None_endof_(
     valueObject.populated_labels,
@@ -3026,13 +3185,13 @@ export function parse_as_PixelClassificationExportAppletStateDto(
 // Automatically generated via DataTransferObject for PixelClassificationExportAppletStateDto
 // Do not edit!
 export class PixelClassificationExportAppletStateDto {
-  public jobs: Array<ExportJobDto | OpenDatasinkJobDto>;
+  public jobs: Array<ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto>;
   public populated_labels: Array<LabelHeaderDto> | undefined;
   public datasource_suggestions:
     | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
     | undefined;
   constructor(_params: {
-    jobs: Array<ExportJobDto | OpenDatasinkJobDto>;
+    jobs: Array<ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto>;
     populated_labels: Array<LabelHeaderDto> | undefined;
     datasource_suggestions:
       | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>

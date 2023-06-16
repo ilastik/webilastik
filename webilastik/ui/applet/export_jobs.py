@@ -1,6 +1,6 @@
 # pyright: strict
 
-from abc import abstractmethod, ABC
+from abc import  ABC
 from dataclasses import dataclass
 import math
 from pathlib import PurePosixPath
@@ -15,7 +15,6 @@ from ndstructs.point5D import Interval5D, Point5D
 from ndstructs.array5D import Array5D
 import numpy as np
 from skimage.transform import resize_local_mean #pyright: ignore [reportMissingTypeStubs, reportUnknownVariableType]
-from ndstructs.utils.json_serializable import JsonableValue
 
 from webilastik.datasource import DataRoi, DataSource
 from webilastik.datasink import DataSink, IDataSinkWriter
@@ -25,7 +24,7 @@ from webilastik.datasource.deep_zoom_image import DziImageElement
 from webilastik.filesystem import IFilesystem
 from webilastik.operator import Operator
 from webilastik.scheduling.job import Job, JobProgressCallback, JobStatus
-from webilastik.server.rpc.dto import ExportJobDto
+from webilastik.server.rpc.dto import ExportJobDto, ZipJobDto, CreateDziPyramidJobDto
 
 
 IN = TypeVar("IN")
@@ -55,10 +54,6 @@ class FallibleJob(Job[OUT], ABC): #FIXME: generic over Exception type>
             args=args,
             num_args=num_args,
         )
-
-    @abstractmethod
-    def to_dto(self) -> JsonableValue: #FIXME: maybe one Dto type per job?
-        pass
 
 class OpenDatasinkJob(FallibleJob["IDataSinkWriter | Exception"]):
     def __init__(
@@ -243,16 +238,15 @@ class CreateDziPyramid(FallibleJob["Sequence[DziLevelSink] | Exception"]):
             on_progress=on_progress,
         )
 
-    def to_dto(self) -> ExportJobDto: #FIXME?
+    def to_dto(self) -> CreateDziPyramidJobDto: #FIXME?
         with self.job_lock:
-            return ExportJobDto(
+            return CreateDziPyramidJobDto(
                 name=self.name,
                 num_args=self.num_args,
                 uuid=str(self.uuid),
                 status=self._status,
                 num_completed_steps=self.num_completed_steps,
                 error_message=self.error_message,
-                datasink=None, # pyright: ignore #FIXME
             )
 
 
@@ -310,5 +304,13 @@ class ZipDirectory(FallibleJob["None | Exception"]):
         except Exception as e:
             return e
 
-    def to_dto(self) -> str:
-        return "asd" #FIXME
+    def to_dto(self) -> ZipJobDto:
+        with self.job_lock:
+            return ZipJobDto(
+                error_message=self.error_message,
+                name=self.name,
+                num_args=self.num_args,
+                num_completed_steps=self.num_completed_steps,
+                status=self._status,
+                uuid=str(self.uuid),
+            )

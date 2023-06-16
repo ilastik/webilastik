@@ -3101,30 +3101,167 @@ class OpenDatasinkJobDto(JobDto):
         return parse_as_OpenDatasinkJobDto(value)
 
 
-def parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_(
+def parse_as_CreateDziPyramidJobDto(
     value: JsonValue,
-) -> "Union[ExportJobDto, OpenDatasinkJobDto] | MessageParsingError":
+) -> "CreateDziPyramidJobDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as CreateDziPyramidJobDto"
+        )
+    if value.get("__class__") != "CreateDziPyramidJobDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as CreateDziPyramidJobDto"
+        )
+    tmp_name = parse_as_str(value.get("name"))
+    if isinstance(tmp_name, MessageParsingError):
+        return tmp_name
+    tmp_num_args = parse_as_Union_of_int0None_endof_(value.get("num_args"))
+    if isinstance(tmp_num_args, MessageParsingError):
+        return tmp_num_args
+    tmp_uuid = parse_as_str(value.get("uuid"))
+    if isinstance(tmp_uuid, MessageParsingError):
+        return tmp_uuid
+    tmp_status = parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
+        value.get("status")
+    )
+    if isinstance(tmp_status, MessageParsingError):
+        return tmp_status
+    tmp_num_completed_steps = parse_as_int(value.get("num_completed_steps"))
+    if isinstance(tmp_num_completed_steps, MessageParsingError):
+        return tmp_num_completed_steps
+    tmp_error_message = parse_as_Union_of_str0None_endof_(value.get("error_message"))
+    if isinstance(tmp_error_message, MessageParsingError):
+        return tmp_error_message
+    return CreateDziPyramidJobDto(
+        name=tmp_name,
+        num_args=tmp_num_args,
+        uuid=tmp_uuid,
+        status=tmp_status,
+        num_completed_steps=tmp_num_completed_steps,
+        error_message=tmp_error_message,
+    )
+
+
+@dataclass
+class CreateDziPyramidJobDto(JobDto):
+    pass
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "CreateDziPyramidJobDto",
+            "name": self.name,
+            "num_args": convert_to_json_value(self.num_args),
+            "uuid": self.uuid,
+            "status": self.status,
+            "num_completed_steps": self.num_completed_steps,
+            "error_message": convert_to_json_value(self.error_message),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "CreateDziPyramidJobDto | MessageParsingError":
+        return parse_as_CreateDziPyramidJobDto(value)
+
+
+def parse_as_ZipJobDto(value: JsonValue) -> "ZipJobDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(f"Could not parse {json.dumps(value)} as ZipJobDto")
+    if value.get("__class__") != "ZipJobDto":
+        return MessageParsingError(f"Could not parse {json.dumps(value)} as ZipJobDto")
+    tmp_name = parse_as_str(value.get("name"))
+    if isinstance(tmp_name, MessageParsingError):
+        return tmp_name
+    tmp_num_args = parse_as_Union_of_int0None_endof_(value.get("num_args"))
+    if isinstance(tmp_num_args, MessageParsingError):
+        return tmp_num_args
+    tmp_uuid = parse_as_str(value.get("uuid"))
+    if isinstance(tmp_uuid, MessageParsingError):
+        return tmp_uuid
+    tmp_status = parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
+        value.get("status")
+    )
+    if isinstance(tmp_status, MessageParsingError):
+        return tmp_status
+    tmp_num_completed_steps = parse_as_int(value.get("num_completed_steps"))
+    if isinstance(tmp_num_completed_steps, MessageParsingError):
+        return tmp_num_completed_steps
+    tmp_error_message = parse_as_Union_of_str0None_endof_(value.get("error_message"))
+    if isinstance(tmp_error_message, MessageParsingError):
+        return tmp_error_message
+    return ZipJobDto(
+        name=tmp_name,
+        num_args=tmp_num_args,
+        uuid=tmp_uuid,
+        status=tmp_status,
+        num_completed_steps=tmp_num_completed_steps,
+        error_message=tmp_error_message,
+    )
+
+
+@dataclass
+class ZipJobDto(JobDto):
+    pass
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "ZipJobDto",
+            "name": self.name,
+            "num_args": convert_to_json_value(self.num_args),
+            "uuid": self.uuid,
+            "status": self.status,
+            "num_completed_steps": self.num_completed_steps,
+            "error_message": convert_to_json_value(self.error_message),
+        }
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "ZipJobDto | MessageParsingError":
+        return parse_as_ZipJobDto(value)
+
+
+ExportJobDtoUnion = Union[
+    ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto
+]
+
+
+def parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_(
+    value: JsonValue,
+) -> "Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto] | MessageParsingError":
     parsed_option_0 = parse_as_ExportJobDto(value)
     if not isinstance(parsed_option_0, MessageParsingError):
         return parsed_option_0
     parsed_option_1 = parse_as_OpenDatasinkJobDto(value)
     if not isinstance(parsed_option_1, MessageParsingError):
         return parsed_option_1
+    parsed_option_2 = parse_as_CreateDziPyramidJobDto(value)
+    if not isinstance(parsed_option_2, MessageParsingError):
+        return parsed_option_2
+    parsed_option_3 = parse_as_ZipJobDto(value)
+    if not isinstance(parsed_option_3, MessageParsingError):
+        return parsed_option_3
     return MessageParsingError(
-        f"Could not parse {json.dumps(value)} into Union[ExportJobDto, OpenDatasinkJobDto]"
+        f"Could not parse {json.dumps(value)} into Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto]"
     )
 
 
-def parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_0_varlen__endof_(
+def parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_0_varlen__endof_(
     value: JsonValue,
-) -> "Tuple[Union[ExportJobDto, OpenDatasinkJobDto], ...] | MessageParsingError":
+) -> "Tuple[Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto], ...] | MessageParsingError":
     if not isinstance(value, (list, tuple)):
         return MessageParsingError(
-            f"Could not parse Tuple[Union[ExportJobDto, OpenDatasinkJobDto], ...] from {json.dumps(value)}"
+            f"Could not parse Tuple[Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto], ...] from {json.dumps(value)}"
         )
-    items: List[Union[ExportJobDto, OpenDatasinkJobDto]] = []
+    items: List[
+        Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto]
+    ] = []
     for item in value:
-        parsed = parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_(item)
+        parsed = parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_(
+            item
+        )
         if isinstance(parsed, MessageParsingError):
             return parsed
         items.append(parsed)
@@ -3190,7 +3327,7 @@ def parse_as_PixelClassificationExportAppletStateDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as PixelClassificationExportAppletStateDto"
         )
-    tmp_jobs = parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_0_varlen__endof_(
+    tmp_jobs = parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_0_varlen__endof_(
         value.get("jobs")
     )
     if isinstance(tmp_jobs, MessageParsingError):
@@ -3216,7 +3353,7 @@ def parse_as_PixelClassificationExportAppletStateDto(
 
 @dataclass
 class PixelClassificationExportAppletStateDto(DataTransferObject):
-    jobs: Tuple[Union[ExportJobDto, OpenDatasinkJobDto], ...]
+    jobs: Tuple[ExportJobDtoUnion, ...]
     populated_labels: Optional[Tuple[LabelHeaderDto, ...]]
     datasource_suggestions: Optional[Tuple[FsDataSourceDto, ...]]
 
