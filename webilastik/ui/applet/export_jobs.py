@@ -8,11 +8,14 @@ from typing import Literal, cast, Any, Callable, Sequence, TypeVar, Iterable, Ge
 from functools import partial
 import uuid
 from pathlib import Path
+from zipfile import ZipFile, ZIP_STORED
+import shutil
 
 from ndstructs.point5D import Interval5D, Point5D
 from ndstructs.array5D import Array5D
 import numpy as np
 from skimage.transform import resize_local_mean #pyright: ignore [reportMissingTypeStubs, reportUnknownVariableType]
+from ndstructs.utils.json_serializable import JsonableValue
 
 from webilastik.datasource import DataRoi, DataSource
 from webilastik.datasink import DataSink, IDataSinkWriter
@@ -54,7 +57,7 @@ class FallibleJob(Job[OUT], ABC): #FIXME: generic over Exception type>
         )
 
     @abstractmethod
-    def to_dto(self) -> ExportJobDto: #FIXME: maybe one Dto type per job?
+    def to_dto(self) -> JsonableValue: #FIXME: maybe one Dto type per job?
         pass
 
 class OpenDatasinkJob(FallibleJob["IDataSinkWriter | Exception"]):
@@ -258,31 +261,54 @@ class ZipDirectory(FallibleJob["None | Exception"]):
         self,
         *,
         name: str,
-        output_path: Path,
-        directory: Path,
+        output_fs: IFilesystem,
+        output_path: PurePosixPath,
+        input_directory: Path,
+        delete_source: bool,
         on_progress: "JobProgressCallback[Exception | None] | None" = None,
     ):
         super().__init__(
             name=name,
-            target=partial(ZipDirectory.zip_directory, output_path),
+            target=partial(
+                ZipDirectory.zip_directory,
+                output_fs=output_fs,
+                output_path=output_path,
+                delete_source=delete_source
+            ),
             on_progress=on_progress,
-            args=[directory],
+            args=[input_directory],
             num_args=1,
         )
 
     @classmethod
-    def zip_directory(cls, output_path: Path, directory: Path) -> "None | Exception":
-        from zipfile import ZipFile, ZIP_STORED
+    def zip_directory(
+        cls, input_directory: Path, /, *, output_fs: IFilesystem, output_path: PurePosixPath, delete_source: bool
+    ) -> "None | Exception":
+        if not input_directory.is_dir():
+            return Exception(f"Not a directory path: {input_directory}")
         try:
-            with ZipFile(output_path, mode="w", compresslevel=ZIP_STORED) as zip_file:
-                def write_to_zip(path: Path):
-                    if path.is_dir():
-                        for p in path.iterdir():
+            tmp_output_path = Path(f"/tmp/{uuid.uuid4()}.zip") #FIXME: get tmp/scratch from config
+            with ZipFile(tmp_output_path, mode="w", compresslevel=ZIP_STORED) as zip_file:
+                def write_to_zip(item_path: Path):
+                    if item_path.is_dir():
+                        for p in item_path.iterdir():
                             write_to_zip(p)
                     else:
-                        arcname = path.relative_to(directory)
-                        print(f"Writing {path} as {arcname}")
-                        zip_file.write(path, arcname=arcname.as_posix())
-                write_to_zip(directory)
+                        arcname = item_path.relative_to(input_directory)
+                        print(f"Writing {item_path} as {arcname}")
+                        zip_file.write(item_path, arcname=arcname.as_posix())
+                write_to_zip(input_directory)
+            #FIXME: reading entire thing to memory
+            print(f"==>>>>>> uploading final zip to target fs {output_fs} at {output_path}")
+            write_result = output_fs.create_file(path=output_path, contents=open(tmp_output_path, "rb").read())
+            print(f"==>>>>>> DONE! uploading final zip to target fs")
+            if isinstance(write_result, Exception):
+                return write_result
+            if delete_source:
+                print(f"Deleting source {input_directory}")
+                shutil.rmtree(input_directory)
         except Exception as e:
             return e
+
+    def to_dto(self) -> str:
+        return "asd" #FIXME

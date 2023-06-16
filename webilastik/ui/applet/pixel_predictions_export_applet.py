@@ -1,7 +1,7 @@
 # pyright: strict
 
 from functools import partial
-from pathlib import PurePosixPath
+from pathlib import PurePosixPath, Path
 import threading
 from typing import Any, Callable, Dict, Sequence, TypeVar
 import uuid
@@ -30,7 +30,7 @@ from webilastik.server.rpc.dto import (
 )
 from webilastik.simple_segmenter import SimpleSegmenter
 from webilastik.ui.applet import AppletOutput, StatelesApplet, UserPrompt
-from webilastik.ui.applet.export_jobs import CreateDziPyramid, DownscaleDatasource, ExportJob, FallibleJob, OpenDatasinkJob
+from webilastik.ui.applet.export_jobs import CreateDziPyramid, DownscaleDatasource, ExportJob, FallibleJob, OpenDatasinkJob, ZipDirectory
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.usage_error import UsageError
 from webilastik.ui.applet.brushing_applet import Label
@@ -110,14 +110,15 @@ class PixelClassificationExportApplet(StatelesApplet):
         job_name: str,
         datasource: DataSource,
         operator: SimpleSegmenter,
-        filesystem: IFilesystem,
-        path: PurePosixPath, #FIXME: use it to save final zip to
+        output_fs: IFilesystem,
+        output_path: PurePosixPath, #FIXME: use it to save final zip to
         dzi_image_format: ImageFormat,
     ) -> "None | UsageError":
         tmp_fs = OsFs.create()
         if isinstance(tmp_fs, Exception):
             return UsageError(str(tmp_fs)) #FIXME: double check this exception
-        tmp_xml_path = PurePosixPath(f"/tmp/{uuid.uuid4()}_dzi/tmp.dzi")
+        tmp_uuid = uuid.uuid4()
+        tmp_xml_path = Path(f"/tmp/{tmp_uuid}_dzi/tmp.dzi") #FIXME: get tmp path from config
         print(f"{tmp_xml_path=}")
 
         dzi_image = DziImageElement(
@@ -127,14 +128,30 @@ class PixelClassificationExportApplet(StatelesApplet):
             TileSize=max(datasource.tile_shape.x, datasource.tile_shape.y),
         )
 
+        def launch_zip_dzi_pyramid_job(job_id: uuid.UUID, job_status: JobStatus, step_index: int, step_result: Any):
+            if job_status != "completed":
+                return
+            self._launch_job(ZipDirectory(
+                name="Zipping dzi",
+                input_directory=tmp_xml_path.parent,
+                output_fs=output_fs,
+                output_path=output_path,
+                delete_source=True,
+            ))
+
         def launch_downscaling_job(
             sinks: Sequence[DziLevelSink], sink_index: int, job_id: uuid.UUID, job_status: JobStatus, step_index: int, step_result: Any
         ) -> "Exception | None":
-            if sink_index not in range(len(sinks)) or job_status != "completed":
+            if job_status != "completed":
                 return
+            print(f"!!!!!!!!! should launch job for sink index {sink_index} !!!!!!!!!!!!!!!!")
             sink = sinks[sink_index]
             previous_level_source = DziLevelDataSource.try_load(
-                filesystem=tmp_fs, level_path=dzi_image.make_level_path(xml_path=tmp_xml_path, level_index=sink.level_index + 1)
+                filesystem=tmp_fs,
+                level_path=dzi_image.make_level_path(
+                    xml_path=PurePosixPath(tmp_xml_path), # FIXME? will this break on windows?
+                    level_index=sink.level_index + 1
+                )
             )
             if isinstance(previous_level_source, Exception):
                 return previous_level_source
@@ -142,7 +159,7 @@ class PixelClassificationExportApplet(StatelesApplet):
                 name=f"Downscaling to {sink.shape}",
                 source=previous_level_source,
                 sink_writer=sink.open(),
-                on_progress=partial(launch_downscaling_job, sinks=sinks, sink_index=sink_index - 1),
+                on_progress=launch_zip_dzi_pyramid_job if sink_index == 0 else partial(launch_downscaling_job, sinks=sinks, sink_index=sink_index - 1),
             ))
             self.on_async_change()
 
@@ -176,7 +193,7 @@ class PixelClassificationExportApplet(StatelesApplet):
                 TileSize=max(datasource.tile_shape.x, datasource.tile_shape.y),
             ),
             num_channels=3,
-            xml_path=tmp_xml_path,
+            xml_path=PurePosixPath(tmp_xml_path), #FIXME: windows?
             on_complete=on_pyramid_ready__launch_first_export,
         ))
 
@@ -215,8 +232,8 @@ class PixelClassificationExportApplet(StatelesApplet):
         self,
         *,
         datasource: DataSource,
-        fs: IFilesystem,
-        path: PurePosixPath,
+        output_fs: IFilesystem,
+        output_path: PurePosixPath,
         dzi_image_format: ImageFormat,
         label_name: str,
     ) -> "UsageError | None":
@@ -228,8 +245,8 @@ class PixelClassificationExportApplet(StatelesApplet):
         if classifier is None:
             return UsageError("Applets upstream are not ready yet")
         return self._launch_export_to_dzip_job(
-            filesystem=fs,
-            path=path,
+            output_fs=output_fs,
+            output_path=output_path,
             operator=SimpleSegmenter(channel_index=label_name_indices[label_name], preprocessor=classifier),
             datasource=datasource,
             dzi_image_format=dzi_image_format,
