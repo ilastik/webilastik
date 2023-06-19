@@ -1,7 +1,7 @@
 # pyright: strict
 
 from functools import partial
-from pathlib import PurePosixPath, Path
+from pathlib import PurePosixPath
 import threading
 from typing import Any, Callable, Dict, Sequence, TypeVar, Union
 import uuid
@@ -116,12 +116,10 @@ class PixelClassificationExportApplet(StatelesApplet):
         output_path: PurePosixPath, #FIXME: use it to save final zip to
         dzi_image_format: ImageFormat,
     ) -> "None | UsageError":
-        tmp_fs = OsFs.create()
+        tmp_fs = OsFs.create_scratch_dir()
         if isinstance(tmp_fs, Exception):
             return UsageError(str(tmp_fs)) #FIXME: double check this exception
-        tmp_uuid = uuid.uuid4()
-        tmp_xml_path = Path(f"/tmp/{tmp_uuid}_dzi/tmp.dzi") #FIXME: get tmp path from config
-        print(f"{tmp_xml_path=}")
+        tmp_xml_path = PurePosixPath("/tmp.dzi")
 
         dzi_image = DziImageElement(
             Format=dzi_image_format,
@@ -135,6 +133,7 @@ class PixelClassificationExportApplet(StatelesApplet):
                 return
             self._launch_job(ZipDirectory(
                 name="Zipping dzi",
+                input_fs=tmp_fs,
                 input_directory=tmp_xml_path.parent,
                 output_fs=output_fs,
                 output_path=output_path,
@@ -146,12 +145,11 @@ class PixelClassificationExportApplet(StatelesApplet):
         ) -> "Exception | None":
             if job_status != "completed":
                 return
-            print(f"!!!!!!!!! should launch job for sink index {sink_index} !!!!!!!!!!!!!!!!")
             sink = sinks[sink_index]
             previous_level_source = DziLevelDataSource.try_load(
                 filesystem=tmp_fs,
                 level_path=dzi_image.make_level_path(
-                    xml_path=PurePosixPath(tmp_xml_path), # FIXME? will this break on windows?
+                    xml_path=tmp_xml_path,
                     level_index=sink.level_index + 1
                 )
             )
@@ -195,7 +193,7 @@ class PixelClassificationExportApplet(StatelesApplet):
                 TileSize=max(datasource.tile_shape.x, datasource.tile_shape.y),
             ),
             num_channels=3,
-            xml_path=PurePosixPath(tmp_xml_path), #FIXME: windows?
+            xml_path=tmp_xml_path,
             on_complete=on_pyramid_ready__launch_first_export,
         ))
 

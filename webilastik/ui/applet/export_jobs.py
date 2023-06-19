@@ -7,9 +7,7 @@ from pathlib import PurePosixPath
 from typing import Literal, cast, Any, Callable, Sequence, TypeVar, Iterable, Generic
 from functools import partial
 import uuid
-from pathlib import Path
 from zipfile import ZipFile, ZIP_STORED
-import shutil
 
 from ndstructs.point5D import Interval5D, Point5D
 from ndstructs.array5D import Array5D
@@ -21,7 +19,8 @@ from webilastik.datasink import DataSink, IDataSinkWriter
 from webilastik.datasink.deep_zoom_sink import DziLevelSink, DziLevelWriter
 from webilastik.datasource.deep_zoom_image import DziImageElement
 from webilastik.datasource.deep_zoom_image import DziImageElement
-from webilastik.filesystem import IFilesystem
+from webilastik.filesystem import FsIoException, FsFileNotFoundException, IFilesystem
+from webilastik.filesystem.os_fs import OsFs
 from webilastik.operator import Operator
 from webilastik.scheduling.job import Job, JobProgressCallback, JobStatus
 from webilastik.server.rpc.dto import ExportJobDto, ZipJobDto, CreateDziPyramidJobDto
@@ -257,7 +256,8 @@ class ZipDirectory(FallibleJob["None | Exception"]):
         name: str,
         output_fs: IFilesystem,
         output_path: PurePosixPath,
-        input_directory: Path,
+        input_fs: IFilesystem,
+        input_directory: PurePosixPath,
         delete_source: bool,
         on_progress: "JobProgressCallback[Exception | None] | None" = None,
     ):
@@ -265,6 +265,7 @@ class ZipDirectory(FallibleJob["None | Exception"]):
             name=name,
             target=partial(
                 ZipDirectory.zip_directory,
+                input_fs=input_fs,
                 output_fs=output_fs,
                 output_path=output_path,
                 delete_source=delete_source
@@ -276,33 +277,60 @@ class ZipDirectory(FallibleJob["None | Exception"]):
 
     @classmethod
     def zip_directory(
-        cls, input_directory: Path, /, *, output_fs: IFilesystem, output_path: PurePosixPath, delete_source: bool
+        cls,
+        input_directory: PurePosixPath,
+        /, *,
+        input_fs: IFilesystem,
+        output_fs: IFilesystem,
+        output_path: PurePosixPath,
+        delete_source: bool,
     ) -> "None | Exception":
-        if not input_directory.is_dir():
-            return Exception(f"Not a directory path: {input_directory}")
+        temp_fs = OsFs.create_scratch_dir()
+        if isinstance(temp_fs, Exception):
+            return temp_fs
+        tmp_zip_file_path = PurePosixPath("/out.zip")
+
         try:
-            tmp_output_path = Path(f"/tmp/{uuid.uuid4()}.zip") #FIXME: get tmp/scratch from config
-            with ZipFile(tmp_output_path, mode="w", compresslevel=ZIP_STORED) as zip_file:
-                def write_to_zip(item_path: Path):
-                    if item_path.is_dir():
-                        for p in item_path.iterdir():
-                            write_to_zip(p)
-                    else:
-                        arcname = item_path.relative_to(input_directory)
-                        print(f"Writing {item_path} as {arcname}")
-                        zip_file.write(item_path, arcname=arcname.as_posix())
-                write_to_zip(input_directory)
-            #FIXME: reading entire thing to memory
-            print(f"==>>>>>> uploading final zip to target fs {output_fs} at {output_path}")
-            write_result = output_fs.create_file(path=output_path, contents=open(tmp_output_path, "rb").read())
-            print(f"==>>>>>> DONE! uploading final zip to target fs")
-            if isinstance(write_result, Exception):
-                return write_result
-            if delete_source:
-                print(f"Deleting source {input_directory}")
-                shutil.rmtree(input_directory)
+            zip_file = ZipFile(temp_fs.resolve_path(tmp_zip_file_path), mode="w", compresslevel=ZIP_STORED)
         except Exception as e:
-            return e
+            return FsIoException(e)
+
+        def write_to_zip(dir_path: PurePosixPath) -> "None | FsIoException | FsFileNotFoundException":
+            dir_contents_result = input_fs.list_contents(dir_path)
+            if isinstance(dir_contents_result, Exception):
+                return dir_contents_result
+
+            for file_path in dir_contents_result.files:
+                data_result = input_fs.read_file(file_path)
+                if isinstance(data_result, Exception):
+                    return data_result
+                arcname = file_path.relative_to(input_directory)
+                try:
+                    zip_file.writestr(arcname.as_posix(), data_result)
+                except Exception as e:
+                    return FsIoException(e)
+
+            for subdir_path in dir_contents_result.directories:
+                writing_result = write_to_zip(subdir_path)
+                if isinstance(writing_result, Exception):
+                    return writing_result
+
+        zipping_result = write_to_zip(input_directory)
+        if isinstance(zipping_result, Exception):
+            return zipping_result
+        zip_file.close()
+
+        write_result = output_fs.transfer_file(
+            source_fs=temp_fs, source_path=tmp_zip_file_path, target_path=output_path
+        )
+        _ = temp_fs.delete(tmp_zip_file_path)
+
+        if delete_source:
+            _ = temp_fs.delete(PurePosixPath("/"))
+
+        if isinstance(write_result, Exception):
+            return write_result
+
 
     def to_dto(self) -> ZipJobDto:
         with self.job_lock:
