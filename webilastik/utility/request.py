@@ -1,3 +1,4 @@
+from io import IOBase
 from typing import Literal, Mapping, Optional
 import requests
 
@@ -17,7 +18,7 @@ def request(
     session: requests.Session,
     method: Literal["get", "put", "post", "delete"],
     url: Url,
-    data: Optional[bytes] = None,
+    data: "bytes | IOBase | None" = None,
     headers: "Mapping[str, str] | None" = None,
 ) -> "bytes | ErrRequestCompletedAsFailure | ErrRequestCrashed":
     try:
