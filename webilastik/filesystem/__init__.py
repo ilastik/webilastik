@@ -66,7 +66,7 @@ class IFilesystem(typing.Protocol):
             return listing_result
         return path in listing_result.files or path in listing_result.directories
 
-    def transfer_file(self, *, source_fs: "IFilesystem", source_path: PurePosixPath, target_path: PurePosixPath) -> "None | Exception":
+    def transfer_file(self, *, source_fs: "IFilesystem", source_path: PurePosixPath, target_path: PurePosixPath) -> "None | FsIoException | FsFileNotFoundException":
         contents = source_fs.read_file(source_path)
         if isinstance(contents, Exception):
             return contents
