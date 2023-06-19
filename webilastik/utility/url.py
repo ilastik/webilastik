@@ -55,10 +55,10 @@ class Url:
     )
 
     def to_ilp_info_filePath(self) -> str:
-        if self.protocol == "file":
-            return f"{self.datascheme or ''}" + self.path.as_posix()
-        else:
-            return self.raw
+        # FIXME: not completely compatible with classic ilastik
+        if self.protocol == "file" and not self.datascheme:
+            return self.path.as_posix()
+        return self.raw
 
     @staticmethod
     def parse(url: str) -> Optional["Url"]:
