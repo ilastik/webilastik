@@ -8,6 +8,7 @@ from ndstructs.utils.json_serializable import ensureJsonArray, ensureJsonObject,
 
 from webilastik.filesystem import IFilesystem, FsIoException, FsFileNotFoundException, FsDirectoryContents
 from webilastik.filesystem.http_fs import HttpFs
+from webilastik.filesystem.os_fs import OsFs
 from webilastik.utility.url import Url
 from webilastik.server.rpc.dto import BucketFSDto
 from webilastik.utility import Seconds
@@ -187,3 +188,20 @@ class BucketFs(IFilesystem):
         )
         yield from cscs_httpfs.download_to_disk(source=cscs_url_result.path, destination=destination, chunk_size=chunk_size)
 
+    def transfer_file(
+        self, *, source_fs: IFilesystem, source_path: PurePosixPath, target_path: PurePosixPath
+    ) -> "FsIoException | FsFileNotFoundException | None":
+        if not isinstance(source_fs, OsFs):
+            return super().transfer_file(source_fs=source_fs, source_path=source_path, target_path=target_path)
+
+        response = _requests_from_data_proxy(method="put", url=self.url.concatpath(target_path), data=None)
+        if isinstance(response, Exception):
+            return FsIoException(response)
+        response_obj = ensureJsonObject(json.loads(response))
+        cscs_url = Url.parse_or_raise(ensureJsonString(response_obj.get("url"))) #FIXME: could raise
+
+        source_file = source_fs.resolve_path(source_path).open("rb")
+        response = safe_request(session=_cscs_session, method="put", url=cscs_url, data=source_file)
+        if isinstance(response, Exception):
+            return FsIoException(response)
+        return None
