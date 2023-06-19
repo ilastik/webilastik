@@ -66,6 +66,12 @@ class IFilesystem(typing.Protocol):
             return listing_result
         return path in listing_result.files or path in listing_result.directories
 
+    def transfer_file(self, *, source_fs: "IFilesystem", source_path: PurePosixPath, target_path: PurePosixPath) -> "None | Exception":
+        contents = source_fs.read_file(source_path)
+        if isinstance(contents, Exception):
+            return contents
+        return self.create_file(contents=contents, path=target_path)
+
 @dataclass
 class FsDirectoryContents:
     files: Sequence[PurePosixPath]
