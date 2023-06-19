@@ -1,5 +1,6 @@
-from typing import List
+from typing import List, Final
 from pathlib import PurePosixPath, Path
+import uuid
 
 from webilastik.filesystem import IFilesystem, FsIoException, FsFileNotFoundException, FsDirectoryContents
 from webilastik.utility.url import Url
@@ -10,19 +11,37 @@ class _PrivateMarker:
     pass
 
 class OsFs(IFilesystem):
-    def __init__(self, _marker: _PrivateMarker) -> None:
-        raise Exception("OsFs not allowed") #FIXME
+    def __init__(self, _marker: _PrivateMarker, base: Path = Path("/")) -> None:
+        self.base: Final[Path] = base
         super().__init__()
 
-    def _make_path(self, path: PurePosixPath) -> Path:
-        return Path("/") / path
+    @classmethod
+    def create_scratch_dir(cls) -> "OsFs | FsIoException":
+        scratch_dir_path = Path(f"/tmp/{uuid.uuid4()}") #FIXME! read base from config
+        try:
+            scratch_dir_path.mkdir()
+        except Exception as e:
+            return FsIoException(e)
+        return OsFs(_marker=_PrivateMarker(), base=scratch_dir_path)
+
+    def resolve_path(self, path: PurePosixPath) -> Path:
+        safe_path_parts: List[str] = []
+        for comp in path.parts:
+            if comp == "." or comp == "" or comp == "/":
+                continue
+            elif comp == ".." and len(safe_path_parts) > 0:
+                _ = safe_path_parts.pop()
+            else:
+                safe_path_parts.append(comp)
+
+        return self.base / "/".join(safe_path_parts)
 
     @classmethod
     def create(cls) -> "OsFs | Exception":
-        try:
+        from webilastik.config import WebilastikConfig
+        if WebilastikConfig.from_env().allow_local_fs:
             return OsFs(_marker=_PrivateMarker())
-        except Exception as e:
-            return e
+        return Exception("OsFs not allowed")
 
     @classmethod
     def from_dto(cls, dto: OsfsDto) -> "OsFs | Exception":
@@ -34,37 +53,44 @@ class OsFs(IFilesystem):
     def list_contents(self, path: PurePosixPath) -> "FsDirectoryContents | FsIoException":
         files: List[PurePosixPath] = []
         directories: List[PurePosixPath] = []
+        resolved_path = self.resolve_path(path)
+        if not resolved_path.is_dir():
+            return FsIoException(f"Path is not a directory: {path}")
         try:
-            for child in self._make_path(path).iterdir():
+            for child in resolved_path.iterdir():
+                fixed_path = PurePosixPath("/") / child.relative_to(self.base)
                 if child.is_dir():
-                    directories.append(PurePosixPath(child))
+                    directories.append(fixed_path)
                 else:
-                    files.append(PurePosixPath(child))
+                    files.append(fixed_path)
             return FsDirectoryContents(files=files, directories=directories)
         except Exception as e:
             return FsIoException(e)
 
     def exists(self, path: PurePosixPath) -> "bool | FsIoException":
-        return self._make_path(path).exists()
+        try:
+            return self.resolve_path(path).exists()
+        except Exception as e:
+            return FsIoException(e)
 
     def create_file(self, *, path: PurePosixPath, contents: bytes) -> "None | FsIoException":
-        file_path = self._make_path(path)
+        file_path = self.resolve_path(path)
         try:
             file_path.parent.mkdir(parents=True, exist_ok=True)
-            with file_path.open("wb") as f:
+            with file_path.open("wb", buffering=0) as f:
                 _ = f.write(contents)
         except Exception as e:
             return FsIoException(e)
 
     def create_directory(self, path: PurePosixPath) -> "None | FsIoException":
-        dir_path = self._make_path(path)
+        dir_path = self.resolve_path(path)
         try:
             dir_path.mkdir(parents=True, exist_ok=True)
         except Exception as e:
             return FsIoException(e)
 
     def read_file(self, path: PurePosixPath) -> "bytes | FsIoException | FsFileNotFoundException":
-        file_path = self._make_path(path)
+        file_path = self.resolve_path(path)
         try:
             with open(file_path, "rb") as f:
                 return f.read()
@@ -75,7 +101,7 @@ class OsFs(IFilesystem):
 
     def delete(self, path: PurePosixPath) -> "None | FsIoException":
         import shutil
-        node_path = Path(path)
+        node_path = Path(self.resolve_path(path))
         try:
             if node_path.is_dir():
                 shutil.rmtree(node_path)
@@ -85,4 +111,4 @@ class OsFs(IFilesystem):
             return FsIoException(e)
 
     def geturl(self, path: PurePosixPath) -> Url:
-        return Url(protocol="file", hostname="localhost", path=path)
+        return Url(protocol="file", hostname="localhost", path=PurePosixPath(self.resolve_path(path)))
