@@ -109,7 +109,6 @@ class PixelClassificationExportApplet(StatelesApplet):
     def _launch_export_to_dzip_job(
         self,
         *,
-        job_name: str,
         datasource: DataSource,
         operator: SimpleSegmenter,
         output_fs: IFilesystem,
@@ -171,7 +170,7 @@ class PixelClassificationExportApplet(StatelesApplet):
             finest_sink_index = len(result) - 1
             finest_res_sink = result[finest_sink_index]
             self._launch_job(ExportJob(
-                name=job_name,
+                name="Exporting finest resolution",
                 on_progress=partial(launch_downscaling_job, sinks=result, sink_index=finest_sink_index - 1),
                 operator=operator,
                 sink_writer=finest_res_sink.open(),
@@ -250,7 +249,6 @@ class PixelClassificationExportApplet(StatelesApplet):
             operator=SimpleSegmenter(channel_index=label_name_indices[label_name], preprocessor=classifier),
             datasource=datasource,
             dzi_image_format=dzi_image_format,
-            job_name="blas",
         )
 
 
