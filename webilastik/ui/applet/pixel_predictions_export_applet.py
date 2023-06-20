@@ -19,7 +19,7 @@ from webilastik.datasource.deep_zoom_datasource import DziLevelDataSource
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.filesystem import IFilesystem
 from webilastik.filesystem.os_fs import OsFs
-from webilastik.operator import Operator
+from webilastik.operator import OpRetriever, Operator
 from webilastik.scheduling.job import JobStatus, PriorityExecutor
 from webilastik.serialization.json_serialization import JsonValue
 from webilastik.server.rpc.dto import (
@@ -28,7 +28,7 @@ from webilastik.server.rpc.dto import (
     StartPixelProbabilitiesExportJobParamsDto,
     StartSimpleSegmentationExportJobParamsDto,
 )
-from webilastik.simple_segmenter import SimpleSegmenter
+from webilastik.simple_segmenter import SimpleSegmenter, SimpleSegmenterDataSource
 from webilastik.ui.applet import AppletOutput, StatelesApplet, UserPrompt
 from webilastik.ui.applet.export_jobs import CreateDziPyramid, DownscaleDatasource, ExportJob, OpenDatasinkJob, ZipDirectory
 from webilastik.ui.applet.ws_applet import WsApplet
@@ -106,11 +106,10 @@ class PixelClassificationExportApplet(StatelesApplet):
             on_complete=on_datasink_ready,
         )
 
-    def _launch_export_to_dzip_job(
+    def _launch_convert_to_dzip_job(
         self,
         *,
         datasource: DataSource,
-        operator: SimpleSegmenter,
         output_fs: IFilesystem,
         output_path: PurePosixPath, #FIXME: use it to save final zip to
         dzi_image_format: ImageFormat,
@@ -129,6 +128,7 @@ class PixelClassificationExportApplet(StatelesApplet):
 
         def launch_zip_dzi_pyramid_job(job_id: uuid.UUID, job_status: JobStatus, step_index: int, step_result: Any):
             if job_status != "completed":
+                self.on_async_change()
                 return
             self._launch_job(ZipDirectory(
                 name="Zipping dzi",
@@ -143,20 +143,27 @@ class PixelClassificationExportApplet(StatelesApplet):
             sinks: Sequence[DziLevelSink], sink_index: int, job_id: uuid.UUID, job_status: JobStatus, step_index: int, step_result: Any
         ) -> "Exception | None":
             if job_status != "completed":
+                self.on_async_change()
                 return
+            if 0 <= sink_index < dzi_image.max_level_index:
+                self._remove_job(job_id)
             sink = sinks[sink_index]
-            previous_level_source = DziLevelDataSource.try_load(
-                filesystem=tmp_fs,
-                level_path=dzi_image.make_level_path(
-                    xml_path=tmp_xml_path,
-                    level_index=sink.level_index + 1
+
+            if sink_index == dzi_image.max_level_index:
+                level_source = datasource
+            else:
+                level_source = DziLevelDataSource.try_load(
+                    filesystem=tmp_fs,
+                    level_path=dzi_image.make_level_path(
+                        xml_path=tmp_xml_path,
+                        level_index=sink.level_index + 1
+                    )
                 )
-            )
-            if isinstance(previous_level_source, Exception):
-                return previous_level_source
+                if isinstance(level_source, Exception):
+                    return level_source
             self._launch_job(DownscaleDatasource(
                 name=f"Downscaling to {sink.shape}",
-                source=previous_level_source,
+                source=level_source,
                 sink_writer=sink.open(),
                 on_progress=launch_zip_dzi_pyramid_job if sink_index == 0 else partial(launch_downscaling_job, sinks=sinks, sink_index=sink_index - 1),
             ))
@@ -165,19 +172,14 @@ class PixelClassificationExportApplet(StatelesApplet):
         def on_pyramid_ready__launch_first_export(job_id: uuid.UUID, result: "Sequence[DziLevelSink] | Exception"):
             if isinstance(result, Exception):
                 return #FIXME?
-            self._remove_job(job_id)
-
-            finest_sink_index = len(result) - 1
-            finest_res_sink = result[finest_sink_index]
-            self._launch_job(ExportJob(
-                name="Exporting finest resolution",
-                on_progress=partial(launch_downscaling_job, sinks=result, sink_index=finest_sink_index - 1),
-                operator=operator,
-                sink_writer=finest_res_sink.open(),
-                args=datasource.roi.split(block_shape=finest_res_sink.tile_shape.updated(c=datasource.shape.c)),
-                num_args=datasource.roi.get_num_tiles(tile_shape=finest_res_sink.tile_shape),
-            ))
-            self.on_async_change()
+            return launch_downscaling_job(
+                sinks=result,
+                sink_index=dzi_image.max_level_index,
+                job_id=job_id,
+                job_status="completed",
+                step_index=0,
+                step_result=None,
+            )
 
         self._launch_job(CreateDziPyramid(
             name="Creating dzi levels",
@@ -207,7 +209,8 @@ class PixelClassificationExportApplet(StatelesApplet):
             return UsageError("Data sink should have dtype of float32 for this kind of export")
         return self._launch_export_job(job_name="Exporting Pixel Probabilities", operator=classifier, datasource=datasource, datasink=datasink)
 
-    def launch_simple_segmentation_export_job(self, *, datasource: DataSource, datasink: DataSink, label_name: str) -> "UsageError | None":
+
+    def create_simple_segmenter_datasource(self, *, datasource: DataSource, label_name: str) -> "SimpleSegmenterDataSource | UsageError":
         with self._lock:
             label_name_indices: Dict[str, int] = {label.name: idx for idx, label in enumerate(self._in_populated_labels() or [])}
             classifier = self._in_operator()
@@ -215,6 +218,20 @@ class PixelClassificationExportApplet(StatelesApplet):
             return UsageError(f"Bad label name: {label_name}")
         if classifier is None:
             return UsageError("Applets upstream are not ready yet")
+        if not classifier.is_applicable_to(datasource):
+            return UsageError(f"Classifier is not compatible with provided datasource: {datasource}")
+        return SimpleSegmenterDataSource(
+            upstream_source=datasource,
+            segmenter=SimpleSegmenter(
+                preprocessor=classifier,
+                channel_index=label_name_indices[label_name],
+            ),
+        )
+
+    def launch_simple_segmentation_export_job(self, *, datasource: DataSource, datasink: DataSink, label_name: str) -> "UsageError | None":
+        simple_segmentation_datasource = self.create_simple_segmenter_datasource(datasource=datasource, label_name=label_name)
+        if isinstance(simple_segmentation_datasource, UsageError):
+            return simple_segmentation_datasource
         expected_shape = datasource.shape.updated(c=3)
         if datasink.shape != expected_shape:
             return UsageError("Data sink should have 3 channels for this kind of export")
@@ -222,12 +239,27 @@ class PixelClassificationExportApplet(StatelesApplet):
             return UsageError("Data sink should have dtype of 'uint8' for this kind of export")
         return self._launch_export_job(
             job_name="Exporting Simple Segmentation",
-            operator=SimpleSegmenter(channel_index=label_name_indices[label_name], preprocessor=classifier),
-            datasource=datasource,
+            operator=OpRetriever(),
+            datasource=simple_segmentation_datasource,
             datasink=datasink,
         )
 
-    def launch_simple_segmentation_dzip_export_job(
+    def launch_convert_to_dzip_job(
+        self,
+        *,
+        datasource: DataSource,
+        output_fs: IFilesystem,
+        output_path: PurePosixPath,
+        dzi_image_format: ImageFormat,
+    ) -> "UsageError | None":
+        return self._launch_convert_to_dzip_job(
+            output_fs=output_fs,
+            output_path=output_path,
+            datasource=datasource,
+            dzi_image_format=dzi_image_format,
+        )
+
+    def launch_export_simple_segmentation_to_dzip(
         self,
         *,
         datasource: DataSource,
@@ -236,18 +268,13 @@ class PixelClassificationExportApplet(StatelesApplet):
         dzi_image_format: ImageFormat,
         label_name: str,
     ) -> "UsageError | None":
-        with self._lock:
-            label_name_indices: Dict[str, int] = {label.name: idx for idx, label in enumerate(self._in_populated_labels() or [])}
-            classifier = self._in_operator()
-        if label_name not in label_name_indices:
-            return UsageError(f"Bad label name: {label_name}")
-        if classifier is None:
-            return UsageError("Applets upstream are not ready yet")
-        return self._launch_export_to_dzip_job(
+        simple_segmentation_datasource = self.create_simple_segmenter_datasource(datasource=datasource, label_name=label_name)
+        if isinstance(simple_segmentation_datasource, UsageError):
+            return simple_segmentation_datasource
+        return self._launch_convert_to_dzip_job(
             output_fs=output_fs,
             output_path=output_path,
-            operator=SimpleSegmenter(channel_index=label_name_indices[label_name], preprocessor=classifier),
-            datasource=datasource,
+            datasource=simple_segmentation_datasource,
             dzi_image_format=dzi_image_format,
         )
 
