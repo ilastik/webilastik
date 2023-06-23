@@ -1181,6 +1181,18 @@ export class BucketFs extends Filesystem{
     public getUrl(path: Path): Url{
         return this.url.joinPath(path)
     }
+    public getDataProxyGuiUrl(params: {dirPath: Path}): Url{
+        let prefix = params.dirPath.toDto().replace(/^\//, "") + "/"
+
+        return new Url({
+            protocol: "https",
+            hostname: "data-proxy.ebrains.eu",
+            path: new Path({components: [this.bucket_name]}),
+            search: new Map([
+                ["prefix", prefix],
+            ]),
+        })
+    }
 }
 
 export type DataSinkUnion = PrecomputedChunksSink | N5DataSink | DziLevelSink

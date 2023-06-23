@@ -2,7 +2,7 @@ import { Applet } from '../../client/applets/applet';
 import { JsonValue } from '../../util/serialization';
 import { assertUnreachable, createFieldset } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
-import { BucketFs, Color, FsDataSource, FsDataSink, Session, DataSinkUnion, PrecomputedChunksSink, Shape5D, DataSourceUnion } from '../../client/ilastik';
+import { BucketFs, Color, FsDataSource, FsDataSink, Session, PrecomputedChunksSink, Shape5D, DataSourceUnion, Filesystem } from '../../client/ilastik';
 import { CssClasses } from '../css_classes';
 import { ErrorPopupWidget } from './popup';
 import {
@@ -11,7 +11,6 @@ import {
     LabelHeaderDto,
     OpenDatasinkJobDto,
     PixelClassificationExportAppletStateDto,
-    PrecomputedChunksSinkDto,
     StartPixelProbabilitiesExportJobParamsDto,
     StartSimpleSegmentationExportJobParamsDto,
     ZipJobDto
@@ -23,7 +22,7 @@ import { DataType } from '../../util/precomputed_chunks';
 import { FileLocationPatternInputWidget } from './file_location_input';
 import { Button, Select } from './input_widget';
 import { Anchor, Div, Label, Paragraph, Span, Table, TableData, TableHeader, TableRow } from './widget';
-import { Url } from '../../util/parsed_url';
+import { Path, Url } from '../../util/parsed_url';
 import { BooleanInput } from './value_input_widget';
 import { Shape5DInputNoChannel } from './shape5d_input';
 
@@ -55,82 +54,74 @@ class LabelHeader{
 }
 
 class Job{
-    public readonly name: string;
-    public readonly num_args: number | undefined;
-    public readonly uuid: string;
-    public readonly status: "pending" | "running" | "cancelled" | "completed";
-    public readonly num_completed_steps: number;
-    public readonly error_message: string | undefined;
-    public readonly datasink: DataSinkUnion | undefined;
+    private readonly jobDto: ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto;
 
-    constructor(params: {
-        name: string,
-        num_args: number | undefined,
-        uuid: string,
-        status: "pending" | "running" | "cancelled" | "completed",
-        num_completed_steps: number,
-        error_message: string | undefined,
-        datasink: DataSinkUnion | undefined,
-    }){
-        this.name = params.name;
-        this.num_args = params.num_args;
-        this.uuid = params.uuid;
-        this.status = params.status;
-        this.num_completed_steps = params.num_completed_steps;
-        this.error_message = params.error_message;
-        this.datasink = params.datasink;
+    constructor(jobDto: ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto){
+        this.jobDto = jobDto
     }
 
-    public static fromDto(dto: ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto): Job{
-        return new Job({
-            ...dto,
-            datasink: "datasink" in dto ? FsDataSink.fromDto(dto.datasink) : undefined,
-        })
-    }
     private makeProgressDisplay(openInViewer: (datasource: DataSourceUnion) => void): TableData{
-        if(this.status == "pending" || this.status == "cancelled"){
-            return new TableData({parentElement: undefined, innerText: this.status})
+        const jobDto = this.jobDto
+
+        if(jobDto.status == "pending" || jobDto.status == "cancelled"){
+            return new TableData({parentElement: undefined, innerText: jobDto.status})
         }
-        if(this.status == "running"){
+        if(jobDto.status == "running"){
             return new TableData({
                 parentElement: undefined,
-                innerText: this.num_args === undefined ? "unknwown" : `${Math.round(this.num_completed_steps / this.num_args * 100)}%`
+                innerText: jobDto.num_args === undefined ?
+                    "unknwown" :
+                    `${Math.round(jobDto.num_completed_steps / jobDto.num_args * 100)}%`
             })
         }
-        if(this.status == "completed"){
-            if(this.error_message){
+        if(jobDto.status == "completed"){
+            if(jobDto.error_message){
                 let td = new TableData({parentElement: undefined, innerText: "failed"})
-                td.element.title = this.error_message
+                td.element.title = jobDto.error_message
                 return td
             }
-            let out = new TableData({parentElement: undefined, innerText: "100%"})
-            const sink = this.datasink
-            if(sink && sink.filesystem instanceof BucketFs){
-                out.clear()
-                let dataProxyPrefixParam = sink.path.raw.replace(/^\//, "")
-                if(this.datasink instanceof PrecomputedChunksSinkDto){
-                    dataProxyPrefixParam += "/"
+            let out = new TableData({parentElement: undefined})
+
+            let dataProxyGuiUrl: Url | undefined = undefined;
+
+            if(jobDto instanceof ZipJobDto){
+                const fs = Filesystem.fromDto(jobDto.output_fs)
+                if(fs instanceof BucketFs){
+                    out.clear()
+                    dataProxyGuiUrl = fs.getDataProxyGuiUrl({dirPath: Path.parse(jobDto.output_path).parent})
                 }
+            }else if(jobDto instanceof ExportJobDto){
+                const sink = FsDataSink.fromDto(jobDto.datasink)
+                if(sink.filesystem instanceof BucketFs){
+                    dataProxyGuiUrl = sink.filesystem.getDataProxyGuiUrl({dirPath: sink.path})
+                }
+                if(sink instanceof PrecomputedChunksSink){
+                    new Button({parentElement: out, inputType: "button", text: "Open in Viewer", onClick: () => {
+                        openInViewer(sink.toDataSource())
+                    }})
+                    out.element.innerHTML += "</br>" //FIXME
+                }
+            }else{
+                out.element.innerText = "100%"
+            }
+
+            if(dataProxyGuiUrl){
                 new Anchor({
                     parentElement: out,
                     innerText: "Open in Data Proxy",
-                    href: Url.parse(`https://data-proxy.ebrains.eu/${sink.filesystem.bucket_name}?prefix=${dataProxyPrefixParam}`), //FIXME
+                    href: dataProxyGuiUrl,
                     target: "_blank",
                     rel: "noopener noreferrer",
                 })
             }
-            if(sink instanceof PrecomputedChunksSink){
-                new Button({parentElement: out, inputType: "button", text: "Open in Viewer", onClick: () => {
-                    openInViewer(sink.toDataSource())
-                }})
-            }
+
             return out
         }
-        assertUnreachable(this.status)
+        assertUnreachable(jobDto.status)
     }
     public toTableRow(openInViewer: (datasource: DataSourceUnion) => void): {name: TableData, progress: TableData}{
         return {
-            name: new TableData({parentElement: undefined, innerText: this.name}),
+            name: new TableData({parentElement: undefined, innerText: this.jobDto.name}),
             progress: this.makeProgressDisplay(openInViewer),
         }
     }
@@ -153,7 +144,7 @@ class PixelClassificationExportAppletState{
 
     public static fromDto(message: PixelClassificationExportAppletStateDto): PixelClassificationExportAppletState{
         return new this({
-            jobs: message.jobs.map(dto => Job.fromDto(dto)),
+            jobs: message.jobs.map(dto => new Job(dto)),
             datasource_suggestions: (message.datasource_suggestions || []).map(msg => FsDataSource.fromDto(msg)), //FIXME?
             populated_labels: message.populated_labels
         })
