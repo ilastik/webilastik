@@ -107,22 +107,40 @@ class PrecomputedChunksDataSourceDto(DataTransferObject):
     dtype: DtypeDto
     encoder: Literal["raw", "jpeg"]
 
+#####################################################
+
+ImageFormatDto = Literal["jpeg", "jpg", "png"]
+
 @dataclass
-class DziLevelDto(DataTransferObject):
+class DziSizeElementDto(DataTransferObject):
+    Width: int
+    Height: int
+
+@dataclass
+class DziImageElementDto(DataTransferObject):
+    Format: ImageFormatDto
+    Overlap: int
+    TileSize: int
+    Size: DziSizeElementDto
+
+@dataclass
+class DziLevelSinkDto(DataTransferObject):
     filesystem: FsDto
-    level_path: str
+    xml_path: str
+    dzi_image: DziImageElementDto
+    num_channels: Literal[1, 3]
     level_index: int
-    overlap: int
-    tile_shape: Shape5DDto
-    shape: Shape5DDto
-    full_shape: Shape5DDto
-    dtype: DtypeDto
-    spatial_resolution: Tuple[int, int, int]
-    image_format: Literal["jpeg", "jpg", "png"]
 
 @dataclass
 class DziLevelDataSourceDto(DataTransferObject):
-    level: DziLevelDto
+    filesystem: FsDto
+    xml_path: str
+    dzi_image: DziImageElementDto
+    num_channels: Literal[1, 3]
+    level_index: int
+
+
+############################################
 
 @dataclass
 class N5GzipCompressorDto(DataTransferObject):
@@ -222,30 +240,6 @@ class PrecomputedChunksSinkDto(DataTransferObject):
     scale_key: str #fixme?
     resolution: Tuple[int, int, int]
     encoding: Literal["raw", "jpeg"]
-
-#####################################################
-
-ImageFormatDto = Literal["jpeg", "jpg", "png"]
-
-@dataclass
-class DziSizeElementDto(DataTransferObject):
-    Width: int
-    Height: int
-
-@dataclass
-class DziImageElementDto(DataTransferObject):
-    Format: ImageFormatDto
-    Overlap: int
-    TileSize: int
-    Size: DziSizeElementDto
-
-@dataclass
-class DziLevelSinkDto(DataTransferObject):
-    filesystem: FsDto
-    xml_path: str
-    dzi_image: DziImageElementDto
-    num_channels: Literal[1, 3]
-    level_index: int
 
 #################################################
 
@@ -387,7 +381,8 @@ class CreateDziPyramidJobDto(JobDto):
 
 @dataclass
 class ZipJobDto(JobDto):
-    pass
+    output_fs: FsDto
+    output_path: str
 
 ExportJobDtoUnion = Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto]
 

@@ -1,6 +1,6 @@
 import io
 from pathlib import PurePosixPath
-from typing import List, Literal, Sequence, cast
+from typing import List, Literal, Sequence, cast, Tuple
 
 import numpy as np
 from PIL import Image as PilImage
@@ -49,6 +49,7 @@ class DziLevelSink(FsDataSink):
         dzi_image: DziImageElement,
         num_channels: Literal[1, 3],
         level_index: int,
+        spatial_resolution: "None | Tuple[int, int, int]",
     ):
         self.dzi_image = dzi_image
         self.level_index = level_index
@@ -59,6 +60,7 @@ class DziLevelSink(FsDataSink):
             tile_shape=dzi_image.get_tile_shape(num_channels=num_channels),
             dtype=np.dtype("uint8"),
             interval=dzi_image.get_shape(level_index=level_index, num_channels=num_channels).to_interval5d(),
+            resolution=spatial_resolution,
         )
 
     def open(self) -> "DziLevelWriter":
@@ -92,6 +94,7 @@ class DziLevelSink(FsDataSink):
                 level_index=level_index,
                 num_channels=num_channels,
                 xml_path=xml_path,
+                spatial_resolution=(1,1,1), #FIXME: resolution should be optional
             )
             out.append(level_sink)
         return out
@@ -122,4 +125,5 @@ class DziLevelSink(FsDataSink):
             num_channels=dto.num_channels,
             xml_path=PurePosixPath(dto.xml_path),
             private_marker=cls.__PrivateMarker(),
+            spatial_resolution=(1,1,1) #FIXME: resolution should be Optional
         )

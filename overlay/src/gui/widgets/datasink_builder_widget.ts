@@ -1,4 +1,4 @@
-import { Bzip2Compressor, DataSinkUnion, Filesystem, GzipCompressor, Interval5D, N5DataSink, PrecomputedChunksSink, RawCompressor, Shape5D, XzCompressor } from "../../client/ilastik";
+import { Bzip2Compressor, DataSinkUnion, DziImageElement, DziLevelSink, DziSizeElement, Filesystem, GzipCompressor, Interval5D, N5DataSink, PrecomputedChunksSink, RawCompressor, Shape5D, XzCompressor } from "../../client/ilastik";
 import { assertUnreachable } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
 import { DataType } from "../../util/precomputed_chunks";
@@ -19,6 +19,103 @@ abstract class DatasinkInputForm extends Div{
         resolution: [number, number, number],
         tile_shape: Shape5D,
     }): DataSinkUnion | undefined;
+}
+
+
+class DziDatasinkConfigWidget extends DatasinkInputForm{
+    private imageFormatSelector: Select<"png" | "jpg">;
+    private overlapInput: NumberInput;
+
+    constructor(params: {parentElement: HTMLElement | undefined}){
+        const imageFormatSelector = new Select<"png" | "jpg">({
+            popupTitle: "Select a Deep Zoom image Format",
+            parentElement: undefined,
+            options: ["png", "jpg"],
+            renderer: (opt) => new Span({parentElement: undefined, innerText: opt}),
+            title: "Image file format of the individual Deep Zoom tiles"
+        });
+
+        const overlapInput = new NumberInput({
+            parentElement: undefined,
+            disabled: true,
+            value: 0,
+            title: "border width that is replicated amongst neighboring tiles. Unsupported for now."
+        })
+        super({
+            ...params,
+            children: [
+                new Paragraph({
+                    parentElement: undefined,
+                    children: [
+                        new Label({innerText: "Image Format: ", parentElement: undefined}),
+                        imageFormatSelector,
+                    ],
+                }),
+
+                new Paragraph({
+                    parentElement: undefined,
+                    children: [
+                        new Label({innerText: "Overlap: ", parentElement: undefined}),
+                        overlapInput
+                    ]
+                })
+
+            ]
+        })
+        this.imageFormatSelector = imageFormatSelector
+        this.overlapInput = overlapInput
+    }
+
+    public tryMakeDataSink(params: {
+        filesystem: Filesystem,
+        path: Path,
+        interval: Interval5D,
+        dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32",
+        resolution: [number, number, number],
+        tile_shape: Shape5D,
+    }): DziLevelSink | undefined {
+        const overlap = this.overlapInput.value
+        if(overlap === undefined){
+            return undefined
+        }
+        if(params.dtype != "uint8"){
+            new ErrorPopupWidget({message: `Deep Zoom images only support uint8 (provided ${params.dtype})`})
+            return undefined
+        }
+        if(params.interval.shape.z > 1 || params.tile_shape.z > 1){
+            new ErrorPopupWidget({message: "Deep Zoom only supports 2D images"})
+            return undefined
+        }
+        if(!params.path.name.toLowerCase().endsWith(".dzip")){
+            new ErrorPopupWidget({message: "Path has to end in '.dzip'"}) //FIXME: bad place to put error msg?
+            return undefined
+        }
+        const num_channels = params.interval.shape.c;
+        if(num_channels != 1 && num_channels != 3){
+            new ErrorPopupWidget({message: "Deep Zoom data sink must have 1 or 3 channels"}) //FIXME: bad place to put error msg?
+            return undefined
+        }
+        if(params.tile_shape.c != params.interval.shape.c){
+            new ErrorPopupWidget({message: `Deep Zoom tiles must have as many channels as the whole image`})
+            return undefined
+        }
+        const dzi_image = new DziImageElement({
+            Format: this.imageFormatSelector.value,
+            Overlap: overlap,
+            Size: new DziSizeElement({
+                Width: params.interval.shape.x,
+                Height: params.interval.shape.y,
+            }),
+            TileSize: Math.max(params.tile_shape.x, params.tile_shape.y),
+        })
+        return new DziLevelSink({
+            dzi_image,
+            num_channels,
+            filesystem: params.filesystem,
+            xml_path: params.path,
+            level_index:dzi_image.max_level_index,
+        })
+    }
 }
 
 class PrecomputedChunksDatasinkConfigWidget extends DatasinkInputForm{
@@ -230,6 +327,7 @@ export class DatasinkConfigWidget{
             tabBodyWidgets: new Map<string, DatasinkInputForm>([
                 ["Precomputed Chunks", new PrecomputedChunksDatasinkConfigWidget({parentElement: undefined, disableEncoding: true})],
                 ["N5", new N5DatasinkConfigWidget({parentElement: undefined})],
+                ["Deep Zoom", new DziDatasinkConfigWidget({parentElement: undefined})],
             ])
         })
         this.element = this.tabs.element

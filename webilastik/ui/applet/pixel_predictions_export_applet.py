@@ -34,6 +34,7 @@ from webilastik.ui.applet.export_jobs import CreateDziPyramid, DownscaleDatasour
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.usage_error import UsageError
 from webilastik.ui.applet.brushing_applet import Label
+from webilastik.utility import get_now_string
 
 JOB_OUT = TypeVar("JOB_OUT")
 
@@ -69,6 +70,7 @@ class PixelClassificationExportApplet(StatelesApplet):
         self.priority_executor.submit_job(job)
         with self._lock:
             self._jobs[job.uuid] = job
+        self.on_async_change()
 
     def _launch_open_datasink_job(self, *, datasink: DataSink, on_complete: Callable[["IDataSinkWriter | Exception"], None]):
         def clean_datasink_job_then_run_on_complete(job_id: uuid.UUID, job_status: JobStatus, step_index: int, step_result: "IDataSinkWriter | Exception"):
@@ -130,6 +132,7 @@ class PixelClassificationExportApplet(StatelesApplet):
             if job_status != "completed":
                 self.on_async_change()
                 return
+            self._remove_job(job_id)
             self._launch_job(ZipDirectory(
                 name="Zipping dzi",
                 input_fs=tmp_fs,
@@ -152,7 +155,7 @@ class PixelClassificationExportApplet(StatelesApplet):
             if sink_index == dzi_image.max_level_index:
                 level_source = datasource
             else:
-                level_source = DziLevelDataSource.try_load(
+                level_source = DziLevelDataSource.try_load( #FIXME: opening the source should be done inside the job
                     filesystem=tmp_fs,
                     level_path=dzi_image.make_level_path(
                         xml_path=tmp_xml_path,
@@ -160,18 +163,19 @@ class PixelClassificationExportApplet(StatelesApplet):
                     )
                 )
                 if isinstance(level_source, Exception):
+                    print(f"Failed to open the previous level source!!!! This needs to be reported back to the user!!!")
                     return level_source
             self._launch_job(DownscaleDatasource(
-                name=f"Downscaling to {sink.shape}",
+                name=f"Downscaling to {sink.shape.x} x {sink.shape.y}{'' if sink.shape.z == 1 else ' ' + str(sink.shape.z)}",
                 source=level_source,
                 sink_writer=sink.open(),
                 on_progress=launch_zip_dzi_pyramid_job if sink_index == 0 else partial(launch_downscaling_job, sinks=sinks, sink_index=sink_index - 1),
             ))
-            self.on_async_change()
 
         def on_pyramid_ready__launch_first_export(job_id: uuid.UUID, result: "Sequence[DziLevelSink] | Exception"):
             if isinstance(result, Exception):
                 return #FIXME?
+            self._remove_job(job_id)
             return launch_downscaling_job(
                 sinks=result,
                 sink_index=dzi_image.max_level_index,
@@ -237,6 +241,17 @@ class PixelClassificationExportApplet(StatelesApplet):
             return UsageError("Data sink should have 3 channels for this kind of export")
         if datasink.dtype != np.dtype("uint8"):
             return UsageError("Data sink should have dtype of 'uint8' for this kind of export")
+
+        if isinstance(datasink, DziLevelSink):
+            #FIXME? The function signature suggests that one could write to a single Dzi level, uncompressed even.
+            #       But we are always producing a .dzip
+            return self._launch_convert_to_dzip_job(
+                output_fs=datasink.filesystem,
+                output_path=datasink.xml_path,
+                datasource=simple_segmentation_datasource,
+                dzi_image_format=datasink.dzi_image.Format,
+            )
+
         return self._launch_export_job(
             job_name="Exporting Simple Segmentation",
             operator=OpRetriever(),

@@ -6,13 +6,15 @@ import { BucketFs, Color, FsDataSource, FsDataSink, Session, DataSinkUnion, Prec
 import { CssClasses } from '../css_classes';
 import { ErrorPopupWidget } from './popup';
 import {
+    CreateDziPyramidJobDto,
     ExportJobDto,
     LabelHeaderDto,
     OpenDatasinkJobDto,
     PixelClassificationExportAppletStateDto,
     PrecomputedChunksSinkDto,
     StartPixelProbabilitiesExportJobParamsDto,
-    StartSimpleSegmentationExportJobParamsDto
+    StartSimpleSegmentationExportJobParamsDto,
+    ZipJobDto
 } from '../../client/dto';
 import { Viewer } from '../../viewer/viewer';
 import { DataSourceListWidget } from './list_widget';
@@ -52,14 +54,14 @@ class LabelHeader{
     }
 }
 
-abstract class Job{
+class Job{
     public readonly name: string;
     public readonly num_args: number | undefined;
     public readonly uuid: string;
     public readonly status: "pending" | "running" | "cancelled" | "completed";
     public readonly num_completed_steps: number;
     public readonly error_message: string | undefined;
-    public readonly datasink: DataSinkUnion;
+    public readonly datasink: DataSinkUnion | undefined;
 
     constructor(params: {
         name: string,
@@ -68,7 +70,7 @@ abstract class Job{
         status: "pending" | "running" | "cancelled" | "completed",
         num_completed_steps: number,
         error_message: string | undefined,
-        datasink: DataSinkUnion,
+        datasink: DataSinkUnion | undefined,
     }){
         this.name = params.name;
         this.num_args = params.num_args;
@@ -79,20 +81,11 @@ abstract class Job{
         this.datasink = params.datasink;
     }
 
-    public static fromDto(dto: ExportJobDto | OpenDatasinkJobDto): Job{
-        if(dto instanceof ExportJobDto){
-            return new ExportJob({
-                ...dto,
-                datasink: FsDataSink.fromDto(dto.datasink,)
-            })
-        }
-        if(dto instanceof OpenDatasinkJobDto){
-            return new OpenDatasinkJob({
-                ...dto,
-                datasink: FsDataSink.fromDto(dto.datasink,)
-            })
-        }
-        assertUnreachable(dto)
+    public static fromDto(dto: ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto): Job{
+        return new Job({
+            ...dto,
+            datasink: "datasink" in dto ? FsDataSink.fromDto(dto.datasink) : undefined,
+        })
     }
     private makeProgressDisplay(openInViewer: (datasource: DataSourceUnion) => void): TableData{
         if(this.status == "pending" || this.status == "cancelled"){
@@ -111,23 +104,24 @@ abstract class Job{
                 return td
             }
             let out = new TableData({parentElement: undefined, innerText: "100%"})
-            if(this.datasink.filesystem instanceof BucketFs){
+            const sink = this.datasink
+            if(sink && sink.filesystem instanceof BucketFs){
                 out.clear()
-                let dataProxyPrefixParam = this.datasink.path.raw.replace(/^\//, "")
+                let dataProxyPrefixParam = sink.path.raw.replace(/^\//, "")
                 if(this.datasink instanceof PrecomputedChunksSinkDto){
                     dataProxyPrefixParam += "/"
                 }
                 new Anchor({
                     parentElement: out,
                     innerText: "Open in Data Proxy",
-                    href: Url.parse(`https://data-proxy.ebrains.eu/${this.datasink.filesystem.bucket_name}?prefix=${dataProxyPrefixParam}`), //FIXME
+                    href: Url.parse(`https://data-proxy.ebrains.eu/${sink.filesystem.bucket_name}?prefix=${dataProxyPrefixParam}`), //FIXME
                     target: "_blank",
                     rel: "noopener noreferrer",
                 })
             }
-            if(this.datasink instanceof PrecomputedChunksSink){
+            if(sink instanceof PrecomputedChunksSink){
                 new Button({parentElement: out, inputType: "button", text: "Open in Viewer", onClick: () => {
-                    openInViewer(this.datasink.toDataSource())
+                    openInViewer(sink.toDataSource())
                 }})
             }
             return out
@@ -142,42 +136,24 @@ abstract class Job{
     }
 }
 
-class ExportJob extends Job{
-    public static fromDto(dto: ExportJobDto): ExportJob{
-        return new ExportJob({
-            ...dto,
-            datasink: FsDataSink.fromDto(dto.datasink,)
-        })
-    }
-}
-
-class OpenDatasinkJob extends Job{
-    public static fromDto(dto: OpenDatasinkJobDto): OpenDatasinkJob{
-        return new OpenDatasinkJob({
-            ...dto,
-            datasink: FsDataSink.fromDto(dto.datasink,)
-        })
-    }
-}
-
 class PixelClassificationExportAppletState{
     jobs: Array<Job>
     populated_labels: LabelHeader[] | undefined
     datasource_suggestions: FsDataSource[]
 
     constructor(params: {
-        jobs: Array<ExportJobDto | OpenDatasinkJobDto>
+        jobs: Array<Job>
         populated_labels: LabelHeaderDto[] | undefined
         datasource_suggestions: FsDataSource[]
     }){
-        this.jobs = params.jobs.map(dto => Job.fromDto(dto))
+        this.jobs = params.jobs
         this.populated_labels = params.populated_labels?.map(msg => LabelHeader.fromDto(msg))
         this.datasource_suggestions = params.datasource_suggestions
     }
 
     public static fromDto(message: PixelClassificationExportAppletStateDto): PixelClassificationExportAppletState{
         return new this({
-            jobs: message.jobs,
+            jobs: message.jobs.map(dto => Job.fromDto(dto)),
             datasource_suggestions: (message.datasource_suggestions || []).map(msg => FsDataSource.fromDto(msg)), //FIXME?
             populated_labels: message.populated_labels
         })

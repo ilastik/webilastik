@@ -274,6 +274,8 @@ class ZipDirectory(FallibleJob["None | Exception"]):
             args=[input_directory],
             num_args=1,
         )
+        self.output_fs = output_fs
+        self.output_path = output_path
 
     @classmethod
     def zip_directory(
@@ -341,4 +343,6 @@ class ZipDirectory(FallibleJob["None | Exception"]):
                 num_completed_steps=self.num_completed_steps,
                 status=self._status,
                 uuid=str(self.uuid),
+                output_fs=self.output_fs.to_dto(),
+                output_path=self.output_path.as_posix(),
             )
