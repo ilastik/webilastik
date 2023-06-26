@@ -131,11 +131,11 @@ class BucketFs(IFilesystem):
             return FsIoException(data_proxy_response) # FIXME: pass exception directly into other?
         return Url.parse_or_raise(json.loads(data_proxy_response)["url"]) #FIXME: fix all raises
 
-    def read_file(self, path: PurePosixPath) -> "bytes | FsIoException | FsFileNotFoundException":
+    def read_file(self, path: PurePosixPath, offset: int = 0, num_bytes: "int | None"  = None) -> "bytes | FsIoException | FsFileNotFoundException":
         cscs_url_result = self.get_swift_object_url(path=path)
         if isinstance(cscs_url_result, Exception):
             return cscs_url_result
-        cscs_response = safe_request(session=_cscs_session, method="get", url=cscs_url_result)
+        cscs_response = safe_request(session=_cscs_session, method="get", url=cscs_url_result, offset=offset, num_bytes=num_bytes)
         if isinstance(cscs_response, Exception):
             return FsIoException(cscs_response) # FIXME: pass exception directly into other?
         return cscs_response

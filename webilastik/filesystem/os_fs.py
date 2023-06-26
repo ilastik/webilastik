@@ -89,11 +89,12 @@ class OsFs(IFilesystem):
         except Exception as e:
             return FsIoException(e)
 
-    def read_file(self, path: PurePosixPath) -> "bytes | FsIoException | FsFileNotFoundException":
+    def read_file(self, path: PurePosixPath, offset: int = 0, num_bytes: "int | None" = None) -> "bytes | FsIoException | FsFileNotFoundException":
         file_path = self.resolve_path(path)
         try:
             with open(file_path, "rb") as f:
-                return f.read()
+                _ = f.seek(offset)
+                return f.read(num_bytes)
         except FileNotFoundError as e:
             return FsFileNotFoundException(path=path)
         except Exception as e:

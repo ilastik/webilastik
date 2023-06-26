@@ -15,13 +15,17 @@ def _do_request(
     method: Literal["get", "put", "post", "delete"],
     url: Url,
     data: Optional[bytes] = None,
+    offset: int = 0,
+    num_bytes: "int | None" = None,
     headers: "Mapping[str, str] | None" = None,
 ) -> "bytes | ErrRequestCompletedAsFailure | ErrRequestCrashed":
     session = _sessions.get(url.hostname)
     if session is None:
         session = requests.Session()
         _sessions[url.hostname] = session
-    return safe_request(session=session, method=method, url=url, data=data, headers=headers)
+    return safe_request(
+        session=session, method=method, url=url, data=data, offset=offset, num_bytes=num_bytes, headers=headers
+    )
 
 
 class HttpFs(IFilesystem):
@@ -93,19 +97,12 @@ class HttpFs(IFilesystem):
     def create_directory(self, path: PurePosixPath) -> "None | FsIoException":
         return None
 
-    def read_file(self, path: PurePosixPath, byte_offset: int = 0, max_length: Optional[int] = None) -> "bytes | FsIoException | FsFileNotFoundException":
-        range_header_value: str
-        if byte_offset >= 0:
-            range_header_value = f"bytes={byte_offset}-"
-            if max_length is not None:
-                range_header_value += str(byte_offset + max_length)
-        else:
-            range_header_value = f"bytes={byte_offset}"
-
+    def read_file(self, path: PurePosixPath, offset: int = 0, num_bytes: "int | None" = None) -> "bytes | FsIoException | FsFileNotFoundException":
         result = _do_request(
             method="get",
             url=self.base.concatpath(path),
-            headers={"Range": range_header_value},
+            offset=offset,
+            num_bytes=num_bytes,
         )
         if isinstance(result, bytes):
             return result
