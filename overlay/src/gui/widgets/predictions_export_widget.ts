@@ -1,6 +1,6 @@
 import { Applet } from '../../client/applets/applet';
 import { JsonValue } from '../../util/serialization';
-import { assertUnreachable, createFieldset } from '../../util/misc';
+import { assertUnreachable, createElement, createFieldset } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
 import { BucketFs, Color, FsDataSource, FsDataSink, Session, PrecomputedChunksSink, Shape5D, DataSourceUnion, Filesystem } from '../../client/ilastik';
 import { CssClasses } from '../css_classes';
@@ -99,7 +99,7 @@ class Job{
                     new Button({parentElement: out, inputType: "button", text: "Open in Viewer", onClick: () => {
                         openInViewer(sink.toDataSource())
                     }})
-                    out.element.appendChild(document.createElement("br")) //FIXME
+                    createElement({parentElement: out.element, tagName: "br"}) //FIXME?
                 }
             }else{
                 out.element.innerText = "100%"
