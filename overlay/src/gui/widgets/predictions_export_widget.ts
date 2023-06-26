@@ -99,7 +99,7 @@ class Job{
                     new Button({parentElement: out, inputType: "button", text: "Open in Viewer", onClick: () => {
                         openInViewer(sink.toDataSource())
                     }})
-                    out.element.innerHTML += "</br>" //FIXME
+                    out.element.appendChild(document.createElement("br")) //FIXME
                 }
             }else{
                 out.element.innerText = "100%"
