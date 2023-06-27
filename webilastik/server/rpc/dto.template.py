@@ -88,7 +88,12 @@ class HttpFsDto(DataTransferObject):
 class BucketFSDto(DataTransferObject):
     bucket_name: str
 
-FsDto = Union[OsfsDto, HttpFsDto, BucketFSDto]
+@dataclass
+class ZipFsDto(DataTransferObject):
+    zip_file_fs: Union[OsfsDto, HttpFsDto, BucketFSDto] #FIXME: no other ZipFs?
+    zip_file_path: str
+
+FsDto = Union[OsfsDto, HttpFsDto, BucketFSDto, ZipFsDto]
 
 DtypeDto = Literal["uint8", "uint16", "uint32", "uint64", "int64", "float32"]
 

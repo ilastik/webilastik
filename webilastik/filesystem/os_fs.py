@@ -1,6 +1,7 @@
 from typing import List, Final
 from pathlib import PurePosixPath, Path
 import uuid
+import os
 
 from webilastik.filesystem import IFilesystem, FsIoException, FsFileNotFoundException, FsDirectoryContents
 from webilastik.utility.url import Url
@@ -93,10 +94,18 @@ class OsFs(IFilesystem):
         file_path = self.resolve_path(path)
         try:
             with open(file_path, "rb") as f:
-                _ = f.seek(offset)
+                _ = f.seek(offset, os.SEEK_SET if offset >= 0 else os.SEEK_END)
                 return f.read(num_bytes)
         except FileNotFoundError as e:
             return FsFileNotFoundException(path=path)
+        except Exception as e:
+            return FsIoException(e)
+
+    def get_size(self, path: PurePosixPath) -> "int | FsIoException | FsFileNotFoundException":
+        try:
+            return self.resolve_path(path).stat().st_size
+        except FileNotFoundError as e:
+            return FsFileNotFoundException(path)
         except Exception as e:
             return FsIoException(e)
 

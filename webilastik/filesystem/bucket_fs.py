@@ -1,10 +1,13 @@
+#pyright: strict
+
 import json
-from typing import Iterator, Literal, Optional, Mapping, Final, Tuple, List
+from typing import Iterator, Literal, Optional, Tuple, List
 from pathlib import Path, PurePosixPath
 import time
 
 import requests
 from ndstructs.utils.json_serializable import ensureJsonArray, ensureJsonObject, ensureJsonString
+from requests.models import CaseInsensitiveDict
 
 from webilastik.filesystem import IFilesystem, FsIoException, FsFileNotFoundException, FsDirectoryContents
 from webilastik.filesystem.http_fs import HttpFs
@@ -12,7 +15,7 @@ from webilastik.filesystem.os_fs import OsFs
 from webilastik.utility.url import Url
 from webilastik.server.rpc.dto import BucketFSDto
 from webilastik.utility import Seconds
-from webilastik.utility.request import request as safe_request, ErrRequestCompletedAsFailure, ErrRequestCrashed
+from webilastik.utility.request import ErrRequestCompletedAsFailure, request_size, request as safe_request, ErrRequestCrashed
 
 _cscs_session = requests.Session()
 _data_proxy_session = requests.Session()
@@ -22,7 +25,7 @@ def _requests_from_data_proxy(
     url: Url,
     data: Optional[bytes],
     refresh_on_401: bool = True,
-) -> "bytes | FsFileNotFoundException | Exception":
+) -> "Tuple[bytes, CaseInsensitiveDict[str]] | FsFileNotFoundException | Exception":
     from webilastik.libebrains import global_user_login
     response_result = safe_request(
         session=_data_proxy_session,
@@ -31,7 +34,7 @@ def _requests_from_data_proxy(
         data=data,
         headers=global_user_login.get_global_login_token().as_auth_header(),
     )
-    if isinstance(response_result, bytes):
+    if isinstance(response_result, tuple):
         return response_result
     if isinstance(response_result, ErrRequestCrashed):
         return response_result
@@ -93,7 +96,7 @@ class BucketFs(IFilesystem):
         response = _requests_from_data_proxy(method="get", url=list_objects_path, data=None)
         if isinstance(response, Exception):
             raise FsIoException(response)
-        payload_obj = ensureJsonObject(json.loads(response)) #FIXME: use DTOs everywhere?
+        payload_obj = ensureJsonObject(json.loads(response[0])) #FIXME: use DTOs everywhere?
         raw_objects = ensureJsonArray(payload_obj.get("objects"))
 
         files: List[PurePosixPath] = []
@@ -112,7 +115,7 @@ class BucketFs(IFilesystem):
         response = _requests_from_data_proxy(method="put", url=self.url.concatpath(path), data=None)
         if isinstance(response, Exception):
             return FsIoException(response)
-        response_obj = ensureJsonObject(json.loads(response))
+        response_obj = ensureJsonObject(json.loads(response[0]))
         cscs_url = Url.parse_or_raise(ensureJsonString(response_obj.get("url"))) #FIXME: could raise
         response = safe_request(session=_cscs_session, method="put", url=cscs_url, data=contents)
         if isinstance(response, Exception):
@@ -129,7 +132,7 @@ class BucketFs(IFilesystem):
             return FsFileNotFoundException(path)
         if isinstance(data_proxy_response, Exception):
             return FsIoException(data_proxy_response) # FIXME: pass exception directly into other?
-        return Url.parse_or_raise(json.loads(data_proxy_response)["url"]) #FIXME: fix all raises
+        return Url.parse_or_raise(json.loads(data_proxy_response[0])["url"]) #FIXME: fix all raises
 
     def read_file(self, path: PurePosixPath, offset: int = 0, num_bytes: "int | None"  = None) -> "bytes | FsIoException | FsFileNotFoundException":
         cscs_url_result = self.get_swift_object_url(path=path)
@@ -138,7 +141,21 @@ class BucketFs(IFilesystem):
         cscs_response = safe_request(session=_cscs_session, method="get", url=cscs_url_result, offset=offset, num_bytes=num_bytes)
         if isinstance(cscs_response, Exception):
             return FsIoException(cscs_response) # FIXME: pass exception directly into other?
-        return cscs_response
+        return cscs_response[0]
+
+    def get_size(self, path: PurePosixPath) -> "int | FsIoException | FsFileNotFoundException":
+        cscs_url_result = self.get_swift_object_url(path=path)
+        if isinstance(cscs_url_result, Exception):
+            return cscs_url_result
+        size_result = request_size(session=_cscs_session, url=cscs_url_result)
+        if isinstance(size_result, ErrRequestCompletedAsFailure):
+            if size_result.status_code == 404:
+                return FsFileNotFoundException(path)
+            else:
+                return FsIoException(size_result)
+        if isinstance(size_result, Exception):
+            return FsIoException(size_result)
+        return size_result
 
     def delete(
         self, path: PurePosixPath, dir_wait_time: Seconds = Seconds(5), dir_wait_interval: Seconds = Seconds(0.2)
@@ -197,7 +214,7 @@ class BucketFs(IFilesystem):
         response = _requests_from_data_proxy(method="put", url=self.url.concatpath(target_path), data=None)
         if isinstance(response, Exception):
             return FsIoException(response)
-        response_obj = ensureJsonObject(json.loads(response))
+        response_obj = ensureJsonObject(json.loads(response[0]))
         cscs_url = Url.parse_or_raise(ensureJsonString(response_obj.get("url"))) #FIXME: could raise
 
         source_file = source_fs.resolve_path(source_path).open("rb")

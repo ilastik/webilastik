@@ -1,7 +1,11 @@
+# pyright: strict
+
 from io import IOBase
-from typing import Literal, Mapping, Optional, Dict
+from typing import Literal, Mapping, Tuple
 import requests
 import sys
+
+from requests.models import CaseInsensitiveDict
 
 from webilastik.utility.url import Url
 
@@ -15,15 +19,18 @@ class ErrRequestCrashed(Exception):
         self.request_exception = cause
         super().__init__(f"Request crashed")
 
+class ErrBadContentLength(Exception):
+    pass
+
 def request(
     session: requests.Session,
-    method: Literal["get", "put", "post", "delete"],
+    method: Literal["get", "put", "post", "delete", "head"],
     url: Url,
     data: "bytes | IOBase | None" = None,
     offset: int = 0,
     num_bytes: "int | None" = None,
     headers: "Mapping[str, str] | None" = None,
-) -> "bytes | ErrRequestCompletedAsFailure | ErrRequestCrashed":
+) -> "Tuple[bytes, CaseInsensitiveDict[str]] | ErrRequestCompletedAsFailure | ErrRequestCrashed":
     range_header_value: str
     if offset >= 0:
         range_header_value = f"bytes={offset}-"
@@ -36,9 +43,23 @@ def request(
 
     try:
         response = session.request(method=method, url=url.schemeless_raw, data=data, headers=headers)
+        response.headers
         if not response.ok:
             return ErrRequestCompletedAsFailure(response.status_code)
-        return response.content
+        return (response.content, response.headers)
     except Exception as e:
         print(f"HTTP ERROR: {e}", file=sys.stderr)
         return ErrRequestCrashed(e)
+
+def request_size(
+    session: requests.Session,
+    url: Url,
+    headers: "Mapping[str, str] | None" = None,
+) -> "int | ErrRequestCompletedAsFailure | ErrRequestCrashed | ErrBadContentLength":
+    response = request(session=session, method="head", url=url, headers=headers)
+    if isinstance(response, Exception):
+        return response
+    try:
+        return int(response[1]["content-length"])
+    except Exception:
+        return ErrBadContentLength()

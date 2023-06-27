@@ -3,29 +3,12 @@ from pathlib import PurePosixPath, Path
 import sys
 
 import requests
+from requests.models import CaseInsensitiveDict
 
 from webilastik.filesystem import IFilesystem, FsIoException, FsFileNotFoundException, FsDirectoryContents
 from webilastik.utility.url import Url
 from webilastik.server.rpc.dto import HttpFsDto
-from webilastik.utility.request import ErrRequestCompletedAsFailure, ErrRequestCrashed, request as safe_request
-
-_sessions: Dict[str, requests.Session] = {}
-
-def _do_request(
-    method: Literal["get", "put", "post", "delete"],
-    url: Url,
-    data: Optional[bytes] = None,
-    offset: int = 0,
-    num_bytes: "int | None" = None,
-    headers: "Mapping[str, str] | None" = None,
-) -> "bytes | ErrRequestCompletedAsFailure | ErrRequestCrashed":
-    session = _sessions.get(url.hostname)
-    if session is None:
-        session = requests.Session()
-        _sessions[url.hostname] = session
-    return safe_request(
-        session=session, method=method, url=url, data=data, offset=offset, num_bytes=num_bytes, headers=headers
-    )
+from webilastik.utility.request import ErrRequestCompletedAsFailure, ErrRequestCrashed, request as safe_request, request_size
 
 
 class HttpFs(IFilesystem):
@@ -47,6 +30,7 @@ class HttpFs(IFilesystem):
             port=port,
             search=search,
         )
+        self.session = requests.Session()
 
     @classmethod
     def try_from_url(cls, url: Url) -> "Tuple[HttpFs, PurePosixPath] | Exception":
@@ -82,11 +66,24 @@ class HttpFs(IFilesystem):
             search=self.base.search,
         )
 
+    def __getstate__(self) -> HttpFsDto:
+        return self.to_dto()
+
+    def __setstate__(self, state: HttpFsDto):
+        self.__init__(
+            protocol=state.protocol,
+            hostname=state.hostname,
+            path=PurePosixPath(state.path),
+            port=state.port,
+            search=state.search
+        )
+
     def list_contents(self, path: PurePosixPath) -> "FsDirectoryContents | FsIoException":
         return FsIoException("Can't reliably list contents of http dir yet")
 
     def create_file(self, *, path: PurePosixPath, contents: bytes) -> "None | FsIoException":
-        result = _do_request(
+        result = safe_request(
+            session=self.session,
             method="post",
             url=self.base.concatpath(path),
             data=contents,
@@ -98,7 +95,8 @@ class HttpFs(IFilesystem):
         return None
 
     def read_file(self, path: PurePosixPath, offset: int = 0, num_bytes: "int | None" = None) -> "bytes | FsIoException | FsFileNotFoundException":
-        result = _do_request(
+        result = safe_request(
+            session=self.session,
             method="get",
             url=self.base.concatpath(path),
             offset=offset,
@@ -110,8 +108,19 @@ class HttpFs(IFilesystem):
             return FsFileNotFoundException(path=path)
         return FsIoException(result)
 
+    def get_size(self, path: PurePosixPath) -> "int | FsIoException | FsFileNotFoundException":
+        size_result = request_size(session=self.session, url=self.base.concatpath(path))
+        if isinstance(size_result, ErrRequestCompletedAsFailure):
+            if size_result.status_code == 404:
+                return FsFileNotFoundException(path)
+            else:
+                return FsIoException(size_result)
+        if isinstance(size_result, Exception):
+            return FsIoException(size_result)
+        return size_result
+
     def delete(self, path: PurePosixPath) -> "None | FsIoException":
-        result = _do_request(method="delete", url=self.base.concatpath(path))
+        result = safe_request(session=self.session, method="delete", url=self.base.concatpath(path))
         if isinstance(result, Exception):
             return FsIoException(result)
 

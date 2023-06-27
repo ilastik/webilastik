@@ -615,15 +615,6 @@ class BucketFSDto(DataTransferObject):
         return parse_as_BucketFSDto(value)
 
 
-FsDto = Union[OsfsDto, HttpFsDto, BucketFSDto]
-
-DtypeDto = Literal["uint8", "uint16", "uint32", "uint64", "int64", "float32"]
-
-
-def dtype_to_dto(dtype: "np.dtype[Any]") -> DtypeDto:
-    return cast(DtypeDto, str(dtype))
-
-
 def parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
     value: JsonValue,
 ) -> "Union[OsfsDto, HttpFsDto, BucketFSDto] | MessageParsingError":
@@ -638,6 +629,73 @@ def parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
         return parsed_option_2
     return MessageParsingError(
         f"Could not parse {json.dumps(value)} into Union[OsfsDto, HttpFsDto, BucketFSDto]"
+    )
+
+
+def parse_as_ZipFsDto(value: JsonValue) -> "ZipFsDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(f"Could not parse {json.dumps(value)} as ZipFsDto")
+    if value.get("__class__") != "ZipFsDto":
+        return MessageParsingError(f"Could not parse {json.dumps(value)} as ZipFsDto")
+    tmp_zip_file_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
+        value.get("zip_file_fs")
+    )
+    if isinstance(tmp_zip_file_fs, MessageParsingError):
+        return tmp_zip_file_fs
+    tmp_zip_file_path = parse_as_str(value.get("zip_file_path"))
+    if isinstance(tmp_zip_file_path, MessageParsingError):
+        return tmp_zip_file_path
+    return ZipFsDto(
+        zip_file_fs=tmp_zip_file_fs,
+        zip_file_path=tmp_zip_file_path,
+    )
+
+
+@dataclass
+class ZipFsDto(DataTransferObject):
+    zip_file_fs: Union[OsfsDto, HttpFsDto, BucketFSDto]  # FIXME: no other ZipFs?
+    zip_file_path: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "ZipFsDto",
+            "zip_file_fs": convert_to_json_value(self.zip_file_fs),
+            "zip_file_path": self.zip_file_path,
+        }
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "ZipFsDto | MessageParsingError":
+        return parse_as_ZipFsDto(value)
+
+
+FsDto = Union[OsfsDto, HttpFsDto, BucketFSDto, ZipFsDto]
+
+DtypeDto = Literal["uint8", "uint16", "uint32", "uint64", "int64", "float32"]
+
+
+def dtype_to_dto(dtype: "np.dtype[Any]") -> DtypeDto:
+    return cast(DtypeDto, str(dtype))
+
+
+def parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
+    value: JsonValue,
+) -> "Union[OsfsDto, HttpFsDto, BucketFSDto, ZipFsDto] | MessageParsingError":
+    parsed_option_0 = parse_as_OsfsDto(value)
+    if not isinstance(parsed_option_0, MessageParsingError):
+        return parsed_option_0
+    parsed_option_1 = parse_as_HttpFsDto(value)
+    if not isinstance(parsed_option_1, MessageParsingError):
+        return parsed_option_1
+    parsed_option_2 = parse_as_BucketFSDto(value)
+    if not isinstance(parsed_option_2, MessageParsingError):
+        return parsed_option_2
+    parsed_option_3 = parse_as_ZipFsDto(value)
+    if not isinstance(parsed_option_3, MessageParsingError):
+        return parsed_option_3
+    return MessageParsingError(
+        f"Could not parse {json.dumps(value)} into Union[OsfsDto, HttpFsDto, BucketFSDto, ZipFsDto]"
     )
 
 
@@ -718,7 +776,7 @@ def parse_as_PrecomputedChunksDataSourceDto(
     tmp_url = parse_as_UrlDto(value.get("url"))
     if isinstance(tmp_url, MessageParsingError):
         return tmp_url
-    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
+    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
         value.get("filesystem")
     )
     if isinstance(tmp_filesystem, MessageParsingError):
@@ -947,7 +1005,7 @@ def parse_as_DziLevelSinkDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as DziLevelSinkDto"
         )
-    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
+    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
         value.get("filesystem")
     )
     if isinstance(tmp_filesystem, MessageParsingError):
@@ -1011,7 +1069,7 @@ def parse_as_DziLevelDataSourceDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as DziLevelDataSourceDto"
         )
-    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
+    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
         value.get("filesystem")
     )
     if isinstance(tmp_filesystem, MessageParsingError):
@@ -1393,7 +1451,7 @@ def parse_as_N5DataSourceDto(
     tmp_url = parse_as_UrlDto(value.get("url"))
     if isinstance(tmp_url, MessageParsingError):
         return tmp_url
-    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
+    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
         value.get("filesystem")
     )
     if isinstance(tmp_filesystem, MessageParsingError):
@@ -1491,7 +1549,7 @@ def parse_as_SkimageDataSourceDto(
     tmp_url = parse_as_UrlDto(value.get("url"))
     if isinstance(tmp_url, MessageParsingError):
         return tmp_url
-    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
+    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
         value.get("filesystem")
     )
     if isinstance(tmp_filesystem, MessageParsingError):
@@ -1668,7 +1726,7 @@ def parse_as_N5DataSinkDto(value: JsonValue) -> "N5DataSinkDto | MessageParsingE
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as N5DataSinkDto"
         )
-    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
+    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
         value.get("filesystem")
     )
     if isinstance(tmp_filesystem, MessageParsingError):
@@ -3119,7 +3177,7 @@ def parse_as_ZipJobDto(value: JsonValue) -> "ZipJobDto | MessageParsingError":
     tmp_error_message = parse_as_Union_of_str0None_endof_(value.get("error_message"))
     if isinstance(tmp_error_message, MessageParsingError):
         return tmp_error_message
-    tmp_output_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
+    tmp_output_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
         value.get("output_fs")
     )
     if isinstance(tmp_output_fs, MessageParsingError):
@@ -4315,7 +4373,9 @@ def parse_as_LoadProjectParamsDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as LoadProjectParamsDto"
         )
-    tmp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(value.get("fs"))
+    tmp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
+        value.get("fs")
+    )
     if isinstance(tmp_fs, MessageParsingError):
         return tmp_fs
     tmp_project_file_path = parse_as_str(value.get("project_file_path"))
@@ -4359,7 +4419,9 @@ def parse_as_SaveProjectParamsDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as SaveProjectParamsDto"
         )
-    tmp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(value.get("fs"))
+    tmp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
+        value.get("fs")
+    )
     if isinstance(tmp_fs, MessageParsingError):
         return tmp_fs
     tmp_project_file_path = parse_as_str(value.get("project_file_path"))
@@ -4547,7 +4609,9 @@ def parse_as_GetFileSystemAndPathFromUrlResponseDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as GetFileSystemAndPathFromUrlResponseDto"
         )
-    tmp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(value.get("fs"))
+    tmp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
+        value.get("fs")
+    )
     if isinstance(tmp_fs, MessageParsingError):
         return tmp_fs
     tmp_path = parse_as_str(value.get("path"))
@@ -4687,7 +4751,9 @@ def parse_as_ListFsDirRequest(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as ListFsDirRequest"
         )
-    tmp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(value.get("fs"))
+    tmp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
+        value.get("fs")
+    )
     if isinstance(tmp_fs, MessageParsingError):
         return tmp_fs
     tmp_path = parse_as_str(value.get("path"))

@@ -605,6 +605,68 @@ export function parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
   }
   return Error(`Could not parse ${JSON.stringify(value)} into OsfsDto | HttpFsDto | BucketFSDto`);
 }
+export function parse_as_ZipFsDto(value: JsonValue): ZipFsDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "ZipFsDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ZipFsDto`);
+  }
+  const temp_zip_file_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.zip_file_fs);
+  if (temp_zip_file_fs instanceof Error) return temp_zip_file_fs;
+  const temp_zip_file_path = parse_as_str(valueObject.zip_file_path);
+  if (temp_zip_file_path instanceof Error) return temp_zip_file_path;
+  return new ZipFsDto({
+    zip_file_fs: temp_zip_file_fs,
+    zip_file_path: temp_zip_file_path,
+  });
+}
+// Automatically generated via DataTransferObject for ZipFsDto
+// Do not edit!
+export class ZipFsDto {
+  public zip_file_fs: OsfsDto | HttpFsDto | BucketFSDto;
+  public zip_file_path: string;
+  constructor(_params: {
+    zip_file_fs: OsfsDto | HttpFsDto | BucketFSDto;
+    zip_file_path: string;
+  }) {
+    this.zip_file_fs = _params.zip_file_fs;
+    this.zip_file_path = _params.zip_file_path;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "ZipFsDto",
+      zip_file_fs: toJsonValue(this.zip_file_fs),
+      zip_file_path: this.zip_file_path,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): ZipFsDto | Error {
+    return parse_as_ZipFsDto(value);
+  }
+}
+
+export function parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
+  value: JsonValue,
+): OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto | Error {
+  const parsed_option_0 = parse_as_OsfsDto(value);
+  if (!(parsed_option_0 instanceof Error)) {
+    return parsed_option_0;
+  }
+  const parsed_option_1 = parse_as_HttpFsDto(value);
+  if (!(parsed_option_1 instanceof Error)) {
+    return parsed_option_1;
+  }
+  const parsed_option_2 = parse_as_BucketFSDto(value);
+  if (!(parsed_option_2 instanceof Error)) {
+    return parsed_option_2;
+  }
+  const parsed_option_3 = parse_as_ZipFsDto(value);
+  if (!(parsed_option_3 instanceof Error)) {
+    return parsed_option_3;
+  }
+  return Error(`Could not parse ${JSON.stringify(value)} into OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto`);
+}
 export function parse_as_Tuple_of_int0int0int_endof_(value: JsonValue): [number, number, number] | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
@@ -668,7 +730,7 @@ export function parse_as_PrecomputedChunksDataSourceDto(value: JsonValue): Preco
   }
   const temp_url = parse_as_UrlDto(valueObject.url);
   if (temp_url instanceof Error) return temp_url;
-  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.filesystem);
+  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.filesystem);
   if (temp_filesystem instanceof Error) return temp_filesystem;
   const temp_path = parse_as_str(valueObject.path);
   if (temp_path instanceof Error) return temp_path;
@@ -703,7 +765,7 @@ export function parse_as_PrecomputedChunksDataSourceDto(value: JsonValue): Preco
 // Do not edit!
 export class PrecomputedChunksDataSourceDto {
   public url: UrlDto;
-  public filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+  public filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
   public path: string;
   public scale_key: string;
   public interval: Interval5DDto;
@@ -713,7 +775,7 @@ export class PrecomputedChunksDataSourceDto {
   public encoder: "raw" | "jpeg";
   constructor(_params: {
     url: UrlDto;
-    filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+    filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
     path: string;
     scale_key: string;
     interval: Interval5DDto;
@@ -885,7 +947,7 @@ export function parse_as_DziLevelSinkDto(value: JsonValue): DziLevelSinkDto | Er
   if (valueObject["__class__"] != "DziLevelSinkDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a DziLevelSinkDto`);
   }
-  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.filesystem);
+  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.filesystem);
   if (temp_filesystem instanceof Error) return temp_filesystem;
   const temp_xml_path = parse_as_str(valueObject.xml_path);
   if (temp_xml_path instanceof Error) return temp_xml_path;
@@ -906,13 +968,13 @@ export function parse_as_DziLevelSinkDto(value: JsonValue): DziLevelSinkDto | Er
 // Automatically generated via DataTransferObject for DziLevelSinkDto
 // Do not edit!
 export class DziLevelSinkDto {
-  public filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+  public filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
   public xml_path: string;
   public dzi_image: DziImageElementDto;
   public num_channels: 1 | 3;
   public level_index: number;
   constructor(_params: {
-    filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+    filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
     xml_path: string;
     dzi_image: DziImageElementDto;
     num_channels: 1 | 3;
@@ -947,7 +1009,7 @@ export function parse_as_DziLevelDataSourceDto(value: JsonValue): DziLevelDataSo
   if (valueObject["__class__"] != "DziLevelDataSourceDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a DziLevelDataSourceDto`);
   }
-  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.filesystem);
+  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.filesystem);
   if (temp_filesystem instanceof Error) return temp_filesystem;
   const temp_xml_path = parse_as_str(valueObject.xml_path);
   if (temp_xml_path instanceof Error) return temp_xml_path;
@@ -968,13 +1030,13 @@ export function parse_as_DziLevelDataSourceDto(value: JsonValue): DziLevelDataSo
 // Automatically generated via DataTransferObject for DziLevelDataSourceDto
 // Do not edit!
 export class DziLevelDataSourceDto {
-  public filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+  public filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
   public xml_path: string;
   public dzi_image: DziImageElementDto;
   public num_channels: 1 | 3;
   public level_index: number;
   constructor(_params: {
-    filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+    filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
     xml_path: string;
     dzi_image: DziImageElementDto;
     num_channels: 1 | 3;
@@ -1262,7 +1324,7 @@ export function parse_as_N5DataSourceDto(value: JsonValue): N5DataSourceDto | Er
   }
   const temp_url = parse_as_UrlDto(valueObject.url);
   if (temp_url instanceof Error) return temp_url;
-  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.filesystem);
+  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.filesystem);
   if (temp_filesystem instanceof Error) return temp_filesystem;
   const temp_path = parse_as_str(valueObject.path);
   if (temp_path instanceof Error) return temp_path;
@@ -1300,7 +1362,7 @@ export function parse_as_N5DataSourceDto(value: JsonValue): N5DataSourceDto | Er
 // Do not edit!
 export class N5DataSourceDto {
   public url: UrlDto;
-  public filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+  public filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
   public path: string;
   public interval: Interval5DDto;
   public tile_shape: Shape5DDto;
@@ -1310,7 +1372,7 @@ export class N5DataSourceDto {
   public c_axiskeys_on_disk: string;
   constructor(_params: {
     url: UrlDto;
-    filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+    filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
     path: string;
     interval: Interval5DDto;
     tile_shape: Shape5DDto;
@@ -1358,7 +1420,7 @@ export function parse_as_SkimageDataSourceDto(value: JsonValue): SkimageDataSour
   }
   const temp_url = parse_as_UrlDto(valueObject.url);
   if (temp_url instanceof Error) return temp_url;
-  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.filesystem);
+  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.filesystem);
   if (temp_filesystem instanceof Error) return temp_filesystem;
   const temp_path = parse_as_str(valueObject.path);
   if (temp_path instanceof Error) return temp_path;
@@ -1387,7 +1449,7 @@ export function parse_as_SkimageDataSourceDto(value: JsonValue): SkimageDataSour
 // Do not edit!
 export class SkimageDataSourceDto {
   public url: UrlDto;
-  public filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+  public filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
   public path: string;
   public interval: Interval5DDto;
   public tile_shape: Shape5DDto;
@@ -1395,7 +1457,7 @@ export class SkimageDataSourceDto {
   public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
   constructor(_params: {
     url: UrlDto;
-    filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+    filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
     path: string;
     interval: Interval5DDto;
     tile_shape: Shape5DDto;
@@ -1521,7 +1583,7 @@ export function parse_as_N5DataSinkDto(value: JsonValue): N5DataSinkDto | Error 
   if (valueObject["__class__"] != "N5DataSinkDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5DataSinkDto`);
   }
-  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.filesystem);
+  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.filesystem);
   if (temp_filesystem instanceof Error) return temp_filesystem;
   const temp_path = parse_as_str(valueObject.path);
   if (temp_path instanceof Error) return temp_path;
@@ -1557,7 +1619,7 @@ export function parse_as_N5DataSinkDto(value: JsonValue): N5DataSinkDto | Error 
 // Automatically generated via DataTransferObject for N5DataSinkDto
 // Do not edit!
 export class N5DataSinkDto {
-  public filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+  public filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
   public path: string;
   public interval: Interval5DDto;
   public tile_shape: Shape5DDto;
@@ -1566,7 +1628,7 @@ export class N5DataSinkDto {
   public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
   public compressor: N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto;
   constructor(_params: {
-    filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+    filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
     path: string;
     interval: Interval5DDto;
     tile_shape: Shape5DDto;
@@ -2944,7 +3006,7 @@ export function parse_as_ZipJobDto(value: JsonValue): ZipJobDto | Error {
   if (temp_num_completed_steps instanceof Error) return temp_num_completed_steps;
   const temp_error_message = parse_as_Union_of_str0None_endof_(valueObject.error_message);
   if (temp_error_message instanceof Error) return temp_error_message;
-  const temp_output_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.output_fs);
+  const temp_output_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.output_fs);
   if (temp_output_fs instanceof Error) return temp_output_fs;
   const temp_output_path = parse_as_str(valueObject.output_path);
   if (temp_output_path instanceof Error) return temp_output_path;
@@ -2968,7 +3030,7 @@ export class ZipJobDto {
   public status: "pending" | "running" | "cancelled" | "completed";
   public num_completed_steps: number;
   public error_message: string | undefined;
-  public output_fs: OsfsDto | HttpFsDto | BucketFSDto;
+  public output_fs: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
   public output_path: string;
   constructor(_params: {
     name: string;
@@ -2977,7 +3039,7 @@ export class ZipJobDto {
     status: "pending" | "running" | "cancelled" | "completed";
     num_completed_steps: number;
     error_message: string | undefined;
-    output_fs: OsfsDto | HttpFsDto | BucketFSDto;
+    output_fs: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
     output_path: string;
   }) {
     this.name = _params.name;
@@ -4128,7 +4190,7 @@ export function parse_as_LoadProjectParamsDto(value: JsonValue): LoadProjectPara
   if (valueObject["__class__"] != "LoadProjectParamsDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a LoadProjectParamsDto`);
   }
-  const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.fs);
+  const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.fs);
   if (temp_fs instanceof Error) return temp_fs;
   const temp_project_file_path = parse_as_str(valueObject.project_file_path);
   if (temp_project_file_path instanceof Error) return temp_project_file_path;
@@ -4140,10 +4202,10 @@ export function parse_as_LoadProjectParamsDto(value: JsonValue): LoadProjectPara
 // Automatically generated via DataTransferObject for LoadProjectParamsDto
 // Do not edit!
 export class LoadProjectParamsDto {
-  public fs: OsfsDto | HttpFsDto | BucketFSDto;
+  public fs: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
   public project_file_path: string;
   constructor(_params: {
-    fs: OsfsDto | HttpFsDto | BucketFSDto;
+    fs: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
     project_file_path: string;
   }) {
     this.fs = _params.fs;
@@ -4169,7 +4231,7 @@ export function parse_as_SaveProjectParamsDto(value: JsonValue): SaveProjectPara
   if (valueObject["__class__"] != "SaveProjectParamsDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a SaveProjectParamsDto`);
   }
-  const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.fs);
+  const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.fs);
   if (temp_fs instanceof Error) return temp_fs;
   const temp_project_file_path = parse_as_str(valueObject.project_file_path);
   if (temp_project_file_path instanceof Error) return temp_project_file_path;
@@ -4181,10 +4243,10 @@ export function parse_as_SaveProjectParamsDto(value: JsonValue): SaveProjectPara
 // Automatically generated via DataTransferObject for SaveProjectParamsDto
 // Do not edit!
 export class SaveProjectParamsDto {
-  public fs: OsfsDto | HttpFsDto | BucketFSDto;
+  public fs: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
   public project_file_path: string;
   constructor(_params: {
-    fs: OsfsDto | HttpFsDto | BucketFSDto;
+    fs: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
     project_file_path: string;
   }) {
     this.fs = _params.fs;
@@ -4374,7 +4436,7 @@ export function parse_as_GetFileSystemAndPathFromUrlResponseDto(
   if (valueObject["__class__"] != "GetFileSystemAndPathFromUrlResponseDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a GetFileSystemAndPathFromUrlResponseDto`);
   }
-  const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.fs);
+  const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.fs);
   if (temp_fs instanceof Error) return temp_fs;
   const temp_path = parse_as_str(valueObject.path);
   if (temp_path instanceof Error) return temp_path;
@@ -4386,10 +4448,10 @@ export function parse_as_GetFileSystemAndPathFromUrlResponseDto(
 // Automatically generated via DataTransferObject for GetFileSystemAndPathFromUrlResponseDto
 // Do not edit!
 export class GetFileSystemAndPathFromUrlResponseDto {
-  public fs: OsfsDto | HttpFsDto | BucketFSDto;
+  public fs: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
   public path: string;
   constructor(_params: {
-    fs: OsfsDto | HttpFsDto | BucketFSDto;
+    fs: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
     path: string;
   }) {
     this.fs = _params.fs;
@@ -4503,7 +4565,7 @@ export function parse_as_ListFsDirRequest(value: JsonValue): ListFsDirRequest | 
   if (valueObject["__class__"] != "ListFsDirRequest") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ListFsDirRequest`);
   }
-  const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.fs);
+  const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.fs);
   if (temp_fs instanceof Error) return temp_fs;
   const temp_path = parse_as_str(valueObject.path);
   if (temp_path instanceof Error) return temp_path;
@@ -4515,10 +4577,10 @@ export function parse_as_ListFsDirRequest(value: JsonValue): ListFsDirRequest | 
 // Automatically generated via DataTransferObject for ListFsDirRequest
 // Do not edit!
 export class ListFsDirRequest {
-  public fs: OsfsDto | HttpFsDto | BucketFSDto;
+  public fs: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
   public path: string;
   constructor(_params: {
-    fs: OsfsDto | HttpFsDto | BucketFSDto;
+    fs: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
     path: string;
   }) {
     this.fs = _params.fs;

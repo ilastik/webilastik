@@ -1,13 +1,13 @@
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 import typing
-from typing import Sequence, Tuple
+from typing import Sequence, Tuple, List
 
-from webilastik.server.rpc.dto import BucketFSDto, HttpFsDto, OsfsDto
+from webilastik.server.rpc.dto import BucketFSDto, HttpFsDto, OsfsDto, ZipFsDto, FsDto
 from webilastik.utility.url import Url
 
 
-def create_filesystem_from_message(message: "OsfsDto | HttpFsDto | BucketFSDto") -> "IFilesystem | Exception":
+def create_filesystem_from_message(message: FsDto) -> "IFilesystem | Exception":
     # FIXME: Maybe register these via __init_subclass__?
     if isinstance(message, HttpFsDto):
         from webilastik.filesystem.http_fs import HttpFs
@@ -18,6 +18,9 @@ def create_filesystem_from_message(message: "OsfsDto | HttpFsDto | BucketFSDto")
     if isinstance(message, BucketFSDto):
         from webilastik.filesystem.bucket_fs import BucketFs
         return BucketFs.from_dto(message)
+    if isinstance(message, ZipFsDto):
+        from webilastik.filesystem.zip_fs import ZipFs
+        return ZipFs.from_dto(message)
 
 
 def create_filesystem_from_url(url: Url) -> "Tuple[IFilesystem, PurePosixPath] | Exception":
@@ -54,9 +57,11 @@ class IFilesystem(typing.Protocol):
         ...
     def read_file(self, path: PurePosixPath, offset: int = 0, num_bytes: "int | None" = None) -> "bytes | FsIoException | FsFileNotFoundException":
         ...
+    def get_size(self, path: PurePosixPath) -> "int | FsIoException | FsFileNotFoundException":
+        ...
     def delete(self, path: PurePosixPath) -> "None | FsIoException":
         ...
-    def to_dto(self) -> "OsfsDto | HttpFsDto | BucketFSDto":
+    def to_dto(self) -> FsDto:
         ...
     def geturl(self, path: PurePosixPath) -> Url:
         ...
@@ -74,5 +79,5 @@ class IFilesystem(typing.Protocol):
 
 @dataclass
 class FsDirectoryContents:
-    files: Sequence[PurePosixPath]
-    directories: Sequence[PurePosixPath]
+    files: List[PurePosixPath]
+    directories: List[PurePosixPath]
