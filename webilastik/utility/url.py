@@ -128,8 +128,7 @@ class Url:
         hash_: Optional[str] = None,
         search_quoting_method: SearchQuotingMethod = SearchQuotingMethod.QUOTE_PLUS,
     ):
-        if not path.is_absolute():
-            raise ValueError("Path '{path}' is not absolute")
+        path = PurePosixPath("/") / path
         path_parts: List[str] = []
         for part in  path.as_posix().split("/"):
             if part == "." or part == "":
