@@ -20,6 +20,7 @@ from webilastik.datasink import FsDataSink
 from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
 from webilastik.datasource import FsDataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale, RawEncoder
+from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.features.ilp_filter import IlpGaussianSmoothing, IlpHessianOfGaussianEigenvalues
 from webilastik.features.ilp_filter import IlpFilter
@@ -30,6 +31,7 @@ from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.libebrains.user_token import UserToken
 from webilastik.ui.applet.brushing_applet import Label
 from webilastik.libebrains.global_user_login import get_global_login_token
+from webilastik.utility import get_now_string
 
 def get_project_root_dir() -> PurePosixPath:
     return PurePosixPath(__file__).parent.parent
@@ -45,12 +47,19 @@ def create_tmp_dir(prefix: str) -> PurePosixPath:
     Path(path).mkdir(parents=True)
     return path
 
-def get_sample_c_cells_datasource() -> SkimageDataSource:
+def get_sample_c_cells_datasource() -> PrecomputedChunksDataSource:
     fs = OsFs.create()
     assert not isinstance(fs, Exception)
-    return SkimageDataSource(
-        filesystem=fs, path=PurePosixPath(get_project_root_dir()) / "public/images/c_cells_1.png"
+    ds = PrecomputedChunksDataSource.try_load(
+        filesystem=fs,
+        spatial_resolution=(1,1,1),
+        path=PurePosixPath(get_project_root_dir()) / "public/images/c_cells_2.precomputed",
     )
+    assert not isinstance(ds, Exception)
+    return ds
+    # return SkimageDataSource(
+    #     filesystem=fs, path=PurePosixPath(get_project_root_dir()) / "public/images/c_cells_1.png"
+    # )
 
 def get_test_output_path() -> PurePosixPath:
     test_dir_path = get_tmp_dir() / f"test-{time.monotonic()}/"
@@ -60,7 +69,7 @@ def get_test_output_path() -> PurePosixPath:
 def get_test_output_bucket_fs() -> Tuple[BucketFs, PurePosixPath]:
     now = datetime.now()
     now_str = f"{now.year:02}y{now.month:02}m{now.day:02}d__{now.hour:02}h{now.minute:02}m{now.second:02}s"
-    return (BucketFs(bucket_name="hbp-image-service"), PurePosixPath(f"/test-{now_str}"))
+    return (BucketFs(bucket_name="hbp-image-service"), PurePosixPath(f"/tmp/test-{now_str}"))
 
 def create_precomputed_chunks_sink(
     *, shape: Shape5D, dtype: "np.dtype[Any]", chunk_size: Shape5D, fs: "OsFs | HttpFs | BucketFs | None" = None
@@ -68,7 +77,7 @@ def create_precomputed_chunks_sink(
     default_fs, path = get_test_output_bucket_fs()
     return PrecomputedChunksSink(
         filesystem=fs or default_fs,
-        path=path / f"{uuid.uuid4()}.precomputed",
+        path=path / f"{get_now_string()}.precomputed",
         dtype=dtype,
         scale_key=PurePosixPath("some_data"),
         encoding=RawEncoder(),
@@ -85,11 +94,11 @@ def get_sample_c_cells_pixel_annotations(override_datasource: "FsDataSource | No
             color=Color(r=np.uint8(255), g=np.uint8(0), b=np.uint8(0)),
             annotations=[
                 Annotation.interpolate_from_points(
-                    voxels=[Point5D.zero(x=140, y=150), Point5D.zero(x=145, y=155)],
+                    voxels=[Point5D.zero(x=191, y=276), Point5D.zero(x=201, y=310)],
                     raw_data=raw_data_source
                 ),
                 Annotation.interpolate_from_points(
-                    voxels=[Point5D.zero(x=238, y=101), Point5D.zero(x=229, y=139)],
+                    voxels=[Point5D.zero(x=102, y=291), Point5D.zero(x=137, y=281)],
                     raw_data=raw_data_source
                 ),
             ]
@@ -99,11 +108,11 @@ def get_sample_c_cells_pixel_annotations(override_datasource: "FsDataSource | No
             color=Color(r=np.uint8(255), g=np.uint8(0), b=np.uint8(0)),
             annotations=[
                 Annotation.interpolate_from_points(
-                    voxels=[Point5D.zero(x=283, y=87), Point5D.zero(x=288, y=92)],
+                    voxels=[Point5D.zero(x=273, y=246), Point5D.zero(x=314, y=218)],
                     raw_data=raw_data_source
                 ),
                 Annotation.interpolate_from_points(
-                    voxels=[Point5D.zero(x=274, y=168), Point5D.zero(x=256, y=191)],
+                    voxels=[Point5D.zero(x=306, y=263), Point5D.zero(x=331, y=275)],
                     raw_data=raw_data_source
                 ),
             ]
