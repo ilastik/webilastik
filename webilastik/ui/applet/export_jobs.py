@@ -156,42 +156,41 @@ class DownscaleDatasource(FallibleJob["DziLevelSink | Exception"]):
         ratio_y = source.shape.y / sink.shape.y
         ratio_z = source.shape.z / sink.shape.z
 
-        for sink_tile in sink.interval.split(sink.tile_shape):
-            sink_roi_plus_halo = sink_tile.enlarged(radius=Point5D(x=1, y=1)).clamped(sink.interval)
+        sink_roi_plus_halo = sink_tile.enlarged(radius=Point5D(x=1, y=1)).clamped(sink.interval)
 
-            source_interval_plus_halo = Interval5D.zero(
-                x=(
-                    math.floor(sink_roi_plus_halo.start.x * ratio_x),
-                    math.ceil(sink_roi_plus_halo.stop.x * ratio_x)
-                ),
-                y=(
-                    math.floor(sink_roi_plus_halo.start.y * ratio_y),
-                    math.ceil(sink_roi_plus_halo.stop.y * ratio_y)
-                ),
-                z=(
-                    math.floor(sink_roi_plus_halo.start.z * ratio_z),
-                    math.ceil(sink_roi_plus_halo.stop.z * ratio_z)
-                ),
-                c=source.interval.c,
-            ).clamped(source.interval)
+        source_interval_plus_halo = Interval5D.zero(
+            x=(
+                math.floor(sink_roi_plus_halo.start.x * ratio_x),
+                math.ceil(sink_roi_plus_halo.stop.x * ratio_x)
+            ),
+            y=(
+                math.floor(sink_roi_plus_halo.start.y * ratio_y),
+                math.ceil(sink_roi_plus_halo.stop.y * ratio_y)
+            ),
+            z=(
+                math.floor(sink_roi_plus_halo.start.z * ratio_z),
+                math.ceil(sink_roi_plus_halo.stop.z * ratio_z)
+            ),
+            c=source.interval.c,
+        ).clamped(source.interval)
 
-            source_data_with_halo = source.retrieve(source_interval_plus_halo)
+        source_data_with_halo = source.retrieve(source_interval_plus_halo)
 
-            sink_tile_data_with_halo_raw: np.ndarray[Any, np.dtype[np.float32]] = cast(
-                "np.ndarray[Any, np.dtype[np.float32]]",
-                resize_local_mean(
-                    image=source_data_with_halo.raw("zyxc"),
-                    channel_axis=3,
-                    output_shape=sink_roi_plus_halo.shape.to_tuple("zyx"),
-                )
+        sink_tile_data_with_halo_raw: np.ndarray[Any, np.dtype[np.float32]] = cast(
+            "np.ndarray[Any, np.dtype[np.float32]]",
+            resize_local_mean(
+                image=source_data_with_halo.raw("zyxc"),
+                channel_axis=3,
+                output_shape=sink_roi_plus_halo.shape.to_tuple("zyx"),
             )
+        )
 
-            sink_tile_data_with_halo = Array5D(sink_tile_data_with_halo_raw, axiskeys="zyxc", location=sink_roi_plus_halo.start).as_uint8()
-            sink_tile_data = sink_tile_data_with_halo.cut(sink_tile)
+        sink_tile_data_with_halo = Array5D(sink_tile_data_with_halo_raw, axiskeys="zyxc", location=sink_roi_plus_halo.start).as_uint8()
+        sink_tile_data = sink_tile_data_with_halo.cut(sink_tile)
 
-            writing_result = sink_writer.write(sink_tile_data)
-            if isinstance(writing_result, Exception):
-                return writing_result
+        writing_result = sink_writer.write(sink_tile_data)
+        if isinstance(writing_result, Exception):
+            return writing_result
         return sink
 
     def to_dto(self) -> ExportJobDto: #FIXME?
