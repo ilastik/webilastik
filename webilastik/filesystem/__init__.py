@@ -24,17 +24,27 @@ def create_filesystem_from_message(message: FsDto) -> "IFilesystem | Exception":
 
 
 def create_filesystem_from_url(url: Url) -> "Tuple[IFilesystem, PurePosixPath] | Exception":
-    if url.protocol == "file":
-        from webilastik.filesystem.os_fs import OsFs
-        fs_result  = OsFs.create()
-        if isinstance(fs_result, Exception):
-            return fs_result
-        return (fs_result, url.path)
+    from webilastik.filesystem.zip_fs import ZipFs
+    fs = ZipFs.try_from(url=url)
+    if fs is not None:
+        return fs
+
+    from webilastik.filesystem.os_fs import OsFs
+    fs = OsFs.try_from(url=url)
+    if fs is not None:
+        return fs
+
     from webilastik.filesystem.bucket_fs import BucketFs
-    if BucketFs.recognizes(url):
-        return BucketFs.try_from_url(url)
+    fs = BucketFs.try_from(url=url)
+    if fs is not None:
+        return fs
+
     from webilastik.filesystem.http_fs import HttpFs
-    return HttpFs.try_from_url(url)
+    fs = HttpFs.try_from(url=url)
+    if fs is not None:
+        return fs
+
+    return Exception(f"Could not open filesystem from {url}")
 
 
 #########################################333

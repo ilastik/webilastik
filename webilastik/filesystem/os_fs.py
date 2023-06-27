@@ -1,4 +1,4 @@
-from typing import List, Final
+from typing import List, Final, Tuple
 from pathlib import PurePosixPath, Path
 import uuid
 import os
@@ -122,3 +122,12 @@ class OsFs(IFilesystem):
 
     def geturl(self, path: PurePosixPath) -> Url:
         return Url(protocol="file", hostname="localhost", path=PurePosixPath(self.resolve_path(path)))
+
+    @classmethod
+    def try_from(cls, *, url: Url) -> "Tuple[OsFs, PurePosixPath] | None | Exception":
+        if not url.protocol == "file":
+            return None
+        fs_result  = OsFs.create()
+        if isinstance(fs_result, Exception):
+            return fs_result
+        return (fs_result, url.path)

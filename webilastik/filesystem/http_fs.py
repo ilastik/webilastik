@@ -33,9 +33,9 @@ class HttpFs(IFilesystem):
         self.session = requests.Session()
 
     @classmethod
-    def try_from_url(cls, url: Url) -> "Tuple[HttpFs, PurePosixPath] | Exception":
+    def try_from(cls, *, url: Url) -> "Tuple[HttpFs, PurePosixPath] | None | Exception":
         if url.protocol not in ("http", "https"):
-            return Exception(f"Bad url for HttpFs: {url}")
+            return None
         return (
             HttpFs(
                 protocol=url.protocol,

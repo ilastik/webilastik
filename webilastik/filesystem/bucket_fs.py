@@ -69,9 +69,9 @@ class BucketFs(IFilesystem):
         )
 
     @classmethod
-    def try_from_url(cls, url: Url) -> "Tuple[BucketFs, PurePosixPath] | Exception":
+    def try_from(cls, url: Url) -> "Tuple[BucketFs, PurePosixPath] | None | Exception":
         if not cls.recognizes(url):
-            return Exception(f"Url must be inside the data-proxy ({cls.API_URL}. Got {url}")
+            return None
         bucket_name_part_index = len(cls.API_URL.path.parts)
         if len(url.path.parts) <= bucket_name_part_index:
             return Exception(f"Bad bucket url: {url}")

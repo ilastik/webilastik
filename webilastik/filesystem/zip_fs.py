@@ -1,8 +1,8 @@
 # pyright: strict
 
 from pathlib import PurePosixPath
-from typing import Final, Any
-from webilastik.filesystem import FsDirectoryContents, FsFileNotFoundException, FsIoException, IFilesystem, create_filesystem_from_message
+from typing import Final, Any, Tuple
+from webilastik.filesystem import FsDirectoryContents, FsFileNotFoundException, FsIoException, IFilesystem, create_filesystem_from_message, create_filesystem_from_url
 
 import netzip # pyright: ignore [reportMissingTypeStubs]
 
@@ -53,15 +53,36 @@ class _FsSource(netzip.Source):
 
 class ZipFs(IFilesystem):
     @classmethod
+    def try_from(cls, *, url: Url) -> "Tuple[ZipFs, PurePosixPath] | None | Exception":
+        parts = url.path.parts[1:] # discard '/' from url paths, which are always absolute
+        last_part_idx = len(parts) - 1
+
+        for part_index, part in enumerate(parts):
+            if not (part.endswith(".zip") or part.endswith(".dzip")):
+                continue
+            if part_index == last_part_idx:
+                break
+            zip_file_path = PurePosixPath("/") / "/".join(parts[0:part_index + 1])
+            inner_path = PurePosixPath("/") / "/".join(parts[part_index + 1:])
+
+            external_fs_and_path_result = create_filesystem_from_url(url.updated_with(path=zip_file_path))
+            if isinstance(external_fs_and_path_result, Exception):
+                return external_fs_and_path_result
+            external_fs = external_fs_and_path_result[0]
+
+            zip_fs_result = ZipFs.create(zip_file_fs=external_fs, zip_file_path=zip_file_path)
+            if isinstance(zip_fs_result, Exception):
+                return zip_fs_result
+            return (zip_fs_result, inner_path)
+        return None
+
+    @classmethod
     def normalize_path(cls, path: "str | PurePosixPath") -> PurePosixPath:
         return PurePosixPath("/") / path
 
     @classmethod
     def raw_path(cls, path: PurePosixPath) -> bytes:
-        raw = path.as_posix()
-        if raw[0] == "/":
-            raw = raw[1:]
-        return raw.encode("utf8")
+        return path.as_posix().lstrip("/").encode("utf8")
 
     def __init__(self, _marker: _PrivateMarker, archive: netzip.Archive, source: _FsSource) -> None:
         self.archive: Final[netzip.Archive] = archive
@@ -90,7 +111,7 @@ class ZipFs(IFilesystem):
 
     def read_file(self, path: PurePosixPath, offset: int = 0, num_bytes: "int | None" = None) -> "bytes | FsIoException | FsFileNotFoundException":
         try:
-            data = self.archive[path.as_posix().encode("utf8")]
+            data = self.archive[self.raw_path(path)]
         except Exception as e:
             return FsIoException(e)
         data_len = len(data)
@@ -108,8 +129,7 @@ class ZipFs(IFilesystem):
         return data[start:end]
 
     def get_size(self, path: PurePosixPath) -> "int | FsIoException | FsFileNotFoundException":
-        raw_entry_name = self.normalize_path(path).as_posix()[1:].encode("utf8")
-        entry = self.archive.files.get(raw_entry_name)
+        entry = self.archive.files.get(self.raw_path(path))
         if entry is None:
             return FsFileNotFoundException(path)
         return entry.size

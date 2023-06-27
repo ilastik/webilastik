@@ -1,6 +1,7 @@
 #pyright: strict
 
 from pathlib import PurePosixPath
+from webilastik.filesystem import create_filesystem_from_url
 from webilastik.filesystem.os_fs import OsFs
 from webilastik.filesystem.bucket_fs import BucketFs
 import uuid
@@ -74,6 +75,16 @@ def test_zip_fs():
     entry2_partial_retrieved_contents = zip_fs.read_file(PurePosixPath(entry2_path), offset=2, num_bytes=3)
     assert not isinstance(entry2_partial_retrieved_contents, Exception), str(entry2_partial_retrieved_contents)
     assert entry2_partial_retrieved_contents == entry2_contents[2:2+3]
+
+
+    zip_fs_and_path_result = create_filesystem_from_url(
+        url=temp_fs.geturl(tmp_zip_file_path).joinpath(entry2_path)
+    )
+    assert not isinstance(zip_fs_and_path_result, Exception), str(zip_fs_and_path_result)
+    zip_fs, entry_path_from_url = zip_fs_and_path_result
+    assert zip_fs.read_file(entry_path_from_url) == entry2_contents
+
+
 
 if __name__ == "__main__":
     import inspect
