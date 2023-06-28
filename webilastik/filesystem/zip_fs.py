@@ -1,8 +1,9 @@
 # pyright: strict
 
 from pathlib import PurePosixPath
-from typing import Final, Any, Tuple
+from typing import Final, Any, Tuple, Set, Dict
 from webilastik.filesystem import FsDirectoryContents, FsFileNotFoundException, FsIoException, IFilesystem, create_filesystem_from_message, create_filesystem_from_url
+from dataclasses import dataclass
 
 import netzip # pyright: ignore [reportMissingTypeStubs]
 
@@ -49,7 +50,18 @@ class _FsSource(netzip.Source):
         return self._size
 
 
+@dataclass
+class _ZipDir:
+    files: Set[str]
+    dirs: Dict[str, "_ZipDir"]
 
+    def print(self, name: str, indent: int = 0):
+        tab = "    "
+        print(tab * indent, name.rstrip("/") + "/" )
+        for f in self.files:
+            print(tab * (indent + 1), f)
+        for d_name, d in self.dirs.items():
+            d.print(name=d_name, indent=indent + 1)
 
 class ZipFs(IFilesystem):
     @classmethod
@@ -87,6 +99,22 @@ class ZipFs(IFilesystem):
     def __init__(self, _marker: _PrivateMarker, archive: netzip.Archive, source: _FsSource) -> None:
         self.archive: Final[netzip.Archive] = archive
         self.source: Final[_FsSource] = source
+        self.root = _ZipDir(files=set(), dirs={})
+
+        for raw_entry_name in self.archive.files.keys():
+            entry_name = raw_entry_name.decode("utf8")
+            entry_path = self.normalize_path(entry_name)
+            cursor = self.root
+            for part in entry_path.parts[1:-1]:
+                new_cursor = cursor.dirs.get(part)
+                if new_cursor is None:
+                    new_cursor = cursor.dirs[part] = _ZipDir(files=set(), dirs={})
+                cursor = new_cursor
+            if entry_name.endswith("/"):
+                cursor.dirs[entry_path.name] = _ZipDir(files=set(), dirs={})
+            else:
+                cursor.files.add(entry_path.name)
+
         super().__init__()
 
     @classmethod
@@ -101,7 +129,21 @@ class ZipFs(IFilesystem):
         return ZipFs(_marker=_PrivateMarker(), archive=archive, source=source_result)
 
     def list_contents(self, path: PurePosixPath) -> "FsDirectoryContents | FsIoException":
-        return FsIoException("Not implemented")
+        path = self.normalize_path(path)
+        cursor = self.root
+        cursor_path = PurePosixPath("/")
+        for part in path.parts[1:]:
+            if part in cursor.files:
+                return FsIoException(f"path '{path}' points to a file entry")
+            new_cursor = cursor.dirs.get(part)
+            if new_cursor is None:
+                return FsIoException(f"path '{path}' not found") # FIXME: should be a FsFileNotFoundException
+            cursor = new_cursor
+            cursor_path = cursor_path / part
+        return FsDirectoryContents(
+            files=[cursor_path / f for f in cursor.files],
+            directories=[cursor_path / d for d in cursor.dirs.keys()]
+        )
 
     def create_file(self, *, path: PurePosixPath, contents: bytes) -> "None | FsIoException":
         return FsIoException("Not implemented")

@@ -59,6 +59,23 @@ def test_zip_fs():
     zip_fs = ZipFs.create(zip_file_fs=temp_fs, zip_file_path=tmp_zip_file_path)
     assert not isinstance(zip_fs, Exception), str(zip_fs)
 
+    root_contents = zip_fs.list_contents(PurePosixPath("/"))
+    assert not isinstance(root_contents, Exception)
+    assert root_contents.files == [PurePosixPath("/") / entry1_path]
+    assert root_contents.directories == [PurePosixPath("/a")]
+
+    slash_a_contents = zip_fs.list_contents(PurePosixPath("/a"))
+    assert not isinstance(slash_a_contents, Exception)
+    assert slash_a_contents.files == []
+    assert slash_a_contents.directories == [PurePosixPath("/a/b")]
+
+    slash_a_slash_b_contents = zip_fs.list_contents(PurePosixPath("/a/b"))
+    assert not isinstance(slash_a_slash_b_contents, Exception)
+    assert slash_a_slash_b_contents.files == [PurePosixPath("/a/b/entry2.txt")]
+    assert slash_a_slash_b_contents.directories == []
+
+    assert isinstance(zip_fs.list_contents(PurePosixPath("/does/not/exist")), Exception)
+
     entry1_retrieved_contents = zip_fs.read_file(PurePosixPath(entry1_path))
     assert not isinstance(entry1_retrieved_contents, Exception)
     assert entry1_retrieved_contents == entry1_contents
