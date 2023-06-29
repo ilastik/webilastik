@@ -13,8 +13,10 @@ from ndstructs.point5D import Point5D, Interval5D
 from ndstructs.array5D import Array5D
 
 from webilastik.datasource import FsDataSource
-from webilastik.datasource.deep_zoom_image import DziImageElement, GarbledTileException
-from webilastik.filesystem import FsFileNotFoundException, IFilesystem
+from webilastik.datasource.deep_zoom_image import DziImageElement, DziParsingException, GarbledTileException
+from webilastik.filesystem import FsFileNotFoundException, FsIoException, IFilesystem
+from webilastik.filesystem import zip_fs
+from webilastik.filesystem.zip_fs import ZipFs
 from webilastik.server.rpc.dto import DziLevelDataSourceDto
 from webilastik.filesystem import FsFileNotFoundException, IFilesystem
 
@@ -49,22 +51,54 @@ class DziLevelDataSource(FsDataSource):
 
     def to_dto(self) -> DziLevelDataSourceDto:
         raise NotImplementedError #FIXME
-        # return DziLevelDataSourceDto(
-        #     level=self.level.to_dto()
-        # )
 
     @staticmethod
     def from_dto(dto: DziLevelDataSourceDto) -> "DziLevelDataSource | Exception":
         raise NotImplementedError #FIXME
-        # level = DziLevel.from_dto(dto.level)
-        # if isinstance(level, Exception):
-        #     return level
-        # return DziLevelDataSource(level=level)
 
     @classmethod
-    def try_load_pyramid(
+    def try_load(
+        cls, *, filesystem: IFilesystem, path: PurePosixPath
+    ) -> "Mapping[int, DziLevelDataSource] | None | FsFileNotFoundException | Exception":
+        out = cls.try_load_as_dzip(filesystem=filesystem, dzip_path=path)
+        if out is not None:
+            return out
+
+        out = cls.try_load_as_pyramid_level(filesystem=filesystem, level_path=path)
+        if isinstance(out, Exception):
+            return out
+        if isinstance(out, DziLevelDataSource):
+            return {out.level_index: out}
+
+        return cls.try_load_as_pyramid(filesystem=filesystem, dzi_path=path)
+
+    @classmethod
+    def try_load_as_dzip(
+        cls, *, filesystem: IFilesystem, dzip_path: PurePosixPath
+    ) -> "Mapping[int, DziLevelDataSource] | None | FsFileNotFoundException | FsIoException | DziParsingException":
+        if dzip_path.suffix.lower() != ".dzip":
+            return None
+        zip_fs_result = ZipFs.create(zip_file_fs=filesystem, zip_file_path=dzip_path)
+        if isinstance(zip_fs, FsFileNotFoundException):
+            return None
+        if isinstance(zip_fs_result, Exception):
+            return zip_fs_result
+        dzip_contents = zip_fs_result.list_contents(PurePosixPath("/"))
+        if isinstance(dzip_contents, Exception):
+            return dzip_contents
+        for f in sorted(dzip_contents.files):
+            pyramid_result = cls.try_load_as_pyramid(filesystem=zip_fs_result, dzi_path=f)
+            if pyramid_result is None:
+                continue
+            return pyramid_result
+        return None
+
+    @classmethod
+    def try_load_as_pyramid(
         cls, *, filesystem: IFilesystem, dzi_path: PurePosixPath
-    ) -> "Mapping[int, DziLevelDataSource] | FsFileNotFoundException | Exception":
+    ) -> "Mapping[int, DziLevelDataSource] | None | FsFileNotFoundException | FsIoException | DziParsingException":
+        if dzi_path.suffix.lower() not in DziImageElement.DZI_XML_SUFFIXES:
+            return None
         dzi_image_element = DziImageElement.try_load(filesystem=filesystem, path=dzi_path)
         if isinstance(dzi_image_element, Exception):
             return dzi_image_element
@@ -88,7 +122,7 @@ class DziLevelDataSource(FsDataSource):
                 return GarbledTileException(first_tile_path) #FIXME: better error type?
             break
         else:
-            return Exception("Could not determine number of channels")
+            return FsFileNotFoundException(DziImageElement.make_level_path(xml_path=dzi_path, level_index=0) / "0_0") #FIXME
 
         datasources: Dict[int, DziLevelDataSource] = {}
         height = dzi_image_element.Size.Height
@@ -107,31 +141,30 @@ class DziLevelDataSource(FsDataSource):
         return datasources
 
     @classmethod
-    def try_load(
+    def try_load_as_pyramid_level(
         cls,
         *,
         filesystem: IFilesystem,
         level_path: PurePosixPath,
-    ) -> "DziLevelDataSource | Exception":
+    ) -> "DziLevelDataSource | None | FsFileNotFoundException | Exception":
         level_index = DziImageElement.get_level_index_from_path(level_path)
-        if not DziImageElement.is_level_path(level_path) or isinstance(level_index, Exception):
-            return Exception(f"Unsupported url: {filesystem.geturl(path=level_path)}")
-        possible_dzi_paths = [
-            level_path.parent.parent / level_path.parent.name.replace("_files", suffix)
-            for suffix in (".dzi", ".xml")
-        ]
+        if isinstance(level_index, Exception):
+            return None
+        possible_dzi_paths = DziImageElement.dzi_paths_from_level_path(level_path=level_path)
         for dzi_path in possible_dzi_paths:
-            pyramid_result = cls.try_load_pyramid(filesystem=filesystem, dzi_path=dzi_path)
+            pyramid_result = cls.try_load_as_pyramid(filesystem=filesystem, dzi_path=dzi_path)
+            if pyramid_result is None:
+                continue
             if isinstance(pyramid_result, FsFileNotFoundException):
                 continue
             if isinstance(pyramid_result , Exception):
                 return pyramid_result
-            return pyramid_result.get(level_index, Exception(f"Level {level_index} does not exist in {filesystem.geturl(path=level_path)}"))
-        return Exception(f"Could not open dzi file at any of {possible_dzi_paths}")
+            return pyramid_result.get(level_index, FsFileNotFoundException(level_path))
+        return FsFileNotFoundException(possible_dzi_paths[0]) #FIXME: we search for more than this one file reported back
 
     @classmethod
     def supports_path(cls, path: PurePosixPath) -> bool:
-        return DziImageElement.is_level_path(path)
+        return DziImageElement.is_level_path(path) or path.suffix.lower() in (".xml", ".dzi", ".dzip")
 
     def __hash__(self) -> int:
         return hash(self.url)

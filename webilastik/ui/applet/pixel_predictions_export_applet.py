@@ -119,7 +119,7 @@ class PixelClassificationExportApplet(StatelesApplet):
         tmp_fs = OsFs.create_scratch_dir()
         if isinstance(tmp_fs, Exception):
             return UsageError(str(tmp_fs)) #FIXME: double check this exception
-        tmp_xml_path = PurePosixPath("/tmp.dzi")
+        tmp_xml_path = PurePosixPath("/tmp.dzi") #FIXME: the name might make a difference
 
         dzi_image = DziImageElement(
             Format=dzi_image_format,
@@ -155,15 +155,16 @@ class PixelClassificationExportApplet(StatelesApplet):
             if sink_index == dzi_image.max_level_index:
                 level_source = datasource
             else:
-                level_source = DziLevelDataSource.try_load( #FIXME: opening the source should be done inside the job
+                level_path = dzi_image.make_level_path(xml_path=tmp_xml_path, level_index=sink.level_index + 1)
+                level_source = DziLevelDataSource.try_load_as_pyramid_level( #FIXME: opening the source should be done inside the job
                     filesystem=tmp_fs,
-                    level_path=dzi_image.make_level_path(
-                        xml_path=tmp_xml_path,
-                        level_index=sink.level_index + 1
-                    )
+                    level_path=level_path
                 )
+                if level_source is None:
+                    print(f"!!!!Failed to open the previous level source!!!! This needs to be reported back to the user!!!") #FIXME
+                    return Exception(f"Could not open level source at {level_path}")
                 if isinstance(level_source, Exception):
-                    print(f"Failed to open the previous level source!!!! This needs to be reported back to the user!!!")
+                    print(f"Failed to open the previous level source!!!! This needs to be reported back to the user!!!") #FIXME
                     return level_source
             self._launch_job(DownscaleDatasource(
                 name=f"Downscaling to {sink.shape.x} x {sink.shape.y}{'' if sink.shape.z == 1 else ' ' + str(sink.shape.z)}",

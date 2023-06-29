@@ -11,9 +11,12 @@ import json
 import skimage.io # type: ignore
 from ndstructs.point5D import Shape5D, Interval5D, Point5D
 from ndstructs.array5D import Array5D
+from tests import get_sample_c_cells_datasource
+from webilastik.datasink.deep_zoom_sink import DziLevelSink
 
 from webilastik.datasource import DataRoi
 from webilastik.datasink.n5_dataset_sink import N5DataSink
+from webilastik.datasource.deep_zoom_image import DziImageElement, DziSizeElement
 from webilastik.datasource.n5_datasource import N5DataSource
 from webilastik.datasource.n5_attributes import N5Compressor, RawCompressor
 from webilastik.datasource import DataSource
@@ -21,6 +24,7 @@ from webilastik.datasource.array_datasource import ArrayDataSource
 from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.filesystem import IFilesystem
 from webilastik.filesystem.os_fs import OsFs
+from webilastik.ui.applet.export_jobs import DownscaleDatasource, ZipDirectory
 
 # fmt: off
 raw = np.asarray([
@@ -476,6 +480,62 @@ def test_data_roi_get_tiles_can_clamp_to_datasource_tiles():
         expected_data = expected_slice_dict.pop(piece.interval)
         assert expected_data == piece.retrieve()
     assert len(expected_slice_dict) == 0
+
+def test_dzip_datasource():
+    source1 = get_sample_c_cells_datasource()
+
+    temp_fs = OsFs.create_scratch_dir()
+    temp_output_dir = PurePosixPath("/bla")
+    temp_xml_path = temp_output_dir / "my_data.dzi"
+    assert not isinstance(temp_fs, Exception)
+    num_channels = source1.shape.c
+    assert num_channels in (1,3)
+
+    sink_pyramid = DziLevelSink.create_pyramid(
+        filesystem=temp_fs,
+        xml_path=temp_xml_path,
+        dzi_image=DziImageElement(
+            Format="png",
+            Overlap=0,
+            Size=DziSizeElement(
+                Width=source1.shape.x,
+                Height=source1.shape.y,
+            ),
+            TileSize=source1.tile_shape.x,
+        ),
+        num_channels=num_channels,
+    )
+    assert not isinstance(sink_pyramid, Exception)
+    for sink in reversed(sink_pyramid):
+        sink_writer = sink.open()
+        for tile in sink.interval.split(sink.tile_shape):
+            writing_result = DownscaleDatasource.downscale(
+                sink_tile=tile, source=source1, sink_writer=sink_writer
+            )
+            assert not isinstance(writing_result, Exception)
+
+
+    output_fs = OsFs.create_scratch_dir()
+    assert not isinstance(output_fs, Exception)
+    output_path = PurePosixPath("/my_pyramid.zip")
+
+    zip_result = ZipDirectory.zip_directory(
+        temp_output_dir,
+        input_fs=temp_fs,
+        delete_source=False,
+        output_fs=output_fs,
+        output_path=output_path
+    )
+    assert not isinstance(zip_result, Exception)
+
+    from webilastik.ui.datasource import try_get_datasources_from_url
+    ds_results = try_get_datasources_from_url(
+        url=output_fs.geturl(output_path),
+    )
+    print(ds_results.__class__)
+    assert not isinstance(ds_results, Exception), str(ds_results)
+
+
 
 if __name__ == "__main__":
     import inspect

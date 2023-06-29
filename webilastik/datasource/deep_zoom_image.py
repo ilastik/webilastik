@@ -1,4 +1,4 @@
-from typing import List, Literal, cast, Final
+from typing import List, Literal, cast, Final, Tuple
 from pathlib import PurePosixPath
 from dataclasses import dataclass
 import math
@@ -92,6 +92,7 @@ class DziSizeElement:
 #         column is the column number of the tile (starting from 0 at left)
 #         format is the appropriate extension for the image format used – either JPEG or PNG.
 class DziImageElement:
+    DZI_XML_SUFFIXES: Final[Tuple[str, str]] = (".xml", ".dzi")
     def __init__(self, *, Format: ImageFormat, Overlap: int, TileSize: int, Size: DziSizeElement) -> None:
         self.Format: Final[ImageFormat] = Format
         self.Overlap: Final[int] = Overlap
@@ -160,6 +161,14 @@ class DziImageElement:
         if isinstance(cls.get_level_index_from_path(path), Exception):
             return False
         return path.parent.name.endswith("_files")
+
+    @classmethod
+    def dzi_paths_from_level_path(cls, level_path: PurePosixPath) -> Tuple[PurePosixPath, PurePosixPath]:
+        xml_file_stem = level_path.parent.name[:-len("_files")]
+        return (
+           level_path.parent.parent / f"{xml_file_stem}.xml",
+           level_path.parent.parent / f"{xml_file_stem}.dzi",
+        )
 
     def get_tile_path(self, *, level_path: PurePosixPath, tile: Interval5D) -> PurePosixPath:
         column = tile.x[0] // self.TileSize

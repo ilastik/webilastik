@@ -67,20 +67,21 @@ class ZipFs(IFilesystem):
     @classmethod
     def try_from(cls, *, url: Url) -> "Tuple[ZipFs, PurePosixPath] | None | Exception":
         parts = url.path.parts[1:] # discard '/' from url paths, which are always absolute
-        last_part_idx = len(parts) - 1
-
+        root: Final[PurePosixPath] = PurePosixPath("/")
         for part_index, part in enumerate(parts):
             if not (part.endswith(".zip") or part.endswith(".dzip")):
                 continue
-            if part_index == last_part_idx:
-                break
-            zip_file_path = PurePosixPath("/") / "/".join(parts[0:part_index + 1])
-            inner_path = PurePosixPath("/") / "/".join(parts[part_index + 1:])
+            zip_file_path = root / "/".join(parts[0:part_index + 1])
+            inner_path = root / "/".join(parts[part_index + 1:])
 
-            external_fs_and_path_result = create_filesystem_from_url(url.updated_with(path=zip_file_path))
+            if inner_path == root:
+                return None
+
+            external_fs_and_path_result = create_filesystem_from_url(url.updated_with(path=zip_file_path.parent))
             if isinstance(external_fs_and_path_result, Exception):
                 return external_fs_and_path_result
-            external_fs = external_fs_and_path_result[0]
+            external_fs, zip_file_parent = external_fs_and_path_result
+            zip_file_path = zip_file_parent / part
 
             zip_fs_result = ZipFs.create(zip_file_fs=external_fs, zip_file_path=zip_file_path)
             if isinstance(zip_fs_result, Exception):

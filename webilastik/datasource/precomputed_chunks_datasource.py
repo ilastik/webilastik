@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Any, List
+from typing import Optional, Tuple, Any
 from pathlib import PurePosixPath
 import logging
 
@@ -52,8 +52,10 @@ class PrecomputedChunksDataSource(FsDataSource):
         path: PurePosixPath,
         spatial_resolution: Tuple[int, int, int],
         chunk_size: Optional[Shape5D] = None,
-    ) -> "PrecomputedChunksDataSource | Exception":
+    ) -> "PrecomputedChunksDataSource | None | Exception":
         info_result = PrecomputedChunksInfo.tryLoad(filesystem=filesystem, path=path / "info")
+        if isinstance(info_result, FsFileNotFoundException):
+            return None
         if isinstance(info_result, Exception):
             return info_result
         scale = info_result.get_scale_5d(resolution=spatial_resolution)
@@ -130,9 +132,12 @@ class PrecomputedChunksDataSource(FsDataSource):
     @classmethod
     def try_open_scales(
         cls, fs: IFilesystem, path: PurePosixPath, resolution: Optional[Tuple[int, int, int]]
-    ) -> "PrecomputedChunksDataSource | Tuple[PrecomputedChunksDataSource, ...] | FsFileNotFoundException | Exception":
+    ) -> "Tuple[PrecomputedChunksDataSource, ...] | None | Exception":
         if resolution is not None:
-            return cls.try_load(filesystem=fs, path=path, spatial_resolution=resolution)
+            datasource_result = cls.try_load(filesystem=fs, path=path, spatial_resolution=resolution)
+            if isinstance(datasource_result, (Exception, type(None))):
+                return datasource_result
+            return (datasource_result, )
         precomp_info_result = PrecomputedChunksInfo.tryLoad(filesystem=fs, path=path / "info")
         if isinstance(precomp_info_result, Exception):
             return precomp_info_result
@@ -151,23 +156,17 @@ class PrecomputedChunksDataSource(FsDataSource):
         )
 
     @classmethod
-    def try_open_as_scale_path(cls, fs: IFilesystem, path: PurePosixPath) -> "PrecomputedChunksDataSource | FsFileNotFoundException | Exception":
-        original_path = path #FIXME: maybe don't modify the original?
-        path = PurePosixPath("/") / path
-        scale_key_components: List[str] = []
-        while True:
-            scale_key_components.insert(0, path.name)
-            path = path.parent
-            scale_path = "/".join(scale_key_components)
-            precomp_info_result = PrecomputedChunksInfo.tryLoad(filesystem=fs, path=path / "info")
+    def try_open_as_scale_path(cls, *, fs: IFilesystem, scale_path: PurePosixPath) -> "PrecomputedChunksDataSource | None | Exception":
+        original_path = scale_path #FIXME: maybe don't modify the original?
+        scale_path = PurePosixPath("/") / scale_path
+        for scale_path_parent in scale_path.parents:
+            precomp_info_result = PrecomputedChunksInfo.tryLoad(filesystem=fs, path=scale_path_parent / "info")
             if isinstance(precomp_info_result, FsFileNotFoundException):
-                if path == PurePosixPath("/"):
-                    return FsFileNotFoundException(original_path)
-                path = path.parent
                 continue
             if isinstance(precomp_info_result, Exception):
                 return precomp_info_result
-            scales = [s for s in precomp_info_result.scales_5d if s.key.as_posix().lstrip("/").rstrip("/") == scale_path]
+            relative_scale_path = scale_path.relative_to(scale_path_parent).as_posix()
+            scales = [s for s in precomp_info_result.scales_5d if s.key.as_posix().lstrip("/").rstrip("/") == relative_scale_path]
             if len(scales) == 0:
                 return FsFileNotFoundException(original_path)
             if len(scales) != 1:
@@ -177,12 +176,13 @@ class PrecomputedChunksDataSource(FsDataSource):
                 dtype=precomp_info_result.data_type,
                 encoding=scale.encoding,
                 filesystem=fs,
-                path=path,
+                path=scale_path_parent,
                 interval=scale.interval,
                 scale_key=scale.key,
                 spatial_resolution=scale.resolution,
                 tile_shape=scale.chunk_sizes_5d[0],
             )
+        return None
 
 
     def __hash__(self) -> int:

@@ -84,9 +84,9 @@ class SkimageDataSource(FsDataSource):
         )
 
     @classmethod
-    def try_open(cls, fs: IFilesystem, path: PurePosixPath) -> "SkimageDataSource | Exception":
+    def try_open(cls, fs: IFilesystem, path: PurePosixPath) -> "SkimageDataSource | None | Exception":
         if not cls.supports_path(path):
-            return Exception(f"Unsupported path: {path}")
+            return None
         try:
             return SkimageDataSource(path=path, filesystem=fs)
         except Exception as e:
