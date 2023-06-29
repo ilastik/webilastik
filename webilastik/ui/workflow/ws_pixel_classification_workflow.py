@@ -242,13 +242,8 @@ class WebIlastik:
             return uncachable_json_response(RpcErrorDto(error=str(datasources_result)).to_json_value(), status=400)
         if isinstance(datasources_result, type(None)):
             return uncachable_json_response(GetDatasourcesFromUrlResponseDto(datasources=None).to_json_value(), status=400)
-        if isinstance(datasources_result, tuple):
-            return uncachable_json_response(
-                GetDatasourcesFromUrlResponseDto(datasources=tuple([ds.to_dto() for ds in datasources_result])).to_json_value(),
-                status=200,
-            )
         return uncachable_json_response(
-            GetDatasourcesFromUrlResponseDto(datasources=datasources_result.to_dto()).to_json_value(),
+            GetDatasourcesFromUrlResponseDto(datasources=tuple([ds.to_dto() for ds in datasources_result])).to_json_value(),
             status=200,
         )
 

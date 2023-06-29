@@ -69,7 +69,7 @@ export class DataSourceSelectionWidget{
             }else if(viewResult === undefined){
                 console.log("FIXME: handle undefined datasource? Maybe just don't have undefined at all?")
             }else{
-                const datasources: FsDataSource[] = viewResult instanceof Array ? viewResult : [viewResult]
+                const datasources: FsDataSource[] = viewResult
                 if(datasources.find(ds => !(ds instanceof PrecomputedChunksDataSource))){
                     errorMessages.push(`Unsupported datasources from ${url.raw}`)
                     unsupportedUrls.push(url)

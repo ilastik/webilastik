@@ -534,7 +534,7 @@ class GetDatasourcesFromUrlParamsDto(DataTransferObject):
 
 @dataclass
 class GetDatasourcesFromUrlResponseDto(DataTransferObject):
-    datasources: Union[FsDataSourceDto, Tuple[FsDataSourceDto, ...], None]
+    datasources: Union[Tuple[FsDataSourceDto, ...], None]
 
 
 @dataclass

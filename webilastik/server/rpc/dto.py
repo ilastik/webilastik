@@ -4490,34 +4490,6 @@ class GetDatasourcesFromUrlParamsDto(DataTransferObject):
         return parse_as_GetDatasourcesFromUrlParamsDto(value)
 
 
-def parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto0Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
-    value: JsonValue,
-) -> "Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto, Tuple[Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto], ...], None] | MessageParsingError":
-    parsed_option_0 = parse_as_PrecomputedChunksDataSourceDto(value)
-    if not isinstance(parsed_option_0, MessageParsingError):
-        return parsed_option_0
-    parsed_option_1 = parse_as_N5DataSourceDto(value)
-    if not isinstance(parsed_option_1, MessageParsingError):
-        return parsed_option_1
-    parsed_option_2 = parse_as_SkimageDataSourceDto(value)
-    if not isinstance(parsed_option_2, MessageParsingError):
-        return parsed_option_2
-    parsed_option_3 = parse_as_DziLevelDataSourceDto(value)
-    if not isinstance(parsed_option_3, MessageParsingError):
-        return parsed_option_3
-    parsed_option_4 = parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
-        value
-    )
-    if not isinstance(parsed_option_4, MessageParsingError):
-        return parsed_option_4
-    parsed_option_5 = parse_as_None(value)
-    if not isinstance(parsed_option_5, MessageParsingError):
-        return parsed_option_5
-    return MessageParsingError(
-        f"Could not parse {json.dumps(value)} into Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto, Tuple[Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto], ...], None]"
-    )
-
-
 def parse_as_GetDatasourcesFromUrlResponseDto(
     value: JsonValue,
 ) -> "GetDatasourcesFromUrlResponseDto | MessageParsingError":
@@ -4531,7 +4503,7 @@ def parse_as_GetDatasourcesFromUrlResponseDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as GetDatasourcesFromUrlResponseDto"
         )
-    tmp_datasources = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto0Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
+    tmp_datasources = parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
         value.get("datasources")
     )
     if isinstance(tmp_datasources, MessageParsingError):
@@ -4543,7 +4515,7 @@ def parse_as_GetDatasourcesFromUrlResponseDto(
 
 @dataclass
 class GetDatasourcesFromUrlResponseDto(DataTransferObject):
-    datasources: Union[FsDataSourceDto, Tuple[FsDataSourceDto, ...], None]
+    datasources: Union[Tuple[FsDataSourceDto, ...], None]
 
     def to_json_value(self) -> JsonObject:
         return {

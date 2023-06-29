@@ -4298,49 +4298,6 @@ export class GetDatasourcesFromUrlParamsDto {
   }
 }
 
-export function parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto0Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
-  value: JsonValue,
-):
-  | PrecomputedChunksDataSourceDto
-  | N5DataSourceDto
-  | SkimageDataSourceDto
-  | DziLevelDataSourceDto
-  | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
-  | undefined
-  | Error {
-  const parsed_option_0 = parse_as_PrecomputedChunksDataSourceDto(value);
-  if (!(parsed_option_0 instanceof Error)) {
-    return parsed_option_0;
-  }
-  const parsed_option_1 = parse_as_N5DataSourceDto(value);
-  if (!(parsed_option_1 instanceof Error)) {
-    return parsed_option_1;
-  }
-  const parsed_option_2 = parse_as_SkimageDataSourceDto(value);
-  if (!(parsed_option_2 instanceof Error)) {
-    return parsed_option_2;
-  }
-  const parsed_option_3 = parse_as_DziLevelDataSourceDto(value);
-  if (!(parsed_option_3 instanceof Error)) {
-    return parsed_option_3;
-  }
-  const parsed_option_4 =
-    parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
-      value,
-    );
-  if (!(parsed_option_4 instanceof Error)) {
-    return parsed_option_4;
-  }
-  const parsed_option_5 = parse_as_None(value);
-  if (!(parsed_option_5 instanceof Error)) {
-    return parsed_option_5;
-  }
-  return Error(
-    `Could not parse ${
-      JSON.stringify(value)
-    } into PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto> | undefined`,
-  );
-}
 export function parse_as_GetDatasourcesFromUrlResponseDto(value: JsonValue): GetDatasourcesFromUrlResponseDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
@@ -4350,7 +4307,7 @@ export function parse_as_GetDatasourcesFromUrlResponseDto(value: JsonValue): Get
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a GetDatasourcesFromUrlResponseDto`);
   }
   const temp_datasources =
-    parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto0Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
+    parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
       valueObject.datasources,
     );
   if (temp_datasources instanceof Error) return temp_datasources;
@@ -4362,18 +4319,10 @@ export function parse_as_GetDatasourcesFromUrlResponseDto(value: JsonValue): Get
 // Do not edit!
 export class GetDatasourcesFromUrlResponseDto {
   public datasources:
-    | PrecomputedChunksDataSourceDto
-    | N5DataSourceDto
-    | SkimageDataSourceDto
-    | DziLevelDataSourceDto
     | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
     | undefined;
   constructor(_params: {
     datasources:
-      | PrecomputedChunksDataSourceDto
-      | N5DataSourceDto
-      | SkimageDataSourceDto
-      | DziLevelDataSourceDto
       | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
       | undefined;
   }) {

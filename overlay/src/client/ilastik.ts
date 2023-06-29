@@ -408,7 +408,7 @@ export class Session{
         return undefined
     }
 
-    public async getDatasourcesFromUrl(params: GetDatasourcesFromUrlParamsDto): Promise<Array<FsDataSource> | FsDataSource | undefined | Error>{
+    public async getDatasourcesFromUrl(params: GetDatasourcesFromUrlParamsDto): Promise<Array<FsDataSource> | undefined | Error>{
         let result = await fetchJson(this.sessionUrl.joinPath("get_datasources_from_url").raw, {
             method: "POST",
             body: JSON.stringify(toJsonValue(params)),
@@ -424,10 +424,7 @@ export class Session{
         if(responseDto.datasources === undefined){
             return undefined
         }
-        if(responseDto.datasources instanceof Array){
-            return responseDto.datasources.map(msg => FsDataSource.fromDto(msg))
-        }
-        return FsDataSource.fromDto(responseDto.datasources)
+        return responseDto.datasources.map(msg => FsDataSource.fromDto(msg))
     }
 
     public async tryGetFsAndPathFromUrl(params: GetFileSystemAndPathFromUrlParamsDto): Promise<{fs: Filesystem, path: Path} | Error>{

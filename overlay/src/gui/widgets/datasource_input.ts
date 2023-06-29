@@ -64,7 +64,7 @@ export class DataSourceInput{
             new ErrorPopupWidget({message: `No datasources fond with given URL: ${url}`})
             return
         }
-        this.popupSuggestions(datasources_result instanceof Array ? datasources_result : [datasources_result])
+        this.popupSuggestions(datasources_result)
     }
 
     protected popupSuggestions(suggestions: FsDataSource[]){
