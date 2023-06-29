@@ -822,12 +822,6 @@ export class PrecomputedChunksDataSource extends FsDataSource{
         this.scale_key = params.scale_key
     }
 
-    public getStrippedUrl(session: Session): Url{
-        return session.sessionUrl.updatedWith({
-            datascheme: "precomputed",
-        }).joinPath(`stripped_precomputed/datasource=${this.toBase64()}`)
-    }
-
     public static fromDto(dto: PrecomputedChunksDataSourceDto) : PrecomputedChunksDataSource{
         return new PrecomputedChunksDataSource({
             filesystem: Filesystem.fromDto(dto.filesystem),

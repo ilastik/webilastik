@@ -121,7 +121,7 @@ export class RawDataLayerWidget extends LayerWidget{
         const nativeView = await params.driver.openUrl({
             isVisible: true,
             name: `raw_${params.datasource.url.name}_${uuidv4()}`,
-            url: params.datasource.getStrippedUrl(params.session),
+            url: params.datasource.url,
             channelColors,
             opacity,
         })

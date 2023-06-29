@@ -314,52 +314,6 @@ class LabelDto(DataTransferObject):
 class BrushingAppletStateDto(DataTransferObject):
     labels: Tuple[LabelDto, ...]
 
-##############################################3333
-
-@dataclass
-class ViewDto(DataTransferObject):
-    name: str
-    url: UrlDto
-
-@dataclass
-class DataView(ViewDto):
-    pass
-
-@dataclass
-class RawDataViewDto(ViewDto):
-    datasources: Tuple[FsDataSourceDto, ...]
-
-@dataclass
-class StrippedPrecomputedViewDto(ViewDto):
-    datasource: FsDataSourceDto
-
-@dataclass
-class PredictionsViewDto(ViewDto):
-    raw_data: FsDataSourceDto
-    classifier_generation: int
-
-@dataclass
-class FailedViewDto(ViewDto):
-    error_message: str
-
-@dataclass
-class UnsupportedDatasetViewDto(ViewDto):
-    pass
-
-DataViewUnion = Union[RawDataViewDto, StrippedPrecomputedViewDto, FailedViewDto, UnsupportedDatasetViewDto]
-
-@dataclass
-class ViewerAppletStateDto(DataTransferObject):
-    frontend_timestamp: int
-    data_views: Tuple[Union[RawDataViewDto, StrippedPrecomputedViewDto, FailedViewDto, UnsupportedDatasetViewDto], ...]
-    prediction_views: Tuple[PredictionsViewDto, ...]
-    label_colors: Tuple[ColorDto, ...]
-
-@dataclass
-class MakeDataViewParams(DataTransferObject):
-    view_name: str
-    url: UrlDto
-
 ##################################################3
 
 @dataclass
