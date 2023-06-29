@@ -34,7 +34,6 @@ from webilastik.ui.applet.export_jobs import CreateDziPyramid, DownscaleDatasour
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.usage_error import UsageError
 from webilastik.ui.applet.brushing_applet import Label
-from webilastik.utility import get_now_string
 
 JOB_OUT = TypeVar("JOB_OUT")
 
