@@ -155,6 +155,8 @@ class ZipFs(IFilesystem):
     def read_file(self, path: PurePosixPath, offset: int = 0, num_bytes: "int | None" = None) -> "bytes | FsIoException | FsFileNotFoundException":
         try:
             data = self.archive[self.raw_path(path)]
+        except KeyError as e:
+            return FsFileNotFoundException(path)
         except Exception as e:
             return FsIoException(e)
         data_len = len(data)
