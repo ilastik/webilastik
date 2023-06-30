@@ -1,8 +1,10 @@
+# pyright: strict
+
 from datetime import datetime
 import os
 from pathlib import Path, PurePosixPath
 import time
-from typing import Any, Dict, Literal, Mapping, Dict, Sequence, Tuple
+from typing import Any, Dict, Literal, Mapping, Sequence, Tuple
 import uuid
 import json
 from collections.abc import Mapping as MappingAbc
@@ -16,21 +18,16 @@ from ndstructs.utils.json_serializable import JsonObject, JsonValue
 
 from webilastik.annotations.annotation import Annotation, Color
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
-from webilastik.datasink import FsDataSink
 from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
 from webilastik.datasource import FsDataSource
-from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale, RawEncoder
+from webilastik.datasource.precomputed_chunks_info import RawEncoder
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
-from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.features.ilp_filter import IlpGaussianSmoothing, IlpHessianOfGaussianEigenvalues
 from webilastik.features.ilp_filter import IlpFilter
-from webilastik.filesystem import IFilesystem
 from webilastik.filesystem.os_fs import OsFs
 from webilastik.filesystem.http_fs import HttpFs
 from webilastik.filesystem.bucket_fs import BucketFs
-from webilastik.libebrains.user_token import UserToken
 from webilastik.ui.applet.brushing_applet import Label
-from webilastik.libebrains.global_user_login import get_global_login_token
 from webilastik.utility import get_now_string
 
 def get_project_root_dir() -> PurePosixPath:
@@ -55,7 +52,7 @@ def get_sample_c_cells_datasource() -> PrecomputedChunksDataSource:
         spatial_resolution=(1,1,1),
         path=PurePosixPath(get_project_root_dir()) / "public/images/c_cells_2.precomputed",
     )
-    assert not isinstance(ds, Exception)
+    assert ds and not isinstance(ds, Exception)
     return ds
     # return SkimageDataSource(
     #     filesystem=fs, path=PurePosixPath(get_project_root_dir()) / "public/images/c_cells_1.png"
@@ -144,7 +141,7 @@ def get_sample_c_cells_pixel_classifier() -> VigraPixelClassifier[IlpFilter]:
 
 def compare_values(v1: Any, v2: Any) -> bool:
     if isinstance(v1, np.ndarray) and isinstance(v2, np.ndarray):
-        return bool(np.array_equal(v1, v2))
+        return bool(np.array_equal(v1, v2)) # pyright: ignore [reportUnknownArgumentType]
     return bool(v1 == v2)
 
 def strip_json_obj(obj: JsonObject) -> JsonObject:
