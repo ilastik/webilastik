@@ -11,11 +11,12 @@ import json
 import skimage.io # type: ignore
 from ndstructs.point5D import Shape5D, Interval5D, Point5D
 from ndstructs.array5D import Array5D
-from tests import get_sample_c_cells_datasource
+from tests import get_sample_c_cells_datasource, get_test_output_bucket_fs
 from webilastik.datasink.deep_zoom_sink import DziLevelSink
 
 from webilastik.datasource import DataRoi
 from webilastik.datasink.n5_dataset_sink import N5DataSink
+from webilastik.datasource.deep_zoom_datasource import DziLevelDataSource
 from webilastik.datasource.deep_zoom_image import DziImageElement, DziSizeElement
 from webilastik.datasource.n5_datasource import N5DataSource
 from webilastik.datasource.n5_attributes import N5Compressor, RawCompressor
@@ -515,9 +516,9 @@ def test_dzip_datasource():
             assert not isinstance(writing_result, Exception)
 
 
-    output_fs = OsFs.create_scratch_dir()
+    output_fs = get_test_output_bucket_fs()[0]
     assert not isinstance(output_fs, Exception)
-    output_path = PurePosixPath("/my_pyramid.zip")
+    output_path = PurePosixPath("/my_pyramid.dzip")
 
     zip_result = ZipDirectory.zip_directory(
         temp_output_dir,
@@ -532,8 +533,20 @@ def test_dzip_datasource():
     ds_results = try_get_datasources_from_url(
         url=output_fs.geturl(output_path),
     )
-    print(ds_results.__class__)
-    assert not isinstance(ds_results, Exception), str(ds_results)
+    assert not isinstance(ds_results, (Exception, type(None))), str(ds_results)
+    for ds in [d for d in ds_results if isinstance(d, DziLevelDataSource)]:
+        print(f"{ds.url}")
+
+    finest_resolution_level_ds = ds_results[-1]
+    # finest_resolution_level_ds.retrieve().show_images()
+
+    retrieved_from_ds_url = try_get_datasources_from_url(url=finest_resolution_level_ds.url)
+    assert not isinstance(retrieved_from_ds_url, (Exception, type(None))), str(retrieved_from_ds_url)
+    assert len(retrieved_from_ds_url) == 1
+
+    # retrieved_from_ds_url[0].retrieve().show_images()
+    assert retrieved_from_ds_url[0].retrieve() == finest_resolution_level_ds.retrieve()
+
 
 
 
