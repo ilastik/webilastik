@@ -92,7 +92,7 @@ class DziSizeElement:
 #         column is the column number of the tile (starting from 0 at left)
 #         format is the appropriate extension for the image format used – either JPEG or PNG.
 class DziImageElement:
-    DZI_XML_SUFFIXES: Final[Tuple[str, str]] = (".xml", ".dzi")
+    DZI_XML_SUFFIXES: Final[Tuple[str, str]] = (".dzi", ".xml")
     def __init__(self, *, Format: ImageFormat, Overlap: int, TileSize: int, Size: DziSizeElement) -> None:
         self.Format: Final[ImageFormat] = Format
         self.Overlap: Final[int] = Overlap
