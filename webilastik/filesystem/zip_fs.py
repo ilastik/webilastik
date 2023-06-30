@@ -193,7 +193,7 @@ class ZipFs(IFilesystem):
         return cls.create(zip_file_fs=fs_result, zip_file_path=path)
 
     def geturl(self, path: PurePosixPath) -> Url:
-        return self.source.fs.geturl(self.source.zip_path).joinpath(path) #FIXME: double check this
+        return self.source.fs.geturl(self.source.zip_path).concatpath(path) #FIXME: double check this
 
     def exists(self, path: PurePosixPath) -> "bool | FsIoException":
         return self.raw_path(path) in self.archive.files
