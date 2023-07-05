@@ -15,7 +15,6 @@ from webilastik.datasink import DataSink, IDataSinkWriter
 from webilastik.datasink.deep_zoom_sink import DziLevelSink
 from webilastik.datasource import DataRoi, DataSource, FsDataSource
 from webilastik.datasource.deep_zoom_image import DziImageElement, DziSizeElement, ImageFormat
-from webilastik.datasource.deep_zoom_datasource import DziLevelDataSource
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.filesystem import IFilesystem
 from webilastik.filesystem.os_fs import OsFs
@@ -154,17 +153,7 @@ class PixelClassificationExportApplet(StatelesApplet):
             if sink_index == dzi_image.max_level_index:
                 level_source = datasource
             else:
-                level_path = dzi_image.make_level_path(xml_path=tmp_xml_path, level_index=sink.level_index + 1)
-                level_source = DziLevelDataSource.try_load_as_pyramid_level( #FIXME: opening the source should be done inside the job
-                    filesystem=tmp_fs,
-                    level_path=level_path
-                )
-                if level_source is None:
-                    print(f"!!!!Failed to open the previous level source!!!! This needs to be reported back to the user!!!") #FIXME
-                    return Exception(f"Could not open level source at {level_path}")
-                if isinstance(level_source, Exception):
-                    print(f"Failed to open the previous level source!!!! This needs to be reported back to the user!!!") #FIXME
-                    return level_source
+                level_source = sinks[sink_index + 1].to_datasource()
             self._launch_job(DownscaleDatasource(
                 name=f"Downscaling to {sink.shape.x} x {sink.shape.y}{'' if sink.shape.z == 1 else ' ' + str(sink.shape.z)}",
                 source=level_source,

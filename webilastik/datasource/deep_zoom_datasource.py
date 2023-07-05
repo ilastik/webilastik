@@ -19,6 +19,7 @@ from webilastik.filesystem import zip_fs
 from webilastik.filesystem.zip_fs import ZipFs
 from webilastik.server.rpc.dto import DziLevelDataSourceDto
 from webilastik.filesystem import FsFileNotFoundException, IFilesystem
+from webilastik.utility.url import Url
 
 
 logger = logging.getLogger(__name__)
@@ -49,6 +50,20 @@ class DziLevelDataSource(FsDataSource):
             spatial_resolution=spatial_resolution, #FIXME: maybe delete this altogether?
         )
 
+    @property
+    def url(self) -> Url:
+        return self.filesystem.geturl(self.xml_path).updated_with(hash_=f"level={self.level_index}")
+
+    @classmethod
+    def get_level_from_url(cls, url: Url) -> "int | None | Exception":
+        level_str = url.get_hash_params().get("level")
+        if level_str is None:
+            return None
+        try:
+            return int(level_str)
+        except Exception:
+            return Exception(f"Bad level fragment parameter: {level_str}")
+
     def to_dto(self) -> DziLevelDataSourceDto:
         raise NotImplementedError #FIXME
 
@@ -63,13 +78,6 @@ class DziLevelDataSource(FsDataSource):
         out = cls.try_load_as_dzip(filesystem=filesystem, dzip_path=path)
         if out is not None:
             return out
-
-        out = cls.try_load_as_pyramid_level(filesystem=filesystem, level_path=path)
-        if isinstance(out, Exception):
-            return out
-        if isinstance(out, DziLevelDataSource):
-            return {out.level_index: out}
-
         return cls.try_load_as_pyramid(filesystem=filesystem, dzi_path=path)
 
     @classmethod
@@ -139,28 +147,6 @@ class DziLevelDataSource(FsDataSource):
             width = math.ceil(width / 2)
             height = math.ceil(height / 2)
         return datasources
-
-    @classmethod
-    def try_load_as_pyramid_level(
-        cls,
-        *,
-        filesystem: IFilesystem,
-        level_path: PurePosixPath,
-    ) -> "DziLevelDataSource | None | FsFileNotFoundException | Exception":
-        level_index = DziImageElement.get_level_index_from_path(level_path)
-        if isinstance(level_index, Exception):
-            return None
-        possible_dzi_paths = DziImageElement.dzi_paths_from_level_path(level_path=level_path)
-        for dzi_path in possible_dzi_paths:
-            pyramid_result = cls.try_load_as_pyramid(filesystem=filesystem, dzi_path=dzi_path)
-            if pyramid_result is None:
-                continue
-            if isinstance(pyramid_result, FsFileNotFoundException):
-                continue
-            if isinstance(pyramid_result , Exception):
-                return pyramid_result
-            return pyramid_result.get(level_index, FsFileNotFoundException(level_path))
-        return FsFileNotFoundException(possible_dzi_paths[0]) #FIXME: we search for more than this one file reported back
 
     @classmethod
     def supports_path(cls, path: PurePosixPath) -> bool:

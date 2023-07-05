@@ -26,10 +26,19 @@ def try_get_datasources_from_url(
     fs, path = fs_result
 
     dzi_datasources = DziLevelDataSource.try_load(filesystem=fs, path=path)
-    if isinstance(dzi_datasources, (Exception, DziLevelDataSource)):
+    if isinstance(dzi_datasources, Exception):
         return dzi_datasources
     if isinstance(dzi_datasources, Mapping):
-        return tuple(dzi_datasources.values())
+        dzi_level_result = DziLevelDataSource.get_level_from_url(url)
+        if isinstance(dzi_level_result, Exception):
+            return dzi_level_result
+        if dzi_level_result is None:
+            out = tuple(dzi_datasources.values())
+        else:
+            out = tuple(ds for level, ds in dzi_datasources.items() if level == dzi_level_result)
+        if len(out) == 0:
+            return Exception(f"No dzi levels found for {url.raw}")
+        return out
     _ensure_none(dzi_datasources)
 
     skimage_datasource = SkimageDataSource.try_open(fs=fs, path=path)
