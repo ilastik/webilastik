@@ -43,7 +43,6 @@ def request(
 
     try:
         response = session.request(method=method, url=url.schemeless_raw, data=data, headers=headers)
-        response.headers
         if not response.ok:
             return ErrRequestCompletedAsFailure(response.status_code)
         return (response.content, response.headers)
