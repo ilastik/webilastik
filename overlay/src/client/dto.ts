@@ -103,9 +103,9 @@ export class LabelHeaderDto {
   }
 }
 
-export function parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_(
+export function parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote_0_quote_deepzoom_quote__endof_(
   value: JsonValue,
-): "precomputed" | "n5" | Error {
+): "precomputed" | "n5" | "deepzoom" | Error {
   const tmp_0 = parse_as_str(value);
   if (!(tmp_0 instanceof Error) && tmp_0 === "precomputed") {
     return tmp_0;
@@ -114,15 +114,21 @@ export function parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote__e
   if (!(tmp_1 instanceof Error) && tmp_1 === "n5") {
     return tmp_1;
   }
-  return Error(`Could not parse ${value} as 'precomputed' | 'n5'`);
+  const tmp_2 = parse_as_str(value);
+  if (!(tmp_2 instanceof Error) && tmp_2 === "deepzoom") {
+    return tmp_2;
+  }
+  return Error(`Could not parse ${value} as 'precomputed' | 'n5' | 'deepzoom'`);
 }
 export function parse_as_None(value: JsonValue): undefined | Error {
   return ensureJsonUndefined(value);
 }
-export function parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_0None_endof_(
+export function parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote_0_quote_deepzoom_quote__endof_0None_endof_(
   value: JsonValue,
-): "precomputed" | "n5" | undefined | Error {
-  const parsed_option_0 = parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_(value);
+): "precomputed" | "n5" | "deepzoom" | undefined | Error {
+  const parsed_option_0 = parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote_0_quote_deepzoom_quote__endof_(
+    value,
+  );
   if (!(parsed_option_0 instanceof Error)) {
     return parsed_option_0;
   }
@@ -130,7 +136,7 @@ export function parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5
   if (!(parsed_option_1 instanceof Error)) {
     return parsed_option_1;
   }
-  return Error(`Could not parse ${JSON.stringify(value)} into 'precomputed' | 'n5' | undefined`);
+  return Error(`Could not parse ${JSON.stringify(value)} into 'precomputed' | 'n5' | 'deepzoom' | undefined`);
 }
 export function parse_as_Literal_of__quote_http_quote_0_quote_https_quote_0_quote_file_quote_0_quote_memory_quote__endof_(
   value: JsonValue,
@@ -216,9 +222,10 @@ export function parse_as_UrlDto(value: JsonValue): UrlDto | Error {
   if (valueObject["__class__"] != "UrlDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a UrlDto`);
   }
-  const temp_datascheme = parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_0None_endof_(
-    valueObject.datascheme,
-  );
+  const temp_datascheme =
+    parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote_0_quote_deepzoom_quote__endof_0None_endof_(
+      valueObject.datascheme,
+    );
   if (temp_datascheme instanceof Error) return temp_datascheme;
   const temp_protocol =
     parse_as_Literal_of__quote_http_quote_0_quote_https_quote_0_quote_file_quote_0_quote_memory_quote__endof_(
@@ -248,7 +255,7 @@ export function parse_as_UrlDto(value: JsonValue): UrlDto | Error {
 // Automatically generated via DataTransferObject for UrlDto
 // Do not edit!
 export class UrlDto {
-  public datascheme: "precomputed" | "n5" | undefined;
+  public datascheme: "precomputed" | "n5" | "deepzoom" | undefined;
   public protocol: "http" | "https" | "file" | "memory";
   public hostname: string;
   public port: number | undefined;
@@ -256,7 +263,7 @@ export class UrlDto {
   public search: { [key: string]: string } | undefined;
   public fragment: string | undefined;
   constructor(_params: {
-    datascheme: "precomputed" | "n5" | undefined;
+    datascheme: "precomputed" | "n5" | "deepzoom" | undefined;
     protocol: "http" | "https" | "file" | "memory";
     hostname: string;
     port: number | undefined;

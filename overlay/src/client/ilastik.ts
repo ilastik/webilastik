@@ -7,6 +7,7 @@ import {
 } from "../util/serialization"
 import {
     BucketFSDto,
+    ZipFsDto,
     CheckLoginResultDto,
     CloseComputeSessionParamsDto,
     ColorDto,
@@ -1020,20 +1021,31 @@ export class DziLevelDataSource extends FsDataSource{
         num_channels: 1 | 3,
         level_index: number,
     }){
-        let level_path = DziImageElement.make_level_path(params.xml_path, params.level_index)
+        let width = params.dzi_image.Size.Width;
+        let height = params.dzi_image.Size.Height;
+
+        for(let i=0; i<params.dzi_image.max_level_index - params.level_index; i++){
+            width = Math.ceil(width / 2)
+            height = Math.ceil(height / 2)
+        }
+
         super({
             dtype: "uint8",
             filesystem: params.filesystem,
-            interval: new Shape5D({x: params.dzi_image.Size.Width, y: params.dzi_image.Size.Height, c: params.num_channels}).toInterval5D({}),
-            path: level_path,
+            interval: new Shape5D({x: width, y: height, c: params.num_channels}).toInterval5D({}),
+            path: params.xml_path,
             spatial_resolution: [1,1,1], //FIXME
             tile_shape: params.dzi_image.get_tile_shape(params.num_channels),
-            url: params.filesystem.getUrl(level_path)
+            url: params.filesystem.getUrl(params.xml_path).updatedWith({datascheme: "deepzoom", hash: `level=${params.level_index}`}),
         })
         this.xml_path = params.xml_path
         this.level_index = params.level_index
         this.dzi_image = params.dzi_image
         this.num_channels = params.num_channels
+    }
+
+    public get resolutionString(): string {
+        return `${this.shape.x}x${this.shape.y} px`
     }
 
     public static fromDto(dto: DziLevelDataSourceDto) : DziLevelDataSource{
@@ -1060,7 +1072,8 @@ export class DziLevelDataSource extends FsDataSource{
 export abstract class Filesystem{
     public constructor(public readonly url: Url){}
 
-    public static fromDto(message: BucketFSDto | HttpFsDto | OsfsDto): Filesystem{
+    //FIXME: this should take a FsDto, whose type should be auto-generated
+    public static fromDto(message: PrecomputedChunksDataSourceDto["filesystem"]): Filesystem{
         if(message instanceof BucketFSDto){
             return BucketFs.fromDto(message)
         }
@@ -1070,12 +1083,39 @@ export abstract class Filesystem{
         if(message instanceof OsfsDto){
             return OsFs.fromDto(message)
         }
+        if(message instanceof ZipFsDto){
+            return ZipFs.fromDto(message)
+        }
         assertUnreachable(message)
     }
 
-    public abstract toDto(): OsfsDto | HttpFsDto | BucketFSDto;
+    //FIXME: this should take a FsDto, whose type should be auto-generated
+    public abstract toDto(): PrecomputedChunksDataSourceDto["filesystem"];
 
     public abstract getUrl(path: Path): Url;
+}
+
+export class ZipFs extends Filesystem{
+    public constructor(
+        public readonly zip_file_fs: OsFs | HttpFs | BucketFs,
+        public readonly zip_file_path: Path
+    ){
+        super(zip_file_fs.getUrl(zip_file_path))
+    }
+    public getUrl(path: Path): Url {
+        return this.zip_file_fs.getUrl(this.zip_file_path).joinPath(path)
+    }
+    public toDto(): ZipFsDto {
+        return new ZipFsDto({
+            zip_file_fs: this.zip_file_fs.toDto(), zip_file_path: this.zip_file_path.toDto()
+        })
+    }
+    public static fromDto(dto: ZipFsDto): ZipFs{
+        return new ZipFs(
+            Filesystem.fromDto(dto.zip_file_fs),
+            Path.parse(dto.zip_file_path)
+        )
+    }
 }
 
 export class OsFs extends Filesystem{

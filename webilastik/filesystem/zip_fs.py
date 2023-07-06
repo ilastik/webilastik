@@ -188,7 +188,7 @@ class ZipFs(IFilesystem):
 
     @classmethod
     def from_dto(cls, dto: ZipFsDto) -> "ZipFs | Exception":
-        fs_result = create_filesystem_from_message(dto)
+        fs_result = create_filesystem_from_message(dto.zip_file_fs)
         if isinstance(fs_result, Exception):
             return fs_result
         path = PurePosixPath(dto.zip_file_path)

@@ -27,7 +27,7 @@ Protocol = Literal["http", "https", "file", "memory"]
 
 @dataclass
 class UrlDto(DataTransferObject):
-    datascheme: Optional[Literal["precomputed", "n5"]]
+    datascheme: Optional[Literal["precomputed", "n5", "deepzoom"]]
     protocol: Literal["http", "https", "file", "memory"]
     hostname: str
     port: Optional[int]

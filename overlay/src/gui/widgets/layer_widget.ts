@@ -1,4 +1,4 @@
-import { Color, FsDataSource, PrecomputedChunksDataSource, Session } from "../../client/ilastik";
+import { Color, DziLevelDataSource, FsDataSource, PrecomputedChunksDataSource, Session } from "../../client/ilastik";
 import { INativeView, IViewerDriver } from "../../drivers/viewer_driver";
 import { uuidv4 } from "../../util/misc";
 import { Url } from "../../util/parsed_url";
@@ -63,7 +63,7 @@ class LayerWidget{
 }
 
 export class RawDataLayerWidget extends LayerWidget{
-    public readonly datasource: PrecomputedChunksDataSource;
+    public readonly datasource: FsDataSource;
 
     //colors by Sasha Trubetskoy: https://sashamaps.net/docs/resources/20-colors/
     public static readonly colorMap = [
@@ -93,7 +93,7 @@ export class RawDataLayerWidget extends LayerWidget{
 
     constructor(params: {
         parentElement: ContainerWidget<any> | undefined,
-        datasource: PrecomputedChunksDataSource,
+        datasource: FsDataSource,
         opacity: number,
         nativeView: INativeView,
     }){
@@ -105,7 +105,7 @@ export class RawDataLayerWidget extends LayerWidget{
         parentElement: ContainerWidget<any> | undefined,
         driver: IViewerDriver,
         session: Session,
-        datasource: PrecomputedChunksDataSource,
+        datasource: FsDataSource,
     }): Promise<RawDataLayerWidget | Error>{
         const opacity = 1
         let channelColors: Color[]
@@ -304,7 +304,7 @@ export class PixelClassificationLaneWidget{
         onDestroyed: (lane: PixelClassificationLaneWidget) => void,
         onVisibilityChanged: (lane: PixelClassificationLaneWidget) => void,
     }): Promise<PixelClassificationLaneWidget | Error>{
-        if(!(params.rawData instanceof PrecomputedChunksDataSource)){
+        if(!(params.rawData instanceof PrecomputedChunksDataSource || params.rawData instanceof DziLevelDataSource)){
             return new Error(`Unsupported datasource type `) //FIXME: maybe driver sould determine this
         }
         let rawDataWidget = await RawDataLayerWidget.create({

@@ -127,17 +127,20 @@ class LabelHeaderDto(DataTransferObject):
 Protocol = Literal["http", "https", "file", "memory"]
 
 
-def parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_(
+def parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote_0_quote_deepzoom_quote__endof_(
     value: JsonValue,
-) -> "Literal['precomputed', 'n5'] | MessageParsingError":
+) -> "Literal['precomputed', 'n5', 'deepzoom'] | MessageParsingError":
     tmp_0 = parse_as_str(value)
     if not isinstance(tmp_0, MessageParsingError) and tmp_0 == "precomputed":
         return tmp_0
     tmp_1 = parse_as_str(value)
     if not isinstance(tmp_1, MessageParsingError) and tmp_1 == "n5":
         return tmp_1
+    tmp_2 = parse_as_str(value)
+    if not isinstance(tmp_2, MessageParsingError) and tmp_2 == "deepzoom":
+        return tmp_2
     return MessageParsingError(
-        f"Could not parse {value} as Literal['precomputed', 'n5']"
+        f"Could not parse {value} as Literal['precomputed', 'n5', 'deepzoom']"
     )
 
 
@@ -148,11 +151,11 @@ def parse_as_None(value: JsonValue) -> "None | MessageParsingError":
     return MessageParsingError(f"Could not parse {json.dumps(value)} as None")
 
 
-def parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_0None_endof_(
+def parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote_0_quote_deepzoom_quote__endof_0None_endof_(
     value: JsonValue,
-) -> "Union[Literal['precomputed', 'n5'], None] | MessageParsingError":
-    parsed_option_0 = (
-        parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_(value)
+) -> "Union[Literal['precomputed', 'n5', 'deepzoom'], None] | MessageParsingError":
+    parsed_option_0 = parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote_0_quote_deepzoom_quote__endof_(
+        value
     )
     if not isinstance(parsed_option_0, MessageParsingError):
         return parsed_option_0
@@ -160,7 +163,7 @@ def parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endo
     if not isinstance(parsed_option_1, MessageParsingError):
         return parsed_option_1
     return MessageParsingError(
-        f"Could not parse {json.dumps(value)} into Union[Literal['precomputed', 'n5'], None]"
+        f"Could not parse {json.dumps(value)} into Union[Literal['precomputed', 'n5', 'deepzoom'], None]"
     )
 
 
@@ -254,7 +257,7 @@ def parse_as_UrlDto(value: JsonValue) -> "UrlDto | MessageParsingError":
         return MessageParsingError(f"Could not parse {json.dumps(value)} as UrlDto")
     if value.get("__class__") != "UrlDto":
         return MessageParsingError(f"Could not parse {json.dumps(value)} as UrlDto")
-    tmp_datascheme = parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_0None_endof_(
+    tmp_datascheme = parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote_0_quote_deepzoom_quote__endof_0None_endof_(
         value.get("datascheme")
     )
     if isinstance(tmp_datascheme, MessageParsingError):
@@ -294,7 +297,7 @@ def parse_as_UrlDto(value: JsonValue) -> "UrlDto | MessageParsingError":
 
 @dataclass
 class UrlDto(DataTransferObject):
-    datascheme: Optional[Literal["precomputed", "n5"]]
+    datascheme: Optional[Literal["precomputed", "n5", "deepzoom"]]
     protocol: Literal["http", "https", "file", "memory"]
     hostname: str
     port: Optional[int]

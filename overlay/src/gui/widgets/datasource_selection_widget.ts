@@ -1,6 +1,6 @@
 // import { ListFsDirRequest } from "../../client/dto";
 import { GetDatasourcesFromUrlParamsDto } from "../../client/dto";
-import { FsDataSource, PrecomputedChunksDataSource, Session } from "../../client/ilastik";
+import { DziLevelDataSource, FsDataSource, PrecomputedChunksDataSource, Session } from "../../client/ilastik";
 import { IViewerDriver } from "../../drivers/viewer_driver";
 import { Url } from "../../util/parsed_url";
 import { Viewer } from "../../viewer/viewer";
@@ -70,7 +70,8 @@ export class DataSourceSelectionWidget{
                 console.log("FIXME: handle undefined datasource? Maybe just don't have undefined at all?")
             }else{
                 const datasources: FsDataSource[] = viewResult
-                if(datasources.find(ds => !(ds instanceof PrecomputedChunksDataSource))){
+                //FIXME: viewer driver should be the one responsible for checking which datasources it supports
+                if(datasources.find(ds => !(ds instanceof PrecomputedChunksDataSource || ds instanceof DziLevelDataSource))){
                     errorMessages.push(`Unsupported datasources from ${url.raw}`)
                     unsupportedUrls.push(url)
                     continue

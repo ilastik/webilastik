@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlencode, quote_plus, quote
 
 from webilastik.server.rpc import dto
 
-DataScheme = Literal["precomputed", "n5"]
+DataScheme = Literal["precomputed", "n5", "deepzoom"]
 Protocol = Literal["http", "https", "file", "memory"]
 
 class SearchQuotingMethod(enum.Enum):

@@ -1,7 +1,7 @@
 import { UrlDto } from "../client/dto";
 import { IJsonable } from "./serialization";
 
-export const data_schemes = ["precomputed", "n5"] as const;
+export const data_schemes = ["precomputed", "n5", "deepzoom"] as const;
 export type DataScheme = typeof data_schemes[number];
 export function ensureDataScheme(value: string): DataScheme{
     const variant = data_schemes.find(variant => variant === value)

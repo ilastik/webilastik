@@ -1,7 +1,7 @@
 # pyright: strict
 
 from collections import Mapping
-from typing import Dict, Literal, Mapping, Tuple
+from typing import Dict, Literal, Mapping
 from pathlib import PurePosixPath
 import logging
 import io
@@ -14,7 +14,7 @@ from ndstructs.array5D import Array5D
 
 from webilastik.datasource import FsDataSource
 from webilastik.datasource.deep_zoom_image import DziImageElement, DziParsingException, GarbledTileException
-from webilastik.filesystem import FsFileNotFoundException, FsIoException, IFilesystem
+from webilastik.filesystem import FsFileNotFoundException, FsIoException, IFilesystem, create_filesystem_from_message
 from webilastik.filesystem import zip_fs
 from webilastik.filesystem.zip_fs import ZipFs
 from webilastik.server.rpc.dto import DziLevelDataSourceDto
@@ -35,8 +35,8 @@ class DziLevelDataSource(FsDataSource):
         dzi_image: DziImageElement,
         num_channels: Literal[1, 3],
         level_index: int,
-        spatial_resolution: Tuple[int, int, int],
     ):
+        self.num_channels: Literal[1, 3] = num_channels
         self.dzi_image = dzi_image
         self.level_index = level_index
         self.xml_path = xml_path
@@ -47,12 +47,11 @@ class DziLevelDataSource(FsDataSource):
             tile_shape=dzi_image.get_tile_shape(num_channels=num_channels),
             dtype=np.dtype("uint8"),
             interval=dzi_image.get_shape(level_index=level_index, num_channels=num_channels).to_interval5d(),
-            spatial_resolution=spatial_resolution, #FIXME: maybe delete this altogether?
         )
 
     @property
     def url(self) -> Url:
-        return self.filesystem.geturl(self.xml_path).updated_with(hash_=f"level={self.level_index}")
+        return self.filesystem.geturl(self.xml_path).updated_with(datascheme="deepzoom", hash_=f"level={self.level_index}")
 
     @classmethod
     def get_level_from_url(cls, url: Url) -> "int | None | Exception":
@@ -65,11 +64,26 @@ class DziLevelDataSource(FsDataSource):
             return Exception(f"Bad level fragment parameter: {level_str}")
 
     def to_dto(self) -> DziLevelDataSourceDto:
-        raise NotImplementedError #FIXME
+        return DziLevelDataSourceDto(
+            filesystem=self.filesystem.to_dto(),
+            dzi_image=self.dzi_image.to_dto(),
+            level_index=self.level_index,
+            num_channels=self.num_channels,
+            xml_path=self.xml_path.as_posix(),
+        )
 
     @staticmethod
     def from_dto(dto: DziLevelDataSourceDto) -> "DziLevelDataSource | Exception":
-        raise NotImplementedError #FIXME
+        fs = create_filesystem_from_message(dto.filesystem)
+        if isinstance(fs, Exception):
+            return fs
+        return DziLevelDataSource(
+            filesystem=fs,
+            dzi_image=DziImageElement.from_dto(dto.dzi_image),
+            level_index=dto.level_index,
+            num_channels=dto.num_channels,
+            xml_path=PurePosixPath(dto.xml_path)
+        )
 
     @classmethod
     def try_load(
@@ -142,7 +156,6 @@ class DziLevelDataSource(FsDataSource):
                 dzi_image=dzi_image_element,
                 num_channels=num_channels,
                 xml_path=dzi_path,
-                spatial_resolution=(1,1,1), #FIXME,
             )
             width = math.ceil(width / 2)
             height = math.ceil(height / 2)
