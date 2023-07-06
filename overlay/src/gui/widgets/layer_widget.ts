@@ -184,7 +184,7 @@ export class PredictionsLayerWidget extends LayerWidget{
             channelColors: params.channelColors,
             opacity,
             isVisible: params.isVisible,
-            name: `preds_for_${params.rawData.url.name}__${params.classifierGeneration}`
+            name: `preds_for_${params.rawData.url.name}__${params.classifierGeneration}_${uuidv4()}`
         })
         if(nativeView instanceof Error){
             return nativeView
