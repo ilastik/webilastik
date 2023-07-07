@@ -101,6 +101,9 @@ def test_zip_fs():
     zip_fs, entry_path_from_url = zip_fs_and_path_result
     assert zip_fs.read_file(entry_path_from_url) == entry2_contents
 
+    zip_fs = ZipFs.create(zip_file_fs=temp_fs, zip_file_path=tmp_zip_file_path)
+    assert not isinstance(zip_fs, Exception), str(zip_fs)
+    assert zip_fs.read_file(PurePosixPath(entry1_path)) == entry1_contents
 
 
 if __name__ == "__main__":
