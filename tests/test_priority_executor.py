@@ -4,7 +4,7 @@ import os
 from typing import Any
 import uuid
 
-from webilastik.scheduling.job import Job, PriorityExecutor
+from webilastik.scheduling.job import Job, JobStatus, PriorityExecutor
 
 
 def green(message: str):
@@ -29,7 +29,11 @@ def test_priority_executor():
     expected_execution_time = ((num_job_steps + num_standalone_tasks) / num_workers) * wait_time_per_task
 
 
-    def on_job_finished(job_id: uuid.UUID, result: Any):
+    def on_progress(*, job_id: uuid.UUID, job_status: JobStatus, step_index: int, step_result: Any):
+        blue(f"Step {step_index} of job {job_id} is complete!")
+
+        if step_index != num_job_steps:
+            return
         total_execution_time = time.time() - start_time
         print(f"Total execution time: {total_execution_time}")
         print(f"Expected execution time: {expected_execution_time}")
@@ -42,8 +46,7 @@ def test_priority_executor():
             target=do_some_work,
             args=[wait_time_per_task] * num_job_steps,
             name="My Job",
-            on_progress=lambda job_id, step_index: blue(f"Step {step_index} of job {job_id} is complete!"),
-            on_success=on_job_finished,
+            on_progress=on_progress,
         )
 
         start_time = time.time()
