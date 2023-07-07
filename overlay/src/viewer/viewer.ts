@@ -8,10 +8,6 @@ import { PixelClassificationLaneWidget } from "../gui/widgets/layer_widget";
 // import { ErrorPopupWidget } from "../gui/widgets/popup";
 import { Div } from "../gui/widgets/widget";
 import { Quat, Vec3 } from "../util/ooglmatrix";
-// import { PredictionsView, DataView, ViewUnion, RawDataView, StrippedPrecomputedView } from "./view";
-
-
-
 
 
 export class Viewer{

@@ -1,7 +1,7 @@
 import { UrlDto } from "../client/dto";
 import { IJsonable } from "./serialization";
 
-export const data_schemes = ["precomputed", "n5"] as const;
+export const data_schemes = ["precomputed", "n5", "deepzoom"] as const;
 export type DataScheme = typeof data_schemes[number];
 export function ensureDataScheme(value: string): DataScheme{
     const variant = data_schemes.find(variant => variant === value)
@@ -50,6 +50,10 @@ export class Path{
 
     public get name(): string{
         return this.components[this.components.length - 1] || "/" //FIXME ?
+    }
+
+    public get stem(): string{
+        return this.name.split(".")[0]
     }
 
     public get suffix(): string{

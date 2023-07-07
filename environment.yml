@@ -4,7 +4,7 @@ channels:
   - conda-forge
 dependencies:
   - python>=3.8
-  - numpy
+  - numpy=1.24.2
   - fastfilters
   - lemon
   - vigra=1.11.1
@@ -22,6 +22,8 @@ dependencies:
   - defusedxml
   - pip
   - pip:
-    - git+https://git@github.com/ilastik/ndstructs@1a5b02d34df0517ef6f3d1ba863e2e8169daf76a
-    - dask-mpi
-    - mpi4py
+    - numpy==1.24.2
+    - git+https://git@github.com/ilastik/ndstructs@43b27382e964211a5e4d94148f826ec83d514636
+    - git+https://github.com/ilastik/netzip@83d30fffe9c73136f19f18430acfb3eda7670f3a
+    - dask-mpi==2022.4.0
+    - mpi4py==3.1.4

@@ -130,7 +130,7 @@ export class DataSourceListWidget extends Div{
         PopupWidget.WaitPopup({
             title: "Loading data sources...",
             operation: (async () => {
-                const datasourcePromises = new HashMap<Url, Promise<FsDataSource[] | FsDataSource | undefined | Error>, string>();
+                const datasourcePromises = new HashMap<Url, Promise<FsDataSource[] | undefined | Error>, string>();
                 urls.forEach(url => datasourcePromises.set(
                     url,
                     this.session.getDatasourcesFromUrl(new GetDatasourcesFromUrlParamsDto({url: url.toDto()}))
@@ -141,10 +141,8 @@ export class DataSourceListWidget extends Div{
                         this.listWidget.push(new DataSourceFetchError({url, cause: datasources_result}))
                     }else if(datasources_result === undefined){
                         this.listWidget.push(new DataSourceFetchError({url, cause: new Error(`Could not open datasource at ${url.raw}`)}))
-                    }else if(datasources_result instanceof Array){
-                        datasources_result.forEach(ds => this.listWidget.push(ds))
                     }else{
-                        this.listWidget.push(datasources_result)
+                        datasources_result.forEach(ds => this.listWidget.push(ds))
                     }
                 }
             })(),

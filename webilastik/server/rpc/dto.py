@@ -127,17 +127,20 @@ class LabelHeaderDto(DataTransferObject):
 Protocol = Literal["http", "https", "file", "memory"]
 
 
-def parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_(
+def parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote_0_quote_deepzoom_quote__endof_(
     value: JsonValue,
-) -> "Literal['precomputed', 'n5'] | MessageParsingError":
+) -> "Literal['precomputed', 'n5', 'deepzoom'] | MessageParsingError":
     tmp_0 = parse_as_str(value)
     if not isinstance(tmp_0, MessageParsingError) and tmp_0 == "precomputed":
         return tmp_0
     tmp_1 = parse_as_str(value)
     if not isinstance(tmp_1, MessageParsingError) and tmp_1 == "n5":
         return tmp_1
+    tmp_2 = parse_as_str(value)
+    if not isinstance(tmp_2, MessageParsingError) and tmp_2 == "deepzoom":
+        return tmp_2
     return MessageParsingError(
-        f"Could not parse {value} as Literal['precomputed', 'n5']"
+        f"Could not parse {value} as Literal['precomputed', 'n5', 'deepzoom']"
     )
 
 
@@ -148,11 +151,11 @@ def parse_as_None(value: JsonValue) -> "None | MessageParsingError":
     return MessageParsingError(f"Could not parse {json.dumps(value)} as None")
 
 
-def parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_0None_endof_(
+def parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote_0_quote_deepzoom_quote__endof_0None_endof_(
     value: JsonValue,
-) -> "Union[Literal['precomputed', 'n5'], None] | MessageParsingError":
-    parsed_option_0 = (
-        parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_(value)
+) -> "Union[Literal['precomputed', 'n5', 'deepzoom'], None] | MessageParsingError":
+    parsed_option_0 = parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote_0_quote_deepzoom_quote__endof_(
+        value
     )
     if not isinstance(parsed_option_0, MessageParsingError):
         return parsed_option_0
@@ -160,7 +163,7 @@ def parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endo
     if not isinstance(parsed_option_1, MessageParsingError):
         return parsed_option_1
     return MessageParsingError(
-        f"Could not parse {json.dumps(value)} into Union[Literal['precomputed', 'n5'], None]"
+        f"Could not parse {json.dumps(value)} into Union[Literal['precomputed', 'n5', 'deepzoom'], None]"
     )
 
 
@@ -254,7 +257,7 @@ def parse_as_UrlDto(value: JsonValue) -> "UrlDto | MessageParsingError":
         return MessageParsingError(f"Could not parse {json.dumps(value)} as UrlDto")
     if value.get("__class__") != "UrlDto":
         return MessageParsingError(f"Could not parse {json.dumps(value)} as UrlDto")
-    tmp_datascheme = parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_0None_endof_(
+    tmp_datascheme = parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote_0_quote_deepzoom_quote__endof_0None_endof_(
         value.get("datascheme")
     )
     if isinstance(tmp_datascheme, MessageParsingError):
@@ -294,7 +297,7 @@ def parse_as_UrlDto(value: JsonValue) -> "UrlDto | MessageParsingError":
 
 @dataclass
 class UrlDto(DataTransferObject):
-    datascheme: Optional[Literal["precomputed", "n5"]]
+    datascheme: Optional[Literal["precomputed", "n5", "deepzoom"]]
     protocol: Literal["http", "https", "file", "memory"]
     hostname: str
     port: Optional[int]
@@ -615,15 +618,6 @@ class BucketFSDto(DataTransferObject):
         return parse_as_BucketFSDto(value)
 
 
-FsDto = Union[OsfsDto, HttpFsDto, BucketFSDto]
-
-DtypeDto = Literal["uint8", "uint16", "uint32", "uint64", "int64", "float32"]
-
-
-def dtype_to_dto(dtype: "np.dtype[Any]") -> DtypeDto:
-    return cast(DtypeDto, str(dtype))
-
-
 def parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
     value: JsonValue,
 ) -> "Union[OsfsDto, HttpFsDto, BucketFSDto] | MessageParsingError":
@@ -638,6 +632,73 @@ def parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
         return parsed_option_2
     return MessageParsingError(
         f"Could not parse {json.dumps(value)} into Union[OsfsDto, HttpFsDto, BucketFSDto]"
+    )
+
+
+def parse_as_ZipFsDto(value: JsonValue) -> "ZipFsDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(f"Could not parse {json.dumps(value)} as ZipFsDto")
+    if value.get("__class__") != "ZipFsDto":
+        return MessageParsingError(f"Could not parse {json.dumps(value)} as ZipFsDto")
+    tmp_zip_file_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
+        value.get("zip_file_fs")
+    )
+    if isinstance(tmp_zip_file_fs, MessageParsingError):
+        return tmp_zip_file_fs
+    tmp_zip_file_path = parse_as_str(value.get("zip_file_path"))
+    if isinstance(tmp_zip_file_path, MessageParsingError):
+        return tmp_zip_file_path
+    return ZipFsDto(
+        zip_file_fs=tmp_zip_file_fs,
+        zip_file_path=tmp_zip_file_path,
+    )
+
+
+@dataclass
+class ZipFsDto(DataTransferObject):
+    zip_file_fs: Union[OsfsDto, HttpFsDto, BucketFSDto]  # FIXME: no other ZipFs?
+    zip_file_path: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "ZipFsDto",
+            "zip_file_fs": convert_to_json_value(self.zip_file_fs),
+            "zip_file_path": self.zip_file_path,
+        }
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "ZipFsDto | MessageParsingError":
+        return parse_as_ZipFsDto(value)
+
+
+FsDto = Union[OsfsDto, HttpFsDto, BucketFSDto, ZipFsDto]
+
+DtypeDto = Literal["uint8", "uint16", "uint32", "uint64", "int64", "float32"]
+
+
+def dtype_to_dto(dtype: "np.dtype[Any]") -> DtypeDto:
+    return cast(DtypeDto, str(dtype))
+
+
+def parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
+    value: JsonValue,
+) -> "Union[OsfsDto, HttpFsDto, BucketFSDto, ZipFsDto] | MessageParsingError":
+    parsed_option_0 = parse_as_OsfsDto(value)
+    if not isinstance(parsed_option_0, MessageParsingError):
+        return parsed_option_0
+    parsed_option_1 = parse_as_HttpFsDto(value)
+    if not isinstance(parsed_option_1, MessageParsingError):
+        return parsed_option_1
+    parsed_option_2 = parse_as_BucketFSDto(value)
+    if not isinstance(parsed_option_2, MessageParsingError):
+        return parsed_option_2
+    parsed_option_3 = parse_as_ZipFsDto(value)
+    if not isinstance(parsed_option_3, MessageParsingError):
+        return parsed_option_3
+    return MessageParsingError(
+        f"Could not parse {json.dumps(value)} into Union[OsfsDto, HttpFsDto, BucketFSDto, ZipFsDto]"
     )
 
 
@@ -718,7 +779,7 @@ def parse_as_PrecomputedChunksDataSourceDto(
     tmp_url = parse_as_UrlDto(value.get("url"))
     if isinstance(tmp_url, MessageParsingError):
         return tmp_url
-    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
+    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
         value.get("filesystem")
     )
     if isinstance(tmp_filesystem, MessageParsingError):
@@ -800,6 +861,53 @@ class PrecomputedChunksDataSourceDto(DataTransferObject):
         return parse_as_PrecomputedChunksDataSourceDto(value)
 
 
+ImageFormatDto = Literal["jpeg", "jpg", "png"]
+
+
+def parse_as_DziSizeElementDto(
+    value: JsonValue,
+) -> "DziSizeElementDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as DziSizeElementDto"
+        )
+    if value.get("__class__") != "DziSizeElementDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as DziSizeElementDto"
+        )
+    tmp_Width = parse_as_int(value.get("Width"))
+    if isinstance(tmp_Width, MessageParsingError):
+        return tmp_Width
+    tmp_Height = parse_as_int(value.get("Height"))
+    if isinstance(tmp_Height, MessageParsingError):
+        return tmp_Height
+    return DziSizeElementDto(
+        Width=tmp_Width,
+        Height=tmp_Height,
+    )
+
+
+@dataclass
+class DziSizeElementDto(DataTransferObject):
+    Width: int
+    Height: int
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "DziSizeElementDto",
+            "Width": self.Width,
+            "Height": self.Height,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "DziSizeElementDto | MessageParsingError":
+        return parse_as_DziSizeElementDto(value)
+
+
 def parse_as_Literal_of__quote_jpeg_quote_0_quote_jpg_quote_0_quote_png_quote__endof_(
     value: JsonValue,
 ) -> "Literal['jpeg', 'jpg', 'png'] | MessageParsingError":
@@ -817,104 +925,138 @@ def parse_as_Literal_of__quote_jpeg_quote_0_quote_jpg_quote_0_quote_png_quote__e
     )
 
 
-def parse_as_DziLevelDto(value: JsonValue) -> "DziLevelDto | MessageParsingError":
+def parse_as_DziImageElementDto(
+    value: JsonValue,
+) -> "DziImageElementDto | MessageParsingError":
     from collections.abc import Mapping
 
     if not isinstance(value, Mapping):
         return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as DziLevelDto"
+            f"Could not parse {json.dumps(value)} as DziImageElementDto"
         )
-    if value.get("__class__") != "DziLevelDto":
+    if value.get("__class__") != "DziImageElementDto":
         return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as DziLevelDto"
+            f"Could not parse {json.dumps(value)} as DziImageElementDto"
         )
-    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
-        value.get("filesystem")
+    tmp_Format = parse_as_Literal_of__quote_jpeg_quote_0_quote_jpg_quote_0_quote_png_quote__endof_(
+        value.get("Format")
     )
-    if isinstance(tmp_filesystem, MessageParsingError):
-        return tmp_filesystem
-    tmp_level_path = parse_as_str(value.get("level_path"))
-    if isinstance(tmp_level_path, MessageParsingError):
-        return tmp_level_path
-    tmp_level_index = parse_as_int(value.get("level_index"))
-    if isinstance(tmp_level_index, MessageParsingError):
-        return tmp_level_index
-    tmp_overlap = parse_as_int(value.get("overlap"))
-    if isinstance(tmp_overlap, MessageParsingError):
-        return tmp_overlap
-    tmp_tile_shape = parse_as_Shape5DDto(value.get("tile_shape"))
-    if isinstance(tmp_tile_shape, MessageParsingError):
-        return tmp_tile_shape
-    tmp_shape = parse_as_Shape5DDto(value.get("shape"))
-    if isinstance(tmp_shape, MessageParsingError):
-        return tmp_shape
-    tmp_full_shape = parse_as_Shape5DDto(value.get("full_shape"))
-    if isinstance(tmp_full_shape, MessageParsingError):
-        return tmp_full_shape
-    tmp_dtype = parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
-        value.get("dtype")
-    )
-    if isinstance(tmp_dtype, MessageParsingError):
-        return tmp_dtype
-    tmp_spatial_resolution = parse_as_Tuple_of_int0int0int_endof_(
-        value.get("spatial_resolution")
-    )
-    if isinstance(tmp_spatial_resolution, MessageParsingError):
-        return tmp_spatial_resolution
-    tmp_image_format = parse_as_Literal_of__quote_jpeg_quote_0_quote_jpg_quote_0_quote_png_quote__endof_(
-        value.get("image_format")
-    )
-    if isinstance(tmp_image_format, MessageParsingError):
-        return tmp_image_format
-    return DziLevelDto(
-        filesystem=tmp_filesystem,
-        level_path=tmp_level_path,
-        level_index=tmp_level_index,
-        overlap=tmp_overlap,
-        tile_shape=tmp_tile_shape,
-        shape=tmp_shape,
-        full_shape=tmp_full_shape,
-        dtype=tmp_dtype,
-        spatial_resolution=tmp_spatial_resolution,
-        image_format=tmp_image_format,
+    if isinstance(tmp_Format, MessageParsingError):
+        return tmp_Format
+    tmp_Overlap = parse_as_int(value.get("Overlap"))
+    if isinstance(tmp_Overlap, MessageParsingError):
+        return tmp_Overlap
+    tmp_TileSize = parse_as_int(value.get("TileSize"))
+    if isinstance(tmp_TileSize, MessageParsingError):
+        return tmp_TileSize
+    tmp_Size = parse_as_DziSizeElementDto(value.get("Size"))
+    if isinstance(tmp_Size, MessageParsingError):
+        return tmp_Size
+    return DziImageElementDto(
+        Format=tmp_Format,
+        Overlap=tmp_Overlap,
+        TileSize=tmp_TileSize,
+        Size=tmp_Size,
     )
 
 
 @dataclass
-class DziLevelDto(DataTransferObject):
-    filesystem: FsDto
-    level_path: str
-    level_index: int
-    overlap: int
-    tile_shape: Shape5DDto
-    shape: Shape5DDto
-    full_shape: Shape5DDto
-    dtype: DtypeDto
-    spatial_resolution: Tuple[int, int, int]
-    image_format: Literal["jpeg", "jpg", "png"]
+class DziImageElementDto(DataTransferObject):
+    Format: ImageFormatDto
+    Overlap: int
+    TileSize: int
+    Size: DziSizeElementDto
 
     def to_json_value(self) -> JsonObject:
         return {
-            "__class__": "DziLevelDto",
-            "filesystem": convert_to_json_value(self.filesystem),
-            "level_path": self.level_path,
-            "level_index": self.level_index,
-            "overlap": self.overlap,
-            "tile_shape": self.tile_shape.to_json_value(),
-            "shape": self.shape.to_json_value(),
-            "full_shape": self.full_shape.to_json_value(),
-            "dtype": self.dtype,
-            "spatial_resolution": (
-                self.spatial_resolution[0],
-                self.spatial_resolution[1],
-                self.spatial_resolution[2],
-            ),
-            "image_format": self.image_format,
+            "__class__": "DziImageElementDto",
+            "Format": self.Format,
+            "Overlap": self.Overlap,
+            "TileSize": self.TileSize,
+            "Size": self.Size.to_json_value(),
         }
 
     @classmethod
-    def from_json_value(cls, value: JsonValue) -> "DziLevelDto | MessageParsingError":
-        return parse_as_DziLevelDto(value)
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "DziImageElementDto | MessageParsingError":
+        return parse_as_DziImageElementDto(value)
+
+
+def parse_as_Literal_of_103_endof_(
+    value: JsonValue,
+) -> "Literal[1, 3] | MessageParsingError":
+    tmp_0 = parse_as_int(value)
+    if not isinstance(tmp_0, MessageParsingError) and tmp_0 == 1:
+        return tmp_0
+    tmp_1 = parse_as_int(value)
+    if not isinstance(tmp_1, MessageParsingError) and tmp_1 == 3:
+        return tmp_1
+    return MessageParsingError(f"Could not parse {value} as Literal[1, 3]")
+
+
+def parse_as_DziLevelSinkDto(
+    value: JsonValue,
+) -> "DziLevelSinkDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as DziLevelSinkDto"
+        )
+    if value.get("__class__") != "DziLevelSinkDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as DziLevelSinkDto"
+        )
+    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
+        value.get("filesystem")
+    )
+    if isinstance(tmp_filesystem, MessageParsingError):
+        return tmp_filesystem
+    tmp_xml_path = parse_as_str(value.get("xml_path"))
+    if isinstance(tmp_xml_path, MessageParsingError):
+        return tmp_xml_path
+    tmp_dzi_image = parse_as_DziImageElementDto(value.get("dzi_image"))
+    if isinstance(tmp_dzi_image, MessageParsingError):
+        return tmp_dzi_image
+    tmp_num_channels = parse_as_Literal_of_103_endof_(value.get("num_channels"))
+    if isinstance(tmp_num_channels, MessageParsingError):
+        return tmp_num_channels
+    tmp_level_index = parse_as_int(value.get("level_index"))
+    if isinstance(tmp_level_index, MessageParsingError):
+        return tmp_level_index
+    return DziLevelSinkDto(
+        filesystem=tmp_filesystem,
+        xml_path=tmp_xml_path,
+        dzi_image=tmp_dzi_image,
+        num_channels=tmp_num_channels,
+        level_index=tmp_level_index,
+    )
+
+
+@dataclass
+class DziLevelSinkDto(DataTransferObject):
+    filesystem: FsDto
+    xml_path: str
+    dzi_image: DziImageElementDto
+    num_channels: Literal[1, 3]
+    level_index: int
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "DziLevelSinkDto",
+            "filesystem": convert_to_json_value(self.filesystem),
+            "xml_path": self.xml_path,
+            "dzi_image": self.dzi_image.to_json_value(),
+            "num_channels": self.num_channels,
+            "level_index": self.level_index,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "DziLevelSinkDto | MessageParsingError":
+        return parse_as_DziLevelSinkDto(value)
 
 
 def parse_as_DziLevelDataSourceDto(
@@ -930,22 +1072,48 @@ def parse_as_DziLevelDataSourceDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as DziLevelDataSourceDto"
         )
-    tmp_level = parse_as_DziLevelDto(value.get("level"))
-    if isinstance(tmp_level, MessageParsingError):
-        return tmp_level
+    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
+        value.get("filesystem")
+    )
+    if isinstance(tmp_filesystem, MessageParsingError):
+        return tmp_filesystem
+    tmp_xml_path = parse_as_str(value.get("xml_path"))
+    if isinstance(tmp_xml_path, MessageParsingError):
+        return tmp_xml_path
+    tmp_dzi_image = parse_as_DziImageElementDto(value.get("dzi_image"))
+    if isinstance(tmp_dzi_image, MessageParsingError):
+        return tmp_dzi_image
+    tmp_num_channels = parse_as_Literal_of_103_endof_(value.get("num_channels"))
+    if isinstance(tmp_num_channels, MessageParsingError):
+        return tmp_num_channels
+    tmp_level_index = parse_as_int(value.get("level_index"))
+    if isinstance(tmp_level_index, MessageParsingError):
+        return tmp_level_index
     return DziLevelDataSourceDto(
-        level=tmp_level,
+        filesystem=tmp_filesystem,
+        xml_path=tmp_xml_path,
+        dzi_image=tmp_dzi_image,
+        num_channels=tmp_num_channels,
+        level_index=tmp_level_index,
     )
 
 
 @dataclass
 class DziLevelDataSourceDto(DataTransferObject):
-    level: DziLevelDto
+    filesystem: FsDto
+    xml_path: str
+    dzi_image: DziImageElementDto
+    num_channels: Literal[1, 3]
+    level_index: int
 
     def to_json_value(self) -> JsonObject:
         return {
             "__class__": "DziLevelDataSourceDto",
-            "level": self.level.to_json_value(),
+            "filesystem": convert_to_json_value(self.filesystem),
+            "xml_path": self.xml_path,
+            "dzi_image": self.dzi_image.to_json_value(),
+            "num_channels": self.num_channels,
+            "level_index": self.level_index,
         }
 
     @classmethod
@@ -1286,7 +1454,7 @@ def parse_as_N5DataSourceDto(
     tmp_url = parse_as_UrlDto(value.get("url"))
     if isinstance(tmp_url, MessageParsingError):
         return tmp_url
-    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
+    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
         value.get("filesystem")
     )
     if isinstance(tmp_filesystem, MessageParsingError):
@@ -1384,7 +1552,7 @@ def parse_as_SkimageDataSourceDto(
     tmp_url = parse_as_UrlDto(value.get("url"))
     if isinstance(tmp_url, MessageParsingError):
         return tmp_url
-    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
+    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
         value.get("filesystem")
     )
     if isinstance(tmp_filesystem, MessageParsingError):
@@ -1550,44 +1718,6 @@ class PrecomputedChunksSinkDto(DataTransferObject):
         return parse_as_PrecomputedChunksSinkDto(value)
 
 
-def parse_as_DziLevelSinkDto(
-    value: JsonValue,
-) -> "DziLevelSinkDto | MessageParsingError":
-    from collections.abc import Mapping
-
-    if not isinstance(value, Mapping):
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as DziLevelSinkDto"
-        )
-    if value.get("__class__") != "DziLevelSinkDto":
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as DziLevelSinkDto"
-        )
-    tmp_level = parse_as_DziLevelDto(value.get("level"))
-    if isinstance(tmp_level, MessageParsingError):
-        return tmp_level
-    return DziLevelSinkDto(
-        level=tmp_level,
-    )
-
-
-@dataclass
-class DziLevelSinkDto(DataTransferObject):
-    level: DziLevelDto
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "DziLevelSinkDto",
-            "level": self.level.to_json_value(),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "DziLevelSinkDto | MessageParsingError":
-        return parse_as_DziLevelSinkDto(value)
-
-
 def parse_as_N5DataSinkDto(value: JsonValue) -> "N5DataSinkDto | MessageParsingError":
     from collections.abc import Mapping
 
@@ -1599,7 +1729,7 @@ def parse_as_N5DataSinkDto(value: JsonValue) -> "N5DataSinkDto | MessageParsingE
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as N5DataSinkDto"
         )
-    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
+    tmp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
         value.get("filesystem")
     )
     if isinstance(tmp_filesystem, MessageParsingError):
@@ -2176,548 +2306,9 @@ class BrushingAppletStateDto(DataTransferObject):
         return parse_as_BrushingAppletStateDto(value)
 
 
-def parse_as_ViewDto(value: JsonValue) -> "ViewDto | MessageParsingError":
-    from collections.abc import Mapping
-
-    if not isinstance(value, Mapping):
-        return MessageParsingError(f"Could not parse {json.dumps(value)} as ViewDto")
-    if value.get("__class__") != "ViewDto":
-        return MessageParsingError(f"Could not parse {json.dumps(value)} as ViewDto")
-    tmp_name = parse_as_str(value.get("name"))
-    if isinstance(tmp_name, MessageParsingError):
-        return tmp_name
-    tmp_url = parse_as_UrlDto(value.get("url"))
-    if isinstance(tmp_url, MessageParsingError):
-        return tmp_url
-    return ViewDto(
-        name=tmp_name,
-        url=tmp_url,
-    )
-
-
-@dataclass
-class ViewDto(DataTransferObject):
-    name: str
-    url: UrlDto
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "ViewDto",
-            "name": self.name,
-            "url": self.url.to_json_value(),
-        }
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "ViewDto | MessageParsingError":
-        return parse_as_ViewDto(value)
-
-
-def parse_as_DataView(value: JsonValue) -> "DataView | MessageParsingError":
-    from collections.abc import Mapping
-
-    if not isinstance(value, Mapping):
-        return MessageParsingError(f"Could not parse {json.dumps(value)} as DataView")
-    if value.get("__class__") != "DataView":
-        return MessageParsingError(f"Could not parse {json.dumps(value)} as DataView")
-    tmp_name = parse_as_str(value.get("name"))
-    if isinstance(tmp_name, MessageParsingError):
-        return tmp_name
-    tmp_url = parse_as_UrlDto(value.get("url"))
-    if isinstance(tmp_url, MessageParsingError):
-        return tmp_url
-    return DataView(
-        name=tmp_name,
-        url=tmp_url,
-    )
-
-
-@dataclass
-class DataView(ViewDto):
-    pass
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "DataView",
-            "name": self.name,
-            "url": self.url.to_json_value(),
-        }
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "DataView | MessageParsingError":
-        return parse_as_DataView(value)
-
-
-def parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
+def parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
     value: JsonValue,
-) -> "Tuple[Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto], ...] | MessageParsingError":
-    if not isinstance(value, (list, tuple)):
-        return MessageParsingError(
-            f"Could not parse Tuple[Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto], ...] from {json.dumps(value)}"
-        )
-    items: List[
-        Union[
-            PrecomputedChunksDataSourceDto,
-            N5DataSourceDto,
-            SkimageDataSourceDto,
-            DziLevelDataSourceDto,
-        ]
-    ] = []
-    for item in value:
-        parsed = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
-            item
-        )
-        if isinstance(parsed, MessageParsingError):
-            return parsed
-        items.append(parsed)
-    return tuple(items)
-
-
-def parse_as_RawDataViewDto(value: JsonValue) -> "RawDataViewDto | MessageParsingError":
-    from collections.abc import Mapping
-
-    if not isinstance(value, Mapping):
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as RawDataViewDto"
-        )
-    if value.get("__class__") != "RawDataViewDto":
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as RawDataViewDto"
-        )
-    tmp_name = parse_as_str(value.get("name"))
-    if isinstance(tmp_name, MessageParsingError):
-        return tmp_name
-    tmp_url = parse_as_UrlDto(value.get("url"))
-    if isinstance(tmp_url, MessageParsingError):
-        return tmp_url
-    tmp_datasources = parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
-        value.get("datasources")
-    )
-    if isinstance(tmp_datasources, MessageParsingError):
-        return tmp_datasources
-    return RawDataViewDto(
-        name=tmp_name,
-        url=tmp_url,
-        datasources=tmp_datasources,
-    )
-
-
-@dataclass
-class RawDataViewDto(ViewDto):
-    datasources: Tuple[FsDataSourceDto, ...]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "RawDataViewDto",
-            "name": self.name,
-            "url": self.url.to_json_value(),
-            "datasources": tuple(
-                convert_to_json_value(item) for item in self.datasources
-            ),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "RawDataViewDto | MessageParsingError":
-        return parse_as_RawDataViewDto(value)
-
-
-def parse_as_StrippedPrecomputedViewDto(
-    value: JsonValue,
-) -> "StrippedPrecomputedViewDto | MessageParsingError":
-    from collections.abc import Mapping
-
-    if not isinstance(value, Mapping):
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as StrippedPrecomputedViewDto"
-        )
-    if value.get("__class__") != "StrippedPrecomputedViewDto":
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as StrippedPrecomputedViewDto"
-        )
-    tmp_name = parse_as_str(value.get("name"))
-    if isinstance(tmp_name, MessageParsingError):
-        return tmp_name
-    tmp_url = parse_as_UrlDto(value.get("url"))
-    if isinstance(tmp_url, MessageParsingError):
-        return tmp_url
-    tmp_datasource = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
-        value.get("datasource")
-    )
-    if isinstance(tmp_datasource, MessageParsingError):
-        return tmp_datasource
-    return StrippedPrecomputedViewDto(
-        name=tmp_name,
-        url=tmp_url,
-        datasource=tmp_datasource,
-    )
-
-
-@dataclass
-class StrippedPrecomputedViewDto(ViewDto):
-    datasource: FsDataSourceDto
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "StrippedPrecomputedViewDto",
-            "name": self.name,
-            "url": self.url.to_json_value(),
-            "datasource": convert_to_json_value(self.datasource),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "StrippedPrecomputedViewDto | MessageParsingError":
-        return parse_as_StrippedPrecomputedViewDto(value)
-
-
-def parse_as_PredictionsViewDto(
-    value: JsonValue,
-) -> "PredictionsViewDto | MessageParsingError":
-    from collections.abc import Mapping
-
-    if not isinstance(value, Mapping):
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as PredictionsViewDto"
-        )
-    if value.get("__class__") != "PredictionsViewDto":
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as PredictionsViewDto"
-        )
-    tmp_name = parse_as_str(value.get("name"))
-    if isinstance(tmp_name, MessageParsingError):
-        return tmp_name
-    tmp_url = parse_as_UrlDto(value.get("url"))
-    if isinstance(tmp_url, MessageParsingError):
-        return tmp_url
-    tmp_raw_data = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
-        value.get("raw_data")
-    )
-    if isinstance(tmp_raw_data, MessageParsingError):
-        return tmp_raw_data
-    tmp_classifier_generation = parse_as_int(value.get("classifier_generation"))
-    if isinstance(tmp_classifier_generation, MessageParsingError):
-        return tmp_classifier_generation
-    return PredictionsViewDto(
-        name=tmp_name,
-        url=tmp_url,
-        raw_data=tmp_raw_data,
-        classifier_generation=tmp_classifier_generation,
-    )
-
-
-@dataclass
-class PredictionsViewDto(ViewDto):
-    raw_data: FsDataSourceDto
-    classifier_generation: int
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "PredictionsViewDto",
-            "name": self.name,
-            "url": self.url.to_json_value(),
-            "raw_data": convert_to_json_value(self.raw_data),
-            "classifier_generation": self.classifier_generation,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "PredictionsViewDto | MessageParsingError":
-        return parse_as_PredictionsViewDto(value)
-
-
-def parse_as_FailedViewDto(value: JsonValue) -> "FailedViewDto | MessageParsingError":
-    from collections.abc import Mapping
-
-    if not isinstance(value, Mapping):
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as FailedViewDto"
-        )
-    if value.get("__class__") != "FailedViewDto":
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as FailedViewDto"
-        )
-    tmp_name = parse_as_str(value.get("name"))
-    if isinstance(tmp_name, MessageParsingError):
-        return tmp_name
-    tmp_url = parse_as_UrlDto(value.get("url"))
-    if isinstance(tmp_url, MessageParsingError):
-        return tmp_url
-    tmp_error_message = parse_as_str(value.get("error_message"))
-    if isinstance(tmp_error_message, MessageParsingError):
-        return tmp_error_message
-    return FailedViewDto(
-        name=tmp_name,
-        url=tmp_url,
-        error_message=tmp_error_message,
-    )
-
-
-@dataclass
-class FailedViewDto(ViewDto):
-    error_message: str
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "FailedViewDto",
-            "name": self.name,
-            "url": self.url.to_json_value(),
-            "error_message": self.error_message,
-        }
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "FailedViewDto | MessageParsingError":
-        return parse_as_FailedViewDto(value)
-
-
-def parse_as_UnsupportedDatasetViewDto(
-    value: JsonValue,
-) -> "UnsupportedDatasetViewDto | MessageParsingError":
-    from collections.abc import Mapping
-
-    if not isinstance(value, Mapping):
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as UnsupportedDatasetViewDto"
-        )
-    if value.get("__class__") != "UnsupportedDatasetViewDto":
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as UnsupportedDatasetViewDto"
-        )
-    tmp_name = parse_as_str(value.get("name"))
-    if isinstance(tmp_name, MessageParsingError):
-        return tmp_name
-    tmp_url = parse_as_UrlDto(value.get("url"))
-    if isinstance(tmp_url, MessageParsingError):
-        return tmp_url
-    return UnsupportedDatasetViewDto(
-        name=tmp_name,
-        url=tmp_url,
-    )
-
-
-@dataclass
-class UnsupportedDatasetViewDto(ViewDto):
-    pass
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "UnsupportedDatasetViewDto",
-            "name": self.name,
-            "url": self.url.to_json_value(),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "UnsupportedDatasetViewDto | MessageParsingError":
-        return parse_as_UnsupportedDatasetViewDto(value)
-
-
-DataViewUnion = Union[
-    RawDataViewDto, StrippedPrecomputedViewDto, FailedViewDto, UnsupportedDatasetViewDto
-]
-
-
-def parse_as_Union_of_RawDataViewDto0StrippedPrecomputedViewDto0FailedViewDto0UnsupportedDatasetViewDto_endof_(
-    value: JsonValue,
-) -> "Union[RawDataViewDto, StrippedPrecomputedViewDto, FailedViewDto, UnsupportedDatasetViewDto] | MessageParsingError":
-    parsed_option_0 = parse_as_RawDataViewDto(value)
-    if not isinstance(parsed_option_0, MessageParsingError):
-        return parsed_option_0
-    parsed_option_1 = parse_as_StrippedPrecomputedViewDto(value)
-    if not isinstance(parsed_option_1, MessageParsingError):
-        return parsed_option_1
-    parsed_option_2 = parse_as_FailedViewDto(value)
-    if not isinstance(parsed_option_2, MessageParsingError):
-        return parsed_option_2
-    parsed_option_3 = parse_as_UnsupportedDatasetViewDto(value)
-    if not isinstance(parsed_option_3, MessageParsingError):
-        return parsed_option_3
-    return MessageParsingError(
-        f"Could not parse {json.dumps(value)} into Union[RawDataViewDto, StrippedPrecomputedViewDto, FailedViewDto, UnsupportedDatasetViewDto]"
-    )
-
-
-def parse_as_Tuple_of_Union_of_RawDataViewDto0StrippedPrecomputedViewDto0FailedViewDto0UnsupportedDatasetViewDto_endof_0_varlen__endof_(
-    value: JsonValue,
-) -> "Tuple[Union[RawDataViewDto, StrippedPrecomputedViewDto, FailedViewDto, UnsupportedDatasetViewDto], ...] | MessageParsingError":
-    if not isinstance(value, (list, tuple)):
-        return MessageParsingError(
-            f"Could not parse Tuple[Union[RawDataViewDto, StrippedPrecomputedViewDto, FailedViewDto, UnsupportedDatasetViewDto], ...] from {json.dumps(value)}"
-        )
-    items: List[
-        Union[
-            RawDataViewDto,
-            StrippedPrecomputedViewDto,
-            FailedViewDto,
-            UnsupportedDatasetViewDto,
-        ]
-    ] = []
-    for item in value:
-        parsed = parse_as_Union_of_RawDataViewDto0StrippedPrecomputedViewDto0FailedViewDto0UnsupportedDatasetViewDto_endof_(
-            item
-        )
-        if isinstance(parsed, MessageParsingError):
-            return parsed
-        items.append(parsed)
-    return tuple(items)
-
-
-def parse_as_Tuple_of_PredictionsViewDto0_varlen__endof_(
-    value: JsonValue,
-) -> "Tuple[PredictionsViewDto, ...] | MessageParsingError":
-    if not isinstance(value, (list, tuple)):
-        return MessageParsingError(
-            f"Could not parse Tuple[PredictionsViewDto, ...] from {json.dumps(value)}"
-        )
-    items: List[PredictionsViewDto] = []
-    for item in value:
-        parsed = parse_as_PredictionsViewDto(item)
-        if isinstance(parsed, MessageParsingError):
-            return parsed
-        items.append(parsed)
-    return tuple(items)
-
-
-def parse_as_Tuple_of_ColorDto0_varlen__endof_(
-    value: JsonValue,
-) -> "Tuple[ColorDto, ...] | MessageParsingError":
-    if not isinstance(value, (list, tuple)):
-        return MessageParsingError(
-            f"Could not parse Tuple[ColorDto, ...] from {json.dumps(value)}"
-        )
-    items: List[ColorDto] = []
-    for item in value:
-        parsed = parse_as_ColorDto(item)
-        if isinstance(parsed, MessageParsingError):
-            return parsed
-        items.append(parsed)
-    return tuple(items)
-
-
-def parse_as_ViewerAppletStateDto(
-    value: JsonValue,
-) -> "ViewerAppletStateDto | MessageParsingError":
-    from collections.abc import Mapping
-
-    if not isinstance(value, Mapping):
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as ViewerAppletStateDto"
-        )
-    if value.get("__class__") != "ViewerAppletStateDto":
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as ViewerAppletStateDto"
-        )
-    tmp_frontend_timestamp = parse_as_int(value.get("frontend_timestamp"))
-    if isinstance(tmp_frontend_timestamp, MessageParsingError):
-        return tmp_frontend_timestamp
-    tmp_data_views = parse_as_Tuple_of_Union_of_RawDataViewDto0StrippedPrecomputedViewDto0FailedViewDto0UnsupportedDatasetViewDto_endof_0_varlen__endof_(
-        value.get("data_views")
-    )
-    if isinstance(tmp_data_views, MessageParsingError):
-        return tmp_data_views
-    tmp_prediction_views = parse_as_Tuple_of_PredictionsViewDto0_varlen__endof_(
-        value.get("prediction_views")
-    )
-    if isinstance(tmp_prediction_views, MessageParsingError):
-        return tmp_prediction_views
-    tmp_label_colors = parse_as_Tuple_of_ColorDto0_varlen__endof_(
-        value.get("label_colors")
-    )
-    if isinstance(tmp_label_colors, MessageParsingError):
-        return tmp_label_colors
-    return ViewerAppletStateDto(
-        frontend_timestamp=tmp_frontend_timestamp,
-        data_views=tmp_data_views,
-        prediction_views=tmp_prediction_views,
-        label_colors=tmp_label_colors,
-    )
-
-
-@dataclass
-class ViewerAppletStateDto(DataTransferObject):
-    frontend_timestamp: int
-    data_views: Tuple[
-        Union[
-            RawDataViewDto,
-            StrippedPrecomputedViewDto,
-            FailedViewDto,
-            UnsupportedDatasetViewDto,
-        ],
-        ...,
-    ]
-    prediction_views: Tuple[PredictionsViewDto, ...]
-    label_colors: Tuple[ColorDto, ...]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "ViewerAppletStateDto",
-            "frontend_timestamp": self.frontend_timestamp,
-            "data_views": tuple(
-                convert_to_json_value(item) for item in self.data_views
-            ),
-            "prediction_views": tuple(
-                item.to_json_value() for item in self.prediction_views
-            ),
-            "label_colors": tuple(item.to_json_value() for item in self.label_colors),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "ViewerAppletStateDto | MessageParsingError":
-        return parse_as_ViewerAppletStateDto(value)
-
-
-def parse_as_MakeDataViewParams(
-    value: JsonValue,
-) -> "MakeDataViewParams | MessageParsingError":
-    from collections.abc import Mapping
-
-    if not isinstance(value, Mapping):
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as MakeDataViewParams"
-        )
-    if value.get("__class__") != "MakeDataViewParams":
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as MakeDataViewParams"
-        )
-    tmp_view_name = parse_as_str(value.get("view_name"))
-    if isinstance(tmp_view_name, MessageParsingError):
-        return tmp_view_name
-    tmp_url = parse_as_UrlDto(value.get("url"))
-    if isinstance(tmp_url, MessageParsingError):
-        return tmp_url
-    return MakeDataViewParams(
-        view_name=tmp_view_name,
-        url=tmp_url,
-    )
-
-
-@dataclass
-class MakeDataViewParams(DataTransferObject):
-    view_name: str
-    url: UrlDto
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "MakeDataViewParams",
-            "view_name": self.view_name,
-            "url": self.url.to_json_value(),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "MakeDataViewParams | MessageParsingError":
-        return parse_as_MakeDataViewParams(value)
-
-
-def parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_failed_quote_0_quote_succeeded_quote__endof_(
-    value: JsonValue,
-) -> "Literal['pending', 'running', 'cancelled', 'failed', 'succeeded'] | MessageParsingError":
+) -> "Literal['pending', 'running', 'cancelled', 'completed'] | MessageParsingError":
     tmp_0 = parse_as_str(value)
     if not isinstance(tmp_0, MessageParsingError) and tmp_0 == "pending":
         return tmp_0
@@ -2728,13 +2319,10 @@ def parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cance
     if not isinstance(tmp_2, MessageParsingError) and tmp_2 == "cancelled":
         return tmp_2
     tmp_3 = parse_as_str(value)
-    if not isinstance(tmp_3, MessageParsingError) and tmp_3 == "failed":
+    if not isinstance(tmp_3, MessageParsingError) and tmp_3 == "completed":
         return tmp_3
-    tmp_4 = parse_as_str(value)
-    if not isinstance(tmp_4, MessageParsingError) and tmp_4 == "succeeded":
-        return tmp_4
     return MessageParsingError(
-        f"Could not parse {value} as Literal['pending', 'running', 'cancelled', 'failed', 'succeeded']"
+        f"Could not parse {value} as Literal['pending', 'running', 'cancelled', 'completed']"
     )
 
 
@@ -2754,7 +2342,7 @@ def parse_as_JobDto(value: JsonValue) -> "JobDto | MessageParsingError":
     tmp_uuid = parse_as_str(value.get("uuid"))
     if isinstance(tmp_uuid, MessageParsingError):
         return tmp_uuid
-    tmp_status = parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_failed_quote_0_quote_succeeded_quote__endof_(
+    tmp_status = parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
         value.get("status")
     )
     if isinstance(tmp_status, MessageParsingError):
@@ -2780,7 +2368,7 @@ class JobDto(DataTransferObject):
     name: str
     num_args: Optional[int]
     uuid: str
-    status: Literal["pending", "running", "cancelled", "failed", "succeeded"]
+    status: Literal["pending", "running", "cancelled", "completed"]
     num_completed_steps: int
     error_message: Optional[str]
 
@@ -2837,7 +2425,7 @@ def parse_as_ExportJobDto(value: JsonValue) -> "ExportJobDto | MessageParsingErr
     tmp_uuid = parse_as_str(value.get("uuid"))
     if isinstance(tmp_uuid, MessageParsingError):
         return tmp_uuid
-    tmp_status = parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_failed_quote_0_quote_succeeded_quote__endof_(
+    tmp_status = parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
         value.get("status")
     )
     if isinstance(tmp_status, MessageParsingError):
@@ -2909,7 +2497,7 @@ def parse_as_OpenDatasinkJobDto(
     tmp_uuid = parse_as_str(value.get("uuid"))
     if isinstance(tmp_uuid, MessageParsingError):
         return tmp_uuid
-    tmp_status = parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_failed_quote_0_quote_succeeded_quote__endof_(
+    tmp_status = parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
         value.get("status")
     )
     if isinstance(tmp_status, MessageParsingError):
@@ -2961,30 +2549,180 @@ class OpenDatasinkJobDto(JobDto):
         return parse_as_OpenDatasinkJobDto(value)
 
 
-def parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_(
+def parse_as_CreateDziPyramidJobDto(
     value: JsonValue,
-) -> "Union[ExportJobDto, OpenDatasinkJobDto] | MessageParsingError":
+) -> "CreateDziPyramidJobDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as CreateDziPyramidJobDto"
+        )
+    if value.get("__class__") != "CreateDziPyramidJobDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as CreateDziPyramidJobDto"
+        )
+    tmp_name = parse_as_str(value.get("name"))
+    if isinstance(tmp_name, MessageParsingError):
+        return tmp_name
+    tmp_num_args = parse_as_Union_of_int0None_endof_(value.get("num_args"))
+    if isinstance(tmp_num_args, MessageParsingError):
+        return tmp_num_args
+    tmp_uuid = parse_as_str(value.get("uuid"))
+    if isinstance(tmp_uuid, MessageParsingError):
+        return tmp_uuid
+    tmp_status = parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
+        value.get("status")
+    )
+    if isinstance(tmp_status, MessageParsingError):
+        return tmp_status
+    tmp_num_completed_steps = parse_as_int(value.get("num_completed_steps"))
+    if isinstance(tmp_num_completed_steps, MessageParsingError):
+        return tmp_num_completed_steps
+    tmp_error_message = parse_as_Union_of_str0None_endof_(value.get("error_message"))
+    if isinstance(tmp_error_message, MessageParsingError):
+        return tmp_error_message
+    return CreateDziPyramidJobDto(
+        name=tmp_name,
+        num_args=tmp_num_args,
+        uuid=tmp_uuid,
+        status=tmp_status,
+        num_completed_steps=tmp_num_completed_steps,
+        error_message=tmp_error_message,
+    )
+
+
+@dataclass
+class CreateDziPyramidJobDto(JobDto):
+    pass
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "CreateDziPyramidJobDto",
+            "name": self.name,
+            "num_args": convert_to_json_value(self.num_args),
+            "uuid": self.uuid,
+            "status": self.status,
+            "num_completed_steps": self.num_completed_steps,
+            "error_message": convert_to_json_value(self.error_message),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "CreateDziPyramidJobDto | MessageParsingError":
+        return parse_as_CreateDziPyramidJobDto(value)
+
+
+def parse_as_ZipJobDto(value: JsonValue) -> "ZipJobDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(f"Could not parse {json.dumps(value)} as ZipJobDto")
+    if value.get("__class__") != "ZipJobDto":
+        return MessageParsingError(f"Could not parse {json.dumps(value)} as ZipJobDto")
+    tmp_name = parse_as_str(value.get("name"))
+    if isinstance(tmp_name, MessageParsingError):
+        return tmp_name
+    tmp_num_args = parse_as_Union_of_int0None_endof_(value.get("num_args"))
+    if isinstance(tmp_num_args, MessageParsingError):
+        return tmp_num_args
+    tmp_uuid = parse_as_str(value.get("uuid"))
+    if isinstance(tmp_uuid, MessageParsingError):
+        return tmp_uuid
+    tmp_status = parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
+        value.get("status")
+    )
+    if isinstance(tmp_status, MessageParsingError):
+        return tmp_status
+    tmp_num_completed_steps = parse_as_int(value.get("num_completed_steps"))
+    if isinstance(tmp_num_completed_steps, MessageParsingError):
+        return tmp_num_completed_steps
+    tmp_error_message = parse_as_Union_of_str0None_endof_(value.get("error_message"))
+    if isinstance(tmp_error_message, MessageParsingError):
+        return tmp_error_message
+    tmp_output_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
+        value.get("output_fs")
+    )
+    if isinstance(tmp_output_fs, MessageParsingError):
+        return tmp_output_fs
+    tmp_output_path = parse_as_str(value.get("output_path"))
+    if isinstance(tmp_output_path, MessageParsingError):
+        return tmp_output_path
+    return ZipJobDto(
+        name=tmp_name,
+        num_args=tmp_num_args,
+        uuid=tmp_uuid,
+        status=tmp_status,
+        num_completed_steps=tmp_num_completed_steps,
+        error_message=tmp_error_message,
+        output_fs=tmp_output_fs,
+        output_path=tmp_output_path,
+    )
+
+
+@dataclass
+class ZipJobDto(JobDto):
+    output_fs: FsDto
+    output_path: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "ZipJobDto",
+            "name": self.name,
+            "num_args": convert_to_json_value(self.num_args),
+            "uuid": self.uuid,
+            "status": self.status,
+            "num_completed_steps": self.num_completed_steps,
+            "error_message": convert_to_json_value(self.error_message),
+            "output_fs": convert_to_json_value(self.output_fs),
+            "output_path": self.output_path,
+        }
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "ZipJobDto | MessageParsingError":
+        return parse_as_ZipJobDto(value)
+
+
+ExportJobDtoUnion = Union[
+    ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto
+]
+
+
+def parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_(
+    value: JsonValue,
+) -> "Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto] | MessageParsingError":
     parsed_option_0 = parse_as_ExportJobDto(value)
     if not isinstance(parsed_option_0, MessageParsingError):
         return parsed_option_0
     parsed_option_1 = parse_as_OpenDatasinkJobDto(value)
     if not isinstance(parsed_option_1, MessageParsingError):
         return parsed_option_1
+    parsed_option_2 = parse_as_CreateDziPyramidJobDto(value)
+    if not isinstance(parsed_option_2, MessageParsingError):
+        return parsed_option_2
+    parsed_option_3 = parse_as_ZipJobDto(value)
+    if not isinstance(parsed_option_3, MessageParsingError):
+        return parsed_option_3
     return MessageParsingError(
-        f"Could not parse {json.dumps(value)} into Union[ExportJobDto, OpenDatasinkJobDto]"
+        f"Could not parse {json.dumps(value)} into Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto]"
     )
 
 
-def parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_0_varlen__endof_(
+def parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_0_varlen__endof_(
     value: JsonValue,
-) -> "Tuple[Union[ExportJobDto, OpenDatasinkJobDto], ...] | MessageParsingError":
+) -> "Tuple[Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto], ...] | MessageParsingError":
     if not isinstance(value, (list, tuple)):
         return MessageParsingError(
-            f"Could not parse Tuple[Union[ExportJobDto, OpenDatasinkJobDto], ...] from {json.dumps(value)}"
+            f"Could not parse Tuple[Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto], ...] from {json.dumps(value)}"
         )
-    items: List[Union[ExportJobDto, OpenDatasinkJobDto]] = []
+    items: List[
+        Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto]
+    ] = []
     for item in value:
-        parsed = parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_(item)
+        parsed = parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_(
+            item
+        )
         if isinstance(parsed, MessageParsingError):
             return parsed
         items.append(parsed)
@@ -3021,6 +2759,31 @@ def parse_as_Union_of_Tuple_of_LabelHeaderDto0_varlen__endof_0None_endof_(
     )
 
 
+def parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
+    value: JsonValue,
+) -> "Tuple[Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto], ...] | MessageParsingError":
+    if not isinstance(value, (list, tuple)):
+        return MessageParsingError(
+            f"Could not parse Tuple[Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto], ...] from {json.dumps(value)}"
+        )
+    items: List[
+        Union[
+            PrecomputedChunksDataSourceDto,
+            N5DataSourceDto,
+            SkimageDataSourceDto,
+            DziLevelDataSourceDto,
+        ]
+    ] = []
+    for item in value:
+        parsed = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
+            item
+        )
+        if isinstance(parsed, MessageParsingError):
+            return parsed
+        items.append(parsed)
+    return tuple(items)
+
+
 def parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
     value: JsonValue,
 ) -> "Union[Tuple[Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto], ...], None] | MessageParsingError":
@@ -3050,7 +2813,7 @@ def parse_as_PixelClassificationExportAppletStateDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as PixelClassificationExportAppletStateDto"
         )
-    tmp_jobs = parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_0_varlen__endof_(
+    tmp_jobs = parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_0_varlen__endof_(
         value.get("jobs")
     )
     if isinstance(tmp_jobs, MessageParsingError):
@@ -3076,7 +2839,7 @@ def parse_as_PixelClassificationExportAppletStateDto(
 
 @dataclass
 class PixelClassificationExportAppletStateDto(DataTransferObject):
-    jobs: Tuple[Union[ExportJobDto, OpenDatasinkJobDto], ...]
+    jobs: Tuple[ExportJobDtoUnion, ...]
     populated_labels: Optional[Tuple[LabelHeaderDto, ...]]
     datasource_suggestions: Optional[Tuple[FsDataSourceDto, ...]]
 
@@ -4099,7 +3862,9 @@ def parse_as_LoadProjectParamsDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as LoadProjectParamsDto"
         )
-    tmp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(value.get("fs"))
+    tmp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
+        value.get("fs")
+    )
     if isinstance(tmp_fs, MessageParsingError):
         return tmp_fs
     tmp_project_file_path = parse_as_str(value.get("project_file_path"))
@@ -4143,7 +3908,9 @@ def parse_as_SaveProjectParamsDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as SaveProjectParamsDto"
         )
-    tmp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(value.get("fs"))
+    tmp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
+        value.get("fs")
+    )
     if isinstance(tmp_fs, MessageParsingError):
         return tmp_fs
     tmp_project_file_path = parse_as_str(value.get("project_file_path"))
@@ -4212,34 +3979,6 @@ class GetDatasourcesFromUrlParamsDto(DataTransferObject):
         return parse_as_GetDatasourcesFromUrlParamsDto(value)
 
 
-def parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto0Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
-    value: JsonValue,
-) -> "Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto, Tuple[Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto], ...], None] | MessageParsingError":
-    parsed_option_0 = parse_as_PrecomputedChunksDataSourceDto(value)
-    if not isinstance(parsed_option_0, MessageParsingError):
-        return parsed_option_0
-    parsed_option_1 = parse_as_N5DataSourceDto(value)
-    if not isinstance(parsed_option_1, MessageParsingError):
-        return parsed_option_1
-    parsed_option_2 = parse_as_SkimageDataSourceDto(value)
-    if not isinstance(parsed_option_2, MessageParsingError):
-        return parsed_option_2
-    parsed_option_3 = parse_as_DziLevelDataSourceDto(value)
-    if not isinstance(parsed_option_3, MessageParsingError):
-        return parsed_option_3
-    parsed_option_4 = parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
-        value
-    )
-    if not isinstance(parsed_option_4, MessageParsingError):
-        return parsed_option_4
-    parsed_option_5 = parse_as_None(value)
-    if not isinstance(parsed_option_5, MessageParsingError):
-        return parsed_option_5
-    return MessageParsingError(
-        f"Could not parse {json.dumps(value)} into Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto, Tuple[Union[PrecomputedChunksDataSourceDto, N5DataSourceDto, SkimageDataSourceDto, DziLevelDataSourceDto], ...], None]"
-    )
-
-
 def parse_as_GetDatasourcesFromUrlResponseDto(
     value: JsonValue,
 ) -> "GetDatasourcesFromUrlResponseDto | MessageParsingError":
@@ -4253,7 +3992,7 @@ def parse_as_GetDatasourcesFromUrlResponseDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as GetDatasourcesFromUrlResponseDto"
         )
-    tmp_datasources = parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto0Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
+    tmp_datasources = parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
         value.get("datasources")
     )
     if isinstance(tmp_datasources, MessageParsingError):
@@ -4265,7 +4004,7 @@ def parse_as_GetDatasourcesFromUrlResponseDto(
 
 @dataclass
 class GetDatasourcesFromUrlResponseDto(DataTransferObject):
-    datasources: Union[FsDataSourceDto, Tuple[FsDataSourceDto, ...], None]
+    datasources: Union[Tuple[FsDataSourceDto, ...], None]
 
     def to_json_value(self) -> JsonObject:
         return {
@@ -4331,7 +4070,9 @@ def parse_as_GetFileSystemAndPathFromUrlResponseDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as GetFileSystemAndPathFromUrlResponseDto"
         )
-    tmp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(value.get("fs"))
+    tmp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
+        value.get("fs")
+    )
     if isinstance(tmp_fs, MessageParsingError):
         return tmp_fs
     tmp_path = parse_as_str(value.get("path"))
@@ -4471,7 +4212,9 @@ def parse_as_ListFsDirRequest(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as ListFsDirRequest"
         )
-    tmp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(value.get("fs"))
+    tmp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
+        value.get("fs")
+    )
     if isinstance(tmp_fs, MessageParsingError):
         return tmp_fs
     tmp_path = parse_as_str(value.get("path"))

@@ -7,6 +7,7 @@ import {
 } from "../util/serialization"
 import {
     BucketFSDto,
+    ZipFsDto,
     CheckLoginResultDto,
     CloseComputeSessionParamsDto,
     ColorDto,
@@ -40,10 +41,11 @@ import {
     N5XzCompressorDto,
     N5DataSourceDto,
     DziLevelDataSourceDto,
-    DziLevelDto,
+    DziImageElementDto,
     DziLevelSinkDto,
     GetFileSystemAndPathFromUrlParamsDto,
     GetFileSystemAndPathFromUrlResponseDto,
+    DziSizeElementDto,
 } from "./dto"
 
 export type HpcSiteName = ComputeSessionStatusDto["hpc_site"] //FIXME?
@@ -407,7 +409,7 @@ export class Session{
         return undefined
     }
 
-    public async getDatasourcesFromUrl(params: GetDatasourcesFromUrlParamsDto): Promise<Array<FsDataSource> | FsDataSource | undefined | Error>{
+    public async getDatasourcesFromUrl(params: GetDatasourcesFromUrlParamsDto): Promise<Array<FsDataSource> | undefined | Error>{
         let result = await fetchJson(this.sessionUrl.joinPath("get_datasources_from_url").raw, {
             method: "POST",
             body: JSON.stringify(toJsonValue(params)),
@@ -423,10 +425,7 @@ export class Session{
         if(responseDto.datasources === undefined){
             return undefined
         }
-        if(responseDto.datasources instanceof Array){
-            return responseDto.datasources.map(msg => FsDataSource.fromDto(msg))
-        }
-        return FsDataSource.fromDto(responseDto.datasources)
+        return responseDto.datasources.map(msg => FsDataSource.fromDto(msg))
     }
 
     public async tryGetFsAndPathFromUrl(params: GetFileSystemAndPathFromUrlParamsDto): Promise<{fs: Filesystem, path: Path} | Error>{
@@ -824,12 +823,6 @@ export class PrecomputedChunksDataSource extends FsDataSource{
         this.scale_key = params.scale_key
     }
 
-    public getStrippedUrl(session: Session): Url{
-        return session.sessionUrl.updatedWith({
-            datascheme: "precomputed",
-        }).joinPath(`stripped_precomputed/datasource=${this.toBase64()}`)
-    }
-
     public static fromDto(dto: PrecomputedChunksDataSourceDto) : PrecomputedChunksDataSource{
         return new PrecomputedChunksDataSource({
             filesystem: Filesystem.fromDto(dto.filesystem),
@@ -926,96 +919,152 @@ export class N5DataSource extends FsDataSource{
     }
 }
 
-class DziLevel{
-    public readonly filesystem: Filesystem
-    public readonly level_path: Path
-    public readonly level_index: number
-    public readonly overlap: number
-    public readonly tile_shape: Shape5D
-    public readonly shape: Shape5D
-    public readonly full_shape: Shape5D
-    public readonly dtype: DataType
-    public readonly spatial_resolution: [number, number, number]
-    public readonly image_format: "jpeg" | "jpg" | "png"
+export class DziSizeElement{
+    public readonly Width: number
+    public readonly Height: number
 
-    constructor(params: {
-        filesystem: Filesystem,
-        level_path: Path,
-        level_index: number,
-        overlap: number,
-        tile_shape: Shape5D,
-        shape: Shape5D,
-        full_shape: Shape5D,
-        dtype: DataType,
-        spatial_resolution: [number, number, number],
-        image_format: "jpeg" | "jpg" | "png",
-    }){
-        this.filesystem = params.filesystem
-        this.level_path = params.level_path
-        this.level_index = params.level_index
-        this.overlap = params.overlap
-        this.tile_shape = params.tile_shape
-        this.shape = params.shape
-        this.full_shape = params.full_shape
-        this.dtype = params.dtype
-        this.spatial_resolution = params.spatial_resolution
-        this.image_format = params.image_format
+    public constructor(params: {Width: number, Height: number}){
+        this.Width = params.Width
+        this.Height = params.Height
     }
 
-    public static fromDto(dto: DziLevelDto){
-        return new this({
-            filesystem: Filesystem.fromDto(dto.filesystem),
-            level_path: Path.parse(dto.level_path),
-            level_index: dto.level_index,
-            overlap: dto.overlap,
-            tile_shape: Shape5D.fromDto(dto.tile_shape),
-            shape: Shape5D.fromDto(dto.shape),
-            full_shape: Shape5D.fromDto(dto.full_shape),
-            dtype: dto.dtype,
-            spatial_resolution: dto.spatial_resolution,
-            image_format: dto.image_format,
+    public static fromDto(dto: DziSizeElementDto): DziSizeElement{
+        return new DziSizeElement(dto)
+    }
+
+    public toDto(): DziSizeElementDto{
+        return new DziSizeElementDto(this)
+    }
+}
+
+export class DziImageElement{
+    public readonly Format: "jpeg" | "jpg" | "png"
+    public readonly Overlap: number
+    public readonly TileSize: number
+    public readonly Size: DziSizeElement
+
+    public readonly max_level_index: number
+    public readonly num_levels: number
+    private levels: Array<{width: number, height: number}>
+
+    public constructor(params: {
+        Format: "jpeg" | "jpg" | "png",
+        Overlap: number,
+        TileSize: number,
+        Size: DziSizeElement,
+    }){
+        this.Format = params.Format
+        this.Overlap = params.Overlap
+        this.TileSize = params.TileSize
+        this.Size = params.Size
+
+        this.max_level_index = Math.ceil(Math.log2(Math.max(this.Size.Height, this.Size.Width)))
+        this.num_levels = this.max_level_index + 1
+
+        this.levels = []
+
+        let width: number = this.Size.Width
+        let height: number = this.Size.Height
+        for(let i=0; i<this.num_levels; i++){
+            this.levels.unshift({width, height})
+            width = Math.ceil(width / 2)
+            height = Math.ceil(height / 2)
+        }
+
+    }
+
+    public get_shape(params: {num_channels: number, level_index: number}): Shape5D{
+        return new Shape5D({
+            x: this.levels[params.level_index].width,
+            y: this.levels[params.level_index].height,
+            c: params.num_channels
         })
     }
 
-    public toDto(): DziLevelDto{
-        return new DziLevelDto({
-            filesystem: this.filesystem.toDto(),
-            level_path: this.level_path.toDto(),
-            level_index: this.level_index,
-            overlap: this.overlap,
-            tile_shape: this.tile_shape.toDto(),
-            shape: this.shape.toDto(),
-            full_shape: this.full_shape.toDto(),
-            dtype: this.dtype,
-            spatial_resolution: this.spatial_resolution,
-            image_format: this.image_format,
+    public get_tile_shape(num_channels: number): Shape5D{
+        return new Shape5D({x: this.TileSize, y: this.TileSize, c: num_channels})
+    }
+
+    public static make_level_path(xml_path: Path, level_index: number): Path{
+        return xml_path.parent.joinPath(`${xml_path.stem}_files/${level_index}`)
+    }
+
+    public static fromDto(dto: DziImageElementDto): DziImageElement{
+        return new DziImageElement({
+            Format: dto.Format,
+            Overlap: dto.Overlap,
+            TileSize: dto.TileSize,
+            Size: DziSizeElement.fromDto(dto.Size)
+        })
+    }
+
+    public toDto(): DziImageElementDto{
+        return new DziImageElementDto({
+            Format: this.Format,
+            Overlap: this.Overlap,
+            TileSize: this.TileSize,
+            Size: this.Size.toDto(),
         })
     }
 }
 
 export class DziLevelDataSource extends FsDataSource{
-    public readonly level: DziLevel
+    public readonly dzi_image: DziImageElement
+    public readonly level_index: number
+    public readonly xml_path: Path
+    public readonly num_channels: 1 | 3
 
-    public constructor(level: DziLevel){
+    public constructor(params: {
+        filesystem: Filesystem,
+        xml_path: Path,
+        dzi_image: DziImageElement,
+        num_channels: 1 | 3,
+        level_index: number,
+    }){
+        let width = params.dzi_image.Size.Width;
+        let height = params.dzi_image.Size.Height;
+
+        for(let i=0; i<params.dzi_image.max_level_index - params.level_index; i++){
+            width = Math.ceil(width / 2)
+            height = Math.ceil(height / 2)
+        }
+
         super({
-            dtype: level.dtype,
-            filesystem: level.filesystem,
-            interval: level.shape.toInterval5D({offset: undefined}),
-            path: level.level_path,
-            spatial_resolution: level.spatial_resolution,
-            tile_shape: level.tile_shape,
-            url: level.filesystem.getUrl(level.level_path)
+            dtype: "uint8",
+            filesystem: params.filesystem,
+            interval: new Shape5D({x: width, y: height, c: params.num_channels}).toInterval5D({}),
+            path: params.xml_path,
+            spatial_resolution: [1,1,1], //FIXME
+            tile_shape: params.dzi_image.get_tile_shape(params.num_channels),
+            url: params.filesystem.getUrl(params.xml_path).updatedWith({datascheme: "deepzoom", hash: `level=${params.level_index}`}),
         })
-        this.level = level
+        this.xml_path = params.xml_path
+        this.level_index = params.level_index
+        this.dzi_image = params.dzi_image
+        this.num_channels = params.num_channels
+    }
+
+    public get resolutionString(): string {
+        return `${this.shape.x}x${this.shape.y} px`
     }
 
     public static fromDto(dto: DziLevelDataSourceDto) : DziLevelDataSource{
-        return new DziLevelDataSource(DziLevel.fromDto(dto.level))
+        return new DziLevelDataSource({
+            filesystem: Filesystem.fromDto(dto.filesystem),
+            dzi_image: DziImageElement.fromDto(dto.dzi_image),
+            xml_path: Path.fromDto(dto.xml_path),
+            level_index: dto.level_index,
+            num_channels: dto.num_channels,
+        })
     }
 
     public toDto(): DziLevelDataSourceDto{
         return new DziLevelDataSourceDto({
-            level: this.level.toDto()
+            xml_path: this.xml_path.toDto(),
+            dzi_image: this.dzi_image.toDto(),
+            filesystem: this.filesystem.toDto(),
+            level_index: this.level_index,
+            num_channels: this.num_channels,
         })
     }
 }
@@ -1023,7 +1072,8 @@ export class DziLevelDataSource extends FsDataSource{
 export abstract class Filesystem{
     public constructor(public readonly url: Url){}
 
-    public static fromDto(message: BucketFSDto | HttpFsDto | OsfsDto): Filesystem{
+    //FIXME: this should take a FsDto, whose type should be auto-generated
+    public static fromDto(message: PrecomputedChunksDataSourceDto["filesystem"]): Filesystem{
         if(message instanceof BucketFSDto){
             return BucketFs.fromDto(message)
         }
@@ -1033,12 +1083,39 @@ export abstract class Filesystem{
         if(message instanceof OsfsDto){
             return OsFs.fromDto(message)
         }
+        if(message instanceof ZipFsDto){
+            return ZipFs.fromDto(message)
+        }
         assertUnreachable(message)
     }
 
-    public abstract toDto(): OsfsDto | HttpFsDto | BucketFSDto;
+    //FIXME: this should take a FsDto, whose type should be auto-generated
+    public abstract toDto(): PrecomputedChunksDataSourceDto["filesystem"];
 
     public abstract getUrl(path: Path): Url;
+}
+
+export class ZipFs extends Filesystem{
+    public constructor(
+        public readonly zip_file_fs: OsFs | HttpFs | BucketFs,
+        public readonly zip_file_path: Path
+    ){
+        super(zip_file_fs.getUrl(zip_file_path))
+    }
+    public getUrl(path: Path): Url {
+        return this.zip_file_fs.getUrl(this.zip_file_path).joinPath(path)
+    }
+    public toDto(): ZipFsDto {
+        return new ZipFsDto({
+            zip_file_fs: this.zip_file_fs.toDto(), zip_file_path: this.zip_file_path.toDto()
+        })
+    }
+    public static fromDto(dto: ZipFsDto): ZipFs{
+        return new ZipFs(
+            Filesystem.fromDto(dto.zip_file_fs),
+            Path.parse(dto.zip_file_path)
+        )
+    }
 }
 
 export class OsFs extends Filesystem{
@@ -1134,6 +1211,18 @@ export class BucketFs extends Filesystem{
     }
     public getUrl(path: Path): Url{
         return this.url.joinPath(path)
+    }
+    public getDataProxyGuiUrl(params: {dirPath: Path}): Url{
+        let prefix = params.dirPath.toDto().replace(/^\//, "") + "/"
+
+        return new Url({
+            protocol: "https",
+            hostname: "data-proxy.ebrains.eu",
+            path: new Path({components: [this.bucket_name]}),
+            search: new Map([
+                ["prefix", prefix],
+            ]),
+        })
     }
 }
 
@@ -1371,25 +1460,61 @@ export class N5DataSink extends FsDataSink{
     }
 }
 
-
 export class DziLevelSink extends FsDataSink{
-    public constructor(public readonly level: DziLevel){
+    public readonly dzi_image: DziImageElement
+    public readonly level_index: number
+    public readonly xml_path: Path
+    public readonly num_channels: 1 | 3
+
+    public constructor(params: {
+        filesystem: Filesystem,
+        xml_path: Path,
+        dzi_image: DziImageElement,
+        num_channels: 1 | 3,
+        level_index: number,
+    }){
+        let level_path = DziImageElement.make_level_path(params.xml_path, params.level_index)
         super({
-            dtype: level.dtype,
-            filesystem: level.filesystem,
-            interval: level.shape.toInterval5D({offset: undefined}),
-            path: level.level_path,
-            resolution: level.spatial_resolution,
-            tile_shape: level.tile_shape,
+            dtype: "uint8",
+            filesystem: params.filesystem,
+            interval: new Shape5D({x: params.dzi_image.Size.Width, y: params.dzi_image.Size.Height, c: params.num_channels}).toInterval5D({}),
+            path: level_path,
+            tile_shape: params.dzi_image.get_tile_shape(params.num_channels),
+            resolution: [1,1,1],
+        })
+        this.xml_path = params.xml_path
+        this.level_index = params.level_index
+        this.dzi_image = params.dzi_image
+        this.num_channels = params.num_channels
+    }
+
+    public static fromDto(dto: DziLevelSinkDto) : DziLevelSink{
+        return new DziLevelSink({
+            filesystem: Filesystem.fromDto(dto.filesystem),
+            dzi_image: DziImageElement.fromDto(dto.dzi_image),
+            xml_path: Path.fromDto(dto.xml_path),
+            level_index: dto.level_index,
+            num_channels: dto.num_channels,
         })
     }
-    public static fromDto(dto: DziLevelSinkDto): DziLevelSink{
-        return new DziLevelSink(DziLevel.fromDto(dto.level))
-    }
+
     public toDto(): DziLevelSinkDto{
-        return new DziLevelSinkDto({level: this.level.toDto()})
+        return new DziLevelSinkDto({
+            xml_path: this.xml_path.toDto(),
+            dzi_image: this.dzi_image.toDto(),
+            filesystem: this.filesystem.toDto(),
+            level_index: this.level_index,
+            num_channels: this.num_channels,
+        })
     }
-    public toDataSource(): DziLevelDataSource{
-        return new DziLevelDataSource(this.level)
+
+    public toDataSource(): FsDataSource {
+        return new DziLevelDataSource({
+            dzi_image: this.dzi_image,
+            filesystem: this.filesystem,
+            level_index: this.level_index,
+            num_channels: this.num_channels,
+            xml_path: this.xml_path,
+        })
     }
 }

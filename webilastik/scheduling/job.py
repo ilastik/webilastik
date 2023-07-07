@@ -16,30 +16,24 @@ from webilastik.utility import PeekableIterator
 IN = TypeVar("IN", covariant=True)
 OUT = TypeVar("OUT")
 
-class JobProgressCallback(Protocol):
-    def __call__(self, job_id: uuid.UUID, step_index: int) -> Any:
-        ...
+JOB_STEP_RESULT = TypeVar("JOB_STEP_RESULT", contravariant=True)
 
-JOB_RESULT = TypeVar("JOB_RESULT", contravariant=True)
+JobStatus = Literal["pending", "running", "cancelled", "completed"]
 
-class JobSucceededCallback(Protocol[JOB_RESULT]):
-    def __call__(self, job_id: uuid.UUID, result: JOB_RESULT) -> Any:
-        ...
-
-class JobFailedCallback(Protocol):
-    def __call__(self, exception: BaseException) -> Any:
+class JobProgressCallback(Protocol[JOB_STEP_RESULT]):
+    def __call__(
+        self, *, job_id: uuid.UUID, job_status: JobStatus, step_index: int, step_result: JOB_STEP_RESULT
+    ) -> Any:
         ...
 
 
-class Job(Generic[IN, OUT]):
+class Job(Generic[OUT]):
     def __init__(
         self,
         *,
         name: str,
         target: Callable[[IN], OUT],
-        on_progress: "JobProgressCallback | None" = None,
-        on_success: "JobSucceededCallback[OUT] | None" = None,
-        on_failure: "JobFailedCallback | None" = None,
+        on_progress: "JobProgressCallback[OUT] | None" = None,
         args: Iterable[IN],
         num_args: "int | None" = None,
     ):
@@ -47,9 +41,7 @@ class Job(Generic[IN, OUT]):
         self.creation_time = time.time()
         self.name = name
         self.target = target
-        self.on_progress: "JobProgressCallback | None" = on_progress
-        self.on_success = on_success
-        self.on_failure = on_failure
+        self.on_progress: "JobProgressCallback[OUT] | None" = on_progress
         self.num_args: "int | None" = num_args or (len(args) if isinstance(args, Sized) else None)
         self.args: PeekableIterator[IN] = PeekableIterator(args)
 
@@ -57,10 +49,10 @@ class Job(Generic[IN, OUT]):
         self.num_completed_steps = 0
         self.num_dispatched_steps = 0
         self.job_lock = threading.Lock()
-        self._status: Literal["pending", "running", "cancelled", "failed", "succeeded"] = "pending"
+        self._status: JobStatus = "pending"
 
     def _done(self) -> bool:
-        return self._status == "cancelled" or self._status == "failed" or self._status == "succeeded"
+        return self._status == "cancelled" or self._status == "completed"
 
     def _launch_next_task(self, executor: Executor) -> "Future[OUT] | None":
         if self._done():
@@ -76,24 +68,14 @@ class Job(Generic[IN, OUT]):
 
         def step_done_callback(future: Future[Any]): # FIXME
             with self.job_lock:
-                status_changed = False
                 self.num_completed_steps += 1
-                if self._status == "failed" or self._status == "cancelled":
+                if self._status == "cancelled":
                     return
-                elif future.exception():
-                    self._status = "failed"
-                    status_changed = True
-                elif not self.args.has_next() and self.num_dispatched_steps == self.num_completed_steps:
-                    self._status = "succeeded"
-                    status_changed = True
+                if not self.args.has_next() and self.num_dispatched_steps == self.num_completed_steps:
+                    self._status = "completed"
+                job_status = self._status
             if self.on_progress:
-                self.on_progress(self.uuid, step_index)
-            if status_changed:
-                exception = future.exception()
-                if exception and self.on_failure:
-                    self.on_failure(exception)
-                if self.on_success:
-                    self.on_success(self.uuid, future.result())
+                self.on_progress(job_id=self.uuid, job_status=job_status, step_index=step_index, step_result=future.result())
 
         future = executor.submit(self.target, step_arg)
         future.add_done_callback(step_done_callback)
@@ -147,7 +129,7 @@ class PriorityExecutor(Executor):
         self._status_lock = threading.Lock()
         self._status: Literal["ready", "shutting_down"] = "ready"
         self._wrapped_executor: Executor = executor
-        self._work_queue: "queue.PriorityQueue[Job[Any, Any] | _Task[Any] | _Shutdown]" = queue.PriorityQueue()
+        self._work_queue: "queue.PriorityQueue[Job[Any] | _Task[Any] | _Shutdown]" = queue.PriorityQueue()
 
         self._enqueueing_thread = threading.Thread(group=None, target=self._enqueueing_target)
         self._enqueueing_thread.start()
@@ -166,7 +148,7 @@ class PriorityExecutor(Executor):
     def __del__(self):
         self.shutdown(wait=True)
 
-    def submit_job(self, job: Job[Any, Any]):
+    def submit_job(self, job: Job[Any]):
         with self._status_lock:
             if self._status != "ready":
                 raise Exception("Executor is shutting down")

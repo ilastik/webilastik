@@ -75,7 +75,7 @@ tasks:
     deps: [create-neuroglancer-git-dir]
     dir: "{{.NEUROGLANCER_GIT_DIR}}"
     vars:
-      COMMIT_HASH: "a95e9f3ae60dcaf86e2f14ae4daf821c30baa911"
+      COMMIT_HASH: "0a2d238a986205f089f9a7afcc430319ad0aad12"
     cmds:
       - git clone https://github.com/ilastik/neuroglancer . && git fetch
       - git checkout {{.COMMIT_HASH}}

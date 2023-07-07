@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlencode, quote_plus, quote
 
 from webilastik.server.rpc import dto
 
-DataScheme = Literal["precomputed", "n5"]
+DataScheme = Literal["precomputed", "n5", "deepzoom"]
 Protocol = Literal["http", "https", "file", "memory"]
 
 class SearchQuotingMethod(enum.Enum):
@@ -55,10 +55,10 @@ class Url:
     )
 
     def to_ilp_info_filePath(self) -> str:
-        if self.protocol == "file":
-            return f"{self.datascheme or ''}" + self.path.as_posix()
-        else:
-            return self.raw
+        # FIXME: not completely compatible with classic ilastik
+        if self.protocol == "file" and not self.datascheme:
+            return self.path.as_posix()
+        return self.raw
 
     @staticmethod
     def parse(url: str) -> Optional["Url"]:
@@ -128,8 +128,7 @@ class Url:
         hash_: Optional[str] = None,
         search_quoting_method: SearchQuotingMethod = SearchQuotingMethod.QUOTE_PLUS,
     ):
-        if not path.is_absolute():
-            raise ValueError("Path '{path}' is not absolute")
+        path = PurePosixPath("/") / path
         path_parts: List[str] = []
         for part in  path.as_posix().split("/"):
             if part == "." or part == "":

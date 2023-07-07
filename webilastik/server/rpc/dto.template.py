@@ -27,7 +27,7 @@ Protocol = Literal["http", "https", "file", "memory"]
 
 @dataclass
 class UrlDto(DataTransferObject):
-    datascheme: Optional[Literal["precomputed", "n5"]]
+    datascheme: Optional[Literal["precomputed", "n5", "deepzoom"]]
     protocol: Literal["http", "https", "file", "memory"]
     hostname: str
     port: Optional[int]
@@ -88,7 +88,12 @@ class HttpFsDto(DataTransferObject):
 class BucketFSDto(DataTransferObject):
     bucket_name: str
 
-FsDto = Union[OsfsDto, HttpFsDto, BucketFSDto]
+@dataclass
+class ZipFsDto(DataTransferObject):
+    zip_file_fs: Union[OsfsDto, HttpFsDto, BucketFSDto] #FIXME: no other ZipFs?
+    zip_file_path: str
+
+FsDto = Union[OsfsDto, HttpFsDto, BucketFSDto, ZipFsDto]
 
 DtypeDto = Literal["uint8", "uint16", "uint32", "uint64", "int64", "float32"]
 
@@ -107,22 +112,40 @@ class PrecomputedChunksDataSourceDto(DataTransferObject):
     dtype: DtypeDto
     encoder: Literal["raw", "jpeg"]
 
+#####################################################
+
+ImageFormatDto = Literal["jpeg", "jpg", "png"]
+
 @dataclass
-class DziLevelDto(DataTransferObject):
+class DziSizeElementDto(DataTransferObject):
+    Width: int
+    Height: int
+
+@dataclass
+class DziImageElementDto(DataTransferObject):
+    Format: ImageFormatDto
+    Overlap: int
+    TileSize: int
+    Size: DziSizeElementDto
+
+@dataclass
+class DziLevelSinkDto(DataTransferObject):
     filesystem: FsDto
-    level_path: str
+    xml_path: str
+    dzi_image: DziImageElementDto
+    num_channels: Literal[1, 3]
     level_index: int
-    overlap: int
-    tile_shape: Shape5DDto
-    shape: Shape5DDto
-    full_shape: Shape5DDto
-    dtype: DtypeDto
-    spatial_resolution: Tuple[int, int, int]
-    image_format: Literal["jpeg", "jpg", "png"]
 
 @dataclass
 class DziLevelDataSourceDto(DataTransferObject):
-    level: DziLevelDto
+    filesystem: FsDto
+    xml_path: str
+    dzi_image: DziImageElementDto
+    num_channels: Literal[1, 3]
+    level_index: int
+
+
+############################################
 
 @dataclass
 class N5GzipCompressorDto(DataTransferObject):
@@ -223,9 +246,7 @@ class PrecomputedChunksSinkDto(DataTransferObject):
     resolution: Tuple[int, int, int]
     encoding: Literal["raw", "jpeg"]
 
-@dataclass
-class DziLevelSinkDto(DataTransferObject):
-    level: DziLevelDto
+#################################################
 
 @dataclass
 class N5DataSinkDto(DataTransferObject):
@@ -293,52 +314,6 @@ class LabelDto(DataTransferObject):
 class BrushingAppletStateDto(DataTransferObject):
     labels: Tuple[LabelDto, ...]
 
-##############################################3333
-
-@dataclass
-class ViewDto(DataTransferObject):
-    name: str
-    url: UrlDto
-
-@dataclass
-class DataView(ViewDto):
-    pass
-
-@dataclass
-class RawDataViewDto(ViewDto):
-    datasources: Tuple[FsDataSourceDto, ...]
-
-@dataclass
-class StrippedPrecomputedViewDto(ViewDto):
-    datasource: FsDataSourceDto
-
-@dataclass
-class PredictionsViewDto(ViewDto):
-    raw_data: FsDataSourceDto
-    classifier_generation: int
-
-@dataclass
-class FailedViewDto(ViewDto):
-    error_message: str
-
-@dataclass
-class UnsupportedDatasetViewDto(ViewDto):
-    pass
-
-DataViewUnion = Union[RawDataViewDto, StrippedPrecomputedViewDto, FailedViewDto, UnsupportedDatasetViewDto]
-
-@dataclass
-class ViewerAppletStateDto(DataTransferObject):
-    frontend_timestamp: int
-    data_views: Tuple[Union[RawDataViewDto, StrippedPrecomputedViewDto, FailedViewDto, UnsupportedDatasetViewDto], ...]
-    prediction_views: Tuple[PredictionsViewDto, ...]
-    label_colors: Tuple[ColorDto, ...]
-
-@dataclass
-class MakeDataViewParams(DataTransferObject):
-    view_name: str
-    url: UrlDto
-
 ##################################################3
 
 @dataclass
@@ -346,7 +321,7 @@ class JobDto(DataTransferObject):
     name: str
     num_args: Optional[int]
     uuid: str
-    status: Literal["pending", "running", "cancelled", "failed", "succeeded"]
+    status: Literal["pending", "running", "cancelled", "completed"]
     num_completed_steps: int
     error_message: Optional[str]
 
@@ -354,13 +329,25 @@ class JobDto(DataTransferObject):
 class ExportJobDto(JobDto):
     datasink: DataSinkDto
 
+
 @dataclass
 class OpenDatasinkJobDto(JobDto):
     datasink: DataSinkDto
 
 @dataclass
+class CreateDziPyramidJobDto(JobDto):
+    pass
+
+@dataclass
+class ZipJobDto(JobDto):
+    output_fs: FsDto
+    output_path: str
+
+ExportJobDtoUnion = Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto]
+
+@dataclass
 class PixelClassificationExportAppletStateDto(DataTransferObject):
-    jobs: Tuple[Union[ExportJobDto, OpenDatasinkJobDto], ...]
+    jobs: Tuple[ExportJobDtoUnion, ...]
     populated_labels: Optional[Tuple[LabelHeaderDto, ...]]
     datasource_suggestions: Optional[Tuple[FsDataSourceDto, ...]]
 
@@ -501,7 +488,7 @@ class GetDatasourcesFromUrlParamsDto(DataTransferObject):
 
 @dataclass
 class GetDatasourcesFromUrlResponseDto(DataTransferObject):
-    datasources: Union[FsDataSourceDto, Tuple[FsDataSourceDto, ...], None]
+    datasources: Union[Tuple[FsDataSourceDto, ...], None]
 
 
 @dataclass

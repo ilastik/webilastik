@@ -9,7 +9,7 @@ from ndstructs.array5D import Array5D
 from webilastik.datasink import FsDataSink, IDataSinkWriter
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale, PrecomputedChunksEncoder
-from webilastik.filesystem import IFilesystem, create_filesystem_from_message
+from webilastik.filesystem import FsIoException, IFilesystem, create_filesystem_from_message
 from webilastik.server.rpc.dto import Interval5DDto, PrecomputedChunksSinkDto, Shape5DDto
 from webilastik.utility.url import Url
 
@@ -22,14 +22,12 @@ class PrecomputedChunksWriter(IDataSinkWriter):
     def data_sink(self) -> "PrecomputedChunksSink":
         return self._data_sink
 
-    def write(self, data: Array5D):
+    def write(self, data: Array5D) -> "FsIoException | None":
         tile = data.interval
         assert tile.is_tile(tile_shape=self._data_sink.tile_shape, full_interval=self._data_sink.interval, clamped=True), f"Bad tile: {tile}"
         chunk_name = f"{tile.x[0]}-{tile.x[1]}_{tile.y[0]}-{tile.y[1]}_{tile.z[0]}-{tile.z[1]}"
         chunk_path = self._data_sink.path / self._data_sink.scale.key / chunk_name
-        result = self._data_sink.filesystem.create_file(path=chunk_path, contents=self._data_sink.scale.encoding.encode(data))
-        if isinstance(result, Exception):
-            raise result #FIXME
+        return self._data_sink.filesystem.create_file(path=chunk_path, contents=self._data_sink.scale.encoding.encode(data))
 
 
 class PrecomputedChunksSink(FsDataSink):

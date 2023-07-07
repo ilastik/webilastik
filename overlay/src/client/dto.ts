@@ -103,9 +103,9 @@ export class LabelHeaderDto {
   }
 }
 
-export function parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_(
+export function parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote_0_quote_deepzoom_quote__endof_(
   value: JsonValue,
-): "precomputed" | "n5" | Error {
+): "precomputed" | "n5" | "deepzoom" | Error {
   const tmp_0 = parse_as_str(value);
   if (!(tmp_0 instanceof Error) && tmp_0 === "precomputed") {
     return tmp_0;
@@ -114,15 +114,21 @@ export function parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote__e
   if (!(tmp_1 instanceof Error) && tmp_1 === "n5") {
     return tmp_1;
   }
-  return Error(`Could not parse ${value} as 'precomputed' | 'n5'`);
+  const tmp_2 = parse_as_str(value);
+  if (!(tmp_2 instanceof Error) && tmp_2 === "deepzoom") {
+    return tmp_2;
+  }
+  return Error(`Could not parse ${value} as 'precomputed' | 'n5' | 'deepzoom'`);
 }
 export function parse_as_None(value: JsonValue): undefined | Error {
   return ensureJsonUndefined(value);
 }
-export function parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_0None_endof_(
+export function parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote_0_quote_deepzoom_quote__endof_0None_endof_(
   value: JsonValue,
-): "precomputed" | "n5" | undefined | Error {
-  const parsed_option_0 = parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_(value);
+): "precomputed" | "n5" | "deepzoom" | undefined | Error {
+  const parsed_option_0 = parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote_0_quote_deepzoom_quote__endof_(
+    value,
+  );
   if (!(parsed_option_0 instanceof Error)) {
     return parsed_option_0;
   }
@@ -130,7 +136,7 @@ export function parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5
   if (!(parsed_option_1 instanceof Error)) {
     return parsed_option_1;
   }
-  return Error(`Could not parse ${JSON.stringify(value)} into 'precomputed' | 'n5' | undefined`);
+  return Error(`Could not parse ${JSON.stringify(value)} into 'precomputed' | 'n5' | 'deepzoom' | undefined`);
 }
 export function parse_as_Literal_of__quote_http_quote_0_quote_https_quote_0_quote_file_quote_0_quote_memory_quote__endof_(
   value: JsonValue,
@@ -216,9 +222,10 @@ export function parse_as_UrlDto(value: JsonValue): UrlDto | Error {
   if (valueObject["__class__"] != "UrlDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a UrlDto`);
   }
-  const temp_datascheme = parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote__endof_0None_endof_(
-    valueObject.datascheme,
-  );
+  const temp_datascheme =
+    parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote_0_quote_deepzoom_quote__endof_0None_endof_(
+      valueObject.datascheme,
+    );
   if (temp_datascheme instanceof Error) return temp_datascheme;
   const temp_protocol =
     parse_as_Literal_of__quote_http_quote_0_quote_https_quote_0_quote_file_quote_0_quote_memory_quote__endof_(
@@ -248,7 +255,7 @@ export function parse_as_UrlDto(value: JsonValue): UrlDto | Error {
 // Automatically generated via DataTransferObject for UrlDto
 // Do not edit!
 export class UrlDto {
-  public datascheme: "precomputed" | "n5" | undefined;
+  public datascheme: "precomputed" | "n5" | "deepzoom" | undefined;
   public protocol: "http" | "https" | "file" | "memory";
   public hostname: string;
   public port: number | undefined;
@@ -256,7 +263,7 @@ export class UrlDto {
   public search: { [key: string]: string } | undefined;
   public fragment: string | undefined;
   constructor(_params: {
-    datascheme: "precomputed" | "n5" | undefined;
+    datascheme: "precomputed" | "n5" | "deepzoom" | undefined;
     protocol: "http" | "https" | "file" | "memory";
     hostname: string;
     port: number | undefined;
@@ -605,6 +612,68 @@ export function parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
   }
   return Error(`Could not parse ${JSON.stringify(value)} into OsfsDto | HttpFsDto | BucketFSDto`);
 }
+export function parse_as_ZipFsDto(value: JsonValue): ZipFsDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "ZipFsDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ZipFsDto`);
+  }
+  const temp_zip_file_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.zip_file_fs);
+  if (temp_zip_file_fs instanceof Error) return temp_zip_file_fs;
+  const temp_zip_file_path = parse_as_str(valueObject.zip_file_path);
+  if (temp_zip_file_path instanceof Error) return temp_zip_file_path;
+  return new ZipFsDto({
+    zip_file_fs: temp_zip_file_fs,
+    zip_file_path: temp_zip_file_path,
+  });
+}
+// Automatically generated via DataTransferObject for ZipFsDto
+// Do not edit!
+export class ZipFsDto {
+  public zip_file_fs: OsfsDto | HttpFsDto | BucketFSDto;
+  public zip_file_path: string;
+  constructor(_params: {
+    zip_file_fs: OsfsDto | HttpFsDto | BucketFSDto;
+    zip_file_path: string;
+  }) {
+    this.zip_file_fs = _params.zip_file_fs;
+    this.zip_file_path = _params.zip_file_path;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "ZipFsDto",
+      zip_file_fs: toJsonValue(this.zip_file_fs),
+      zip_file_path: this.zip_file_path,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): ZipFsDto | Error {
+    return parse_as_ZipFsDto(value);
+  }
+}
+
+export function parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
+  value: JsonValue,
+): OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto | Error {
+  const parsed_option_0 = parse_as_OsfsDto(value);
+  if (!(parsed_option_0 instanceof Error)) {
+    return parsed_option_0;
+  }
+  const parsed_option_1 = parse_as_HttpFsDto(value);
+  if (!(parsed_option_1 instanceof Error)) {
+    return parsed_option_1;
+  }
+  const parsed_option_2 = parse_as_BucketFSDto(value);
+  if (!(parsed_option_2 instanceof Error)) {
+    return parsed_option_2;
+  }
+  const parsed_option_3 = parse_as_ZipFsDto(value);
+  if (!(parsed_option_3 instanceof Error)) {
+    return parsed_option_3;
+  }
+  return Error(`Could not parse ${JSON.stringify(value)} into OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto`);
+}
 export function parse_as_Tuple_of_int0int0int_endof_(value: JsonValue): [number, number, number] | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
@@ -668,7 +737,7 @@ export function parse_as_PrecomputedChunksDataSourceDto(value: JsonValue): Preco
   }
   const temp_url = parse_as_UrlDto(valueObject.url);
   if (temp_url instanceof Error) return temp_url;
-  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.filesystem);
+  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.filesystem);
   if (temp_filesystem instanceof Error) return temp_filesystem;
   const temp_path = parse_as_str(valueObject.path);
   if (temp_path instanceof Error) return temp_path;
@@ -703,7 +772,7 @@ export function parse_as_PrecomputedChunksDataSourceDto(value: JsonValue): Preco
 // Do not edit!
 export class PrecomputedChunksDataSourceDto {
   public url: UrlDto;
-  public filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+  public filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
   public path: string;
   public scale_key: string;
   public interval: Interval5DDto;
@@ -713,7 +782,7 @@ export class PrecomputedChunksDataSourceDto {
   public encoder: "raw" | "jpeg";
   constructor(_params: {
     url: UrlDto;
-    filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+    filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
     path: string;
     scale_key: string;
     interval: Interval5DDto;
@@ -751,6 +820,47 @@ export class PrecomputedChunksDataSourceDto {
   }
 }
 
+export function parse_as_DziSizeElementDto(value: JsonValue): DziSizeElementDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "DziSizeElementDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a DziSizeElementDto`);
+  }
+  const temp_Width = parse_as_int(valueObject.Width);
+  if (temp_Width instanceof Error) return temp_Width;
+  const temp_Height = parse_as_int(valueObject.Height);
+  if (temp_Height instanceof Error) return temp_Height;
+  return new DziSizeElementDto({
+    Width: temp_Width,
+    Height: temp_Height,
+  });
+}
+// Automatically generated via DataTransferObject for DziSizeElementDto
+// Do not edit!
+export class DziSizeElementDto {
+  public Width: number;
+  public Height: number;
+  constructor(_params: {
+    Width: number;
+    Height: number;
+  }) {
+    this.Width = _params.Width;
+    this.Height = _params.Height;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "DziSizeElementDto",
+      Width: this.Width,
+      Height: this.Height,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): DziSizeElementDto | Error {
+    return parse_as_DziSizeElementDto(value);
+  }
+}
+
 export function parse_as_Literal_of__quote_jpeg_quote_0_quote_jpg_quote_0_quote_png_quote__endof_(
   value: JsonValue,
 ): "jpeg" | "jpg" | "png" | Error {
@@ -768,105 +878,133 @@ export function parse_as_Literal_of__quote_jpeg_quote_0_quote_jpg_quote_0_quote_
   }
   return Error(`Could not parse ${value} as 'jpeg' | 'jpg' | 'png'`);
 }
-export function parse_as_DziLevelDto(value: JsonValue): DziLevelDto | Error {
+export function parse_as_DziImageElementDto(value: JsonValue): DziImageElementDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
   }
-  if (valueObject["__class__"] != "DziLevelDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a DziLevelDto`);
+  if (valueObject["__class__"] != "DziImageElementDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a DziImageElementDto`);
   }
-  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.filesystem);
-  if (temp_filesystem instanceof Error) return temp_filesystem;
-  const temp_level_path = parse_as_str(valueObject.level_path);
-  if (temp_level_path instanceof Error) return temp_level_path;
-  const temp_level_index = parse_as_int(valueObject.level_index);
-  if (temp_level_index instanceof Error) return temp_level_index;
-  const temp_overlap = parse_as_int(valueObject.overlap);
-  if (temp_overlap instanceof Error) return temp_overlap;
-  const temp_tile_shape = parse_as_Shape5DDto(valueObject.tile_shape);
-  if (temp_tile_shape instanceof Error) return temp_tile_shape;
-  const temp_shape = parse_as_Shape5DDto(valueObject.shape);
-  if (temp_shape instanceof Error) return temp_shape;
-  const temp_full_shape = parse_as_Shape5DDto(valueObject.full_shape);
-  if (temp_full_shape instanceof Error) return temp_full_shape;
-  const temp_dtype =
-    parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
-      valueObject.dtype,
-    );
-  if (temp_dtype instanceof Error) return temp_dtype;
-  const temp_spatial_resolution = parse_as_Tuple_of_int0int0int_endof_(valueObject.spatial_resolution);
-  if (temp_spatial_resolution instanceof Error) return temp_spatial_resolution;
-  const temp_image_format = parse_as_Literal_of__quote_jpeg_quote_0_quote_jpg_quote_0_quote_png_quote__endof_(
-    valueObject.image_format,
+  const temp_Format = parse_as_Literal_of__quote_jpeg_quote_0_quote_jpg_quote_0_quote_png_quote__endof_(
+    valueObject.Format,
   );
-  if (temp_image_format instanceof Error) return temp_image_format;
-  return new DziLevelDto({
-    filesystem: temp_filesystem,
-    level_path: temp_level_path,
-    level_index: temp_level_index,
-    overlap: temp_overlap,
-    tile_shape: temp_tile_shape,
-    shape: temp_shape,
-    full_shape: temp_full_shape,
-    dtype: temp_dtype,
-    spatial_resolution: temp_spatial_resolution,
-    image_format: temp_image_format,
+  if (temp_Format instanceof Error) return temp_Format;
+  const temp_Overlap = parse_as_int(valueObject.Overlap);
+  if (temp_Overlap instanceof Error) return temp_Overlap;
+  const temp_TileSize = parse_as_int(valueObject.TileSize);
+  if (temp_TileSize instanceof Error) return temp_TileSize;
+  const temp_Size = parse_as_DziSizeElementDto(valueObject.Size);
+  if (temp_Size instanceof Error) return temp_Size;
+  return new DziImageElementDto({
+    Format: temp_Format,
+    Overlap: temp_Overlap,
+    TileSize: temp_TileSize,
+    Size: temp_Size,
   });
 }
-// Automatically generated via DataTransferObject for DziLevelDto
+// Automatically generated via DataTransferObject for DziImageElementDto
 // Do not edit!
-export class DziLevelDto {
-  public filesystem: OsfsDto | HttpFsDto | BucketFSDto;
-  public level_path: string;
-  public level_index: number;
-  public overlap: number;
-  public tile_shape: Shape5DDto;
-  public shape: Shape5DDto;
-  public full_shape: Shape5DDto;
-  public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
-  public spatial_resolution: [number, number, number];
-  public image_format: "jpeg" | "jpg" | "png";
+export class DziImageElementDto {
+  public Format: "jpeg" | "jpg" | "png";
+  public Overlap: number;
+  public TileSize: number;
+  public Size: DziSizeElementDto;
   constructor(_params: {
-    filesystem: OsfsDto | HttpFsDto | BucketFSDto;
-    level_path: string;
-    level_index: number;
-    overlap: number;
-    tile_shape: Shape5DDto;
-    shape: Shape5DDto;
-    full_shape: Shape5DDto;
-    dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
-    spatial_resolution: [number, number, number];
-    image_format: "jpeg" | "jpg" | "png";
+    Format: "jpeg" | "jpg" | "png";
+    Overlap: number;
+    TileSize: number;
+    Size: DziSizeElementDto;
   }) {
-    this.filesystem = _params.filesystem;
-    this.level_path = _params.level_path;
-    this.level_index = _params.level_index;
-    this.overlap = _params.overlap;
-    this.tile_shape = _params.tile_shape;
-    this.shape = _params.shape;
-    this.full_shape = _params.full_shape;
-    this.dtype = _params.dtype;
-    this.spatial_resolution = _params.spatial_resolution;
-    this.image_format = _params.image_format;
+    this.Format = _params.Format;
+    this.Overlap = _params.Overlap;
+    this.TileSize = _params.TileSize;
+    this.Size = _params.Size;
   }
   public toJsonValue(): JsonObject {
     return {
-      "__class__": "DziLevelDto",
-      filesystem: toJsonValue(this.filesystem),
-      level_path: this.level_path,
-      level_index: this.level_index,
-      overlap: this.overlap,
-      tile_shape: this.tile_shape.toJsonValue(),
-      shape: this.shape.toJsonValue(),
-      full_shape: this.full_shape.toJsonValue(),
-      dtype: this.dtype,
-      spatial_resolution: [this.spatial_resolution[0], this.spatial_resolution[1], this.spatial_resolution[2]],
-      image_format: this.image_format,
+      "__class__": "DziImageElementDto",
+      Format: this.Format,
+      Overlap: this.Overlap,
+      TileSize: this.TileSize,
+      Size: this.Size.toJsonValue(),
     };
   }
-  public static fromJsonValue(value: JsonValue): DziLevelDto | Error {
-    return parse_as_DziLevelDto(value);
+  public static fromJsonValue(value: JsonValue): DziImageElementDto | Error {
+    return parse_as_DziImageElementDto(value);
+  }
+}
+
+export function parse_as_Literal_of_103_endof_(value: JsonValue): 1 | 3 | Error {
+  const tmp_0 = parse_as_int(value);
+  if (!(tmp_0 instanceof Error) && tmp_0 === 1) {
+    return tmp_0;
+  }
+  const tmp_1 = parse_as_int(value);
+  if (!(tmp_1 instanceof Error) && tmp_1 === 3) {
+    return tmp_1;
+  }
+  return Error(`Could not parse ${value} as 1 | 3`);
+}
+export function parse_as_DziLevelSinkDto(value: JsonValue): DziLevelSinkDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "DziLevelSinkDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a DziLevelSinkDto`);
+  }
+  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.filesystem);
+  if (temp_filesystem instanceof Error) return temp_filesystem;
+  const temp_xml_path = parse_as_str(valueObject.xml_path);
+  if (temp_xml_path instanceof Error) return temp_xml_path;
+  const temp_dzi_image = parse_as_DziImageElementDto(valueObject.dzi_image);
+  if (temp_dzi_image instanceof Error) return temp_dzi_image;
+  const temp_num_channels = parse_as_Literal_of_103_endof_(valueObject.num_channels);
+  if (temp_num_channels instanceof Error) return temp_num_channels;
+  const temp_level_index = parse_as_int(valueObject.level_index);
+  if (temp_level_index instanceof Error) return temp_level_index;
+  return new DziLevelSinkDto({
+    filesystem: temp_filesystem,
+    xml_path: temp_xml_path,
+    dzi_image: temp_dzi_image,
+    num_channels: temp_num_channels,
+    level_index: temp_level_index,
+  });
+}
+// Automatically generated via DataTransferObject for DziLevelSinkDto
+// Do not edit!
+export class DziLevelSinkDto {
+  public filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
+  public xml_path: string;
+  public dzi_image: DziImageElementDto;
+  public num_channels: 1 | 3;
+  public level_index: number;
+  constructor(_params: {
+    filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
+    xml_path: string;
+    dzi_image: DziImageElementDto;
+    num_channels: 1 | 3;
+    level_index: number;
+  }) {
+    this.filesystem = _params.filesystem;
+    this.xml_path = _params.xml_path;
+    this.dzi_image = _params.dzi_image;
+    this.num_channels = _params.num_channels;
+    this.level_index = _params.level_index;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "DziLevelSinkDto",
+      filesystem: toJsonValue(this.filesystem),
+      xml_path: this.xml_path,
+      dzi_image: this.dzi_image.toJsonValue(),
+      num_channels: this.num_channels,
+      level_index: this.level_index,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): DziLevelSinkDto | Error {
+    return parse_as_DziLevelSinkDto(value);
   }
 }
 
@@ -878,25 +1016,53 @@ export function parse_as_DziLevelDataSourceDto(value: JsonValue): DziLevelDataSo
   if (valueObject["__class__"] != "DziLevelDataSourceDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a DziLevelDataSourceDto`);
   }
-  const temp_level = parse_as_DziLevelDto(valueObject.level);
-  if (temp_level instanceof Error) return temp_level;
+  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.filesystem);
+  if (temp_filesystem instanceof Error) return temp_filesystem;
+  const temp_xml_path = parse_as_str(valueObject.xml_path);
+  if (temp_xml_path instanceof Error) return temp_xml_path;
+  const temp_dzi_image = parse_as_DziImageElementDto(valueObject.dzi_image);
+  if (temp_dzi_image instanceof Error) return temp_dzi_image;
+  const temp_num_channels = parse_as_Literal_of_103_endof_(valueObject.num_channels);
+  if (temp_num_channels instanceof Error) return temp_num_channels;
+  const temp_level_index = parse_as_int(valueObject.level_index);
+  if (temp_level_index instanceof Error) return temp_level_index;
   return new DziLevelDataSourceDto({
-    level: temp_level,
+    filesystem: temp_filesystem,
+    xml_path: temp_xml_path,
+    dzi_image: temp_dzi_image,
+    num_channels: temp_num_channels,
+    level_index: temp_level_index,
   });
 }
 // Automatically generated via DataTransferObject for DziLevelDataSourceDto
 // Do not edit!
 export class DziLevelDataSourceDto {
-  public level: DziLevelDto;
+  public filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
+  public xml_path: string;
+  public dzi_image: DziImageElementDto;
+  public num_channels: 1 | 3;
+  public level_index: number;
   constructor(_params: {
-    level: DziLevelDto;
+    filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
+    xml_path: string;
+    dzi_image: DziImageElementDto;
+    num_channels: 1 | 3;
+    level_index: number;
   }) {
-    this.level = _params.level;
+    this.filesystem = _params.filesystem;
+    this.xml_path = _params.xml_path;
+    this.dzi_image = _params.dzi_image;
+    this.num_channels = _params.num_channels;
+    this.level_index = _params.level_index;
   }
   public toJsonValue(): JsonObject {
     return {
       "__class__": "DziLevelDataSourceDto",
-      level: this.level.toJsonValue(),
+      filesystem: toJsonValue(this.filesystem),
+      xml_path: this.xml_path,
+      dzi_image: this.dzi_image.toJsonValue(),
+      num_channels: this.num_channels,
+      level_index: this.level_index,
     };
   }
   public static fromJsonValue(value: JsonValue): DziLevelDataSourceDto | Error {
@@ -1165,7 +1331,7 @@ export function parse_as_N5DataSourceDto(value: JsonValue): N5DataSourceDto | Er
   }
   const temp_url = parse_as_UrlDto(valueObject.url);
   if (temp_url instanceof Error) return temp_url;
-  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.filesystem);
+  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.filesystem);
   if (temp_filesystem instanceof Error) return temp_filesystem;
   const temp_path = parse_as_str(valueObject.path);
   if (temp_path instanceof Error) return temp_path;
@@ -1203,7 +1369,7 @@ export function parse_as_N5DataSourceDto(value: JsonValue): N5DataSourceDto | Er
 // Do not edit!
 export class N5DataSourceDto {
   public url: UrlDto;
-  public filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+  public filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
   public path: string;
   public interval: Interval5DDto;
   public tile_shape: Shape5DDto;
@@ -1213,7 +1379,7 @@ export class N5DataSourceDto {
   public c_axiskeys_on_disk: string;
   constructor(_params: {
     url: UrlDto;
-    filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+    filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
     path: string;
     interval: Interval5DDto;
     tile_shape: Shape5DDto;
@@ -1261,7 +1427,7 @@ export function parse_as_SkimageDataSourceDto(value: JsonValue): SkimageDataSour
   }
   const temp_url = parse_as_UrlDto(valueObject.url);
   if (temp_url instanceof Error) return temp_url;
-  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.filesystem);
+  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.filesystem);
   if (temp_filesystem instanceof Error) return temp_filesystem;
   const temp_path = parse_as_str(valueObject.path);
   if (temp_path instanceof Error) return temp_path;
@@ -1290,7 +1456,7 @@ export function parse_as_SkimageDataSourceDto(value: JsonValue): SkimageDataSour
 // Do not edit!
 export class SkimageDataSourceDto {
   public url: UrlDto;
-  public filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+  public filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
   public path: string;
   public interval: Interval5DDto;
   public tile_shape: Shape5DDto;
@@ -1298,7 +1464,7 @@ export class SkimageDataSourceDto {
   public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
   constructor(_params: {
     url: UrlDto;
-    filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+    filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
     path: string;
     interval: Interval5DDto;
     tile_shape: Shape5DDto;
@@ -1416,40 +1582,6 @@ export class PrecomputedChunksSinkDto {
   }
 }
 
-export function parse_as_DziLevelSinkDto(value: JsonValue): DziLevelSinkDto | Error {
-  const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
-    return valueObject;
-  }
-  if (valueObject["__class__"] != "DziLevelSinkDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a DziLevelSinkDto`);
-  }
-  const temp_level = parse_as_DziLevelDto(valueObject.level);
-  if (temp_level instanceof Error) return temp_level;
-  return new DziLevelSinkDto({
-    level: temp_level,
-  });
-}
-// Automatically generated via DataTransferObject for DziLevelSinkDto
-// Do not edit!
-export class DziLevelSinkDto {
-  public level: DziLevelDto;
-  constructor(_params: {
-    level: DziLevelDto;
-  }) {
-    this.level = _params.level;
-  }
-  public toJsonValue(): JsonObject {
-    return {
-      "__class__": "DziLevelSinkDto",
-      level: this.level.toJsonValue(),
-    };
-  }
-  public static fromJsonValue(value: JsonValue): DziLevelSinkDto | Error {
-    return parse_as_DziLevelSinkDto(value);
-  }
-}
-
 export function parse_as_N5DataSinkDto(value: JsonValue): N5DataSinkDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
@@ -1458,7 +1590,7 @@ export function parse_as_N5DataSinkDto(value: JsonValue): N5DataSinkDto | Error 
   if (valueObject["__class__"] != "N5DataSinkDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5DataSinkDto`);
   }
-  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.filesystem);
+  const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.filesystem);
   if (temp_filesystem instanceof Error) return temp_filesystem;
   const temp_path = parse_as_str(valueObject.path);
   if (temp_path instanceof Error) return temp_path;
@@ -1494,7 +1626,7 @@ export function parse_as_N5DataSinkDto(value: JsonValue): N5DataSinkDto | Error 
 // Automatically generated via DataTransferObject for N5DataSinkDto
 // Do not edit!
 export class N5DataSinkDto {
-  public filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+  public filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
   public path: string;
   public interval: Interval5DDto;
   public tile_shape: Shape5DDto;
@@ -1503,7 +1635,7 @@ export class N5DataSinkDto {
   public dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32";
   public compressor: N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto;
   constructor(_params: {
-    filesystem: OsfsDto | HttpFsDto | BucketFSDto;
+    filesystem: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
     path: string;
     interval: Interval5DDto;
     tile_shape: Shape5DDto;
@@ -2000,521 +2132,9 @@ export class BrushingAppletStateDto {
   }
 }
 
-export function parse_as_ViewDto(value: JsonValue): ViewDto | Error {
-  const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
-    return valueObject;
-  }
-  if (valueObject["__class__"] != "ViewDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ViewDto`);
-  }
-  const temp_name = parse_as_str(valueObject.name);
-  if (temp_name instanceof Error) return temp_name;
-  const temp_url = parse_as_UrlDto(valueObject.url);
-  if (temp_url instanceof Error) return temp_url;
-  return new ViewDto({
-    name: temp_name,
-    url: temp_url,
-  });
-}
-// Automatically generated via DataTransferObject for ViewDto
-// Do not edit!
-export class ViewDto {
-  public name: string;
-  public url: UrlDto;
-  constructor(_params: {
-    name: string;
-    url: UrlDto;
-  }) {
-    this.name = _params.name;
-    this.url = _params.url;
-  }
-  public toJsonValue(): JsonObject {
-    return {
-      "__class__": "ViewDto",
-      name: this.name,
-      url: this.url.toJsonValue(),
-    };
-  }
-  public static fromJsonValue(value: JsonValue): ViewDto | Error {
-    return parse_as_ViewDto(value);
-  }
-}
-
-export function parse_as_DataView(value: JsonValue): DataView | Error {
-  const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
-    return valueObject;
-  }
-  if (valueObject["__class__"] != "DataView") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a DataView`);
-  }
-  const temp_name = parse_as_str(valueObject.name);
-  if (temp_name instanceof Error) return temp_name;
-  const temp_url = parse_as_UrlDto(valueObject.url);
-  if (temp_url instanceof Error) return temp_url;
-  return new DataView({
-    name: temp_name,
-    url: temp_url,
-  });
-}
-// Automatically generated via DataTransferObject for DataView
-// Do not edit!
-export class DataView {
-  public name: string;
-  public url: UrlDto;
-  constructor(_params: {
-    name: string;
-    url: UrlDto;
-  }) {
-    this.name = _params.name;
-    this.url = _params.url;
-  }
-  public toJsonValue(): JsonObject {
-    return {
-      "__class__": "DataView",
-      name: this.name,
-      url: this.url.toJsonValue(),
-    };
-  }
-  public static fromJsonValue(value: JsonValue): DataView | Error {
-    return parse_as_DataView(value);
-  }
-}
-
-export function parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
+export function parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
   value: JsonValue,
-): Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto> | Error {
-  const arr = ensureJsonArray(value);
-  if (arr instanceof Error) return arr;
-  const out: Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto> =
-    [];
-  for (let item of arr) {
-    let parsed_item =
-      parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
-        item,
-      );
-    if (parsed_item instanceof Error) return parsed_item;
-    out.push(parsed_item);
-  }
-  return out;
-}
-export function parse_as_RawDataViewDto(value: JsonValue): RawDataViewDto | Error {
-  const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
-    return valueObject;
-  }
-  if (valueObject["__class__"] != "RawDataViewDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a RawDataViewDto`);
-  }
-  const temp_name = parse_as_str(valueObject.name);
-  if (temp_name instanceof Error) return temp_name;
-  const temp_url = parse_as_UrlDto(valueObject.url);
-  if (temp_url instanceof Error) return temp_url;
-  const temp_datasources =
-    parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
-      valueObject.datasources,
-    );
-  if (temp_datasources instanceof Error) return temp_datasources;
-  return new RawDataViewDto({
-    name: temp_name,
-    url: temp_url,
-    datasources: temp_datasources,
-  });
-}
-// Automatically generated via DataTransferObject for RawDataViewDto
-// Do not edit!
-export class RawDataViewDto {
-  public name: string;
-  public url: UrlDto;
-  public datasources: Array<
-    PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto
-  >;
-  constructor(_params: {
-    name: string;
-    url: UrlDto;
-    datasources: Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>;
-  }) {
-    this.name = _params.name;
-    this.url = _params.url;
-    this.datasources = _params.datasources;
-  }
-  public toJsonValue(): JsonObject {
-    return {
-      "__class__": "RawDataViewDto",
-      name: this.name,
-      url: this.url.toJsonValue(),
-      datasources: this.datasources.map((item) => toJsonValue(item)),
-    };
-  }
-  public static fromJsonValue(value: JsonValue): RawDataViewDto | Error {
-    return parse_as_RawDataViewDto(value);
-  }
-}
-
-export function parse_as_StrippedPrecomputedViewDto(value: JsonValue): StrippedPrecomputedViewDto | Error {
-  const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
-    return valueObject;
-  }
-  if (valueObject["__class__"] != "StrippedPrecomputedViewDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a StrippedPrecomputedViewDto`);
-  }
-  const temp_name = parse_as_str(valueObject.name);
-  if (temp_name instanceof Error) return temp_name;
-  const temp_url = parse_as_UrlDto(valueObject.url);
-  if (temp_url instanceof Error) return temp_url;
-  const temp_datasource =
-    parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
-      valueObject.datasource,
-    );
-  if (temp_datasource instanceof Error) return temp_datasource;
-  return new StrippedPrecomputedViewDto({
-    name: temp_name,
-    url: temp_url,
-    datasource: temp_datasource,
-  });
-}
-// Automatically generated via DataTransferObject for StrippedPrecomputedViewDto
-// Do not edit!
-export class StrippedPrecomputedViewDto {
-  public name: string;
-  public url: UrlDto;
-  public datasource: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto;
-  constructor(_params: {
-    name: string;
-    url: UrlDto;
-    datasource: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto;
-  }) {
-    this.name = _params.name;
-    this.url = _params.url;
-    this.datasource = _params.datasource;
-  }
-  public toJsonValue(): JsonObject {
-    return {
-      "__class__": "StrippedPrecomputedViewDto",
-      name: this.name,
-      url: this.url.toJsonValue(),
-      datasource: toJsonValue(this.datasource),
-    };
-  }
-  public static fromJsonValue(value: JsonValue): StrippedPrecomputedViewDto | Error {
-    return parse_as_StrippedPrecomputedViewDto(value);
-  }
-}
-
-export function parse_as_PredictionsViewDto(value: JsonValue): PredictionsViewDto | Error {
-  const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
-    return valueObject;
-  }
-  if (valueObject["__class__"] != "PredictionsViewDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a PredictionsViewDto`);
-  }
-  const temp_name = parse_as_str(valueObject.name);
-  if (temp_name instanceof Error) return temp_name;
-  const temp_url = parse_as_UrlDto(valueObject.url);
-  if (temp_url instanceof Error) return temp_url;
-  const temp_raw_data =
-    parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
-      valueObject.raw_data,
-    );
-  if (temp_raw_data instanceof Error) return temp_raw_data;
-  const temp_classifier_generation = parse_as_int(valueObject.classifier_generation);
-  if (temp_classifier_generation instanceof Error) return temp_classifier_generation;
-  return new PredictionsViewDto({
-    name: temp_name,
-    url: temp_url,
-    raw_data: temp_raw_data,
-    classifier_generation: temp_classifier_generation,
-  });
-}
-// Automatically generated via DataTransferObject for PredictionsViewDto
-// Do not edit!
-export class PredictionsViewDto {
-  public name: string;
-  public url: UrlDto;
-  public raw_data: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto;
-  public classifier_generation: number;
-  constructor(_params: {
-    name: string;
-    url: UrlDto;
-    raw_data: PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto;
-    classifier_generation: number;
-  }) {
-    this.name = _params.name;
-    this.url = _params.url;
-    this.raw_data = _params.raw_data;
-    this.classifier_generation = _params.classifier_generation;
-  }
-  public toJsonValue(): JsonObject {
-    return {
-      "__class__": "PredictionsViewDto",
-      name: this.name,
-      url: this.url.toJsonValue(),
-      raw_data: toJsonValue(this.raw_data),
-      classifier_generation: this.classifier_generation,
-    };
-  }
-  public static fromJsonValue(value: JsonValue): PredictionsViewDto | Error {
-    return parse_as_PredictionsViewDto(value);
-  }
-}
-
-export function parse_as_FailedViewDto(value: JsonValue): FailedViewDto | Error {
-  const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
-    return valueObject;
-  }
-  if (valueObject["__class__"] != "FailedViewDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a FailedViewDto`);
-  }
-  const temp_name = parse_as_str(valueObject.name);
-  if (temp_name instanceof Error) return temp_name;
-  const temp_url = parse_as_UrlDto(valueObject.url);
-  if (temp_url instanceof Error) return temp_url;
-  const temp_error_message = parse_as_str(valueObject.error_message);
-  if (temp_error_message instanceof Error) return temp_error_message;
-  return new FailedViewDto({
-    name: temp_name,
-    url: temp_url,
-    error_message: temp_error_message,
-  });
-}
-// Automatically generated via DataTransferObject for FailedViewDto
-// Do not edit!
-export class FailedViewDto {
-  public name: string;
-  public url: UrlDto;
-  public error_message: string;
-  constructor(_params: {
-    name: string;
-    url: UrlDto;
-    error_message: string;
-  }) {
-    this.name = _params.name;
-    this.url = _params.url;
-    this.error_message = _params.error_message;
-  }
-  public toJsonValue(): JsonObject {
-    return {
-      "__class__": "FailedViewDto",
-      name: this.name,
-      url: this.url.toJsonValue(),
-      error_message: this.error_message,
-    };
-  }
-  public static fromJsonValue(value: JsonValue): FailedViewDto | Error {
-    return parse_as_FailedViewDto(value);
-  }
-}
-
-export function parse_as_UnsupportedDatasetViewDto(value: JsonValue): UnsupportedDatasetViewDto | Error {
-  const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
-    return valueObject;
-  }
-  if (valueObject["__class__"] != "UnsupportedDatasetViewDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a UnsupportedDatasetViewDto`);
-  }
-  const temp_name = parse_as_str(valueObject.name);
-  if (temp_name instanceof Error) return temp_name;
-  const temp_url = parse_as_UrlDto(valueObject.url);
-  if (temp_url instanceof Error) return temp_url;
-  return new UnsupportedDatasetViewDto({
-    name: temp_name,
-    url: temp_url,
-  });
-}
-// Automatically generated via DataTransferObject for UnsupportedDatasetViewDto
-// Do not edit!
-export class UnsupportedDatasetViewDto {
-  public name: string;
-  public url: UrlDto;
-  constructor(_params: {
-    name: string;
-    url: UrlDto;
-  }) {
-    this.name = _params.name;
-    this.url = _params.url;
-  }
-  public toJsonValue(): JsonObject {
-    return {
-      "__class__": "UnsupportedDatasetViewDto",
-      name: this.name,
-      url: this.url.toJsonValue(),
-    };
-  }
-  public static fromJsonValue(value: JsonValue): UnsupportedDatasetViewDto | Error {
-    return parse_as_UnsupportedDatasetViewDto(value);
-  }
-}
-
-export function parse_as_Union_of_RawDataViewDto0StrippedPrecomputedViewDto0FailedViewDto0UnsupportedDatasetViewDto_endof_(
-  value: JsonValue,
-): RawDataViewDto | StrippedPrecomputedViewDto | FailedViewDto | UnsupportedDatasetViewDto | Error {
-  const parsed_option_0 = parse_as_RawDataViewDto(value);
-  if (!(parsed_option_0 instanceof Error)) {
-    return parsed_option_0;
-  }
-  const parsed_option_1 = parse_as_StrippedPrecomputedViewDto(value);
-  if (!(parsed_option_1 instanceof Error)) {
-    return parsed_option_1;
-  }
-  const parsed_option_2 = parse_as_FailedViewDto(value);
-  if (!(parsed_option_2 instanceof Error)) {
-    return parsed_option_2;
-  }
-  const parsed_option_3 = parse_as_UnsupportedDatasetViewDto(value);
-  if (!(parsed_option_3 instanceof Error)) {
-    return parsed_option_3;
-  }
-  return Error(
-    `Could not parse ${
-      JSON.stringify(value)
-    } into RawDataViewDto | StrippedPrecomputedViewDto | FailedViewDto | UnsupportedDatasetViewDto`,
-  );
-}
-export function parse_as_Tuple_of_Union_of_RawDataViewDto0StrippedPrecomputedViewDto0FailedViewDto0UnsupportedDatasetViewDto_endof_0_varlen__endof_(
-  value: JsonValue,
-): Array<RawDataViewDto | StrippedPrecomputedViewDto | FailedViewDto | UnsupportedDatasetViewDto> | Error {
-  const arr = ensureJsonArray(value);
-  if (arr instanceof Error) return arr;
-  const out: Array<RawDataViewDto | StrippedPrecomputedViewDto | FailedViewDto | UnsupportedDatasetViewDto> = [];
-  for (let item of arr) {
-    let parsed_item =
-      parse_as_Union_of_RawDataViewDto0StrippedPrecomputedViewDto0FailedViewDto0UnsupportedDatasetViewDto_endof_(item);
-    if (parsed_item instanceof Error) return parsed_item;
-    out.push(parsed_item);
-  }
-  return out;
-}
-export function parse_as_Tuple_of_PredictionsViewDto0_varlen__endof_(
-  value: JsonValue,
-): Array<PredictionsViewDto> | Error {
-  const arr = ensureJsonArray(value);
-  if (arr instanceof Error) return arr;
-  const out: Array<PredictionsViewDto> = [];
-  for (let item of arr) {
-    let parsed_item = parse_as_PredictionsViewDto(item);
-    if (parsed_item instanceof Error) return parsed_item;
-    out.push(parsed_item);
-  }
-  return out;
-}
-export function parse_as_Tuple_of_ColorDto0_varlen__endof_(value: JsonValue): Array<ColorDto> | Error {
-  const arr = ensureJsonArray(value);
-  if (arr instanceof Error) return arr;
-  const out: Array<ColorDto> = [];
-  for (let item of arr) {
-    let parsed_item = parse_as_ColorDto(item);
-    if (parsed_item instanceof Error) return parsed_item;
-    out.push(parsed_item);
-  }
-  return out;
-}
-export function parse_as_ViewerAppletStateDto(value: JsonValue): ViewerAppletStateDto | Error {
-  const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
-    return valueObject;
-  }
-  if (valueObject["__class__"] != "ViewerAppletStateDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ViewerAppletStateDto`);
-  }
-  const temp_frontend_timestamp = parse_as_int(valueObject.frontend_timestamp);
-  if (temp_frontend_timestamp instanceof Error) return temp_frontend_timestamp;
-  const temp_data_views =
-    parse_as_Tuple_of_Union_of_RawDataViewDto0StrippedPrecomputedViewDto0FailedViewDto0UnsupportedDatasetViewDto_endof_0_varlen__endof_(
-      valueObject.data_views,
-    );
-  if (temp_data_views instanceof Error) return temp_data_views;
-  const temp_prediction_views = parse_as_Tuple_of_PredictionsViewDto0_varlen__endof_(valueObject.prediction_views);
-  if (temp_prediction_views instanceof Error) return temp_prediction_views;
-  const temp_label_colors = parse_as_Tuple_of_ColorDto0_varlen__endof_(valueObject.label_colors);
-  if (temp_label_colors instanceof Error) return temp_label_colors;
-  return new ViewerAppletStateDto({
-    frontend_timestamp: temp_frontend_timestamp,
-    data_views: temp_data_views,
-    prediction_views: temp_prediction_views,
-    label_colors: temp_label_colors,
-  });
-}
-// Automatically generated via DataTransferObject for ViewerAppletStateDto
-// Do not edit!
-export class ViewerAppletStateDto {
-  public frontend_timestamp: number;
-  public data_views: Array<RawDataViewDto | StrippedPrecomputedViewDto | FailedViewDto | UnsupportedDatasetViewDto>;
-  public prediction_views: Array<PredictionsViewDto>;
-  public label_colors: Array<ColorDto>;
-  constructor(_params: {
-    frontend_timestamp: number;
-    data_views: Array<RawDataViewDto | StrippedPrecomputedViewDto | FailedViewDto | UnsupportedDatasetViewDto>;
-    prediction_views: Array<PredictionsViewDto>;
-    label_colors: Array<ColorDto>;
-  }) {
-    this.frontend_timestamp = _params.frontend_timestamp;
-    this.data_views = _params.data_views;
-    this.prediction_views = _params.prediction_views;
-    this.label_colors = _params.label_colors;
-  }
-  public toJsonValue(): JsonObject {
-    return {
-      "__class__": "ViewerAppletStateDto",
-      frontend_timestamp: this.frontend_timestamp,
-      data_views: this.data_views.map((item) => toJsonValue(item)),
-      prediction_views: this.prediction_views.map((item) => item.toJsonValue()),
-      label_colors: this.label_colors.map((item) => item.toJsonValue()),
-    };
-  }
-  public static fromJsonValue(value: JsonValue): ViewerAppletStateDto | Error {
-    return parse_as_ViewerAppletStateDto(value);
-  }
-}
-
-export function parse_as_MakeDataViewParams(value: JsonValue): MakeDataViewParams | Error {
-  const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
-    return valueObject;
-  }
-  if (valueObject["__class__"] != "MakeDataViewParams") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a MakeDataViewParams`);
-  }
-  const temp_view_name = parse_as_str(valueObject.view_name);
-  if (temp_view_name instanceof Error) return temp_view_name;
-  const temp_url = parse_as_UrlDto(valueObject.url);
-  if (temp_url instanceof Error) return temp_url;
-  return new MakeDataViewParams({
-    view_name: temp_view_name,
-    url: temp_url,
-  });
-}
-// Automatically generated via DataTransferObject for MakeDataViewParams
-// Do not edit!
-export class MakeDataViewParams {
-  public view_name: string;
-  public url: UrlDto;
-  constructor(_params: {
-    view_name: string;
-    url: UrlDto;
-  }) {
-    this.view_name = _params.view_name;
-    this.url = _params.url;
-  }
-  public toJsonValue(): JsonObject {
-    return {
-      "__class__": "MakeDataViewParams",
-      view_name: this.view_name,
-      url: this.url.toJsonValue(),
-    };
-  }
-  public static fromJsonValue(value: JsonValue): MakeDataViewParams | Error {
-    return parse_as_MakeDataViewParams(value);
-  }
-}
-
-export function parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_failed_quote_0_quote_succeeded_quote__endof_(
-  value: JsonValue,
-): "pending" | "running" | "cancelled" | "failed" | "succeeded" | Error {
+): "pending" | "running" | "cancelled" | "completed" | Error {
   const tmp_0 = parse_as_str(value);
   if (!(tmp_0 instanceof Error) && tmp_0 === "pending") {
     return tmp_0;
@@ -2528,14 +2148,10 @@ export function parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0
     return tmp_2;
   }
   const tmp_3 = parse_as_str(value);
-  if (!(tmp_3 instanceof Error) && tmp_3 === "failed") {
+  if (!(tmp_3 instanceof Error) && tmp_3 === "completed") {
     return tmp_3;
   }
-  const tmp_4 = parse_as_str(value);
-  if (!(tmp_4 instanceof Error) && tmp_4 === "succeeded") {
-    return tmp_4;
-  }
-  return Error(`Could not parse ${value} as 'pending' | 'running' | 'cancelled' | 'failed' | 'succeeded'`);
+  return Error(`Could not parse ${value} as 'pending' | 'running' | 'cancelled' | 'completed'`);
 }
 export function parse_as_JobDto(value: JsonValue): JobDto | Error {
   const valueObject = ensureJsonObject(value);
@@ -2552,7 +2168,7 @@ export function parse_as_JobDto(value: JsonValue): JobDto | Error {
   const temp_uuid = parse_as_str(valueObject.uuid);
   if (temp_uuid instanceof Error) return temp_uuid;
   const temp_status =
-    parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_failed_quote_0_quote_succeeded_quote__endof_(
+    parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
       valueObject.status,
     );
   if (temp_status instanceof Error) return temp_status;
@@ -2575,14 +2191,14 @@ export class JobDto {
   public name: string;
   public num_args: number | undefined;
   public uuid: string;
-  public status: "pending" | "running" | "cancelled" | "failed" | "succeeded";
+  public status: "pending" | "running" | "cancelled" | "completed";
   public num_completed_steps: number;
   public error_message: string | undefined;
   constructor(_params: {
     name: string;
     num_args: number | undefined;
     uuid: string;
-    status: "pending" | "running" | "cancelled" | "failed" | "succeeded";
+    status: "pending" | "running" | "cancelled" | "completed";
     num_completed_steps: number;
     error_message: string | undefined;
   }) {
@@ -2643,7 +2259,7 @@ export function parse_as_ExportJobDto(value: JsonValue): ExportJobDto | Error {
   const temp_uuid = parse_as_str(valueObject.uuid);
   if (temp_uuid instanceof Error) return temp_uuid;
   const temp_status =
-    parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_failed_quote_0_quote_succeeded_quote__endof_(
+    parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
       valueObject.status,
     );
   if (temp_status instanceof Error) return temp_status;
@@ -2671,7 +2287,7 @@ export class ExportJobDto {
   public name: string;
   public num_args: number | undefined;
   public uuid: string;
-  public status: "pending" | "running" | "cancelled" | "failed" | "succeeded";
+  public status: "pending" | "running" | "cancelled" | "completed";
   public num_completed_steps: number;
   public error_message: string | undefined;
   public datasink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto;
@@ -2679,7 +2295,7 @@ export class ExportJobDto {
     name: string;
     num_args: number | undefined;
     uuid: string;
-    status: "pending" | "running" | "cancelled" | "failed" | "succeeded";
+    status: "pending" | "running" | "cancelled" | "completed";
     num_completed_steps: number;
     error_message: string | undefined;
     datasink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto;
@@ -2724,7 +2340,7 @@ export function parse_as_OpenDatasinkJobDto(value: JsonValue): OpenDatasinkJobDt
   const temp_uuid = parse_as_str(valueObject.uuid);
   if (temp_uuid instanceof Error) return temp_uuid;
   const temp_status =
-    parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_failed_quote_0_quote_succeeded_quote__endof_(
+    parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
       valueObject.status,
     );
   if (temp_status instanceof Error) return temp_status;
@@ -2752,7 +2368,7 @@ export class OpenDatasinkJobDto {
   public name: string;
   public num_args: number | undefined;
   public uuid: string;
-  public status: "pending" | "running" | "cancelled" | "failed" | "succeeded";
+  public status: "pending" | "running" | "cancelled" | "completed";
   public num_completed_steps: number;
   public error_message: string | undefined;
   public datasink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto;
@@ -2760,7 +2376,7 @@ export class OpenDatasinkJobDto {
     name: string;
     num_args: number | undefined;
     uuid: string;
-    status: "pending" | "running" | "cancelled" | "failed" | "succeeded";
+    status: "pending" | "running" | "cancelled" | "completed";
     num_completed_steps: number;
     error_message: string | undefined;
     datasink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto;
@@ -2790,9 +2406,167 @@ export class OpenDatasinkJobDto {
   }
 }
 
-export function parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_(
+export function parse_as_CreateDziPyramidJobDto(value: JsonValue): CreateDziPyramidJobDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "CreateDziPyramidJobDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a CreateDziPyramidJobDto`);
+  }
+  const temp_name = parse_as_str(valueObject.name);
+  if (temp_name instanceof Error) return temp_name;
+  const temp_num_args = parse_as_Union_of_int0None_endof_(valueObject.num_args);
+  if (temp_num_args instanceof Error) return temp_num_args;
+  const temp_uuid = parse_as_str(valueObject.uuid);
+  if (temp_uuid instanceof Error) return temp_uuid;
+  const temp_status =
+    parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
+      valueObject.status,
+    );
+  if (temp_status instanceof Error) return temp_status;
+  const temp_num_completed_steps = parse_as_int(valueObject.num_completed_steps);
+  if (temp_num_completed_steps instanceof Error) return temp_num_completed_steps;
+  const temp_error_message = parse_as_Union_of_str0None_endof_(valueObject.error_message);
+  if (temp_error_message instanceof Error) return temp_error_message;
+  return new CreateDziPyramidJobDto({
+    name: temp_name,
+    num_args: temp_num_args,
+    uuid: temp_uuid,
+    status: temp_status,
+    num_completed_steps: temp_num_completed_steps,
+    error_message: temp_error_message,
+  });
+}
+// Automatically generated via DataTransferObject for CreateDziPyramidJobDto
+// Do not edit!
+export class CreateDziPyramidJobDto {
+  public name: string;
+  public num_args: number | undefined;
+  public uuid: string;
+  public status: "pending" | "running" | "cancelled" | "completed";
+  public num_completed_steps: number;
+  public error_message: string | undefined;
+  constructor(_params: {
+    name: string;
+    num_args: number | undefined;
+    uuid: string;
+    status: "pending" | "running" | "cancelled" | "completed";
+    num_completed_steps: number;
+    error_message: string | undefined;
+  }) {
+    this.name = _params.name;
+    this.num_args = _params.num_args;
+    this.uuid = _params.uuid;
+    this.status = _params.status;
+    this.num_completed_steps = _params.num_completed_steps;
+    this.error_message = _params.error_message;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "CreateDziPyramidJobDto",
+      name: this.name,
+      num_args: toJsonValue(this.num_args),
+      uuid: this.uuid,
+      status: this.status,
+      num_completed_steps: this.num_completed_steps,
+      error_message: toJsonValue(this.error_message),
+    };
+  }
+  public static fromJsonValue(value: JsonValue): CreateDziPyramidJobDto | Error {
+    return parse_as_CreateDziPyramidJobDto(value);
+  }
+}
+
+export function parse_as_ZipJobDto(value: JsonValue): ZipJobDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "ZipJobDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ZipJobDto`);
+  }
+  const temp_name = parse_as_str(valueObject.name);
+  if (temp_name instanceof Error) return temp_name;
+  const temp_num_args = parse_as_Union_of_int0None_endof_(valueObject.num_args);
+  if (temp_num_args instanceof Error) return temp_num_args;
+  const temp_uuid = parse_as_str(valueObject.uuid);
+  if (temp_uuid instanceof Error) return temp_uuid;
+  const temp_status =
+    parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
+      valueObject.status,
+    );
+  if (temp_status instanceof Error) return temp_status;
+  const temp_num_completed_steps = parse_as_int(valueObject.num_completed_steps);
+  if (temp_num_completed_steps instanceof Error) return temp_num_completed_steps;
+  const temp_error_message = parse_as_Union_of_str0None_endof_(valueObject.error_message);
+  if (temp_error_message instanceof Error) return temp_error_message;
+  const temp_output_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.output_fs);
+  if (temp_output_fs instanceof Error) return temp_output_fs;
+  const temp_output_path = parse_as_str(valueObject.output_path);
+  if (temp_output_path instanceof Error) return temp_output_path;
+  return new ZipJobDto({
+    name: temp_name,
+    num_args: temp_num_args,
+    uuid: temp_uuid,
+    status: temp_status,
+    num_completed_steps: temp_num_completed_steps,
+    error_message: temp_error_message,
+    output_fs: temp_output_fs,
+    output_path: temp_output_path,
+  });
+}
+// Automatically generated via DataTransferObject for ZipJobDto
+// Do not edit!
+export class ZipJobDto {
+  public name: string;
+  public num_args: number | undefined;
+  public uuid: string;
+  public status: "pending" | "running" | "cancelled" | "completed";
+  public num_completed_steps: number;
+  public error_message: string | undefined;
+  public output_fs: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
+  public output_path: string;
+  constructor(_params: {
+    name: string;
+    num_args: number | undefined;
+    uuid: string;
+    status: "pending" | "running" | "cancelled" | "completed";
+    num_completed_steps: number;
+    error_message: string | undefined;
+    output_fs: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
+    output_path: string;
+  }) {
+    this.name = _params.name;
+    this.num_args = _params.num_args;
+    this.uuid = _params.uuid;
+    this.status = _params.status;
+    this.num_completed_steps = _params.num_completed_steps;
+    this.error_message = _params.error_message;
+    this.output_fs = _params.output_fs;
+    this.output_path = _params.output_path;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "ZipJobDto",
+      name: this.name,
+      num_args: toJsonValue(this.num_args),
+      uuid: this.uuid,
+      status: this.status,
+      num_completed_steps: this.num_completed_steps,
+      error_message: toJsonValue(this.error_message),
+      output_fs: toJsonValue(this.output_fs),
+      output_path: this.output_path,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): ZipJobDto | Error {
+    return parse_as_ZipJobDto(value);
+  }
+}
+
+export function parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_(
   value: JsonValue,
-): ExportJobDto | OpenDatasinkJobDto | Error {
+): ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto | Error {
   const parsed_option_0 = parse_as_ExportJobDto(value);
   if (!(parsed_option_0 instanceof Error)) {
     return parsed_option_0;
@@ -2801,16 +2575,28 @@ export function parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_(
   if (!(parsed_option_1 instanceof Error)) {
     return parsed_option_1;
   }
-  return Error(`Could not parse ${JSON.stringify(value)} into ExportJobDto | OpenDatasinkJobDto`);
+  const parsed_option_2 = parse_as_CreateDziPyramidJobDto(value);
+  if (!(parsed_option_2 instanceof Error)) {
+    return parsed_option_2;
+  }
+  const parsed_option_3 = parse_as_ZipJobDto(value);
+  if (!(parsed_option_3 instanceof Error)) {
+    return parsed_option_3;
+  }
+  return Error(
+    `Could not parse ${
+      JSON.stringify(value)
+    } into ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto`,
+  );
 }
-export function parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_0_varlen__endof_(
+export function parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_0_varlen__endof_(
   value: JsonValue,
-): Array<ExportJobDto | OpenDatasinkJobDto> | Error {
+): Array<ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto> | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
-  const out: Array<ExportJobDto | OpenDatasinkJobDto> = [];
+  const out: Array<ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto> = [];
   for (let item of arr) {
-    let parsed_item = parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_(item);
+    let parsed_item = parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_(item);
     if (parsed_item instanceof Error) return parsed_item;
     out.push(parsed_item);
   }
@@ -2839,6 +2625,23 @@ export function parse_as_Union_of_Tuple_of_LabelHeaderDto0_varlen__endof_0None_e
     return parsed_option_1;
   }
   return Error(`Could not parse ${JSON.stringify(value)} into Array<LabelHeaderDto> | undefined`);
+}
+export function parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
+  value: JsonValue,
+): Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto> | Error {
+  const arr = ensureJsonArray(value);
+  if (arr instanceof Error) return arr;
+  const out: Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto> =
+    [];
+  for (let item of arr) {
+    let parsed_item =
+      parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
+        item,
+      );
+    if (parsed_item instanceof Error) return parsed_item;
+    out.push(parsed_item);
+  }
+  return out;
 }
 export function parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
   value: JsonValue,
@@ -2873,7 +2676,10 @@ export function parse_as_PixelClassificationExportAppletStateDto(
   if (valueObject["__class__"] != "PixelClassificationExportAppletStateDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a PixelClassificationExportAppletStateDto`);
   }
-  const temp_jobs = parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto_endof_0_varlen__endof_(valueObject.jobs);
+  const temp_jobs =
+    parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_0_varlen__endof_(
+      valueObject.jobs,
+    );
   if (temp_jobs instanceof Error) return temp_jobs;
   const temp_populated_labels = parse_as_Union_of_Tuple_of_LabelHeaderDto0_varlen__endof_0None_endof_(
     valueObject.populated_labels,
@@ -2893,13 +2699,13 @@ export function parse_as_PixelClassificationExportAppletStateDto(
 // Automatically generated via DataTransferObject for PixelClassificationExportAppletStateDto
 // Do not edit!
 export class PixelClassificationExportAppletStateDto {
-  public jobs: Array<ExportJobDto | OpenDatasinkJobDto>;
+  public jobs: Array<ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto>;
   public populated_labels: Array<LabelHeaderDto> | undefined;
   public datasource_suggestions:
     | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
     | undefined;
   constructor(_params: {
-    jobs: Array<ExportJobDto | OpenDatasinkJobDto>;
+    jobs: Array<ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto>;
     populated_labels: Array<LabelHeaderDto> | undefined;
     datasource_suggestions:
       | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
@@ -3896,7 +3702,7 @@ export function parse_as_LoadProjectParamsDto(value: JsonValue): LoadProjectPara
   if (valueObject["__class__"] != "LoadProjectParamsDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a LoadProjectParamsDto`);
   }
-  const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.fs);
+  const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.fs);
   if (temp_fs instanceof Error) return temp_fs;
   const temp_project_file_path = parse_as_str(valueObject.project_file_path);
   if (temp_project_file_path instanceof Error) return temp_project_file_path;
@@ -3908,10 +3714,10 @@ export function parse_as_LoadProjectParamsDto(value: JsonValue): LoadProjectPara
 // Automatically generated via DataTransferObject for LoadProjectParamsDto
 // Do not edit!
 export class LoadProjectParamsDto {
-  public fs: OsfsDto | HttpFsDto | BucketFSDto;
+  public fs: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
   public project_file_path: string;
   constructor(_params: {
-    fs: OsfsDto | HttpFsDto | BucketFSDto;
+    fs: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
     project_file_path: string;
   }) {
     this.fs = _params.fs;
@@ -3937,7 +3743,7 @@ export function parse_as_SaveProjectParamsDto(value: JsonValue): SaveProjectPara
   if (valueObject["__class__"] != "SaveProjectParamsDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a SaveProjectParamsDto`);
   }
-  const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.fs);
+  const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.fs);
   if (temp_fs instanceof Error) return temp_fs;
   const temp_project_file_path = parse_as_str(valueObject.project_file_path);
   if (temp_project_file_path instanceof Error) return temp_project_file_path;
@@ -3949,10 +3755,10 @@ export function parse_as_SaveProjectParamsDto(value: JsonValue): SaveProjectPara
 // Automatically generated via DataTransferObject for SaveProjectParamsDto
 // Do not edit!
 export class SaveProjectParamsDto {
-  public fs: OsfsDto | HttpFsDto | BucketFSDto;
+  public fs: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
   public project_file_path: string;
   constructor(_params: {
-    fs: OsfsDto | HttpFsDto | BucketFSDto;
+    fs: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
     project_file_path: string;
   }) {
     this.fs = _params.fs;
@@ -4004,49 +3810,6 @@ export class GetDatasourcesFromUrlParamsDto {
   }
 }
 
-export function parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto0Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
-  value: JsonValue,
-):
-  | PrecomputedChunksDataSourceDto
-  | N5DataSourceDto
-  | SkimageDataSourceDto
-  | DziLevelDataSourceDto
-  | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
-  | undefined
-  | Error {
-  const parsed_option_0 = parse_as_PrecomputedChunksDataSourceDto(value);
-  if (!(parsed_option_0 instanceof Error)) {
-    return parsed_option_0;
-  }
-  const parsed_option_1 = parse_as_N5DataSourceDto(value);
-  if (!(parsed_option_1 instanceof Error)) {
-    return parsed_option_1;
-  }
-  const parsed_option_2 = parse_as_SkimageDataSourceDto(value);
-  if (!(parsed_option_2 instanceof Error)) {
-    return parsed_option_2;
-  }
-  const parsed_option_3 = parse_as_DziLevelDataSourceDto(value);
-  if (!(parsed_option_3 instanceof Error)) {
-    return parsed_option_3;
-  }
-  const parsed_option_4 =
-    parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
-      value,
-    );
-  if (!(parsed_option_4 instanceof Error)) {
-    return parsed_option_4;
-  }
-  const parsed_option_5 = parse_as_None(value);
-  if (!(parsed_option_5 instanceof Error)) {
-    return parsed_option_5;
-  }
-  return Error(
-    `Could not parse ${
-      JSON.stringify(value)
-    } into PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto> | undefined`,
-  );
-}
 export function parse_as_GetDatasourcesFromUrlResponseDto(value: JsonValue): GetDatasourcesFromUrlResponseDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
@@ -4056,7 +3819,7 @@ export function parse_as_GetDatasourcesFromUrlResponseDto(value: JsonValue): Get
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a GetDatasourcesFromUrlResponseDto`);
   }
   const temp_datasources =
-    parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto0Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
+    parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
       valueObject.datasources,
     );
   if (temp_datasources instanceof Error) return temp_datasources;
@@ -4068,18 +3831,10 @@ export function parse_as_GetDatasourcesFromUrlResponseDto(value: JsonValue): Get
 // Do not edit!
 export class GetDatasourcesFromUrlResponseDto {
   public datasources:
-    | PrecomputedChunksDataSourceDto
-    | N5DataSourceDto
-    | SkimageDataSourceDto
-    | DziLevelDataSourceDto
     | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
     | undefined;
   constructor(_params: {
     datasources:
-      | PrecomputedChunksDataSourceDto
-      | N5DataSourceDto
-      | SkimageDataSourceDto
-      | DziLevelDataSourceDto
       | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
       | undefined;
   }) {
@@ -4142,7 +3897,7 @@ export function parse_as_GetFileSystemAndPathFromUrlResponseDto(
   if (valueObject["__class__"] != "GetFileSystemAndPathFromUrlResponseDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a GetFileSystemAndPathFromUrlResponseDto`);
   }
-  const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.fs);
+  const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.fs);
   if (temp_fs instanceof Error) return temp_fs;
   const temp_path = parse_as_str(valueObject.path);
   if (temp_path instanceof Error) return temp_path;
@@ -4154,10 +3909,10 @@ export function parse_as_GetFileSystemAndPathFromUrlResponseDto(
 // Automatically generated via DataTransferObject for GetFileSystemAndPathFromUrlResponseDto
 // Do not edit!
 export class GetFileSystemAndPathFromUrlResponseDto {
-  public fs: OsfsDto | HttpFsDto | BucketFSDto;
+  public fs: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
   public path: string;
   constructor(_params: {
-    fs: OsfsDto | HttpFsDto | BucketFSDto;
+    fs: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
     path: string;
   }) {
     this.fs = _params.fs;
@@ -4271,7 +4026,7 @@ export function parse_as_ListFsDirRequest(value: JsonValue): ListFsDirRequest | 
   if (valueObject["__class__"] != "ListFsDirRequest") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ListFsDirRequest`);
   }
-  const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.fs);
+  const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.fs);
   if (temp_fs instanceof Error) return temp_fs;
   const temp_path = parse_as_str(valueObject.path);
   if (temp_path instanceof Error) return temp_path;
@@ -4283,10 +4038,10 @@ export function parse_as_ListFsDirRequest(value: JsonValue): ListFsDirRequest | 
 // Automatically generated via DataTransferObject for ListFsDirRequest
 // Do not edit!
 export class ListFsDirRequest {
-  public fs: OsfsDto | HttpFsDto | BucketFSDto;
+  public fs: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
   public path: string;
   constructor(_params: {
-    fs: OsfsDto | HttpFsDto | BucketFSDto;
+    fs: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
     path: string;
   }) {
     this.fs = _params.fs;

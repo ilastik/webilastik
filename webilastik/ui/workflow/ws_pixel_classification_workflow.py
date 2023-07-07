@@ -173,14 +173,6 @@ class WebIlastik:
             ),
             web.post("/download_project_as_ilp", self.download_project_as_ilp),
             web.delete("/close", self.close_session),
-            web.get(
-                "/stripped_precomputed/datasource={encoded_datasource}/info",
-                self.stripped_precomputed_info
-            ),
-            web.get(
-                "/stripped_precomputed/datasource={encoded_datasource}/data/{xBegin}-{xEnd}_{yBegin}-{yEnd}_{zBegin}-{zEnd}",
-                self.forward_chunk_request
-            ),
             web.post(
                 "/get_datasources_from_url",
                 self.get_datasources_from_url
@@ -242,13 +234,8 @@ class WebIlastik:
             return uncachable_json_response(RpcErrorDto(error=str(datasources_result)).to_json_value(), status=400)
         if isinstance(datasources_result, type(None)):
             return uncachable_json_response(GetDatasourcesFromUrlResponseDto(datasources=None).to_json_value(), status=400)
-        if isinstance(datasources_result, tuple):
-            return uncachable_json_response(
-                GetDatasourcesFromUrlResponseDto(datasources=tuple([ds.to_dto() for ds in datasources_result])).to_json_value(),
-                status=200,
-            )
         return uncachable_json_response(
-            GetDatasourcesFromUrlResponseDto(datasources=datasources_result.to_dto()).to_json_value(),
+            GetDatasourcesFromUrlResponseDto(datasources=tuple([ds.to_dto() for ds in datasources_result])).to_json_value(),
             status=200,
         )
 
@@ -428,65 +415,6 @@ class WebIlastik:
         self.workflow = new_workflow_result
         self._update_clients()
         return web.Response(status=200, text=f"Project saved to {fs_result.geturl(file_path)}")
-
-    async def stripped_precomputed_info(self, request: web.Request) -> web.Response:
-        """Serves a precomp info stripped of all but one scales"""
-        ds_result = get_encoded_datasource_from_url(match_info_key="encoded_datasource", request=request)
-        if isinstance(ds_result, Exception):
-            return uncachable_json_response(payload=f"Could not get data source from URL: {ds_result}", status=400)
-        if not isinstance(ds_result, PrecomputedChunksDataSource):
-            return uncachable_json_response(payload=f"Expected data source to be Precomputed Chunks", status=400)
-        info = PrecomputedChunksInfo(
-            type_="image",
-            data_type=ds_result.dtype,
-            num_channels=ds_result.shape.c,
-            scales=tuple([
-                PrecomputedChunksScale(
-                    key=PurePosixPath("data"),
-                    chunk_sizes=tuple([
-                        (ds_result.tile_shape.x, ds_result.tile_shape.y, ds_result.tile_shape.z)
-                    ]),
-                    encoding=ds_result.encoding,
-                    resolution=ds_result.spatial_resolution,
-                    size=(ds_result.shape.x, ds_result.shape.y, ds_result.shape.z),
-                    voxel_offset=(ds_result.interval.start.x, ds_result.interval.start.y, ds_result.interval.start.z),
-                )
-            ])
-        )
-        return web.json_response(info.to_json_value())
-
-    async def forward_chunk_request(self, request: web.Request) -> web.Response:
-        """Redirects a precomp chunk request to the original URL"""
-        xBegin = int(request.match_info.get("xBegin")) # type: ignore
-        xEnd = int(request.match_info.get("xEnd")) # type: ignore
-        yBegin = int(request.match_info.get("yBegin")) # type: ignore
-        yEnd = int(request.match_info.get("yEnd")) # type: ignore
-        zBegin = int(request.match_info.get("zBegin")) # type: ignore
-        zEnd = int(request.match_info.get("zEnd")) # type: ignore
-
-        ds_result = get_encoded_datasource_from_url(match_info_key="encoded_datasource", request=request)
-        if isinstance(ds_result, Exception):
-            return uncachable_json_response(payload=f"Could not get data source from URL: {ds_result}", status=400)
-        if not isinstance(ds_result, PrecomputedChunksDataSource):
-            return uncachable_json_response(payload=f"Expected a PrecomputedChunksDataSource, found: {ds_result}", status=400)
-        tile_interval = ds_result.interval.updated(
-            x=(xBegin, xEnd),
-            y=(yBegin, yEnd),
-            z=(zBegin, zEnd),
-        )
-        if not isinstance(ds_result.filesystem, BucketFs):
-            ds_url = ds_result.url
-            raise web.HTTPFound(location=Url(
-                datascheme=None,
-                protocol=ds_url.protocol,
-                hostname=ds_url.hostname,
-                port=ds_url.port,
-                path=ds_result.get_tile_path(tile_interval),
-            ).raw)
-        object_url_result = ds_result.filesystem.get_swift_object_url(path=ds_result.get_tile_path(tile_interval))
-        if isinstance(object_url_result, Exception):
-            return uncachable_json_response(f"Could not retrieve object url: {object_url_result}", status=400)
-        raise web.HTTPFound(location=object_url_result.raw)
 
 if __name__ == '__main__':
     from webilastik.config import WorkflowConfig
