@@ -2,7 +2,7 @@ import { Applet } from '../../client/applets/applet';
 import { JsonValue } from '../../util/serialization';
 import { assertUnreachable, createElement, createFieldset } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
-import { BucketFs, Color, FsDataSource, FsDataSink, Session, PrecomputedChunksSink, Shape5D, DataSourceUnion, Filesystem } from '../../client/ilastik';
+import { BucketFs, Color, FsDataSource, FsDataSink, Session, PrecomputedChunksSink, Shape5D, Filesystem } from '../../client/ilastik';
 import { CssClasses } from '../css_classes';
 import { ErrorPopupWidget } from './popup';
 import {
@@ -25,6 +25,7 @@ import { Anchor, Div, Label, Paragraph, Span, Table, TableData, TableHeader, Tab
 import { Path, Url } from '../../util/parsed_url';
 import { BooleanInput } from './value_input_widget';
 import { Shape5DInputNoChannel } from './shape5d_input';
+import { DataSourceSelectionWidget } from './datasource_selection_widget';
 
 const sink_creation_stati = ["pending", "running", "cancelled", "failed", "succeeded"] as const;
 export type SinkCreationStatus = typeof sink_creation_stati[number];
@@ -60,7 +61,10 @@ class Job{
         this.jobDto = jobDto
     }
 
-    private makeProgressDisplay(openInViewer: (datasource: DataSourceUnion) => void): TableData{
+    private makeProgressDisplay(params: {
+        openInViewer: (datasource: FsDataSource) => void,
+        session: Session,
+    }): TableData{
         const jobDto = this.jobDto
 
         if(jobDto.status == "pending" || jobDto.status == "cancelled"){
@@ -90,6 +94,23 @@ class Job{
                     out.clear()
                     dataProxyGuiUrl = fs.getDataProxyGuiUrl({dirPath: Path.parse(jobDto.output_path).parent})
                 }
+                const output_path = Path.fromDto(jobDto.output_path)
+                if(output_path.extension?.toLowerCase() === "dzip"){
+                    const outputUrl = fs.getUrl(output_path).updatedWith({datascheme: "deepzoom"})
+                    new Button({parentElement: out, inputType: "button", text: "Open in Viewer", onClick: async () => {
+                        const datasourceResult = await DataSourceSelectionWidget.uiResolveUrlToDatasource({
+                            datasources: outputUrl,
+                            session: params.session,
+                        })
+                        if(datasourceResult instanceof Error){
+                            new ErrorPopupWidget({message: `Could not open URL: ${datasourceResult}`})
+                            return
+                        }
+                        params.openInViewer(datasourceResult)
+
+                    }})
+                    createElement({parentElement: out.element, tagName: "br"}) //FIXME?
+                }
             }else if(jobDto instanceof ExportJobDto){
                 const sink = FsDataSink.fromDto(jobDto.datasink)
                 if(sink.filesystem instanceof BucketFs){
@@ -97,7 +118,7 @@ class Job{
                 }
                 if(sink instanceof PrecomputedChunksSink){
                     new Button({parentElement: out, inputType: "button", text: "Open in Viewer", onClick: () => {
-                        openInViewer(sink.toDataSource())
+                        params.openInViewer(sink.toDataSource())
                     }})
                     createElement({parentElement: out.element, tagName: "br"}) //FIXME?
                 }
@@ -119,10 +140,13 @@ class Job{
         }
         assertUnreachable(jobDto.status)
     }
-    public toTableRow(openInViewer: (datasource: DataSourceUnion) => void): {name: TableData, progress: TableData}{
+    public toTableRow(params: {
+        openInViewer: (datasource: FsDataSource) => void,
+        session: Session,
+    }): {name: TableData, progress: TableData}{
         return {
             name: new TableData({parentElement: undefined, innerText: this.jobDto.name}),
-            progress: this.makeProgressDisplay(openInViewer),
+            progress: this.makeProgressDisplay(params),
         }
     }
 }
@@ -351,12 +375,15 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
         ]})
 
         new_state.jobs.forEach(job => {
-            const row = job.toTableRow((datasource) => {
-                this.viewer.openLane({
-                    rawData: datasource,
-                    name: datasource.url.name, //FIXME?
-                    isVisible: true,
-                })
+            const row = job.toTableRow({
+                session: this.session,
+                openInViewer: (datasource) => {
+                    this.viewer.openLane({
+                        rawData: datasource,
+                        name: datasource.url.name, //FIXME?
+                        isVisible: true,
+                    })
+                }
             })
             new TableRow({parentElement: jobsTable, children: [row.name, row.progress]})
         })
