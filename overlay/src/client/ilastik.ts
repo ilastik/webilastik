@@ -800,7 +800,7 @@ export abstract class FsDataSource{
     }
 
     public getDisplayString() : string{
-        return `${this.url.raw} (${this.resolutionString})`
+        return `${this.url.name} (${this.resolutionString})`
     }
 
     public equals(other: FsDataSource): boolean{

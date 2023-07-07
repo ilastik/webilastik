@@ -380,7 +380,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                 openInViewer: (datasource) => {
                     this.viewer.openLane({
                         rawData: datasource,
-                        name: datasource.url.name, //FIXME?
+                        name: datasource.getDisplayString(), //FIXME?
                         isVisible: true,
                     })
                 }

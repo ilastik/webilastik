@@ -85,7 +85,7 @@ export class DataSourceSelectionWidget{
             fillInPopup: (params: {popup: PopupWidget, resolve: (result: FsDataSource) => void}) => {
                 for(const ds of datasources){
                     const p = new Paragraph({parentElement: params.popup.element})
-                    new Button({inputType: "button", parentElement: p, text: ds.resolutionString, onClick: () => params.resolve(ds)})
+                    new Button({inputType: "button", parentElement: p, text: ds.getDisplayString(), onClick: () => params.resolve(ds)})
                 }
             }
         })
@@ -110,7 +110,7 @@ export class DataSourceSelectionWidget{
                 continue
             }
             const openingResult = await viewer.openLane({
-                name: `${datasourceResult.url.name}`,
+                name: datasourceResult.getDisplayString(),
                 isVisible: true,
                 rawData: datasourceResult,
             })

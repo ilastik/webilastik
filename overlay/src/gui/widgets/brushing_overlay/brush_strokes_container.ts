@@ -390,7 +390,7 @@ class BrushStokeTable extends Div{
         super({...params, children: [
             new Paragraph({
                 parentElement: undefined,
-                innerText: `${params.datasource.url.name} ${params.datasource.resolutionString}`,
+                innerText: params.datasource.getDisplayString(),
                 title: params.datasource.url.raw,
                 cssClasses: [CssClasses.ItkBrushDatasourceLink],
                 onClick: params.onCaptionCliked,
