@@ -54,6 +54,7 @@ class DziLevelSink(FsDataSink):
         self.dzi_image = dzi_image
         self.level_index = level_index
         self.xml_path = xml_path
+        self.num_channels: Literal[1, 3] = num_channels
         super().__init__(
             filesystem=filesystem,
             path=DziImageElement.make_level_path(xml_path=xml_path, level_index=level_index),
@@ -100,7 +101,13 @@ class DziLevelSink(FsDataSink):
         return out
 
     def to_datasource(self) -> DziLevelDataSource:
-        raise Exception(f"FIXME")
+        return DziLevelDataSource(
+            filesystem=self.filesystem,
+            dzi_image=self.dzi_image,
+            level_index=self.level_index,
+            num_channels=self.num_channels,
+            xml_path=self.xml_path,
+        )
 
     def to_dto(self) -> DziLevelSinkDto:
         num_channels = cast(Literal[1, 3], self.shape.c)
