@@ -76,6 +76,7 @@ body{
     justify-content: end;
     background-color: var(--default-title-bar-background-color);
     padding: var(--default-title-bar-padding);
+    font-weight: bold;
 }
 
 .ItkTitleBar .ItkTitleBarText{
@@ -115,6 +116,11 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
     border-left: solid var(--default-button-border-thickness) var(--default-highlight-bright-color);
     border-bottom: solid var(--default-button-border-thickness) var(--default-highlight-dark-color);
     border-right: solid var(--default-button-border-thickness) var(--default-highlight-dark-color);
+    cursor: default;
+}
+
+.ItkButton:hover:not(.ItkDisabled){
+    filter: brightness(1.1)
 }
 
 .ItkButton:active, .ItkButtonDepressed{
