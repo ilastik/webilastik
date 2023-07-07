@@ -81,7 +81,10 @@ export class SessionManagerWidget{
                 parentElement: undefined,
                 onClick: async () => {
                     this.listSessionsButton.disabled = true
-                    let ilastikUrl = await this.ensureLoggedInAndGetIlastikUrl();
+                    let ilastikUrl = await PopupWidget.WaitPopup({
+                        title: "Authenticating...",
+                        operation: this.ensureLoggedInAndGetIlastikUrl()
+                    })
                     if(!ilastikUrl){
                         this.listSessionsButton.disabled = false
                         return
