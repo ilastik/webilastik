@@ -26,6 +26,7 @@ from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.filesystem import IFilesystem
 from webilastik.filesystem.os_fs import OsFs
 from webilastik.ui.applet.export_jobs import DownscaleDatasource, ZipDirectory
+from webilastik.utility import get_now_string
 
 # fmt: off
 raw = np.asarray([
@@ -518,7 +519,7 @@ def test_dzip_datasource():
 
     output_fs = get_test_output_bucket_fs()[0]
     assert not isinstance(output_fs, Exception)
-    output_path = PurePosixPath("/my_pyramid.dzip")
+    output_path = PurePosixPath(f"/datasource_test_pyramid_{get_now_string()}/{temp_xml_path.stem}.dzip")
 
     zip_result = ZipDirectory.zip_directory(
         temp_output_dir,
@@ -527,7 +528,8 @@ def test_dzip_datasource():
         output_fs=output_fs,
         output_path=output_path
     )
-    assert not isinstance(zip_result, Exception)
+    assert not isinstance(zip_result, Exception), str(zip_result)
+    print(f"Uploaded a zip to {output_fs.geturl(output_path)}")
 
     from webilastik.ui.datasource import try_get_datasources_from_url
     ds_results = try_get_datasources_from_url(
