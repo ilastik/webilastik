@@ -1,26 +1,25 @@
+# pyright: strict
+
 from pathlib import Path, PurePosixPath
 import time
-from concurrent.futures import ProcessPoolExecutor
 import json
 from typing import List
 
 import numpy as np
-from ndstructs.utils.json_serializable import JsonObject, ensureJsonArray, ensureJsonInt, ensureJsonObject
 
 from tests import create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations, get_test_output_path
+from webilastik.filesystem.zip_fs import ZipFs
 from webilastik.datasource import DataRoi
-from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
+from webilastik.datasource.deep_zoom_datasource import DziLevelDataSource
 from webilastik.features.ilp_filter import (
     IlpDifferenceOfGaussians, IlpGaussianGradientMagnitude, IlpGaussianSmoothing,
     IlpHessianOfGaussianEigenvalues, IlpLaplacianOfGaussian, IlpStructureTensorEigenvalues,
 )
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.filesystem.os_fs import OsFs
-from webilastik.libebrains.user_token import UserToken
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet import dummy_prompt
 from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
-from webilastik.utility.url import Protocol, Url
 from executor_getter import get_executor
 
 test_output_path = get_test_output_path()
@@ -49,7 +48,7 @@ def test_pixel_classification_workflow():
     priority_executor = PriorityExecutor(executor=executor, max_active_job_steps=8)
 
     workflow = PixelClassificationWorkflow(
-        on_async_change=lambda : print(json.dumps(workflow.export_applet._get_json_state(), indent=4)),
+        on_async_change=lambda : None, #print(json.dumps(workflow.export_applet._get_json_state(), indent=4)),
         executor=executor,
         priority_executor=priority_executor,
     )
@@ -96,18 +95,22 @@ def test_pixel_classification_workflow():
 
     fs = OsFs.create()
     assert not isinstance(fs, Exception)
+
+    # import pydevd; pydevd.settrace()
     _ = workflow.save_project(fs=fs, path=test_output_path / "blas.ilp")
 
+    # import pydevd; pydevd.settrace()
     loaded_workflow = PixelClassificationWorkflow.from_ilp(
         original_ilp_fs=fs,
         temp_ilp_path=Path(test_output_path / "blas.ilp"),
-        on_async_change=lambda : print(json.dumps(workflow.export_applet._get_json_state(), indent=4)),
+        on_async_change=lambda : print(json.dumps(workflow.export_applet._get_json_state(), indent=4)), # pyright: ignore [reportPrivateUsage]
         executor=executor,
         priority_executor=priority_executor,
     )
     print(loaded_workflow)
-    assert isinstance(loaded_workflow, PixelClassificationWorkflow)
-    print(f"Loaded workflow and state pixel aplet description is {loaded_workflow.pixel_classifier_applet._state.description}")
+    if isinstance(loaded_workflow, Exception):
+        raise loaded_workflow
+    print(f"Loaded workflow and state pixel aplet description is {loaded_workflow.pixel_classifier_applet._state.description}") # pyright: ignore [reportPrivateUsage]
 
 
 
@@ -128,52 +131,110 @@ def test_pixel_classification_workflow():
 
 #######################################33
 
-    # run an export job
-    predictions_export_datasink = create_precomputed_chunks_sink(
-        shape=raw_data_source.shape.updated(c=classifier.num_classes),
-        dtype=np.dtype("float32"),
-        chunk_size=raw_data_source.tile_shape.updated(c=classifier.num_classes),
-    )
+    sink_fs = OsFs.create(); assert not isinstance(sink_fs, Exception)
 
-    print(f"Sending predictions job request??????")
-    result = workflow.export_applet.launch_pixel_probabilities_export_job(
-        datasource=raw_data_source,
-        datasink=predictions_export_datasink
-    )
-    assert result is None
+    def run_an_export_job(): # pyright: ignore [reportUnusedFunction]
+        predictions_export_datasink = create_precomputed_chunks_sink(
+            fs=sink_fs,
 
-    print(f"---> Job successfully scheduled? Waiting for a while")
-    wait_until_jobs_completed(workflow=workflow)
-    print(f"Done waiting. Checking outputs")
+            shape=raw_data_source.shape.updated(c=classifier.num_classes),
+            dtype=np.dtype("float32"),
+            chunk_size=raw_data_source.tile_shape.updated(c=classifier.num_classes),
+        )
 
-    predictions_output = predictions_export_datasink.to_datasource()
-    for tile in predictions_output.roi.get_datasource_tiles():
-        _ = tile.retrieve().cut(c=1).as_uint8(normalized=True)#.show_channels()
+        print(f"Sending predictions job request??????")
+        result = workflow.export_applet.launch_pixel_probabilities_export_job(
+            datasource=raw_data_source,
+            datasink=predictions_export_datasink
+        )
+        assert result is None
+
+        print(f"---> Job successfully scheduled? Waiting for a while")
+        wait_until_jobs_completed(workflow=workflow)
+        print(f"Done waiting. Checking outputs")
+
+        # predictions_output = predictions_export_datasink.to_datasource()
+        # for tile in predictions_output.roi.get_datasource_tiles():
+        #     _ = tile.retrieve().cut(c=1).as_uint8(normalized=True).show_channels()
+    # run_an_export_job()
 
 ##################################333
 
-    simple_segmentation_datasink = create_precomputed_chunks_sink(
-        shape=raw_data_source.shape.updated(c=3),
-        dtype=np.dtype("uint8"),
-        chunk_size=raw_data_source.tile_shape.updated(c=3),
-    )
+    def run_a_simple_segmentation_job():  # pyright: ignore [reportUnusedFunction]
+        simple_segmentation_datasink = create_precomputed_chunks_sink(
+            fs=sink_fs,
+            shape=raw_data_source.shape.updated(c=3),
+            dtype=np.dtype("uint8"),
+            chunk_size=raw_data_source.tile_shape.updated(c=3),
+        )
 
-    print(f"Sending simple segmentation job request??????")
-    result = workflow.export_applet.launch_simple_segmentation_export_job(
-        datasource=raw_data_source,
-        datasink=simple_segmentation_datasink,
-        label_name=pixel_annotations[1].name,
-    )
+        print(f"Sending simple segmentation job request??????")
+        result = workflow.export_applet.launch_simple_segmentation_export_job(
+            datasource=raw_data_source,
+            datasink=simple_segmentation_datasink,
+            label_name=pixel_annotations[0].name,
+        )
+        assert not isinstance(result, Exception)
 
-    print(f"---> Job successfully scheduled? Waiting for a while")
-    wait_until_jobs_completed(workflow=workflow)
-    print(f"Done waiting. Checking outputs")
+        print(f"---> Job successfully scheduled? Waiting for a while")
+        wait_until_jobs_completed(workflow=workflow)
+        print(f"Done waiting. Checking outputs")
 
-    segmentation_output_1 = simple_segmentation_datasink.to_datasource()
-    for tile in segmentation_output_1.roi.get_datasource_tiles():
-        _ = tile.retrieve()#.show_images()
+        # segmentation_output_1 = simple_segmentation_datasink.to_datasource()
+        # for tile in segmentation_output_1.roi.get_datasource_tiles():
+        #     _ = tile.retrieve().show_images()
+    # run_a_simple_segmentation_job()
 
 ####################################3
+
+    def run_dzi_export_job():
+        # sink_fs = OsFs.create(); assert not isinstance(sink_fs, Exception)
+        output_fs = OsFs.create_scratch_dir()
+        assert not isinstance(output_fs, Exception)
+        output_path = PurePosixPath("my_output.zip")
+
+        res = workflow.export_applet.launch_export_simple_segmentation_to_dzip(
+            datasource=raw_data_source,
+            output_fs=output_fs,
+            output_path=output_path,
+            dzi_image_format="png",
+            label_name="Foreground",
+        )
+        assert not isinstance(res, Exception)
+
+        for _ in range(99999999):
+            time.sleep(2)
+            for job in workflow.export_applet.get_state_dto().jobs:
+                if job.error_message:
+                    print(f"oooooooooo A job failed: {job.name}: {job.error_message}")
+                    exit(1)
+                if job.status != "completed":
+                    print(f"ooooooooooo {time.time()} Jobs are not done yet")
+                    break
+            else:
+                output_exists = output_fs.exists(output_path)
+                assert not isinstance(output_exists, Exception), str(output_exists)
+                if output_exists:
+                    print(f"====>>>>> The final output path is {output_fs.resolve_path(output_path)}")
+                    break
+                else:
+                    print(f"ooooooooooo Output doesn't seem to exist yet")
+                    continue
+
+        zip_fs = ZipFs.create(zip_file_fs=output_fs, zip_file_path=output_path)
+        assert not isinstance(zip_fs, Exception)
+
+        pyramid = DziLevelDataSource.try_load_as_pyramid(
+            filesystem=zip_fs,
+            dzi_path=PurePosixPath("/tmp.dzi"), #FIXME: name might change,
+        )
+        assert not isinstance(pyramid, Exception) and pyramid is not None
+        for level_index in reversed(range(pyramid[0].dzi_image.max_level_index + 1)):
+            level = pyramid[level_index]
+            _ = level.retrieve()#.show_images(name_suffix=f"__{level_index}")
+
+
+    run_dzi_export_job()
 
     priority_executor.shutdown()
 
