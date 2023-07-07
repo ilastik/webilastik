@@ -19,10 +19,10 @@ export class DataSourceSelectionWidget{
     public readonly lanesContainer: Div;
 
     constructor(params: {
-        parentElement: HTMLElement, session: Session, defaultBucketName: string, viewer_driver: IViewerDriver
+        parentElement: HTMLElement, session: Session, defaultBucketName: string, viewer_driver: IViewerDriver, help: string[]
     }){
         this.element = new CollapsableWidget({
-            display_name: "Data Sources", parentElement: params.parentElement
+            display_name: "Data Sources", parentElement: params.parentElement, help: params.help
         }).element
         this.session = params.session
 

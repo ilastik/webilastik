@@ -29,10 +29,22 @@ export class ReferencePixelClassificationWorkflowGui{
         this.session = session
         this.element = createElement({tagName: "div", parentElement, cssClasses: ["ReferencePixelClassificationWorkflowGui"]})
 
-        this.project_widget = new ProjectWidget({parentElement: this.element, session, projectLocation, defaultBucketName})
+        this.project_widget = new ProjectWidget({
+            parentElement: this.element, session, projectLocation, defaultBucketName, help: [
+                ("You can save your project with all of its annotations to the Ebrains Data Proxy so that you can " +
+                "reload it later to process more images or to refine your annotations.")
+            ]
+        })
 
         this.data_selection_widget = new DataSourceSelectionWidget({
-            parentElement: this.element, session, viewer_driver, defaultBucketName
+            parentElement: this.element, session, viewer_driver, defaultBucketName, help: [
+                ("Select simages from the Ebrains Data Proxy. You will be able to use those as training examples for the " +
+                "pixel classifier."
+                ),
+
+                ("You can open multiple images and train the same Pixel Classifier with examples from different images, " +
+                "which usually increases the robustness of the classifier.")
+            ]
         });
 
         this.feature_selection_applet = new FeatureSelectionWidget({
