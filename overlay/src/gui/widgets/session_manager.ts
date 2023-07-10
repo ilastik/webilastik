@@ -112,79 +112,80 @@ export class SessionManagerWidget{
             ]
         })
 
-
         createElement({tagName: "h3", parentElement: this.element, innerText: "Create Session"})
-        new Paragraph({
-            parentElement: this.element,
-            cssClasses: [CssClasses.ItkInputParagraph],
-            children: [
-                new Label({parentElement: undefined, innerText: "Session Duration (minutes): "}),
-                this.sessionDurationInput = new NumberInput({parentElement: undefined, value: 60, min: 5}),
-            ]
+        const sessionCreationForm = new Form({parentElement: this.element, children: [
+            new Paragraph({
+                parentElement: this.element,
+                cssClasses: [CssClasses.ItkInputParagraph],
+                children: [
+                    new Label({parentElement: undefined, innerText: "Session Duration (minutes): "}),
+                    this.sessionDurationInput = new NumberInput({parentElement: undefined, value: 60, min: 5, required: true}),
+                ]
+            }),
+            new Paragraph({parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
+                this.createSessionButton = new Button({parentElement: undefined, inputType: "submit", text: "Create Session"}),
+            ]})
+        ]})
+        sessionCreationForm.preventSubmitWith(async () => {
+            let timeoutMinutes = this.getWaitTimeout()
+            if(timeoutMinutes === undefined){
+                return
+            }
+            this.enableSessionAccquisitionControls({enabled: false})
+            let ilastikUrl = await await PopupWidget.WaitPopup({
+                title: "Authenticating...",
+                operation: this.ensureLoggedInAndGetIlastikUrl()
+            });
+            if(!ilastikUrl){
+                return this.enableSessionAccquisitionControls({enabled: true})
+            }
+            let sessionDurationMinutes = this.sessionDurationInput.value
+            if(sessionDurationMinutes === undefined){
+                new ErrorPopupWidget({message: `Bad session duration: ${this.sessionDurationInput.value}`})
+                return
+            }
+            this.logMessage("Creating session....")
+            this.enableSessionAccquisitionControls({enabled: false})
+            this.sessionIdField.value = ""
+            let sessionResult = await Session.create({
+                ilastikUrl,
+                timeout_minutes: timeoutMinutes,
+                rpcParams: new CreateComputeSessionParamsDto({
+                    hpc_site: this.hpcSiteInput.value,
+                    session_duration_minutes: sessionDurationMinutes,
+                }),
+                onProgress: (message) => this.logMessage(message),
+                onUsageError: (message) => {new ErrorPopupWidget({message: message})},
+                autoCloseOnTimeout: true,
+            })
+            if(sessionResult instanceof Error){
+                return this.onNewSession({sessionResult})
+            }
+
+            const startupConfigs = StartupConfigs.tryFromWindowLocation()
+            if(startupConfigs instanceof Error){
+                new ErrorPopupWidget({message: `Could not get startup configs from current URL: ${startupConfigs.message}`})
+                return this.onNewSession({sessionResult})
+            }
+            if(startupConfigs.project_file_url instanceof Error){
+                new ErrorPopupWidget({message: `Could get project url from current page url: ${startupConfigs.project_file_url.message}`})
+            }
+
+            let projectLocation: {fs: Filesystem, path: Path} | undefined = undefined;
+            if(startupConfigs.project_file_url instanceof Url){
+                let projectLocationResult = await PopupWidget.WaitPopup({
+                    title: "Interpreting project ilp URL...",
+                    operation: sessionResult.tryGetFsAndPathFromUrl(new GetFileSystemAndPathFromUrlParamsDto({url: startupConfigs.project_file_url.toDto()})),
+                });
+                if(projectLocationResult instanceof Error){
+                    new ErrorPopupWidget({message: `Could not interpret url {FIXME} as a valid location`})
+                }else{
+                    projectLocation = projectLocationResult
+                }
+            }
+            this.onNewSession({sessionResult, projectLocation, defaultBucketName: startupConfigs.effectiveBucketName})
         })
 
-        new Paragraph({
-            parentElement: this.element,
-            cssClasses: [CssClasses.ItkInputParagraph],
-            children: [
-                this.createSessionButton = new Button({parentElement: undefined, inputType: "button", text: "Create Session", onClick: async () => {
-                    let timeoutMinutes = this.getWaitTimeout()
-                    if(timeoutMinutes === undefined){
-                        return
-                    }
-                    this.enableSessionAccquisitionControls({enabled: false})
-                    let ilastikUrl = await this.ensureLoggedInAndGetIlastikUrl();
-                    if(!ilastikUrl){
-                        return this.enableSessionAccquisitionControls({enabled: true})
-                    }
-                    let sessionDurationMinutes = this.sessionDurationInput.value
-                    if(sessionDurationMinutes === undefined){
-                        new ErrorPopupWidget({message: `Bad session duration: ${this.sessionDurationInput.value}`})
-                        return
-                    }
-                    this.logMessage("Creating session....")
-                    this.enableSessionAccquisitionControls({enabled: false})
-                    this.sessionIdField.value = ""
-                    let sessionResult = await Session.create({
-                        ilastikUrl,
-                        timeout_minutes: timeoutMinutes,
-                        rpcParams: new CreateComputeSessionParamsDto({
-                            hpc_site: this.hpcSiteInput.value,
-                            session_duration_minutes: sessionDurationMinutes,
-                        }),
-                        onProgress: (message) => this.logMessage(message),
-                        onUsageError: (message) => {new ErrorPopupWidget({message: message})},
-                        autoCloseOnTimeout: true,
-                    })
-                    if(sessionResult instanceof Error){
-                        return this.onNewSession({sessionResult})
-                    }
-
-                    const startupConfigs = StartupConfigs.tryFromWindowLocation()
-                    if(startupConfigs instanceof Error){
-                        new ErrorPopupWidget({message: `Could not get startup configs from current URL: ${startupConfigs.message}`})
-                        return this.onNewSession({sessionResult})
-                    }
-                    if(startupConfigs.project_file_url instanceof Error){
-                        new ErrorPopupWidget({message: `Could get project url from current page url: ${startupConfigs.project_file_url.message}`})
-                    }
-
-                    let projectLocation: {fs: Filesystem, path: Path} | undefined = undefined;
-                    if(startupConfigs.project_file_url instanceof Url){
-                        let projectLocationResult = await PopupWidget.WaitPopup({
-                            title: "Interpreting project ilp URL...",
-                            operation: sessionResult.tryGetFsAndPathFromUrl(new GetFileSystemAndPathFromUrlParamsDto({url: startupConfigs.project_file_url.toDto()})),
-                        });
-                        if(projectLocationResult instanceof Error){
-                            new ErrorPopupWidget({message: `Could not interpret url {FIXME} as a valid location`})
-                        }else{
-                            projectLocation = projectLocationResult
-                        }
-                    }
-                    this.onNewSession({sessionResult, projectLocation, defaultBucketName: startupConfigs.effectiveBucketName})
-                }})
-            ]
-        })
 
         createElement({tagName: "h3", parentElement: this.element, innerText: "Rejoin Session"})
         const sessionRejoinForm = new Form({parentElement: this.element, children: [
@@ -193,7 +194,7 @@ export class SessionManagerWidget{
                 this.sessionIdField = new TextInput({parentElement: undefined, value: undefined, required: true, }),
             ]}),
             new Paragraph({parentElement: this.element, children: [
-                this.rejoinSessionButton = new Button({inputType: "button", text: "Rejoin Session", parentElement: undefined})
+                this.rejoinSessionButton = new Button({inputType: "submit", text: "Rejoin Session", parentElement: undefined})
             ]})
         ]});
         sessionRejoinForm.preventSubmitWith(async () => {
@@ -207,7 +208,10 @@ export class SessionManagerWidget{
                 return
             }
             this.enableSessionAccquisitionControls({enabled: false})
-            let ilastikUrl = await this.ensureLoggedInAndGetIlastikUrl();
+            let ilastikUrl = await await PopupWidget.WaitPopup({
+                title: "Authenticating...",
+                operation: this.ensureLoggedInAndGetIlastikUrl()
+            });
             if(!ilastikUrl){
                 return this.enableSessionAccquisitionControls({enabled: true})
             }

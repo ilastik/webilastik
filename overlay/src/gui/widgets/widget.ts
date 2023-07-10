@@ -135,11 +135,11 @@ export class Form extends ContainerWidget<"form">{
         super({...params, tagName: "form"})
     }
 
-    public preventSubmitWith(callback: () => void){
+    public preventSubmitWith(callback: (ev: SubmitEvent) => void){
         this.element.addEventListener("submit", (ev): false => {
             ev.preventDefault()
             ev.stopPropagation()
-            callback()
+            callback(ev)
             return false
         })
     }
