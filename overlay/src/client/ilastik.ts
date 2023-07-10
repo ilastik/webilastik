@@ -66,15 +66,18 @@ export const SESSION_DONE_STATES = [
 export class StartupConfigs{
     project_file_url: Url | undefined | Error
     ebrains_bucket_name?: string
+    ebrains_bucket_path: Path
     clb_collab_id?: string
 
     public constructor(params: {
         project_file_url: Url | undefined | Error,
         ebrains_bucket_name?: string,
+        ebrains_bucket_path: Path,
         clb_collab_id?: string,
     }){
         this.project_file_url = params.project_file_url
         this.ebrains_bucket_name = params.ebrains_bucket_name
+        this.ebrains_bucket_path = params.ebrains_bucket_path
         this.clb_collab_id = params.clb_collab_id
     }
 
@@ -91,11 +94,15 @@ export class StartupConfigs{
         const ebrains_bucket_name__key = "ebrains_bucket_name"
         const ebrainsBucketNameRaw = locationUrlResult.search.get(ebrains_bucket_name__key)
 
+        const ebrains_bucket_path_key = "ebrains_bucket_path"
+        const ebrainsBucketPathRaw = locationUrlResult.search.get(ebrains_bucket_path_key)
+
         const collabId = locationUrlResult.search.get("clb-collab-id")
 
         return new StartupConfigs({
             [project_file_url__key]: projectFileUrlResult,
             [ebrains_bucket_name__key]: ebrainsBucketNameRaw,
+            [ebrains_bucket_path_key]: ebrainsBucketPathRaw ? Path.parse(ebrainsBucketPathRaw) : Path.root,
             clb_collab_id: collabId,
         })
     }

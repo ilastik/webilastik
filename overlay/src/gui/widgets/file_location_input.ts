@@ -86,12 +86,15 @@ export class FileLocationPatternInputWidget{
     constructor(params: {
         parentElement: HTMLElement,
         defaultBucketName?: string,
+        defaultBucketPath: Path,
         defaultPathPattern?: string,
         required?: boolean,
         filesystemChoices: Array<"http" | "data-proxy">,
     }){
         this.fsInput = new FsInputWidget({
-            parentElement: params.parentElement, defaultBucketName: params.defaultBucketName, filesystemChoices: params.filesystemChoices
+            parentElement: params.parentElement,
+            defaultBucketName: params.defaultBucketName,
+            filesystemChoices: params.filesystemChoices,
         })
         new Paragraph({parentElement: params.parentElement, cssClasses: [CssClasses.ItkInputParagraph], children: [
             new Label({innerText: "Path pattern: ", parentElement: undefined}),

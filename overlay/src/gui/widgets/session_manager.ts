@@ -183,7 +183,9 @@ export class SessionManagerWidget{
                     projectLocation = projectLocationResult
                 }
             }
-            this.onNewSession({sessionResult, projectLocation, defaultBucketName: startupConfigs.effectiveBucketName})
+            this.onNewSession({
+                sessionResult, projectLocation, defaultBucketName: startupConfigs.effectiveBucketName, defaultBucketPath: startupConfigs.ebrains_bucket_path
+            })
         })
 
 
@@ -355,10 +357,12 @@ export class SessionManagerWidget{
         sessionResult,
         projectLocation,
         defaultBucketName,
+        defaultBucketPath,
     }: {
         sessionResult: Session | Error,
         projectLocation?: {fs: Filesystem, path: Path,},
         defaultBucketName?: string,
+        defaultBucketPath?: Path,
     }){
         if(sessionResult instanceof Error){
             this.logMessage(sessionResult.message)
@@ -375,6 +379,7 @@ export class SessionManagerWidget{
             parentElement: this.workflowContainer,
             viewer_driver: this.viewerDriver,
             defaultBucketName,
+            defaultBucketPath,
             projectLocation: projectLocation,
         })
         this.sessionIdField.value = sessionResult.sessionId

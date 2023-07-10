@@ -2,7 +2,7 @@
 import { GetDatasourcesFromUrlParamsDto } from "../../client/dto";
 import { FsDataSource, Session } from "../../client/ilastik";
 import { IViewerDriver } from "../../drivers/viewer_driver";
-import { Url } from "../../util/parsed_url";
+import { Path, Url } from "../../util/parsed_url";
 import { Viewer } from "../../viewer/viewer";
 import { CssClasses } from "../css_classes";
 import { CollapsableWidget } from "./collapsable_applet_gui";
@@ -19,7 +19,12 @@ export class DataSourceSelectionWidget{
     public readonly lanesContainer: Div;
 
     constructor(params: {
-        parentElement: HTMLElement, session: Session, defaultBucketName: string, viewer_driver: IViewerDriver, help: string[]
+        parentElement: HTMLElement,
+        session: Session,
+        defaultBucketName: string,
+        defaultBucketPath: Path,
+        viewer_driver: IViewerDriver,
+        help: string[],
     }){
         this.element = new CollapsableWidget({
             display_name: "Data Sources", parentElement: params.parentElement, help: params.help
@@ -30,6 +35,7 @@ export class DataSourceSelectionWidget{
             parentElement: this.element,
             session: params.session,
             defaultBucketName: params.defaultBucketName,
+            defaultBucketPath: params.defaultBucketPath,
             onOk: (liveFsTree: LiveFsTree) => PopupWidget.WaitPopup({
                 title: "Loading data sources...",
                 operation: DataSourceSelectionWidget.tryOpenViews({

@@ -187,8 +187,14 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
     private customTileShapeCheckbox: BooleanInput;
     private tileShapeInput: Shape5DInputNoChannel
 
-    public constructor({name, parentElement, session, help, viewer, defaultBucketName}: {
-        name: string, parentElement: HTMLElement, session: Session, help: string[], viewer: Viewer, defaultBucketName: string
+    public constructor({name, parentElement, session, help, viewer, defaultBucketName, defaultBucketPath}: {
+        name: string,
+        parentElement: HTMLElement,
+        session: Session,
+        help: string[],
+        viewer: Viewer,
+        defaultBucketName: string,
+        defaultBucketPath: Path,
     }){
         super({
             name,
@@ -221,14 +227,15 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
 
         const datasourceFieldset = createFieldset({parentElement: this.element, legend: "Input Datasets:"})
         this.datasourceListWidget = new DataSourceListWidget({
-            parentElement: datasourceFieldset, session: this.session, defaultBucketName
+            parentElement: datasourceFieldset, session: this.session, defaultBucketName, defaultBucketPath
         })
 
         const datasinkFieldset = createFieldset({legend: "Output: ", parentElement: this.element})
         const fileLocationInputWidget = new FileLocationPatternInputWidget({
             parentElement: datasinkFieldset,
             defaultBucketName,
-            defaultPathPattern: "/ilastik_exports/{timestamp}/{name}_{output_type}",
+            defaultBucketPath,
+            defaultPathPattern: defaultBucketPath.joinPath("ilastik_exports").raw + "/{timestamp}/{name}_{output_type}",
             filesystemChoices: ["data-proxy"]
         })
         const datasinkConfigWidget = new DatasinkConfigWidget({parentElement: datasinkFieldset})

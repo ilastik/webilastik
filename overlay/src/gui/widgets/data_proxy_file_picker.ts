@@ -72,4 +72,7 @@ export class DataProxyFilePicker{
     public get bucketName(): string | undefined{
         return this.bucketNameInput.value
     }
+    public get bucketPath(): Path | undefined{
+        return this.dirPathInput.value
+    }
 }

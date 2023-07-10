@@ -18,12 +18,13 @@ export class ReferencePixelClassificationWorkflowGui{
     public readonly session: Session;
     public readonly data_selection_widget: DataSourceSelectionWidget;
 
-    public constructor({parentElement, session, viewer_driver, projectLocation, defaultBucketName}: {
+    public constructor({parentElement, session, viewer_driver, projectLocation, defaultBucketName, defaultBucketPath=Path.root}: {
         parentElement: HTMLElement,
         session: Session,
         viewer_driver: IViewerDriver,
         projectLocation?: {fs: Filesystem, path: Path},
         defaultBucketName?: string,
+        defaultBucketPath?: Path,
     }){
         defaultBucketName = defaultBucketName || "hbp-image-service"
         this.session = session
@@ -37,7 +38,7 @@ export class ReferencePixelClassificationWorkflowGui{
         })
 
         this.data_selection_widget = new DataSourceSelectionWidget({
-            parentElement: this.element, session, viewer_driver, defaultBucketName, help: [
+            parentElement: this.element, session, viewer_driver, defaultBucketName, defaultBucketPath, help: [
                 ("Select simages from the Ebrains Data Proxy. You will be able to use those as training examples for the " +
                 "pixel classifier."
                 ),
@@ -89,6 +90,7 @@ export class ReferencePixelClassificationWorkflowGui{
             session: this.session,
             viewer: this.data_selection_widget.viewer,
             defaultBucketName,
+            defaultBucketPath,
             help: [
                 ("Once you trained your pixel classifier with the previous applets, you can apply it to other datasets " +
                 "or even the same dataset that was used to do the training on."),
