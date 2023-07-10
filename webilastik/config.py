@@ -77,32 +77,18 @@ class WebilastikConfig:
     def __init__(
         self,
         *,
-        allow_local_fs: bool,
-        scratch_dir: PurePosixPath,
         ebrains_oidc_client: OidcClient,
     ) -> None:
         super().__init__()
-        self.allow_local_fs = allow_local_fs
-        self.scratch_dir = scratch_dir
         self.ebrains_oidc_client = ebrains_oidc_client
 
     @classmethod
     def from_env(
         cls,
         *,
-        allow_local_fs: Optional[bool] = None,
-        scratch_dir: Optional[PurePosixPath] = None,
         ebrains_oidc_client: Optional[OidcClient] = None,
     ) -> "WebilastikConfig":
         return WebilastikConfig(
-            allow_local_fs=allow_local_fs if allow_local_fs is not None else read_bool_env_var(
-                name= WEBILASTIK_ALLOW_LOCAL_FS,
-                help_text="Allow ilastik to read and write to the local filesystem",
-            ),
-            scratch_dir=scratch_dir if scratch_dir is not None else PurePosixPath(read_str_env_var(
-                name= WEBILASTIK_SCRATCH_DIR,
-                help_text="base path where temporary files can be created",
-            )),
             ebrains_oidc_client=ebrains_oidc_client if ebrains_oidc_client is not None else OidcClient(
                 client_id=read_str_env_var(
                     EBRAINS_CLIENT_ID,
@@ -117,7 +103,6 @@ class WebilastikConfig:
 
     def to_env_vars(self) -> Sequence[EnvVar]:
         return [
-            EnvVar(name=WEBILASTIK_ALLOW_LOCAL_FS, value=str(self.allow_local_fs).lower()),
             EnvVar(name=EBRAINS_CLIENT_ID, value=self.ebrains_oidc_client.client_id),
             EnvVar(name=EBRAINS_CLIENT_SECRET, value=self.ebrains_oidc_client.client_secret),
         ]
@@ -135,8 +120,6 @@ class SessionAllocatorConfig(WebilastikConfig):
     def __init__(
         self,
         *,
-        allow_local_fs: bool,
-        scratch_dir: PurePosixPath,
         ebrains_oidc_client: OidcClient,
 
         allow_local_compute_sessions: bool,
@@ -144,8 +127,6 @@ class SessionAllocatorConfig(WebilastikConfig):
         external_url: Url
     ) -> None:
         super().__init__(
-            allow_local_fs=allow_local_fs,
-            scratch_dir=scratch_dir,
             ebrains_oidc_client=ebrains_oidc_client,
         )
         self.allow_local_compute_sessions = allow_local_compute_sessions
@@ -169,19 +150,15 @@ class SessionAllocatorConfig(WebilastikConfig):
     def from_env(
         cls,
         *,
-        allow_local_fs: Optional[bool] = None,
-        scratch_dir: Optional[PurePosixPath] = None,
         ebrains_oidc_client: Optional[OidcClient] = None,
 
         allow_local_compute_sessions: Optional[bool] = None,
         session_allocator_b64_fernet_key: Optional[str] = None,
         external_url: Optional[Url] = None
     ) -> "SessionAllocatorConfig":
-        base_config = WebilastikConfig.from_env(allow_local_fs=allow_local_fs, scratch_dir=scratch_dir, ebrains_oidc_client=ebrains_oidc_client)
+        base_config = WebilastikConfig.from_env(ebrains_oidc_client=ebrains_oidc_client)
 
         return SessionAllocatorConfig(
-            allow_local_fs=base_config.allow_local_fs,
-            scratch_dir=base_config.scratch_dir,
             ebrains_oidc_client=base_config.ebrains_oidc_client,
             allow_local_compute_sessions=allow_local_compute_sessions if allow_local_compute_sessions is not None else read_bool_env_var(
                 name=WEBILASTIK_ALLOW_LOCAL_COMPUTE_SESSIONS,
@@ -225,10 +202,10 @@ class WorkflowConfig(WebilastikConfig):
         session_allocator_socket_path: Path
     ) -> None:
         super().__init__(
-            allow_local_fs=allow_local_fs,
-            scratch_dir=scratch_dir,
             ebrains_oidc_client=ebrains_oidc_client,
         )
+        self.allow_local_fs = allow_local_fs
+        self.scratch_dir = scratch_dir
         self.ebrains_user_token: UserToken = ebrains_user_token
         self.max_duration_minutes = max_duration_minutes
         self.listen_socket = listen_socket
@@ -261,7 +238,7 @@ class WorkflowConfig(WebilastikConfig):
         session_allocator_username: Optional[Username] = None,
         session_allocator_socket_path: Optional[Path] = None
     ) -> "WorkflowConfig":
-        base_config = WebilastikConfig.from_env(allow_local_fs=allow_local_fs, scratch_dir=scratch_dir, ebrains_oidc_client=ebrains_oidc_client)
+        base_config = WebilastikConfig.from_env(ebrains_oidc_client=ebrains_oidc_client)
         if ebrains_user_token is None:
             raw_user_access_token = read_str_env_var(
                 EBRAINS_USER_ACCESS_TOKEN,
@@ -273,8 +250,14 @@ class WorkflowConfig(WebilastikConfig):
             )
             ebrains_user_token = UserToken(access_token=raw_user_access_token, refresh_token=raw_user_refresh_token)
         return WorkflowConfig(
-            allow_local_fs=base_config.allow_local_fs,
-            scratch_dir=base_config.scratch_dir,
+            allow_local_fs=allow_local_fs if allow_local_fs is not None else read_bool_env_var(
+                name= WEBILASTIK_ALLOW_LOCAL_FS,
+                help_text="Allow ilastik to read and write to the local filesystem",
+            ),
+            scratch_dir=scratch_dir if scratch_dir is not None else PurePosixPath(read_str_env_var(
+                name= WEBILASTIK_SCRATCH_DIR,
+                help_text="base path where temporary files can be created",
+            )),
             ebrains_oidc_client=base_config.ebrains_oidc_client,
             ebrains_user_token=ebrains_user_token,
             max_duration_minutes=max_duration_minutes if max_duration_minutes is not None else Minutes(float(read_int_env_var(
@@ -309,6 +292,8 @@ class WorkflowConfig(WebilastikConfig):
     def to_env_vars(self) -> Sequence[EnvVar]:
         return [
             *super().to_env_vars(),
+            EnvVar(name=WEBILASTIK_ALLOW_LOCAL_FS, value=str(self.allow_local_fs).lower()),
+            EnvVar(name=WEBILASTIK_SCRATCH_DIR, value=str(self.scratch_dir)),
             EnvVar(name=EBRAINS_USER_ACCESS_TOKEN, value=self.ebrains_user_token.access_token),
             EnvVar(name=EBRAINS_USER_REFRESH_TOKEN, value=self.ebrains_user_token.refresh_token),
             EnvVar(name=WEBILASTIK_JOB_MAX_DURATION_MINUTES, value=str(self.max_duration_minutes.to_int())),

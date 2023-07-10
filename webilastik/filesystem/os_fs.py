@@ -2,7 +2,7 @@ from typing import List, Final, Tuple
 from pathlib import PurePosixPath, Path
 import uuid
 import os
-from webilastik.config import WebilastikConfig
+from webilastik.config import WorkflowConfig
 
 from webilastik.filesystem import IFilesystem, FsIoException, FsFileNotFoundException, FsDirectoryContents
 from webilastik.utility.url import Url
@@ -19,9 +19,9 @@ class OsFs(IFilesystem):
 
     @classmethod
     def create_scratch_dir(cls) -> "OsFs | FsIoException":
-        scratch_dir_path = Path(WebilastikConfig.from_env().scratch_dir) / str(uuid.uuid4())
+        scratch_dir_path = Path(WorkflowConfig.from_env().scratch_dir) / str(uuid.uuid4())
         try:
-            scratch_dir_path.mkdir()
+            scratch_dir_path.mkdir(parents=True)
         except Exception as e:
             return FsIoException(e)
         return OsFs(_marker=_PrivateMarker(), base=scratch_dir_path)
@@ -41,7 +41,7 @@ class OsFs(IFilesystem):
     @classmethod
     def create(cls) -> "OsFs | Exception":
         from webilastik.config import WebilastikConfig
-        if WebilastikConfig.from_env().allow_local_fs:
+        if WorkflowConfig.from_env().allow_local_fs:
             return OsFs(_marker=_PrivateMarker())
         return Exception("OsFs not allowed")
 
