@@ -2,6 +2,7 @@ from typing import List, Final, Tuple
 from pathlib import PurePosixPath, Path
 import uuid
 import os
+from webilastik.config import WebilastikConfig
 
 from webilastik.filesystem import IFilesystem, FsIoException, FsFileNotFoundException, FsDirectoryContents
 from webilastik.utility.url import Url
@@ -18,7 +19,7 @@ class OsFs(IFilesystem):
 
     @classmethod
     def create_scratch_dir(cls) -> "OsFs | FsIoException":
-        scratch_dir_path = Path(f"/tmp/{uuid.uuid4()}") #FIXME! read base from config
+        scratch_dir_path = Path(WebilastikConfig.from_env().scratch_dir) / str(uuid.uuid4())
         try:
             scratch_dir_path.mkdir()
         except Exception as e:

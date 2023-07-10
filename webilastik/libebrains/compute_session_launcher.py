@@ -10,7 +10,7 @@ import datetime
 import textwrap
 import tempfile
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import getpass
 import sys
 import os
@@ -458,6 +458,7 @@ class LocalJobLauncher(SshJobLauncher):
         working_dir = Path(f"/tmp/{compute_session_id}")
         job_config = WorkflowConfig(
             allow_local_fs=allow_local_fs,
+            scratch_dir=PurePosixPath(f"/tmp/webilastik_scratch"),
             ebrains_oidc_client=ebrains_oidc_client,
             ebrains_user_token=ebrains_user_token,
             max_duration_minutes=max_duration_minutes,
@@ -639,6 +640,7 @@ class JusufSshJobLauncher(SshJobLauncher):
         working_dir = Path(f"$SCRATCH/{compute_session_id}")
         job_config = WorkflowConfig(
             allow_local_fs=allow_local_fs,
+            scratch_dir=PurePosixPath(f"/p/scratch/{self.account}"),
             ebrains_oidc_client=ebrains_oidc_client,
             ebrains_user_token=ebrains_user_token,
             max_duration_minutes=max_duration_minutes,
@@ -758,6 +760,7 @@ class CscsSshJobLauncher(SshJobLauncher):
         working_dir = Path(f"$SCRATCH/{compute_session_id}")
         job_config = WorkflowConfig(
             allow_local_fs=allow_local_fs,
+            scratch_dir=PurePosixPath(f"/scratch/snx3000/bp000188"),
             ebrains_oidc_client=ebrains_oidc_client,
             ebrains_user_token=ebrains_user_token,
             max_duration_minutes=max_duration_minutes,

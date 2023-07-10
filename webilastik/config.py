@@ -3,7 +3,7 @@
 import os
 
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import ClassVar, Optional, Sequence
 
 from cryptography.fernet import Fernet
@@ -58,6 +58,7 @@ class EnvVar:
         return f'Environment={self.name}={self.value}'
 
 WEBILASTIK_ALLOW_LOCAL_FS="WEBILASTIK_ALLOW_LOCAL_FS"
+WEBILASTIK_SCRATCH_DIR="WEBILASTIK_SCRATCH_DIR"
 WEBILASTIK_ALLOW_LOCAL_COMPUTE_SESSIONS="WEBILASTIK_ALLOW_LOCAL_COMPUTE_SESSIONS"
 WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY="WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY"
 WEBILASTIK_EXTERNAL_URL="WEBILASTIK_EXTERNAL_URL"
@@ -77,10 +78,12 @@ class WebilastikConfig:
         self,
         *,
         allow_local_fs: bool,
+        scratch_dir: PurePosixPath,
         ebrains_oidc_client: OidcClient,
     ) -> None:
         super().__init__()
         self.allow_local_fs = allow_local_fs
+        self.scratch_dir = scratch_dir
         self.ebrains_oidc_client = ebrains_oidc_client
 
     @classmethod
@@ -88,6 +91,7 @@ class WebilastikConfig:
         cls,
         *,
         allow_local_fs: Optional[bool] = None,
+        scratch_dir: Optional[PurePosixPath] = None,
         ebrains_oidc_client: Optional[OidcClient] = None,
     ) -> "WebilastikConfig":
         return WebilastikConfig(
@@ -95,6 +99,10 @@ class WebilastikConfig:
                 name= WEBILASTIK_ALLOW_LOCAL_FS,
                 help_text="Allow ilastik to read and write to the local filesystem",
             ),
+            scratch_dir=scratch_dir if scratch_dir is not None else PurePosixPath(read_str_env_var(
+                name= WEBILASTIK_SCRATCH_DIR,
+                help_text="base path where temporary files can be created",
+            )),
             ebrains_oidc_client=ebrains_oidc_client if ebrains_oidc_client is not None else OidcClient(
                 client_id=read_str_env_var(
                     EBRAINS_CLIENT_ID,
@@ -128,6 +136,7 @@ class SessionAllocatorConfig(WebilastikConfig):
         self,
         *,
         allow_local_fs: bool,
+        scratch_dir: PurePosixPath,
         ebrains_oidc_client: OidcClient,
 
         allow_local_compute_sessions: bool,
@@ -136,6 +145,7 @@ class SessionAllocatorConfig(WebilastikConfig):
     ) -> None:
         super().__init__(
             allow_local_fs=allow_local_fs,
+            scratch_dir=scratch_dir,
             ebrains_oidc_client=ebrains_oidc_client,
         )
         self.allow_local_compute_sessions = allow_local_compute_sessions
@@ -160,16 +170,18 @@ class SessionAllocatorConfig(WebilastikConfig):
         cls,
         *,
         allow_local_fs: Optional[bool] = None,
+        scratch_dir: Optional[PurePosixPath] = None,
         ebrains_oidc_client: Optional[OidcClient] = None,
 
         allow_local_compute_sessions: Optional[bool] = None,
         session_allocator_b64_fernet_key: Optional[str] = None,
         external_url: Optional[Url] = None
     ) -> "SessionAllocatorConfig":
-        base_config = WebilastikConfig.from_env(allow_local_fs=allow_local_fs, ebrains_oidc_client=ebrains_oidc_client)
+        base_config = WebilastikConfig.from_env(allow_local_fs=allow_local_fs, scratch_dir=scratch_dir, ebrains_oidc_client=ebrains_oidc_client)
 
         return SessionAllocatorConfig(
             allow_local_fs=base_config.allow_local_fs,
+            scratch_dir=base_config.scratch_dir,
             ebrains_oidc_client=base_config.ebrains_oidc_client,
             allow_local_compute_sessions=allow_local_compute_sessions if allow_local_compute_sessions is not None else read_bool_env_var(
                 name=WEBILASTIK_ALLOW_LOCAL_COMPUTE_SESSIONS,
@@ -200,6 +212,7 @@ class WorkflowConfig(WebilastikConfig):
         self,
         *,
         allow_local_fs: bool,
+        scratch_dir: PurePosixPath,
         ebrains_oidc_client: OidcClient,
 
         ebrains_user_token: UserToken,
@@ -213,8 +226,9 @@ class WorkflowConfig(WebilastikConfig):
     ) -> None:
         super().__init__(
             allow_local_fs=allow_local_fs,
+            scratch_dir=scratch_dir,
             ebrains_oidc_client=ebrains_oidc_client,
-    )
+        )
         self.ebrains_user_token: UserToken = ebrains_user_token
         self.max_duration_minutes = max_duration_minutes
         self.listen_socket = listen_socket
@@ -235,6 +249,7 @@ class WorkflowConfig(WebilastikConfig):
         cls,
         *,
         allow_local_fs: Optional[bool] = None,
+        scratch_dir: Optional[PurePosixPath] = None,
         ebrains_oidc_client: Optional[OidcClient] = None,
 
         ebrains_user_token: Optional[UserToken] = None,
@@ -246,7 +261,7 @@ class WorkflowConfig(WebilastikConfig):
         session_allocator_username: Optional[Username] = None,
         session_allocator_socket_path: Optional[Path] = None
     ) -> "WorkflowConfig":
-        base_config = WebilastikConfig.from_env(allow_local_fs=allow_local_fs, ebrains_oidc_client=ebrains_oidc_client)
+        base_config = WebilastikConfig.from_env(allow_local_fs=allow_local_fs, scratch_dir=scratch_dir, ebrains_oidc_client=ebrains_oidc_client)
         if ebrains_user_token is None:
             raw_user_access_token = read_str_env_var(
                 EBRAINS_USER_ACCESS_TOKEN,
@@ -259,6 +274,7 @@ class WorkflowConfig(WebilastikConfig):
             ebrains_user_token = UserToken(access_token=raw_user_access_token, refresh_token=raw_user_refresh_token)
         return WorkflowConfig(
             allow_local_fs=base_config.allow_local_fs,
+            scratch_dir=base_config.scratch_dir,
             ebrains_oidc_client=base_config.ebrains_oidc_client,
             ebrains_user_token=ebrains_user_token,
             max_duration_minutes=max_duration_minutes if max_duration_minutes is not None else Minutes(float(read_int_env_var(
