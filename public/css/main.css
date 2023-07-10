@@ -119,7 +119,7 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
     cursor: default;
 }
 
-.ItkButton:hover:not(.ItkDisabled){
+.ItkButton:hover:not(.ItkDisabled):not(disabled){
     filter: brightness(1.1)
 }
 
