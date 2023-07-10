@@ -78,26 +78,26 @@ export class FsFolderWidget extends Details{
                 summary = new Summary({parentElement: undefined, children: [
                     expandWidget = new Span({
                         parentElement: undefined,
-                        innerText: "▶",
+                        innerText: "▸ 📁",
                         cssClasses: [CssClasses.ItkExpandFolderWidget],
                         onClick: (ev): false => {
                             ev.stopPropagation()
                             ev.preventDefault()
                             this.element.open = !this.element.open
                             if(this.element.open){
-                                expandWidget.element.innerText = "▼"
+                                expandWidget.element.innerText = "▾ 📂"
                                 if(params.onOpen){
                                     params.onOpen(this)
                                 }
                             }else{
-                                expandWidget.element.innerText = "▶"
+                                expandWidget.element.innerText = "▸ 📁"
                             }
                             return false
                         }
                     }),
                     new Span({
                         parentElement: undefined,
-                        innerText: "📁 " + params.name,
+                        innerText: params.name,
                         cssClasses: [CssClasses.ItkFsNodeName],
                         onClick: (ev): false => {
                             ev.stopPropagation()
