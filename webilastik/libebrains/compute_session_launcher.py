@@ -178,6 +178,18 @@ class ComputeSession:
         self.compute_session_id = compute_session_id
         super().__init__()
 
+    def __repr__(self) -> str:
+        return json.dumps({
+            "native_compute_session_id": self.native_compute_session_id,
+            "state": self.state,
+            "start_time_utc_sec": self.start_time_utc_sec and self.start_time_utc_sec.to_int(),
+            "time_elapsed_sec": self.time_elapsed_sec.to_int(),
+            "time_limit_minutes": self.time_limit_minutes.to_int(),
+            "num_nodes": self.num_nodes.to_int(),
+            "user_id": str(self.user_id),
+            "compute_session_id": str(self.compute_session_id),
+        }, indent=4)
+
 
     def to_dto(self) -> ComputeSessionDto:
         return ComputeSessionDto(
