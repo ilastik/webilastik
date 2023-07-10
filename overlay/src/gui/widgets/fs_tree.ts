@@ -63,10 +63,11 @@ export class FsFolderWidget extends Details{
     private children = new Map<string, FsFileWidget | FsFolderWidget>()
     public readonly parent: FsFolderWidget | undefined
     public readonly path: Path
+    private readonly expandWidget: Span;
 
     constructor(params: {
         parent: HTMLElement | FsFolderWidget,
-        name: string,
+        path: Path,
         onOpen?: (widget: FsFolderWidget) => void,
     }){
         let summary: Summary;
@@ -97,7 +98,7 @@ export class FsFolderWidget extends Details{
                     }),
                     new Span({
                         parentElement: undefined,
-                        innerText: params.name,
+                        innerText: params.parent instanceof FsFolderWidget ? params.path.name : params.path.raw,
                         cssClasses: [CssClasses.ItkFsNodeName],
                         onClick: (ev): false => {
                             ev.stopPropagation()
@@ -109,9 +110,16 @@ export class FsFolderWidget extends Details{
                 ]}),
             ]
         })
-        this.path = params.parent instanceof FsFolderWidget ? params.parent.path.joinPath(params.name) : Path.parse("/")
+        this.path = params.path
         this.parent = params.parent instanceof FsFolderWidget ? params.parent : undefined
         this.summary = summary;
+        this.expandWidget = expandWidget
+    }
+
+    public open(open: boolean){
+        if(this.element.open != open){
+            this.expandWidget.element.click()
+        }
     }
 
     public clear(){
@@ -191,7 +199,7 @@ export class FsFolderWidget extends Details{
     }
 
     public addChildFolder(params: {name: string, onOpen?: (widget: FsFolderWidget) => void}): FsFolderWidget{
-        const child = new FsFolderWidget({parent: this, ...params})
+        const child = new FsFolderWidget({parent: this, path: this.path.joinPath(params.name), onOpen: params.onOpen})
         this.children.set(params.name, child)
         return child
     }

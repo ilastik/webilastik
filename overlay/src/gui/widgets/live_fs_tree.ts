@@ -9,7 +9,7 @@ export class LiveFsTree{
     element: HTMLDivElement;
     root: FsFolderWidget;
     session: Session;
-    constructor(params: {fs: Filesystem, session: Session, parentElement: HTMLElement}){
+    constructor(params: {fs: Filesystem, dirPath?: Path, session: Session, parentElement: HTMLElement}){
         this.fs = params.fs
         this.session = params.session
         this.element = createElement({tagName: "div", parentElement: params.parentElement})
@@ -36,7 +36,9 @@ export class LiveFsTree{
             }
         }
 
-        this.root = new FsFolderWidget({parent: this.element, name: "/", onOpen})
+        let dirPath = params.dirPath || Path.root
+        this.root = new FsFolderWidget({parent: this.element, path: dirPath, onOpen})
+        this.root.open(true)
     }
 
     public getSelectedNodes(): Array<FsFileWidget | FsFolderWidget>{
