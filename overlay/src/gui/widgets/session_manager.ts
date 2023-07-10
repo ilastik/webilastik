@@ -7,7 +7,7 @@ import { ReferencePixelClassificationWorkflowGui } from "../reference_pixel_clas
 import { CollapsableWidget } from "./collapsable_applet_gui";
 import { ErrorPopupWidget, PopupWidget } from "./popup";
 import { SessionsPopup } from "./sessions_list_widget";
-import { Label, Paragraph, Span } from "./widget";
+import { Form, Label, Paragraph, Span } from "./widget";
 import { Button, Select } from "./input_widget";
 import { TextInput, NumberInput, UrlInput } from "./value_input_widget";
 import { CssClasses } from "../css_classes";
@@ -187,46 +187,46 @@ export class SessionManagerWidget{
         })
 
         createElement({tagName: "h3", parentElement: this.element, innerText: "Rejoin Session"})
-        new Paragraph({parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
-            new Label({parentElement: undefined, innerText: "Session ID :"}),
-            this.sessionIdField = new TextInput({parentElement: undefined, value: undefined}),
-        ]})
-        new Paragraph({parentElement: this.element, children: [
-            this.rejoinSessionButton = new Button({
-                inputType: "button",
-                text: "Rejoin Session",
-                parentElement: this.element,
-                onClick: async () => {
-                    let timeoutMinutes = this.getWaitTimeout()
-                    if(timeoutMinutes === undefined){
-                        return
-                    }
-                    let sessionId = this.sessionIdField.value
-                    if(!sessionId){
-                        new ErrorPopupWidget({message: "Bad session ID"})
-                        return
-                    }
-                    this.enableSessionAccquisitionControls({enabled: false})
-                    let ilastikUrl = await this.ensureLoggedInAndGetIlastikUrl();
-                    if(!ilastikUrl){
-                        return this.enableSessionAccquisitionControls({enabled: true})
-                    }
-                    this.logMessage("Joining session....")
-                    let sessionResult = await Session.load({
-                        ilastikUrl,
-                        getStatusRpcParams: new GetComputeSessionStatusParamsDto({
-                            compute_session_id: sessionId,
-                            hpc_site: this.hpcSiteInput.value,
-                        }),
-                        timeout_minutes: timeoutMinutes,
-                        onUsageError: (message) => this.logMessage(message),
-                        onProgress: (message) => this.logMessage(message),
-                        autoCloseOnTimeout: false,
-                    })
-                    this.onNewSession({sessionResult})
-                }
+        const sessionRejoinForm = new Form({parentElement: this.element, children: [
+            new Paragraph({parentElement: undefined, cssClasses: [CssClasses.ItkInputParagraph], children: [
+                new Label({parentElement: undefined, innerText: "Session ID :"}),
+                this.sessionIdField = new TextInput({parentElement: undefined, value: undefined, required: true, }),
+            ]}),
+            new Paragraph({parentElement: this.element, children: [
+                this.rejoinSessionButton = new Button({inputType: "button", text: "Rejoin Session", parentElement: undefined})
+            ]})
+        ]});
+        sessionRejoinForm.preventSubmitWith(async () => {
+            let timeoutMinutes = this.getWaitTimeout()
+            if(timeoutMinutes === undefined){
+                return
+            }
+            let sessionId = this.sessionIdField.value
+            if(!sessionId){
+                new ErrorPopupWidget({message: "Bad session ID"})
+                return
+            }
+            this.enableSessionAccquisitionControls({enabled: false})
+            let ilastikUrl = await this.ensureLoggedInAndGetIlastikUrl();
+            if(!ilastikUrl){
+                return this.enableSessionAccquisitionControls({enabled: true})
+            }
+            this.logMessage("Joining session....")
+            let sessionResult = await Session.load({
+                ilastikUrl,
+                getStatusRpcParams: new GetComputeSessionStatusParamsDto({
+                    compute_session_id: sessionId,
+                    hpc_site: this.hpcSiteInput.value,
+                }),
+                timeout_minutes: timeoutMinutes,
+                onUsageError: (message) => this.logMessage(message),
+                onProgress: (message) => this.logMessage(message),
+                autoCloseOnTimeout: false,
             })
-        ]})
+            this.onNewSession({sessionResult})
+        })
+
+
 
         this.messagesContainerLabel = new Label({parentElement: this.element, innerText: "Log:", show: false});
         this.messagesContainer = new Paragraph({parentElement: this.element, cssClasses: [CssClasses.ItkLogContainer], show: false})
