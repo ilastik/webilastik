@@ -21,7 +21,9 @@ from aiohttp import web
 from aiohttp.client import ClientSession
 from aiohttp.http_websocket import WSCloseCode
 from aiohttp.web_app import Application
+import h5py
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
+from webilastik.classic_ilastik.ilp.pixel_classification_ilp import IlpPixelClassificationWorkflowGroup
 
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource, PrecomputedChunksInfo
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale
@@ -385,36 +387,50 @@ class WebIlastik:
         payload = await request.json()
         params_result = LoadProjectParamsDto.from_json_value(payload)
         if isinstance(params_result, MessageParsingError):
-            return web.Response(status=400, text=f"Bad payload")
-        fs_result = create_filesystem_from_message(params_result.fs)
-        if isinstance(fs_result, Exception):
-            return uncachable_json_response(RpcErrorDto(error=str(fs_result)).to_json_value(), status=400)
+            return uncachable_json_response(RpcErrorDto(error="Could not parse message").to_json_value(), status=400)
+        input_fs_result = create_filesystem_from_message(params_result.fs)
+        if isinstance(input_fs_result, Exception):
+            return uncachable_json_response(RpcErrorDto(error=str(input_fs_result)).to_json_value(), status=400)
         file_path = PurePosixPath(params_result.project_file_path)
         if len(file_path.parts) == 0 or ".." in file_path.parts:
-            return web.Response(status=400, text=f"Bad project file path: {file_path}")
+            return uncachable_json_response(RpcErrorDto(error="Bad path").to_json_value(), status=400)
 
-        temp_ilp_path = await asyncio.wrap_future(self.executor.submit(
-            download_project_bytes,
-            filesystem=fs_result,
-            ilp_path=file_path,
+        if isinstance(input_fs_result, OsFs):
+            ilp_fs = input_fs_result
+            ilp_path = file_path
+        else:
+            ilp_path = PurePosixPath("temp_ilp_project.ilp")
+            ilp_fs_result = OsFs.create_scratch_dir()
+            if isinstance(ilp_fs_result, Exception):
+                print(ilp_fs_result)
+                return uncachable_json_response(RpcErrorDto(error="Could not donwload ilp: no osfs permission").to_json_value(), status=400)
+            ilp_fs = ilp_fs_result
+
+            transfer_result = await asyncio.wrap_future(self.executor.submit(
+                ilp_fs.transfer_file,
+                source_fs=input_fs_result, source_path=file_path, target_path=ilp_path
+            ))
+            if isinstance(transfer_result, Exception):
+                print(ilp_fs_result)
+                return uncachable_json_response(RpcErrorDto(error="Could not donwload ilp").to_json_value(), status=400)
+
+        group_result = await asyncio.wrap_future(self.executor.submit(
+            IlpPixelClassificationWorkflowGroup.from_file,
+            ilp_fs=ilp_fs, path=ilp_path
         ))
-        if isinstance(temp_ilp_path, Exception):
-            return uncachable_json_response({"error": str(temp_ilp_path)}, status=404)
+        if isinstance(group_result, Exception):
+            print(group_result)
+            return uncachable_json_response(RpcErrorDto(error=f"Could not parse ilp: {group_result}").to_json_value(), status=400)
 
-        # FIXME: reading the ilp can make some requests that couild be slow, so this should somehow
-        # be run inside an executor
-        new_workflow_result = WsPixelClassificationWorkflow.load_from_ilp(
-            original_ilp_fs=fs_result,
-            temp_ilp_path=temp_ilp_path,
+        new_workflow_result =  WsPixelClassificationWorkflow.from_ilp(
+            workflow_group=group_result,
             on_async_change=lambda: self.enqueue_user_interaction(user_interaction=lambda: None), #FIXME?
             executor=self.executor,
             priority_executor=self.priority_executor,
         )
-        if isinstance(new_workflow_result, Exception):
-            return web.Response(status=400, text=f"Could not load project: {new_workflow_result}")
         self.workflow = new_workflow_result
         self._update_clients()
-        return web.Response(status=200, text=f"Project saved to {fs_result.geturl(file_path)}")
+        return web.Response(status=200)
 
 if __name__ == '__main__':
     from webilastik.config import WorkflowConfig

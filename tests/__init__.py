@@ -28,6 +28,7 @@ from webilastik.filesystem.os_fs import OsFs
 from webilastik.filesystem.http_fs import HttpFs
 from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.ui.applet.brushing_applet import Label
+from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.utility import get_now_string
 
 def get_project_root_dir() -> PurePosixPath:
@@ -57,6 +58,17 @@ def get_sample_c_cells_datasource() -> PrecomputedChunksDataSource:
     # return SkimageDataSource(
     #     filesystem=fs, path=PurePosixPath(get_project_root_dir()) / "public/images/c_cells_1.png"
     # )
+
+def get_sample_dzip_c_cells_datasource() -> FsDataSource:
+    fs = OsFs.create()
+    assert not isinstance(fs, Exception)
+    datasources = try_get_datasources_from_url(
+        url=fs.geturl(
+            PurePosixPath(get_project_root_dir() / "public/images/c_cells_2.dzip")
+        ).updated_with(hash_="level=10")
+    )
+    assert isinstance(datasources, tuple) and len(datasources) == 1, str(datasources)
+    return datasources[0]
 
 def get_test_output_path() -> PurePosixPath:
     test_dir_path = get_tmp_dir() / f"test-{time.monotonic()}/"
