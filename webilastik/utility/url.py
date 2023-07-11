@@ -4,7 +4,8 @@ from base64 import b64decode, b64encode
 import re
 from pathlib import PurePosixPath
 import enum
-from typing import Literal, Optional, List, Dict, Mapping, Union
+from typing import Literal, Optional, List, Dict, Mapping, Union, Final
+from typing_extensions import assert_never
 from urllib.parse import parse_qs, urlencode, quote_plus, quote
 
 from webilastik.server.rpc import dto
@@ -27,32 +28,91 @@ class Url:
     datascheme: Optional[DataScheme]
     protocol: Protocol
 
-    hostname_pattern = r"[0-9a-z\-\.]*"
-
-    url_pattern = re.compile(
+    datascheme_pattern: Final[str] = (
         "("
-            r"(?P<datascheme>[a-z0-9\-\.]+)" + r"(\+|://)"
+            r"(?P<datascheme>precomputed|n5|deepzoom)" + r"(\+|://)"
         ")?"
-
-        r"(?P<protocol>[a-z0-9\-\.]+)" + "://"
-
-        f"(?P<hostname>{hostname_pattern})"
-
+    )
+    hostname_pattern: Final[str] = r"(?P<hostname>[\w\-\.]+)"
+    port_pattern: Final[str] = (
         "(:"
             r"(?P<port>\d+)"
         ")?"
-
-        r"(?P<path>/[^?#]*)"
-
+    )
+    path_pattern: Final[str] = r"(?P<path>/[^?#]*)"
+    search_params_pattern: Final[str] = (
         r"(\?"
             r"(?P<search>[^#]*)"
         r")?"
-
+    )
+    hash_pattern: Final[str] = (
         r"(#"
             r"(?P<hash_>.*)"
-        r")?",
+        r")?"
+    )
+
+    file_url_regex = re.compile(
+        datascheme_pattern + "file://" + path_pattern + hash_pattern,
         re.IGNORECASE
     )
+
+    networked_url_regex = re.compile(
+        datascheme_pattern + r"(?P<protocol>http|https)://" + hostname_pattern + port_pattern + path_pattern + search_params_pattern + hash_pattern,
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def parse_as_file_url(cls, raw_url: str) -> "Url | None | Exception":
+        match = Url.file_url_regex.fullmatch(raw_url)
+        if match is None:
+            return None
+        datascheme = match.group("datascheme")
+        if datascheme != "precomputed" and datascheme != "n5" and datascheme != "deepzoom":
+            return ValueError(f"unexpected datascheme: {datascheme}")
+        return Url(
+            datascheme=datascheme,
+            protocol="file",
+            hostname="",
+            path=PurePosixPath(match.group("path")),
+            hash_=match.group("hash_")
+        )
+
+    @classmethod
+    def parse_as_net_url(cls, raw_url: str) -> "Url | None | Exception":
+        match = Url.networked_url_regex.fullmatch(raw_url)
+        if match is None:
+            return None
+        datascheme = match.group("datascheme")
+        if datascheme is not None and datascheme != "precomputed" and datascheme != "n5" and datascheme != "deepzoom":
+            return RuntimeError(f"Bug: unexpected datascheme: {datascheme}")
+        protocol = match.group("protocol")
+        if protocol != "http" and protocol != "https":
+            return RuntimeError(f"Bug: unexpected protocol: {protocol}")
+        raw_port = match.group("port")
+        if raw_port is None:
+            port = None
+        else:
+            try:
+                port = int(raw_port)
+            except:
+                return None #Fixme: would be better to return an exception
+        try:
+            path = PurePosixPath(match.group("path"))
+        except:
+            return ValueError(f"Could not parse URL path from {raw_url}")
+
+        raw_search = match.group("search")
+        search = parse_params(raw_search)
+
+        return Url(
+            datascheme=datascheme,
+            protocol=protocol,
+            hostname=match.group("hostname"),
+            port=port,
+            path=path,
+            search=search,
+            hash_=match.group("hash_")
+        )
 
     def to_ilp_info_filePath(self) -> str:
         # FIXME: not completely compatible with classic ilastik
@@ -62,29 +122,22 @@ class Url:
 
     @staticmethod
     def parse(url: str) -> Optional["Url"]:
-        match = Url.url_pattern.fullmatch(url)
-        if match is None:
-            return None
+        file_url_result = Url.parse_as_file_url(url)
+        if isinstance(file_url_result, Url):
+            return file_url_result
+        if isinstance(file_url_result, Exception):
+            return None #FIXME
+        if file_url_result is not None:
+            assert_never(file_url_result)
 
-        raw_datascheme = match.group("datascheme")
-        if raw_datascheme != None and raw_datascheme != "precomputed":
-            return None #FIXME: shouold return an error...
-        raw_protocol = match.group("protocol")
-        if raw_protocol != "http" and raw_protocol != "https" and raw_protocol != "file" and raw_protocol != "memory":
-            return None
-        raw_port = match.group("port")
-        raw_search = match.group("search")
-        search = parse_params(raw_search)
-
-        return Url(
-            datascheme=raw_datascheme,
-            protocol=raw_protocol,
-            hostname=match.group("hostname"),
-            port=None if raw_port is None else int(raw_port),
-            path=PurePosixPath(match.group("path")),
-            search=search,
-            hash_=match.group("hash_")
-        )
+        net_url_result = Url.parse_as_net_url(url)
+        if isinstance(net_url_result, Url):
+            return net_url_result
+        if isinstance(net_url_result, Exception):
+            return None #FIXME
+        if net_url_result is not None:
+            assert_never(net_url_result)
+        return None
 
     @staticmethod
     def parse_or_raise(url: str) -> "Url":
@@ -116,6 +169,8 @@ class Url:
             fragment=self.hash_,
         )
 
+    #FIXME: http:// and file:// URLs are too different to be a single class
+    #FIXME: file:// has no hostname, search or port
     def __init__(
         self,
         *,
@@ -147,9 +202,9 @@ class Url:
         self.path = PurePosixPath("/") / "/".join(path_parts)
         self.search = search or {}
         self.hash_ = hash_
-        self.schemeless_raw = f"{protocol}://{self.host}"
+        self.schemeless_raw = f"{protocol}://{self.host if protocol != 'file' else ''}"
         self.schemeless_raw += str(path)
-        if self.search:
+        if self.search and protocol != "file":
             if search_quoting_method == SearchQuotingMethod.QUOTE_PLUS:
                 quote_via = quote_plus
             else:
