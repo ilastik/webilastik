@@ -149,7 +149,6 @@ tasks:
           from webilastik.utility.url import Url
           print(
             SessionAllocatorConfig.from_env(
-              allow_local_fs=False,
               allow_local_compute_sessions=False,
               external_url=Url.parse_or_raise('https://app.ilastik.org/')
             ).to_systemd_environment_confs()
@@ -239,7 +238,6 @@ tasks:
           from webilastik.utility.url import Url
           print(
             SessionAllocatorConfig.from_env(
-              allow_local_fs=True,
               allow_local_compute_sessions=True,
               external_url=Url.parse_or_raise('https://app.ilastik.org/')
             ).to_systemd_environment_confs()
