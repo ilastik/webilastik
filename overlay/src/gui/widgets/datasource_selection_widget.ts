@@ -13,7 +13,7 @@ import { PopupWidget } from "./popup";
 import { Anchor, Div, Label, Paragraph, Span } from "./widget";
 
 export class DataSourceSelectionWidget{
-    private element: HTMLDetailsElement;
+    private element: HTMLDivElement;
     private session: Session;
     public readonly viewer: Viewer;
     public readonly lanesContainer: Div;

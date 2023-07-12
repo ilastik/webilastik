@@ -50,4 +50,5 @@ export enum CssClasses{
     ItkLaneWidget = "ItkLaneWidget",
     ItkLaneLayerWidget = "ItkLaneLayerWidget",
     ItkButtonDepressed = "ItkButtonDepressed",
+    ItkAppletContents = "ItkAppletContents",
 }

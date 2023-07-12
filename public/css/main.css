@@ -84,6 +84,11 @@ body{
     font-size: calc(var(--default-font-size) + 1px);
 }
 
+.ItkCollapsableApplet .ItkAppletContents{
+    padding-left: 3px;
+    padding-right: 3px;
+}
+
 details.ItkCollapsableApplet[open] .ItkTitleBar::before{
     transform: rotate(90deg);
 }
