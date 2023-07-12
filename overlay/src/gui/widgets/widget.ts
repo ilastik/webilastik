@@ -78,6 +78,9 @@ export abstract class Widget<T extends TagName>{
         return this.element.style.display == "none"
     }
 
+    public hasCssClass(klass: CssClasses): boolean{
+        return this.element.classList.contains(klass)
+    }
     public addCssClass(klass: CssClasses){
         this.element.classList.add(klass)
     }
@@ -95,6 +98,23 @@ export abstract class Widget<T extends TagName>{
 export class Label extends Widget<"label">{
     constructor(params: WidgetParams){
         super({...params, tagName: "label"})
+    }
+}
+
+export class Li extends Widget<"li">{
+    constructor(params: WidgetParams & {children?: Widget<any>[]}){
+        super({...params, tagName: "li"});
+        (params.children || []).forEach(child => this.element.appendChild(child.element))
+    }
+}
+
+export class Ul extends Widget<"ul">{
+    constructor(params: WidgetParams & {children?: Li[]}){
+        super({...params, tagName: "ul"});
+        (params.children || []).forEach(child => this.element.appendChild(child.element))
+    }
+    public addItem(item: Li){
+        this.element.appendChild(item.element)
     }
 }
 
