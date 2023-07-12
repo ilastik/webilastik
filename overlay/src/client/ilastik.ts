@@ -1051,6 +1051,17 @@ export class DziLevelDataSource extends FsDataSource{
         this.num_channels = params.num_channels
     }
 
+    public getDisplayString(): string {
+        let name = this.url.path.name
+        for(let comp of this.url.path.components){
+            if(comp.toLowerCase().endsWith(".dzip")){
+                name = comp
+                break
+            }
+        }
+        return `${name} ${this.resolutionString}`
+    }
+
     public get resolutionString(): string {
         return `${this.shape.x}x${this.shape.y} px`
     }
