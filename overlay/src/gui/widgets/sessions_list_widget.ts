@@ -1,13 +1,14 @@
 import { HpcSiteName, Session, SESSION_DONE_STATES } from "../../client/ilastik";
 import { CloseComputeSessionParamsDto, ComputeSessionStatusDto, ListComputeSessionsParamsDto } from "../../client/dto";
-import { createElement, createImage, createInput, removeElement, secondsToTimeDeltaString } from "../../util/misc";
+import { createElement, createImage, removeElement, secondsToTimeDeltaString } from "../../util/misc";
 import { Url } from "../../util/parsed_url";
 import { ErrorPopupWidget, PopupWidget } from "./popup";
+import { Button } from "./input_widget";
 
 class SessionItemWidget{
     public readonly status: ComputeSessionStatusDto;
     public readonly element: HTMLTableRowElement;
-    private cancelButton: HTMLInputElement
+    private cancelButton: Button<"button">
 
     constructor(params: {
         status: ComputeSessionStatusDto,
@@ -25,14 +26,13 @@ class SessionItemWidget{
         createElement({tagName: "td", parentElement: this.element, innerText: secondsToTimeDeltaString(comp_session.time_elapsed_sec)})
         createElement({tagName: "td", parentElement: this.element, innerText: comp_session.state})
         let cancelButtonTd = createElement({tagName: "td", parentElement: this.element})
-        this.cancelButton = createInput({
+        this.cancelButton = new Button({
             inputType: "button",
             parentElement: cancelButtonTd,
             disabled: SESSION_DONE_STATES.includes(comp_session.state) ,
-            value: "Kill",
+            text: "Kill",
             onClick: async () => {
                 this.cancelButton.disabled = true;
-                this.cancelButton.classList.add("ItkLoadingBackground");
                 let cancellationResult = await Session.cancel({
                     ilastikUrl: params.ilastikUrl,
                     rpcParams: new CloseComputeSessionParamsDto({
@@ -46,7 +46,6 @@ class SessionItemWidget{
                         onClose: () => {this.cancelButton.disabled = false}
                     })
                     this.cancelButton.disabled = false;
-                    this.cancelButton.classList.remove("ItkLoadingBackground");
                     return
                 }else{
                     removeElement(this.element)
@@ -74,7 +73,7 @@ export class SessionsPopup{
             ...params, status, parentElement: table,
         }))
 
-        createInput({inputType: "button", parentElement: popup.element, value: "OK", onClick: () => popup.destroy()})
+        new Button({inputType: "button", parentElement: popup.element, text: "OK", onClick: () => popup.destroy()})
     }
 
     public static async create(params: {
@@ -87,8 +86,8 @@ export class SessionsPopup{
             src: "/public/images/loading.gif",
             parentElement: createElement({tagName: "p", parentElement: loadingPopup.element}),
         })
-        createInput({
-            inputType: "button", parentElement: loadingPopup.element, value: "Cancel", onClick: () => loadingPopup.destroy()
+        new Button({
+            inputType: "button", parentElement: loadingPopup.element, text: "Cancel", onClick: () => loadingPopup.destroy()
         })
         let sessionStatiResult = await Session.listSessions({
             ilastikUrl: params.ilastikUrl,

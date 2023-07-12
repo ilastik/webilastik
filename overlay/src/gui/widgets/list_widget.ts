@@ -1,7 +1,7 @@
 import { GetDatasourcesFromUrlParamsDto } from "../../client/dto";
 import { FsDataSource, Session } from "../../client/ilastik";
 import { HashMap } from "../../util/hashmap";
-import { Url } from "../../util/parsed_url";
+import { Path, Url } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
 import { DataProxyFilePicker } from "./data_proxy_file_picker";
 import { Button } from "./input_widget";
@@ -85,6 +85,7 @@ export class DataSourceListWidget extends Div{
     listWidget: ListWidget<FsDataSource | DataSourceFetchError>;
     session: Session;
     private defaultBucketName: string;
+    private defaultBucketPath: Path;
 
     constructor(params: {
         parentElement: HTMLElement,
@@ -93,9 +94,11 @@ export class DataSourceListWidget extends Div{
         items?: Array<FsDataSource | DataSourceFetchError>,
         session: Session,
         defaultBucketName: string,
+        defaultBucketPath: Path,
     }){
         super({parentElement: params.parentElement, cssClasses: [CssClasses.ItkDataSourceListWidget]})
         this.defaultBucketName = params.defaultBucketName
+        this.defaultBucketPath = params.defaultBucketPath
         new Div({parentElement: this, cssClasses: [CssClasses.ItkDatasourcesListContainer], children: [
             this.listWidget = new ListWidget({...params, parentElement: undefined, itemRenderer: params.itemRenderer || this.renderDataSourceOrError})
         ]})
@@ -118,8 +121,10 @@ export class DataSourceListWidget extends Div{
             parentElement: popup.element,
             session: this.session,
             defaultBucketName: this.defaultBucketName,
+            defaultBucketPath: this.defaultBucketPath,
             onOk: (liveFsTree: LiveFsTree) => {
                 this.defaultBucketName = filePicker.bucketName || this.defaultBucketName;
+                this.defaultBucketPath = filePicker.bucketPath || this.defaultBucketPath;
                 this.addDataSourcesFromUrls(liveFsTree.getSelectedUrls());
             },
             okButtonValue: "Add",

@@ -322,7 +322,7 @@ class SessionAllocator:
             session_result = await session_launcher.launch(
                 user_id=user_info.sub,
                 compute_session_id=compute_session_id,
-                allow_local_fs=server_config.allow_local_fs,
+                allow_local_fs=False, #FIXME: maybe allow when local sessions are allowed?
                 ebrains_oidc_client=server_config.ebrains_oidc_client,
                 ebrains_user_token=ebrains_login.user_token,
                 max_duration_minutes=Minutes(params.session_duration_minutes),

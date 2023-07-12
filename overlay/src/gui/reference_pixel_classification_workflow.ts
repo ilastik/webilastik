@@ -18,21 +18,34 @@ export class ReferencePixelClassificationWorkflowGui{
     public readonly session: Session;
     public readonly data_selection_widget: DataSourceSelectionWidget;
 
-    public constructor({parentElement, session, viewer_driver, projectLocation, defaultBucketName}: {
+    public constructor({parentElement, session, viewer_driver, projectLocation, defaultBucketName, defaultBucketPath=Path.root}: {
         parentElement: HTMLElement,
         session: Session,
         viewer_driver: IViewerDriver,
         projectLocation?: {fs: Filesystem, path: Path},
         defaultBucketName?: string,
+        defaultBucketPath?: Path,
     }){
         defaultBucketName = defaultBucketName || "hbp-image-service"
         this.session = session
         this.element = createElement({tagName: "div", parentElement, cssClasses: ["ReferencePixelClassificationWorkflowGui"]})
 
-        this.project_widget = new ProjectWidget({parentElement: this.element, session, projectLocation, defaultBucketName})
+        this.project_widget = new ProjectWidget({
+            parentElement: this.element, session, projectLocation, defaultBucketName, help: [
+                ("You can save your project with all of its annotations to the Ebrains Data Proxy so that you can " +
+                "reload it later to process more images or to refine your annotations.")
+            ]
+        })
 
         this.data_selection_widget = new DataSourceSelectionWidget({
-            parentElement: this.element, session, viewer_driver, defaultBucketName
+            parentElement: this.element, session, viewer_driver, defaultBucketName, defaultBucketPath, help: [
+                ("Select simages from the Ebrains Data Proxy. You will be able to use those as training examples for the " +
+                "pixel classifier."
+                ),
+
+                ("You can open multiple images and train the same Pixel Classifier with examples from different images, " +
+                "which usually increases the robustness of the classifier.")
+            ]
         });
 
         this.feature_selection_applet = new FeatureSelectionWidget({
@@ -77,6 +90,7 @@ export class ReferencePixelClassificationWorkflowGui{
             session: this.session,
             viewer: this.data_selection_widget.viewer,
             defaultBucketName,
+            defaultBucketPath,
             help: [
                 ("Once you trained your pixel classifier with the previous applets, you can apply it to other datasets " +
                 "or even the same dataset that was used to do the training on."),

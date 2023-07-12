@@ -111,11 +111,12 @@ export class ProjectWidget{
         session: Session,
         projectLocation?: {fs: Filesystem, path: Path},
         defaultBucketName: string,
+        help: string[],
     }){
         this.session = params.session
         this.defaultBucketName = params.defaultBucketName;
         this.defaultPath = Path.parse(`/MyProject_${dateToSafeString(params.session.startTime || new Date())}.ilp`)
-        this.containerWidget = new CollapsableWidget({display_name: "Project", parentElement: params.parentElement})
+        this.containerWidget = new CollapsableWidget({display_name: "Project", parentElement: params.parentElement, help: params.help})
         new Paragraph({parentElement: this.containerWidget.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
             new Button({inputType: "button", parentElement: undefined, text: "Save Project", onClick: this.popupSaveProject}),
             new Button({inputType: "button", parentElement: undefined, text: "Load Project", onClick: () => {

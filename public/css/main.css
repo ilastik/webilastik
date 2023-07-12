@@ -76,11 +76,17 @@ body{
     justify-content: end;
     background-color: var(--default-title-bar-background-color);
     padding: var(--default-title-bar-padding);
+    font-weight: bold;
 }
 
 .ItkTitleBar .ItkTitleBarText{
     flex-grow: 1;
     font-size: calc(var(--default-font-size) + 1px);
+}
+
+.ItkCollapsableApplet .ItkAppletContents{
+    padding-left: 3px;
+    padding-right: 3px;
 }
 
 details.ItkCollapsableApplet[open] .ItkTitleBar::before{
@@ -115,6 +121,11 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
     border-left: solid var(--default-button-border-thickness) var(--default-highlight-bright-color);
     border-bottom: solid var(--default-button-border-thickness) var(--default-highlight-dark-color);
     border-right: solid var(--default-button-border-thickness) var(--default-highlight-dark-color);
+    cursor: default;
+}
+
+.ItkButton:hover:not(.ItkDisabled):not(disabled){
+    filter: brightness(1.1)
 }
 
 .ItkButton:active, .ItkButtonDepressed{

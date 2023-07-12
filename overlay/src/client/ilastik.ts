@@ -66,15 +66,18 @@ export const SESSION_DONE_STATES = [
 export class StartupConfigs{
     project_file_url: Url | undefined | Error
     ebrains_bucket_name?: string
+    ebrains_bucket_path: Path
     clb_collab_id?: string
 
     public constructor(params: {
         project_file_url: Url | undefined | Error,
         ebrains_bucket_name?: string,
+        ebrains_bucket_path: Path,
         clb_collab_id?: string,
     }){
         this.project_file_url = params.project_file_url
         this.ebrains_bucket_name = params.ebrains_bucket_name
+        this.ebrains_bucket_path = params.ebrains_bucket_path
         this.clb_collab_id = params.clb_collab_id
     }
 
@@ -91,11 +94,15 @@ export class StartupConfigs{
         const ebrains_bucket_name__key = "ebrains_bucket_name"
         const ebrainsBucketNameRaw = locationUrlResult.search.get(ebrains_bucket_name__key)
 
+        const ebrains_bucket_path_key = "ebrains_bucket_path"
+        const ebrainsBucketPathRaw = locationUrlResult.search.get(ebrains_bucket_path_key)
+
         const collabId = locationUrlResult.search.get("clb-collab-id")
 
         return new StartupConfigs({
             [project_file_url__key]: projectFileUrlResult,
             [ebrains_bucket_name__key]: ebrainsBucketNameRaw,
+            [ebrains_bucket_path_key]: ebrainsBucketPathRaw ? Path.parse(ebrainsBucketPathRaw) : Path.root,
             clb_collab_id: collabId,
         })
     }
@@ -796,11 +803,11 @@ export abstract class FsDataSource{
     }
 
     public get resolutionString(): string{
-        return `${this.spatial_resolution[0]} x ${this.spatial_resolution[1]} x ${this.spatial_resolution[2]}nm`
+        return `${this.spatial_resolution[0]}x${this.spatial_resolution[1]}x${this.spatial_resolution[2]} nm`
     }
 
     public getDisplayString() : string{
-        return `${this.url.raw} (${this.resolutionString})`
+        return `${this.url.name} (${this.resolutionString})`
     }
 
     public equals(other: FsDataSource): boolean{
@@ -1042,6 +1049,17 @@ export class DziLevelDataSource extends FsDataSource{
         this.level_index = params.level_index
         this.dzi_image = params.dzi_image
         this.num_channels = params.num_channels
+    }
+
+    public getDisplayString(): string {
+        let name = this.url.path.name
+        for(let comp of this.url.path.components){
+            if(comp.toLowerCase().endsWith(".dzip")){
+                name = comp
+                break
+            }
+        }
+        return `${name} ${this.resolutionString}`
     }
 
     public get resolutionString(): string {

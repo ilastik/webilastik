@@ -100,6 +100,8 @@ export class Select<T> extends ButtonSpan{
                     new Paragraph({
                         parentElement: popup.contents,
                         children: [params.renderer(opt)],
+                        cssClasses: [CssClasses.ItkButton],
+                        inlineCss: {display: "block"},
                         onClick: () => {
                             this.value = opt
                             if(params.onChange){

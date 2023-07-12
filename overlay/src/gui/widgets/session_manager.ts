@@ -7,7 +7,7 @@ import { ReferencePixelClassificationWorkflowGui } from "../reference_pixel_clas
 import { CollapsableWidget } from "./collapsable_applet_gui";
 import { ErrorPopupWidget, PopupWidget } from "./popup";
 import { SessionsPopup } from "./sessions_list_widget";
-import { Label, Paragraph, Span } from "./widget";
+import { Form, Label, Paragraph, Span } from "./widget";
 import { Button, Select } from "./input_widget";
 import { TextInput, NumberInput, UrlInput } from "./value_input_widget";
 import { CssClasses } from "../css_classes";
@@ -81,7 +81,10 @@ export class SessionManagerWidget{
                 parentElement: undefined,
                 onClick: async () => {
                     this.listSessionsButton.disabled = true
-                    let ilastikUrl = await this.ensureLoggedInAndGetIlastikUrl();
+                    let ilastikUrl = await PopupWidget.WaitPopup({
+                        title: "Authenticating...",
+                        operation: this.ensureLoggedInAndGetIlastikUrl()
+                    })
                     if(!ilastikUrl){
                         this.listSessionsButton.disabled = false
                         return
@@ -109,121 +112,127 @@ export class SessionManagerWidget{
             ]
         })
 
-
         createElement({tagName: "h3", parentElement: this.element, innerText: "Create Session"})
-        new Paragraph({
-            parentElement: this.element,
-            cssClasses: [CssClasses.ItkInputParagraph],
-            children: [
-                new Label({parentElement: undefined, innerText: "Session Duration (minutes): "}),
-                this.sessionDurationInput = new NumberInput({parentElement: undefined, value: 60, min: 5}),
-            ]
+        const sessionCreationForm = new Form({parentElement: this.element, children: [
+            new Paragraph({
+                parentElement: this.element,
+                cssClasses: [CssClasses.ItkInputParagraph],
+                children: [
+                    new Label({parentElement: undefined, innerText: "Session Duration (minutes): "}),
+                    this.sessionDurationInput = new NumberInput({parentElement: undefined, value: 60, min: 5, required: true}),
+                ]
+            }),
+            new Paragraph({parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
+                this.createSessionButton = new Button({parentElement: undefined, inputType: "submit", text: "Create Session"}),
+            ]})
+        ]})
+        sessionCreationForm.preventSubmitWith(async () => {
+            let timeoutMinutes = this.getWaitTimeout()
+            if(timeoutMinutes === undefined){
+                return
+            }
+            this.enableSessionAccquisitionControls({enabled: false})
+            let ilastikUrl = await await PopupWidget.WaitPopup({
+                title: "Authenticating...",
+                operation: this.ensureLoggedInAndGetIlastikUrl()
+            });
+            if(!ilastikUrl){
+                return this.enableSessionAccquisitionControls({enabled: true})
+            }
+            let sessionDurationMinutes = this.sessionDurationInput.value
+            if(sessionDurationMinutes === undefined){
+                new ErrorPopupWidget({message: `Bad session duration: ${this.sessionDurationInput.value}`})
+                return
+            }
+            this.logMessage("Creating session....")
+            this.enableSessionAccquisitionControls({enabled: false})
+            this.sessionIdField.value = ""
+            let sessionResult = await Session.create({
+                ilastikUrl,
+                timeout_minutes: timeoutMinutes,
+                rpcParams: new CreateComputeSessionParamsDto({
+                    hpc_site: this.hpcSiteInput.value,
+                    session_duration_minutes: sessionDurationMinutes,
+                }),
+                onProgress: (message) => this.logMessage(message),
+                onUsageError: (message) => {new ErrorPopupWidget({message: message})},
+                autoCloseOnTimeout: true,
+            })
+            if(sessionResult instanceof Error){
+                return this.onNewSession({sessionResult})
+            }
+
+            const startupConfigs = StartupConfigs.tryFromWindowLocation()
+            if(startupConfigs instanceof Error){
+                new ErrorPopupWidget({message: `Could not get startup configs from current URL: ${startupConfigs.message}`})
+                return this.onNewSession({sessionResult})
+            }
+            if(startupConfigs.project_file_url instanceof Error){
+                new ErrorPopupWidget({message: `Could get project url from current page url: ${startupConfigs.project_file_url.message}`})
+            }
+
+            let projectLocation: {fs: Filesystem, path: Path} | undefined = undefined;
+            if(startupConfigs.project_file_url instanceof Url){
+                let projectLocationResult = await PopupWidget.WaitPopup({
+                    title: "Interpreting project ilp URL...",
+                    operation: sessionResult.tryGetFsAndPathFromUrl(new GetFileSystemAndPathFromUrlParamsDto({url: startupConfigs.project_file_url.toDto()})),
+                });
+                if(projectLocationResult instanceof Error){
+                    new ErrorPopupWidget({message: `Could not interpret url {FIXME} as a valid location`})
+                }else{
+                    projectLocation = projectLocationResult
+                }
+            }
+            this.onNewSession({
+                sessionResult, projectLocation, defaultBucketName: startupConfigs.effectiveBucketName, defaultBucketPath: startupConfigs.ebrains_bucket_path
+            })
         })
 
-        new Paragraph({
-            parentElement: this.element,
-            cssClasses: [CssClasses.ItkInputParagraph],
-            children: [
-                this.createSessionButton = new Button({parentElement: undefined, inputType: "button", text: "Create Session", onClick: async () => {
-                    let timeoutMinutes = this.getWaitTimeout()
-                    if(timeoutMinutes === undefined){
-                        return
-                    }
-                    this.enableSessionAccquisitionControls({enabled: false})
-                    let ilastikUrl = await this.ensureLoggedInAndGetIlastikUrl();
-                    if(!ilastikUrl){
-                        return this.enableSessionAccquisitionControls({enabled: true})
-                    }
-                    let sessionDurationMinutes = this.sessionDurationInput.value
-                    if(sessionDurationMinutes === undefined){
-                        new ErrorPopupWidget({message: `Bad session duration: ${this.sessionDurationInput.value}`})
-                        return
-                    }
-                    this.logMessage("Creating session....")
-                    this.enableSessionAccquisitionControls({enabled: false})
-                    this.sessionIdField.value = ""
-                    let sessionResult = await Session.create({
-                        ilastikUrl,
-                        timeout_minutes: timeoutMinutes,
-                        rpcParams: new CreateComputeSessionParamsDto({
-                            hpc_site: this.hpcSiteInput.value,
-                            session_duration_minutes: sessionDurationMinutes,
-                        }),
-                        onProgress: (message) => this.logMessage(message),
-                        onUsageError: (message) => {new ErrorPopupWidget({message: message})},
-                        autoCloseOnTimeout: true,
-                    })
-                    if(sessionResult instanceof Error){
-                        return this.onNewSession({sessionResult})
-                    }
-
-                    const startupConfigs = StartupConfigs.tryFromWindowLocation()
-                    if(startupConfigs instanceof Error){
-                        new ErrorPopupWidget({message: `Could not get startup configs from current URL: ${startupConfigs.message}`})
-                        return this.onNewSession({sessionResult})
-                    }
-                    if(startupConfigs.project_file_url instanceof Error){
-                        new ErrorPopupWidget({message: `Could get project url from current page url: ${startupConfigs.project_file_url.message}`})
-                    }
-
-                    let projectLocation: {fs: Filesystem, path: Path} | undefined = undefined;
-                    if(startupConfigs.project_file_url instanceof Url){
-                        let projectLocationResult = await PopupWidget.WaitPopup({
-                            title: "Interpreting project ilp URL...",
-                            operation: sessionResult.tryGetFsAndPathFromUrl(new GetFileSystemAndPathFromUrlParamsDto({url: startupConfigs.project_file_url.toDto()})),
-                        });
-                        if(projectLocationResult instanceof Error){
-                            new ErrorPopupWidget({message: `Could not interpret url {FIXME} as a valid location`})
-                        }else{
-                            projectLocation = projectLocationResult
-                        }
-                    }
-                    this.onNewSession({sessionResult, projectLocation, defaultBucketName: startupConfigs.effectiveBucketName})
-                }})
-            ]
-        })
 
         createElement({tagName: "h3", parentElement: this.element, innerText: "Rejoin Session"})
-        new Paragraph({parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
-            new Label({parentElement: undefined, innerText: "Session ID :"}),
-            this.sessionIdField = new TextInput({parentElement: undefined, value: undefined}),
-        ]})
-        new Paragraph({parentElement: this.element, children: [
-            this.rejoinSessionButton = new Button({
-                inputType: "button",
-                text: "Rejoin Session",
-                parentElement: this.element,
-                onClick: async () => {
-                    let timeoutMinutes = this.getWaitTimeout()
-                    if(timeoutMinutes === undefined){
-                        return
-                    }
-                    let sessionId = this.sessionIdField.value
-                    if(!sessionId){
-                        new ErrorPopupWidget({message: "Bad session ID"})
-                        return
-                    }
-                    this.enableSessionAccquisitionControls({enabled: false})
-                    let ilastikUrl = await this.ensureLoggedInAndGetIlastikUrl();
-                    if(!ilastikUrl){
-                        return this.enableSessionAccquisitionControls({enabled: true})
-                    }
-                    this.logMessage("Joining session....")
-                    let sessionResult = await Session.load({
-                        ilastikUrl,
-                        getStatusRpcParams: new GetComputeSessionStatusParamsDto({
-                            compute_session_id: sessionId,
-                            hpc_site: this.hpcSiteInput.value,
-                        }),
-                        timeout_minutes: timeoutMinutes,
-                        onUsageError: (message) => this.logMessage(message),
-                        onProgress: (message) => this.logMessage(message),
-                        autoCloseOnTimeout: false,
-                    })
-                    this.onNewSession({sessionResult})
-                }
+        const sessionRejoinForm = new Form({parentElement: this.element, children: [
+            new Paragraph({parentElement: undefined, cssClasses: [CssClasses.ItkInputParagraph], children: [
+                new Label({parentElement: undefined, innerText: "Session ID :"}),
+                this.sessionIdField = new TextInput({parentElement: undefined, value: undefined, required: true, }),
+            ]}),
+            new Paragraph({parentElement: this.element, children: [
+                this.rejoinSessionButton = new Button({inputType: "submit", text: "Rejoin Session", parentElement: undefined})
+            ]})
+        ]});
+        sessionRejoinForm.preventSubmitWith(async () => {
+            let timeoutMinutes = this.getWaitTimeout()
+            if(timeoutMinutes === undefined){
+                return
+            }
+            let sessionId = this.sessionIdField.value
+            if(!sessionId){
+                new ErrorPopupWidget({message: "Bad session ID"})
+                return
+            }
+            this.enableSessionAccquisitionControls({enabled: false})
+            let ilastikUrl = await await PopupWidget.WaitPopup({
+                title: "Authenticating...",
+                operation: this.ensureLoggedInAndGetIlastikUrl()
+            });
+            if(!ilastikUrl){
+                return this.enableSessionAccquisitionControls({enabled: true})
+            }
+            this.logMessage("Joining session....")
+            let sessionResult = await Session.load({
+                ilastikUrl,
+                getStatusRpcParams: new GetComputeSessionStatusParamsDto({
+                    compute_session_id: sessionId,
+                    hpc_site: this.hpcSiteInput.value,
+                }),
+                timeout_minutes: timeoutMinutes,
+                onUsageError: (message) => this.logMessage(message),
+                onProgress: (message) => this.logMessage(message),
+                autoCloseOnTimeout: false,
             })
-        ]})
+            this.onNewSession({sessionResult})
+        })
+
+
 
         this.messagesContainerLabel = new Label({parentElement: this.element, innerText: "Log:", show: false});
         this.messagesContainer = new Paragraph({parentElement: this.element, cssClasses: [CssClasses.ItkLogContainer], show: false})
@@ -348,10 +357,12 @@ export class SessionManagerWidget{
         sessionResult,
         projectLocation,
         defaultBucketName,
+        defaultBucketPath,
     }: {
         sessionResult: Session | Error,
         projectLocation?: {fs: Filesystem, path: Path,},
         defaultBucketName?: string,
+        defaultBucketPath?: Path,
     }){
         if(sessionResult instanceof Error){
             this.logMessage(sessionResult.message)
@@ -368,6 +379,7 @@ export class SessionManagerWidget{
             parentElement: this.workflowContainer,
             viewer_driver: this.viewerDriver,
             defaultBucketName,
+            defaultBucketPath,
             projectLocation: projectLocation,
         })
         this.sessionIdField.value = sessionResult.sessionId

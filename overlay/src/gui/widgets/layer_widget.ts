@@ -269,7 +269,7 @@ export class PixelClassificationLaneWidget{
     }){
         this.element = new Div({parentElement: params.parentElement, cssClasses: [CssClasses.ItkLaneWidget], children: [
             new Paragraph({parentElement: undefined, children: [
-                new Span({parentElement: undefined, innerText: params.name}),
+                new Span({parentElement: undefined, innerText: params.name, title: params.rawDataWidget.datasource.url.raw}),
                 this.visibilityInput = new ToggleButton({
                     parentElement: undefined,
                     text: "👁️",

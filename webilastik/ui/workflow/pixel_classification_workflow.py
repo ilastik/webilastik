@@ -1,10 +1,10 @@
 # pyright: strict
 
 from concurrent.futures import Executor
-from pathlib import Path, PurePosixPath
+from pathlib import PurePosixPath
 from typing import Callable, Dict, Sequence, Set
+from typing_extensions import Self
 
-import h5py
 import numpy as np
 
 from ndstructs.utils.json_serializable import JsonObject
@@ -95,28 +95,20 @@ class PixelClassificationWorkflow:
     def from_ilp(
         cls,
         *,
-        original_ilp_fs: IFilesystem,
-        temp_ilp_path: Path,
+        workflow_group: IlpPixelClassificationWorkflowGroup,
         on_async_change: Callable[[], None],
         executor: Executor,
         priority_executor: PriorityExecutor,
-    ) -> "PixelClassificationWorkflow | Exception":
-        with h5py.File(temp_ilp_path, "r") as f:
-            parsing_result = IlpPixelClassificationWorkflowGroup.parse(
-                group=f, ilp_fs=original_ilp_fs,
-            )
-            if isinstance(parsing_result, Exception):
-                return parsing_result
+    ) -> "Self": #FIXME: Self and intantiating via cls is unsound
+        return cls(
+            on_async_change=on_async_change,
+            executor=executor,
+            priority_executor=priority_executor,
 
-            return PixelClassificationWorkflow(
-                on_async_change=on_async_change,
-                executor=executor,
-                priority_executor=priority_executor,
-
-                feature_extractors=set(parsing_result.FeatureSelections.feature_extractors),
-                labels=parsing_result.PixelClassification.labels,
-                pixel_classifier=parsing_result.PixelClassification.classifier,
-            )
+            feature_extractors=set(workflow_group.FeatureSelections.feature_extractors),
+            labels=workflow_group.PixelClassification.labels,
+            pixel_classifier=workflow_group.PixelClassification.classifier,
+        )
 
     def to_ilp_workflow_group(self) -> IlpPixelClassificationWorkflowGroup:
         return IlpPixelClassificationWorkflowGroup.create(
@@ -172,34 +164,4 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             feature_extractors=set(workflow.feature_selection_applet.feature_extractors()),
             labels=workflow.brushing_applet.labels(),
             pixel_classifier=workflow.pixel_classifier_applet.pixel_classifier(),
-        )
-
-    @staticmethod
-    def load_from_ilp(
-        *,
-        original_ilp_fs: IFilesystem,
-        temp_ilp_path: Path,
-        on_async_change: Callable[[], None],
-        executor: Executor,
-        priority_executor: PriorityExecutor,
-    ) -> "WsPixelClassificationWorkflow | Exception":
-        try:
-            f = h5py.File(temp_ilp_path, "r")
-        except Exception as e:
-            print(e)
-            return Exception(f"Could not open ilp file")
-
-        parsing_result = IlpPixelClassificationWorkflowGroup.parse(
-            group=f, ilp_fs=original_ilp_fs,
-        )
-        if isinstance(parsing_result, Exception):
-            return parsing_result
-        return WsPixelClassificationWorkflow(
-            on_async_change=on_async_change,
-            executor=executor,
-            priority_executor=priority_executor,
-
-            feature_extractors=set(parsing_result.FeatureSelections.feature_extractors),
-            labels=parsing_result.PixelClassification.labels,
-            pixel_classifier=parsing_result.PixelClassification.classifier,
         )

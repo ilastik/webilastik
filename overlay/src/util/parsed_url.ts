@@ -23,6 +23,7 @@ export function ensureProtocol(value: string): Protocol{
 
 export class Path{
     public readonly components: Array<string>;
+    public static readonly root = new Path({components: []})
 
     public static parse(raw: string): Path{
         return new Path({components: raw.split("/")})

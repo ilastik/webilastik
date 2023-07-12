@@ -1,6 +1,6 @@
 # pyright: strict
 
-from pathlib import PurePosixPath
+from pathlib import PurePosixPath, Path
 from typing import Callable, ClassVar, Mapping, Optional, Dict, Sequence, Any, List, Tuple, Type
 from datetime import datetime
 import textwrap
@@ -41,6 +41,7 @@ from webilastik.datasource import DataSource, FsDataSource
 from webilastik.annotations import Annotation
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier, dump_to_temp_file, vigra_forest_to_h5_bytes
 from webilastik.filesystem import IFilesystem
+from webilastik.filesystem.os_fs import OsFs
 from webilastik.ui.applet.brushing_applet import Label
 
 VIGRA_ILP_CLASSIFIER_FACTORY = textwrap.dedent(
@@ -364,6 +365,15 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
         Prediction_Export["OutputFormat"] = "hdf5".encode("utf8")
         Prediction_Export["OutputInternalPath"] = "exported_data".encode("utf8")
         Prediction_Export["StorageVersion"] = "0.1".encode("utf8")
+
+    @classmethod
+    def from_file(cls, *, ilp_fs: OsFs, path: PurePosixPath) -> "IlpPixelClassificationWorkflowGroup | Exception":
+        native_path = Path(ilp_fs.geturl(path).path)
+        try:
+            with h5py.File(native_path, "r") as f:
+                return IlpPixelClassificationWorkflowGroup.parse(group=f, ilp_fs=ilp_fs)
+        except Exception as e:
+            return e
 
     @classmethod
     def parse(

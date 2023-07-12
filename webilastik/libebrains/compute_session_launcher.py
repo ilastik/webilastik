@@ -10,7 +10,7 @@ import datetime
 import textwrap
 import tempfile
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import getpass
 import sys
 import os
@@ -121,7 +121,7 @@ class ComputeSession:
         if clean_raw_state not in COMPUTE_SESSION_STATES:
             return Exception(f"Bad job state: '{clean_raw_state}' derived from '{raw_state}'")
 
-        start_time_utc_sec = None if raw_start_time_utc_sec == "Unknown" else Seconds.try_from_str(raw_start_time_utc_sec)
+        start_time_utc_sec = None if raw_start_time_utc_sec in ("Unknown", "None") else Seconds.try_from_str(raw_start_time_utc_sec)
         if isinstance(start_time_utc_sec, Exception):
             return Exception(f"Bad job start time: {raw_start_time_utc_sec}")
 
@@ -177,6 +177,18 @@ class ComputeSession:
         self.user_id = user_id
         self.compute_session_id = compute_session_id
         super().__init__()
+
+    def __repr__(self) -> str:
+        return json.dumps({
+            "native_compute_session_id": self.native_compute_session_id,
+            "state": self.state,
+            "start_time_utc_sec": self.start_time_utc_sec and self.start_time_utc_sec.to_int(),
+            "time_elapsed_sec": self.time_elapsed_sec.to_int(),
+            "time_limit_minutes": self.time_limit_minutes.to_int(),
+            "num_nodes": self.num_nodes.to_int(),
+            "user_id": str(self.user_id),
+            "compute_session_id": str(self.compute_session_id),
+        }, indent=4)
 
 
     def to_dto(self) -> ComputeSessionDto:
@@ -458,6 +470,7 @@ class LocalJobLauncher(SshJobLauncher):
         working_dir = Path(f"/tmp/{compute_session_id}")
         job_config = WorkflowConfig(
             allow_local_fs=allow_local_fs,
+            scratch_dir=PurePosixPath(f"/tmp/webilastik_scratch"),
             ebrains_oidc_client=ebrains_oidc_client,
             ebrains_user_token=ebrains_user_token,
             max_duration_minutes=max_duration_minutes,
@@ -639,6 +652,7 @@ class JusufSshJobLauncher(SshJobLauncher):
         working_dir = Path(f"$SCRATCH/{compute_session_id}")
         job_config = WorkflowConfig(
             allow_local_fs=allow_local_fs,
+            scratch_dir=PurePosixPath(f"/p/scratch/{self.account}"),
             ebrains_oidc_client=ebrains_oidc_client,
             ebrains_user_token=ebrains_user_token,
             max_duration_minutes=max_duration_minutes,
@@ -758,6 +772,7 @@ class CscsSshJobLauncher(SshJobLauncher):
         working_dir = Path(f"$SCRATCH/{compute_session_id}")
         job_config = WorkflowConfig(
             allow_local_fs=allow_local_fs,
+            scratch_dir=PurePosixPath(f"/scratch/snx3000/bp000188"),
             ebrains_oidc_client=ebrains_oidc_client,
             ebrains_user_token=ebrains_user_token,
             max_duration_minutes=max_duration_minutes,

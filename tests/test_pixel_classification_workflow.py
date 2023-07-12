@@ -1,13 +1,13 @@
 # pyright: strict
 
-from pathlib import Path, PurePosixPath
+from pathlib import PurePosixPath
 import time
 import json
 from typing import List
 
 import numpy as np
 
-from tests import create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations, get_test_output_path
+from tests import create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations, get_sample_dzip_c_cells_datasource
 from webilastik.filesystem.zip_fs import ZipFs
 from webilastik.datasource import DataRoi
 from webilastik.datasource.deep_zoom_datasource import DziLevelDataSource
@@ -21,8 +21,6 @@ from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet import dummy_prompt
 from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
 from executor_getter import get_executor
-
-test_output_path = get_test_output_path()
 
 def wait_until_jobs_completed(workflow: PixelClassificationWorkflow, timeout: float = 50):
     wait_time = 0.5
@@ -74,7 +72,7 @@ def test_pixel_classification_workflow():
         feature_extractors=all_feature_extractors,
     )
 
-    pixel_annotations = get_sample_c_cells_pixel_annotations()
+    pixel_annotations = get_sample_c_cells_pixel_annotations(get_sample_dzip_c_cells_datasource())
     for label_name, label in zip(workflow.brushing_applet.label_names(), pixel_annotations):
         for a in label.annotations:
             result = workflow.brushing_applet.add_annotation(
@@ -93,16 +91,17 @@ def test_pixel_classification_workflow():
 
 
 
-    fs = OsFs.create()
+    fs = OsFs.create_scratch_dir()
     assert not isinstance(fs, Exception)
+    ilp_path = PurePosixPath("my_test_output_proj.ilp")
 
     # import pydevd; pydevd.settrace()
-    _ = workflow.save_project(fs=fs, path=test_output_path / "blas.ilp")
+    _ = workflow.save_project(fs=fs, path=ilp_path)
 
     # import pydevd; pydevd.settrace()
     loaded_workflow = PixelClassificationWorkflow.from_ilp(
-        original_ilp_fs=fs,
-        temp_ilp_path=Path(test_output_path / "blas.ilp"),
+        fs=fs,
+        path=ilp_path,
         on_async_change=lambda : print(json.dumps(workflow.export_applet._get_json_state(), indent=4)), # pyright: ignore [reportPrivateUsage]
         executor=executor,
         priority_executor=priority_executor,
