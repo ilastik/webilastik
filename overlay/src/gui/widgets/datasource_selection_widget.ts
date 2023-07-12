@@ -7,7 +7,7 @@ import { Viewer } from "../../viewer/viewer";
 import { CssClasses } from "../css_classes";
 import { CollapsableWidget } from "./collapsable_applet_gui";
 import { DataProxyFilePicker } from "./data_proxy_file_picker";
-import { Button } from "./input_widget";
+import { Button, ButtonWidget, MultiSelect } from "./input_widget";
 import { LiveFsTree } from "./live_fs_tree";
 import { PopupWidget } from "./popup";
 import { Anchor, Div, Paragraph, Span } from "./widget";
@@ -75,11 +75,11 @@ export class DataSourceSelectionWidget{
     public static async uiResolveUrlToDatasource(params: {
         datasources: Url | Promise<FsDataSource[] | undefined | Error>,
         session: Session
-    }): Promise<FsDataSource | Error>{
+    }): Promise<FsDataSource[] | Error>{
         let datasourcesResult: FsDataSource[] | undefined | Error;
         if(params.datasources instanceof Url){
             datasourcesResult = await PopupWidget.WaitPopup({
-                title: "Opening URL...",
+                title: `Opening ${params.datasources.raw}`,
                 operation: params.session.getDatasourcesFromUrl(
                     new GetDatasourcesFromUrlParamsDto({
                         url: params.datasources.toDto(),
@@ -87,7 +87,11 @@ export class DataSourceSelectionWidget{
                 )
             })
         }else{
-            datasourcesResult = await params.datasources
+            const datasourcesPromise = params.datasources
+            datasourcesResult = await PopupWidget.WaitPopup({
+                title: `Opening datasources...`,
+                operation: datasourcesPromise
+            })
         }
         if(datasourcesResult instanceof Error){
             return datasourcesResult
@@ -96,16 +100,19 @@ export class DataSourceSelectionWidget{
             return new Error(`Unsupported datasource format`)
         }
         if(datasourcesResult.length == 1){
-            return datasourcesResult[0]
+            return datasourcesResult
         }
         const datasources = datasourcesResult
         return PopupWidget.AsyncDialog({
-            title: "Select a resolution",
-            fillInPopup: (params: {popup: PopupWidget, resolve: (result: FsDataSource) => void}) => {
-                for(const ds of datasources){
-                    const p = new Paragraph({parentElement: params.popup.element})
-                    new Button({inputType: "button", parentElement: p, text: ds.getDisplayString(), onClick: () => params.resolve(ds)})
-                }
+            title: "Select resolutions to open",
+            fillInPopup: (params: {popup: PopupWidget, resolve: (result: FsDataSource[]) => void}) => {
+                let datasourcesSelect = new MultiSelect<FsDataSource>({
+                    parentElement: params.popup.element,
+                    options: datasources,
+                    renderer: (ds) => new Span({parentElement: undefined, innerText: ds.getDisplayString()}),
+                })
+                new ButtonWidget({parentElement: params.popup.element, contents: "Open Selected", onClick: () => params.resolve(datasourcesSelect.value)})
+                new ButtonWidget({parentElement: params.popup.element, contents: "Skip", onClick: () => params.resolve([])})
             }
         })
     }
@@ -123,18 +130,20 @@ export class DataSourceSelectionWidget{
         for(let i = 0; i < urls.length; i++){
             let viewPromise = viewPromises[i]
 
-            let datasourceResult = await this.uiResolveUrlToDatasource({datasources: viewPromise, session})
-            if(datasourceResult instanceof Error){
-                errorMessages.push(`Could not resolve datasource: ${datasourceResult.message}`)
+            let datasourcesResult = await this.uiResolveUrlToDatasource({datasources: viewPromise, session})
+            if(datasourcesResult instanceof Error){
+                errorMessages.push(`Could not resolve datasource: ${datasourcesResult.message}`)
                 continue
             }
-            const openingResult = await viewer.openLane({
-                name: datasourceResult.getDisplayString(),
-                isVisible: true,
-                rawData: datasourceResult,
-            })
-            if(openingResult instanceof Error){
-                errorMessages.push(`Could not open view: ${openingResult.message}`)
+            for(let ds of datasourcesResult){
+                const openingResult = await viewer.openLane({
+                    name: ds.getDisplayString(),
+                    isVisible: true,
+                    rawData: ds,
+                })
+                if(openingResult instanceof Error){
+                    errorMessages.push(`Could not open view: ${openingResult.message}`)
+                }
             }
         }
 

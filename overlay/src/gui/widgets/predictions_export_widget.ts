@@ -98,16 +98,17 @@ class Job{
                 if(output_path.extension?.toLowerCase() === "dzip"){
                     const outputUrl = fs.getUrl(output_path).updatedWith({datascheme: "deepzoom"})
                     new Button({parentElement: out, inputType: "button", text: "Open in Viewer", onClick: async () => {
-                        const datasourceResult = await DataSourceSelectionWidget.uiResolveUrlToDatasource({
+                        const datasourcesResult = await DataSourceSelectionWidget.uiResolveUrlToDatasource({
                             datasources: outputUrl,
                             session: params.session,
                         })
-                        if(datasourceResult instanceof Error){
-                            new ErrorPopupWidget({message: `Could not open URL: ${datasourceResult}`})
+                        if(datasourcesResult instanceof Error){
+                            new ErrorPopupWidget({message: `Could not open URL: ${datasourcesResult}`})
                             return
                         }
-                        params.openInViewer(datasourceResult)
-
+                        for(let ds of datasourcesResult){
+                            params.openInViewer(ds)
+                        }
                     }})
                     createElement({parentElement: out.element, tagName: "br"}) //FIXME?
                 }

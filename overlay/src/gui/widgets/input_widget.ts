@@ -1,4 +1,4 @@
-import { ContainerWidget, Li, Paragraph, Ul, Widget, WidgetParams } from "./widget";
+import { ContainerWidget, Li, Paragraph, Span, Ul, Widget, WidgetParams } from "./widget";
 import { PopupWidget } from "./popup";
 import { CssClasses } from "../css_classes";
 import { InlineCss } from "../../util/misc";
@@ -46,14 +46,18 @@ export abstract class InputWidget<IT extends InputType> extends Widget<"input">{
 export class ButtonWidget extends Widget<"button">{
     constructor(params: Omit<WidgetParams, "onClick"> & {
         buttonType?: "button" | "submit" | "reset",
-        children?: Widget<any>[],
+        contents?: string | Widget<any>[],
         onClick: (ev: MouseEvent, button: ButtonWidget) => void,
     }){
         super({...params, tagName: "button", cssClasses: [CssClasses.ItkButton], onClick: (ev) => {
             params.onClick(ev, this)
         }});
         this.element.type = params.buttonType || "button";
-        (params.children || []).forEach(child => this.element.appendChild(child.element))
+        if(typeof(params.contents) == 'string'){
+            this.element.appendChild(new Span({parentElement: undefined, innerText: params.contents}).element)
+        }else{
+            (params.contents || []).forEach(child => this.element.appendChild(child.element))
+        }
     }
 }
 
@@ -62,7 +66,7 @@ export class ToggleButtonWidget<T> extends ButtonWidget{
 
     constructor(params: Omit<WidgetParams, "onClick"> & {
         buttonType?: "button" | "submit" | "reset",
-        children?: Widget<any>[],
+        contents?: string | Widget<any>[],
         onClick: (ev: MouseEvent, button: ToggleButtonWidget<T>) => void,
         depressed?: boolean,
         valueWhenDepressed: T,
@@ -150,8 +154,8 @@ export class Select<T> extends ButtonSpan{
                     new Paragraph({parentElement: popup.contents, children: [
                         new ButtonWidget({
                             parentElement: popup.contents,
-                            children: [params.renderer(opt)],
-                            inlineCss: {display: "block"},
+                            contents: [params.renderer(opt)],
+                            inlineCss: {display: "block", width: "100%"},
                             onClick: () => {
                                 this.value = opt
                                 if(params.onChange){
@@ -194,7 +198,7 @@ export class MultiSelect<T> extends Ul{
         renderer: (val: T) => Widget<any>,
         onChange?: (values: T[]) => void,
     }){
-        super({parentElement: params.parentElement})
+        super({parentElement: params.parentElement, inlineCss: {listStyleType: "none", paddingInlineStart: "5px"}})
         if(params.options.length == 0){
             this.addItem(new Li({parentElement: undefined, innerText: "No options available"}))
             return
@@ -202,8 +206,8 @@ export class MultiSelect<T> extends Ul{
         for(const opt of params.options){
             let button = new ToggleButtonWidget<T>({
                 parentElement: undefined,
-                children: [params.renderer(opt)],
-                inlineCss: {display: "block"},
+                contents: [params.renderer(opt)],
+                inlineCss: {display: "block", width: "100%"},
                 valueWhenDepressed: opt,
                 onClick: (ev: MouseEvent, clickedButton: ToggleButtonWidget<T>) => {
                     let preClickState = !clickedButton.depressed;

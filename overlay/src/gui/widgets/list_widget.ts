@@ -1,10 +1,10 @@
 import { GetDatasourcesFromUrlParamsDto } from "../../client/dto";
 import { FsDataSource, Session } from "../../client/ilastik";
-import { HashMap } from "../../util/hashmap";
 import { Path, Url } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
+import { DataSourceSelectionWidget } from "./datasource_selection_widget";
 import { DataProxyFilePicker } from "./data_proxy_file_picker";
-import { Button } from "./input_widget";
+import { Button, ButtonWidget } from "./input_widget";
 import { LiveFsTree } from "./live_fs_tree";
 import { PopupWidget } from "./popup";
 import { ContainerWidget, Div, Paragraph, Span, Table, TableData, TableRow, TagName, Widget } from "./widget";
@@ -122,35 +122,30 @@ export class DataSourceListWidget extends Div{
             session: this.session,
             defaultBucketName: this.defaultBucketName,
             defaultBucketPath: this.defaultBucketPath,
-            onOk: (liveFsTree: LiveFsTree) => {
+            onOk: async (liveFsTree: LiveFsTree) => {
                 this.defaultBucketName = filePicker.bucketName || this.defaultBucketName;
                 this.defaultBucketPath = filePicker.bucketPath || this.defaultBucketPath;
-                this.addDataSourcesFromUrls(liveFsTree.getSelectedUrls());
+
+                let datasourcePromises = liveFsTree.getSelectedUrls().map(url => this.session.getDatasourcesFromUrl(
+                    new GetDatasourcesFromUrlParamsDto({url: url.toDto()})
+                ))
+
+                for(let dsPromise of datasourcePromises){
+                    let datasourcesResult = await DataSourceSelectionWidget.uiResolveUrlToDatasource({
+                        datasources: dsPromise, session: this.session
+                    })
+                    if(datasourcesResult instanceof Error){
+                        const errorMessage = datasourcesResult.message;
+                        await PopupWidget.AsyncDialog<void>({title: "Error", fillInPopup: (params) => {
+                            new Paragraph({parentElement: params.popup.element, innerText: errorMessage});
+                            new ButtonWidget({parentElement: params.popup.element, contents: "Ok", onClick: () => {params.resolve()}})
+                        }})
+                        continue
+                    }
+                    datasourcesResult.forEach(ds => this.listWidget.push(ds))
+                }
             },
             okButtonValue: "Add",
-        })
-    }
-
-    private addDataSourcesFromUrls = async (urls: Url[]) => {
-        PopupWidget.WaitPopup({
-            title: "Loading data sources...",
-            operation: (async () => {
-                const datasourcePromises = new HashMap<Url, Promise<FsDataSource[] | undefined | Error>, string>();
-                urls.forEach(url => datasourcePromises.set(
-                    url,
-                    this.session.getDatasourcesFromUrl(new GetDatasourcesFromUrlParamsDto({url: url.toDto()}))
-                ));
-                for(const [url, dsPromise] of datasourcePromises.entries()){
-                    const datasources_result = await dsPromise;
-                    if(datasources_result instanceof Error){
-                        this.listWidget.push(new DataSourceFetchError({url, cause: datasources_result}))
-                    }else if(datasources_result === undefined){
-                        this.listWidget.push(new DataSourceFetchError({url, cause: new Error(`Could not open datasource at ${url.raw}`)}))
-                    }else{
-                        datasources_result.forEach(ds => this.listWidget.push(ds))
-                    }
-                }
-            })(),
         })
     }
 
