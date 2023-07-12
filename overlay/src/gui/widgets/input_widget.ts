@@ -1,4 +1,4 @@
-import { ContainerWidget, Paragraph, Widget } from "./widget";
+import { ContainerWidget, Li, Paragraph, Ul, Widget, WidgetParams } from "./widget";
 import { PopupWidget } from "./popup";
 import { CssClasses } from "../css_classes";
 import { InlineCss } from "../../util/misc";
@@ -43,6 +43,56 @@ export abstract class InputWidget<IT extends InputType> extends Widget<"input">{
     }
 }
 
+export class ButtonWidget extends Widget<"button">{
+    constructor(params: Omit<WidgetParams, "onClick"> & {
+        buttonType?: "button" | "submit" | "reset",
+        children?: Widget<any>[],
+        onClick: (ev: MouseEvent, button: ButtonWidget) => void,
+    }){
+        super({...params, tagName: "button", cssClasses: [CssClasses.ItkButton], onClick: (ev) => {
+            params.onClick(ev, this)
+        }});
+        this.element.type = params.buttonType || "button";
+        (params.children || []).forEach(child => this.element.appendChild(child.element))
+    }
+}
+
+export class ToggleButtonWidget<T> extends ButtonWidget{
+    public readonly valueWhenDepressed: T;
+
+    constructor(params: Omit<WidgetParams, "onClick"> & {
+        buttonType?: "button" | "submit" | "reset",
+        children?: Widget<any>[],
+        onClick: (ev: MouseEvent, button: ToggleButtonWidget<T>) => void,
+        depressed?: boolean,
+        valueWhenDepressed: T,
+    }){
+        super({...params, onClick: (ev) => {
+            this.depressed = !this.depressed
+            params.onClick(ev, this)
+        }});
+        this.valueWhenDepressed = params.valueWhenDepressed
+        if(params.depressed){
+            this.addCssClass(CssClasses.ItkButtonDepressed)
+        }
+    }
+    public get depressed(): boolean{
+        return this.hasCssClass(CssClasses.ItkButtonDepressed)
+    }
+    public set depressed(value: boolean){
+        if(value){
+            this.addCssClass(CssClasses.ItkButtonDepressed)
+        }else{
+            this.removeCssClass(CssClasses.ItkButtonDepressed)
+        }
+    }
+    public get value(): T | undefined{
+        return this.depressed ? this.valueWhenDepressed : undefined
+    }
+    public toggle(){
+        this.depressed = !this.depressed
+    }
+}
 
 export class Button<T extends "button" | "submit"> extends InputWidget<T>{
     constructor(params: InputWidgetParams & {inputType: T, text: string}){
@@ -97,19 +147,21 @@ export class Select<T> extends ButtonSpan{
                     return
                 }
                 for(const opt of params.options){
-                    new Paragraph({
-                        parentElement: popup.contents,
-                        children: [params.renderer(opt)],
-                        cssClasses: [CssClasses.ItkButton],
-                        inlineCss: {display: "block"},
-                        onClick: () => {
-                            this.value = opt
-                            if(params.onChange){
-                                params.onChange(opt)
+                    new Paragraph({parentElement: popup.contents, children: [
+                        new ButtonWidget({
+                            parentElement: popup.contents,
+                            children: [params.renderer(opt)],
+                            inlineCss: {display: "block"},
+                            onClick: () => {
+                                this.value = opt
+                                if(params.onChange){
+                                    params.onChange(opt)
+                                }
+                                popup.destroy()
                             }
-                            popup.destroy()
-                        }
-                    })
+                        })
+                    ]})
+
                 }
             },
         })
@@ -130,5 +182,61 @@ export class Select<T> extends ButtonSpan{
 
     public get options(): T[]{
         return this._options.slice()
+    }
+}
+
+export class MultiSelect<T> extends Ul{
+    private buttons: Array<ToggleButtonWidget<T>> = []
+
+    constructor(params: {
+        parentElement: HTMLElement | ContainerWidget<any> | undefined,
+        options: Array<T>,
+        renderer: (val: T) => Widget<any>,
+        onChange?: (values: T[]) => void,
+    }){
+        super({parentElement: params.parentElement})
+        if(params.options.length == 0){
+            this.addItem(new Li({parentElement: undefined, innerText: "No options available"}))
+            return
+        }
+        for(const opt of params.options){
+            let button = new ToggleButtonWidget<T>({
+                parentElement: undefined,
+                children: [params.renderer(opt)],
+                inlineCss: {display: "block"},
+                valueWhenDepressed: opt,
+                onClick: (ev: MouseEvent, clickedButton: ToggleButtonWidget<T>) => {
+                    let preClickState = !clickedButton.depressed;
+                    if(!ev.ctrlKey && !ev.shiftKey){
+                        this.buttons.forEach(btn => {btn.depressed = false})
+                        clickedButton.depressed = !preClickState
+                    }else if(ev.ctrlKey && !ev.shiftKey){
+                        clickedButton.depressed = !preClickState
+                    }else if(!ev.ctrlKey && ev.shiftKey && !preClickState){
+                        let cursor = this.buttons.findIndex(btn => btn == clickedButton)
+                        let target = this.buttons.findIndex(sib => sib.depressed && sib != clickedButton)
+                        target = target < 0 ? cursor : target
+                        const increment = Math.sign(target - cursor) || 1;
+
+                        for(; increment * (target - cursor) >= 0 ; cursor += increment){
+                            this.buttons[cursor].depressed = true
+                        }
+                    }
+                    if(params.onChange){
+                        params.onChange(this.value)
+                    }
+                }
+            })
+            this.addItem(new Li({parentElement: undefined, children: [button]}))
+            this.buttons.push(button)
+        }
+    }
+
+    public get value(): T[]{
+        return this.buttons.filter(btn => btn.depressed).map(btn => btn.valueWhenDepressed)
+    }
+
+    public get options(): T[]{
+        return this.buttons.map(btn => btn.valueWhenDepressed)
     }
 }
