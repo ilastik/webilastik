@@ -803,7 +803,7 @@ export abstract class FsDataSource{
     }
 
     public get resolutionString(): string{
-        return `${this.spatial_resolution[0]} x ${this.spatial_resolution[1]} x ${this.spatial_resolution[2]}nm`
+        return `${this.spatial_resolution[0]}x${this.spatial_resolution[1]}x${this.spatial_resolution[2]} nm`
     }
 
     public getDisplayString() : string{
