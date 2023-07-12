@@ -10,13 +10,15 @@ import { DataProxyFilePicker } from "./data_proxy_file_picker";
 import { Button } from "./input_widget";
 import { LiveFsTree } from "./live_fs_tree";
 import { PopupWidget } from "./popup";
-import { Anchor, Div, Label, Paragraph, Span } from "./widget";
+import { Anchor, Div, Paragraph, Span } from "./widget";
 
 export class DataSourceSelectionWidget{
     private element: HTMLDivElement;
     private session: Session;
     public readonly viewer: Viewer;
     public readonly lanesContainer: Div;
+    private defaultBucketPath: Path;
+    private defaultBucketName: string;
 
     constructor(params: {
         parentElement: HTMLElement,
@@ -30,25 +32,36 @@ export class DataSourceSelectionWidget{
             display_name: "Data Sources", parentElement: params.parentElement, help: params.help
         }).element
         this.session = params.session
+        this.defaultBucketName = params.defaultBucketName
+        this.defaultBucketPath = params.defaultBucketPath
 
-        new DataProxyFilePicker({
-            parentElement: this.element,
-            session: params.session,
-            defaultBucketName: params.defaultBucketName,
-            defaultBucketPath: params.defaultBucketPath,
-            onOk: (liveFsTree: LiveFsTree) => PopupWidget.WaitPopup({
-                title: "Loading data sources...",
-                operation: DataSourceSelectionWidget.tryOpenViews({
-                    urls: liveFsTree.getSelectedUrls(),
+        new Paragraph({parentElement: this.element, children: [
+            new Button({inputType: "button", text: "Open...", parentElement: undefined, onClick: () => {
+                const popup = PopupWidget.ClosablePopup({title: "Select datasets from Data Proxy"})
+                const filePicker = new DataProxyFilePicker({
+                    parentElement: popup.element,
                     session: this.session,
-                    viewer: this.viewer,
-                }),
-            }),
-            okButtonValue: "Open",
-        })
+                    defaultBucketName: this.defaultBucketName,
+                    defaultBucketPath: this.defaultBucketPath,
+                    onOk: (liveFsTree: LiveFsTree) => {
+                        popup.destroy()
+                        this.defaultBucketName = filePicker.bucketName || this.defaultBucketName;
+                        this.defaultBucketPath = filePicker.bucketPath || this.defaultBucketPath;
+                        PopupWidget.WaitPopup({
+                            title: "Loading data sources...",
+                            operation: DataSourceSelectionWidget.tryOpenViews({
+                                urls: liveFsTree.getSelectedUrls(),
+                                session: this.session,
+                                viewer: this.viewer,
+                            }),
+                        })
+                    },
+                    okButtonValue: "Open",
+                })
+            }})
+        ]})
 
         this.lanesContainer = new Div({parentElement: this.element})
-        new Label({parentElement: this.element, innerText: "Data Sources:"})
         this.viewer = new Viewer({
             driver: params.viewer_driver, session: params.session, parentElement: this.element
         })
