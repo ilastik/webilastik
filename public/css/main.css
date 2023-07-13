@@ -181,7 +181,7 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
 }
 
 .ItkSelectButton:after{
-    content:" ↕";
+    content:" ⬍";
 }
 
 .ItkBrushDatasourceLink{
