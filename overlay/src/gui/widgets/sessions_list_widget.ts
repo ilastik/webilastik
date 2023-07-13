@@ -34,13 +34,16 @@ class SessionItemWidget{
             text: "Kill",
             onClick: async () => {
                 this.cancelButton.disabled = true;
-                let cancellationResult = await Session.cancel({
-                    ilastikUrl: params.ilastikUrl,
-                    rpcParams: new CloseComputeSessionParamsDto({
-                        compute_session_id: comp_session.compute_session_id,
-                        hpc_site: params.status.hpc_site,
+                let cancellationResult = await PopupWidget.WaitPopup({
+                    title: `Killing session ${comp_session.compute_session_id} at ${params.status.hpc_site}`,
+                    operation: Session.cancel({
+                        ilastikUrl: params.ilastikUrl,
+                        rpcParams: new CloseComputeSessionParamsDto({
+                            compute_session_id: comp_session.compute_session_id,
+                            hpc_site: params.status.hpc_site,
+                        })
                     })
-                })
+                });
                 if(cancellationResult instanceof Error){
                     new ErrorPopupWidget({
                         message: `Could not delete session: ${cancellationResult.message}`,
