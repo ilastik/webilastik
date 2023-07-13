@@ -4,7 +4,6 @@ import { Path } from "../../util/parsed_url";
 import { DataType } from "../../util/precomputed_chunks";
 import { CssClasses } from "../css_classes";
 import { Select } from "./input_widget";
-import { ErrorPopupWidget } from "./popup";
 import { TabsWidget } from "./tabs_widget";
 import { AxesKeysInput, NumberInput, PathInput } from "./value_input_widget";
 import { ContainerWidget, Div, Label, Paragraph, Span, TagName } from "./widget";
@@ -150,6 +149,8 @@ class DziDatasinkConfigWidget extends DatasinkInputForm{
     }
 }
 
+export class MissingSinkParametersError extends Error{}
+
 class PrecomputedChunksDatasinkConfigWidget extends DatasinkInputForm{
     public readonly encoderSelector: Select<"raw" | "jpeg">;
     public readonly scaleKeyInput: PathInput;
@@ -187,12 +188,11 @@ class PrecomputedChunksDatasinkConfigWidget extends DatasinkInputForm{
         dtype: DataType,
         resolution: [number, number, number],
         tile_shape: Shape5D,
-    }): PrecomputedChunksSink | undefined{
+    }): PrecomputedChunksSink | undefined | Error{
         const encoding = this.encoderSelector.value;
         const scaleKey = this.scaleKeyInput.value;
         if(!scaleKey){
-            new ErrorPopupWidget({message: "Missing some paramenters"})
-            return
+            return new MissingSinkParametersError(`Missing Scale Key`)
         }
 
         return new PrecomputedChunksSink({
