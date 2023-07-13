@@ -14,7 +14,7 @@ import { CssClasses } from "../css_classes";
 
 export class SessionManagerWidget{
     element: HTMLElement
-    session?: Session
+    session: undefined | Session | Promise<Session | Error>
     workflow?: ReferencePixelClassificationWorkflowGui
 
     private remainingTimeIntervalID: number = 0;
@@ -35,6 +35,7 @@ export class SessionManagerWidget{
     sessionDurationInput: NumberInput;
     private warnedUserOfImpendingClose = false
     hpcSiteInput: Select<HpcSiteName>;
+    private sessionRejoinForm: Form;
 
     constructor({parentElement, ilastikUrl, viewer_driver, workflow_container, hpcSiteNames}: {
         parentElement: HTMLElement, ilastikUrl: Url, viewer_driver: IViewerDriver, workflow_container: HTMLElement, hpcSiteNames: Array<HpcSiteName>
@@ -93,9 +94,13 @@ export class SessionManagerWidget{
                         ilastikUrl,
                         hpc_site: this.hpcSiteInput.value,
                         onSessionClosed: (status) => {
-                            if(this.session && this.session.sessionUrl.equals(Url.fromDto(status.session_url))){
+                            if(this.session instanceof Session && this.session.sessionUrl.equals(Url.fromDto(status.session_url))){
                                 this.onLeaveSession()
                             }
+                        },
+                        rejoinSession: this.session ? undefined : (sessionId) => {
+                            this.sessionIdField.value = sessionId;
+                            this.rejoinSession(sessionId)
                         }
                     });
                     this.listSessionsButton.disabled = false
@@ -127,12 +132,16 @@ export class SessionManagerWidget{
             ]})
         ]})
         sessionCreationForm.preventSubmitWith(async () => {
+            if(this.session){
+                new ErrorPopupWidget({message: `Can't create session as one is already running`})
+                return
+            }
             let timeoutMinutes = this.getWaitTimeout()
             if(timeoutMinutes === undefined){
                 return
             }
             this.enableSessionAccquisitionControls({enabled: false})
-            let ilastikUrl = await await PopupWidget.WaitPopup({
+            let ilastikUrl = await PopupWidget.WaitPopup({
                 title: "Authenticating...",
                 operation: this.ensureLoggedInAndGetIlastikUrl()
             });
@@ -147,7 +156,7 @@ export class SessionManagerWidget{
             this.logMessage("Creating session....")
             this.enableSessionAccquisitionControls({enabled: false})
             this.sessionIdField.value = ""
-            let sessionResult = await Session.create({
+            const sessionPromise = this.session = Session.create({
                 ilastikUrl,
                 timeout_minutes: timeoutMinutes,
                 rpcParams: new CreateComputeSessionParamsDto({
@@ -158,21 +167,19 @@ export class SessionManagerWidget{
                 onUsageError: (message) => {new ErrorPopupWidget({message: message})},
                 autoCloseOnTimeout: true,
             })
+            const sessionResult = await sessionPromise;
             if(sessionResult instanceof Error){
-                return this.onNewSession({sessionResult})
+                return this.handleSessionFailed(sessionResult)
             }
 
-            const startupConfigs = StartupConfigs.tryFromWindowLocation()
+            let startupConfigs = StartupConfigs.tryFromWindowLocation()
             if(startupConfigs instanceof Error){
-                new ErrorPopupWidget({message: `Could not get startup configs from current URL: ${startupConfigs.message}`})
-                return this.onNewSession({sessionResult})
+                new ErrorPopupWidget({message: `Could not get startup configs from current URL: ${startupConfigs.message}. Using defaults...`})
             }
-            if(startupConfigs.project_file_url instanceof Error){
-                new ErrorPopupWidget({message: `Could get project url from current page url: ${startupConfigs.project_file_url.message}`})
-            }
+            startupConfigs = StartupConfigs.getDefault()
 
             let projectLocation: {fs: Filesystem, path: Path} | undefined = undefined;
-            if(startupConfigs.project_file_url instanceof Url){
+            if(startupConfigs.project_file_url){
                 let projectLocationResult = await PopupWidget.WaitPopup({
                     title: "Interpreting project ilp URL...",
                     operation: sessionResult.tryGetFsAndPathFromUrl(new GetFileSystemAndPathFromUrlParamsDto({url: startupConfigs.project_file_url.toDto()})),
@@ -183,14 +190,14 @@ export class SessionManagerWidget{
                     projectLocation = projectLocationResult
                 }
             }
-            this.onNewSession({
+            this.handleSessionSuccess({
                 sessionResult, projectLocation, defaultBucketName: startupConfigs.effectiveBucketName, defaultBucketPath: startupConfigs.ebrains_bucket_path
             })
         })
 
 
         createElement({tagName: "h3", parentElement: this.element, innerText: "Rejoin Session"})
-        const sessionRejoinForm = new Form({parentElement: this.element, children: [
+        this.sessionRejoinForm = new Form({parentElement: this.element, children: [
             new Paragraph({parentElement: undefined, cssClasses: [CssClasses.ItkInputParagraph], children: [
                 new Label({parentElement: undefined, innerText: "Session ID :"}),
                 this.sessionIdField = new TextInput({parentElement: undefined, value: undefined, required: true, }),
@@ -199,37 +206,13 @@ export class SessionManagerWidget{
                 this.rejoinSessionButton = new Button({inputType: "submit", text: "Rejoin Session", parentElement: undefined})
             ]})
         ]});
-        sessionRejoinForm.preventSubmitWith(async () => {
-            let timeoutMinutes = this.getWaitTimeout()
-            if(timeoutMinutes === undefined){
-                return
-            }
-            let sessionId = this.sessionIdField.value
+        this.sessionRejoinForm.preventSubmitWith(() => {
+            const sessionId = this.sessionIdField.value
             if(!sessionId){
-                new ErrorPopupWidget({message: "Bad session ID"})
+                new ErrorPopupWidget({message: "Bad session Id"})
                 return
             }
-            this.enableSessionAccquisitionControls({enabled: false})
-            let ilastikUrl = await await PopupWidget.WaitPopup({
-                title: "Authenticating...",
-                operation: this.ensureLoggedInAndGetIlastikUrl()
-            });
-            if(!ilastikUrl){
-                return this.enableSessionAccquisitionControls({enabled: true})
-            }
-            this.logMessage("Joining session....")
-            let sessionResult = await Session.load({
-                ilastikUrl,
-                getStatusRpcParams: new GetComputeSessionStatusParamsDto({
-                    compute_session_id: sessionId,
-                    hpc_site: this.hpcSiteInput.value,
-                }),
-                timeout_minutes: timeoutMinutes,
-                onUsageError: (message) => this.logMessage(message),
-                onProgress: (message) => this.logMessage(message),
-                autoCloseOnTimeout: false,
-            })
-            this.onNewSession({sessionResult})
+            this.rejoinSession(sessionId)
         })
 
 
@@ -265,9 +248,59 @@ export class SessionManagerWidget{
         ]});
     }
 
+    private rejoinSession = async (sessionId: string) => {
+        let timeoutMinutes = this.getWaitTimeout()
+        if(timeoutMinutes === undefined){
+            return
+        }
+        const ilastikUrl = await PopupWidget.WaitPopup({
+            title: "Authenticating...",
+            operation: this.ensureLoggedInAndGetIlastikUrl()
+        });
+        if(!ilastikUrl){
+            this.enableSessionAccquisitionControls({enabled: true})
+            new ErrorPopupWidget({message: `Bad ilasitk API url`})
+            return
+        }
+        if(this.session){
+            new ErrorPopupWidget({message: `Could not join session ${sessionId} because there's already a sesison runnig`})
+            return
+        }
+        this.session = this.doRejoinSession({sessionId, timeoutMinutes, ilastikUrl})
+    }
+
+    private doRejoinSession = async (params: {
+        sessionId: string,
+        timeoutMinutes: number,
+        ilastikUrl: Url,
+    }): Promise<Session | Error> => {
+        this.enableSessionAccquisitionControls({enabled: false})
+        this.logMessage("Joining session....")
+        let sessionResult = await Session.load({
+            ilastikUrl: params.ilastikUrl,
+            getStatusRpcParams: new GetComputeSessionStatusParamsDto({
+                compute_session_id: params.sessionId,
+                hpc_site: this.hpcSiteInput.value,
+            }),
+            timeout_minutes: params.timeoutMinutes,
+            onUsageError: (message) => this.logMessage(message),
+            onProgress: (message) => this.logMessage(message),
+            autoCloseOnTimeout: false,
+        })
+        if(sessionResult instanceof Error){
+            this.handleSessionFailed(sessionResult)
+        }else{
+            this.handleSessionSuccess({sessionResult})
+        }
+        return sessionResult
+    }
+
     private closeSession = () => {
-        this.logMessage(`Closing session ${this.session?.sessionId}`)
-        this.session?.terminate()
+        if(!(this.session instanceof Session)){
+            return
+        }
+        this.logMessage(`Closing session ${this.session.sessionId}`)
+        this.session.terminate()
         this.session = undefined
         this.onLeaveSession()
         this.sessionIdField.value = ""
@@ -353,22 +386,23 @@ export class SessionManagerWidget{
         return undefined
     }
 
-    private onNewSession({
+    private handleSessionFailed(error: Error){
+        this.logMessage(error.message)
+        this.enableSessionAccquisitionControls({enabled: true})
+        this.session = undefined
+    }
+
+    private handleSessionSuccess({
         sessionResult,
         projectLocation,
         defaultBucketName,
         defaultBucketPath,
     }: {
-        sessionResult: Session | Error,
+        sessionResult: Session,
         projectLocation?: {fs: Filesystem, path: Path,},
         defaultBucketName?: string,
         defaultBucketPath?: Path,
     }){
-        if(sessionResult instanceof Error){
-            this.logMessage(sessionResult.message)
-            this.enableSessionAccquisitionControls({enabled: true})
-            return
-        }
         this.sessionIdField.value = sessionResult.sessionUrl.raw
 
         this.enableSessionAccquisitionControls({enabled: false})
@@ -386,18 +420,15 @@ export class SessionManagerWidget{
         this.reminaningTimeContainer.show(true)
 
         this.warnedUserOfImpendingClose = false
+        window.clearInterval(this.remainingTimeIntervalID)
         this.remainingTimeIntervalID = window.setInterval(() => {
-            if(this.session === undefined){
-                window.clearInterval(this.remainingTimeIntervalID)
-                return
-            }
-            const startTime = this.session.startTime
+            const startTime = sessionResult.startTime
             if(startTime === undefined){
                 this.remainingTimeDisplay.value = "Not started yet"
                 return
             }
             const ellapsedTimeMs = new Date().getTime() - startTime.getTime()
-            const remainingTimeSec = (this.session.timeLimitMinutes * 60 - ellapsedTimeMs / 1000)
+            const remainingTimeSec = (sessionResult.timeLimitMinutes * 60 - ellapsedTimeMs / 1000)
             this.remainingTimeDisplay.value = secondsToTimeDeltaString(Math.floor(remainingTimeSec))
             if(!this.warnedUserOfImpendingClose && remainingTimeSec < 3 * 60){
                 this.warnedUserOfImpendingClose = true
@@ -407,6 +438,7 @@ export class SessionManagerWidget{
                 this.closeSession()
             }
         }, 1000);
+        window.removeEventListener("beforeunload", this.onUnload)
         window.addEventListener("beforeunload", this.onUnload);
         this.enableSessionDismissalControls({enabled: true})
     }
@@ -417,7 +449,15 @@ export class SessionManagerWidget{
     };
 
     private onLeaveSession = () => {
-        this.session?.closeWebsocket()
+        let session: Session | undefined
+        if(this.session instanceof Session){
+            session = this.session
+        }else if(this.session instanceof Promise){
+            //FIXME: does this make sense? can this ever happen?
+            new ErrorPopupWidget({message: `Can't leave session yet a sit is still resolving`})
+            return
+        }
+        session?.closeWebsocket()
         this.session = undefined
         window.clearInterval(this.remainingTimeIntervalID)
         this.reminaningTimeContainer.show(false)
