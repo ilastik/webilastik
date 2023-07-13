@@ -45,6 +45,7 @@ export abstract class InputWidget<IT extends InputType> extends Widget<"input">{
 
 export class ButtonWidget extends Widget<"button">{
     constructor(params: Omit<WidgetParams, "onClick"> & {
+        disabled?: boolean,
         buttonType?: "button" | "submit" | "reset",
         contents?: string | Widget<any>[],
         onClick: (ev: MouseEvent, button: ButtonWidget) => void,
@@ -53,6 +54,11 @@ export class ButtonWidget extends Widget<"button">{
             params.onClick(ev, this)
         }});
         this.element.type = params.buttonType || "button";
+        const disabled = params.disabled === undefined ? false : params.disabled;
+        if(disabled){
+            this.element.disabled = true
+            this.addCssClass(CssClasses.ItkDisabled)
+        }
         if(typeof(params.contents) == 'string'){
             this.element.appendChild(new Span({parentElement: undefined, innerText: params.contents}).element)
         }else{
