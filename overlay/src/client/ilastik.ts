@@ -371,8 +371,13 @@ export class Session{
             if(SESSION_DONE_STATES.includes(sessionStatus.compute_session.state)){ //FIXME
                 return Error(`Session ${params.getStatusRpcParams.compute_session_id} is already closed`)
             }
+            if(sessionStatus.compute_session.state != "RUNNING"){
+                onProgress(`Session has not started yet`)
+                await sleep(2000)
+                continue
+            }
             if(!sessionStatus.connected){
-                onProgress(`Session is not ready yet`)
+                onProgress(`Session is running. Connecting...`)
                 await sleep(2000)
                 continue
             }
