@@ -18,9 +18,46 @@ abstract class DatasinkInputForm extends Div{
         dtype: DataType,
         resolution: [number, number, number],
         tile_shape: Shape5D,
-    }): DataSinkUnion | undefined;
+    }): DataSinkUnion | undefined | Error;
 }
 
+export class DziSinkCreationError extends Error{}
+
+export class UnsupportedDziDataType extends DziSinkCreationError{
+    public readonly dtype: Exclude<DataType, "uint8">;
+    constructor(params: {dtype: Exclude<DataType, "uint8">}){
+        super(`This data type is incompatible with the DZI format: ${params.dtype}`)
+        this.dtype = params.dtype
+    }
+}
+export class UnsupportedDziDimensions extends DziSinkCreationError{
+    public readonly z: number;
+    constructor(params: {z: number}){
+        super(`DZI only supports 2D images. Provided z: ${params.z}`)
+        this.z = params.z
+    }
+}
+export class UnsupportedDziNumChannels extends DziSinkCreationError{
+    public readonly c: number;
+    constructor(params: {c: number}){
+        super(`DZI only supports 2D images. Provided c: ${params.c}`)
+        this.c = params.c
+    }
+}
+export class UnsupportedDziTileNumChannels extends DziSinkCreationError{
+    public readonly c: number;
+    constructor(params: {c: number}){
+        super(`DZI tiles only support 2D images. Provided c: ${params.c}`)
+        this.c = params.c
+    }
+}
+export class UnsupportedDziPath extends DziSinkCreationError{
+    public readonly path: Path;
+    constructor(params: {path: Path}){
+        super(`DZI files must end in .dzip. Provided: ${params.path.raw}`)
+        this.path = params.path
+    }
+}
 
 class DziDatasinkConfigWidget extends DatasinkInputForm{
     private imageFormatSelector: Select<"png" | "jpg">;
@@ -73,31 +110,26 @@ class DziDatasinkConfigWidget extends DatasinkInputForm{
         dtype: "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32",
         resolution: [number, number, number],
         tile_shape: Shape5D,
-    }): DziLevelSink | undefined {
+    }): DziLevelSink | undefined | DziSinkCreationError {
         const overlap = this.overlapInput.value
         if(overlap === undefined){
             return undefined
         }
         if(params.dtype != "uint8"){
-            new ErrorPopupWidget({message: `Deep Zoom images only support uint8 (provided ${params.dtype})`})
-            return undefined
+            return new UnsupportedDziDataType({dtype: params.dtype})
         }
         if(params.interval.shape.z > 1 || params.tile_shape.z > 1){
-            new ErrorPopupWidget({message: "Deep Zoom only supports 2D images"})
-            return undefined
+            return new UnsupportedDziDimensions({z: params.interval.shape.z})
         }
         if(!params.path.name.toLowerCase().endsWith(".dzip")){
-            new ErrorPopupWidget({message: "Path has to end in '.dzip'"}) //FIXME: bad place to put error msg?
-            return undefined
+            return new UnsupportedDziPath({path: params.path})
         }
         const num_channels = params.interval.shape.c;
         if(num_channels != 1 && num_channels != 3){
-            new ErrorPopupWidget({message: "Deep Zoom data sink must have 1 or 3 channels"}) //FIXME: bad place to put error msg?
-            return undefined
+            return new UnsupportedDziNumChannels({c: num_channels})
         }
         if(params.tile_shape.c != params.interval.shape.c){
-            new ErrorPopupWidget({message: `Deep Zoom tiles must have as many channels as the whole image`})
-            return undefined
+            return new UnsupportedDziTileNumChannels({c: params.tile_shape.c})
         }
         const dzi_image = new DziImageElement({
             Format: this.imageFormatSelector.value,
@@ -340,7 +372,7 @@ export class DatasinkConfigWidget{
         dtype: DataType,
         resolution: [number, number, number],
         tile_shape: Shape5D,
-    }): DataSinkUnion | undefined{
+    }): DataSinkUnion | undefined | Error{
         return this.tabs.current.widget.tryMakeDataSink(params)
     }
 }
