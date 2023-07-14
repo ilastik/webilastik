@@ -322,7 +322,7 @@ export class SessionManagerWidget{
         this.leaveSessionButton.disabled = !params.enabled
     }
 
-    private logMessage = (message: string) => {
+    private logMessage = (message: string, messageType: "INFO" | "ERROR" = "INFO") => {
         this.messagesContainerLabel.show(true)
         this.messagesContainer.show(true)
 
@@ -330,6 +330,7 @@ export class SessionManagerWidget{
         new Paragraph({
             parentElement: this.messagesContainer,
             innerText: `${new Date().toLocaleString()} ${message}`,
+            cssClasses: messageType == "ERROR" ? [CssClasses.ItkErrorText] : []
         })
         this.messagesContainer.element.scrollTop = this.messagesContainer.element.scrollHeight
     }
@@ -387,7 +388,7 @@ export class SessionManagerWidget{
     }
 
     private handleSessionFailed(error: Error){
-        this.logMessage(error.message)
+        this.logMessage(error.message, "ERROR")
         this.enableSessionAccquisitionControls({enabled: true})
         this.session = undefined
     }
