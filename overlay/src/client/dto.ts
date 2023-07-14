@@ -2985,12 +2985,14 @@ export class RemoveFeatureExtractorsParamsDto {
   }
 }
 
-export function parse_as_Literal_of__quote_BOOT_FAIL_quote_0_quote_CANCELLED_quote_0_quote_COMPLETED_quote_0_quote_DEADLINE_quote_0_quote_FAILED_quote_0_quote_NODE_FAIL_quote_0_quote_OUT_OF_MEMORY_quote_0_quote_PENDING_quote_0_quote_PREEMPTED_quote_0_quote_RUNNING_quote_0_quote_REQUEUED_quote_0_quote_RESIZING_quote_0_quote_REVOKED_quote_0_quote_SUSPENDED_quote_0_quote_TIMEOUT_quote__endof_(
+export function parse_as_Literal_of__quote_BOOT_FAIL_quote_0_quote_CANCELLED_quote_0_quote_COMPLETED_quote_0_quote_CONFIGURING_quote_0_quote_COMPLETING_quote_0_quote_DEADLINE_quote_0_quote_FAILED_quote_0_quote_NODE_FAIL_quote_0_quote_OUT_OF_MEMORY_quote_0_quote_PENDING_quote_0_quote_PREEMPTED_quote_0_quote_RUNNING_quote_0_quote_RESV_DEL_HOLD_quote_0_quote_REQUEUE_FED_quote_0_quote_REQUEUE_HOLD_quote_0_quote_REQUEUED_quote_0_quote_RESIZING_quote_0_quote_REVOKED_quote_0_quote_SIGNALING_quote_0_quote_SPECIAL_EXIT_quote_0_quote_STAGE_OUT_quote_0_quote_STOPPED_quote_0_quote_SUSPENDED_quote_0_quote_TIMEOUT_quote__endof_(
   value: JsonValue,
 ):
   | "BOOT_FAIL"
   | "CANCELLED"
   | "COMPLETED"
+  | "CONFIGURING"
+  | "COMPLETING"
   | "DEADLINE"
   | "FAILED"
   | "NODE_FAIL"
@@ -2998,9 +3000,16 @@ export function parse_as_Literal_of__quote_BOOT_FAIL_quote_0_quote_CANCELLED_quo
   | "PENDING"
   | "PREEMPTED"
   | "RUNNING"
+  | "RESV_DEL_HOLD"
+  | "REQUEUE_FED"
+  | "REQUEUE_HOLD"
   | "REQUEUED"
   | "RESIZING"
   | "REVOKED"
+  | "SIGNALING"
+  | "SPECIAL_EXIT"
+  | "STAGE_OUT"
+  | "STOPPED"
   | "SUSPENDED"
   | "TIMEOUT"
   | Error {
@@ -3017,55 +3026,91 @@ export function parse_as_Literal_of__quote_BOOT_FAIL_quote_0_quote_CANCELLED_quo
     return tmp_2;
   }
   const tmp_3 = parse_as_str(value);
-  if (!(tmp_3 instanceof Error) && tmp_3 === "DEADLINE") {
+  if (!(tmp_3 instanceof Error) && tmp_3 === "CONFIGURING") {
     return tmp_3;
   }
   const tmp_4 = parse_as_str(value);
-  if (!(tmp_4 instanceof Error) && tmp_4 === "FAILED") {
+  if (!(tmp_4 instanceof Error) && tmp_4 === "COMPLETING") {
     return tmp_4;
   }
   const tmp_5 = parse_as_str(value);
-  if (!(tmp_5 instanceof Error) && tmp_5 === "NODE_FAIL") {
+  if (!(tmp_5 instanceof Error) && tmp_5 === "DEADLINE") {
     return tmp_5;
   }
   const tmp_6 = parse_as_str(value);
-  if (!(tmp_6 instanceof Error) && tmp_6 === "OUT_OF_MEMORY") {
+  if (!(tmp_6 instanceof Error) && tmp_6 === "FAILED") {
     return tmp_6;
   }
   const tmp_7 = parse_as_str(value);
-  if (!(tmp_7 instanceof Error) && tmp_7 === "PENDING") {
+  if (!(tmp_7 instanceof Error) && tmp_7 === "NODE_FAIL") {
     return tmp_7;
   }
   const tmp_8 = parse_as_str(value);
-  if (!(tmp_8 instanceof Error) && tmp_8 === "PREEMPTED") {
+  if (!(tmp_8 instanceof Error) && tmp_8 === "OUT_OF_MEMORY") {
     return tmp_8;
   }
   const tmp_9 = parse_as_str(value);
-  if (!(tmp_9 instanceof Error) && tmp_9 === "RUNNING") {
+  if (!(tmp_9 instanceof Error) && tmp_9 === "PENDING") {
     return tmp_9;
   }
   const tmp_10 = parse_as_str(value);
-  if (!(tmp_10 instanceof Error) && tmp_10 === "REQUEUED") {
+  if (!(tmp_10 instanceof Error) && tmp_10 === "PREEMPTED") {
     return tmp_10;
   }
   const tmp_11 = parse_as_str(value);
-  if (!(tmp_11 instanceof Error) && tmp_11 === "RESIZING") {
+  if (!(tmp_11 instanceof Error) && tmp_11 === "RUNNING") {
     return tmp_11;
   }
   const tmp_12 = parse_as_str(value);
-  if (!(tmp_12 instanceof Error) && tmp_12 === "REVOKED") {
+  if (!(tmp_12 instanceof Error) && tmp_12 === "RESV_DEL_HOLD") {
     return tmp_12;
   }
   const tmp_13 = parse_as_str(value);
-  if (!(tmp_13 instanceof Error) && tmp_13 === "SUSPENDED") {
+  if (!(tmp_13 instanceof Error) && tmp_13 === "REQUEUE_FED") {
     return tmp_13;
   }
   const tmp_14 = parse_as_str(value);
-  if (!(tmp_14 instanceof Error) && tmp_14 === "TIMEOUT") {
+  if (!(tmp_14 instanceof Error) && tmp_14 === "REQUEUE_HOLD") {
     return tmp_14;
   }
+  const tmp_15 = parse_as_str(value);
+  if (!(tmp_15 instanceof Error) && tmp_15 === "REQUEUED") {
+    return tmp_15;
+  }
+  const tmp_16 = parse_as_str(value);
+  if (!(tmp_16 instanceof Error) && tmp_16 === "RESIZING") {
+    return tmp_16;
+  }
+  const tmp_17 = parse_as_str(value);
+  if (!(tmp_17 instanceof Error) && tmp_17 === "REVOKED") {
+    return tmp_17;
+  }
+  const tmp_18 = parse_as_str(value);
+  if (!(tmp_18 instanceof Error) && tmp_18 === "SIGNALING") {
+    return tmp_18;
+  }
+  const tmp_19 = parse_as_str(value);
+  if (!(tmp_19 instanceof Error) && tmp_19 === "SPECIAL_EXIT") {
+    return tmp_19;
+  }
+  const tmp_20 = parse_as_str(value);
+  if (!(tmp_20 instanceof Error) && tmp_20 === "STAGE_OUT") {
+    return tmp_20;
+  }
+  const tmp_21 = parse_as_str(value);
+  if (!(tmp_21 instanceof Error) && tmp_21 === "STOPPED") {
+    return tmp_21;
+  }
+  const tmp_22 = parse_as_str(value);
+  if (!(tmp_22 instanceof Error) && tmp_22 === "SUSPENDED") {
+    return tmp_22;
+  }
+  const tmp_23 = parse_as_str(value);
+  if (!(tmp_23 instanceof Error) && tmp_23 === "TIMEOUT") {
+    return tmp_23;
+  }
   return Error(
-    `Could not parse ${value} as 'BOOT_FAIL' | 'CANCELLED' | 'COMPLETED' | 'DEADLINE' | 'FAILED' | 'NODE_FAIL' | 'OUT_OF_MEMORY' | 'PENDING' | 'PREEMPTED' | 'RUNNING' | 'REQUEUED' | 'RESIZING' | 'REVOKED' | 'SUSPENDED' | 'TIMEOUT'`,
+    `Could not parse ${value} as 'BOOT_FAIL' | 'CANCELLED' | 'COMPLETED' | 'CONFIGURING' | 'COMPLETING' | 'DEADLINE' | 'FAILED' | 'NODE_FAIL' | 'OUT_OF_MEMORY' | 'PENDING' | 'PREEMPTED' | 'RUNNING' | 'RESV_DEL_HOLD' | 'REQUEUE_FED' | 'REQUEUE_HOLD' | 'REQUEUED' | 'RESIZING' | 'REVOKED' | 'SIGNALING' | 'SPECIAL_EXIT' | 'STAGE_OUT' | 'STOPPED' | 'SUSPENDED' | 'TIMEOUT'`,
   );
 }
 export function parse_as_ComputeSessionDto(value: JsonValue): ComputeSessionDto | Error {
@@ -3087,7 +3132,7 @@ export function parse_as_ComputeSessionDto(value: JsonValue): ComputeSessionDto 
   const temp_compute_session_id = parse_as_str(valueObject.compute_session_id);
   if (temp_compute_session_id instanceof Error) return temp_compute_session_id;
   const temp_state =
-    parse_as_Literal_of__quote_BOOT_FAIL_quote_0_quote_CANCELLED_quote_0_quote_COMPLETED_quote_0_quote_DEADLINE_quote_0_quote_FAILED_quote_0_quote_NODE_FAIL_quote_0_quote_OUT_OF_MEMORY_quote_0_quote_PENDING_quote_0_quote_PREEMPTED_quote_0_quote_RUNNING_quote_0_quote_REQUEUED_quote_0_quote_RESIZING_quote_0_quote_REVOKED_quote_0_quote_SUSPENDED_quote_0_quote_TIMEOUT_quote__endof_(
+    parse_as_Literal_of__quote_BOOT_FAIL_quote_0_quote_CANCELLED_quote_0_quote_COMPLETED_quote_0_quote_CONFIGURING_quote_0_quote_COMPLETING_quote_0_quote_DEADLINE_quote_0_quote_FAILED_quote_0_quote_NODE_FAIL_quote_0_quote_OUT_OF_MEMORY_quote_0_quote_PENDING_quote_0_quote_PREEMPTED_quote_0_quote_RUNNING_quote_0_quote_RESV_DEL_HOLD_quote_0_quote_REQUEUE_FED_quote_0_quote_REQUEUE_HOLD_quote_0_quote_REQUEUED_quote_0_quote_RESIZING_quote_0_quote_REVOKED_quote_0_quote_SIGNALING_quote_0_quote_SPECIAL_EXIT_quote_0_quote_STAGE_OUT_quote_0_quote_STOPPED_quote_0_quote_SUSPENDED_quote_0_quote_TIMEOUT_quote__endof_(
       valueObject.state,
     );
   if (temp_state instanceof Error) return temp_state;
@@ -3112,6 +3157,8 @@ export class ComputeSessionDto {
     | "BOOT_FAIL"
     | "CANCELLED"
     | "COMPLETED"
+    | "CONFIGURING"
+    | "COMPLETING"
     | "DEADLINE"
     | "FAILED"
     | "NODE_FAIL"
@@ -3119,9 +3166,16 @@ export class ComputeSessionDto {
     | "PENDING"
     | "PREEMPTED"
     | "RUNNING"
+    | "RESV_DEL_HOLD"
+    | "REQUEUE_FED"
+    | "REQUEUE_HOLD"
     | "REQUEUED"
     | "RESIZING"
     | "REVOKED"
+    | "SIGNALING"
+    | "SPECIAL_EXIT"
+    | "STAGE_OUT"
+    | "STOPPED"
     | "SUSPENDED"
     | "TIMEOUT";
   constructor(_params: {
@@ -3134,6 +3188,8 @@ export class ComputeSessionDto {
       | "BOOT_FAIL"
       | "CANCELLED"
       | "COMPLETED"
+      | "CONFIGURING"
+      | "COMPLETING"
       | "DEADLINE"
       | "FAILED"
       | "NODE_FAIL"
@@ -3141,9 +3197,16 @@ export class ComputeSessionDto {
       | "PENDING"
       | "PREEMPTED"
       | "RUNNING"
+      | "RESV_DEL_HOLD"
+      | "REQUEUE_FED"
+      | "REQUEUE_HOLD"
       | "REQUEUED"
       | "RESIZING"
       | "REVOKED"
+      | "SIGNALING"
+      | "SPECIAL_EXIT"
+      | "STAGE_OUT"
+      | "STOPPED"
       | "SUSPENDED"
       | "TIMEOUT";
   }) {
