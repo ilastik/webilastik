@@ -27,62 +27,91 @@ from webilastik.utility import ComputeNodes, Hostname, Minutes, NodeSeconds, Sec
 from webilastik.utility.url import Url
 
 ComputeSessionState = Literal[
-    "BOOT_FAIL",
-    "CANCELLED",
-    "COMPLETED",
-    "DEADLINE",
-    "FAILED",
-    "NODE_FAIL",
-    "OUT_OF_MEMORY",
-    "PENDING",
-    "PREEMPTED",
-    "RUNNING",
-    "REQUEUED",
-    "RESIZING",
-    "REVOKED",
-    "SUSPENDED",
-    "TIMEOUT",
+    "BOOT_FAIL", #Job terminated due to launch failure, typically due to a hardware failure (e.g. unable to boot the node or block and the job can not be requeued).
+    "CANCELLED", #Job was explicitly cancelled by the user or system administrator. The job may or may not have been initiated.
+    "COMPLETED", #Job has terminated all processes on all nodes with an exit code of zero.
+    "CONFIGURING", #Job has been allocated resources, but are waiting for them to become ready for use (e.g. booting).
+    "COMPLETING", #Job is in the process of completing. Some processes on some nodes may still be active.
+    "DEADLINE", #Job terminated on deadline.
+    "FAILED", #Job terminated with non-zero exit code or other failure condition.
+    "NODE_FAIL", #Job terminated due to failure of one or more allocated nodes.
+    "OUT_OF_MEMORY", #Job experienced out of memory error.
+    "PENDING", #Job is awaiting resource allocation.
+    "PREEMPTED", #Job terminated due to preemption.
+    "RUNNING", #Job currently has an allocation.
+    "RESV_DEL_HOLD", #Job is being held after requested reservation was deleted.
+    "REQUEUE_FED", #Job is being requeued by a federation.
+    "REQUEUE_HOLD", #Held job is being requeued.
+    "REQUEUED", #Completing job is being requeued.
+    "RESIZING", #Job is about to change size.
+    "REVOKED", #Sibling was removed from cluster due to other cluster starting the job.
+    "SIGNALING", #Job is being signaled.
+    "SPECIAL_EXIT", #The job was requeued in a special state. This state can be set by users, typically in EpilogSlurmctld, if the job has terminated with a particular exit value.
+    "STAGE_OUT", #Job is staging out files.
+    "STOPPED", #Job has an allocation, but execution has been stopped with SIGSTOP signal. CPUS have been retained by this job.
+    "SUSPENDED", #Job has an allocation, but execution has been suspended and CPUs have been released for other jobs.
+    "TIMEOUT", #Job terminated upon reaching its time limit.
 ]
 
 COMPUTE_SESSION_STATES: Set[ComputeSessionState] = set([
-    "BOOT_FAIL",
-    "CANCELLED",
-    "COMPLETED",
-    "DEADLINE",
-    "FAILED",
-    "NODE_FAIL",
-    "OUT_OF_MEMORY",
-    "PENDING",
-    "PREEMPTED",
-    "RUNNING",
-    "REQUEUED",
-    "RESIZING",
-    "REVOKED",
-    "SUSPENDED",
-    "TIMEOUT",
+    "BOOT_FAIL", #Job terminated due to launch failure, typically due to a hardware failure (e.g. unable to boot the node or block and the job can not be requeued).
+    "CANCELLED", #Job was explicitly cancelled by the user or system administrator. The job may or may not have been initiated.
+    "COMPLETED", #Job has terminated all processes on all nodes with an exit code of zero.
+    "CONFIGURING", #Job has been allocated resources, but are waiting for them to become ready for use (e.g. booting).
+    "COMPLETING", #Job is in the process of completing. Some processes on some nodes may still be active.
+    "DEADLINE", #Job terminated on deadline.
+    "FAILED", #Job terminated with non-zero exit code or other failure condition.
+    "NODE_FAIL", #Job terminated due to failure of one or more allocated nodes.
+    "OUT_OF_MEMORY", #Job experienced out of memory error.
+    "PENDING", #Job is awaiting resource allocation.
+    "PREEMPTED", #Job terminated due to preemption.
+    "RUNNING", #Job currently has an allocation.
+    "RESV_DEL_HOLD", #Job is being held after requested reservation was deleted.
+    "REQUEUE_FED", #Job is being requeued by a federation.
+    "REQUEUE_HOLD", #Held job is being requeued.
+    "REQUEUED", #Completing job is being requeued.
+    "RESIZING", #Job is about to change size.
+    "REVOKED", #Sibling was removed from cluster due to other cluster starting the job.
+    "SIGNALING", #Job is being signaled.
+    "SPECIAL_EXIT", #The job was requeued in a special state. This state can be set by users, typically in EpilogSlurmctld, if the job has terminated with a particular exit value.
+    "STAGE_OUT", #Job is staging out files.
+    "STOPPED", #Job has an allocation, but execution has been stopped with SIGSTOP signal. CPUS have been retained by this job.
+    "SUSPENDED", #Job has an allocation, but execution has been suspended and CPUs have been released for other jobs.
+    "TIMEOUT", #Job terminated upon reaching its time limit.
 ])
 
 FAILED_STATES: Set[ComputeSessionState] = set([
-    "BOOT_FAIL",
-    "CANCELLED",
-    "DEADLINE",
-    "FAILED",
-    "NODE_FAIL",
-    "OUT_OF_MEMORY",
-    "PREEMPTED",
-    "REVOKED",
-    "TIMEOUT",
+    "BOOT_FAIL", #Job terminated due to launch failure, typically due to a hardware failure (e.g. unable to boot the node or block and the job can not be requeued).
+    "CANCELLED",  #Job was explicitly cancelled by the user or system administrator. The job may or may not have been initiated.
+    "DEADLINE", #Job terminated on deadline.
+    "FAILED", #Job terminated with non-zero exit code or other failure condition.
+    "NODE_FAIL", #Job terminated due to failure of one or more allocated nodes.
+    "OUT_OF_MEMORY", #Job experienced out of memory error.
+    "PREEMPTED", #Job terminated due to preemption.
+    "REVOKED", #Sibling was removed from cluster due to other cluster starting the job.
+    "TIMEOUT", #Job terminated upon reaching its time limit.
 ])
 
-DONE_STATES: Set[ComputeSessionState] = set(["COMPLETED", *FAILED_STATES])
+DONE_STATES: Set[ComputeSessionState] = set([
+    "COMPLETED",
+    *FAILED_STATES
+])
 
 RUNNABLE_STATES: Set[ComputeSessionState] = set([
-    "PENDING",
-    "RUNNING",
-    "REQUEUED",
-    "RESIZING",
-    "SUSPENDED",
+    "CONFIGURING", #Job has been allocated resources, but are waiting for them to become ready for use (e.g. booting).
+    "PENDING", #Job is awaiting resource allocation.
+    "RUNNING", #Job currently has an allocation.
+    "RESV_DEL_HOLD", #Job is being held after requested reservation was deleted.
+    "REQUEUE_FED", #Job is being requeued by a federation.
+    "REQUEUE_HOLD", #Held job is being requeued.
+    "REQUEUED", #Completing job is being requeued.
+    "RESIZING", #Job is about to change size.
+    "SIGNALING", #Job is being signaled.
+    "STOPPED", #Job has an allocation, but execution has been stopped with SIGSTOP signal. CPUS have been retained by this job.
+    "SUSPENDED", #Job has an allocation, but execution has been suspended and CPUs have been released for other jobs.
 ])
+
+assert RUNNABLE_STATES & FAILED_STATES == set()
 
 NativeComputeSessionId = NewType("NativeComputeSessionId", int)
 

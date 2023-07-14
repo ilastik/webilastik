@@ -17,7 +17,7 @@ import {
 } from '../../client/dto';
 import { Viewer } from '../../viewer/viewer';
 import { DataSourceListWidget } from './list_widget';
-import { DatasinkConfigWidget } from './datasink_builder_widget';
+import { DatasinkConfigWidget, UnsupportedDziDataType } from './datasink_builder_widget';
 import { DataType } from '../../util/precomputed_chunks';
 import { FileLocationPatternInputWidget } from './file_location_input';
 import { Button, Select } from './input_widget';
@@ -269,7 +269,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                 }
 
                 if(numChannels == 0){
-                    new ErrorPopupWidget({message: "Missing or wrong parameters"})
+                    new ErrorPopupWidget({message: "Training isn't done yet"})
                     return
                 }
 
@@ -301,8 +301,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                     }else{
                         datasink_tile_shape = datasource.tile_shape
                     }
-
-                    const datasink = datasinkConfigWidget.tryMakeDataSink({
+                    const datasink_result = datasinkConfigWidget.tryMakeDataSink({
                         filesystem: fileLocation.filesystem,
                         path: fileLocation.path,
                         dtype,
@@ -310,13 +309,26 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                         resolution: datasource.spatial_resolution,
                         tile_shape: datasink_tile_shape.updated({c: numChannels}),
                     })
-                    if(!datasource || !datasink){
+                    if(datasink_result instanceof UnsupportedDziDataType && exportMode == "pixel probabilities"){
+                        new ErrorPopupWidget({
+                            message: (
+                                "Can't export pixel probabilities as .dzip, since those are float values. " +
+                                "Maybe you meant to use 'simple segmentation'?"
+                            )
+                        })
+                        return
+                    }
+                    if(datasink_result instanceof Error){
+                        new ErrorPopupWidget({message: datasink_result.message})
+                        return
+                    }
+                    if(!datasource || !datasink_result){
                         new ErrorPopupWidget({message: "Missing export parameters"})
                         return
                     }
                     if(this.exportModeSelector.value == "pixel probabilities"){
                         this.doRPC("launch_pixel_probabilities_export_job", new StartPixelProbabilitiesExportJobParamsDto({
-                            datasource: datasource.toDto(), datasink: datasink.toDto()
+                            datasource: datasource.toDto(), datasink: datasink_result.toDto()
                         }))
                     }else if(this.exportModeSelector.value == "simple segmentation"){
                         const label_header = this.labelToExportSelector?.value;
@@ -325,7 +337,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                             return
                         }
                         this.doRPC("launch_simple_segmentation_export_job", new StartSimpleSegmentationExportJobParamsDto({
-                            datasource: datasource.toDto(), datasink: datasink.toDto(), label_header: label_header.toDto()
+                            datasource: datasource.toDto(), datasink: datasink_result.toDto(), label_header: label_header.toDto()
                         }))
                     }else{
                         assertUnreachable(this.exportModeSelector.value)

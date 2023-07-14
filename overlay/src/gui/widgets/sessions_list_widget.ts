@@ -3,7 +3,7 @@ import { CloseComputeSessionParamsDto, ComputeSessionStatusDto, ListComputeSessi
 import { createElement, createImage, removeElement, secondsToTimeDeltaString } from "../../util/misc";
 import { Url } from "../../util/parsed_url";
 import { ErrorPopupWidget, PopupWidget } from "./popup";
-import { Button } from "./input_widget";
+import { Button, ButtonWidget } from "./input_widget";
 
 class SessionItemWidget{
     public readonly status: ComputeSessionStatusDto;
@@ -15,6 +15,7 @@ class SessionItemWidget{
         parentElement: HTMLTableElement,
         ilastikUrl: Url,
         onSessionClosed: (status: ComputeSessionStatusDto) => void,
+        rejoinSession?: (sessionId: string) => void,
     }){
         this.status = params.status
         this.element = createElement({tagName: "tr", parentElement: params.parentElement})
@@ -33,13 +34,16 @@ class SessionItemWidget{
             text: "Kill",
             onClick: async () => {
                 this.cancelButton.disabled = true;
-                let cancellationResult = await Session.cancel({
-                    ilastikUrl: params.ilastikUrl,
-                    rpcParams: new CloseComputeSessionParamsDto({
-                        compute_session_id: comp_session.compute_session_id,
-                        hpc_site: params.status.hpc_site,
+                let cancellationResult = await PopupWidget.WaitPopup({
+                    title: `Killing session ${comp_session.compute_session_id} at ${params.status.hpc_site}`,
+                    operation: Session.cancel({
+                        ilastikUrl: params.ilastikUrl,
+                        rpcParams: new CloseComputeSessionParamsDto({
+                            compute_session_id: comp_session.compute_session_id,
+                            hpc_site: params.status.hpc_site,
+                        })
                     })
-                })
+                });
                 if(cancellationResult instanceof Error){
                     new ErrorPopupWidget({
                         message: `Could not delete session: ${cancellationResult.message}`,
@@ -53,6 +57,15 @@ class SessionItemWidget{
                 }
             }
         })
+        new ButtonWidget({
+            parentElement: cancelButtonTd,
+            contents: "Rejoin",
+            disabled: SESSION_DONE_STATES.includes(comp_session.state) || params.rejoinSession === undefined,
+            onClick: () => {
+                if(params.rejoinSession){
+                    params.rejoinSession(comp_session.compute_session_id)
+                }
+            }})
     }
 }
 
@@ -61,6 +74,7 @@ export class SessionsPopup{
         ilastikUrl: Url,
         sessionStati: Array<ComputeSessionStatusDto>,
         onSessionClosed: (status: ComputeSessionStatusDto) => void,
+        rejoinSession?: (sessionId: string) => void,
     }){
         let popup = new PopupWidget("Sessions:")
         let table = createElement({tagName: "table", parentElement: popup.element, cssClasses: ["ItkTable"]})
@@ -68,9 +82,14 @@ export class SessionsPopup{
         createElement({tagName: "th", parentElement: table, innerText: "Start Time"})
         createElement({tagName: "th", parentElement: table, innerText: "Duration"})
         createElement({tagName: "th", parentElement: table, innerText: "Status"})
-        createElement({tagName: "th", parentElement: table, innerText: ""})
+        createElement({tagName: "th", parentElement: table, innerText: "Actions"})
         params.sessionStati.forEach(status => new SessionItemWidget({
-            ...params, status, parentElement: table,
+            ...params, status, parentElement: table, rejoinSession: params.rejoinSession === undefined ? undefined : (sessionId) => {
+                popup.destroy()
+                if(params.rejoinSession){
+                    params.rejoinSession(sessionId)
+                }
+            }
         }))
 
         new Button({inputType: "button", parentElement: popup.element, text: "OK", onClick: () => popup.destroy()})
@@ -79,6 +98,7 @@ export class SessionsPopup{
     public static async create(params: {
         ilastikUrl: Url,
         onSessionClosed: (status: ComputeSessionStatusDto) => void,
+        rejoinSession?: (sessionId: string) => void,
         hpc_site: HpcSiteName,
     }): Promise<SessionsPopup | Error | undefined>{
         const loadingPopup = new PopupWidget("Fetching sessions...");

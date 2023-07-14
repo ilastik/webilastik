@@ -3142,9 +3142,9 @@ class RemoveFeatureExtractorsParamsDto(DataTransferObject):
         return parse_as_RemoveFeatureExtractorsParamsDto(value)
 
 
-def parse_as_Literal_of__quote_BOOT_FAIL_quote_0_quote_CANCELLED_quote_0_quote_COMPLETED_quote_0_quote_DEADLINE_quote_0_quote_FAILED_quote_0_quote_NODE_FAIL_quote_0_quote_OUT_OF_MEMORY_quote_0_quote_PENDING_quote_0_quote_PREEMPTED_quote_0_quote_RUNNING_quote_0_quote_REQUEUED_quote_0_quote_RESIZING_quote_0_quote_REVOKED_quote_0_quote_SUSPENDED_quote_0_quote_TIMEOUT_quote__endof_(
+def parse_as_Literal_of__quote_BOOT_FAIL_quote_0_quote_CANCELLED_quote_0_quote_COMPLETED_quote_0_quote_CONFIGURING_quote_0_quote_COMPLETING_quote_0_quote_DEADLINE_quote_0_quote_FAILED_quote_0_quote_NODE_FAIL_quote_0_quote_OUT_OF_MEMORY_quote_0_quote_PENDING_quote_0_quote_PREEMPTED_quote_0_quote_RUNNING_quote_0_quote_RESV_DEL_HOLD_quote_0_quote_REQUEUE_FED_quote_0_quote_REQUEUE_HOLD_quote_0_quote_REQUEUED_quote_0_quote_RESIZING_quote_0_quote_REVOKED_quote_0_quote_SIGNALING_quote_0_quote_SPECIAL_EXIT_quote_0_quote_STAGE_OUT_quote_0_quote_STOPPED_quote_0_quote_SUSPENDED_quote_0_quote_TIMEOUT_quote__endof_(
     value: JsonValue,
-) -> "Literal['BOOT_FAIL', 'CANCELLED', 'COMPLETED', 'DEADLINE', 'FAILED', 'NODE_FAIL', 'OUT_OF_MEMORY', 'PENDING', 'PREEMPTED', 'RUNNING', 'REQUEUED', 'RESIZING', 'REVOKED', 'SUSPENDED', 'TIMEOUT'] | MessageParsingError":
+) -> "Literal['BOOT_FAIL', 'CANCELLED', 'COMPLETED', 'CONFIGURING', 'COMPLETING', 'DEADLINE', 'FAILED', 'NODE_FAIL', 'OUT_OF_MEMORY', 'PENDING', 'PREEMPTED', 'RUNNING', 'RESV_DEL_HOLD', 'REQUEUE_FED', 'REQUEUE_HOLD', 'REQUEUED', 'RESIZING', 'REVOKED', 'SIGNALING', 'SPECIAL_EXIT', 'STAGE_OUT', 'STOPPED', 'SUSPENDED', 'TIMEOUT'] | MessageParsingError":
     tmp_0 = parse_as_str(value)
     if not isinstance(tmp_0, MessageParsingError) and tmp_0 == "BOOT_FAIL":
         return tmp_0
@@ -3155,43 +3155,70 @@ def parse_as_Literal_of__quote_BOOT_FAIL_quote_0_quote_CANCELLED_quote_0_quote_C
     if not isinstance(tmp_2, MessageParsingError) and tmp_2 == "COMPLETED":
         return tmp_2
     tmp_3 = parse_as_str(value)
-    if not isinstance(tmp_3, MessageParsingError) and tmp_3 == "DEADLINE":
+    if not isinstance(tmp_3, MessageParsingError) and tmp_3 == "CONFIGURING":
         return tmp_3
     tmp_4 = parse_as_str(value)
-    if not isinstance(tmp_4, MessageParsingError) and tmp_4 == "FAILED":
+    if not isinstance(tmp_4, MessageParsingError) and tmp_4 == "COMPLETING":
         return tmp_4
     tmp_5 = parse_as_str(value)
-    if not isinstance(tmp_5, MessageParsingError) and tmp_5 == "NODE_FAIL":
+    if not isinstance(tmp_5, MessageParsingError) and tmp_5 == "DEADLINE":
         return tmp_5
     tmp_6 = parse_as_str(value)
-    if not isinstance(tmp_6, MessageParsingError) and tmp_6 == "OUT_OF_MEMORY":
+    if not isinstance(tmp_6, MessageParsingError) and tmp_6 == "FAILED":
         return tmp_6
     tmp_7 = parse_as_str(value)
-    if not isinstance(tmp_7, MessageParsingError) and tmp_7 == "PENDING":
+    if not isinstance(tmp_7, MessageParsingError) and tmp_7 == "NODE_FAIL":
         return tmp_7
     tmp_8 = parse_as_str(value)
-    if not isinstance(tmp_8, MessageParsingError) and tmp_8 == "PREEMPTED":
+    if not isinstance(tmp_8, MessageParsingError) and tmp_8 == "OUT_OF_MEMORY":
         return tmp_8
     tmp_9 = parse_as_str(value)
-    if not isinstance(tmp_9, MessageParsingError) and tmp_9 == "RUNNING":
+    if not isinstance(tmp_9, MessageParsingError) and tmp_9 == "PENDING":
         return tmp_9
     tmp_10 = parse_as_str(value)
-    if not isinstance(tmp_10, MessageParsingError) and tmp_10 == "REQUEUED":
+    if not isinstance(tmp_10, MessageParsingError) and tmp_10 == "PREEMPTED":
         return tmp_10
     tmp_11 = parse_as_str(value)
-    if not isinstance(tmp_11, MessageParsingError) and tmp_11 == "RESIZING":
+    if not isinstance(tmp_11, MessageParsingError) and tmp_11 == "RUNNING":
         return tmp_11
     tmp_12 = parse_as_str(value)
-    if not isinstance(tmp_12, MessageParsingError) and tmp_12 == "REVOKED":
+    if not isinstance(tmp_12, MessageParsingError) and tmp_12 == "RESV_DEL_HOLD":
         return tmp_12
     tmp_13 = parse_as_str(value)
-    if not isinstance(tmp_13, MessageParsingError) and tmp_13 == "SUSPENDED":
+    if not isinstance(tmp_13, MessageParsingError) and tmp_13 == "REQUEUE_FED":
         return tmp_13
     tmp_14 = parse_as_str(value)
-    if not isinstance(tmp_14, MessageParsingError) and tmp_14 == "TIMEOUT":
+    if not isinstance(tmp_14, MessageParsingError) and tmp_14 == "REQUEUE_HOLD":
         return tmp_14
+    tmp_15 = parse_as_str(value)
+    if not isinstance(tmp_15, MessageParsingError) and tmp_15 == "REQUEUED":
+        return tmp_15
+    tmp_16 = parse_as_str(value)
+    if not isinstance(tmp_16, MessageParsingError) and tmp_16 == "RESIZING":
+        return tmp_16
+    tmp_17 = parse_as_str(value)
+    if not isinstance(tmp_17, MessageParsingError) and tmp_17 == "REVOKED":
+        return tmp_17
+    tmp_18 = parse_as_str(value)
+    if not isinstance(tmp_18, MessageParsingError) and tmp_18 == "SIGNALING":
+        return tmp_18
+    tmp_19 = parse_as_str(value)
+    if not isinstance(tmp_19, MessageParsingError) and tmp_19 == "SPECIAL_EXIT":
+        return tmp_19
+    tmp_20 = parse_as_str(value)
+    if not isinstance(tmp_20, MessageParsingError) and tmp_20 == "STAGE_OUT":
+        return tmp_20
+    tmp_21 = parse_as_str(value)
+    if not isinstance(tmp_21, MessageParsingError) and tmp_21 == "STOPPED":
+        return tmp_21
+    tmp_22 = parse_as_str(value)
+    if not isinstance(tmp_22, MessageParsingError) and tmp_22 == "SUSPENDED":
+        return tmp_22
+    tmp_23 = parse_as_str(value)
+    if not isinstance(tmp_23, MessageParsingError) and tmp_23 == "TIMEOUT":
+        return tmp_23
     return MessageParsingError(
-        f"Could not parse {value} as Literal['BOOT_FAIL', 'CANCELLED', 'COMPLETED', 'DEADLINE', 'FAILED', 'NODE_FAIL', 'OUT_OF_MEMORY', 'PENDING', 'PREEMPTED', 'RUNNING', 'REQUEUED', 'RESIZING', 'REVOKED', 'SUSPENDED', 'TIMEOUT']"
+        f"Could not parse {value} as Literal['BOOT_FAIL', 'CANCELLED', 'COMPLETED', 'CONFIGURING', 'COMPLETING', 'DEADLINE', 'FAILED', 'NODE_FAIL', 'OUT_OF_MEMORY', 'PENDING', 'PREEMPTED', 'RUNNING', 'RESV_DEL_HOLD', 'REQUEUE_FED', 'REQUEUE_HOLD', 'REQUEUED', 'RESIZING', 'REVOKED', 'SIGNALING', 'SPECIAL_EXIT', 'STAGE_OUT', 'STOPPED', 'SUSPENDED', 'TIMEOUT']"
     )
 
 
@@ -3225,7 +3252,7 @@ def parse_as_ComputeSessionDto(
     tmp_compute_session_id = parse_as_str(value.get("compute_session_id"))
     if isinstance(tmp_compute_session_id, MessageParsingError):
         return tmp_compute_session_id
-    tmp_state = parse_as_Literal_of__quote_BOOT_FAIL_quote_0_quote_CANCELLED_quote_0_quote_COMPLETED_quote_0_quote_DEADLINE_quote_0_quote_FAILED_quote_0_quote_NODE_FAIL_quote_0_quote_OUT_OF_MEMORY_quote_0_quote_PENDING_quote_0_quote_PREEMPTED_quote_0_quote_RUNNING_quote_0_quote_REQUEUED_quote_0_quote_RESIZING_quote_0_quote_REVOKED_quote_0_quote_SUSPENDED_quote_0_quote_TIMEOUT_quote__endof_(
+    tmp_state = parse_as_Literal_of__quote_BOOT_FAIL_quote_0_quote_CANCELLED_quote_0_quote_COMPLETED_quote_0_quote_CONFIGURING_quote_0_quote_COMPLETING_quote_0_quote_DEADLINE_quote_0_quote_FAILED_quote_0_quote_NODE_FAIL_quote_0_quote_OUT_OF_MEMORY_quote_0_quote_PENDING_quote_0_quote_PREEMPTED_quote_0_quote_RUNNING_quote_0_quote_RESV_DEL_HOLD_quote_0_quote_REQUEUE_FED_quote_0_quote_REQUEUE_HOLD_quote_0_quote_REQUEUED_quote_0_quote_RESIZING_quote_0_quote_REVOKED_quote_0_quote_SIGNALING_quote_0_quote_SPECIAL_EXIT_quote_0_quote_STAGE_OUT_quote_0_quote_STOPPED_quote_0_quote_SUSPENDED_quote_0_quote_TIMEOUT_quote__endof_(
         value.get("state")
     )
     if isinstance(tmp_state, MessageParsingError):
@@ -3251,6 +3278,8 @@ class ComputeSessionDto(DataTransferObject):
         "BOOT_FAIL",
         "CANCELLED",
         "COMPLETED",
+        "CONFIGURING",
+        "COMPLETING",
         "DEADLINE",
         "FAILED",
         "NODE_FAIL",
@@ -3258,9 +3287,16 @@ class ComputeSessionDto(DataTransferObject):
         "PENDING",
         "PREEMPTED",
         "RUNNING",
+        "RESV_DEL_HOLD",
+        "REQUEUE_FED",
+        "REQUEUE_HOLD",
         "REQUEUED",
         "RESIZING",
         "REVOKED",
+        "SIGNALING",
+        "SPECIAL_EXIT",
+        "STAGE_OUT",
+        "STOPPED",
         "SUSPENDED",
         "TIMEOUT",
     ]
