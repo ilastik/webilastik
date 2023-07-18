@@ -25,13 +25,9 @@ import h5py
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 from webilastik.classic_ilastik.ilp.pixel_classification_ilp import IlpPixelClassificationWorkflowGroup
 
-from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource, PrecomputedChunksInfo
-from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale
 from webilastik.filesystem import FsFileNotFoundException, FsIoException, IFilesystem, create_filesystem_from_message, create_filesystem_from_url
-from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.filesystem.os_fs import OsFs
 from webilastik.scheduling.job import PriorityExecutor
-from webilastik.server.util import get_encoded_datasource_from_url
 from webilastik.server.rpc.dto import GetDatasourcesFromUrlParamsDto, GetDatasourcesFromUrlResponseDto, GetFileSystemAndPathFromUrlParamsDto, GetFileSystemAndPathFromUrlResponseDto, ListFsDirRequest, ListFsDirResponse, LoadProjectParamsDto, MessageParsingError, RpcErrorDto, SaveProjectParamsDto
 from webilastik.server.session_allocator import uncachable_json_response
 from webilastik.ui.datasource import try_get_datasources_from_url
