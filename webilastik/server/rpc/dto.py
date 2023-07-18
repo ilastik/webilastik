@@ -4323,3 +4323,342 @@ class ListFsDirResponse(DataTransferObject):
         cls, value: JsonValue
     ) -> "ListFsDirResponse | MessageParsingError":
         return parse_as_ListFsDirResponse(value)
+
+
+def parse_as_Literal_of__quote_hbp_quote__endof_(
+    value: JsonValue,
+) -> "Literal['hbp'] | MessageParsingError":
+    tmp_0 = parse_as_str(value)
+    if not isinstance(tmp_0, MessageParsingError) and tmp_0 == "hbp":
+        return tmp_0
+    return MessageParsingError(f"Could not parse {value} as Literal['hbp']")
+
+
+def parse_as_HbpIamPublicKeyDto(
+    value: JsonValue,
+) -> "HbpIamPublicKeyDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as HbpIamPublicKeyDto"
+        )
+    tmp_realm = parse_as_Literal_of__quote_hbp_quote__endof_(value.get("realm"))
+    if isinstance(tmp_realm, MessageParsingError):
+        return tmp_realm
+    tmp_public_key = parse_as_str(value.get("public_key"))
+    if isinstance(tmp_public_key, MessageParsingError):
+        return tmp_public_key
+    return HbpIamPublicKeyDto(
+        realm=tmp_realm,
+        public_key=tmp_public_key,
+    )
+
+
+@dataclass
+class HbpIamPublicKeyDto(DataTransferObject):
+    realm: Literal["hbp"]
+    public_key: str
+
+    @classmethod
+    def tag_value(cls) -> "str | None":
+        return None
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "realm": self.realm,
+            "public_key": self.public_key,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "HbpIamPublicKeyDto | MessageParsingError":
+        return parse_as_HbpIamPublicKeyDto(value)
+
+
+def parse_as_Literal_of__quote_RS256_quote__endof_(
+    value: JsonValue,
+) -> "Literal['RS256'] | MessageParsingError":
+    tmp_0 = parse_as_str(value)
+    if not isinstance(tmp_0, MessageParsingError) and tmp_0 == "RS256":
+        return tmp_0
+    return MessageParsingError(f"Could not parse {value} as Literal['RS256']")
+
+
+def parse_as_Literal_of__quote_JWT_quote__endof_(
+    value: JsonValue,
+) -> "Literal['JWT'] | MessageParsingError":
+    tmp_0 = parse_as_str(value)
+    if not isinstance(tmp_0, MessageParsingError) and tmp_0 == "JWT":
+        return tmp_0
+    return MessageParsingError(f"Could not parse {value} as Literal['JWT']")
+
+
+def parse_as_EbrainsAccessTokenHeaderDto(
+    value: JsonValue,
+) -> "EbrainsAccessTokenHeaderDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as EbrainsAccessTokenHeaderDto"
+        )
+    tmp_alg = parse_as_Literal_of__quote_RS256_quote__endof_(value.get("alg"))
+    if isinstance(tmp_alg, MessageParsingError):
+        return tmp_alg
+    tmp_typ = parse_as_Literal_of__quote_JWT_quote__endof_(value.get("typ"))
+    if isinstance(tmp_typ, MessageParsingError):
+        return tmp_typ
+    tmp_kid = parse_as_str(value.get("kid"))
+    if isinstance(tmp_kid, MessageParsingError):
+        return tmp_kid
+    return EbrainsAccessTokenHeaderDto(
+        alg=tmp_alg,
+        typ=tmp_typ,
+        kid=tmp_kid,
+    )
+
+
+@dataclass
+class EbrainsAccessTokenHeaderDto(DataTransferObject):
+    alg: Literal["RS256"]
+    typ: Literal["JWT"]
+    kid: str
+
+    @classmethod
+    def tag_value(cls) -> "str | None":
+        return None
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "alg": self.alg,
+            "typ": self.typ,
+            "kid": self.kid,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "EbrainsAccessTokenHeaderDto | MessageParsingError":
+        return parse_as_EbrainsAccessTokenHeaderDto(value)
+
+
+def parse_as_Tuple_of_str_endof_(
+    value: JsonValue,
+) -> "Tuple[str] | MessageParsingError":
+    if not isinstance(value, (list, tuple)) or len(value) < 1:
+        return MessageParsingError(
+            f"Could not parse Tuple[str] from {json.dumps(value)}"
+        )
+    tmp_0 = parse_as_str(value[0])
+    if isinstance(tmp_0, MessageParsingError):
+        return tmp_0
+    return (tmp_0,)
+
+
+def parse_as_Literal_of__quote_Bearer_quote__endof_(
+    value: JsonValue,
+) -> "Literal['Bearer'] | MessageParsingError":
+    tmp_0 = parse_as_str(value)
+    if not isinstance(tmp_0, MessageParsingError) and tmp_0 == "Bearer":
+        return tmp_0
+    return MessageParsingError(f"Could not parse {value} as Literal['Bearer']")
+
+
+def parse_as_EbrainsAccessTokenPayloadDto(
+    value: JsonValue,
+) -> "EbrainsAccessTokenPayloadDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as EbrainsAccessTokenPayloadDto"
+        )
+    tmp_exp = parse_as_int(value.get("exp"))
+    if isinstance(tmp_exp, MessageParsingError):
+        return tmp_exp
+    tmp_iat = parse_as_int(value.get("iat"))
+    if isinstance(tmp_iat, MessageParsingError):
+        return tmp_iat
+    tmp_auth_time = parse_as_int(value.get("auth_time"))
+    if isinstance(tmp_auth_time, MessageParsingError):
+        return tmp_auth_time
+    tmp_jti = parse_as_str(value.get("jti"))
+    if isinstance(tmp_jti, MessageParsingError):
+        return tmp_jti
+    tmp_iss = parse_as_str(value.get("iss"))
+    if isinstance(tmp_iss, MessageParsingError):
+        return tmp_iss
+    tmp_aud = parse_as_Tuple_of_str_endof_(value.get("aud"))
+    if isinstance(tmp_aud, MessageParsingError):
+        return tmp_aud
+    tmp_sub = parse_as_str(value.get("sub"))
+    if isinstance(tmp_sub, MessageParsingError):
+        return tmp_sub
+    tmp_typ = parse_as_Literal_of__quote_Bearer_quote__endof_(value.get("typ"))
+    if isinstance(tmp_typ, MessageParsingError):
+        return tmp_typ
+    tmp_azp = parse_as_str(value.get("azp"))
+    if isinstance(tmp_azp, MessageParsingError):
+        return tmp_azp
+    tmp_session_state = parse_as_str(value.get("session_state"))
+    if isinstance(tmp_session_state, MessageParsingError):
+        return tmp_session_state
+    tmp_acr = parse_as_str(value.get("acr"))
+    if isinstance(tmp_acr, MessageParsingError):
+        return tmp_acr
+    tmp_scope = parse_as_str(value.get("scope"))
+    if isinstance(tmp_scope, MessageParsingError):
+        return tmp_scope
+    tmp_sid = parse_as_str(value.get("sid"))
+    if isinstance(tmp_sid, MessageParsingError):
+        return tmp_sid
+    tmp_email_verified = parse_as_bool(value.get("email_verified"))
+    if isinstance(tmp_email_verified, MessageParsingError):
+        return tmp_email_verified
+    tmp_gender = parse_as_str(value.get("gender"))
+    if isinstance(tmp_gender, MessageParsingError):
+        return tmp_gender
+    tmp_name = parse_as_str(value.get("name"))
+    if isinstance(tmp_name, MessageParsingError):
+        return tmp_name
+    tmp_preferred_username = parse_as_str(value.get("preferred_username"))
+    if isinstance(tmp_preferred_username, MessageParsingError):
+        return tmp_preferred_username
+    tmp_given_name = parse_as_str(value.get("given_name"))
+    if isinstance(tmp_given_name, MessageParsingError):
+        return tmp_given_name
+    tmp_family_name = parse_as_str(value.get("family_name"))
+    if isinstance(tmp_family_name, MessageParsingError):
+        return tmp_family_name
+    tmp_email = parse_as_str(value.get("email"))
+    if isinstance(tmp_email, MessageParsingError):
+        return tmp_email
+    return EbrainsAccessTokenPayloadDto(
+        exp=tmp_exp,
+        iat=tmp_iat,
+        auth_time=tmp_auth_time,
+        jti=tmp_jti,
+        iss=tmp_iss,
+        aud=tmp_aud,
+        sub=tmp_sub,
+        typ=tmp_typ,
+        azp=tmp_azp,
+        session_state=tmp_session_state,
+        acr=tmp_acr,
+        scope=tmp_scope,
+        sid=tmp_sid,
+        email_verified=tmp_email_verified,
+        gender=tmp_gender,
+        name=tmp_name,
+        preferred_username=tmp_preferred_username,
+        given_name=tmp_given_name,
+        family_name=tmp_family_name,
+        email=tmp_email,
+    )
+
+
+@dataclass
+class EbrainsAccessTokenPayloadDto(DataTransferObject):
+    exp: int  # e.g. 1689775678
+    iat: int  # e.g. 1689334268
+    auth_time: int  # e.g. 1689170878
+    jti: str  # e.g. "1740e10e-b09c-4db8-acf8-63d1b417763a"
+    iss: str  # e.g. "https://iam.ebrains.eu/auth/realms/hbp"
+    aud: Tuple[
+        str
+    ]  # e.g.: ["jupyterhub", "tutorialOidcApi", "jupyterhub-jsc", "xwiki", "team", "plus", "group"]
+    sub: str  # this is the user ID, e.g. "bdca269c-f207-4cdb-8b68-a562e434faed"
+    typ: Literal["Bearer"]
+    azp: str  # e.g. "webilastik",
+    session_state: str  # e.g. "e29d75a2-0dfe-4a4c-a800-c35eae234a47"
+    acr: str  # e.g. "0"
+    # allowed-origins: Tuple[str] #e.g. ["https://app.ilastik.org"]
+    scope: str  # actually a list of strings concatenated with spaces: e.g. "profile roles email openid group team"
+    sid: str  # e.g.: "e29d75a2-0dfe-4a4c-a800-c35e12334a47"
+    email_verified: bool  # e.g. true
+    gender: str  # e.g. "null"
+    name: str  # e.g. "John Doe"
+    # mitreid-sub: str # e.g. "301234"
+    preferred_username: str  # e.g. "johndoe"
+    given_name: str  # e.g. "John"
+    family_name: str  # e.g. "Doe"
+    email: str  # e.g. "john.doe@example.com"
+
+    @classmethod
+    def tag_value(cls) -> "str | None":
+        return None
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "exp": self.exp,
+            "iat": self.iat,
+            "auth_time": self.auth_time,
+            "jti": self.jti,
+            "iss": self.iss,
+            "aud": (self.aud[0],),
+            "sub": self.sub,
+            "typ": self.typ,
+            "azp": self.azp,
+            "session_state": self.session_state,
+            "acr": self.acr,
+            "scope": self.scope,
+            "sid": self.sid,
+            "email_verified": self.email_verified,
+            "gender": self.gender,
+            "name": self.name,
+            "preferred_username": self.preferred_username,
+            "given_name": self.given_name,
+            "family_name": self.family_name,
+            "email": self.email,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "EbrainsAccessTokenPayloadDto | MessageParsingError":
+        return parse_as_EbrainsAccessTokenPayloadDto(value)
+
+
+def parse_as_EbrainsUserTokenDto(
+    value: JsonValue,
+) -> "EbrainsUserTokenDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as EbrainsUserTokenDto"
+        )
+    tmp_access_token = parse_as_str(value.get("access_token"))
+    if isinstance(tmp_access_token, MessageParsingError):
+        return tmp_access_token
+    tmp_refresh_token = parse_as_str(value.get("refresh_token"))
+    if isinstance(tmp_refresh_token, MessageParsingError):
+        return tmp_refresh_token
+    return EbrainsUserTokenDto(
+        access_token=tmp_access_token,
+        refresh_token=tmp_refresh_token,
+    )
+
+
+@dataclass
+class EbrainsUserTokenDto(DataTransferObject):
+    access_token: str
+    refresh_token: str
+
+    @classmethod
+    def tag_value(cls) -> "str | None":
+        return None
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "access_token": self.access_token,
+            "refresh_token": self.refresh_token,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "EbrainsUserTokenDto | MessageParsingError":
+        return parse_as_EbrainsUserTokenDto(value)

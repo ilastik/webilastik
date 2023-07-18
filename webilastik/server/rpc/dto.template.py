@@ -530,3 +530,65 @@ class ListFsDirRequest(DataTransferObject):
 class ListFsDirResponse(DataTransferObject):
     files: Tuple[str, ...]
     directories: Tuple[str, ...]
+
+##########################################
+
+@dataclass
+class HbpIamPublicKeyDto(DataTransferObject):
+    realm: Literal["hbp"]
+    public_key: str
+
+    @classmethod
+    def tag_value(cls) -> "str | None":
+        return None
+
+
+@dataclass
+class EbrainsAccessTokenHeaderDto(DataTransferObject):
+    alg: Literal["RS256"]
+    typ: Literal["JWT"]
+    kid: str
+
+    @classmethod
+    def tag_value(cls) -> "str | None":
+        return None
+
+
+@dataclass
+class EbrainsAccessTokenPayloadDto(DataTransferObject):
+    exp: int # e.g. 1689775678
+    iat: int # e.g. 1689334268
+    auth_time: int # e.g. 1689170878
+    jti: str # e.g. "1740e10e-b09c-4db8-acf8-63d1b417763a"
+    iss: str # e.g. "https://iam.ebrains.eu/auth/realms/hbp"
+    aud: Tuple[str] # e.g.: ["jupyterhub", "tutorialOidcApi", "jupyterhub-jsc", "xwiki", "team", "plus", "group"]
+    sub: str # this is the user ID, e.g. "bdca269c-f207-4cdb-8b68-a562e434faed"
+    typ: Literal["Bearer"]
+    azp: str # e.g. "webilastik",
+    session_state: str # e.g. "e29d75a2-0dfe-4a4c-a800-c35eae234a47"
+    acr: str # e.g. "0"
+    # allowed-origins: Tuple[str] #e.g. ["https://app.ilastik.org"]
+    scope: str # actually a list of strings concatenated with spaces: e.g. "profile roles email openid group team"
+    sid: str # e.g.: "e29d75a2-0dfe-4a4c-a800-c35e12334a47"
+    email_verified: bool # e.g. true
+    gender: str # e.g. "null"
+    name: str # e.g. "John Doe"
+    # mitreid-sub: str # e.g. "301234"
+    preferred_username: str # e.g. "johndoe"
+    given_name: str # e.g. "John"
+    family_name: str # e.g. "Doe"
+    email: str # e.g. "john.doe@example.com"
+
+    @classmethod
+    def tag_value(cls) -> "str | None":
+        return None
+
+
+@dataclass
+class EbrainsUserTokenDto(DataTransferObject):
+    access_token: str
+    refresh_token: str
+
+    @classmethod
+    def tag_value(cls) -> "str | None":
+        return None

@@ -4162,3 +4162,319 @@ export class ListFsDirResponse {
     return parse_as_ListFsDirResponse(value);
   }
 }
+
+export function parse_as_Literal_of__quote_hbp_quote__endof_(value: JsonValue): "hbp" | Error {
+  const tmp_0 = parse_as_str(value);
+  if (!(tmp_0 instanceof Error) && tmp_0 === "hbp") {
+    return tmp_0;
+  }
+  return Error(`Could not parse ${value} as 'hbp'`);
+}
+export function parse_as_HbpIamPublicKeyDto(value: JsonValue): HbpIamPublicKeyDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  const temp_realm = parse_as_Literal_of__quote_hbp_quote__endof_(valueObject.realm);
+  if (temp_realm instanceof Error) return temp_realm;
+  const temp_public_key = parse_as_str(valueObject.public_key);
+  if (temp_public_key instanceof Error) return temp_public_key;
+  return new HbpIamPublicKeyDto({
+    realm: temp_realm,
+    public_key: temp_public_key,
+  });
+}
+// Automatically generated via DataTransferObject for HbpIamPublicKeyDto
+// Do not edit!
+export class HbpIamPublicKeyDto {
+  public realm: "hbp";
+  public public_key: string;
+  constructor(_params: {
+    realm: "hbp";
+    public_key: string;
+  }) {
+    this.realm = _params.realm;
+    this.public_key = _params.public_key;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      realm: this.realm,
+      public_key: this.public_key,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): HbpIamPublicKeyDto | Error {
+    return parse_as_HbpIamPublicKeyDto(value);
+  }
+}
+
+export function parse_as_Literal_of__quote_RS256_quote__endof_(value: JsonValue): "RS256" | Error {
+  const tmp_0 = parse_as_str(value);
+  if (!(tmp_0 instanceof Error) && tmp_0 === "RS256") {
+    return tmp_0;
+  }
+  return Error(`Could not parse ${value} as 'RS256'`);
+}
+export function parse_as_Literal_of__quote_JWT_quote__endof_(value: JsonValue): "JWT" | Error {
+  const tmp_0 = parse_as_str(value);
+  if (!(tmp_0 instanceof Error) && tmp_0 === "JWT") {
+    return tmp_0;
+  }
+  return Error(`Could not parse ${value} as 'JWT'`);
+}
+export function parse_as_EbrainsAccessTokenHeaderDto(value: JsonValue): EbrainsAccessTokenHeaderDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  const temp_alg = parse_as_Literal_of__quote_RS256_quote__endof_(valueObject.alg);
+  if (temp_alg instanceof Error) return temp_alg;
+  const temp_typ = parse_as_Literal_of__quote_JWT_quote__endof_(valueObject.typ);
+  if (temp_typ instanceof Error) return temp_typ;
+  const temp_kid = parse_as_str(valueObject.kid);
+  if (temp_kid instanceof Error) return temp_kid;
+  return new EbrainsAccessTokenHeaderDto({
+    alg: temp_alg,
+    typ: temp_typ,
+    kid: temp_kid,
+  });
+}
+// Automatically generated via DataTransferObject for EbrainsAccessTokenHeaderDto
+// Do not edit!
+export class EbrainsAccessTokenHeaderDto {
+  public alg: "RS256";
+  public typ: "JWT";
+  public kid: string;
+  constructor(_params: {
+    alg: "RS256";
+    typ: "JWT";
+    kid: string;
+  }) {
+    this.alg = _params.alg;
+    this.typ = _params.typ;
+    this.kid = _params.kid;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      alg: this.alg,
+      typ: this.typ,
+      kid: this.kid,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): EbrainsAccessTokenHeaderDto | Error {
+    return parse_as_EbrainsAccessTokenHeaderDto(value);
+  }
+}
+
+export function parse_as_Tuple_of_str_endof_(value: JsonValue): [string] | Error {
+  const arr = ensureJsonArray(value);
+  if (arr instanceof Error) return arr;
+  const temp_0 = parse_as_str(arr[0]);
+  if (temp_0 instanceof Error) return temp_0;
+  return [temp_0];
+}
+export function parse_as_Literal_of__quote_Bearer_quote__endof_(value: JsonValue): "Bearer" | Error {
+  const tmp_0 = parse_as_str(value);
+  if (!(tmp_0 instanceof Error) && tmp_0 === "Bearer") {
+    return tmp_0;
+  }
+  return Error(`Could not parse ${value} as 'Bearer'`);
+}
+export function parse_as_EbrainsAccessTokenPayloadDto(value: JsonValue): EbrainsAccessTokenPayloadDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  const temp_exp = parse_as_int(valueObject.exp);
+  if (temp_exp instanceof Error) return temp_exp;
+  const temp_iat = parse_as_int(valueObject.iat);
+  if (temp_iat instanceof Error) return temp_iat;
+  const temp_auth_time = parse_as_int(valueObject.auth_time);
+  if (temp_auth_time instanceof Error) return temp_auth_time;
+  const temp_jti = parse_as_str(valueObject.jti);
+  if (temp_jti instanceof Error) return temp_jti;
+  const temp_iss = parse_as_str(valueObject.iss);
+  if (temp_iss instanceof Error) return temp_iss;
+  const temp_aud = parse_as_Tuple_of_str_endof_(valueObject.aud);
+  if (temp_aud instanceof Error) return temp_aud;
+  const temp_sub = parse_as_str(valueObject.sub);
+  if (temp_sub instanceof Error) return temp_sub;
+  const temp_typ = parse_as_Literal_of__quote_Bearer_quote__endof_(valueObject.typ);
+  if (temp_typ instanceof Error) return temp_typ;
+  const temp_azp = parse_as_str(valueObject.azp);
+  if (temp_azp instanceof Error) return temp_azp;
+  const temp_session_state = parse_as_str(valueObject.session_state);
+  if (temp_session_state instanceof Error) return temp_session_state;
+  const temp_acr = parse_as_str(valueObject.acr);
+  if (temp_acr instanceof Error) return temp_acr;
+  const temp_scope = parse_as_str(valueObject.scope);
+  if (temp_scope instanceof Error) return temp_scope;
+  const temp_sid = parse_as_str(valueObject.sid);
+  if (temp_sid instanceof Error) return temp_sid;
+  const temp_email_verified = parse_as_bool(valueObject.email_verified);
+  if (temp_email_verified instanceof Error) return temp_email_verified;
+  const temp_gender = parse_as_str(valueObject.gender);
+  if (temp_gender instanceof Error) return temp_gender;
+  const temp_name = parse_as_str(valueObject.name);
+  if (temp_name instanceof Error) return temp_name;
+  const temp_preferred_username = parse_as_str(valueObject.preferred_username);
+  if (temp_preferred_username instanceof Error) return temp_preferred_username;
+  const temp_given_name = parse_as_str(valueObject.given_name);
+  if (temp_given_name instanceof Error) return temp_given_name;
+  const temp_family_name = parse_as_str(valueObject.family_name);
+  if (temp_family_name instanceof Error) return temp_family_name;
+  const temp_email = parse_as_str(valueObject.email);
+  if (temp_email instanceof Error) return temp_email;
+  return new EbrainsAccessTokenPayloadDto({
+    exp: temp_exp,
+    iat: temp_iat,
+    auth_time: temp_auth_time,
+    jti: temp_jti,
+    iss: temp_iss,
+    aud: temp_aud,
+    sub: temp_sub,
+    typ: temp_typ,
+    azp: temp_azp,
+    session_state: temp_session_state,
+    acr: temp_acr,
+    scope: temp_scope,
+    sid: temp_sid,
+    email_verified: temp_email_verified,
+    gender: temp_gender,
+    name: temp_name,
+    preferred_username: temp_preferred_username,
+    given_name: temp_given_name,
+    family_name: temp_family_name,
+    email: temp_email,
+  });
+}
+// Automatically generated via DataTransferObject for EbrainsAccessTokenPayloadDto
+// Do not edit!
+export class EbrainsAccessTokenPayloadDto {
+  public exp: number;
+  public iat: number;
+  public auth_time: number;
+  public jti: string;
+  public iss: string;
+  public aud: [string];
+  public sub: string;
+  public typ: "Bearer";
+  public azp: string;
+  public session_state: string;
+  public acr: string;
+  public scope: string;
+  public sid: string;
+  public email_verified: boolean;
+  public gender: string;
+  public name: string;
+  public preferred_username: string;
+  public given_name: string;
+  public family_name: string;
+  public email: string;
+  constructor(_params: {
+    exp: number;
+    iat: number;
+    auth_time: number;
+    jti: string;
+    iss: string;
+    aud: [string];
+    sub: string;
+    typ: "Bearer";
+    azp: string;
+    session_state: string;
+    acr: string;
+    scope: string;
+    sid: string;
+    email_verified: boolean;
+    gender: string;
+    name: string;
+    preferred_username: string;
+    given_name: string;
+    family_name: string;
+    email: string;
+  }) {
+    this.exp = _params.exp;
+    this.iat = _params.iat;
+    this.auth_time = _params.auth_time;
+    this.jti = _params.jti;
+    this.iss = _params.iss;
+    this.aud = _params.aud;
+    this.sub = _params.sub;
+    this.typ = _params.typ;
+    this.azp = _params.azp;
+    this.session_state = _params.session_state;
+    this.acr = _params.acr;
+    this.scope = _params.scope;
+    this.sid = _params.sid;
+    this.email_verified = _params.email_verified;
+    this.gender = _params.gender;
+    this.name = _params.name;
+    this.preferred_username = _params.preferred_username;
+    this.given_name = _params.given_name;
+    this.family_name = _params.family_name;
+    this.email = _params.email;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      exp: this.exp,
+      iat: this.iat,
+      auth_time: this.auth_time,
+      jti: this.jti,
+      iss: this.iss,
+      aud: [this.aud[0]],
+      sub: this.sub,
+      typ: this.typ,
+      azp: this.azp,
+      session_state: this.session_state,
+      acr: this.acr,
+      scope: this.scope,
+      sid: this.sid,
+      email_verified: this.email_verified,
+      gender: this.gender,
+      name: this.name,
+      preferred_username: this.preferred_username,
+      given_name: this.given_name,
+      family_name: this.family_name,
+      email: this.email,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): EbrainsAccessTokenPayloadDto | Error {
+    return parse_as_EbrainsAccessTokenPayloadDto(value);
+  }
+}
+
+export function parse_as_EbrainsUserTokenDto(value: JsonValue): EbrainsUserTokenDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  const temp_access_token = parse_as_str(valueObject.access_token);
+  if (temp_access_token instanceof Error) return temp_access_token;
+  const temp_refresh_token = parse_as_str(valueObject.refresh_token);
+  if (temp_refresh_token instanceof Error) return temp_refresh_token;
+  return new EbrainsUserTokenDto({
+    access_token: temp_access_token,
+    refresh_token: temp_refresh_token,
+  });
+}
+// Automatically generated via DataTransferObject for EbrainsUserTokenDto
+// Do not edit!
+export class EbrainsUserTokenDto {
+  public access_token: string;
+  public refresh_token: string;
+  constructor(_params: {
+    access_token: string;
+    refresh_token: string;
+  }) {
+    this.access_token = _params.access_token;
+    this.refresh_token = _params.refresh_token;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      access_token: this.access_token,
+      refresh_token: this.refresh_token,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): EbrainsUserTokenDto | Error {
+    return parse_as_EbrainsUserTokenDto(value);
+  }
+}
