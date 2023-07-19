@@ -592,3 +592,9 @@ class EbrainsUserTokenDto(DataTransferObject):
     @classmethod
     def tag_value(cls) -> "str | None":
         return None
+
+##########################################33
+
+@dataclass
+class LoginRequiredErrorDto(DataTransferObject):
+    pass

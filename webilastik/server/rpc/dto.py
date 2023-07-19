@@ -4662,3 +4662,35 @@ class EbrainsUserTokenDto(DataTransferObject):
         cls, value: JsonValue
     ) -> "EbrainsUserTokenDto | MessageParsingError":
         return parse_as_EbrainsUserTokenDto(value)
+
+
+def parse_as_LoginRequiredErrorDto(
+    value: JsonValue,
+) -> "LoginRequiredErrorDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as LoginRequiredErrorDto"
+        )
+    if value.get("__class__") != "LoginRequiredErrorDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as LoginRequiredErrorDto"
+        )
+    return LoginRequiredErrorDto()
+
+
+@dataclass
+class LoginRequiredErrorDto(DataTransferObject):
+    pass
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "LoginRequiredErrorDto",
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "LoginRequiredErrorDto | MessageParsingError":
+        return parse_as_LoginRequiredErrorDto(value)

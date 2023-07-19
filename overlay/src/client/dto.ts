@@ -4478,3 +4478,28 @@ export class EbrainsUserTokenDto {
     return parse_as_EbrainsUserTokenDto(value);
   }
 }
+
+export function parse_as_LoginRequiredErrorDto(value: JsonValue): LoginRequiredErrorDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "LoginRequiredErrorDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a LoginRequiredErrorDto`);
+  }
+  return new LoginRequiredErrorDto({});
+}
+// Automatically generated via DataTransferObject for LoginRequiredErrorDto
+// Do not edit!
+export class LoginRequiredErrorDto {
+  constructor(_params: {}) {
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "LoginRequiredErrorDto",
+    };
+  }
+  public static fromJsonValue(value: JsonValue): LoginRequiredErrorDto | Error {
+    return parse_as_LoginRequiredErrorDto(value);
+  }
+}
