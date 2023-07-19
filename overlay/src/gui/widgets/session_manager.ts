@@ -175,8 +175,8 @@ export class SessionManagerWidget{
             let startupConfigs = StartupConfigs.tryFromWindowLocation()
             if(startupConfigs instanceof Error){
                 new ErrorPopupWidget({message: `Could not get startup configs from current URL: ${startupConfigs.message}. Using defaults...`})
+                startupConfigs = StartupConfigs.getDefault()
             }
-            startupConfigs = StartupConfigs.getDefault()
 
             let projectLocation: {fs: Filesystem, path: Path} | undefined = undefined;
             if(startupConfigs.project_file_url){
