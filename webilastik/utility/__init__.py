@@ -5,10 +5,17 @@ from typing import Callable, Generic, Iterable, NewType, TypeVar
 import threading
 import os
 import sys
+import uuid
 from typing_extensions import Protocol, Self
 
 from ndstructs.utils.json_serializable import JsonObject, JsonValue
 import datetime
+
+def parse_uuid(raw: str) -> "uuid.UUID | Exception":
+    try:
+        return uuid.UUID(raw)
+    except Exception as e:
+        return e
 
 def get_now_string() -> str:
     now = datetime.datetime.now()

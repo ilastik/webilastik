@@ -1,7 +1,7 @@
-import os
 from pathlib import PurePosixPath
-from typing import ClassVar, Dict, Final, Literal, Optional, Mapping
+from typing import ClassVar, Dict, Final, Literal
 from typing_extensions import assert_never
+import uuid
 import requests
 from datetime import datetime, timezone, timedelta
 
@@ -9,20 +9,18 @@ import aiohttp
 import jwt
 from cryptography.hazmat.backends.openssl.backend import backend as ossl
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
-from cryptography.hazmat.primitives.asymmetric import padding
 
 
 from aiohttp.client import ClientSession
-from aiohttp.client_exceptions import ClientResponseError
-from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString, ensureOptional
+from ndstructs.utils.json_serializable import JsonValue
 
 from webilastik.server.rpc.dto import EbrainsAccessTokenHeaderDto, EbrainsAccessTokenPayloadDto, EbrainsUserTokenDto, HbpIamPublicKeyDto
 from webilastik.libebrains.oidc_client import OidcClient
 from webilastik.libebrains.user_info import UserInfo
 from webilastik.serialization.json_serialization import parse_json
 from webilastik.server.util import urlsafe_b64decode
-from webilastik.ui.usage_error import UsageError
 from webilastik.utility.url import Url
+from webilastik.utility import parse_uuid
 
 class HbpIamPublicKey:
     _instance: ClassVar["HbpIamPublicKey | None"] = None
@@ -153,10 +151,14 @@ class AccessTokenPayload:
     class _PrivateMarker:
         pass
 
-    def __init__(self, _marker: _PrivateMarker, raw: str, exp: datetime) -> None:
+    def __init__(self, _marker: _PrivateMarker, raw: str, exp: datetime, auth_time: datetime, sub: uuid.UUID) -> None:
         super().__init__()
         self.raw: Final[str] = raw
         self.exp = exp
+        self.auth_time = auth_time
+        self.sub = sub
+        # my_timezone = datetime.now(timezone.utc).astimezone().tzinfo
+        # print(f"%%%%%%% AccessToken auth time is {self.auth_time.astimezone(my_timezone)}")
 
     @classmethod
     def from_raw(cls, raw: str) -> "AccessTokenPayload | Exception":
@@ -169,10 +171,16 @@ class AccessTokenPayload:
         payload_dto = EbrainsAccessTokenPayloadDto.from_json_value(payload_json)
         if isinstance(payload_dto, Exception):
             return Exception(f"Could not deserialize token payload from json value")
+        sub_result = parse_uuid(payload_dto.sub)
+        if isinstance(sub_result, Exception):
+            return sub_result
+
         return AccessTokenPayload(
             _marker=cls._PrivateMarker(),
             raw=raw,
-            exp = datetime.fromtimestamp(payload_dto.exp, timezone.utc)
+            exp=datetime.fromtimestamp(payload_dto.exp, timezone.utc),
+            auth_time=datetime.fromtimestamp(payload_dto.auth_time, timezone.utc),
+            sub=sub_result,
         )
 
     @property
@@ -192,19 +200,36 @@ class AccessToken:
         self.payload = payload
         self.raw_token: Final[str] = header.raw + "." + payload.raw + "." + raw_signature
 
-    def is_valid(self, checking_key: HbpIamPublicKey) -> bool:
+
+    def get_status_sync(self) -> "Literal['expired', 'invalid', 'valid'] | Exception":
+        return self._do_get_status(checking_key=HbpIamPublicKey.get_sync())
+
+    async def get_status_async(self) -> "Literal['expired', 'invalid', 'valid'] | Exception":
+        return self._do_get_status(checking_key=await HbpIamPublicKey.get_async())
+
+    def _do_get_status(self, checking_key: "HbpIamPublicKey | Exception") -> "Literal['expired', 'invalid', 'valid'] | Exception":
+        if isinstance(checking_key, Exception):
+            return checking_key
         if self.payload.expired:
-            return False
-        return checking_key.check(raw_token=self.raw_token)
+            return "expired"
+        if checking_key.check(raw_token=self.raw_token):
+            return "valid"
+        return "invalid"
+
 
     @classmethod
-    def create(cls, header: AccessTokenHeader, payload: AccessTokenPayload, raw_signature: str) -> "AccessToken | Exception":
-        if header.alg == "RS256":
-            return AccessToken(_marker=cls._PrivateMarker(), header=header, payload=payload, raw_signature=raw_signature)
-        assert_never(header.alg)
+    async def from_raw_token_async(cls, raw_token: str) -> "AccessToken | None | Exception":
+        return cls._do_from_raw_token(raw_token=raw_token, checking_key=await HbpIamPublicKey.get_async())
 
     @classmethod
-    def from_raw_token(cls, raw_token: str, checking_key: HbpIamPublicKey) -> "AccessToken | Exception":
+    def from_raw_token_sync(cls, raw_token: str) -> "AccessToken | None | Exception":
+        return cls._do_from_raw_token(raw_token=raw_token, checking_key=HbpIamPublicKey.get_sync())
+
+    @classmethod
+    def _do_from_raw_token(cls, raw_token: str, checking_key: "HbpIamPublicKey | Exception") -> "AccessToken | None | Exception":
+        if isinstance(checking_key, Exception):
+            return checking_key
+
         parts = raw_token.split(".")
         if len(parts) != 3:
             return Exception(f"Bad user token. Should have 3 parts, found {len(parts)}")
@@ -221,10 +246,16 @@ class AccessToken:
         access_token = AccessToken(
             _marker=cls._PrivateMarker(), header=header_result, payload=payload_result, raw_signature=serialized_signature
         )
-        if not access_token.is_valid(checking_key=checking_key):
+        status =  access_token._do_get_status(checking_key=checking_key)
+        if isinstance(status, Exception):
+            return status
+        if status == "valid":
+            return access_token
+        if status == "expired":
+            return None
+        if status == "invalid":
             return Exception("Token is not valid!")
-
-        return access_token
+        assert_never(status)
 
 
 class UserToken:
@@ -232,7 +263,7 @@ class UserToken:
         self,
         *,
         access_token: AccessToken,
-        refresh_token: str,
+        refresh_token: "str | None",
     ):
         api_url = Url.parse("https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect")
         assert api_url is not None
@@ -241,8 +272,12 @@ class UserToken:
         self.refresh_token = refresh_token
         super().__init__()
 
+    @property
+    def user_id(self) -> uuid.UUID:
+        return self.access_token.payload.sub
+
     @classmethod
-    async def async_from_code(
+    async def from_code_async(
         cls, *, code: str, redirect_uri: Url, http_client_session: ClientSession, oidc_client: OidcClient
     ) -> "UserToken | Exception":
         data = {
@@ -258,7 +293,8 @@ class UserToken:
             allow_redirects=False,
             data=data
         )
-        resp.raise_for_status()
+        if not resp.ok:
+            return Exception("Could not fetch token from code")
 
         try:
             data = await resp.json()
@@ -269,9 +305,50 @@ class UserToken:
         if isinstance(checking_key_result, Exception):
             return checking_key_result
 
-        return UserToken.from_json_value(data, checking_key=checking_key_result)
+        return cls._from_json_value(data, checking_key=await HbpIamPublicKey.get_async())
+
 
     async def async_refreshed(self, *, http_client_session: ClientSession, oidc_client: OidcClient) -> "UserToken | Exception":
+        if self.refresh_token is None:
+            return Exception("No user token available")
+        return await self.try_from_refresh_token_async(
+            http_client_session=http_client_session, oidc_client=oidc_client, refresh_token=self.refresh_token
+        )
+
+    def refreshed(self, *, oidc_client: OidcClient) -> "UserToken | Exception":
+        if self.refresh_token is None:
+            return Exception("No user token available")
+        return self.try_from_refresh_token_sync(oidc_client=oidc_client, refresh_token=self.refresh_token)
+
+    @classmethod
+    def try_from_refresh_token_sync(cls, *, oidc_client: OidcClient, refresh_token: str) -> "UserToken | Exception":
+        checking_key_result = HbpIamPublicKey.get_sync()
+        if isinstance(checking_key_result, Exception):
+            return checking_key_result
+
+        resp = requests.post(
+            "https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect/token",
+            allow_redirects=False,
+            data={
+                "client_id": oidc_client.client_id,
+                "client_secret": oidc_client.client_secret,
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+            }
+        )
+        if not resp.ok:
+            return Exception(f"Could not refresh user token via refresh_token: {resp.text}")
+
+        try:
+            data = resp.json()
+        except Exception:
+            return Exception("Could not parse user token as json")
+        return cls._from_json_value(data, checking_key=HbpIamPublicKey.get_sync())
+
+    @classmethod
+    async def try_from_refresh_token_async(
+        cls, *, http_client_session: ClientSession, oidc_client: OidcClient, refresh_token: str
+    ) -> "UserToken | Exception":
         checking_key_result = await HbpIamPublicKey.get_async()
         if isinstance(checking_key_result, Exception):
             return checking_key_result
@@ -284,7 +361,7 @@ class UserToken:
                 "client_id": oidc_client.client_id,
                 "client_secret": oidc_client.client_secret,
                 "grant_type": "refresh_token",
-                "refresh_token": self.refresh_token,
+                "refresh_token": refresh_token,
             }
         )
         if not resp.ok:
@@ -294,46 +371,18 @@ class UserToken:
             data = await resp.json()
         except Exception:
             return Exception("Could not parse user token as josn")
-        return UserToken.from_json_value(data, checking_key=checking_key_result)
-
-    def refreshed(self, *, oidc_client: OidcClient) -> "UserToken | Exception":
-        checking_key_result = HbpIamPublicKey.get_sync()
-        if isinstance(checking_key_result, Exception):
-            return checking_key_result
-
-        resp = requests.post(
-            "https://iam.ebrains.eu/auth/realms/hbp/protocol/openid-connect/token",
-            allow_redirects=False,
-            data={
-                "client_id": oidc_client.client_id,
-                "client_secret": oidc_client.client_secret,
-                "grant_type": "refresh_token",
-                "refresh_token": self.refresh_token,
-            }
-        )
-        if not resp.ok:
-            return Exception(f"Could not refresh user token via refresh_token: {resp.text}")
-
-        try:
-            data = resp.json()
-        except Exception:
-            return Exception("Could not parse user token as json")
-        return UserToken.from_json_value(data, checking_key=checking_key_result)
+        return cls._from_json_value(data, checking_key=await HbpIamPublicKey.get_async())
 
     @classmethod
-    def from_dto(cls, dto: EbrainsUserTokenDto, checking_key: HbpIamPublicKey) -> "UserToken | Exception":
-        acces_token_result = AccessToken.from_raw_token(dto.access_token, checking_key=checking_key)
-        if isinstance(acces_token_result, Exception):
-            return acces_token_result
-        refresh_token = dto.refresh_token
-        return UserToken(access_token=acces_token_result, refresh_token=refresh_token)
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue, checking_key: HbpIamPublicKey) -> "UserToken | Exception":
+    def _from_json_value(cls, value: JsonValue, *, checking_key: "HbpIamPublicKey | Exception") -> "UserToken | Exception":
+        if isinstance(checking_key, Exception):
+            return checking_key
         dto_result = EbrainsUserTokenDto.from_json_value(value)
         if isinstance(dto_result, Exception):
-            return dto_result
-        access_token_result = AccessToken.from_raw_token(raw_token=dto_result.access_token, checking_key=checking_key)
+            return Exception("Could not parse refresh token payload")
+        access_token_result = AccessToken._do_from_raw_token(raw_token=dto_result.access_token, checking_key=checking_key)
+        if access_token_result is None:
+            return Exception("Refreshing token produced expired token")
         if isinstance(access_token_result, Exception):
             return access_token_result
         return UserToken(
@@ -341,44 +390,25 @@ class UserToken:
             refresh_token=dto_result.refresh_token,
         )
 
-    # def to_json_value(self) -> JsonObject:
-    #     return {
-    #         "access_token": self.access_token,
-    #         "refresh_token": self.refresh_token,
-    #     }
-
     def as_auth_header(self) -> Dict[str, str]:
-        return {"Authorization": f"Bearer {self.access_token}"}
+        return {"Authorization": f"Bearer {self.access_token.raw_token}"}
 
-    async def _get(
-        self,
-        path: PurePosixPath,
-        *,
-        params: Optional[Mapping[str, str]] = None,
-        headers: Optional[Mapping[str, str]] = None,
-        http_client_session: ClientSession,
-    ) -> JsonValue:
-        url = self._api_url.concatpath(path).updated_with(search={})
+    async def get_userinfo(self, http_client_session: ClientSession) -> "UserInfo | Exception":
+        url = self._api_url.concatpath(PurePosixPath("userinfo")).updated_with(search={})
         resp = await http_client_session.request(
             method="GET",
             url=url.raw,
-            params={**url.search, **(params or {})},
-            headers={
-                **(headers or {}),
-                **self.as_auth_header(),
-            },
+            headers=self.as_auth_header(),
             raise_for_status=True,
         )
-        resp.raise_for_status
-        return await resp.json()
+        if not resp.ok:
+            return Exception("Could not retrieve user info")
 
-    async def is_valid(self, http_client_session: ClientSession, checking_key: HbpIamPublicKey) -> bool:
-        return self.access_token.is_valid(checking_key=checking_key)
-
-    async def get_userinfo(self, http_client_session: ClientSession) -> "UserInfo | Exception":
         try:
-            return UserInfo.from_json_value(await self._get(
-                path=PurePosixPath("userinfo"), http_client_session=http_client_session
-            ))
-        except Exception as e:
-            return e
+            data = await resp.json()
+        except Exception:
+            return Exception("Could not parse userinfo response as json")
+        return UserInfo.from_json_value(data)
+
+    async def get_status_async(self) -> "Literal['expired', 'invalid', 'valid'] | Exception":
+        return await self.access_token.get_status_async()
