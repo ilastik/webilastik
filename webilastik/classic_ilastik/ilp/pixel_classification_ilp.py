@@ -368,7 +368,7 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
 
     @classmethod
     def from_file(cls, *, ilp_fs: OsFs, path: PurePosixPath) -> "IlpPixelClassificationWorkflowGroup | Exception":
-        native_path = Path(ilp_fs.geturl(path).path)
+        native_path = Path(ilp_fs.resolve_path(path))
         try:
             with h5py.File(native_path, "r") as f:
                 return IlpPixelClassificationWorkflowGroup.parse(group=f, ilp_fs=ilp_fs)
@@ -385,9 +385,15 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
         if workflowname != "Pixel Classification":
             raise IlpParsingError(f"Unexpected workflow name: {workflowname}")
 
+        fs_base_path = ilp_fs.geturl(PurePosixPath("dummy")).path.parent
+        ilp_path = PurePosixPath(group.file.filename)
+        if not ilp_path.is_relative_to(fs_base_path):
+            return Exception("Could not retrieve ilp file path. This is a bug")
+        ilp_path = ilp_path.relative_to(fs_base_path)
+
         Input_Data = IlpInputDataGroup.parse(ensure_group(group, "Input Data"))
         raw_data_datasources_result = Input_Data.try_to_datasources(
-            role_name="Raw Data", ilp_fs=ilp_fs, ilp_path=PurePosixPath(group.file.filename)
+            role_name="Raw Data", ilp_fs=ilp_fs, ilp_path=ilp_path
         )
         if isinstance(raw_data_datasources_result, Exception):
             return raw_data_datasources_result
