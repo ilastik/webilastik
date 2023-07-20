@@ -8,6 +8,7 @@ from typing import List
 import numpy as np
 
 from tests import create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations, get_sample_dzip_c_cells_datasource
+from webilastik.classic_ilastik.ilp.pixel_classification_ilp import IlpPixelClassificationWorkflowGroup
 from webilastik.filesystem.zip_fs import ZipFs
 from webilastik.datasource import DataRoi
 from webilastik.datasource.deep_zoom_datasource import DziLevelDataSource
@@ -99,9 +100,10 @@ def test_pixel_classification_workflow():
     _ = workflow.save_project(fs=fs, path=ilp_path)
 
     # import pydevd; pydevd.settrace()
+    workflow_ilp_group = IlpPixelClassificationWorkflowGroup.from_file(ilp_fs=fs, path=ilp_path)
+    assert not isinstance(workflow_ilp_group, Exception), str(workflow_ilp_group)
     loaded_workflow = PixelClassificationWorkflow.from_ilp(
-        fs=fs,
-        path=ilp_path,
+        workflow_group=workflow_ilp_group,
         on_async_change=lambda : print(json.dumps(workflow.export_applet._get_json_state(), indent=4)), # pyright: ignore [reportPrivateUsage]
         executor=executor,
         priority_executor=priority_executor,
