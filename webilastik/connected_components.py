@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Optional, Set, Any
 
-from skimage import measure as skmeasure #type: ignore
+from skimage import measure as skmeasure
 from ndstructs.point5D import Interval5D, Shape5D, Point5D
 from ndstructs.array5D import ARR, Array5D, ScalarData
 from webilastik.datasource import DataRoi
@@ -68,7 +68,9 @@ class ConnectedComponents(ScalarData):
         assert data.shape.t == 1  # FIXME: iterate over time frames?
 
         raw_axes = "xyz"
-        labeled_raw, num_labels = skmeasure.label(data.raw(raw_axes), background=background, return_num=True)
+        labeling_result = skmeasure.label(data.raw(raw_axes), background=background, return_num=True)
+        assert isinstance(labeling_result, tuple)
+        labeled_raw, num_labels = labeling_result
         all_labels = set(range(1, num_labels + 1))
         return ConnectedComponents(labeled_raw, axiskeys=raw_axes, location=data.location, labels=all_labels)
 
