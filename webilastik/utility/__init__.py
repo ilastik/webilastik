@@ -25,13 +25,13 @@ T = TypeVar("T")
 
 A = TypeVar("A", covariant=True)
 
-class _Empty:
+class Empty:
     pass
 
 class PeekableIterator(Generic[A]):
     def __init__(self, args: Iterable[A]) -> None:
         self.args = iter(args)
-        self.next_arg: "A | _Empty" = _Empty()
+        self.next_arg: "A | Empty" = Empty()
         try:
             self.next_arg = next(self.args)
         except StopIteration:
@@ -39,16 +39,16 @@ class PeekableIterator(Generic[A]):
         super().__init__()
 
     def has_next(self) -> bool:
-        return not isinstance(self.next_arg, _Empty)
+        return not isinstance(self.next_arg, Empty)
 
-    def get_next(self) -> "A":
-        if isinstance(self.next_arg, _Empty):
-            raise ValueError(f"Iterator is empty")
+    def get_next(self) -> "A | Empty":
+        if isinstance(self.next_arg, Empty):
+            return Empty()
         out = self.next_arg
         try:
             self.next_arg = next(self.args)
         except StopIteration:
-            self.next_arg = _Empty()
+            self.next_arg = Empty()
         return out
 
 class DebugLock:

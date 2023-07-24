@@ -317,13 +317,30 @@ class BrushingAppletStateDto(DataTransferObject):
 ##################################################3
 
 @dataclass
+class JobFinishedDto(DataTransferObject):
+    pass
+
+@dataclass
+class JobIsPendingDto(DataTransferObject):
+    pass
+
+@dataclass
+class JobIsRunningDto(DataTransferObject):
+    num_completed_steps: int
+    num_dispatched_steps: int
+
+@dataclass
+class JobCanceledDto(DataTransferObject):
+    message: str
+
+JobStatusDto = Union[JobFinishedDto, JobIsPendingDto, JobIsRunningDto, JobCanceledDto]
+
+@dataclass
 class JobDto(DataTransferObject):
     name: str
     num_args: Optional[int]
     uuid: str
-    status: Literal["pending", "running", "cancelled", "completed"]
-    num_completed_steps: int
-    error_message: Optional[str]
+    status: JobStatusDto
 
 @dataclass
 class ExportJobDto(JobDto):

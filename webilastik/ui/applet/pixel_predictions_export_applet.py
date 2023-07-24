@@ -1,9 +1,10 @@
 # pyright: strict
 
+from concurrent.futures import Future
 from functools import partial
 from pathlib import PurePosixPath
 import threading
-from typing import Any, Callable, Dict, Sequence, TypeVar, Union
+from typing import Any, Callable, Dict, Literal, Sequence, TypeVar, Union
 import uuid
 
 import numpy as np
@@ -13,13 +14,15 @@ from ndstructs.utils.json_serializable import JsonObject
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.datasink import DataSink, IDataSinkWriter
 from webilastik.datasink.deep_zoom_sink import DziLevelSink
+from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
 from webilastik.datasource import DataRoi, DataSource, FsDataSource
 from webilastik.datasource.deep_zoom_image import DziImageElement, DziSizeElement, ImageFormat
+from webilastik.datasource.precomputed_chunks_info import RawEncoder
 from webilastik.features.ilp_filter import IlpFilter
-from webilastik.filesystem import IFilesystem
+from webilastik.filesystem import FsIoException, IFilesystem
 from webilastik.filesystem.os_fs import OsFs
 from webilastik.operator import OpRetriever, Operator
-from webilastik.scheduling.job import JobStatus, PriorityExecutor
+from webilastik.scheduling.job import Job, JobCanceled, JobFinished, JobStatus, PriorityExecutor, SimpleJob
 from webilastik.serialization.json_serialization import JsonValue
 from webilastik.server.rpc.dto import (
     MessageParsingError,
@@ -29,14 +32,14 @@ from webilastik.server.rpc.dto import (
 )
 from webilastik.simple_segmenter import SimpleSegmenter, SimpleSegmenterDataSource
 from webilastik.ui.applet import AppletOutput, StatelesApplet, UserPrompt
-from webilastik.ui.applet.export_jobs import CreateDziPyramid, DownscaleDatasource, ExportJob, OpenDatasinkJob, ZipDirectory
+from webilastik.ui.applet.export_jobs import CreateDziPyramid, DownscaleDatasource, ExportJob, ZipDirectory
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.usage_error import UsageError
 from webilastik.ui.applet.brushing_applet import Label
 
 JOB_OUT = TypeVar("JOB_OUT")
 
-ExportJobUnion = Union[ExportJob, OpenDatasinkJob, CreateDziPyramid, DownscaleDatasource, ZipDirectory]
+ExportJobUnion = Union[ExportJob, CreateDziPyramid, DownscaleDatasource, ZipDirectory]
 
 class PixelClassificationExportApplet(StatelesApplet):
     def __init__(
@@ -64,47 +67,87 @@ class PixelClassificationExportApplet(StatelesApplet):
         with self._lock:
             del self._jobs[job_id]
 
-    def _launch_job(self, job: ExportJobUnion):
+    def _launch_job(self, job: Job[JOB_OUT], on_success: Callable[[JOB_OUT], None] = lambda _: None) -> Job[JOB_OUT]:
+        def on_complete(status: "JobCanceled | JobFinished[JOB_OUT | Exception]"):
+            if isinstance(status, JobCanceled) or isinstance(status.result, Exception):
+                return
+            self._remove_job(job.uuid)
+            on_success(status.result)
+        job.add_done_callback(on_complete)
+
         self.priority_executor.submit_job(job)
         with self._lock:
             self._jobs[job.uuid] = job
         self.on_async_change()
+        return job
 
-    def _launch_open_datasink_job(self, *, datasink: DataSink, on_complete: Callable[["IDataSinkWriter | Exception"], None]):
-        def clean_datasink_job_then_run_on_complete(job_id: uuid.UUID, job_status: JobStatus, step_index: int, step_result: "IDataSinkWriter | Exception"):
-            if not isinstance(step_result, Exception):
-                self._remove_job(job_id)
-            on_complete(step_result)
+    def _launch_open_datasink_job(self, *, datasink: DataSink, on_succcess: Callable[["IDataSinkWriter"], None]):
+        open_datasink_job = SimpleJob(name="Opening data sink", target=datasink.open)
 
-        self._launch_job(OpenDatasinkJob(
-            datasink=datasink,
-            on_complete=clean_datasink_job_then_run_on_complete,
-        ))
+        def on_complete(status: "JobCanceled | JobFinished[IDataSinkWriter | Exception]"):
+            if isinstance(status, JobCanceled) or isinstance(status.result, Exception):
+                return
+            self._remove_job(open_datasink_job.uuid)
+            on_succcess(status.result)
+
+        open_datasink_job.add_done_callback(on_complete)
+        return self._launch_job(open_datasink_job)
 
     def _launch_export_job(
-        self, *, job_name: str, operator: Operator[DataRoi, Array5D], datasource: DataSource, datasink: DataSink
+        self,
+        *,
+        job_name: str,
+        operator: Operator[DataRoi, Array5D],
+        datasource: DataSource,
+        datasink: DataSink,
+        on_success: Callable[[DataSink], None] = lambda _: None
     ):
-
-        def on_datasink_ready(result: "Exception | IDataSinkWriter"):
-            if isinstance(result, BaseException):
-                raise result #FIXME?
-
-            def on_progress(job_id: uuid.UUID, job_status: JobStatus, step_index: int, step_result: "None | Exception"):
-                self.on_async_change()
-
-            self._launch_job(ExportJob(
+        def on_open_datasink_done(sink_writer: IDataSinkWriter):
+            export_job = ExportJob(
                 name=job_name,
-                on_progress=on_progress,
+                on_progress=lambda job_id, step_index: self.on_async_change(),
                 operator=operator,
-                sink_writer=result,
-                args=datasource.roi.split(block_shape=result.data_sink.tile_shape.updated(c=datasource.shape.c)),
-                num_args=datasource.roi.get_num_tiles(tile_shape=result.data_sink.tile_shape),
-            ))
+                sink_writer=sink_writer,
+                args=datasource.roi.split(block_shape=sink_writer.data_sink.tile_shape.updated(c=datasource.shape.c)),
+                num_args=datasource.roi.get_num_tiles(tile_shape=sink_writer.data_sink.tile_shape),
+            )
 
-        _ = self._launch_open_datasink_job(
-            datasink=datasink,
-            on_complete=on_datasink_ready,
+            def on_complete(status: "JobCanceled | JobFinished[None | Exception]"):
+                if isinstance(status, JobCanceled) or isinstance(status.result, Exception):
+                    return
+                self._remove_job(export_job.uuid)
+                on_success(datasink)
+
+            export_job.add_done_callback(on_complete)
+            _ = self._launch_job(export_job)
+
+        return self._launch_open_datasink_job(datasink=datasink, on_succcess=on_open_datasink_done)
+
+    def _launch_create_dzi_pyramid_job(
+        self,
+        *,
+        filesystem: IFilesystem,
+        xml_path: PurePosixPath,
+        dzi_image: DziImageElement,
+        num_channels: Literal[1, 3],
+        on_succcess: Callable[[Sequence[DziLevelSink]], None] = lambda _: None,
+    ):
+        create_dzi_pyramid_job = CreateDziPyramid(
+            name="Creating dzi levels",
+            filesystem=filesystem,
+            dzi_image=dzi_image,
+            num_channels=num_channels,
+            xml_path=xml_path,
         )
+        def on_complete(status: "JobCanceled | JobFinished[Sequence[DziLevelSink] | Exception]"):
+            if isinstance(status, JobCanceled) or isinstance(status.result, Exception):
+                return
+            self._remove_job(create_dzi_pyramid_job.uuid)
+            on_succcess(status.result)
+
+        create_dzi_pyramid_job.add_done_callback(on_complete)
+
+        return self._launch_job(create_dzi_pyramid_job)
 
     def _launch_convert_to_dzip_job(
         self,
@@ -117,7 +160,7 @@ class PixelClassificationExportApplet(StatelesApplet):
         tmp_fs = OsFs.create_scratch_dir()
         if isinstance(tmp_fs, Exception):
             return UsageError(str(tmp_fs)) #FIXME: double check this exception
-        tmp_xml_path = PurePosixPath("/tmp.dzi") #FIXME: the name might make a difference
+        tmp_xml_path = PurePosixPath(output_path.name) #FIXME: the name might make a difference
 
         dzi_image = DziImageElement(
             Format=dzi_image_format,
@@ -174,7 +217,7 @@ class PixelClassificationExportApplet(StatelesApplet):
                 step_result=None,
             )
 
-        self._launch_job(CreateDziPyramid(
+        create_dzi_pyramid_job = CreateDziPyramid(
             name="Creating dzi levels",
             filesystem=tmp_fs,
             dzi_image=DziImageElement(
@@ -188,8 +231,9 @@ class PixelClassificationExportApplet(StatelesApplet):
             ),
             num_channels=3,
             xml_path=tmp_xml_path,
-            on_complete=on_pyramid_ready__launch_first_export,
-        ))
+            # on_complete=on_pyramid_ready__launch_first_export,
+        )
+        self._launch_job()
 
     def launch_pixel_probabilities_export_job(self, *, datasource: DataSource, datasink: DataSink) -> "UsageError | None":
         classifier = self._in_operator()
@@ -221,7 +265,14 @@ class PixelClassificationExportApplet(StatelesApplet):
             ),
         )
 
-    def launch_simple_segmentation_export_job(self, *, datasource: DataSource, datasink: DataSink, label_name: str) -> "UsageError | None":
+    def launch_simple_segmentation_export_job(
+        self,
+        *,
+        datasource: DataSource,
+        datasink: DataSink,
+        label_name: str,
+        on_complete: Callable[[uuid.UUID], None] = lambda _: None
+    ) -> "UsageError | None":
         simple_segmentation_datasource = self.create_simple_segmenter_datasource(datasource=datasource, label_name=label_name)
         if isinstance(simple_segmentation_datasource, UsageError):
             return simple_segmentation_datasource
@@ -246,6 +297,7 @@ class PixelClassificationExportApplet(StatelesApplet):
             operator=OpRetriever(),
             datasource=simple_segmentation_datasource,
             datasink=datasink,
+            on_complete=on_complete,
         )
 
     def launch_convert_to_dzip_job(
