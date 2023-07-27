@@ -54,7 +54,11 @@ export class Path{
     }
 
     public get stem(): string{
-        return this.name.split(".")[0]
+        let parts = this.name.split(".")
+        if(parts.length > 1){
+            parts.pop()
+        }
+        return parts.join(".")
     }
 
     public get suffix(): string{
