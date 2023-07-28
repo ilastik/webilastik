@@ -1,3 +1,5 @@
+# pyright: strict
+
 from pathlib import PurePosixPath
 from typing import ClassVar, Dict, Final, Literal
 from typing_extensions import assert_never
@@ -380,7 +382,7 @@ class UserToken:
         dto_result = EbrainsUserTokenDto.from_json_value(value)
         if isinstance(dto_result, Exception):
             return Exception("Could not parse refresh token payload")
-        access_token_result = AccessToken._do_from_raw_token(raw_token=dto_result.access_token, checking_key=checking_key)
+        access_token_result = AccessToken._do_from_raw_token(raw_token=dto_result.access_token, checking_key=checking_key) # pyright: ignore [reportPrivateUsage]
         if access_token_result is None:
             return Exception("Refreshing token produced expired token")
         if isinstance(access_token_result, Exception):

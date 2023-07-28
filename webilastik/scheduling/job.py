@@ -13,21 +13,25 @@ from concurrent.futures import Executor, Future
 import functools
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from webilastik.server.rpc.dto import JobCanceledDto, JobFinishedDto, JobIsPendingDto, JobIsRunningDto
+from webilastik.server.rpc.dto import JobCanceledDto, JobDto, JobFinishedDto, JobIsPendingDto, JobIsRunningDto
 
 from webilastik.utility import Empty, PeekableIterator
 
 _IN = TypeVar("_IN", covariant=True)
-_OUT = TypeVar("_OUT")
+_OK = TypeVar("_OK")
+_ERR = TypeVar("_ERR", bound=Exception)
 _P = ParamSpec("_P")
 
 
 @dataclass
-class JobFinished(Generic[_OUT]):
-    result: _OUT
+class JobFinished(Generic[_OK, _ERR]):
+    result: "_OK | _ERR"
 
     def to_dto(self) -> JobFinishedDto:
-        return JobFinishedDto()
+        # FIXME: is it fair to check here if result is an Exception? should this be generic over _ERR?
+        return JobFinishedDto(
+            error_message=str(self.result) if isinstance(self.result, Exception) else None
+        )
 
 @dataclass
 class JobIsPending:
@@ -49,7 +53,7 @@ class JobCanceled:
     def to_dto(self) -> JobCanceledDto:
         return JobCanceledDto(message=self.message)
 
-JobStatus: TypeAlias = Union[JobFinished[_OUT], JobIsPending, JobIsRunning, JobCanceled]
+JobStatus: TypeAlias = Union[JobFinished[_OK, _ERR], JobIsPending, JobIsRunning, JobCanceled]
 
 class JobProgressCallback(Protocol):
     def __call__(self, *, job_id: uuid.UUID, step_index: int) -> Any:
@@ -60,15 +64,24 @@ class JobFinishedCallback(Protocol[JOB_OUT]):
     def __call__(self, *, job_id: uuid.UUID, output: JOB_OUT) -> Any:
         ...
 
-class Job(Generic[_OUT], ABC):
-    def __init__(self, name: str) -> None:
+class Job(Generic[_OK, _ERR], ABC):
+    def __init__(self, name: str, num_args: "int | None") -> None:
         super().__init__()
         self.name = name
+        self.num_args = num_args
         self.creation_time = datetime.now(timezone.utc)
         self.job_lock = threading.Lock()
         self.uuid: uuid.UUID = uuid.uuid4()
-        self._status: JobStatus[_OUT] = JobIsPending()
-        self.on_complete_callbacks: List[Callable[["JobCanceled | JobFinished[_OUT]"], None]] = []
+        self._status: JobStatus[_OK, _ERR] = JobIsPending()
+        self.on_complete_callbacks: List[Callable[["JobCanceled | JobFinished[_OK, _ERR]"], None]] = []
+
+    def to_dto(self) -> JobDto:
+        return JobDto(
+            name=self.name,
+            num_args=self.num_args,
+            uuid=str(self.uuid),
+            status=self._status.to_dto(),
+        )
 
     def __lt__(self, other: object) -> bool:
         if isinstance(other, (_Shutdown, _Task)):
@@ -77,14 +90,14 @@ class Job(Generic[_OUT], ABC):
         return self.creation_time < other.creation_time
 
     @abstractmethod
-    def _launch_next_task(self, executor: Executor) -> "Future[_OUT] | None":
+    def _launch_next_task(self, executor: Executor) -> "None | Future[_OK | _ERR]":
         pass
 
     def _done(self) -> bool:
         return isinstance(self._status, (JobCanceled, JobFinished))
 
-    def add_done_callback(self, callback: Callable[["JobCanceled | JobFinished[_OUT]"], None]):
-        run_immediately_arg: "None | JobCanceled | JobFinished[_OUT]"
+    def add_done_callback(self, callback: Callable[["JobCanceled | JobFinished[_OK, _ERR]"], None]):
+        run_immediately_arg: "None | JobCanceled | JobFinished[_OK, _ERR]"
         with self.job_lock:
             if isinstance(self._status, (JobCanceled, Job)):
                 run_immediately_arg = self._status
@@ -95,7 +108,7 @@ class Job(Generic[_OUT], ABC):
             callback(run_immediately_arg)
 
     def cancel(self) -> bool:
-        callbacks_to_call: List[Callable[["JobCanceled | JobFinished[_OUT]"], None]]
+        callbacks_to_call: List[Callable[["JobCanceled | JobFinished[_OK, _ERR]"], None]]
         with self.job_lock:
             if self._done():
                 return False
@@ -105,21 +118,21 @@ class Job(Generic[_OUT], ABC):
             callback(status)
         return True
 
-class SimpleJob(Job[_OUT]):
+class SimpleJob(Job[_OK, _ERR]):
     def __init__(
         self,
         name: str,
-        target: Callable[_P, _OUT],
+        target: Callable[_P, "_OK | _ERR"],
         *args: _P.args,
         **kwargs: _P.kwargs,
     ):
-        super().__init__(name=name)
+        super().__init__(name=name, num_args=1)
         self.target = target
         self.args = args
         self.kwargs = kwargs
-        self._status: "JobFinished[_OUT] | JobIsPending | JobIsRunning | JobCanceled" = JobIsPending()
+        self._status: "JobFinished[_OK, _ERR] | JobIsPending | JobIsRunning | JobCanceled" = JobIsPending()
 
-    def _launch_next_task(self, executor: Executor) -> "Future[_OUT] | None":
+    def _launch_next_task(self, executor: Executor) -> "None | Future[_OK | _ERR]":
         with self.job_lock:
             if not isinstance(self._status, JobIsPending):
                 return None
@@ -127,15 +140,15 @@ class SimpleJob(Job[_OUT]):
 
         future = executor.submit(self.target, *self.args, **self.kwargs)
 
-        def step_done_callback(future: Future[_OUT]): # FIXME
-            callbacks_to_call: List[Callable[["JobCanceled | JobFinished[_OUT]"], None]]
+        def step_done_callback(future: Future["_OK | _ERR"]): # FIXME
+            callbacks_to_call: List[Callable[["JobCanceled | JobFinished[_OK, _ERR]"], None]]
             with self.job_lock:
                 if self._done():
                     return
                 if future.cancelled():
                     self._status = status = JobCanceled("Job cancelled on executor")
                 else:
-                    self._status = status = JobFinished(future.result())
+                    self._status = status = JobFinished[_OK, _ERR](future.result())
                 callbacks_to_call = self.on_complete_callbacks[:]
             for callback in callbacks_to_call:
                 callback(status)
@@ -144,50 +157,46 @@ class SimpleJob(Job[_OUT]):
         return future
 
 
-class IteratingJob(Job["None | Exception"]):
+class IteratingJob(Job[None, _ERR]):
     def __init__(
         self,
         *,
         name: str,
-        cancel_on_first_exception: bool,
-        target: Callable[[_IN], "None | Exception"],
+        target: Callable[[_IN], "None | _ERR"],
         on_progress: "JobProgressCallback" = lambda job_id, step_index: None,
         args: Iterable[_IN],
         num_args: "int | None" = None,
     ):
-        super().__init__(name=name)
-        self.cancel_on_first_exception = cancel_on_first_exception
+        super().__init__(
+            name=name,
+            num_args=num_args or (len(args) if isinstance(args, Sized) else None)
+        )
         self.target = target
         self.on_progress = on_progress
-        self.num_args: "int | None" = num_args or (len(args) if isinstance(args, Sized) else None)
         self.args: PeekableIterator[_IN] = PeekableIterator(args)
 
-    def _launch_next_task(self, executor: Executor) -> "Future[None | Exception] | None":
+    def _launch_next_task(self, executor: Executor) -> "Future[None | _ERR] | None":
         with self.job_lock:
             if isinstance(self._status, (JobCanceled, JobFinished)):
                 return None
             step_arg = self.args.get_next()
-            num_new_steps = 0 if isinstance(step_arg, Empty) else 1
             if isinstance(self._status, JobIsPending):
-                num_dispatched_steps = num_new_steps
-                self._status = JobIsRunning(
-                    num_completed_steps=0, num_dispatched_steps=num_dispatched_steps
-                )
+                self._status = JobIsRunning(num_completed_steps=0, num_dispatched_steps=1)
             else:
-                num_dispatched_steps = self._status.num_dispatched_steps + num_new_steps
-                self._status = JobIsRunning(
-                    num_completed_steps=self._status.num_completed_steps,
-                    num_dispatched_steps=num_dispatched_steps
-                )
+                self._status.num_dispatched_steps += (0 if isinstance(step_arg, Empty) else 1)
+        if isinstance(step_arg, Empty):
+            return None
 
-        def step_done_callback(future: Future["None | Exception"]): # FIXME
-            on_complete_callbacks: List[Callable[["JobCanceled | JobFinished[None | Exception]"], None]] = []
+        def step_done_callback(future: Future["None | _ERR"]): # FIXME
+            on_complete_callbacks: List[Callable[["JobCanceled | JobFinished[None, _ERR]"], None]] = []
             with self.job_lock:
                 if isinstance(self._status, (JobCanceled, JobFinished)):
                     return
                 assert not isinstance(self._status, JobIsPending)
+                step_index = self._status.num_completed_steps
+                self._status.num_completed_steps += 1
                 result = future.result()
-                if self.cancel_on_first_exception and isinstance(result, Exception):
+                if isinstance(result, Exception):
                     self._status = JobCanceled(f"Cancelled due to exception: {result}")
                     on_complete_callbacks = self.on_complete_callbacks[:]
                 elif not self.args.has_next() and self._status.num_dispatched_steps == self._status.num_completed_steps:
@@ -195,7 +204,7 @@ class IteratingJob(Job["None | Exception"]):
                     on_complete_callbacks = self.on_complete_callbacks[:]
                 status = self._status
             if self.on_progress:
-                self.on_progress(job_id=self.uuid, step_index=num_dispatched_steps-1)
+                self.on_progress(job_id=self.uuid, step_index=step_index)
             if not isinstance(status, JobIsRunning):
                 for callback in on_complete_callbacks:
                     callback(status)
@@ -256,7 +265,7 @@ class PriorityExecutor(Executor):
         self._status_lock = threading.Lock()
         self._status: Literal["ready", "shutting_down"] = "ready"
         self._wrapped_executor: Executor = executor
-        self._work_queue: "queue.PriorityQueue[Job[Any] | _Task[Any] | _Shutdown]" = queue.PriorityQueue()
+        self._work_queue: "queue.PriorityQueue[Job[Any, Any] | _Task[Any] | _Shutdown]" = queue.PriorityQueue()
 
         self._enqueueing_thread = threading.Thread(group=None, target=self._enqueueing_target)
         self._enqueueing_thread.start()
@@ -275,7 +284,7 @@ class PriorityExecutor(Executor):
     def __del__(self):
         self.shutdown(wait=True)
 
-    def submit_job(self, job: Job[Any]):
+    def submit_job(self, job: Job[Any, Any]):
         with self._status_lock:
             if self._status != "ready":
                 raise Exception("Executor is shutting down")

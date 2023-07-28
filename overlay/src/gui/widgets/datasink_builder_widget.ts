@@ -1,11 +1,11 @@
-import { Bzip2Compressor, DataSinkUnion, DziImageElement, DziLevelSink, DziSizeElement, Filesystem, GzipCompressor, Interval5D, N5DataSink, PrecomputedChunksSink, RawCompressor, Shape5D, XzCompressor } from "../../client/ilastik";
+import { Bzip2Compressor, DataSinkUnion, DziImageElement, DziLevelSink, DziSizeElement, Filesystem, GzipCompressor, Interval5D, N5DataSink, PrecomputedChunksSink, RawCompressor, Shape5D, XzCompressor, ZipFs } from "../../client/ilastik";
 import { assertUnreachable } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
 import { DataType } from "../../util/precomputed_chunks";
 import { CssClasses } from "../css_classes";
 import { Select } from "./input_widget";
 import { TabsWidget } from "./tabs_widget";
-import { AxesKeysInput, NumberInput, PathInput } from "./value_input_widget";
+import { AxesKeysInput, BooleanInput, NumberInput, PathInput } from "./value_input_widget";
 import { ContainerWidget, Div, Label, Paragraph, Span, TagName } from "./widget";
 
 
@@ -50,10 +50,17 @@ export class UnsupportedDziTileNumChannels extends DziSinkCreationError{
         this.c = params.c
     }
 }
+export class UnsupportedZippedDziPath extends DziSinkCreationError{
+    public readonly path: Path;
+    constructor(params: {path: Path}){
+        super(`Zipped DZI path names must be like 'some_name.dzip'. Provided: ${params.path.raw}`)
+        this.path = params.path
+    }
+}
 export class UnsupportedDziPath extends DziSinkCreationError{
     public readonly path: Path;
     constructor(params: {path: Path}){
-        super(`DZI files must end in .dzip. Provided: ${params.path.raw}`)
+        super(`DZI paths must be like 'some_name.xml' or 'some_name.dzi' . Provided: ${params.path.raw}`)
         this.path = params.path
     }
 }
@@ -61,6 +68,7 @@ export class UnsupportedDziPath extends DziSinkCreationError{
 class DziDatasinkConfigWidget extends DatasinkInputForm{
     private imageFormatSelector: Select<"png" | "jpg">;
     private overlapInput: NumberInput;
+    private zipCheckbox: BooleanInput
 
     constructor(params: {parentElement: HTMLElement | undefined}){
         const imageFormatSelector = new Select<"png" | "jpg">({
@@ -77,6 +85,9 @@ class DziDatasinkConfigWidget extends DatasinkInputForm{
             value: 0,
             title: "border width that is replicated amongst neighboring tiles. Unsupported for now."
         })
+
+        const zipCheckbox = new BooleanInput({parentElement: undefined, value: true})
+
         super({
             ...params,
             children: [
@@ -94,12 +105,21 @@ class DziDatasinkConfigWidget extends DatasinkInputForm{
                         new Label({innerText: "Overlap: ", parentElement: undefined}),
                         overlapInput
                     ]
+                }),
+
+                new Paragraph({
+                    parentElement: undefined,
+                    children: [
+                        new Label({innerText: "Zip: ", parentElement: undefined}),
+                        zipCheckbox
+                    ]
                 })
 
             ]
         })
         this.imageFormatSelector = imageFormatSelector
         this.overlapInput = overlapInput
+        this.zipCheckbox = zipCheckbox
     }
 
     public tryMakeDataSink(params: {
@@ -120,8 +140,21 @@ class DziDatasinkConfigWidget extends DatasinkInputForm{
         if(params.interval.shape.z > 1 || params.tile_shape.z > 1){
             return new UnsupportedDziDimensions({z: params.interval.shape.z})
         }
-        if(!params.path.name.toLowerCase().endsWith(".dzip")){
-            return new UnsupportedDziPath({path: params.path})
+        const suffix = params.path.suffix.toLowerCase()
+        let filesystem: Filesystem
+        let xml_path: Path
+        if(this.zipCheckbox.value){
+            if(suffix != "dzip"|| params.path.equals(Path.root)){
+                return new UnsupportedZippedDziPath({path: params.path})
+            }
+            filesystem = new ZipFs(params.filesystem, params.path);
+            xml_path = new Path({components: [params.path.stem + ".dzi"]})
+        }else{
+            if((suffix != "xml" && suffix != "dzi") || params.path.equals(Path.root)){
+                return new UnsupportedDziPath({path: params.path})
+            }
+            filesystem = params.filesystem
+            xml_path = params.path
         }
         const num_channels = params.interval.shape.c;
         if(num_channels != 1 && num_channels != 3){
@@ -142,8 +175,8 @@ class DziDatasinkConfigWidget extends DatasinkInputForm{
         return new DziLevelSink({
             dzi_image,
             num_channels,
-            filesystem: params.filesystem,
-            xml_path: params.path,
+            filesystem,
+            xml_path,
             level_index:dzi_image.max_level_index,
         })
     }

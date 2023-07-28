@@ -4,10 +4,15 @@ import { assertUnreachable, createElement, createFieldset } from '../../util/mis
 import { CollapsableWidget } from './collapsable_applet_gui';
 import { BucketFs, Color, FsDataSource, FsDataSink, Session, PrecomputedChunksSink, Shape5D, Filesystem } from '../../client/ilastik';
 import { CssClasses } from '../css_classes';
-import { ErrorPopupWidget } from './popup';
+import { ErrorPopupWidget, PopupWidget } from './popup';
 import {
     CreateDziPyramidJobDto,
     ExportJobDto,
+    JobCanceledDto,
+    JobDto,
+    JobFinishedDto,
+    JobIsPendingDto,
+    JobIsRunningDto,
     LabelHeaderDto,
     OpenDatasinkJobDto,
     PixelClassificationExportAppletStateDto,
@@ -20,7 +25,7 @@ import { DataSourceListWidget } from './list_widget';
 import { DatasinkConfigWidget, UnsupportedDziDataType } from './datasink_builder_widget';
 import { DataType } from '../../util/precomputed_chunks';
 import { FileLocationPatternInputWidget } from './file_location_input';
-import { Button, Select } from './input_widget';
+import { Button, ButtonWidget, Select } from './input_widget';
 import { Anchor, Div, Label, Paragraph, Span, Table, TableData, TableHeader, TableRow } from './widget';
 import { Path, Url } from '../../util/parsed_url';
 import { BooleanInput } from './value_input_widget';
@@ -55,7 +60,7 @@ class LabelHeader{
 }
 
 class Job{
-    private readonly jobDto: ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto;
+    private readonly jobDto: ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto | JobDto;
 
     constructor(jobDto: ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto){
         this.jobDto = jobDto
@@ -67,21 +72,32 @@ class Job{
     }): TableData{
         const jobDto = this.jobDto
 
-        if(jobDto.status == "pending" || jobDto.status == "cancelled"){
-            return new TableData({parentElement: undefined, innerText: jobDto.status})
+        if(jobDto.status instanceof JobIsPendingDto){
+            return new TableData({parentElement: undefined, innerText: "pending"})
         }
-        if(jobDto.status == "running"){
+        if(jobDto.status instanceof JobCanceledDto){
+            const cancellationMessage = jobDto.status.message;
+            return new TableData({parentElement: undefined, children: [
+                new Label({parentElement: undefined, innerText: "cancelled"}),
+                new ButtonWidget({
+                    parentElement: undefined, contents: "?", onClick: () => PopupWidget.OkPopup({
+                        title: "Job Cancelled", paragraphs: [cancellationMessage]
+                    })
+                })
+            ]})
+        }
+        if(jobDto.status instanceof JobIsRunningDto){
             return new TableData({
                 parentElement: undefined,
                 innerText: jobDto.num_args === undefined ?
                     "unknwown" :
-                    `${Math.round(jobDto.num_completed_steps / jobDto.num_args * 100)}%`
+                    `${Math.round(jobDto.status.num_completed_steps / jobDto.num_args * 100)}%`
             })
         }
-        if(jobDto.status == "completed"){
-            if(jobDto.error_message){
+        if(jobDto.status instanceof JobFinishedDto){
+            if(jobDto.status.error_message){
                 let td = new TableData({parentElement: undefined, innerText: "failed"})
-                td.element.title = jobDto.error_message
+                td.element.title = jobDto.status.error_message
                 return td
             }
             let out = new TableData({parentElement: undefined})
@@ -285,6 +301,10 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                     });
                     if(fileLocation === undefined){
                         new ErrorPopupWidget({message: "Unexpected bad file location"}) //FIXME? Shouldn't this be impossible?
+                        return
+                    }
+                    if(fileLocation.path.equals(Path.root)){
+                        new ErrorPopupWidget({message: `Can't export directly to the root of the filesystem. Provide a file name.`})
                         return
                     }
                     if(!(datasource instanceof FsDataSource)){

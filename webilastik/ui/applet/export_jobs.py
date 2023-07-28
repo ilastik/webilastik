@@ -16,17 +16,18 @@ from skimage.transform import resize_local_mean #pyright: ignore [reportMissingT
 
 from webilastik.datasource import DataRoi, DataSource
 from webilastik.datasink import IDataSinkWriter
-from webilastik.datasink.deep_zoom_sink import DziLevelSink, DziLevelWriter
+from webilastik.datasink.deep_zoom_sink import DziLevelSink
 from webilastik.datasource.deep_zoom_image import DziImageElement
 from webilastik.datasource.deep_zoom_image import DziImageElement
 from webilastik.filesystem import FsIoException, FsFileNotFoundException, IFilesystem
 from webilastik.filesystem.os_fs import OsFs
 from webilastik.operator import Operator
 from webilastik.scheduling.job import IteratingJob, JobProgressCallback, SimpleJob
-from webilastik.server.rpc.dto import ExportJobDto, ZipJobDto, CreateDziPyramidJobDto
+from webilastik.server.rpc.dto import ExportJobDto, TransferFileJobDto, ZipJobDto, CreateDziPyramidJobDto
 
 
 _IN = TypeVar("_IN")
+_ERR = TypeVar("_ERR", bound=Exception)
 
 @dataclass
 class _ExportTask(Generic[_IN]):
@@ -38,7 +39,7 @@ class _ExportTask(Generic[_IN]):
         print(f"Writing tile {tile}")
         return self.sink_writer.write(tile)
 
-class ExportJob(IteratingJob):
+class ExportJob(IteratingJob[Exception]):
     def __init__(
         self,
         *,
@@ -51,7 +52,6 @@ class ExportJob(IteratingJob):
     ):
         super().__init__(
             name=name,
-            cancel_on_first_exception=True,
             target=_ExportTask(operator=operator, sink_writer=sink_writer),
             on_progress=on_progress,
             args=args,
@@ -70,19 +70,18 @@ class ExportJob(IteratingJob):
             )
 
 
-class DownscaleDatasource(IteratingJob):
+class DownscaleDatasource(IteratingJob[Exception]):
     def __init__(
         self,
         *,
         name: str,
         source: DataSource,
-        sink_writer: DziLevelWriter,
+        sink_writer: IDataSinkWriter,
         on_progress: JobProgressCallback,
     ):
         sink = sink_writer.data_sink
         super().__init__(
             name=name,
-            cancel_on_first_exception=True,
             target=partial(DownscaleDatasource.downscale, source=source, sink_writer=sink_writer),
             on_progress=on_progress,
             args=sink.interval.split(sink.tile_shape),
@@ -91,7 +90,7 @@ class DownscaleDatasource(IteratingJob):
         self.sink_writer = sink_writer
 
     @staticmethod
-    def downscale(sink_tile: Interval5D, source: DataSource, sink_writer: DziLevelWriter) -> "None | Exception":
+    def downscale(sink_tile: Interval5D, source: DataSource, sink_writer: IDataSinkWriter) -> "None | Exception":
         prefix = f"########### thread: {threading.get_native_id()} {sink_tile}"
         def pt(*, msg: str, t1: float, t0: float):
             if sink_writer.data_sink.shape.x == 697:
@@ -155,7 +154,7 @@ class DownscaleDatasource(IteratingJob):
             )
 
 
-class CreateDziPyramid(SimpleJob["Sequence[DziLevelSink] | Exception"]):
+class CreateDziPyramid(SimpleJob[Sequence[DziLevelSink], Exception]):
     def __init__(
         self,
         *,
@@ -184,12 +183,12 @@ class CreateDziPyramid(SimpleJob["Sequence[DziLevelSink] | Exception"]):
             )
 
 
-class ZipDirectory(SimpleJob["None | Exception"]):
+class ZipDirectory(SimpleJob[None, Exception]):
     def __init__(
         self,
         *,
         name: str,
-        output_fs: IFilesystem,
+        output_fs: OsFs,
         output_path: PurePosixPath,
         input_fs: IFilesystem,
         input_directory: PurePosixPath,
@@ -210,20 +209,18 @@ class ZipDirectory(SimpleJob["None | Exception"]):
     @classmethod
     def zip_directory(
         cls,
+        *,
         input_directory: PurePosixPath,
-        /, *,
         input_fs: IFilesystem,
-        output_fs: IFilesystem,
+        output_fs: OsFs,
         output_path: PurePosixPath,
         delete_source: bool,
     ) -> "None | Exception":
-        temp_fs = OsFs.create_scratch_dir()
-        if isinstance(temp_fs, Exception):
-            return temp_fs
-        tmp_zip_file_path = PurePosixPath("/out.zip")
-
         try:
-            zip_file = ZipFile(temp_fs.resolve_path(tmp_zip_file_path), mode="w", compresslevel=ZIP_STORED)
+            from pathlib import Path
+            zip_file_path = Path(output_fs.resolve_path(output_path))
+            zip_file_path.parent.mkdir(parents=True)
+            zip_file = ZipFile(output_fs.resolve_path(output_path), mode="w", compresslevel=ZIP_STORED)
         except Exception as e:
             return FsIoException(e)
 
@@ -250,19 +247,14 @@ class ZipDirectory(SimpleJob["None | Exception"]):
         zipping_result = write_to_zip(input_directory)
         if isinstance(zipping_result, Exception):
             return zipping_result
-        zip_file.close()
 
-        write_result = output_fs.transfer_file(
-            source_fs=temp_fs, source_path=tmp_zip_file_path, target_path=output_path
-        )
-        _ = temp_fs.delete(tmp_zip_file_path)
+        try:
+            zip_file.close()
+        except Exception as e:
+            return FsIoException(e)
 
         if delete_source:
-            _ = temp_fs.delete(PurePosixPath("/"))
-
-        if isinstance(write_result, Exception):
-            return write_result
-
+            _ = input_fs.delete(input_directory)
 
     def to_dto(self) -> ZipJobDto:
         with self.job_lock:
@@ -274,3 +266,31 @@ class ZipDirectory(SimpleJob["None | Exception"]):
                 output_fs=self.output_fs.to_dto(),
                 output_path=self.output_path.as_posix(),
             )
+
+class TransferFileJob(SimpleJob[None, Exception]):
+    def __init__(
+        self,
+        *,
+        name: str,
+        source_fs: IFilesystem,
+        source_path: PurePosixPath,
+        target_fs: IFilesystem,
+        target_path: PurePosixPath,
+    ):
+        self.target_url = source_fs.geturl(target_path)
+        super().__init__(
+            name=name,
+            target=target_fs.transfer_file,
+            source_fs=source_fs,
+            source_path=source_path,
+            target_path=target_path,
+        )
+
+    def to_dto(self) -> TransferFileJobDto:
+        return TransferFileJobDto(
+            uuid=str(self.uuid),
+            name=self.name,
+            num_args=self.num_args,
+            status=self._status.to_dto(),
+            target_url=self.target_url.to_dto(),
+        )

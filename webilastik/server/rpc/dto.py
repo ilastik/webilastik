@@ -2317,16 +2317,22 @@ def parse_as_JobFinishedDto(value: JsonValue) -> "JobFinishedDto | MessageParsin
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as JobFinishedDto"
         )
-    return JobFinishedDto()
+    tmp_error_message = parse_as_Union_of_str0None_endof_(value.get("error_message"))
+    if isinstance(tmp_error_message, MessageParsingError):
+        return tmp_error_message
+    return JobFinishedDto(
+        error_message=tmp_error_message,
+    )
 
 
 @dataclass
 class JobFinishedDto(DataTransferObject):
-    pass
+    error_message: Optional[str]
 
     def to_json_value(self) -> JsonObject:
         return {
             "__class__": "JobFinishedDto",
+            "error_message": convert_to_json_value(self.error_message),
         }
 
     @classmethod
@@ -2777,14 +2783,79 @@ class ZipJobDto(JobDto):
         return parse_as_ZipJobDto(value)
 
 
+def parse_as_TransferFileJobDto(
+    value: JsonValue,
+) -> "TransferFileJobDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as TransferFileJobDto"
+        )
+    if value.get("__class__") != "TransferFileJobDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as TransferFileJobDto"
+        )
+    tmp_name = parse_as_str(value.get("name"))
+    if isinstance(tmp_name, MessageParsingError):
+        return tmp_name
+    tmp_num_args = parse_as_Union_of_int0None_endof_(value.get("num_args"))
+    if isinstance(tmp_num_args, MessageParsingError):
+        return tmp_num_args
+    tmp_uuid = parse_as_str(value.get("uuid"))
+    if isinstance(tmp_uuid, MessageParsingError):
+        return tmp_uuid
+    tmp_status = parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
+        value.get("status")
+    )
+    if isinstance(tmp_status, MessageParsingError):
+        return tmp_status
+    tmp_target_url = parse_as_UrlDto(value.get("target_url"))
+    if isinstance(tmp_target_url, MessageParsingError):
+        return tmp_target_url
+    return TransferFileJobDto(
+        name=tmp_name,
+        num_args=tmp_num_args,
+        uuid=tmp_uuid,
+        status=tmp_status,
+        target_url=tmp_target_url,
+    )
+
+
+@dataclass
+class TransferFileJobDto(JobDto):
+    target_url: UrlDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "TransferFileJobDto",
+            "name": self.name,
+            "num_args": convert_to_json_value(self.num_args),
+            "uuid": self.uuid,
+            "status": convert_to_json_value(self.status),
+            "target_url": self.target_url.to_json_value(),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "TransferFileJobDto | MessageParsingError":
+        return parse_as_TransferFileJobDto(value)
+
+
 ExportJobDtoUnion = Union[
-    ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto
+    ExportJobDto,
+    OpenDatasinkJobDto,
+    CreateDziPyramidJobDto,
+    ZipJobDto,
+    TransferFileJobDto,
+    JobDto,
 ]
 
 
-def parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_(
+def parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto0TransferFileJobDto0JobDto_endof_(
     value: JsonValue,
-) -> "Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto] | MessageParsingError":
+) -> "Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto, TransferFileJobDto, JobDto] | MessageParsingError":
     parsed_option_0 = parse_as_ExportJobDto(value)
     if not isinstance(parsed_option_0, MessageParsingError):
         return parsed_option_0
@@ -2797,23 +2868,36 @@ def parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0Zip
     parsed_option_3 = parse_as_ZipJobDto(value)
     if not isinstance(parsed_option_3, MessageParsingError):
         return parsed_option_3
+    parsed_option_4 = parse_as_TransferFileJobDto(value)
+    if not isinstance(parsed_option_4, MessageParsingError):
+        return parsed_option_4
+    parsed_option_5 = parse_as_JobDto(value)
+    if not isinstance(parsed_option_5, MessageParsingError):
+        return parsed_option_5
     return MessageParsingError(
-        f"Could not parse {json.dumps(value)} into Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto]"
+        f"Could not parse {json.dumps(value)} into Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto, TransferFileJobDto, JobDto]"
     )
 
 
-def parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_0_varlen__endof_(
+def parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto0TransferFileJobDto0JobDto_endof_0_varlen__endof_(
     value: JsonValue,
-) -> "Tuple[Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto], ...] | MessageParsingError":
+) -> "Tuple[Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto, TransferFileJobDto, JobDto], ...] | MessageParsingError":
     if not isinstance(value, (list, tuple)):
         return MessageParsingError(
-            f"Could not parse Tuple[Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto], ...] from {json.dumps(value)}"
+            f"Could not parse Tuple[Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto, TransferFileJobDto, JobDto], ...] from {json.dumps(value)}"
         )
     items: List[
-        Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto]
+        Union[
+            ExportJobDto,
+            OpenDatasinkJobDto,
+            CreateDziPyramidJobDto,
+            ZipJobDto,
+            TransferFileJobDto,
+            JobDto,
+        ]
     ] = []
     for item in value:
-        parsed = parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_(
+        parsed = parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto0TransferFileJobDto0JobDto_endof_(
             item
         )
         if isinstance(parsed, MessageParsingError):
@@ -2906,7 +2990,7 @@ def parse_as_PixelClassificationExportAppletStateDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as PixelClassificationExportAppletStateDto"
         )
-    tmp_jobs = parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_0_varlen__endof_(
+    tmp_jobs = parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto0TransferFileJobDto0JobDto_endof_0_varlen__endof_(
         value.get("jobs")
     )
     if isinstance(tmp_jobs, MessageParsingError):
@@ -4539,28 +4623,6 @@ class EbrainsAccessTokenHeaderDto(DataTransferObject):
         return parse_as_EbrainsAccessTokenHeaderDto(value)
 
 
-def parse_as_Tuple_of_str_endof_(
-    value: JsonValue,
-) -> "Tuple[str] | MessageParsingError":
-    if not isinstance(value, (list, tuple)) or len(value) < 1:
-        return MessageParsingError(
-            f"Could not parse Tuple[str] from {json.dumps(value)}"
-        )
-    tmp_0 = parse_as_str(value[0])
-    if isinstance(tmp_0, MessageParsingError):
-        return tmp_0
-    return (tmp_0,)
-
-
-def parse_as_Literal_of__quote_Bearer_quote__endof_(
-    value: JsonValue,
-) -> "Literal['Bearer'] | MessageParsingError":
-    tmp_0 = parse_as_str(value)
-    if not isinstance(tmp_0, MessageParsingError) and tmp_0 == "Bearer":
-        return tmp_0
-    return MessageParsingError(f"Could not parse {value} as Literal['Bearer']")
-
-
 def parse_as_EbrainsAccessTokenPayloadDto(
     value: JsonValue,
 ) -> "EbrainsAccessTokenPayloadDto | MessageParsingError":
@@ -4573,113 +4635,43 @@ def parse_as_EbrainsAccessTokenPayloadDto(
     tmp_exp = parse_as_int(value.get("exp"))
     if isinstance(tmp_exp, MessageParsingError):
         return tmp_exp
-    tmp_iat = parse_as_int(value.get("iat"))
-    if isinstance(tmp_iat, MessageParsingError):
-        return tmp_iat
     tmp_auth_time = parse_as_int(value.get("auth_time"))
     if isinstance(tmp_auth_time, MessageParsingError):
         return tmp_auth_time
-    tmp_jti = parse_as_str(value.get("jti"))
-    if isinstance(tmp_jti, MessageParsingError):
-        return tmp_jti
-    tmp_iss = parse_as_str(value.get("iss"))
-    if isinstance(tmp_iss, MessageParsingError):
-        return tmp_iss
-    tmp_aud = parse_as_Tuple_of_str_endof_(value.get("aud"))
-    if isinstance(tmp_aud, MessageParsingError):
-        return tmp_aud
     tmp_sub = parse_as_str(value.get("sub"))
     if isinstance(tmp_sub, MessageParsingError):
         return tmp_sub
-    tmp_typ = parse_as_Literal_of__quote_Bearer_quote__endof_(value.get("typ"))
-    if isinstance(tmp_typ, MessageParsingError):
-        return tmp_typ
-    tmp_azp = parse_as_str(value.get("azp"))
-    if isinstance(tmp_azp, MessageParsingError):
-        return tmp_azp
-    tmp_session_state = parse_as_str(value.get("session_state"))
-    if isinstance(tmp_session_state, MessageParsingError):
-        return tmp_session_state
-    tmp_acr = parse_as_str(value.get("acr"))
-    if isinstance(tmp_acr, MessageParsingError):
-        return tmp_acr
-    tmp_scope = parse_as_str(value.get("scope"))
-    if isinstance(tmp_scope, MessageParsingError):
-        return tmp_scope
-    tmp_sid = parse_as_str(value.get("sid"))
-    if isinstance(tmp_sid, MessageParsingError):
-        return tmp_sid
-    tmp_email_verified = parse_as_bool(value.get("email_verified"))
-    if isinstance(tmp_email_verified, MessageParsingError):
-        return tmp_email_verified
-    tmp_gender = parse_as_str(value.get("gender"))
-    if isinstance(tmp_gender, MessageParsingError):
-        return tmp_gender
-    tmp_name = parse_as_str(value.get("name"))
-    if isinstance(tmp_name, MessageParsingError):
-        return tmp_name
-    tmp_preferred_username = parse_as_str(value.get("preferred_username"))
-    if isinstance(tmp_preferred_username, MessageParsingError):
-        return tmp_preferred_username
-    tmp_given_name = parse_as_str(value.get("given_name"))
-    if isinstance(tmp_given_name, MessageParsingError):
-        return tmp_given_name
-    tmp_family_name = parse_as_str(value.get("family_name"))
-    if isinstance(tmp_family_name, MessageParsingError):
-        return tmp_family_name
-    tmp_email = parse_as_str(value.get("email"))
-    if isinstance(tmp_email, MessageParsingError):
-        return tmp_email
     return EbrainsAccessTokenPayloadDto(
         exp=tmp_exp,
-        iat=tmp_iat,
         auth_time=tmp_auth_time,
-        jti=tmp_jti,
-        iss=tmp_iss,
-        aud=tmp_aud,
         sub=tmp_sub,
-        typ=tmp_typ,
-        azp=tmp_azp,
-        session_state=tmp_session_state,
-        acr=tmp_acr,
-        scope=tmp_scope,
-        sid=tmp_sid,
-        email_verified=tmp_email_verified,
-        gender=tmp_gender,
-        name=tmp_name,
-        preferred_username=tmp_preferred_username,
-        given_name=tmp_given_name,
-        family_name=tmp_family_name,
-        email=tmp_email,
     )
 
 
 @dataclass
 class EbrainsAccessTokenPayloadDto(DataTransferObject):
     exp: int  # e.g. 1689775678
-    iat: int  # e.g. 1689334268
+    # iat: int # e.g. 1689334268
     auth_time: int  # e.g. 1689170878
-    jti: str  # e.g. "1740e10e-b09c-4db8-acf8-63d1b417763a"
-    iss: str  # e.g. "https://iam.ebrains.eu/auth/realms/hbp"
-    aud: Tuple[
-        str
-    ]  # e.g.: ["jupyterhub", "tutorialOidcApi", "jupyterhub-jsc", "xwiki", "team", "plus", "group"]
+    # jti: str # e.g. "1740e10e-b09c-4db8-acf8-63d1b417763a"
+    # iss: str # e.g. "https://iam.ebrains.eu/auth/realms/hbp"
+    # aud: Tuple[str] # e.g.: ["jupyterhub", "tutorialOidcApi", "jupyterhub-jsc", "xwiki", "team", "plus", "group"]
     sub: str  # this is the user ID, e.g. "bdca269c-f207-4cdb-8b68-a562e434faed"
-    typ: Literal["Bearer"]
-    azp: str  # e.g. "webilastik",
-    session_state: str  # e.g. "e29d75a2-0dfe-4a4c-a800-c35eae234a47"
-    acr: str  # e.g. "0"
+    # typ: Literal["Bearer"]
+    # azp: str # e.g. "webilastik",
+    # session_state: str # e.g. "e29d75a2-0dfe-4a4c-a800-c35eae234a47"
+    # acr: str # e.g. "0"
     # allowed-origins: Tuple[str] #e.g. ["https://app.ilastik.org"]
-    scope: str  # actually a list of strings concatenated with spaces: e.g. "profile roles email openid group team"
-    sid: str  # e.g.: "e29d75a2-0dfe-4a4c-a800-c35e12334a47"
-    email_verified: bool  # e.g. true
-    gender: str  # e.g. "null"
-    name: str  # e.g. "John Doe"
+    # scope: str # actually a list of strings concatenated with spaces: e.g. "profile roles email openid group team"
+    # sid: str # e.g.: "e29d75a2-0dfe-4a4c-a800-c35e12334a47"
+    # email_verified: bool # e.g. true
+    # gender: str # e.g. "null"
+    # name: str # e.g. "John Doe"
     # mitreid-sub: str # e.g. "301234"
-    preferred_username: str  # e.g. "johndoe"
-    given_name: str  # e.g. "John"
-    family_name: str  # e.g. "Doe"
-    email: str  # e.g. "john.doe@example.com"
+    # preferred_username: str # e.g. "johndoe"
+    # given_name: str # e.g. "John"
+    # family_name: str # e.g. "Doe"
+    # email: str # e.g. "john.doe@example.com"
 
     @classmethod
     def tag_value(cls) -> "str | None":
@@ -4688,25 +4680,8 @@ class EbrainsAccessTokenPayloadDto(DataTransferObject):
     def to_json_value(self) -> JsonObject:
         return {
             "exp": self.exp,
-            "iat": self.iat,
             "auth_time": self.auth_time,
-            "jti": self.jti,
-            "iss": self.iss,
-            "aud": (self.aud[0],),
             "sub": self.sub,
-            "typ": self.typ,
-            "azp": self.azp,
-            "session_state": self.session_state,
-            "acr": self.acr,
-            "scope": self.scope,
-            "sid": self.sid,
-            "email_verified": self.email_verified,
-            "gender": self.gender,
-            "name": self.name,
-            "preferred_username": self.preferred_username,
-            "given_name": self.given_name,
-            "family_name": self.family_name,
-            "email": self.email,
         }
 
     @classmethod

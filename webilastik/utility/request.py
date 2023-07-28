@@ -35,7 +35,8 @@ def request(
     if offset >= 0:
         range_header_value = f"bytes={offset}-"
         if num_bytes is not None:
-            range_header_value += str(offset + num_bytes - 1)
+            range_end = max(offset, offset + num_bytes - 1)
+            range_header_value += str(range_end)
     else:
         range_header_value = f"bytes={offset}"
 
@@ -45,7 +46,10 @@ def request(
         response = session.request(method=method, url=url.schemeless_raw, data=data, headers=headers)
         if not response.ok:
             return ErrRequestCompletedAsFailure(response.status_code)
-        return (response.content, response.headers)
+        content = response.content
+        if num_bytes is not None:
+            content = content[:num_bytes]
+        return (content, response.headers)
     except Exception as e:
         print(f"HTTP ERROR: {e}", file=sys.stderr)
         return ErrRequestCrashed(e)

@@ -2140,16 +2140,25 @@ export function parse_as_JobFinishedDto(value: JsonValue): JobFinishedDto | Erro
   if (valueObject["__class__"] != "JobFinishedDto") {
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a JobFinishedDto`);
   }
-  return new JobFinishedDto({});
+  const temp_error_message = parse_as_Union_of_str0None_endof_(valueObject.error_message);
+  if (temp_error_message instanceof Error) return temp_error_message;
+  return new JobFinishedDto({
+    error_message: temp_error_message,
+  });
 }
 // Automatically generated via DataTransferObject for JobFinishedDto
 // Do not edit!
 export class JobFinishedDto {
-  constructor(_params: {}) {
+  public error_message: string | undefined;
+  constructor(_params: {
+    error_message: string | undefined;
+  }) {
+    this.error_message = _params.error_message;
   }
   public toJsonValue(): JsonObject {
     return {
       "__class__": "JobFinishedDto",
+      error_message: toJsonValue(this.error_message),
     };
   }
   public static fromJsonValue(value: JsonValue): JobFinishedDto | Error {
@@ -2616,9 +2625,73 @@ export class ZipJobDto {
   }
 }
 
-export function parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_(
+export function parse_as_TransferFileJobDto(value: JsonValue): TransferFileJobDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "TransferFileJobDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a TransferFileJobDto`);
+  }
+  const temp_name = parse_as_str(valueObject.name);
+  if (temp_name instanceof Error) return temp_name;
+  const temp_num_args = parse_as_Union_of_int0None_endof_(valueObject.num_args);
+  if (temp_num_args instanceof Error) return temp_num_args;
+  const temp_uuid = parse_as_str(valueObject.uuid);
+  if (temp_uuid instanceof Error) return temp_uuid;
+  const temp_status = parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
+    valueObject.status,
+  );
+  if (temp_status instanceof Error) return temp_status;
+  const temp_target_url = parse_as_UrlDto(valueObject.target_url);
+  if (temp_target_url instanceof Error) return temp_target_url;
+  return new TransferFileJobDto({
+    name: temp_name,
+    num_args: temp_num_args,
+    uuid: temp_uuid,
+    status: temp_status,
+    target_url: temp_target_url,
+  });
+}
+// Automatically generated via DataTransferObject for TransferFileJobDto
+// Do not edit!
+export class TransferFileJobDto {
+  public name: string;
+  public num_args: number | undefined;
+  public uuid: string;
+  public status: JobFinishedDto | JobIsPendingDto | JobIsRunningDto | JobCanceledDto;
+  public target_url: UrlDto;
+  constructor(_params: {
+    name: string;
+    num_args: number | undefined;
+    uuid: string;
+    status: JobFinishedDto | JobIsPendingDto | JobIsRunningDto | JobCanceledDto;
+    target_url: UrlDto;
+  }) {
+    this.name = _params.name;
+    this.num_args = _params.num_args;
+    this.uuid = _params.uuid;
+    this.status = _params.status;
+    this.target_url = _params.target_url;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "TransferFileJobDto",
+      name: this.name,
+      num_args: toJsonValue(this.num_args),
+      uuid: this.uuid,
+      status: toJsonValue(this.status),
+      target_url: this.target_url.toJsonValue(),
+    };
+  }
+  public static fromJsonValue(value: JsonValue): TransferFileJobDto | Error {
+    return parse_as_TransferFileJobDto(value);
+  }
+}
+
+export function parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto0TransferFileJobDto0JobDto_endof_(
   value: JsonValue,
-): ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto | Error {
+): ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto | TransferFileJobDto | JobDto | Error {
   const parsed_option_0 = parse_as_ExportJobDto(value);
   if (!(parsed_option_0 instanceof Error)) {
     return parsed_option_0;
@@ -2635,20 +2708,33 @@ export function parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyram
   if (!(parsed_option_3 instanceof Error)) {
     return parsed_option_3;
   }
+  const parsed_option_4 = parse_as_TransferFileJobDto(value);
+  if (!(parsed_option_4 instanceof Error)) {
+    return parsed_option_4;
+  }
+  const parsed_option_5 = parse_as_JobDto(value);
+  if (!(parsed_option_5 instanceof Error)) {
+    return parsed_option_5;
+  }
   return Error(
     `Could not parse ${
       JSON.stringify(value)
-    } into ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto`,
+    } into ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto | TransferFileJobDto | JobDto`,
   );
 }
-export function parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_0_varlen__endof_(
+export function parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto0TransferFileJobDto0JobDto_endof_0_varlen__endof_(
   value: JsonValue,
-): Array<ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto> | Error {
+): Array<ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto | TransferFileJobDto | JobDto> | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
-  const out: Array<ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto> = [];
+  const out: Array<
+    ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto | TransferFileJobDto | JobDto
+  > = [];
   for (let item of arr) {
-    let parsed_item = parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_(item);
+    let parsed_item =
+      parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto0TransferFileJobDto0JobDto_endof_(
+        item,
+      );
     if (parsed_item instanceof Error) return parsed_item;
     out.push(parsed_item);
   }
@@ -2729,7 +2815,7 @@ export function parse_as_PixelClassificationExportAppletStateDto(
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a PixelClassificationExportAppletStateDto`);
   }
   const temp_jobs =
-    parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_0_varlen__endof_(
+    parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto0TransferFileJobDto0JobDto_endof_0_varlen__endof_(
       valueObject.jobs,
     );
   if (temp_jobs instanceof Error) return temp_jobs;
@@ -2751,13 +2837,15 @@ export function parse_as_PixelClassificationExportAppletStateDto(
 // Automatically generated via DataTransferObject for PixelClassificationExportAppletStateDto
 // Do not edit!
 export class PixelClassificationExportAppletStateDto {
-  public jobs: Array<ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto>;
+  public jobs: Array<
+    ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto | TransferFileJobDto | JobDto
+  >;
   public populated_labels: Array<LabelHeaderDto> | undefined;
   public datasource_suggestions:
     | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
     | undefined;
   constructor(_params: {
-    jobs: Array<ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto>;
+    jobs: Array<ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto | TransferFileJobDto | JobDto>;
     populated_labels: Array<LabelHeaderDto> | undefined;
     datasource_suggestions:
       | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
@@ -4317,20 +4405,6 @@ export class EbrainsAccessTokenHeaderDto {
   }
 }
 
-export function parse_as_Tuple_of_str_endof_(value: JsonValue): [string] | Error {
-  const arr = ensureJsonArray(value);
-  if (arr instanceof Error) return arr;
-  const temp_0 = parse_as_str(arr[0]);
-  if (temp_0 instanceof Error) return temp_0;
-  return [temp_0];
-}
-export function parse_as_Literal_of__quote_Bearer_quote__endof_(value: JsonValue): "Bearer" | Error {
-  const tmp_0 = parse_as_str(value);
-  if (!(tmp_0 instanceof Error) && tmp_0 === "Bearer") {
-    return tmp_0;
-  }
-  return Error(`Could not parse ${value} as 'Bearer'`);
-}
 export function parse_as_EbrainsAccessTokenPayloadDto(value: JsonValue): EbrainsAccessTokenPayloadDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
@@ -4338,155 +4412,36 @@ export function parse_as_EbrainsAccessTokenPayloadDto(value: JsonValue): Ebrains
   }
   const temp_exp = parse_as_int(valueObject.exp);
   if (temp_exp instanceof Error) return temp_exp;
-  const temp_iat = parse_as_int(valueObject.iat);
-  if (temp_iat instanceof Error) return temp_iat;
   const temp_auth_time = parse_as_int(valueObject.auth_time);
   if (temp_auth_time instanceof Error) return temp_auth_time;
-  const temp_jti = parse_as_str(valueObject.jti);
-  if (temp_jti instanceof Error) return temp_jti;
-  const temp_iss = parse_as_str(valueObject.iss);
-  if (temp_iss instanceof Error) return temp_iss;
-  const temp_aud = parse_as_Tuple_of_str_endof_(valueObject.aud);
-  if (temp_aud instanceof Error) return temp_aud;
   const temp_sub = parse_as_str(valueObject.sub);
   if (temp_sub instanceof Error) return temp_sub;
-  const temp_typ = parse_as_Literal_of__quote_Bearer_quote__endof_(valueObject.typ);
-  if (temp_typ instanceof Error) return temp_typ;
-  const temp_azp = parse_as_str(valueObject.azp);
-  if (temp_azp instanceof Error) return temp_azp;
-  const temp_session_state = parse_as_str(valueObject.session_state);
-  if (temp_session_state instanceof Error) return temp_session_state;
-  const temp_acr = parse_as_str(valueObject.acr);
-  if (temp_acr instanceof Error) return temp_acr;
-  const temp_scope = parse_as_str(valueObject.scope);
-  if (temp_scope instanceof Error) return temp_scope;
-  const temp_sid = parse_as_str(valueObject.sid);
-  if (temp_sid instanceof Error) return temp_sid;
-  const temp_email_verified = parse_as_bool(valueObject.email_verified);
-  if (temp_email_verified instanceof Error) return temp_email_verified;
-  const temp_gender = parse_as_str(valueObject.gender);
-  if (temp_gender instanceof Error) return temp_gender;
-  const temp_name = parse_as_str(valueObject.name);
-  if (temp_name instanceof Error) return temp_name;
-  const temp_preferred_username = parse_as_str(valueObject.preferred_username);
-  if (temp_preferred_username instanceof Error) return temp_preferred_username;
-  const temp_given_name = parse_as_str(valueObject.given_name);
-  if (temp_given_name instanceof Error) return temp_given_name;
-  const temp_family_name = parse_as_str(valueObject.family_name);
-  if (temp_family_name instanceof Error) return temp_family_name;
-  const temp_email = parse_as_str(valueObject.email);
-  if (temp_email instanceof Error) return temp_email;
   return new EbrainsAccessTokenPayloadDto({
     exp: temp_exp,
-    iat: temp_iat,
     auth_time: temp_auth_time,
-    jti: temp_jti,
-    iss: temp_iss,
-    aud: temp_aud,
     sub: temp_sub,
-    typ: temp_typ,
-    azp: temp_azp,
-    session_state: temp_session_state,
-    acr: temp_acr,
-    scope: temp_scope,
-    sid: temp_sid,
-    email_verified: temp_email_verified,
-    gender: temp_gender,
-    name: temp_name,
-    preferred_username: temp_preferred_username,
-    given_name: temp_given_name,
-    family_name: temp_family_name,
-    email: temp_email,
   });
 }
 // Automatically generated via DataTransferObject for EbrainsAccessTokenPayloadDto
 // Do not edit!
 export class EbrainsAccessTokenPayloadDto {
   public exp: number;
-  public iat: number;
   public auth_time: number;
-  public jti: string;
-  public iss: string;
-  public aud: [string];
   public sub: string;
-  public typ: "Bearer";
-  public azp: string;
-  public session_state: string;
-  public acr: string;
-  public scope: string;
-  public sid: string;
-  public email_verified: boolean;
-  public gender: string;
-  public name: string;
-  public preferred_username: string;
-  public given_name: string;
-  public family_name: string;
-  public email: string;
   constructor(_params: {
     exp: number;
-    iat: number;
     auth_time: number;
-    jti: string;
-    iss: string;
-    aud: [string];
     sub: string;
-    typ: "Bearer";
-    azp: string;
-    session_state: string;
-    acr: string;
-    scope: string;
-    sid: string;
-    email_verified: boolean;
-    gender: string;
-    name: string;
-    preferred_username: string;
-    given_name: string;
-    family_name: string;
-    email: string;
   }) {
     this.exp = _params.exp;
-    this.iat = _params.iat;
     this.auth_time = _params.auth_time;
-    this.jti = _params.jti;
-    this.iss = _params.iss;
-    this.aud = _params.aud;
     this.sub = _params.sub;
-    this.typ = _params.typ;
-    this.azp = _params.azp;
-    this.session_state = _params.session_state;
-    this.acr = _params.acr;
-    this.scope = _params.scope;
-    this.sid = _params.sid;
-    this.email_verified = _params.email_verified;
-    this.gender = _params.gender;
-    this.name = _params.name;
-    this.preferred_username = _params.preferred_username;
-    this.given_name = _params.given_name;
-    this.family_name = _params.family_name;
-    this.email = _params.email;
   }
   public toJsonValue(): JsonObject {
     return {
       exp: this.exp,
-      iat: this.iat,
       auth_time: this.auth_time,
-      jti: this.jti,
-      iss: this.iss,
-      aud: [this.aud[0]],
       sub: this.sub,
-      typ: this.typ,
-      azp: this.azp,
-      session_state: this.session_state,
-      acr: this.acr,
-      scope: this.scope,
-      sid: this.sid,
-      email_verified: this.email_verified,
-      gender: this.gender,
-      name: this.name,
-      preferred_username: this.preferred_username,
-      given_name: this.given_name,
-      family_name: this.family_name,
-      email: this.email,
     };
   }
   public static fromJsonValue(value: JsonValue): EbrainsAccessTokenPayloadDto | Error {

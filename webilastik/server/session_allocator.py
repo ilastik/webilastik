@@ -4,7 +4,7 @@
 from functools import wraps
 import getpass
 import json
-from typing import Any, Callable, Coroutine, Dict, List, Literal, NoReturn, Optional, Set
+from typing import Any, Callable, Coroutine, Dict, List, Literal, Optional, Set
 from pathlib import Path, PurePosixPath
 import uuid
 import asyncio
@@ -54,12 +54,15 @@ def get_requested_url(request: web.Request) -> Url:
     url = Url(protocol=protocol, hostname=hostname, port=port, path=path)
     return  url
 
-def redirect_to_oidc_login(request: web.Request, oidc_client: OidcClient) -> NoReturn:
-    raise web.HTTPFound(
-        location=oidc_client.create_user_login_url(
-            redirect_uri=get_requested_url(request),
-            scopes=set([Scope.OPENID, Scope.GROUP, Scope.TEAM, Scope.EMAIL, Scope.PROFILE]),
-        ).raw
+def redirect_to_oidc_login(request: web.Request, oidc_client: OidcClient) -> web.Response:
+    return web.Response(
+        status=301,
+        headers={
+            "Location": oidc_client.create_user_login_url(
+                redirect_uri=get_requested_url(request),
+                scopes=set([Scope.OPENID, Scope.GROUP, Scope.TEAM, Scope.EMAIL, Scope.PROFILE]),
+            ).raw
+        }
     )
 
 def uncachable_json_response(payload: JsonValue, *, status: int) -> web.Response:
@@ -129,9 +132,10 @@ def require_user_token(
         user_token = await try_get_user_token_from_request(request, http_client_session=self.http_client_session, oidc_client=self.oidc_client)
         if isinstance(user_token, (Exception, type(None))):
             requested_path = get_requested_url(request).path.as_posix()
-            if requested_path.endswith("/api/viewer"):
-                redirect_to_oidc_login(request=request, oidc_client=self.oidc_client)
-            resp = uncachable_json_response(LoginRequiredErrorDto().to_json_value(), status=500)
+            if requested_path.endswith("/api/viewer") or requested_path.endswith("/api/login_then_close"):
+                resp = redirect_to_oidc_login(request=request, oidc_client=self.oidc_client)
+            else:
+                resp = uncachable_json_response(LoginRequiredErrorDto().to_json_value(), status=401)
             del_token_cookie(resp)
             return resp
         response = await endpoint(self, user_token, request)
@@ -204,26 +208,29 @@ class SessionAllocator:
         response = uncachable_json_response({EBRAINS_USER_ACCESS_TOKEN_COOKIE_KEY: user_token.access_token.raw_token}, status=200)
         return response
 
-    async def serve_service_worker(self, request: web.Request) -> web.StreamResponse:
+    async def serve_service_worker(self, request: web.Request) -> web.Response:
         requested_url = get_requested_url(request)
         redirect_url = requested_url.updated_with(path=requested_url.path.parent.joinpath("public/js/service_worker.js"))
-        raise web.HTTPFound(location=redirect_url.raw)
+        return web.Response(
+            status=301,
+            headers={"Location": redirect_url.raw}
+        )
 
     async def welcome(self, request: web.Request) -> web.Response:
         redirect_url = get_requested_url(request).joinpath("public/html/welcome.html")
-        raise web.HTTPFound(location=redirect_url.raw)
+        return web.Response(
+            status=301,
+            headers={"Location": redirect_url.raw}
+        )
 
     @require_user_token
     async def login_then_open_viewer(self, user_token: UserToken, request: web.Request) -> web.Response:
         redirect_url = get_requested_url(request).updated_with(path=PurePosixPath("/public/nehuba/index.html"), hash_='!%7B"layout":"xy"%7D')
         resp = web.Response(
             status=301,
-            headers={
-                "Location": redirect_url.raw
-            }
+            headers={"Location": redirect_url.raw}
         )
         return set_token_cookie(resp, token=user_token)
-        # raise web.HTTPFound(location=redirect_url.raw)
 
     def _make_compute_session_url(self, compute_session_id: uuid.UUID) -> Url:
         return self.external_url.joinpath(f"session-{compute_session_id}")

@@ -517,13 +517,13 @@ def test_dzip_datasource():
             assert not isinstance(writing_result, Exception)
 
 
-    output_fs = get_test_output_bucket_fs()[0]
+    output_fs = OsFs.create_scratch_dir()
     assert not isinstance(output_fs, Exception)
     output_path = PurePosixPath(f"/datasource_test_pyramid_{get_now_string()}/{temp_xml_path.stem}.dzip")
 
     zip_result = ZipDirectory.zip_directory(
-        temp_output_dir,
         input_fs=temp_fs,
+        input_directory=temp_output_dir,
         delete_source=False,
         output_fs=output_fs,
         output_path=output_path
