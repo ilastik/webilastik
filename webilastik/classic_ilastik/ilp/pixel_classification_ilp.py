@@ -121,7 +121,7 @@ class IlpPixelClassificationGroup:
             ilp_filter = filter_class(
                 ilp_scale=ilp_scale, axis_2d= "z" if in_2D else None # FIXME: is axis_2d always 'z'?
             )
-            expected_num_channels = max(expected_num_channels, channel_index // ilp_filter.channel_multiplier)
+            expected_num_channels = max(expected_num_channels, (channel_index + 1) // ilp_filter.channel_multiplier)
             if len(out) == 0 or out[-1] != ilp_filter:
                 out.append(ilp_filter)
         return (out, expected_num_channels)
