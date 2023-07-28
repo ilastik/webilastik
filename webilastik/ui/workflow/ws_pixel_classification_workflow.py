@@ -21,14 +21,24 @@ from aiohttp import web
 from aiohttp.client import ClientSession
 from aiohttp.http_websocket import WSCloseCode
 from aiohttp.web_app import Application
-import h5py
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 from webilastik.classic_ilastik.ilp.pixel_classification_ilp import IlpPixelClassificationWorkflowGroup
 
 from webilastik.filesystem import FsFileNotFoundException, FsIoException, IFilesystem, create_filesystem_from_message, create_filesystem_from_url
 from webilastik.filesystem.os_fs import OsFs
 from webilastik.scheduling.job import PriorityExecutor
-from webilastik.server.rpc.dto import GetDatasourcesFromUrlParamsDto, GetDatasourcesFromUrlResponseDto, GetFileSystemAndPathFromUrlParamsDto, GetFileSystemAndPathFromUrlResponseDto, ListFsDirRequest, ListFsDirResponse, LoadProjectParamsDto, MessageParsingError, RpcErrorDto, SaveProjectParamsDto
+from webilastik.server.rpc.dto import (
+    GetDatasourcesFromUrlParamsDto,
+    GetDatasourcesFromUrlResponseDto,
+    GetFileSystemAndPathFromUrlParamsDto,
+    GetFileSystemAndPathFromUrlResponseDto,
+    ListFsDirRequest,
+    ListFsDirResponse,
+    LoadProjectParamsDto,
+    MessageParsingError,
+    RpcErrorDto,
+    SaveProjectParamsDto,
+)
 from webilastik.server.session_allocator import uncachable_json_response
 from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError
