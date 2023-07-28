@@ -295,5 +295,5 @@ class TransferFileJob(SimpleJob[None, Exception]):
             num_args=self.num_args,
             status=self._status.to_dto(),
             target_url=self.target_url.to_dto(),
-            result_sink=self.result_sink.to_dto(),
+            result_sink=self.result_sink and self.result_sink.to_dto(),
         )
