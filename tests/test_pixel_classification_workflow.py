@@ -9,12 +9,10 @@ import numpy as np
 
 from tests import create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations, get_sample_dzip_c_cells_datasource
 from webilastik.classic_ilastik.ilp.pixel_classification_ilp import IlpPixelClassificationWorkflowGroup
-from webilastik.datasink import DataSink, FsDataSink
-from webilastik.datasource.deep_zoom_image import DziImageElement, DziSizeElement
+from webilastik.datasink import FsDataSink
 from webilastik.filesystem.zip_fs import ZipFs
 from webilastik.datasink.deep_zoom_sink import DziLevelSink
 from webilastik.datasource import DataRoi
-from webilastik.datasource.deep_zoom_datasource import DziLevelDataSource
 from webilastik.features.ilp_filter import (
     IlpDifferenceOfGaussians, IlpGaussianGradientMagnitude, IlpGaussianSmoothing,
     IlpHessianOfGaussianEigenvalues, IlpLaplacianOfGaussian, IlpStructureTensorEigenvalues,
@@ -22,7 +20,7 @@ from webilastik.features.ilp_filter import (
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.filesystem.os_fs import OsFs
 from webilastik.scheduling.job import PriorityExecutor
-from webilastik.server.rpc.dto import DziLevelSinkDto, JobCanceledDto, JobFinishedDto, JobIsPendingDto, parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto_endof_
+from webilastik.server.rpc.dto import DziLevelSinkDto, JobCanceledDto, JobFinishedDto, JobIsPendingDto
 from webilastik.ui.applet import dummy_prompt
 from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
 from executor_getter import get_executor

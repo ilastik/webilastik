@@ -4,6 +4,7 @@ from typing import Optional, Any, Tuple
 import tempfile
 from pathlib import PurePosixPath
 import pickle
+from PIL import Image as PilImage
 
 import numpy as np
 import h5py
@@ -25,7 +26,7 @@ from webilastik.datasource.array_datasource import ArrayDataSource
 from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.filesystem import IFilesystem
 from webilastik.filesystem.os_fs import OsFs
-from webilastik.ui.applet.export_jobs import DownscaleDatasource, ZipDirectory
+from webilastik.ui.applet.export_jobs import DownscaleDatasource, ZipDirectoryJob
 from webilastik.utility import get_now_string
 
 # fmt: off
@@ -70,7 +71,7 @@ raw_4_5x2_4y = np.asarray([
 
 def create_png(array: Array5D) -> PurePosixPath:
     png_path = tempfile.mkstemp()[1] + ".png"
-    skimage.io.imsave(png_path, array.raw("yxc"))
+    skimage.io.imsave(png_path, array.raw("yx"))
     return PurePosixPath(png_path)
 
 
@@ -521,7 +522,7 @@ def test_dzip_datasource():
     assert not isinstance(output_fs, Exception)
     output_path = PurePosixPath(f"/datasource_test_pyramid_{get_now_string()}/{temp_xml_path.stem}.dzip")
 
-    zip_result = ZipDirectory.zip_directory(
+    zip_result = ZipDirectoryJob.zip_directory(
         input_fs=temp_fs,
         input_directory=temp_output_dir,
         delete_source=False,
