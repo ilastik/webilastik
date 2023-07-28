@@ -2,7 +2,7 @@ import { Applet } from '../../client/applets/applet';
 import { JsonValue } from '../../util/serialization';
 import { assertUnreachable, createElement, createFieldset } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
-import { BucketFs, Color, FsDataSource, FsDataSink, Session, PrecomputedChunksSink, Shape5D, Filesystem } from '../../client/ilastik';
+import { BucketFs, Color, FsDataSource, FsDataSink, Session, PrecomputedChunksSink, Shape5D } from '../../client/ilastik';
 import { CssClasses } from '../css_classes';
 import { ErrorPopupWidget, PopupWidget } from './popup';
 import {
@@ -18,7 +18,8 @@ import {
     PixelClassificationExportAppletStateDto,
     StartPixelProbabilitiesExportJobParamsDto,
     StartSimpleSegmentationExportJobParamsDto,
-    ZipJobDto
+    ZipDirectoryJobDto,
+    TransferFileJobDto,
 } from '../../client/dto';
 import { Viewer } from '../../viewer/viewer';
 import { DataSourceListWidget } from './list_widget';
@@ -60,9 +61,9 @@ class LabelHeader{
 }
 
 class Job{
-    private readonly jobDto: ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto | JobDto;
+    private readonly jobDto: ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipDirectoryJobDto | TransferFileJobDto | JobDto;
 
-    constructor(jobDto: ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto){
+    constructor(jobDto: Job["jobDto"]){
         this.jobDto = jobDto
     }
 
@@ -94,68 +95,60 @@ class Job{
                     `${Math.round(jobDto.status.num_completed_steps / jobDto.num_args * 100)}%`
             })
         }
-        if(jobDto.status instanceof JobFinishedDto){
-            if(jobDto.status.error_message){
-                let td = new TableData({parentElement: undefined, innerText: "failed"})
-                td.element.title = jobDto.status.error_message
-                return td
-            }
-            let out = new TableData({parentElement: undefined})
-
-            let dataProxyGuiUrl: Url | undefined = undefined;
-
-            if(jobDto instanceof ZipJobDto){
-                const fs = Filesystem.fromDto(jobDto.output_fs)
-                if(fs instanceof BucketFs){
-                    out.clear()
-                    dataProxyGuiUrl = fs.getDataProxyGuiUrl({dirPath: Path.parse(jobDto.output_path).parent})
-                }
-                const output_path = Path.fromDto(jobDto.output_path)
-                if(output_path.extension?.toLowerCase() === "dzip"){
-                    const outputUrl = fs.getUrl(output_path).updatedWith({datascheme: "deepzoom"})
-                    new Button({parentElement: out, inputType: "button", text: "Open in Viewer", onClick: async () => {
-                        const datasourcesResult = await DataSourceSelectionWidget.uiResolveUrlToDatasource({
-                            datasources: outputUrl,
-                            session: params.session,
-                        })
-                        if(datasourcesResult instanceof Error){
-                            new ErrorPopupWidget({message: `Could not open URL: ${datasourcesResult}`})
-                            return
-                        }
-                        for(let ds of datasourcesResult){
-                            params.openInViewer(ds)
-                        }
-                    }})
-                    createElement({parentElement: out.element, tagName: "br"}) //FIXME?
-                }
-            }else if(jobDto instanceof ExportJobDto){
-                const sink = FsDataSink.fromDto(jobDto.datasink)
-                if(sink.filesystem instanceof BucketFs){
-                    dataProxyGuiUrl = sink.filesystem.getDataProxyGuiUrl({dirPath: sink.path})
-                }
-                if(sink instanceof PrecomputedChunksSink){
-                    new Button({parentElement: out, inputType: "button", text: "Open in Viewer", onClick: () => {
-                        params.openInViewer(sink.toDataSource())
-                    }})
-                    createElement({parentElement: out.element, tagName: "br"}) //FIXME?
-                }
-            }else{
-                out.element.innerText = "100%"
-            }
-
-            if(dataProxyGuiUrl){
-                new Anchor({
-                    parentElement: out,
-                    innerText: "Open in Data Proxy",
-                    href: dataProxyGuiUrl,
-                    target: "_blank",
-                    rel: "noopener noreferrer",
-                })
-            }
-
-            return out
+        if(!(jobDto.status instanceof JobFinishedDto)){
+            assertUnreachable(jobDto.status)
         }
-        assertUnreachable(jobDto.status)
+        if(jobDto.status.error_message){
+            let td = new TableData({parentElement: undefined, innerText: "failed"})
+            td.element.title = jobDto.status.error_message
+            return td
+        }
+        let out = new TableData({parentElement: undefined})
+
+        let dataProxyGuiUrl: Url | undefined = undefined;
+
+        if(jobDto instanceof TransferFileJobDto){
+            const targetUrl = Url.fromDto(jobDto.target_url);
+            dataProxyGuiUrl = BucketFs.tryGetDataProxyGuiUrl({url: targetUrl.parent})
+            new ButtonWidget({parentElement: out, contents: "Open", onClick: async () => {
+                const datasourcesResult = await DataSourceSelectionWidget.uiResolveUrlToDatasource({
+                    datasources: targetUrl,
+                    session: params.session,
+                })
+                if(datasourcesResult instanceof Error){
+                    new ErrorPopupWidget({message: `Could not open URL: ${datasourcesResult}`})
+                    return
+                }
+                for(let ds of datasourcesResult){
+                    params.openInViewer(ds)
+                }
+            }})
+        }else if(jobDto instanceof ExportJobDto){
+            const sink = FsDataSink.fromDto(jobDto.datasink)
+            if(sink.filesystem instanceof BucketFs){
+                dataProxyGuiUrl = sink.filesystem.getDataProxyGuiUrl({dirPath: sink.path})
+            }
+            if(sink instanceof PrecomputedChunksSink){
+                new Button({parentElement: out, inputType: "button", text: "Open", onClick: () => {
+                    params.openInViewer(sink.toDataSource())
+                }})
+                createElement({parentElement: out.element, tagName: "br"}) //FIXME?
+            }
+        }else{
+            out.element.innerText = "100%"
+        }
+
+        if(dataProxyGuiUrl){
+            new Anchor({
+                parentElement: out,
+                innerText: "Open in Data Proxy",
+                href: dataProxyGuiUrl,
+                target: "_blank",
+                rel: "noopener noreferrer",
+            })
+        }
+
+        return out
     }
     public toTableRow(params: {
         openInViewer: (datasource: FsDataSource) => void,

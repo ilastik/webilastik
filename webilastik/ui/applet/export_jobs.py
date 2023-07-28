@@ -15,7 +15,7 @@ import numpy as np
 from skimage.transform import resize_local_mean #pyright: ignore [reportMissingTypeStubs, reportUnknownVariableType]
 
 from webilastik.datasource import DataRoi, DataSource
-from webilastik.datasink import IDataSinkWriter
+from webilastik.datasink import DataSink, IDataSinkWriter
 from webilastik.datasink.deep_zoom_sink import DziLevelSink
 from webilastik.datasource.deep_zoom_image import DziImageElement
 from webilastik.datasource.deep_zoom_image import DziImageElement
@@ -23,7 +23,7 @@ from webilastik.filesystem import FsIoException, FsFileNotFoundException, IFiles
 from webilastik.filesystem.os_fs import OsFs
 from webilastik.operator import Operator
 from webilastik.scheduling.job import IteratingJob, JobProgressCallback, SimpleJob
-from webilastik.server.rpc.dto import ExportJobDto, TransferFileJobDto, ZipJobDto, CreateDziPyramidJobDto
+from webilastik.server.rpc.dto import ExportJobDto, TransferFileJobDto, ZipDirectoryJobDto, CreateDziPyramidJobDto
 
 
 _IN = TypeVar("_IN")
@@ -183,7 +183,7 @@ class CreateDziPyramid(SimpleJob[Sequence[DziLevelSink], Exception]):
             )
 
 
-class ZipDirectory(SimpleJob[None, Exception]):
+class ZipDirectoryJob(SimpleJob[None, Exception]):
     def __init__(
         self,
         *,
@@ -196,7 +196,7 @@ class ZipDirectory(SimpleJob[None, Exception]):
     ):
         super().__init__(
             name=name,
-            target=ZipDirectory.zip_directory,
+            target=ZipDirectoryJob.zip_directory,
                 input_fs=input_fs,
                 output_fs=output_fs,
                 output_path=output_path,
@@ -256,9 +256,9 @@ class ZipDirectory(SimpleJob[None, Exception]):
         if delete_source:
             _ = input_fs.delete(input_directory)
 
-    def to_dto(self) -> ZipJobDto:
+    def to_dto(self) -> ZipDirectoryJobDto:
         with self.job_lock:
-            return ZipJobDto(
+            return ZipDirectoryJobDto(
                 name=self.name,
                 num_args=1,
                 status=self._status.to_dto(),
@@ -276,8 +276,10 @@ class TransferFileJob(SimpleJob[None, Exception]):
         source_path: PurePosixPath,
         target_fs: IFilesystem,
         target_path: PurePosixPath,
+        result_sink: "None | DataSink",
     ):
-        self.target_url = source_fs.geturl(target_path)
+        self.target_url = target_fs.geturl(target_path)
+        self.result_sink = result_sink
         super().__init__(
             name=name,
             target=target_fs.transfer_file,
@@ -293,4 +295,5 @@ class TransferFileJob(SimpleJob[None, Exception]):
             num_args=self.num_args,
             status=self._status.to_dto(),
             target_url=self.target_url.to_dto(),
+            result_sink=self.result_sink.to_dto(),
         )

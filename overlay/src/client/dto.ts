@@ -2554,13 +2554,13 @@ export class CreateDziPyramidJobDto {
   }
 }
 
-export function parse_as_ZipJobDto(value: JsonValue): ZipJobDto | Error {
+export function parse_as_ZipDirectoryJobDto(value: JsonValue): ZipDirectoryJobDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
   }
-  if (valueObject["__class__"] != "ZipJobDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ZipJobDto`);
+  if (valueObject["__class__"] != "ZipDirectoryJobDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ZipDirectoryJobDto`);
   }
   const temp_name = parse_as_str(valueObject.name);
   if (temp_name instanceof Error) return temp_name;
@@ -2576,7 +2576,7 @@ export function parse_as_ZipJobDto(value: JsonValue): ZipJobDto | Error {
   if (temp_output_fs instanceof Error) return temp_output_fs;
   const temp_output_path = parse_as_str(valueObject.output_path);
   if (temp_output_path instanceof Error) return temp_output_path;
-  return new ZipJobDto({
+  return new ZipDirectoryJobDto({
     name: temp_name,
     num_args: temp_num_args,
     uuid: temp_uuid,
@@ -2585,9 +2585,9 @@ export function parse_as_ZipJobDto(value: JsonValue): ZipJobDto | Error {
     output_path: temp_output_path,
   });
 }
-// Automatically generated via DataTransferObject for ZipJobDto
+// Automatically generated via DataTransferObject for ZipDirectoryJobDto
 // Do not edit!
-export class ZipJobDto {
+export class ZipDirectoryJobDto {
   public name: string;
   public num_args: number | undefined;
   public uuid: string;
@@ -2611,7 +2611,7 @@ export class ZipJobDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      "__class__": "ZipJobDto",
+      "__class__": "ZipDirectoryJobDto",
       name: this.name,
       num_args: toJsonValue(this.num_args),
       uuid: this.uuid,
@@ -2620,11 +2620,36 @@ export class ZipJobDto {
       output_path: this.output_path,
     };
   }
-  public static fromJsonValue(value: JsonValue): ZipJobDto | Error {
-    return parse_as_ZipJobDto(value);
+  public static fromJsonValue(value: JsonValue): ZipDirectoryJobDto | Error {
+    return parse_as_ZipDirectoryJobDto(value);
   }
 }
 
+export function parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto0None_endof_(
+  value: JsonValue,
+): PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto | undefined | Error {
+  const parsed_option_0 = parse_as_PrecomputedChunksSinkDto(value);
+  if (!(parsed_option_0 instanceof Error)) {
+    return parsed_option_0;
+  }
+  const parsed_option_1 = parse_as_N5DataSinkDto(value);
+  if (!(parsed_option_1 instanceof Error)) {
+    return parsed_option_1;
+  }
+  const parsed_option_2 = parse_as_DziLevelSinkDto(value);
+  if (!(parsed_option_2 instanceof Error)) {
+    return parsed_option_2;
+  }
+  const parsed_option_3 = parse_as_None(value);
+  if (!(parsed_option_3 instanceof Error)) {
+    return parsed_option_3;
+  }
+  return Error(
+    `Could not parse ${
+      JSON.stringify(value)
+    } into PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto | undefined`,
+  );
+}
 export function parse_as_TransferFileJobDto(value: JsonValue): TransferFileJobDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
@@ -2645,12 +2670,17 @@ export function parse_as_TransferFileJobDto(value: JsonValue): TransferFileJobDt
   if (temp_status instanceof Error) return temp_status;
   const temp_target_url = parse_as_UrlDto(valueObject.target_url);
   if (temp_target_url instanceof Error) return temp_target_url;
+  const temp_result_sink = parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto0None_endof_(
+    valueObject.result_sink,
+  );
+  if (temp_result_sink instanceof Error) return temp_result_sink;
   return new TransferFileJobDto({
     name: temp_name,
     num_args: temp_num_args,
     uuid: temp_uuid,
     status: temp_status,
     target_url: temp_target_url,
+    result_sink: temp_result_sink,
   });
 }
 // Automatically generated via DataTransferObject for TransferFileJobDto
@@ -2661,18 +2691,21 @@ export class TransferFileJobDto {
   public uuid: string;
   public status: JobFinishedDto | JobIsPendingDto | JobIsRunningDto | JobCanceledDto;
   public target_url: UrlDto;
+  public result_sink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto | undefined;
   constructor(_params: {
     name: string;
     num_args: number | undefined;
     uuid: string;
     status: JobFinishedDto | JobIsPendingDto | JobIsRunningDto | JobCanceledDto;
     target_url: UrlDto;
+    result_sink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto | undefined;
   }) {
     this.name = _params.name;
     this.num_args = _params.num_args;
     this.uuid = _params.uuid;
     this.status = _params.status;
     this.target_url = _params.target_url;
+    this.result_sink = _params.result_sink;
   }
   public toJsonValue(): JsonObject {
     return {
@@ -2682,6 +2715,7 @@ export class TransferFileJobDto {
       uuid: this.uuid,
       status: toJsonValue(this.status),
       target_url: this.target_url.toJsonValue(),
+      result_sink: toJsonValue(this.result_sink),
     };
   }
   public static fromJsonValue(value: JsonValue): TransferFileJobDto | Error {
@@ -2689,9 +2723,16 @@ export class TransferFileJobDto {
   }
 }
 
-export function parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto0TransferFileJobDto0JobDto_endof_(
+export function parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipDirectoryJobDto0TransferFileJobDto0JobDto_endof_(
   value: JsonValue,
-): ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto | TransferFileJobDto | JobDto | Error {
+):
+  | ExportJobDto
+  | OpenDatasinkJobDto
+  | CreateDziPyramidJobDto
+  | ZipDirectoryJobDto
+  | TransferFileJobDto
+  | JobDto
+  | Error {
   const parsed_option_0 = parse_as_ExportJobDto(value);
   if (!(parsed_option_0 instanceof Error)) {
     return parsed_option_0;
@@ -2704,7 +2745,7 @@ export function parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyram
   if (!(parsed_option_2 instanceof Error)) {
     return parsed_option_2;
   }
-  const parsed_option_3 = parse_as_ZipJobDto(value);
+  const parsed_option_3 = parse_as_ZipDirectoryJobDto(value);
   if (!(parsed_option_3 instanceof Error)) {
     return parsed_option_3;
   }
@@ -2719,20 +2760,22 @@ export function parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyram
   return Error(
     `Could not parse ${
       JSON.stringify(value)
-    } into ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto | TransferFileJobDto | JobDto`,
+    } into ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipDirectoryJobDto | TransferFileJobDto | JobDto`,
   );
 }
-export function parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto0TransferFileJobDto0JobDto_endof_0_varlen__endof_(
+export function parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipDirectoryJobDto0TransferFileJobDto0JobDto_endof_0_varlen__endof_(
   value: JsonValue,
-): Array<ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto | TransferFileJobDto | JobDto> | Error {
+):
+  | Array<ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipDirectoryJobDto | TransferFileJobDto | JobDto>
+  | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
   const out: Array<
-    ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto | TransferFileJobDto | JobDto
+    ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipDirectoryJobDto | TransferFileJobDto | JobDto
   > = [];
   for (let item of arr) {
     let parsed_item =
-      parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto0TransferFileJobDto0JobDto_endof_(
+      parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipDirectoryJobDto0TransferFileJobDto0JobDto_endof_(
         item,
       );
     if (parsed_item instanceof Error) return parsed_item;
@@ -2815,7 +2858,7 @@ export function parse_as_PixelClassificationExportAppletStateDto(
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a PixelClassificationExportAppletStateDto`);
   }
   const temp_jobs =
-    parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto0TransferFileJobDto0JobDto_endof_0_varlen__endof_(
+    parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipDirectoryJobDto0TransferFileJobDto0JobDto_endof_0_varlen__endof_(
       valueObject.jobs,
     );
   if (temp_jobs instanceof Error) return temp_jobs;
@@ -2838,14 +2881,16 @@ export function parse_as_PixelClassificationExportAppletStateDto(
 // Do not edit!
 export class PixelClassificationExportAppletStateDto {
   public jobs: Array<
-    ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto | TransferFileJobDto | JobDto
+    ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipDirectoryJobDto | TransferFileJobDto | JobDto
   >;
   public populated_labels: Array<LabelHeaderDto> | undefined;
   public datasource_suggestions:
     | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
     | undefined;
   constructor(_params: {
-    jobs: Array<ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto | TransferFileJobDto | JobDto>;
+    jobs: Array<
+      ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipDirectoryJobDto | TransferFileJobDto | JobDto
+    >;
     populated_labels: Array<LabelHeaderDto> | undefined;
     datasource_suggestions:
       | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>

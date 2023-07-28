@@ -356,15 +356,16 @@ class CreateDziPyramidJobDto(JobDto):
     pass
 
 @dataclass
-class ZipJobDto(JobDto):
+class ZipDirectoryJobDto(JobDto):
     output_fs: FsDto
     output_path: str
 
 @dataclass
 class TransferFileJobDto(JobDto):
     target_url: UrlDto
+    result_sink: Optional[DataSinkDto]
 
-ExportJobDtoUnion = Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto, TransferFileJobDto, JobDto]
+ExportJobDtoUnion = Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipDirectoryJobDto, TransferFileJobDto, JobDto]
 
 @dataclass
 class PixelClassificationExportAppletStateDto(DataTransferObject):

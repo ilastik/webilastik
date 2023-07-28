@@ -31,7 +31,7 @@ from webilastik.server.rpc.dto import (
 )
 from webilastik.simple_segmenter import SimpleSegmenter
 from webilastik.ui.applet import AppletOutput, StatelesApplet, UserPrompt
-from webilastik.ui.applet.export_jobs import CreateDziPyramid, DownscaleDatasource, ExportJob, ZipDirectory
+from webilastik.ui.applet.export_jobs import CreateDziPyramid, DownscaleDatasource, ExportJob, TransferFileJob, ZipDirectoryJob
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.usage_error import UsageError
 from webilastik.ui.applet.brushing_applet import Label
@@ -98,7 +98,8 @@ class PixelClassificationExportApplet(StatelesApplet):
         operator: Operator[DataRoi, Array5D],
         datasource: DataSource,
         datasink: DataSink,
-        on_success: Callable[[DataSink], Any] = lambda _: None
+        on_success: Callable[[DataSink], Any] = lambda _: None,
+        clean_on_success: bool = True,
     ):
         def on_open_datasink_done(sink_writer: IDataSinkWriter):
             export_job = ExportJob(
@@ -109,7 +110,7 @@ class PixelClassificationExportApplet(StatelesApplet):
                 args=datasource.roi.split(block_shape=sink_writer.data_sink.tile_shape.updated(c=datasource.shape.c)),
                 num_args=datasource.roi.get_num_tiles(tile_shape=sink_writer.data_sink.tile_shape),
             )
-            _ = self._launch_job(export_job, on_success=lambda _: on_success(datasink))
+            _ = self._launch_job(export_job, on_success=lambda _: on_success(datasink), clean_on_success=clean_on_success)
 
         return self._launch_open_datasink_job(datasink=datasink, on_succcess=on_open_datasink_done)
 
@@ -195,7 +196,7 @@ class PixelClassificationExportApplet(StatelesApplet):
             return UsageError("Data sink should have dtype of float32 for this kind of export")
         if isinstance(datasink, FsDataSink) and isinstance(datasink.filesystem, ZipFs):
             return UsageError("Exporting pixel probabilities to Zip archives is not supported yet")
-        _ = self._launch_export_job(job_name="Exporting Pixel Probabilities", operator=classifier, datasource=datasource, datasink=datasink)
+        _ = self._launch_export_job(job_name="Exporting Pixel Probabilities", operator=classifier, datasource=datasource, datasink=datasink, clean_on_success=False)
 
     def launch_simple_segmentation_export_job(
         self, *, datasource: DataSource, datasink: DataSink, label_name: str,
@@ -233,6 +234,7 @@ class PixelClassificationExportApplet(StatelesApplet):
             scratch_fs_xml_path = scratch_fs_dzi_dir_path / datasink.xml_path.as_posix().lstrip("/")
             scratch_fs_dzip_path = PurePosixPath("/final_export/output.dzip")
 
+            clean_export_on_success = True
             export_job_sink = PrecomputedChunksSink(
                 filesystem=scratch_fs_result,
                 dtype=datasink.dtype,
@@ -254,8 +256,8 @@ class PixelClassificationExportApplet(StatelesApplet):
                     datasource=export_job_sink.to_datasource(),
                     pyramid=pyramid,
                     on_succcess=lambda _: self._launch_job(
-                        ZipDirectory(
-                            name=f"Zipping results from {datasink.url.raw}...",
+                        ZipDirectoryJob(
+                            name=f"Zipping results...",
                             input_fs=pyramid[0].filesystem,
                             input_directory=scratch_fs_xml_path.parent,
                             output_fs=scratch_fs_result,
@@ -263,12 +265,13 @@ class PixelClassificationExportApplet(StatelesApplet):
                             delete_source=True,
                         ),
                         on_success=lambda _: self._launch_job(
-                            SimpleJob[None, Exception](
-                                f"Transferring results to {datasink.filesystem.geturl(PurePosixPath('/'))}",
-                                target=target_fs.transfer_file,
+                            TransferFileJob(
+                                name=f"Uploading results...",
                                 source_fs=scratch_fs_result,
                                 source_path=scratch_fs_dzip_path,
+                                target_fs=target_fs,
                                 target_path=target_dzip_path,
+                                result_sink=datasink,
                             ),
                             clean_on_success=False,
                             on_success=lambda _: print(f"Should have transferred to {target_fs.geturl(target_dzip_path)}")
@@ -277,6 +280,7 @@ class PixelClassificationExportApplet(StatelesApplet):
                 )
             )
         else:
+            clean_export_on_success = False
             export_job_sink = datasink
             on_export_success: Callable[[DataSink], Any] = lambda sink: None
 
@@ -286,6 +290,7 @@ class PixelClassificationExportApplet(StatelesApplet):
             operator=segmenter,
             datasink=export_job_sink,
             on_success=on_export_success,
+            clean_on_success=clean_export_on_success,
         )
 
 

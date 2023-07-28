@@ -2723,13 +2723,19 @@ class CreateDziPyramidJobDto(JobDto):
         return parse_as_CreateDziPyramidJobDto(value)
 
 
-def parse_as_ZipJobDto(value: JsonValue) -> "ZipJobDto | MessageParsingError":
+def parse_as_ZipDirectoryJobDto(
+    value: JsonValue,
+) -> "ZipDirectoryJobDto | MessageParsingError":
     from collections.abc import Mapping
 
     if not isinstance(value, Mapping):
-        return MessageParsingError(f"Could not parse {json.dumps(value)} as ZipJobDto")
-    if value.get("__class__") != "ZipJobDto":
-        return MessageParsingError(f"Could not parse {json.dumps(value)} as ZipJobDto")
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as ZipDirectoryJobDto"
+        )
+    if value.get("__class__") != "ZipDirectoryJobDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as ZipDirectoryJobDto"
+        )
     tmp_name = parse_as_str(value.get("name"))
     if isinstance(tmp_name, MessageParsingError):
         return tmp_name
@@ -2752,7 +2758,7 @@ def parse_as_ZipJobDto(value: JsonValue) -> "ZipJobDto | MessageParsingError":
     tmp_output_path = parse_as_str(value.get("output_path"))
     if isinstance(tmp_output_path, MessageParsingError):
         return tmp_output_path
-    return ZipJobDto(
+    return ZipDirectoryJobDto(
         name=tmp_name,
         num_args=tmp_num_args,
         uuid=tmp_uuid,
@@ -2763,13 +2769,13 @@ def parse_as_ZipJobDto(value: JsonValue) -> "ZipJobDto | MessageParsingError":
 
 
 @dataclass
-class ZipJobDto(JobDto):
+class ZipDirectoryJobDto(JobDto):
     output_fs: FsDto
     output_path: str
 
     def to_json_value(self) -> JsonObject:
         return {
-            "__class__": "ZipJobDto",
+            "__class__": "ZipDirectoryJobDto",
             "name": self.name,
             "num_args": convert_to_json_value(self.num_args),
             "uuid": self.uuid,
@@ -2779,8 +2785,30 @@ class ZipJobDto(JobDto):
         }
 
     @classmethod
-    def from_json_value(cls, value: JsonValue) -> "ZipJobDto | MessageParsingError":
-        return parse_as_ZipJobDto(value)
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "ZipDirectoryJobDto | MessageParsingError":
+        return parse_as_ZipDirectoryJobDto(value)
+
+
+def parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto0None_endof_(
+    value: JsonValue,
+) -> "Union[PrecomputedChunksSinkDto, N5DataSinkDto, DziLevelSinkDto, None] | MessageParsingError":
+    parsed_option_0 = parse_as_PrecomputedChunksSinkDto(value)
+    if not isinstance(parsed_option_0, MessageParsingError):
+        return parsed_option_0
+    parsed_option_1 = parse_as_N5DataSinkDto(value)
+    if not isinstance(parsed_option_1, MessageParsingError):
+        return parsed_option_1
+    parsed_option_2 = parse_as_DziLevelSinkDto(value)
+    if not isinstance(parsed_option_2, MessageParsingError):
+        return parsed_option_2
+    parsed_option_3 = parse_as_None(value)
+    if not isinstance(parsed_option_3, MessageParsingError):
+        return parsed_option_3
+    return MessageParsingError(
+        f"Could not parse {json.dumps(value)} into Union[PrecomputedChunksSinkDto, N5DataSinkDto, DziLevelSinkDto, None]"
+    )
 
 
 def parse_as_TransferFileJobDto(
@@ -2813,18 +2841,25 @@ def parse_as_TransferFileJobDto(
     tmp_target_url = parse_as_UrlDto(value.get("target_url"))
     if isinstance(tmp_target_url, MessageParsingError):
         return tmp_target_url
+    tmp_result_sink = parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto0None_endof_(
+        value.get("result_sink")
+    )
+    if isinstance(tmp_result_sink, MessageParsingError):
+        return tmp_result_sink
     return TransferFileJobDto(
         name=tmp_name,
         num_args=tmp_num_args,
         uuid=tmp_uuid,
         status=tmp_status,
         target_url=tmp_target_url,
+        result_sink=tmp_result_sink,
     )
 
 
 @dataclass
 class TransferFileJobDto(JobDto):
     target_url: UrlDto
+    result_sink: Optional[DataSinkDto]
 
     def to_json_value(self) -> JsonObject:
         return {
@@ -2834,6 +2869,7 @@ class TransferFileJobDto(JobDto):
             "uuid": self.uuid,
             "status": convert_to_json_value(self.status),
             "target_url": self.target_url.to_json_value(),
+            "result_sink": convert_to_json_value(self.result_sink),
         }
 
     @classmethod
@@ -2847,15 +2883,15 @@ ExportJobDtoUnion = Union[
     ExportJobDto,
     OpenDatasinkJobDto,
     CreateDziPyramidJobDto,
-    ZipJobDto,
+    ZipDirectoryJobDto,
     TransferFileJobDto,
     JobDto,
 ]
 
 
-def parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto0TransferFileJobDto0JobDto_endof_(
+def parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipDirectoryJobDto0TransferFileJobDto0JobDto_endof_(
     value: JsonValue,
-) -> "Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto, TransferFileJobDto, JobDto] | MessageParsingError":
+) -> "Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipDirectoryJobDto, TransferFileJobDto, JobDto] | MessageParsingError":
     parsed_option_0 = parse_as_ExportJobDto(value)
     if not isinstance(parsed_option_0, MessageParsingError):
         return parsed_option_0
@@ -2865,7 +2901,7 @@ def parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0Zip
     parsed_option_2 = parse_as_CreateDziPyramidJobDto(value)
     if not isinstance(parsed_option_2, MessageParsingError):
         return parsed_option_2
-    parsed_option_3 = parse_as_ZipJobDto(value)
+    parsed_option_3 = parse_as_ZipDirectoryJobDto(value)
     if not isinstance(parsed_option_3, MessageParsingError):
         return parsed_option_3
     parsed_option_4 = parse_as_TransferFileJobDto(value)
@@ -2875,29 +2911,29 @@ def parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0Zip
     if not isinstance(parsed_option_5, MessageParsingError):
         return parsed_option_5
     return MessageParsingError(
-        f"Could not parse {json.dumps(value)} into Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto, TransferFileJobDto, JobDto]"
+        f"Could not parse {json.dumps(value)} into Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipDirectoryJobDto, TransferFileJobDto, JobDto]"
     )
 
 
-def parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto0TransferFileJobDto0JobDto_endof_0_varlen__endof_(
+def parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipDirectoryJobDto0TransferFileJobDto0JobDto_endof_0_varlen__endof_(
     value: JsonValue,
-) -> "Tuple[Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto, TransferFileJobDto, JobDto], ...] | MessageParsingError":
+) -> "Tuple[Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipDirectoryJobDto, TransferFileJobDto, JobDto], ...] | MessageParsingError":
     if not isinstance(value, (list, tuple)):
         return MessageParsingError(
-            f"Could not parse Tuple[Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto, TransferFileJobDto, JobDto], ...] from {json.dumps(value)}"
+            f"Could not parse Tuple[Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipDirectoryJobDto, TransferFileJobDto, JobDto], ...] from {json.dumps(value)}"
         )
     items: List[
         Union[
             ExportJobDto,
             OpenDatasinkJobDto,
             CreateDziPyramidJobDto,
-            ZipJobDto,
+            ZipDirectoryJobDto,
             TransferFileJobDto,
             JobDto,
         ]
     ] = []
     for item in value:
-        parsed = parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto0TransferFileJobDto0JobDto_endof_(
+        parsed = parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipDirectoryJobDto0TransferFileJobDto0JobDto_endof_(
             item
         )
         if isinstance(parsed, MessageParsingError):
@@ -2990,7 +3026,7 @@ def parse_as_PixelClassificationExportAppletStateDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as PixelClassificationExportAppletStateDto"
         )
-    tmp_jobs = parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto0TransferFileJobDto0JobDto_endof_0_varlen__endof_(
+    tmp_jobs = parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipDirectoryJobDto0TransferFileJobDto0JobDto_endof_0_varlen__endof_(
         value.get("jobs")
     )
     if isinstance(tmp_jobs, MessageParsingError):
