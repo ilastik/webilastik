@@ -63,6 +63,7 @@ def test_pixel_classifier():
         )
     loaded_classifier = loaded_classification_group.classifier
     assert loaded_classifier is not None
+    assert loaded_classifier.num_input_channels == classifier.num_input_channels
 
     for label_index, label in enumerate(loaded_classification_group.labels):
         loaded_points: Set[Point5D] = set()
