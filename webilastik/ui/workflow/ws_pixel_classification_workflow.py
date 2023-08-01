@@ -27,6 +27,7 @@ from webilastik.classic_ilastik.ilp.pixel_classification_ilp import IlpPixelClas
 from webilastik.filesystem import FsFileNotFoundException, FsIoException, IFilesystem, create_filesystem_from_message, create_filesystem_from_url
 from webilastik.filesystem.os_fs import OsFs
 from webilastik.scheduling.job import PriorityExecutor
+from webilastik.serialization.json_serialization import parse_json
 from webilastik.server.rpc.dto import (
     GetDatasourcesFromUrlParamsDto,
     GetDatasourcesFromUrlResponseDto,
@@ -103,20 +104,6 @@ class WebIlastik:
         if self._loop == None:
             self._loop = self.app.loop
         return self._loop
-
-    def enqueue_user_interaction(self, user_interaction: Callable[[], Optional[UsageError]]):
-        async def do_rpc():
-            error_message = None
-            try:
-                result = user_interaction()
-                if isinstance(result, UsageError):
-                    error_message = str(result)
-            except Exception as e:
-                traceback_messages = traceback.format_exc()
-                error_message = f"Unhandled Exception: {e}\n\n{traceback_messages}"
-                logger.error(error_message)
-            self._update_clients(error_message=error_message)
-        self.loop.call_soon_threadsafe(lambda: self.loop.create_task(do_rpc()))
 
     async def close_websockets(self, app: Application):
         for ws in self.websockets:
@@ -286,6 +273,24 @@ class WebIlastik:
     def run(self, host: Optional[str] = None, port: Optional[int] = None, unix_socket_path: Optional[str] = None):
         web.run_app(self.app, port=port, path=unix_socket_path)
 
+    def _do_rpc(self, message: str) -> "None | Exception":
+        parsed_payload = parse_json(message)
+        if isinstance(parsed_payload, Exception):
+            return parsed_payload
+        logger.debug(f"Got new rpc call:\n{json.dumps(parsed_payload, indent=4)}\n")
+        payload = RPCPayload.from_json_value(parsed_payload)
+        logger.debug("GOT PAYLOAD OK")
+
+        try:
+            return self.workflow.run_rpc(
+                user_prompt=dummy_prompt,
+                applet_name=payload.applet_name,
+                method_name=payload.method_name,
+                arguments=payload.arguments,
+            )
+        except Exception as e:
+            return e
+
     async def open_websocket(self, request: web.Request):
         websocket = web.WebSocketResponse()
         _ = await websocket.prepare(request)
@@ -297,23 +302,12 @@ class WebIlastik:
                 if msg.data == 'close':
                     _ = await websocket.close()
                     continue
-                try:
-                    parsed_payload = json.loads(msg.data)
-                    logger.debug(f"Got new rpc call:\n{json.dumps(parsed_payload, indent=4)}\n")
-                    payload = RPCPayload.from_json_value(parsed_payload)
-                    logger.debug("GOT PAYLOAD OK")
-                    user_interaction = partial(
-                        self.workflow.run_rpc,
-                        user_prompt=dummy_prompt,
-                        applet_name=payload.applet_name,
-                        method_name=payload.method_name,
-                        arguments=payload.arguments,
-                    )
-                    self.enqueue_user_interaction(user_interaction)
-                except Exception:
-                    import traceback
-                    traceback.print_exc()
-                    self._update_clients() # restore last known good state of offending client
+                rpc_result = self._do_rpc(msg.data)
+                error_message: "None | str" = None
+                if isinstance(rpc_result, Exception):
+                    error_message = str(rpc_result)
+                    logger.error(error_message)
+                self._update_clients(error_message=error_message)
             elif msg.type == aiohttp.WSMsgType.BINARY:
                 logger.error(f'Unexpected binary message')
             elif msg.type == aiohttp.WSMsgType.ERROR:
