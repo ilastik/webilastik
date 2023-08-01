@@ -91,20 +91,6 @@ class RPCPayload:
 def do_save_project(filesystem: IFilesystem, file_path: PurePosixPath, workflow_contents: bytes) -> "None | FsIoException":
     return filesystem.create_file(path=file_path, contents=workflow_contents)
 
-def download_project_bytes(filesystem: IFilesystem, ilp_path: PurePosixPath) -> "Path | FsFileNotFoundException | FsIoException":
-    if isinstance(filesystem, OsFs):
-        return Path(ilp_path) # FIXME: windows?
-    tmp_file_handle, tmp_ilp_path = tempfile.mkstemp(suffix=".ilp") # FIXME
-    ilp_bytes_result = filesystem.read_file(ilp_path)
-    if isinstance(ilp_bytes_result, Exception):
-        return ilp_bytes_result
-    try:
-        _ = os.write(tmp_file_handle, ilp_bytes_result)
-    except Exception:
-        return FsIoException("Failed writing ilp file")
-    os.close(tmp_file_handle)
-    return Path(tmp_ilp_path)
-
 class WebIlastik:
     @property
     def http_client_session(self) -> ClientSession:
