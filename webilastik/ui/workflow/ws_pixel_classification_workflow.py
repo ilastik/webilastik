@@ -149,7 +149,7 @@ class WebIlastik:
         self.priority_executor = PriorityExecutor(executor=self.executor, max_active_job_steps=2 * multiprocessing.cpu_count())
 
         self.workflow = WsPixelClassificationWorkflow(
-            on_async_change=lambda: self.enqueue_user_interaction(user_interaction=lambda: None), #FIXME?
+            on_async_change=lambda: self.loop.call_soon_threadsafe(self._update_clients) and None,
             executor=self.executor,
             priority_executor=self.priority_executor
         )
@@ -416,7 +416,7 @@ class WebIlastik:
 
         new_workflow_result =  WsPixelClassificationWorkflow.from_ilp(
             workflow_group=group_result,
-            on_async_change=lambda: self.enqueue_user_interaction(user_interaction=lambda: None), #FIXME?
+            on_async_change=lambda: self.loop.call_soon_threadsafe(self._update_clients) and None, #FIXME?
             executor=self.executor,
             priority_executor=self.priority_executor,
         )
