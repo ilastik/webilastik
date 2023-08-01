@@ -104,6 +104,14 @@ class IlpPixelClassificationGroup:
         return name
 
     @classmethod
+    def sort_filters(cls, filters: Sequence[IlpFilter]) -> List[IlpFilter]:
+        #FIXME: some sorting might be necessary to ensure compatibility with classic ilastik
+        # but it is currently breaking deserialization since the forest expects the exact order of features
+        return list(filters)
+        get_feature_extractor_order: Callable[[IlpFilter], Tuple[int, float]] = lambda ex: (cls.feature_classes.index(ex.__class__), ex.ilp_scale)
+        return sorted(filters, key=get_feature_extractor_order)
+
+    @classmethod
     def ilp_filters_and_expected_num_channels_from_names(cls, feature_names: Sequence[str]) -> Tuple[Sequence[IlpFilter], int]:
         out: List[IlpFilter] = []
 
@@ -124,6 +132,9 @@ class IlpPixelClassificationGroup:
             expected_num_channels = max(expected_num_channels, (channel_index + 1) // ilp_filter.channel_multiplier)
             if len(out) == 0 or out[-1] != ilp_filter:
                 out.append(ilp_filter)
+
+        out = cls.sort_filters(out)
+
         return (out, expected_num_channels)
 
 
@@ -187,8 +198,7 @@ class IlpPixelClassificationGroup:
             ClassifierForests = group.create_group("ClassifierForests")
 
             feature_names: List[bytes] = []
-            get_feature_extractor_order: Callable[[IlpFilter], int] = lambda ex: self.feature_classes.index(ex.__class__)
-            for fe in sorted(self.classifier.feature_extractors, key=get_feature_extractor_order):
+            for fe in self.sort_filters(self.classifier.feature_extractors):
                 for c in range(self.classifier.num_input_channels * fe.channel_multiplier):
                     feature_names.append(self.make_feature_ilp_name(fe, channel_index=c).encode("utf8"))
 

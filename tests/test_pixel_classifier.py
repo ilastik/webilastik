@@ -25,12 +25,12 @@ def test_pixel_classifier():
     default_scales = [0.7, 1.0, 1.6, 3.5, 5.0, 10.0]
 
     feature_extractors: List[IlpFilter] = [
+        *[IlpHessianOfGaussianEigenvalues(ilp_scale=scale, axis_2d="z") for scale in default_scales],
         *[IlpGaussianSmoothing(ilp_scale=scale, axis_2d="z") for scale in default_scales],
-        *[IlpLaplacianOfGaussian(ilp_scale=scale, axis_2d="z") for scale in default_scales],
         *[IlpGaussianGradientMagnitude(ilp_scale=scale, axis_2d="z") for scale in default_scales],
+        *[IlpLaplacianOfGaussian(ilp_scale=scale, axis_2d="z") for scale in default_scales],
         *[IlpDifferenceOfGaussians(ilp_scale=scale, axis_2d="z") for scale in default_scales],
         *[IlpStructureTensorEigenvalues(ilp_scale=scale, axis_2d="z") for scale in default_scales],
-        *[IlpHessianOfGaussianEigenvalues(ilp_scale=scale, axis_2d="z") for scale in default_scales],
     ]
     labels = tests.get_sample_c_cells_pixel_annotations()
     classifier = VigraPixelClassifier.train(
@@ -64,6 +64,9 @@ def test_pixel_classifier():
     loaded_classifier = loaded_classification_group.classifier
     assert loaded_classifier is not None
     assert loaded_classifier.num_input_channels == classifier.num_input_channels
+
+    for fe, loaded_fe in zip(classifier.feature_extractors, loaded_classifier.feature_extractors):
+        assert fe == loaded_fe, str(f"Feature extractors don't match: {fe} {loaded_fe}")
 
     for label_index, label in enumerate(loaded_classification_group.labels):
         loaded_points: Set[Point5D] = set()
