@@ -9,13 +9,13 @@ from webilastik.classifiers.pixel_classifier import PixelClassifier, VigraPixelC
 
 from webilastik.datasource import DataRoi, FsDataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale, RawEncoder
-from webilastik.server.util import get_encoded_datasource_from_url
 from webilastik.server.rpc import MessageParsingError
 from webilastik.server.rpc.dto import CheckDatasourceCompatibilityParams, CheckDatasourceCompatibilityResponse, RpcErrorDto, Shape5DDto
 from webilastik.ui.applet import CascadeError, UserPrompt
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.usage_error import UsageError
+from webilastik.ui.datasource import get_encoded_datasource_from_url
 from webilastik.server.session_allocator import uncachable_json_response
 
 class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):

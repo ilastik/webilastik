@@ -9,7 +9,7 @@ from typing import ClassVar, Optional, Sequence
 from cryptography.fernet import Fernet
 from webilastik.libebrains.oidc_client import OidcClient
 
-from webilastik.libebrains.user_token import UserToken
+from webilastik.libebrains.user_token import AccessToken, UserToken
 from webilastik.utility import Hostname, Minutes, Username
 from webilastik.utility.url import Url
 
@@ -248,7 +248,12 @@ class WorkflowConfig(WebilastikConfig):
                 EBRAINS_USER_REFRESH_TOKEN,
                 help_text="The raw string for an ebrains user refresh token, retrieved from ebrains iam",
             )
-            ebrains_user_token = UserToken(access_token=raw_user_access_token, refresh_token=raw_user_refresh_token)
+            access_token_result = AccessToken.from_raw_token_sync(raw_user_access_token)
+            if isinstance(access_token_result, Exception):
+                raise access_token_result
+            if access_token_result is None:
+                raise Exception("Could not get an access token from config")
+            ebrains_user_token = UserToken(access_token=access_token_result, refresh_token=raw_user_refresh_token or None)
         return WorkflowConfig(
             allow_local_fs=allow_local_fs if allow_local_fs is not None else read_bool_env_var(
                 name= WEBILASTIK_ALLOW_LOCAL_FS,
@@ -294,8 +299,8 @@ class WorkflowConfig(WebilastikConfig):
             *super().to_env_vars(),
             EnvVar(name=WEBILASTIK_ALLOW_LOCAL_FS, value=str(self.allow_local_fs).lower()),
             EnvVar(name=WEBILASTIK_SCRATCH_DIR, value=str(self.scratch_dir)),
-            EnvVar(name=EBRAINS_USER_ACCESS_TOKEN, value=self.ebrains_user_token.access_token),
-            EnvVar(name=EBRAINS_USER_REFRESH_TOKEN, value=self.ebrains_user_token.refresh_token),
+            EnvVar(name=EBRAINS_USER_ACCESS_TOKEN, value=self.ebrains_user_token.access_token.raw_token),
+            EnvVar(name=EBRAINS_USER_REFRESH_TOKEN, value=self.ebrains_user_token.refresh_token or ""),
             EnvVar(name=WEBILASTIK_JOB_MAX_DURATION_MINUTES, value=str(self.max_duration_minutes.to_int())),
             EnvVar(name=WEBILASTIK_JOB_LISTEN_SOCKET, value=str(self.listen_socket)),
             EnvVar(name=WEBILASTIK_JOB_SESSION_URL, value=self.session_url.raw),

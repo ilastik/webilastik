@@ -104,6 +104,14 @@ class IlpPixelClassificationGroup:
         return name
 
     @classmethod
+    def sort_filters(cls, filters: Sequence[IlpFilter]) -> List[IlpFilter]:
+        #FIXME: some sorting might be necessary to ensure compatibility with classic ilastik
+        # but it is currently breaking deserialization since the forest expects the exact order of features
+        return list(filters)
+        get_feature_extractor_order: Callable[[IlpFilter], Tuple[int, float]] = lambda ex: (cls.feature_classes.index(ex.__class__), ex.ilp_scale)
+        return sorted(filters, key=get_feature_extractor_order)
+
+    @classmethod
     def ilp_filters_and_expected_num_channels_from_names(cls, feature_names: Sequence[str]) -> Tuple[Sequence[IlpFilter], int]:
         out: List[IlpFilter] = []
 
@@ -121,9 +129,12 @@ class IlpPixelClassificationGroup:
             ilp_filter = filter_class(
                 ilp_scale=ilp_scale, axis_2d= "z" if in_2D else None # FIXME: is axis_2d always 'z'?
             )
-            expected_num_channels = max(expected_num_channels, channel_index // ilp_filter.channel_multiplier)
+            expected_num_channels = max(expected_num_channels, (channel_index + 1) // ilp_filter.channel_multiplier)
             if len(out) == 0 or out[-1] != ilp_filter:
                 out.append(ilp_filter)
+
+        out = cls.sort_filters(out)
+
         return (out, expected_num_channels)
 
 
@@ -187,8 +198,7 @@ class IlpPixelClassificationGroup:
             ClassifierForests = group.create_group("ClassifierForests")
 
             feature_names: List[bytes] = []
-            get_feature_extractor_order: Callable[[IlpFilter], int] = lambda ex: self.feature_classes.index(ex.__class__)
-            for fe in sorted(self.classifier.feature_extractors, key=get_feature_extractor_order):
+            for fe in self.sort_filters(self.classifier.feature_extractors):
                 for c in range(self.classifier.num_input_channels * fe.channel_multiplier):
                     feature_names.append(self.make_feature_ilp_name(fe, channel_index=c).encode("utf8"))
 
@@ -368,7 +378,7 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
 
     @classmethod
     def from_file(cls, *, ilp_fs: OsFs, path: PurePosixPath) -> "IlpPixelClassificationWorkflowGroup | Exception":
-        native_path = Path(ilp_fs.geturl(path).path)
+        native_path = Path(ilp_fs.resolve_path(path))
         try:
             with h5py.File(native_path, "r") as f:
                 return IlpPixelClassificationWorkflowGroup.parse(group=f, ilp_fs=ilp_fs)
@@ -385,9 +395,15 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
         if workflowname != "Pixel Classification":
             raise IlpParsingError(f"Unexpected workflow name: {workflowname}")
 
+        fs_base_path = ilp_fs.geturl(PurePosixPath("dummy")).path.parent
+        ilp_path = PurePosixPath(group.file.filename)
+        if not ilp_path.is_relative_to(fs_base_path):
+            return Exception("Could not retrieve ilp file path. This is a bug")
+        ilp_path = ilp_path.relative_to(fs_base_path)
+
         Input_Data = IlpInputDataGroup.parse(ensure_group(group, "Input Data"))
         raw_data_datasources_result = Input_Data.try_to_datasources(
-            role_name="Raw Data", ilp_fs=ilp_fs, ilp_path=PurePosixPath(group.file.filename)
+            role_name="Raw Data", ilp_fs=ilp_fs, ilp_path=ilp_path
         )
         if isinstance(raw_data_datasources_result, Exception):
             return raw_data_datasources_result

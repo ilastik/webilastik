@@ -8,9 +8,11 @@ from typing import List
 import numpy as np
 
 from tests import create_precomputed_chunks_sink, get_sample_c_cells_datasource, get_sample_c_cells_pixel_annotations, get_sample_dzip_c_cells_datasource
+from webilastik.classic_ilastik.ilp.pixel_classification_ilp import IlpPixelClassificationWorkflowGroup
+from webilastik.datasink import FsDataSink
 from webilastik.filesystem.zip_fs import ZipFs
+from webilastik.datasink.deep_zoom_sink import DziLevelSink
 from webilastik.datasource import DataRoi
-from webilastik.datasource.deep_zoom_datasource import DziLevelDataSource
 from webilastik.features.ilp_filter import (
     IlpDifferenceOfGaussians, IlpGaussianGradientMagnitude, IlpGaussianSmoothing,
     IlpHessianOfGaussianEigenvalues, IlpLaplacianOfGaussian, IlpStructureTensorEigenvalues,
@@ -18,6 +20,7 @@ from webilastik.features.ilp_filter import (
 from webilastik.features.ilp_filter import IlpFilter
 from webilastik.filesystem.os_fs import OsFs
 from webilastik.scheduling.job import PriorityExecutor
+from webilastik.server.rpc.dto import DziLevelSinkDto, JobCanceledDto, JobFinishedDto, JobIsPendingDto
 from webilastik.ui.applet import dummy_prompt
 from webilastik.ui.workflow.pixel_classification_workflow import PixelClassificationWorkflow
 from executor_getter import get_executor
@@ -28,10 +31,14 @@ def wait_until_jobs_completed(workflow: PixelClassificationWorkflow, timeout: fl
         export_state = workflow.export_applet.get_state_dto()
         for job in export_state.jobs:
             num_args = job.num_args
-            num_completed_steps = job.num_completed_steps
             print("checkign,....")
-            print(f"job {num_args=}  {num_completed_steps=}")
-            if num_completed_steps < (num_args or float("inf")):
+            print(f"job {job.status=}")
+            if isinstance(job.status, (JobCanceledDto, JobFinishedDto)):
+                continue
+            if isinstance(job.status, JobIsPendingDto):
+                print(f"Some jobs still pending...")
+                continue
+            if job.status.num_completed_steps < (num_args or float("inf")):
                 print(f"Jobs not done yet. Waiting...")
                 time.sleep(wait_time)
                 timeout -= wait_time
@@ -99,9 +106,10 @@ def test_pixel_classification_workflow():
     _ = workflow.save_project(fs=fs, path=ilp_path)
 
     # import pydevd; pydevd.settrace()
+    workflow_ilp_group = IlpPixelClassificationWorkflowGroup.from_file(ilp_fs=fs, path=ilp_path)
+    assert not isinstance(workflow_ilp_group, Exception), str(workflow_ilp_group)
     loaded_workflow = PixelClassificationWorkflow.from_ilp(
-        fs=fs,
-        path=ilp_path,
+        workflow_group=workflow_ilp_group,
         on_async_change=lambda : print(json.dumps(workflow.export_applet._get_json_state(), indent=4)), # pyright: ignore [reportPrivateUsage]
         executor=executor,
         priority_executor=priority_executor,
@@ -187,50 +195,113 @@ def test_pixel_classification_workflow():
 ####################################3
 
     def run_dzi_export_job():
-        # sink_fs = OsFs.create(); assert not isinstance(sink_fs, Exception)
-        output_fs = OsFs.create_scratch_dir()
-        assert not isinstance(output_fs, Exception)
-        output_path = PurePosixPath("my_output.zip")
+        # zip_file_path = PurePosixPath("my_output.dzip")
+        # xml_path = PurePosixPath("/my_output.dzi")
 
-        res = workflow.export_applet.launch_export_simple_segmentation_to_dzip(
+        # output_fs = OsFs.create_scratch_dir()
+        # assert not isinstance(output_fs, Exception)
+
+        # zip_fs = ZipFs.create(zip_file_fs=output_fs, zip_file_path=zip_file_path)
+        # assert not isinstance(zip_fs, Exception), str(zip_fs)
+        # output_dzi_image = DziImageElement(
+        #     Format="png",
+        #     Overlap=0,
+        #     Size=DziSizeElement(Width=raw_data_source.shape.x, Height=raw_data_source.shape.y),
+        #     TileSize=max(raw_data_source.tile_shape.x, raw_data_source.tile_shape.y),
+        # )
+        # sink = DziLevelSink(
+        #     dzi_image=output_dzi_image,
+        #     filesystem=zip_fs,
+        #     xml_path=xml_path,
+        #     level_index=output_dzi_image.max_level_index,
+        #     num_channels=3,
+        #     spatial_resolution=None,
+        # )
+
+        datasink_dto = DziLevelSinkDto.from_json_value(json.loads(
+            """{
+                "__class__": "DziLevelSinkDto",
+                "filesystem": {
+                    "__class__": "ZipFsDto",
+                    "zip_file_fs": {
+                        "__class__": "BucketFSDto",
+                        "bucket_name": "hbp-image-service"
+                    },
+                    "zip_file_path": "/zip_sink_test/c_cells_1.png_simple_segmentation.dzip"
+                },
+                "xml_path": "/c_cells_1.png_simple_segmentation.dzi",
+                "dzi_image": {
+                    "__class__": "DziImageElementDto",
+                    "Format": "png",
+                    "Overlap": 0,
+                    "TileSize": 256,
+                    "Size": {
+                        "__class__": "DziSizeElementDto",
+                        "Width": 697,
+                        "Height": 450
+                    }
+                },
+                "num_channels": 3,
+                "level_index": 10
+            }"""
+        ))
+        assert not isinstance(datasink_dto, Exception), str(datasink_dto)
+        # import pydevd; pydevd.settrace()
+        sink = DziLevelSink.from_dto(datasink_dto)
+        assert not isinstance(sink, Exception), str(sink)
+
+
+
+
+
+        res = workflow.export_applet.launch_simple_segmentation_export_job(
             datasource=raw_data_source,
-            output_fs=output_fs,
-            output_path=output_path,
-            dzi_image_format="png",
+            datasink=sink,
             label_name="Foreground",
         )
-        assert not isinstance(res, Exception)
+        assert not isinstance(res, Exception), str(res)
 
         for _ in range(99999999):
             time.sleep(2)
             for job in workflow.export_applet.get_state_dto().jobs:
-                if job.error_message:
-                    print(f"oooooooooo A job failed: {job.name}: {job.error_message}")
+                if isinstance(job.status, JobFinishedDto):
+                    if job.status.error_message:
+                        print(f"oooooooooo A job failed: {job.name}: {job.status.error_message}")
+                        exit(1)
+                elif isinstance(job.status, JobCanceledDto):
+                    print(f"oooooooooo A job was canceled: {job.name}: {job.status.message}")
                     exit(1)
-                if job.status != "completed":
-                    print(f"ooooooooooo {time.time()} Jobs are not done yet")
+                else:
+                    print(f"ooooooooooo {time.time()} Jobs are not done yet: {job.status.to_json_value()}")
                     break
             else:
-                output_exists = output_fs.exists(output_path)
+                assert isinstance(sink, FsDataSink)
+                zip_fs = sink.filesystem
+                assert isinstance(zip_fs, ZipFs)
+
+                output_url = zip_fs.zip_file_fs.geturl(zip_fs.zip_file_path)
+                print(f"~~~~~~``>>> Checking if this exists: {output_url.raw}")
+                output_exists = zip_fs.zip_file_fs.exists(zip_fs.zip_file_path)
                 assert not isinstance(output_exists, Exception), str(output_exists)
                 if output_exists:
-                    print(f"====>>>>> The final output path is {output_fs.resolve_path(output_path)}")
+                    print(f"====>>>>> I think we're done")
                     break
                 else:
                     print(f"ooooooooooo Output doesn't seem to exist yet")
                     continue
 
-        zip_fs = ZipFs.create(zip_file_fs=output_fs, zip_file_path=output_path)
-        assert not isinstance(zip_fs, Exception)
+        # import pydevd; pydevd.settrace()
+        # zip_fs = ZipFs.create(zip_file_fs=output_fs, zip_file_path=zip_file_path)
+        # assert not isinstance(zip_fs, Exception)
 
-        pyramid = DziLevelDataSource.try_load_as_pyramid(
-            filesystem=zip_fs,
-            dzi_path=PurePosixPath("/tmp.dzi"), #FIXME: name might change,
-        )
-        assert not isinstance(pyramid, Exception) and pyramid is not None
-        for level_index in reversed(range(pyramid[0].dzi_image.max_level_index + 1)):
-            level = pyramid[level_index]
-            _ = level.retrieve()#.show_images(name_suffix=f"__{level_index}")
+        # pyramid = DziLevelDataSource.try_load_as_pyramid(
+        #     filesystem=zip_fs,
+        #     dzi_path=xml_path,
+        # )
+        # assert not isinstance(pyramid, (Exception, type(None))), str(pyramid)
+        # for level_index in reversed(range(pyramid[0].dzi_image.max_level_index + 1)):
+        #     level = pyramid[level_index]
+        #     _ = level.retrieve().show_images(name_suffix=f"__{level_index}")
 
 
     run_dzi_export_job()

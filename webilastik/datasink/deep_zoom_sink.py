@@ -37,13 +37,13 @@ class DziLevelWriter(IDataSinkWriter):
 
 
 class DziLevelSink(FsDataSink):
-    class __PrivateMarker:
-        pass
+    # class __PrivateMarker:
+    #     pass
 
     def __init__(
         self,
         *,
-        private_marker: __PrivateMarker,
+        # private_marker: __PrivateMarker,
         filesystem: IFilesystem,
         xml_path: PurePosixPath,
         dzi_image: DziImageElement,
@@ -89,7 +89,7 @@ class DziLevelSink(FsDataSink):
             if isinstance(resp, Exception):
                 return resp
             level_sink = DziLevelSink(
-                private_marker=cls.__PrivateMarker(),
+                # private_marker=cls.__PrivateMarker(),
                 filesystem=filesystem,
                 dzi_image=dzi_image,
                 level_index=level_index,
@@ -131,6 +131,6 @@ class DziLevelSink(FsDataSink):
             level_index=dto.level_index,
             num_channels=dto.num_channels,
             xml_path=PurePosixPath(dto.xml_path),
-            private_marker=cls.__PrivateMarker(),
+            # private_marker=cls.__PrivateMarker(),
             spatial_resolution=(1,1,1) #FIXME: resolution should be Optional
         )

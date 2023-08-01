@@ -21,18 +21,24 @@ from aiohttp import web
 from aiohttp.client import ClientSession
 from aiohttp.http_websocket import WSCloseCode
 from aiohttp.web_app import Application
-import h5py
 from ndstructs.utils.json_serializable import JsonObject, JsonValue, ensureJsonObject, ensureJsonString
 from webilastik.classic_ilastik.ilp.pixel_classification_ilp import IlpPixelClassificationWorkflowGroup
 
-from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource, PrecomputedChunksInfo
-from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksScale
 from webilastik.filesystem import FsFileNotFoundException, FsIoException, IFilesystem, create_filesystem_from_message, create_filesystem_from_url
-from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.filesystem.os_fs import OsFs
 from webilastik.scheduling.job import PriorityExecutor
-from webilastik.server.util import get_encoded_datasource_from_url
-from webilastik.server.rpc.dto import GetDatasourcesFromUrlParamsDto, GetDatasourcesFromUrlResponseDto, GetFileSystemAndPathFromUrlParamsDto, GetFileSystemAndPathFromUrlResponseDto, ListFsDirRequest, ListFsDirResponse, LoadProjectParamsDto, MessageParsingError, RpcErrorDto, SaveProjectParamsDto
+from webilastik.server.rpc.dto import (
+    GetDatasourcesFromUrlParamsDto,
+    GetDatasourcesFromUrlResponseDto,
+    GetFileSystemAndPathFromUrlParamsDto,
+    GetFileSystemAndPathFromUrlResponseDto,
+    ListFsDirRequest,
+    ListFsDirResponse,
+    LoadProjectParamsDto,
+    MessageParsingError,
+    RpcErrorDto,
+    SaveProjectParamsDto,
+)
 from webilastik.server.session_allocator import uncachable_json_response
 from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.ui.usage_error import UsageError
@@ -84,20 +90,6 @@ class RPCPayload:
 
 def do_save_project(filesystem: IFilesystem, file_path: PurePosixPath, workflow_contents: bytes) -> "None | FsIoException":
     return filesystem.create_file(path=file_path, contents=workflow_contents)
-
-def download_project_bytes(filesystem: IFilesystem, ilp_path: PurePosixPath) -> "Path | FsFileNotFoundException | FsIoException":
-    if isinstance(filesystem, OsFs):
-        return Path(ilp_path) # FIXME: windows?
-    tmp_file_handle, tmp_ilp_path = tempfile.mkstemp(suffix=".ilp") # FIXME
-    ilp_bytes_result = filesystem.read_file(ilp_path)
-    if isinstance(ilp_bytes_result, Exception):
-        return ilp_bytes_result
-    try:
-        _ = os.write(tmp_file_handle, ilp_bytes_result)
-    except Exception:
-        return FsIoException("Failed writing ilp file")
-    os.close(tmp_file_handle)
-    return Path(tmp_ilp_path)
 
 class WebIlastik:
     @property

@@ -114,7 +114,7 @@ def get_sample_c_cells_pixel_annotations(override_datasource: "FsDataSource | No
         ),
         Label(
             name="Background",
-            color=Color(r=np.uint8(255), g=np.uint8(0), b=np.uint8(0)),
+            color=Color(r=np.uint8(0), g=np.uint8(255), b=np.uint8(0)),
             annotations=[
                 Annotation.interpolate_from_points(
                     voxels=[Point5D.zero(x=273, y=246), Point5D.zero(x=314, y=218)],

@@ -47,6 +47,13 @@ tasks:
     status:
       - test -d {{.BUILD_DIR}}
 
+  test:
+    env:
+      WEBILASTIK_SCRATCH_DIR: "/tmp/ilastik_tests_scratch/"
+      PYTHONPATH: "{{.PYTHONPATH}}:./caching/lru_cache/:./executor_getters/default/:./ndstructs/"
+    cmds:
+      - find tests/ -iname 'test_*.py' | grep -v test_hashing_mpi_executor.py | parallel --group -t --halt now,fail=1 python
+
   create-conda-environment:
     deps: [create-build-dir]
     sources: ["{{.PROJECT_ROOT}}/environment.yml"]
@@ -81,7 +88,6 @@ tasks:
       - git checkout {{.COMMIT_HASH}}
     status: # FIXME: this doesn't update the ng repo
       - git status > /dev/null 2>&1
-      - test "$(git rev-parse HEAD)" = "$(git rev-parse {{.COMMIT_HASH}})"
 
   install-neuroglancer-dependencies:
     deps: [checkout-neuroglancer]
@@ -226,6 +232,7 @@ tasks:
     cmds:
       - echo "Ensuring no changes in the working tree before packing to .deb"
       - test $(git status --porcelain | wc -l) -eq 0
+      - test "$(git rev-parse HEAD)" ==  "$(git rev-parse origin/master)"
       - dpkg-deb --build -z2 {{.DEB_TREE_PATH}} {{.DEB_PKG_PATH}}
 
   start-local-server:

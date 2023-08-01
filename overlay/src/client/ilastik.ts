@@ -1227,6 +1227,11 @@ export class HttpFs extends Filesystem{
 }
 
 export class BucketFs extends Filesystem{
+    public static readonly API_URL = new Url({
+        protocol: "https",
+        hostname: "data-proxy.ebrains.eu",
+        path: Path.parse('/api/v1/buckets/'),
+    })
     public readonly bucket_name: string
 
     public constructor(params: {
@@ -1262,6 +1267,25 @@ export class BucketFs extends Filesystem{
             ]),
         })
     }
+    public static tryGetDataProxyGuiUrl(params: {url: Url}): Url | undefined{
+        if(!this.API_URL.isParentOf(params.url)){
+            return undefined
+        }
+        const components = params.url.path.components;
+        const bucketComponentIndex = this.API_URL.path.components.length
+        const bucketName = components[bucketComponentIndex]
+        const prefix = components.slice(bucketComponentIndex + 1).join("/") + "/"
+
+        return new Url({
+            protocol: "https",
+            hostname: "data-proxy.ebrains.eu",
+            path: new Path({components: [bucketName]}),
+            search: new Map([
+                ["prefix", prefix],
+            ]),
+        })
+    }
+
 }
 
 export type DataSinkUnion = PrecomputedChunksSink | N5DataSink | DziLevelSink

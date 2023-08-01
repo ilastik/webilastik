@@ -2306,23 +2306,174 @@ class BrushingAppletStateDto(DataTransferObject):
         return parse_as_BrushingAppletStateDto(value)
 
 
-def parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
+def parse_as_JobFinishedDto(value: JsonValue) -> "JobFinishedDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as JobFinishedDto"
+        )
+    if value.get("__class__") != "JobFinishedDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as JobFinishedDto"
+        )
+    tmp_error_message = parse_as_Union_of_str0None_endof_(value.get("error_message"))
+    if isinstance(tmp_error_message, MessageParsingError):
+        return tmp_error_message
+    return JobFinishedDto(
+        error_message=tmp_error_message,
+    )
+
+
+@dataclass
+class JobFinishedDto(DataTransferObject):
+    error_message: Optional[str]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "JobFinishedDto",
+            "error_message": convert_to_json_value(self.error_message),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "JobFinishedDto | MessageParsingError":
+        return parse_as_JobFinishedDto(value)
+
+
+def parse_as_JobIsPendingDto(
     value: JsonValue,
-) -> "Literal['pending', 'running', 'cancelled', 'completed'] | MessageParsingError":
-    tmp_0 = parse_as_str(value)
-    if not isinstance(tmp_0, MessageParsingError) and tmp_0 == "pending":
-        return tmp_0
-    tmp_1 = parse_as_str(value)
-    if not isinstance(tmp_1, MessageParsingError) and tmp_1 == "running":
-        return tmp_1
-    tmp_2 = parse_as_str(value)
-    if not isinstance(tmp_2, MessageParsingError) and tmp_2 == "cancelled":
-        return tmp_2
-    tmp_3 = parse_as_str(value)
-    if not isinstance(tmp_3, MessageParsingError) and tmp_3 == "completed":
-        return tmp_3
+) -> "JobIsPendingDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as JobIsPendingDto"
+        )
+    if value.get("__class__") != "JobIsPendingDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as JobIsPendingDto"
+        )
+    return JobIsPendingDto()
+
+
+@dataclass
+class JobIsPendingDto(DataTransferObject):
+    pass
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "JobIsPendingDto",
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "JobIsPendingDto | MessageParsingError":
+        return parse_as_JobIsPendingDto(value)
+
+
+def parse_as_JobIsRunningDto(
+    value: JsonValue,
+) -> "JobIsRunningDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as JobIsRunningDto"
+        )
+    if value.get("__class__") != "JobIsRunningDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as JobIsRunningDto"
+        )
+    tmp_num_completed_steps = parse_as_int(value.get("num_completed_steps"))
+    if isinstance(tmp_num_completed_steps, MessageParsingError):
+        return tmp_num_completed_steps
+    tmp_num_dispatched_steps = parse_as_int(value.get("num_dispatched_steps"))
+    if isinstance(tmp_num_dispatched_steps, MessageParsingError):
+        return tmp_num_dispatched_steps
+    return JobIsRunningDto(
+        num_completed_steps=tmp_num_completed_steps,
+        num_dispatched_steps=tmp_num_dispatched_steps,
+    )
+
+
+@dataclass
+class JobIsRunningDto(DataTransferObject):
+    num_completed_steps: int
+    num_dispatched_steps: int
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "JobIsRunningDto",
+            "num_completed_steps": self.num_completed_steps,
+            "num_dispatched_steps": self.num_dispatched_steps,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "JobIsRunningDto | MessageParsingError":
+        return parse_as_JobIsRunningDto(value)
+
+
+def parse_as_JobCanceledDto(value: JsonValue) -> "JobCanceledDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as JobCanceledDto"
+        )
+    if value.get("__class__") != "JobCanceledDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as JobCanceledDto"
+        )
+    tmp_message = parse_as_str(value.get("message"))
+    if isinstance(tmp_message, MessageParsingError):
+        return tmp_message
+    return JobCanceledDto(
+        message=tmp_message,
+    )
+
+
+@dataclass
+class JobCanceledDto(DataTransferObject):
+    message: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "JobCanceledDto",
+            "message": self.message,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "JobCanceledDto | MessageParsingError":
+        return parse_as_JobCanceledDto(value)
+
+
+JobStatusDto = Union[JobFinishedDto, JobIsPendingDto, JobIsRunningDto, JobCanceledDto]
+
+
+def parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
+    value: JsonValue,
+) -> "Union[JobFinishedDto, JobIsPendingDto, JobIsRunningDto, JobCanceledDto] | MessageParsingError":
+    parsed_option_0 = parse_as_JobFinishedDto(value)
+    if not isinstance(parsed_option_0, MessageParsingError):
+        return parsed_option_0
+    parsed_option_1 = parse_as_JobIsPendingDto(value)
+    if not isinstance(parsed_option_1, MessageParsingError):
+        return parsed_option_1
+    parsed_option_2 = parse_as_JobIsRunningDto(value)
+    if not isinstance(parsed_option_2, MessageParsingError):
+        return parsed_option_2
+    parsed_option_3 = parse_as_JobCanceledDto(value)
+    if not isinstance(parsed_option_3, MessageParsingError):
+        return parsed_option_3
     return MessageParsingError(
-        f"Could not parse {value} as Literal['pending', 'running', 'cancelled', 'completed']"
+        f"Could not parse {json.dumps(value)} into Union[JobFinishedDto, JobIsPendingDto, JobIsRunningDto, JobCanceledDto]"
     )
 
 
@@ -2342,24 +2493,16 @@ def parse_as_JobDto(value: JsonValue) -> "JobDto | MessageParsingError":
     tmp_uuid = parse_as_str(value.get("uuid"))
     if isinstance(tmp_uuid, MessageParsingError):
         return tmp_uuid
-    tmp_status = parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
+    tmp_status = parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
         value.get("status")
     )
     if isinstance(tmp_status, MessageParsingError):
         return tmp_status
-    tmp_num_completed_steps = parse_as_int(value.get("num_completed_steps"))
-    if isinstance(tmp_num_completed_steps, MessageParsingError):
-        return tmp_num_completed_steps
-    tmp_error_message = parse_as_Union_of_str0None_endof_(value.get("error_message"))
-    if isinstance(tmp_error_message, MessageParsingError):
-        return tmp_error_message
     return JobDto(
         name=tmp_name,
         num_args=tmp_num_args,
         uuid=tmp_uuid,
         status=tmp_status,
-        num_completed_steps=tmp_num_completed_steps,
-        error_message=tmp_error_message,
     )
 
 
@@ -2368,9 +2511,7 @@ class JobDto(DataTransferObject):
     name: str
     num_args: Optional[int]
     uuid: str
-    status: Literal["pending", "running", "cancelled", "completed"]
-    num_completed_steps: int
-    error_message: Optional[str]
+    status: JobStatusDto
 
     def to_json_value(self) -> JsonObject:
         return {
@@ -2378,9 +2519,7 @@ class JobDto(DataTransferObject):
             "name": self.name,
             "num_args": convert_to_json_value(self.num_args),
             "uuid": self.uuid,
-            "status": self.status,
-            "num_completed_steps": self.num_completed_steps,
-            "error_message": convert_to_json_value(self.error_message),
+            "status": convert_to_json_value(self.status),
         }
 
     @classmethod
@@ -2425,17 +2564,11 @@ def parse_as_ExportJobDto(value: JsonValue) -> "ExportJobDto | MessageParsingErr
     tmp_uuid = parse_as_str(value.get("uuid"))
     if isinstance(tmp_uuid, MessageParsingError):
         return tmp_uuid
-    tmp_status = parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
+    tmp_status = parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
         value.get("status")
     )
     if isinstance(tmp_status, MessageParsingError):
         return tmp_status
-    tmp_num_completed_steps = parse_as_int(value.get("num_completed_steps"))
-    if isinstance(tmp_num_completed_steps, MessageParsingError):
-        return tmp_num_completed_steps
-    tmp_error_message = parse_as_Union_of_str0None_endof_(value.get("error_message"))
-    if isinstance(tmp_error_message, MessageParsingError):
-        return tmp_error_message
     tmp_datasink = (
         parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto_endof_(
             value.get("datasink")
@@ -2448,8 +2581,6 @@ def parse_as_ExportJobDto(value: JsonValue) -> "ExportJobDto | MessageParsingErr
         num_args=tmp_num_args,
         uuid=tmp_uuid,
         status=tmp_status,
-        num_completed_steps=tmp_num_completed_steps,
-        error_message=tmp_error_message,
         datasink=tmp_datasink,
     )
 
@@ -2464,9 +2595,7 @@ class ExportJobDto(JobDto):
             "name": self.name,
             "num_args": convert_to_json_value(self.num_args),
             "uuid": self.uuid,
-            "status": self.status,
-            "num_completed_steps": self.num_completed_steps,
-            "error_message": convert_to_json_value(self.error_message),
+            "status": convert_to_json_value(self.status),
             "datasink": convert_to_json_value(self.datasink),
         }
 
@@ -2497,17 +2626,11 @@ def parse_as_OpenDatasinkJobDto(
     tmp_uuid = parse_as_str(value.get("uuid"))
     if isinstance(tmp_uuid, MessageParsingError):
         return tmp_uuid
-    tmp_status = parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
+    tmp_status = parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
         value.get("status")
     )
     if isinstance(tmp_status, MessageParsingError):
         return tmp_status
-    tmp_num_completed_steps = parse_as_int(value.get("num_completed_steps"))
-    if isinstance(tmp_num_completed_steps, MessageParsingError):
-        return tmp_num_completed_steps
-    tmp_error_message = parse_as_Union_of_str0None_endof_(value.get("error_message"))
-    if isinstance(tmp_error_message, MessageParsingError):
-        return tmp_error_message
     tmp_datasink = (
         parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto_endof_(
             value.get("datasink")
@@ -2520,8 +2643,6 @@ def parse_as_OpenDatasinkJobDto(
         num_args=tmp_num_args,
         uuid=tmp_uuid,
         status=tmp_status,
-        num_completed_steps=tmp_num_completed_steps,
-        error_message=tmp_error_message,
         datasink=tmp_datasink,
     )
 
@@ -2536,9 +2657,7 @@ class OpenDatasinkJobDto(JobDto):
             "name": self.name,
             "num_args": convert_to_json_value(self.num_args),
             "uuid": self.uuid,
-            "status": self.status,
-            "num_completed_steps": self.num_completed_steps,
-            "error_message": convert_to_json_value(self.error_message),
+            "status": convert_to_json_value(self.status),
             "datasink": convert_to_json_value(self.datasink),
         }
 
@@ -2571,24 +2690,16 @@ def parse_as_CreateDziPyramidJobDto(
     tmp_uuid = parse_as_str(value.get("uuid"))
     if isinstance(tmp_uuid, MessageParsingError):
         return tmp_uuid
-    tmp_status = parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
+    tmp_status = parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
         value.get("status")
     )
     if isinstance(tmp_status, MessageParsingError):
         return tmp_status
-    tmp_num_completed_steps = parse_as_int(value.get("num_completed_steps"))
-    if isinstance(tmp_num_completed_steps, MessageParsingError):
-        return tmp_num_completed_steps
-    tmp_error_message = parse_as_Union_of_str0None_endof_(value.get("error_message"))
-    if isinstance(tmp_error_message, MessageParsingError):
-        return tmp_error_message
     return CreateDziPyramidJobDto(
         name=tmp_name,
         num_args=tmp_num_args,
         uuid=tmp_uuid,
         status=tmp_status,
-        num_completed_steps=tmp_num_completed_steps,
-        error_message=tmp_error_message,
     )
 
 
@@ -2602,9 +2713,7 @@ class CreateDziPyramidJobDto(JobDto):
             "name": self.name,
             "num_args": convert_to_json_value(self.num_args),
             "uuid": self.uuid,
-            "status": self.status,
-            "num_completed_steps": self.num_completed_steps,
-            "error_message": convert_to_json_value(self.error_message),
+            "status": convert_to_json_value(self.status),
         }
 
     @classmethod
@@ -2614,13 +2723,19 @@ class CreateDziPyramidJobDto(JobDto):
         return parse_as_CreateDziPyramidJobDto(value)
 
 
-def parse_as_ZipJobDto(value: JsonValue) -> "ZipJobDto | MessageParsingError":
+def parse_as_ZipDirectoryJobDto(
+    value: JsonValue,
+) -> "ZipDirectoryJobDto | MessageParsingError":
     from collections.abc import Mapping
 
     if not isinstance(value, Mapping):
-        return MessageParsingError(f"Could not parse {json.dumps(value)} as ZipJobDto")
-    if value.get("__class__") != "ZipJobDto":
-        return MessageParsingError(f"Could not parse {json.dumps(value)} as ZipJobDto")
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as ZipDirectoryJobDto"
+        )
+    if value.get("__class__") != "ZipDirectoryJobDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as ZipDirectoryJobDto"
+        )
     tmp_name = parse_as_str(value.get("name"))
     if isinstance(tmp_name, MessageParsingError):
         return tmp_name
@@ -2630,17 +2745,11 @@ def parse_as_ZipJobDto(value: JsonValue) -> "ZipJobDto | MessageParsingError":
     tmp_uuid = parse_as_str(value.get("uuid"))
     if isinstance(tmp_uuid, MessageParsingError):
         return tmp_uuid
-    tmp_status = parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
+    tmp_status = parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
         value.get("status")
     )
     if isinstance(tmp_status, MessageParsingError):
         return tmp_status
-    tmp_num_completed_steps = parse_as_int(value.get("num_completed_steps"))
-    if isinstance(tmp_num_completed_steps, MessageParsingError):
-        return tmp_num_completed_steps
-    tmp_error_message = parse_as_Union_of_str0None_endof_(value.get("error_message"))
-    if isinstance(tmp_error_message, MessageParsingError):
-        return tmp_error_message
     tmp_output_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
         value.get("output_fs")
     )
@@ -2649,49 +2758,140 @@ def parse_as_ZipJobDto(value: JsonValue) -> "ZipJobDto | MessageParsingError":
     tmp_output_path = parse_as_str(value.get("output_path"))
     if isinstance(tmp_output_path, MessageParsingError):
         return tmp_output_path
-    return ZipJobDto(
+    return ZipDirectoryJobDto(
         name=tmp_name,
         num_args=tmp_num_args,
         uuid=tmp_uuid,
         status=tmp_status,
-        num_completed_steps=tmp_num_completed_steps,
-        error_message=tmp_error_message,
         output_fs=tmp_output_fs,
         output_path=tmp_output_path,
     )
 
 
 @dataclass
-class ZipJobDto(JobDto):
+class ZipDirectoryJobDto(JobDto):
     output_fs: FsDto
     output_path: str
 
     def to_json_value(self) -> JsonObject:
         return {
-            "__class__": "ZipJobDto",
+            "__class__": "ZipDirectoryJobDto",
             "name": self.name,
             "num_args": convert_to_json_value(self.num_args),
             "uuid": self.uuid,
-            "status": self.status,
-            "num_completed_steps": self.num_completed_steps,
-            "error_message": convert_to_json_value(self.error_message),
+            "status": convert_to_json_value(self.status),
             "output_fs": convert_to_json_value(self.output_fs),
             "output_path": self.output_path,
         }
 
     @classmethod
-    def from_json_value(cls, value: JsonValue) -> "ZipJobDto | MessageParsingError":
-        return parse_as_ZipJobDto(value)
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "ZipDirectoryJobDto | MessageParsingError":
+        return parse_as_ZipDirectoryJobDto(value)
+
+
+def parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto0None_endof_(
+    value: JsonValue,
+) -> "Union[PrecomputedChunksSinkDto, N5DataSinkDto, DziLevelSinkDto, None] | MessageParsingError":
+    parsed_option_0 = parse_as_PrecomputedChunksSinkDto(value)
+    if not isinstance(parsed_option_0, MessageParsingError):
+        return parsed_option_0
+    parsed_option_1 = parse_as_N5DataSinkDto(value)
+    if not isinstance(parsed_option_1, MessageParsingError):
+        return parsed_option_1
+    parsed_option_2 = parse_as_DziLevelSinkDto(value)
+    if not isinstance(parsed_option_2, MessageParsingError):
+        return parsed_option_2
+    parsed_option_3 = parse_as_None(value)
+    if not isinstance(parsed_option_3, MessageParsingError):
+        return parsed_option_3
+    return MessageParsingError(
+        f"Could not parse {json.dumps(value)} into Union[PrecomputedChunksSinkDto, N5DataSinkDto, DziLevelSinkDto, None]"
+    )
+
+
+def parse_as_TransferFileJobDto(
+    value: JsonValue,
+) -> "TransferFileJobDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as TransferFileJobDto"
+        )
+    if value.get("__class__") != "TransferFileJobDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as TransferFileJobDto"
+        )
+    tmp_name = parse_as_str(value.get("name"))
+    if isinstance(tmp_name, MessageParsingError):
+        return tmp_name
+    tmp_num_args = parse_as_Union_of_int0None_endof_(value.get("num_args"))
+    if isinstance(tmp_num_args, MessageParsingError):
+        return tmp_num_args
+    tmp_uuid = parse_as_str(value.get("uuid"))
+    if isinstance(tmp_uuid, MessageParsingError):
+        return tmp_uuid
+    tmp_status = parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
+        value.get("status")
+    )
+    if isinstance(tmp_status, MessageParsingError):
+        return tmp_status
+    tmp_target_url = parse_as_UrlDto(value.get("target_url"))
+    if isinstance(tmp_target_url, MessageParsingError):
+        return tmp_target_url
+    tmp_result_sink = parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto0None_endof_(
+        value.get("result_sink")
+    )
+    if isinstance(tmp_result_sink, MessageParsingError):
+        return tmp_result_sink
+    return TransferFileJobDto(
+        name=tmp_name,
+        num_args=tmp_num_args,
+        uuid=tmp_uuid,
+        status=tmp_status,
+        target_url=tmp_target_url,
+        result_sink=tmp_result_sink,
+    )
+
+
+@dataclass
+class TransferFileJobDto(JobDto):
+    target_url: UrlDto
+    result_sink: Optional[DataSinkDto]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "TransferFileJobDto",
+            "name": self.name,
+            "num_args": convert_to_json_value(self.num_args),
+            "uuid": self.uuid,
+            "status": convert_to_json_value(self.status),
+            "target_url": self.target_url.to_json_value(),
+            "result_sink": convert_to_json_value(self.result_sink),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "TransferFileJobDto | MessageParsingError":
+        return parse_as_TransferFileJobDto(value)
 
 
 ExportJobDtoUnion = Union[
-    ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto
+    ExportJobDto,
+    OpenDatasinkJobDto,
+    CreateDziPyramidJobDto,
+    ZipDirectoryJobDto,
+    TransferFileJobDto,
+    JobDto,
 ]
 
 
-def parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_(
+def parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipDirectoryJobDto0TransferFileJobDto0JobDto_endof_(
     value: JsonValue,
-) -> "Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto] | MessageParsingError":
+) -> "Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipDirectoryJobDto, TransferFileJobDto, JobDto] | MessageParsingError":
     parsed_option_0 = parse_as_ExportJobDto(value)
     if not isinstance(parsed_option_0, MessageParsingError):
         return parsed_option_0
@@ -2701,26 +2901,39 @@ def parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0Zip
     parsed_option_2 = parse_as_CreateDziPyramidJobDto(value)
     if not isinstance(parsed_option_2, MessageParsingError):
         return parsed_option_2
-    parsed_option_3 = parse_as_ZipJobDto(value)
+    parsed_option_3 = parse_as_ZipDirectoryJobDto(value)
     if not isinstance(parsed_option_3, MessageParsingError):
         return parsed_option_3
+    parsed_option_4 = parse_as_TransferFileJobDto(value)
+    if not isinstance(parsed_option_4, MessageParsingError):
+        return parsed_option_4
+    parsed_option_5 = parse_as_JobDto(value)
+    if not isinstance(parsed_option_5, MessageParsingError):
+        return parsed_option_5
     return MessageParsingError(
-        f"Could not parse {json.dumps(value)} into Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto]"
+        f"Could not parse {json.dumps(value)} into Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipDirectoryJobDto, TransferFileJobDto, JobDto]"
     )
 
 
-def parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_0_varlen__endof_(
+def parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipDirectoryJobDto0TransferFileJobDto0JobDto_endof_0_varlen__endof_(
     value: JsonValue,
-) -> "Tuple[Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto], ...] | MessageParsingError":
+) -> "Tuple[Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipDirectoryJobDto, TransferFileJobDto, JobDto], ...] | MessageParsingError":
     if not isinstance(value, (list, tuple)):
         return MessageParsingError(
-            f"Could not parse Tuple[Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto], ...] from {json.dumps(value)}"
+            f"Could not parse Tuple[Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipDirectoryJobDto, TransferFileJobDto, JobDto], ...] from {json.dumps(value)}"
         )
     items: List[
-        Union[ExportJobDto, OpenDatasinkJobDto, CreateDziPyramidJobDto, ZipJobDto]
+        Union[
+            ExportJobDto,
+            OpenDatasinkJobDto,
+            CreateDziPyramidJobDto,
+            ZipDirectoryJobDto,
+            TransferFileJobDto,
+            JobDto,
+        ]
     ] = []
     for item in value:
-        parsed = parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_(
+        parsed = parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipDirectoryJobDto0TransferFileJobDto0JobDto_endof_(
             item
         )
         if isinstance(parsed, MessageParsingError):
@@ -2813,7 +3026,7 @@ def parse_as_PixelClassificationExportAppletStateDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as PixelClassificationExportAppletStateDto"
         )
-    tmp_jobs = parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_0_varlen__endof_(
+    tmp_jobs = parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipDirectoryJobDto0TransferFileJobDto0JobDto_endof_0_varlen__endof_(
         value.get("jobs")
     )
     if isinstance(tmp_jobs, MessageParsingError):
@@ -3324,7 +3537,9 @@ HpcSiteName = Literal["LOCAL_DASK", "LOCAL_PROCESS_POOL", "CSCS", "JUSUF"]
 
 def parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
     value: JsonValue,
-) -> "Literal['LOCAL_DASK', 'LOCAL_PROCESS_POOL', 'CSCS', 'JUSUF'] | MessageParsingError":
+) -> (
+    "Literal['LOCAL_DASK', 'LOCAL_PROCESS_POOL', 'CSCS', 'JUSUF'] | MessageParsingError"
+):
     tmp_0 = parse_as_str(value)
     if not isinstance(tmp_0, MessageParsingError) and tmp_0 == "LOCAL_DASK":
         return tmp_0
@@ -4323,3 +4538,265 @@ class ListFsDirResponse(DataTransferObject):
         cls, value: JsonValue
     ) -> "ListFsDirResponse | MessageParsingError":
         return parse_as_ListFsDirResponse(value)
+
+
+def parse_as_Literal_of__quote_hbp_quote__endof_(
+    value: JsonValue,
+) -> "Literal['hbp'] | MessageParsingError":
+    tmp_0 = parse_as_str(value)
+    if not isinstance(tmp_0, MessageParsingError) and tmp_0 == "hbp":
+        return tmp_0
+    return MessageParsingError(f"Could not parse {value} as Literal['hbp']")
+
+
+def parse_as_HbpIamPublicKeyDto(
+    value: JsonValue,
+) -> "HbpIamPublicKeyDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as HbpIamPublicKeyDto"
+        )
+    tmp_realm = parse_as_Literal_of__quote_hbp_quote__endof_(value.get("realm"))
+    if isinstance(tmp_realm, MessageParsingError):
+        return tmp_realm
+    tmp_public_key = parse_as_str(value.get("public_key"))
+    if isinstance(tmp_public_key, MessageParsingError):
+        return tmp_public_key
+    return HbpIamPublicKeyDto(
+        realm=tmp_realm,
+        public_key=tmp_public_key,
+    )
+
+
+@dataclass
+class HbpIamPublicKeyDto(DataTransferObject):
+    realm: Literal["hbp"]
+    public_key: str
+
+    @classmethod
+    def tag_value(cls) -> "str | None":
+        return None
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "realm": self.realm,
+            "public_key": self.public_key,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "HbpIamPublicKeyDto | MessageParsingError":
+        return parse_as_HbpIamPublicKeyDto(value)
+
+
+def parse_as_Literal_of__quote_RS256_quote__endof_(
+    value: JsonValue,
+) -> "Literal['RS256'] | MessageParsingError":
+    tmp_0 = parse_as_str(value)
+    if not isinstance(tmp_0, MessageParsingError) and tmp_0 == "RS256":
+        return tmp_0
+    return MessageParsingError(f"Could not parse {value} as Literal['RS256']")
+
+
+def parse_as_Literal_of__quote_JWT_quote__endof_(
+    value: JsonValue,
+) -> "Literal['JWT'] | MessageParsingError":
+    tmp_0 = parse_as_str(value)
+    if not isinstance(tmp_0, MessageParsingError) and tmp_0 == "JWT":
+        return tmp_0
+    return MessageParsingError(f"Could not parse {value} as Literal['JWT']")
+
+
+def parse_as_EbrainsAccessTokenHeaderDto(
+    value: JsonValue,
+) -> "EbrainsAccessTokenHeaderDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as EbrainsAccessTokenHeaderDto"
+        )
+    tmp_alg = parse_as_Literal_of__quote_RS256_quote__endof_(value.get("alg"))
+    if isinstance(tmp_alg, MessageParsingError):
+        return tmp_alg
+    tmp_typ = parse_as_Literal_of__quote_JWT_quote__endof_(value.get("typ"))
+    if isinstance(tmp_typ, MessageParsingError):
+        return tmp_typ
+    tmp_kid = parse_as_str(value.get("kid"))
+    if isinstance(tmp_kid, MessageParsingError):
+        return tmp_kid
+    return EbrainsAccessTokenHeaderDto(
+        alg=tmp_alg,
+        typ=tmp_typ,
+        kid=tmp_kid,
+    )
+
+
+@dataclass
+class EbrainsAccessTokenHeaderDto(DataTransferObject):
+    alg: Literal["RS256"]
+    typ: Literal["JWT"]
+    kid: str
+
+    @classmethod
+    def tag_value(cls) -> "str | None":
+        return None
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "alg": self.alg,
+            "typ": self.typ,
+            "kid": self.kid,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "EbrainsAccessTokenHeaderDto | MessageParsingError":
+        return parse_as_EbrainsAccessTokenHeaderDto(value)
+
+
+def parse_as_EbrainsAccessTokenPayloadDto(
+    value: JsonValue,
+) -> "EbrainsAccessTokenPayloadDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as EbrainsAccessTokenPayloadDto"
+        )
+    tmp_exp = parse_as_int(value.get("exp"))
+    if isinstance(tmp_exp, MessageParsingError):
+        return tmp_exp
+    tmp_auth_time = parse_as_int(value.get("auth_time"))
+    if isinstance(tmp_auth_time, MessageParsingError):
+        return tmp_auth_time
+    tmp_sub = parse_as_str(value.get("sub"))
+    if isinstance(tmp_sub, MessageParsingError):
+        return tmp_sub
+    return EbrainsAccessTokenPayloadDto(
+        exp=tmp_exp,
+        auth_time=tmp_auth_time,
+        sub=tmp_sub,
+    )
+
+
+@dataclass
+class EbrainsAccessTokenPayloadDto(DataTransferObject):
+    exp: int  # e.g. 1689775678
+    # iat: int # e.g. 1689334268
+    auth_time: int  # e.g. 1689170878
+    # jti: str # e.g. "1740e10e-b09c-4db8-acf8-63d1b417763a"
+    # iss: str # e.g. "https://iam.ebrains.eu/auth/realms/hbp"
+    # aud: Tuple[str] # e.g.: ["jupyterhub", "tutorialOidcApi", "jupyterhub-jsc", "xwiki", "team", "plus", "group"]
+    sub: str  # this is the user ID, e.g. "bdca269c-f207-4cdb-8b68-a562e434faed"
+    # typ: Literal["Bearer"]
+    # azp: str # e.g. "webilastik",
+    # session_state: str # e.g. "e29d75a2-0dfe-4a4c-a800-c35eae234a47"
+    # acr: str # e.g. "0"
+    # allowed-origins: Tuple[str] #e.g. ["https://app.ilastik.org"]
+    # scope: str # actually a list of strings concatenated with spaces: e.g. "profile roles email openid group team"
+    # sid: str # e.g.: "e29d75a2-0dfe-4a4c-a800-c35e12334a47"
+    # email_verified: bool # e.g. true
+    # gender: str # e.g. "null"
+    # name: str # e.g. "John Doe"
+    # mitreid-sub: str # e.g. "301234"
+    # preferred_username: str # e.g. "johndoe"
+    # given_name: str # e.g. "John"
+    # family_name: str # e.g. "Doe"
+    # email: str # e.g. "john.doe@example.com"
+
+    @classmethod
+    def tag_value(cls) -> "str | None":
+        return None
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "exp": self.exp,
+            "auth_time": self.auth_time,
+            "sub": self.sub,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "EbrainsAccessTokenPayloadDto | MessageParsingError":
+        return parse_as_EbrainsAccessTokenPayloadDto(value)
+
+
+def parse_as_EbrainsUserTokenDto(
+    value: JsonValue,
+) -> "EbrainsUserTokenDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as EbrainsUserTokenDto"
+        )
+    tmp_access_token = parse_as_str(value.get("access_token"))
+    if isinstance(tmp_access_token, MessageParsingError):
+        return tmp_access_token
+    tmp_refresh_token = parse_as_str(value.get("refresh_token"))
+    if isinstance(tmp_refresh_token, MessageParsingError):
+        return tmp_refresh_token
+    return EbrainsUserTokenDto(
+        access_token=tmp_access_token,
+        refresh_token=tmp_refresh_token,
+    )
+
+
+@dataclass
+class EbrainsUserTokenDto(DataTransferObject):
+    access_token: str
+    refresh_token: str
+
+    @classmethod
+    def tag_value(cls) -> "str | None":
+        return None
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "access_token": self.access_token,
+            "refresh_token": self.refresh_token,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "EbrainsUserTokenDto | MessageParsingError":
+        return parse_as_EbrainsUserTokenDto(value)
+
+
+def parse_as_LoginRequiredErrorDto(
+    value: JsonValue,
+) -> "LoginRequiredErrorDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as LoginRequiredErrorDto"
+        )
+    if value.get("__class__") != "LoginRequiredErrorDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as LoginRequiredErrorDto"
+        )
+    return LoginRequiredErrorDto()
+
+
+@dataclass
+class LoginRequiredErrorDto(DataTransferObject):
+    pass
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "LoginRequiredErrorDto",
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "LoginRequiredErrorDto | MessageParsingError":
+        return parse_as_LoginRequiredErrorDto(value)

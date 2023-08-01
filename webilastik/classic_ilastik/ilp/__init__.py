@@ -415,8 +415,17 @@ class IlpDatasetInfo:
     ) -> "FsDataSource | Exception":
         url = Url.parse(self.filePath)
         if url is None: # filePath was probably a path, not an URL
-            path = ilp_path.parent.joinpath(self.filePath)
-            url = ilp_fs.geturl(path)
+            try:
+                filePath = PurePosixPath(self.filePath)
+            except Exception:
+                return Exception(f"Could not interpret filePath as path or URL: {self.filePath}")
+            if not filePath.is_absolute():
+                url = ilp_fs.geturl(ilp_path.parent / filePath)
+            else:
+                fs_base_path = ilp_fs.geturl(PurePosixPath("dummy")).path.parent
+                if not filePath.is_relative_to(fs_base_path):
+                    return Exception(f"Could not interpret filePath '{self.filePath}' as path inside provided fs")
+                url = ilp_fs.geturl(filePath.relative_to(fs_base_path))
         # import pydevd; pydevd.settrace()
         datasources_result = try_get_datasources_from_url(url=url)
         if datasources_result is None:

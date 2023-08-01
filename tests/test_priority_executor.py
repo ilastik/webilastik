@@ -4,7 +4,7 @@ import os
 from typing import Any
 import uuid
 
-from webilastik.scheduling.job import Job, JobStatus, PriorityExecutor
+from webilastik.scheduling.job import IteratingJob, Job, JobStatus, PriorityExecutor
 
 
 def green(message: str):
@@ -29,7 +29,7 @@ def test_priority_executor():
     expected_execution_time = ((num_job_steps + num_standalone_tasks) / num_workers) * wait_time_per_task
 
 
-    def on_progress(*, job_id: uuid.UUID, job_status: JobStatus, step_index: int, step_result: Any):
+    def on_progress(*, job_id: uuid.UUID, step_index: int):
         blue(f"Step {step_index} of job {job_id} is complete!")
 
         if step_index != num_job_steps:
@@ -42,7 +42,7 @@ def test_priority_executor():
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
         priority_executor = PriorityExecutor(executor=executor, max_active_job_steps=num_workers)
 
-        job = Job(
+        job = IteratingJob(
             target=do_some_work,
             args=[wait_time_per_task] * num_job_steps,
             name="My Job",

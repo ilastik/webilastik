@@ -34,6 +34,6 @@ class MPICommExecutorWrapper(Executor):
             return self._executor.__exit__(exc_type, exc_val, exc_tb)
         return None
 
-    def shutdown(self, wait: bool = True) -> None:
+    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None: #FIXME: use cancel_futures
         _ = self.__exit__(None, None, None)
         return None

@@ -132,7 +132,7 @@ class HashingMpiExecutor(Executor):
             _ = future.set_running_or_notify_cancel()
             return future
 
-    def shutdown(self, wait: bool = True):
+    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None: #FIXME: use cancel_futures
         with self._lock:
             if self._shutting_down:
                 return

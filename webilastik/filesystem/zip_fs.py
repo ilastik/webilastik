@@ -4,6 +4,8 @@ from pathlib import PurePosixPath
 from typing import Final, Any, Tuple, Set, Dict
 from webilastik.filesystem import FsDirectoryContents, FsFileNotFoundException, FsIoException, IFilesystem, create_filesystem_from_message, create_filesystem_from_url
 from dataclasses import dataclass
+import zipfile
+import io
 
 import netzip # pyright: ignore [reportMissingTypeStubs]
 
@@ -25,8 +27,19 @@ class _FsSource(netzip.Source):
     @classmethod
     def create(cls, fs: IFilesystem, zip_path: PurePosixPath) -> "_FsSource | FsIoException | FsFileNotFoundException":
         size_result = fs.get_size(zip_path)
-        if isinstance(size_result, Exception):
-            raise size_result
+        if isinstance(size_result, FsIoException):
+            return size_result
+        if isinstance(size_result, FsFileNotFoundException):
+            #FIXME: once we can write to zips, this dummy stuff should probably be removed
+            buffer = io.BytesIO()
+            empty_file = zipfile.ZipFile(buffer, "w")
+            empty_file.close()
+            _ = buffer.seek(0)
+            contents = buffer.read()
+            file_creation_result = fs.create_file(path=zip_path, contents=contents)
+            if isinstance(file_creation_result, Exception):
+                return file_creation_result
+            size_result = len(contents)
         return _FsSource(_marker=_PrivateMarker(), fs=fs, zip_path=zip_path, size=size_result)
 
     def read(self, offset: int, size: int = -1) -> bytes:
@@ -117,6 +130,14 @@ class ZipFs(IFilesystem):
                 cursor.files.add(entry_path.name)
 
         super().__init__()
+
+    @property
+    def zip_file_fs(self) -> IFilesystem:
+        return self.source.fs
+
+    @property
+    def zip_file_path(self) -> PurePosixPath:
+        return self.source.zip_path
 
     @classmethod
     def create(cls, zip_file_fs: IFilesystem, zip_file_path: PurePosixPath) -> "ZipFs | FsIoException | FsFileNotFoundException":

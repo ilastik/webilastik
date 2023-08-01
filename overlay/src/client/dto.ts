@@ -2132,26 +2132,162 @@ export class BrushingAppletStateDto {
   }
 }
 
-export function parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
+export function parse_as_JobFinishedDto(value: JsonValue): JobFinishedDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "JobFinishedDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a JobFinishedDto`);
+  }
+  const temp_error_message = parse_as_Union_of_str0None_endof_(valueObject.error_message);
+  if (temp_error_message instanceof Error) return temp_error_message;
+  return new JobFinishedDto({
+    error_message: temp_error_message,
+  });
+}
+// Automatically generated via DataTransferObject for JobFinishedDto
+// Do not edit!
+export class JobFinishedDto {
+  public error_message: string | undefined;
+  constructor(_params: {
+    error_message: string | undefined;
+  }) {
+    this.error_message = _params.error_message;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "JobFinishedDto",
+      error_message: toJsonValue(this.error_message),
+    };
+  }
+  public static fromJsonValue(value: JsonValue): JobFinishedDto | Error {
+    return parse_as_JobFinishedDto(value);
+  }
+}
+
+export function parse_as_JobIsPendingDto(value: JsonValue): JobIsPendingDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "JobIsPendingDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a JobIsPendingDto`);
+  }
+  return new JobIsPendingDto({});
+}
+// Automatically generated via DataTransferObject for JobIsPendingDto
+// Do not edit!
+export class JobIsPendingDto {
+  constructor(_params: {}) {
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "JobIsPendingDto",
+    };
+  }
+  public static fromJsonValue(value: JsonValue): JobIsPendingDto | Error {
+    return parse_as_JobIsPendingDto(value);
+  }
+}
+
+export function parse_as_JobIsRunningDto(value: JsonValue): JobIsRunningDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "JobIsRunningDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a JobIsRunningDto`);
+  }
+  const temp_num_completed_steps = parse_as_int(valueObject.num_completed_steps);
+  if (temp_num_completed_steps instanceof Error) return temp_num_completed_steps;
+  const temp_num_dispatched_steps = parse_as_int(valueObject.num_dispatched_steps);
+  if (temp_num_dispatched_steps instanceof Error) return temp_num_dispatched_steps;
+  return new JobIsRunningDto({
+    num_completed_steps: temp_num_completed_steps,
+    num_dispatched_steps: temp_num_dispatched_steps,
+  });
+}
+// Automatically generated via DataTransferObject for JobIsRunningDto
+// Do not edit!
+export class JobIsRunningDto {
+  public num_completed_steps: number;
+  public num_dispatched_steps: number;
+  constructor(_params: {
+    num_completed_steps: number;
+    num_dispatched_steps: number;
+  }) {
+    this.num_completed_steps = _params.num_completed_steps;
+    this.num_dispatched_steps = _params.num_dispatched_steps;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "JobIsRunningDto",
+      num_completed_steps: this.num_completed_steps,
+      num_dispatched_steps: this.num_dispatched_steps,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): JobIsRunningDto | Error {
+    return parse_as_JobIsRunningDto(value);
+  }
+}
+
+export function parse_as_JobCanceledDto(value: JsonValue): JobCanceledDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "JobCanceledDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a JobCanceledDto`);
+  }
+  const temp_message = parse_as_str(valueObject.message);
+  if (temp_message instanceof Error) return temp_message;
+  return new JobCanceledDto({
+    message: temp_message,
+  });
+}
+// Automatically generated via DataTransferObject for JobCanceledDto
+// Do not edit!
+export class JobCanceledDto {
+  public message: string;
+  constructor(_params: {
+    message: string;
+  }) {
+    this.message = _params.message;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "JobCanceledDto",
+      message: this.message,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): JobCanceledDto | Error {
+    return parse_as_JobCanceledDto(value);
+  }
+}
+
+export function parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
   value: JsonValue,
-): "pending" | "running" | "cancelled" | "completed" | Error {
-  const tmp_0 = parse_as_str(value);
-  if (!(tmp_0 instanceof Error) && tmp_0 === "pending") {
-    return tmp_0;
+): JobFinishedDto | JobIsPendingDto | JobIsRunningDto | JobCanceledDto | Error {
+  const parsed_option_0 = parse_as_JobFinishedDto(value);
+  if (!(parsed_option_0 instanceof Error)) {
+    return parsed_option_0;
   }
-  const tmp_1 = parse_as_str(value);
-  if (!(tmp_1 instanceof Error) && tmp_1 === "running") {
-    return tmp_1;
+  const parsed_option_1 = parse_as_JobIsPendingDto(value);
+  if (!(parsed_option_1 instanceof Error)) {
+    return parsed_option_1;
   }
-  const tmp_2 = parse_as_str(value);
-  if (!(tmp_2 instanceof Error) && tmp_2 === "cancelled") {
-    return tmp_2;
+  const parsed_option_2 = parse_as_JobIsRunningDto(value);
+  if (!(parsed_option_2 instanceof Error)) {
+    return parsed_option_2;
   }
-  const tmp_3 = parse_as_str(value);
-  if (!(tmp_3 instanceof Error) && tmp_3 === "completed") {
-    return tmp_3;
+  const parsed_option_3 = parse_as_JobCanceledDto(value);
+  if (!(parsed_option_3 instanceof Error)) {
+    return parsed_option_3;
   }
-  return Error(`Could not parse ${value} as 'pending' | 'running' | 'cancelled' | 'completed'`);
+  return Error(
+    `Could not parse ${JSON.stringify(value)} into JobFinishedDto | JobIsPendingDto | JobIsRunningDto | JobCanceledDto`,
+  );
 }
 export function parse_as_JobDto(value: JsonValue): JobDto | Error {
   const valueObject = ensureJsonObject(value);
@@ -2167,22 +2303,15 @@ export function parse_as_JobDto(value: JsonValue): JobDto | Error {
   if (temp_num_args instanceof Error) return temp_num_args;
   const temp_uuid = parse_as_str(valueObject.uuid);
   if (temp_uuid instanceof Error) return temp_uuid;
-  const temp_status =
-    parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
-      valueObject.status,
-    );
+  const temp_status = parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
+    valueObject.status,
+  );
   if (temp_status instanceof Error) return temp_status;
-  const temp_num_completed_steps = parse_as_int(valueObject.num_completed_steps);
-  if (temp_num_completed_steps instanceof Error) return temp_num_completed_steps;
-  const temp_error_message = parse_as_Union_of_str0None_endof_(valueObject.error_message);
-  if (temp_error_message instanceof Error) return temp_error_message;
   return new JobDto({
     name: temp_name,
     num_args: temp_num_args,
     uuid: temp_uuid,
     status: temp_status,
-    num_completed_steps: temp_num_completed_steps,
-    error_message: temp_error_message,
   });
 }
 // Automatically generated via DataTransferObject for JobDto
@@ -2191,23 +2320,17 @@ export class JobDto {
   public name: string;
   public num_args: number | undefined;
   public uuid: string;
-  public status: "pending" | "running" | "cancelled" | "completed";
-  public num_completed_steps: number;
-  public error_message: string | undefined;
+  public status: JobFinishedDto | JobIsPendingDto | JobIsRunningDto | JobCanceledDto;
   constructor(_params: {
     name: string;
     num_args: number | undefined;
     uuid: string;
-    status: "pending" | "running" | "cancelled" | "completed";
-    num_completed_steps: number;
-    error_message: string | undefined;
+    status: JobFinishedDto | JobIsPendingDto | JobIsRunningDto | JobCanceledDto;
   }) {
     this.name = _params.name;
     this.num_args = _params.num_args;
     this.uuid = _params.uuid;
     this.status = _params.status;
-    this.num_completed_steps = _params.num_completed_steps;
-    this.error_message = _params.error_message;
   }
   public toJsonValue(): JsonObject {
     return {
@@ -2215,9 +2338,7 @@ export class JobDto {
       name: this.name,
       num_args: toJsonValue(this.num_args),
       uuid: this.uuid,
-      status: this.status,
-      num_completed_steps: this.num_completed_steps,
-      error_message: toJsonValue(this.error_message),
+      status: toJsonValue(this.status),
     };
   }
   public static fromJsonValue(value: JsonValue): JobDto | Error {
@@ -2258,15 +2379,10 @@ export function parse_as_ExportJobDto(value: JsonValue): ExportJobDto | Error {
   if (temp_num_args instanceof Error) return temp_num_args;
   const temp_uuid = parse_as_str(valueObject.uuid);
   if (temp_uuid instanceof Error) return temp_uuid;
-  const temp_status =
-    parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
-      valueObject.status,
-    );
+  const temp_status = parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
+    valueObject.status,
+  );
   if (temp_status instanceof Error) return temp_status;
-  const temp_num_completed_steps = parse_as_int(valueObject.num_completed_steps);
-  if (temp_num_completed_steps instanceof Error) return temp_num_completed_steps;
-  const temp_error_message = parse_as_Union_of_str0None_endof_(valueObject.error_message);
-  if (temp_error_message instanceof Error) return temp_error_message;
   const temp_datasink = parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto_endof_(
     valueObject.datasink,
   );
@@ -2276,8 +2392,6 @@ export function parse_as_ExportJobDto(value: JsonValue): ExportJobDto | Error {
     num_args: temp_num_args,
     uuid: temp_uuid,
     status: temp_status,
-    num_completed_steps: temp_num_completed_steps,
-    error_message: temp_error_message,
     datasink: temp_datasink,
   });
 }
@@ -2287,25 +2401,19 @@ export class ExportJobDto {
   public name: string;
   public num_args: number | undefined;
   public uuid: string;
-  public status: "pending" | "running" | "cancelled" | "completed";
-  public num_completed_steps: number;
-  public error_message: string | undefined;
+  public status: JobFinishedDto | JobIsPendingDto | JobIsRunningDto | JobCanceledDto;
   public datasink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto;
   constructor(_params: {
     name: string;
     num_args: number | undefined;
     uuid: string;
-    status: "pending" | "running" | "cancelled" | "completed";
-    num_completed_steps: number;
-    error_message: string | undefined;
+    status: JobFinishedDto | JobIsPendingDto | JobIsRunningDto | JobCanceledDto;
     datasink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto;
   }) {
     this.name = _params.name;
     this.num_args = _params.num_args;
     this.uuid = _params.uuid;
     this.status = _params.status;
-    this.num_completed_steps = _params.num_completed_steps;
-    this.error_message = _params.error_message;
     this.datasink = _params.datasink;
   }
   public toJsonValue(): JsonObject {
@@ -2314,9 +2422,7 @@ export class ExportJobDto {
       name: this.name,
       num_args: toJsonValue(this.num_args),
       uuid: this.uuid,
-      status: this.status,
-      num_completed_steps: this.num_completed_steps,
-      error_message: toJsonValue(this.error_message),
+      status: toJsonValue(this.status),
       datasink: toJsonValue(this.datasink),
     };
   }
@@ -2339,15 +2445,10 @@ export function parse_as_OpenDatasinkJobDto(value: JsonValue): OpenDatasinkJobDt
   if (temp_num_args instanceof Error) return temp_num_args;
   const temp_uuid = parse_as_str(valueObject.uuid);
   if (temp_uuid instanceof Error) return temp_uuid;
-  const temp_status =
-    parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
-      valueObject.status,
-    );
+  const temp_status = parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
+    valueObject.status,
+  );
   if (temp_status instanceof Error) return temp_status;
-  const temp_num_completed_steps = parse_as_int(valueObject.num_completed_steps);
-  if (temp_num_completed_steps instanceof Error) return temp_num_completed_steps;
-  const temp_error_message = parse_as_Union_of_str0None_endof_(valueObject.error_message);
-  if (temp_error_message instanceof Error) return temp_error_message;
   const temp_datasink = parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto_endof_(
     valueObject.datasink,
   );
@@ -2357,8 +2458,6 @@ export function parse_as_OpenDatasinkJobDto(value: JsonValue): OpenDatasinkJobDt
     num_args: temp_num_args,
     uuid: temp_uuid,
     status: temp_status,
-    num_completed_steps: temp_num_completed_steps,
-    error_message: temp_error_message,
     datasink: temp_datasink,
   });
 }
@@ -2368,25 +2467,19 @@ export class OpenDatasinkJobDto {
   public name: string;
   public num_args: number | undefined;
   public uuid: string;
-  public status: "pending" | "running" | "cancelled" | "completed";
-  public num_completed_steps: number;
-  public error_message: string | undefined;
+  public status: JobFinishedDto | JobIsPendingDto | JobIsRunningDto | JobCanceledDto;
   public datasink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto;
   constructor(_params: {
     name: string;
     num_args: number | undefined;
     uuid: string;
-    status: "pending" | "running" | "cancelled" | "completed";
-    num_completed_steps: number;
-    error_message: string | undefined;
+    status: JobFinishedDto | JobIsPendingDto | JobIsRunningDto | JobCanceledDto;
     datasink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto;
   }) {
     this.name = _params.name;
     this.num_args = _params.num_args;
     this.uuid = _params.uuid;
     this.status = _params.status;
-    this.num_completed_steps = _params.num_completed_steps;
-    this.error_message = _params.error_message;
     this.datasink = _params.datasink;
   }
   public toJsonValue(): JsonObject {
@@ -2395,9 +2488,7 @@ export class OpenDatasinkJobDto {
       name: this.name,
       num_args: toJsonValue(this.num_args),
       uuid: this.uuid,
-      status: this.status,
-      num_completed_steps: this.num_completed_steps,
-      error_message: toJsonValue(this.error_message),
+      status: toJsonValue(this.status),
       datasink: toJsonValue(this.datasink),
     };
   }
@@ -2420,22 +2511,15 @@ export function parse_as_CreateDziPyramidJobDto(value: JsonValue): CreateDziPyra
   if (temp_num_args instanceof Error) return temp_num_args;
   const temp_uuid = parse_as_str(valueObject.uuid);
   if (temp_uuid instanceof Error) return temp_uuid;
-  const temp_status =
-    parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
-      valueObject.status,
-    );
+  const temp_status = parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
+    valueObject.status,
+  );
   if (temp_status instanceof Error) return temp_status;
-  const temp_num_completed_steps = parse_as_int(valueObject.num_completed_steps);
-  if (temp_num_completed_steps instanceof Error) return temp_num_completed_steps;
-  const temp_error_message = parse_as_Union_of_str0None_endof_(valueObject.error_message);
-  if (temp_error_message instanceof Error) return temp_error_message;
   return new CreateDziPyramidJobDto({
     name: temp_name,
     num_args: temp_num_args,
     uuid: temp_uuid,
     status: temp_status,
-    num_completed_steps: temp_num_completed_steps,
-    error_message: temp_error_message,
   });
 }
 // Automatically generated via DataTransferObject for CreateDziPyramidJobDto
@@ -2444,23 +2528,17 @@ export class CreateDziPyramidJobDto {
   public name: string;
   public num_args: number | undefined;
   public uuid: string;
-  public status: "pending" | "running" | "cancelled" | "completed";
-  public num_completed_steps: number;
-  public error_message: string | undefined;
+  public status: JobFinishedDto | JobIsPendingDto | JobIsRunningDto | JobCanceledDto;
   constructor(_params: {
     name: string;
     num_args: number | undefined;
     uuid: string;
-    status: "pending" | "running" | "cancelled" | "completed";
-    num_completed_steps: number;
-    error_message: string | undefined;
+    status: JobFinishedDto | JobIsPendingDto | JobIsRunningDto | JobCanceledDto;
   }) {
     this.name = _params.name;
     this.num_args = _params.num_args;
     this.uuid = _params.uuid;
     this.status = _params.status;
-    this.num_completed_steps = _params.num_completed_steps;
-    this.error_message = _params.error_message;
   }
   public toJsonValue(): JsonObject {
     return {
@@ -2468,9 +2546,7 @@ export class CreateDziPyramidJobDto {
       name: this.name,
       num_args: toJsonValue(this.num_args),
       uuid: this.uuid,
-      status: this.status,
-      num_completed_steps: this.num_completed_steps,
-      error_message: toJsonValue(this.error_message),
+      status: toJsonValue(this.status),
     };
   }
   public static fromJsonValue(value: JsonValue): CreateDziPyramidJobDto | Error {
@@ -2478,13 +2554,13 @@ export class CreateDziPyramidJobDto {
   }
 }
 
-export function parse_as_ZipJobDto(value: JsonValue): ZipJobDto | Error {
+export function parse_as_ZipDirectoryJobDto(value: JsonValue): ZipDirectoryJobDto | Error {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof Error) {
     return valueObject;
   }
-  if (valueObject["__class__"] != "ZipJobDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ZipJobDto`);
+  if (valueObject["__class__"] != "ZipDirectoryJobDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ZipDirectoryJobDto`);
   }
   const temp_name = parse_as_str(valueObject.name);
   if (temp_name instanceof Error) return temp_name;
@@ -2492,48 +2568,37 @@ export function parse_as_ZipJobDto(value: JsonValue): ZipJobDto | Error {
   if (temp_num_args instanceof Error) return temp_num_args;
   const temp_uuid = parse_as_str(valueObject.uuid);
   if (temp_uuid instanceof Error) return temp_uuid;
-  const temp_status =
-    parse_as_Literal_of__quote_pending_quote_0_quote_running_quote_0_quote_cancelled_quote_0_quote_completed_quote__endof_(
-      valueObject.status,
-    );
+  const temp_status = parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
+    valueObject.status,
+  );
   if (temp_status instanceof Error) return temp_status;
-  const temp_num_completed_steps = parse_as_int(valueObject.num_completed_steps);
-  if (temp_num_completed_steps instanceof Error) return temp_num_completed_steps;
-  const temp_error_message = parse_as_Union_of_str0None_endof_(valueObject.error_message);
-  if (temp_error_message instanceof Error) return temp_error_message;
   const temp_output_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.output_fs);
   if (temp_output_fs instanceof Error) return temp_output_fs;
   const temp_output_path = parse_as_str(valueObject.output_path);
   if (temp_output_path instanceof Error) return temp_output_path;
-  return new ZipJobDto({
+  return new ZipDirectoryJobDto({
     name: temp_name,
     num_args: temp_num_args,
     uuid: temp_uuid,
     status: temp_status,
-    num_completed_steps: temp_num_completed_steps,
-    error_message: temp_error_message,
     output_fs: temp_output_fs,
     output_path: temp_output_path,
   });
 }
-// Automatically generated via DataTransferObject for ZipJobDto
+// Automatically generated via DataTransferObject for ZipDirectoryJobDto
 // Do not edit!
-export class ZipJobDto {
+export class ZipDirectoryJobDto {
   public name: string;
   public num_args: number | undefined;
   public uuid: string;
-  public status: "pending" | "running" | "cancelled" | "completed";
-  public num_completed_steps: number;
-  public error_message: string | undefined;
+  public status: JobFinishedDto | JobIsPendingDto | JobIsRunningDto | JobCanceledDto;
   public output_fs: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
   public output_path: string;
   constructor(_params: {
     name: string;
     num_args: number | undefined;
     uuid: string;
-    status: "pending" | "running" | "cancelled" | "completed";
-    num_completed_steps: number;
-    error_message: string | undefined;
+    status: JobFinishedDto | JobIsPendingDto | JobIsRunningDto | JobCanceledDto;
     output_fs: OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto;
     output_path: string;
   }) {
@@ -2541,32 +2606,133 @@ export class ZipJobDto {
     this.num_args = _params.num_args;
     this.uuid = _params.uuid;
     this.status = _params.status;
-    this.num_completed_steps = _params.num_completed_steps;
-    this.error_message = _params.error_message;
     this.output_fs = _params.output_fs;
     this.output_path = _params.output_path;
   }
   public toJsonValue(): JsonObject {
     return {
-      "__class__": "ZipJobDto",
+      "__class__": "ZipDirectoryJobDto",
       name: this.name,
       num_args: toJsonValue(this.num_args),
       uuid: this.uuid,
-      status: this.status,
-      num_completed_steps: this.num_completed_steps,
-      error_message: toJsonValue(this.error_message),
+      status: toJsonValue(this.status),
       output_fs: toJsonValue(this.output_fs),
       output_path: this.output_path,
     };
   }
-  public static fromJsonValue(value: JsonValue): ZipJobDto | Error {
-    return parse_as_ZipJobDto(value);
+  public static fromJsonValue(value: JsonValue): ZipDirectoryJobDto | Error {
+    return parse_as_ZipDirectoryJobDto(value);
   }
 }
 
-export function parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_(
+export function parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto0None_endof_(
   value: JsonValue,
-): ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto | Error {
+): PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto | undefined | Error {
+  const parsed_option_0 = parse_as_PrecomputedChunksSinkDto(value);
+  if (!(parsed_option_0 instanceof Error)) {
+    return parsed_option_0;
+  }
+  const parsed_option_1 = parse_as_N5DataSinkDto(value);
+  if (!(parsed_option_1 instanceof Error)) {
+    return parsed_option_1;
+  }
+  const parsed_option_2 = parse_as_DziLevelSinkDto(value);
+  if (!(parsed_option_2 instanceof Error)) {
+    return parsed_option_2;
+  }
+  const parsed_option_3 = parse_as_None(value);
+  if (!(parsed_option_3 instanceof Error)) {
+    return parsed_option_3;
+  }
+  return Error(
+    `Could not parse ${
+      JSON.stringify(value)
+    } into PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto | undefined`,
+  );
+}
+export function parse_as_TransferFileJobDto(value: JsonValue): TransferFileJobDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "TransferFileJobDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a TransferFileJobDto`);
+  }
+  const temp_name = parse_as_str(valueObject.name);
+  if (temp_name instanceof Error) return temp_name;
+  const temp_num_args = parse_as_Union_of_int0None_endof_(valueObject.num_args);
+  if (temp_num_args instanceof Error) return temp_num_args;
+  const temp_uuid = parse_as_str(valueObject.uuid);
+  if (temp_uuid instanceof Error) return temp_uuid;
+  const temp_status = parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
+    valueObject.status,
+  );
+  if (temp_status instanceof Error) return temp_status;
+  const temp_target_url = parse_as_UrlDto(valueObject.target_url);
+  if (temp_target_url instanceof Error) return temp_target_url;
+  const temp_result_sink = parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto0None_endof_(
+    valueObject.result_sink,
+  );
+  if (temp_result_sink instanceof Error) return temp_result_sink;
+  return new TransferFileJobDto({
+    name: temp_name,
+    num_args: temp_num_args,
+    uuid: temp_uuid,
+    status: temp_status,
+    target_url: temp_target_url,
+    result_sink: temp_result_sink,
+  });
+}
+// Automatically generated via DataTransferObject for TransferFileJobDto
+// Do not edit!
+export class TransferFileJobDto {
+  public name: string;
+  public num_args: number | undefined;
+  public uuid: string;
+  public status: JobFinishedDto | JobIsPendingDto | JobIsRunningDto | JobCanceledDto;
+  public target_url: UrlDto;
+  public result_sink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto | undefined;
+  constructor(_params: {
+    name: string;
+    num_args: number | undefined;
+    uuid: string;
+    status: JobFinishedDto | JobIsPendingDto | JobIsRunningDto | JobCanceledDto;
+    target_url: UrlDto;
+    result_sink: PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto | undefined;
+  }) {
+    this.name = _params.name;
+    this.num_args = _params.num_args;
+    this.uuid = _params.uuid;
+    this.status = _params.status;
+    this.target_url = _params.target_url;
+    this.result_sink = _params.result_sink;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "TransferFileJobDto",
+      name: this.name,
+      num_args: toJsonValue(this.num_args),
+      uuid: this.uuid,
+      status: toJsonValue(this.status),
+      target_url: this.target_url.toJsonValue(),
+      result_sink: toJsonValue(this.result_sink),
+    };
+  }
+  public static fromJsonValue(value: JsonValue): TransferFileJobDto | Error {
+    return parse_as_TransferFileJobDto(value);
+  }
+}
+
+export function parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipDirectoryJobDto0TransferFileJobDto0JobDto_endof_(
+  value: JsonValue,
+):
+  | ExportJobDto
+  | OpenDatasinkJobDto
+  | CreateDziPyramidJobDto
+  | ZipDirectoryJobDto
+  | TransferFileJobDto
+  | JobDto
+  | Error {
   const parsed_option_0 = parse_as_ExportJobDto(value);
   if (!(parsed_option_0 instanceof Error)) {
     return parsed_option_0;
@@ -2579,24 +2745,39 @@ export function parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyram
   if (!(parsed_option_2 instanceof Error)) {
     return parsed_option_2;
   }
-  const parsed_option_3 = parse_as_ZipJobDto(value);
+  const parsed_option_3 = parse_as_ZipDirectoryJobDto(value);
   if (!(parsed_option_3 instanceof Error)) {
     return parsed_option_3;
+  }
+  const parsed_option_4 = parse_as_TransferFileJobDto(value);
+  if (!(parsed_option_4 instanceof Error)) {
+    return parsed_option_4;
+  }
+  const parsed_option_5 = parse_as_JobDto(value);
+  if (!(parsed_option_5 instanceof Error)) {
+    return parsed_option_5;
   }
   return Error(
     `Could not parse ${
       JSON.stringify(value)
-    } into ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto`,
+    } into ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipDirectoryJobDto | TransferFileJobDto | JobDto`,
   );
 }
-export function parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_0_varlen__endof_(
+export function parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipDirectoryJobDto0TransferFileJobDto0JobDto_endof_0_varlen__endof_(
   value: JsonValue,
-): Array<ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto> | Error {
+):
+  | Array<ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipDirectoryJobDto | TransferFileJobDto | JobDto>
+  | Error {
   const arr = ensureJsonArray(value);
   if (arr instanceof Error) return arr;
-  const out: Array<ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto> = [];
+  const out: Array<
+    ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipDirectoryJobDto | TransferFileJobDto | JobDto
+  > = [];
   for (let item of arr) {
-    let parsed_item = parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_(item);
+    let parsed_item =
+      parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipDirectoryJobDto0TransferFileJobDto0JobDto_endof_(
+        item,
+      );
     if (parsed_item instanceof Error) return parsed_item;
     out.push(parsed_item);
   }
@@ -2677,7 +2858,7 @@ export function parse_as_PixelClassificationExportAppletStateDto(
     return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a PixelClassificationExportAppletStateDto`);
   }
   const temp_jobs =
-    parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipJobDto_endof_0_varlen__endof_(
+    parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipDirectoryJobDto0TransferFileJobDto0JobDto_endof_0_varlen__endof_(
       valueObject.jobs,
     );
   if (temp_jobs instanceof Error) return temp_jobs;
@@ -2699,13 +2880,17 @@ export function parse_as_PixelClassificationExportAppletStateDto(
 // Automatically generated via DataTransferObject for PixelClassificationExportAppletStateDto
 // Do not edit!
 export class PixelClassificationExportAppletStateDto {
-  public jobs: Array<ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto>;
+  public jobs: Array<
+    ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipDirectoryJobDto | TransferFileJobDto | JobDto
+  >;
   public populated_labels: Array<LabelHeaderDto> | undefined;
   public datasource_suggestions:
     | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
     | undefined;
   constructor(_params: {
-    jobs: Array<ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipJobDto>;
+    jobs: Array<
+      ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipDirectoryJobDto | TransferFileJobDto | JobDto
+    >;
     populated_labels: Array<LabelHeaderDto> | undefined;
     datasource_suggestions:
       | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
@@ -4160,5 +4345,213 @@ export class ListFsDirResponse {
   }
   public static fromJsonValue(value: JsonValue): ListFsDirResponse | Error {
     return parse_as_ListFsDirResponse(value);
+  }
+}
+
+export function parse_as_Literal_of__quote_hbp_quote__endof_(value: JsonValue): "hbp" | Error {
+  const tmp_0 = parse_as_str(value);
+  if (!(tmp_0 instanceof Error) && tmp_0 === "hbp") {
+    return tmp_0;
+  }
+  return Error(`Could not parse ${value} as 'hbp'`);
+}
+export function parse_as_HbpIamPublicKeyDto(value: JsonValue): HbpIamPublicKeyDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  const temp_realm = parse_as_Literal_of__quote_hbp_quote__endof_(valueObject.realm);
+  if (temp_realm instanceof Error) return temp_realm;
+  const temp_public_key = parse_as_str(valueObject.public_key);
+  if (temp_public_key instanceof Error) return temp_public_key;
+  return new HbpIamPublicKeyDto({
+    realm: temp_realm,
+    public_key: temp_public_key,
+  });
+}
+// Automatically generated via DataTransferObject for HbpIamPublicKeyDto
+// Do not edit!
+export class HbpIamPublicKeyDto {
+  public realm: "hbp";
+  public public_key: string;
+  constructor(_params: {
+    realm: "hbp";
+    public_key: string;
+  }) {
+    this.realm = _params.realm;
+    this.public_key = _params.public_key;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      realm: this.realm,
+      public_key: this.public_key,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): HbpIamPublicKeyDto | Error {
+    return parse_as_HbpIamPublicKeyDto(value);
+  }
+}
+
+export function parse_as_Literal_of__quote_RS256_quote__endof_(value: JsonValue): "RS256" | Error {
+  const tmp_0 = parse_as_str(value);
+  if (!(tmp_0 instanceof Error) && tmp_0 === "RS256") {
+    return tmp_0;
+  }
+  return Error(`Could not parse ${value} as 'RS256'`);
+}
+export function parse_as_Literal_of__quote_JWT_quote__endof_(value: JsonValue): "JWT" | Error {
+  const tmp_0 = parse_as_str(value);
+  if (!(tmp_0 instanceof Error) && tmp_0 === "JWT") {
+    return tmp_0;
+  }
+  return Error(`Could not parse ${value} as 'JWT'`);
+}
+export function parse_as_EbrainsAccessTokenHeaderDto(value: JsonValue): EbrainsAccessTokenHeaderDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  const temp_alg = parse_as_Literal_of__quote_RS256_quote__endof_(valueObject.alg);
+  if (temp_alg instanceof Error) return temp_alg;
+  const temp_typ = parse_as_Literal_of__quote_JWT_quote__endof_(valueObject.typ);
+  if (temp_typ instanceof Error) return temp_typ;
+  const temp_kid = parse_as_str(valueObject.kid);
+  if (temp_kid instanceof Error) return temp_kid;
+  return new EbrainsAccessTokenHeaderDto({
+    alg: temp_alg,
+    typ: temp_typ,
+    kid: temp_kid,
+  });
+}
+// Automatically generated via DataTransferObject for EbrainsAccessTokenHeaderDto
+// Do not edit!
+export class EbrainsAccessTokenHeaderDto {
+  public alg: "RS256";
+  public typ: "JWT";
+  public kid: string;
+  constructor(_params: {
+    alg: "RS256";
+    typ: "JWT";
+    kid: string;
+  }) {
+    this.alg = _params.alg;
+    this.typ = _params.typ;
+    this.kid = _params.kid;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      alg: this.alg,
+      typ: this.typ,
+      kid: this.kid,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): EbrainsAccessTokenHeaderDto | Error {
+    return parse_as_EbrainsAccessTokenHeaderDto(value);
+  }
+}
+
+export function parse_as_EbrainsAccessTokenPayloadDto(value: JsonValue): EbrainsAccessTokenPayloadDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  const temp_exp = parse_as_int(valueObject.exp);
+  if (temp_exp instanceof Error) return temp_exp;
+  const temp_auth_time = parse_as_int(valueObject.auth_time);
+  if (temp_auth_time instanceof Error) return temp_auth_time;
+  const temp_sub = parse_as_str(valueObject.sub);
+  if (temp_sub instanceof Error) return temp_sub;
+  return new EbrainsAccessTokenPayloadDto({
+    exp: temp_exp,
+    auth_time: temp_auth_time,
+    sub: temp_sub,
+  });
+}
+// Automatically generated via DataTransferObject for EbrainsAccessTokenPayloadDto
+// Do not edit!
+export class EbrainsAccessTokenPayloadDto {
+  public exp: number;
+  public auth_time: number;
+  public sub: string;
+  constructor(_params: {
+    exp: number;
+    auth_time: number;
+    sub: string;
+  }) {
+    this.exp = _params.exp;
+    this.auth_time = _params.auth_time;
+    this.sub = _params.sub;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      exp: this.exp,
+      auth_time: this.auth_time,
+      sub: this.sub,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): EbrainsAccessTokenPayloadDto | Error {
+    return parse_as_EbrainsAccessTokenPayloadDto(value);
+  }
+}
+
+export function parse_as_EbrainsUserTokenDto(value: JsonValue): EbrainsUserTokenDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  const temp_access_token = parse_as_str(valueObject.access_token);
+  if (temp_access_token instanceof Error) return temp_access_token;
+  const temp_refresh_token = parse_as_str(valueObject.refresh_token);
+  if (temp_refresh_token instanceof Error) return temp_refresh_token;
+  return new EbrainsUserTokenDto({
+    access_token: temp_access_token,
+    refresh_token: temp_refresh_token,
+  });
+}
+// Automatically generated via DataTransferObject for EbrainsUserTokenDto
+// Do not edit!
+export class EbrainsUserTokenDto {
+  public access_token: string;
+  public refresh_token: string;
+  constructor(_params: {
+    access_token: string;
+    refresh_token: string;
+  }) {
+    this.access_token = _params.access_token;
+    this.refresh_token = _params.refresh_token;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      access_token: this.access_token,
+      refresh_token: this.refresh_token,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): EbrainsUserTokenDto | Error {
+    return parse_as_EbrainsUserTokenDto(value);
+  }
+}
+
+export function parse_as_LoginRequiredErrorDto(value: JsonValue): LoginRequiredErrorDto | Error {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof Error) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "LoginRequiredErrorDto") {
+    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a LoginRequiredErrorDto`);
+  }
+  return new LoginRequiredErrorDto({});
+}
+// Automatically generated via DataTransferObject for LoginRequiredErrorDto
+// Do not edit!
+export class LoginRequiredErrorDto {
+  constructor(_params: {}) {
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "LoginRequiredErrorDto",
+    };
+  }
+  public static fromJsonValue(value: JsonValue): LoginRequiredErrorDto | Error {
+    return parse_as_LoginRequiredErrorDto(value);
   }
 }

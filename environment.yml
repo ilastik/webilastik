@@ -20,6 +20,7 @@ dependencies:
   - redis-py=4.4.2
   - cryptography
   - defusedxml
+  - pyjwt
   - pip
   - pip:
     - numpy==1.24.2

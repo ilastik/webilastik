@@ -54,7 +54,11 @@ export class Path{
     }
 
     public get stem(): string{
-        return this.name.split(".")[0]
+        let parts = this.name.split(".")
+        if(parts.length > 1){
+            parts.pop()
+        }
+        return parts.join(".")
     }
 
     public get suffix(): string{
@@ -66,6 +70,18 @@ export class Path{
         let new_components = this.components.slice()
         new_components.pop()
         return new Path({components: new_components})
+    }
+
+    public isParentOf(other: Path): boolean{
+        if(this.components.length >= other.components.length){
+            return false
+        }
+        for(let i=0; i<this.components.length; i++){
+            if(this.components[i] != other.components[i]){
+                return false
+            }
+        }
+        return true
     }
 
     public get extension(): string | undefined{
@@ -290,6 +306,13 @@ export class Url implements IJsonable{
 
     public get parent(): Url{
         return this.updatedWith({path: this.path.parent})
+    }
+
+    public isParentOf(other: Url): boolean{
+        if(!this.equals(other.updatedWith({datascheme: this.datascheme, path: this.path}))){
+            return false
+        }
+        return this.path.isParentOf(other.path)
     }
 
     public joinPath(subpath: string | Path): Url{

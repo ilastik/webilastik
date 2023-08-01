@@ -55,6 +55,10 @@ class FsFileNotFoundException(Exception):
 
 class FsIoException(Exception):
     pass
+    # def __init__(self, cause: "Exception | None"):
+    #     super().__init__(cause)
+    #     self.cause = cause
+
 
 #####################################
 
