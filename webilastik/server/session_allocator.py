@@ -17,7 +17,7 @@ from aiohttp.client import ClientSession
 from cryptography.fernet import Fernet
 from ndstructs.utils.json_serializable import JsonValue
 
-from webilastik.libebrains.compute_session_launcher import CscsSshJobLauncher, JusufSshJobLauncher, LocalJobLauncher, Minutes, ComputeSession, SshJobLauncher
+from webilastik.libebrains.compute_session_launcher import JusufSshJobLauncher, LocalJobLauncher, Minutes, ComputeSession, SshJobLauncher
 from webilastik.libebrains.user_token import UserToken, AccessToken
 from webilastik.libebrains.oidc_client import OidcClient, Scope
 from webilastik.utility import parse_uuid
@@ -144,8 +144,8 @@ def require_user_token(
 
     return wrapper
 
-HpcSiteName = Literal["LOCAL_DASK", "LOCAL_PROCESS_POOL", "CSCS", "JUSUF"]
-HPC_SITE_NAMES: Set[HpcSiteName] = set(["LOCAL_DASK", "LOCAL_PROCESS_POOL", "CSCS", "JUSUF"])
+HpcSiteName = Literal["LOCAL_DASK", "LOCAL_PROCESS_POOL", "JUSUF"]
+HPC_SITE_NAMES: Set[HpcSiteName] = set(["LOCAL_DASK", "LOCAL_PROCESS_POOL", "JUSUF"])
 
 class SessionAllocator:
     def __init__(
@@ -163,7 +163,6 @@ class SessionAllocator:
             self.session_launchers["LOCAL_PROCESS_POOL"] = LocalJobLauncher(fernet=fernet, executor_getter="default")
         self.session_launchers.update({
             "JUSUF": JusufSshJobLauncher(fernet=fernet),
-            "CSCS": CscsSshJobLauncher(fernet=fernet),
         })
         self.external_url: Url = external_url
         self.oidc_client: OidcClient = oidc_client
