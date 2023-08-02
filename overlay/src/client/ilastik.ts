@@ -243,6 +243,25 @@ export class Session{
         }))
     }
 
+    public async doHttpRpc(params: Array<{
+        applet_name: string,
+        method_name: string,
+        arguments: JsonableValue,
+    }>): Promise<undefined | Error>{
+        const resp = await fetchJson(
+            this.sessionUrl.joinPath("http_rpc").raw,
+            {
+                cache: "no-store",
+                method: "POST",
+                body: JSON.stringify(toJsonValue(params))
+            }
+        )
+        if(resp instanceof Error){
+            return resp
+        }
+        return undefined
+    }
+
     public static btoa(url: String): string{
         return btoa(url.toString()).replace("+", "-").replace("/", "_")
     }
