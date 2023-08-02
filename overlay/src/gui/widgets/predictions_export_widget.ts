@@ -263,7 +263,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
 
 
         new Paragraph({parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
-            new Button({parentElement: undefined, inputType: "button", text: "Start Export Jobs", onClick: () => {
+            new Button({parentElement: undefined, inputType: "button", text: "Start Export Jobs", onClick: async () => {
                 const exportMode = this.exportModeSelector.value
                 let dtype: DataType;
                 let numChannels: number;
@@ -287,6 +287,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                     return
                 }
 
+                const jobSubmissionPayloads: Array<StartPixelProbabilitiesExportJobParamsDto | StartSimpleSegmentationExportJobParamsDto> = []
                 for(let job_index=0; job_index < this.datasourceListWidget.value.length; job_index++){
                     const datasource = this.datasourceListWidget.value[job_index]
                     let fileLocation = fileLocationInputWidget.tryGetLocation({
@@ -340,21 +341,42 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                         return
                     }
                     if(this.exportModeSelector.value == "pixel probabilities"){
-                        this.doRPC("launch_pixel_probabilities_export_job", new StartPixelProbabilitiesExportJobParamsDto({
-                            datasource: datasource.toDto(), datasink: datasink_result.toDto()
-                        }))
+                        jobSubmissionPayloads.push(
+                            new StartPixelProbabilitiesExportJobParamsDto({
+                                datasource: datasource.toDto(), datasink: datasink_result.toDto()
+                            })
+                        )
+                        // this.doRPC("launch_pixel_probabilities_export_job", )
                     }else if(this.exportModeSelector.value == "simple segmentation"){
                         const label_header = this.labelToExportSelector?.value;
                         if(!label_header){
                             new ErrorPopupWidget({message: "Missing export parameters"})
                             return
                         }
-                        this.doRPC("launch_simple_segmentation_export_job", new StartSimpleSegmentationExportJobParamsDto({
-                            datasource: datasource.toDto(), datasink: datasink_result.toDto(), label_header: label_header.toDto()
-                        }))
+                        jobSubmissionPayloads.push(
+                            new StartSimpleSegmentationExportJobParamsDto({
+                                datasource: datasource.toDto(), datasink: datasink_result.toDto(), label_header: label_header.toDto()
+                            })
+                        )
+                        // this.doRPC("launch_simple_segmentation_export_job", )
                     }else{
                         assertUnreachable(this.exportModeSelector.value)
                     }
+                }
+                const jobsSubmissionResult = await PopupWidget.WaitPopup({
+                    title: "Submitting jobs...",
+                    operation: this.session.doHttpRpc(
+                        jobSubmissionPayloads.map(payload => ({
+                            applet_name: this.name,
+                            method_name: payload instanceof StartPixelProbabilitiesExportJobParamsDto ?
+                                "launch_pixel_probabilities_export_job" :
+                                "launch_simple_segmentation_export_job",
+                            arguments: payload,
+                        }))
+                    )
+                })
+                if(jobsSubmissionResult instanceof Error){
+                    new ErrorPopupWidget({message: "Some job submissions failed."})
                 }
             }}),
         ]})
