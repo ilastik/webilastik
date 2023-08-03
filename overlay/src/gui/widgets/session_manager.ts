@@ -37,6 +37,16 @@ export class SessionManagerWidget{
     hpcSiteInput: Select<HpcSiteName>;
     private sessionRejoinForm: Form;
 
+    public static uiGetUrlConfigs(): StartupConfigs{
+        let startupConfigs = StartupConfigs.tryFromWindowLocation()
+        if(startupConfigs instanceof Error){
+            new ErrorPopupWidget({message: `Could not get startup configs from current URL: ${startupConfigs.message}. Using defaults...`})
+            return StartupConfigs.getDefault()
+        }
+        return startupConfigs
+
+    }
+
     constructor({parentElement, ilastikUrl, viewer_driver, workflow_container, hpcSiteNames}: {
         parentElement: HTMLElement, ilastikUrl: Url, viewer_driver: IViewerDriver, workflow_container: HTMLElement, hpcSiteNames: Array<HpcSiteName>
     }){
@@ -172,11 +182,7 @@ export class SessionManagerWidget{
                 return this.handleSessionFailed(sessionResult)
             }
 
-            let startupConfigs = StartupConfigs.tryFromWindowLocation()
-            if(startupConfigs instanceof Error){
-                new ErrorPopupWidget({message: `Could not get startup configs from current URL: ${startupConfigs.message}. Using defaults...`})
-                startupConfigs = StartupConfigs.getDefault()
-            }
+            let startupConfigs = SessionManagerWidget.uiGetUrlConfigs()
 
             let projectLocation: {fs: Filesystem, path: Path} | undefined = undefined;
             if(startupConfigs.project_file_url){
@@ -266,13 +272,15 @@ export class SessionManagerWidget{
             new ErrorPopupWidget({message: `Could not join session ${sessionId} because there's already a sesison runnig`})
             return
         }
-        this.session = this.doRejoinSession({sessionId, timeoutMinutes, ilastikUrl})
+        const startupConfigs = SessionManagerWidget.uiGetUrlConfigs()
+        this.session = this.doRejoinSession({sessionId, timeoutMinutes, ilastikUrl, startupConfigs})
     }
 
     private doRejoinSession = async (params: {
         sessionId: string,
         timeoutMinutes: number,
         ilastikUrl: Url,
+        startupConfigs: StartupConfigs,
     }): Promise<Session | Error> => {
         this.enableSessionAccquisitionControls({enabled: false})
         this.logMessage("Joining session....")
@@ -290,7 +298,13 @@ export class SessionManagerWidget{
         if(sessionResult instanceof Error){
             this.handleSessionFailed(sessionResult)
         }else{
-            this.handleSessionSuccess({sessionResult})
+            params
+            this.handleSessionSuccess({
+                sessionResult,
+                defaultBucketName: params.startupConfigs.effectiveBucketName,
+                defaultBucketPath: params.startupConfigs.ebrains_bucket_path,
+                // projectLocation: ..., //loading the project again would clobber the running session
+            })
         }
         return sessionResult
     }
