@@ -68,23 +68,27 @@ export class StartupConfigs{
     ebrains_bucket_name?: string
     ebrains_bucket_path: Path
     clb_collab_id?: string
+    output_path_pattern?: string
 
     public constructor(params: {
         project_file_url: Url | undefined,
         ebrains_bucket_name?: string,
         ebrains_bucket_path: Path,
         clb_collab_id?: string,
+        output_path_pattern?: string
     }){
         this.project_file_url = params.project_file_url
         this.ebrains_bucket_name = params.ebrains_bucket_name
         this.ebrains_bucket_path = params.ebrains_bucket_path
         this.clb_collab_id = params.clb_collab_id
+        this.output_path_pattern = params.output_path_pattern
     }
 
     public static getDefault(): StartupConfigs{
         return new StartupConfigs({
             project_file_url: undefined,
-            ebrains_bucket_path: Path.root
+            ebrains_bucket_path: Path.root,
+
         })
     }
 
@@ -107,6 +111,9 @@ export class StartupConfigs{
         const ebrains_bucket_path_key = "ebrains_bucket_path"
         const ebrainsBucketPathRaw = locationUrlResult.search.get(ebrains_bucket_path_key)
 
+        const output_path_pattern = "output_path_pattern"
+        const outputPathPattern = locationUrlResult.search.get(output_path_pattern)
+
         const collabId = locationUrlResult.search.get("clb-collab-id")
 
         return new StartupConfigs({
@@ -114,11 +121,19 @@ export class StartupConfigs{
             [ebrains_bucket_name__key]: ebrainsBucketNameRaw,
             [ebrains_bucket_path_key]: ebrainsBucketPathRaw ? Path.parse(ebrainsBucketPathRaw) : Path.root,
             clb_collab_id: collabId,
+            [output_path_pattern]: outputPathPattern,
         })
     }
 
     public get effectiveBucketName(): string{
         return this.ebrains_bucket_name || this.clb_collab_id || "hbp-image-service"
+    }
+
+    public get effectiveOutputPathPattern(): string{
+        if(this.output_path_pattern){
+            return this.output_path_pattern
+        }
+        return this.ebrains_bucket_path.joinPath("ilastik_exports").raw + "/{timestamp}/{name}_{output_type}"
     }
 }
 

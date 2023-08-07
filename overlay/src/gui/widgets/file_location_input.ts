@@ -86,7 +86,6 @@ export class FileLocationPatternInputWidget{
     constructor(params: {
         parentElement: HTMLElement,
         defaultBucketName?: string,
-        defaultBucketPath: Path,
         defaultPathPattern?: string,
         required?: boolean,
         filesystemChoices: Array<"http" | "data-proxy">,
