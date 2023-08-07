@@ -197,7 +197,10 @@ export class SessionManagerWidget{
                 }
             }
             this.handleSessionSuccess({
-                sessionResult, projectLocation, defaultBucketName: startupConfigs.effectiveBucketName, defaultBucketPath: startupConfigs.ebrains_bucket_path
+                sessionResult, projectLocation,
+                defaultBucketName: startupConfigs.effectiveBucketName,
+                defaultBucketPath: startupConfigs.ebrains_bucket_path,
+                defaultOutputPathPattern: startupConfigs.effectiveOutputPathPattern,
             })
         })
 
@@ -304,6 +307,7 @@ export class SessionManagerWidget{
                 defaultBucketName: params.startupConfigs.effectiveBucketName,
                 defaultBucketPath: params.startupConfigs.ebrains_bucket_path,
                 // projectLocation: ..., //loading the project again would clobber the running session
+                defaultOutputPathPattern: params.startupConfigs.effectiveOutputPathPattern,
             })
         }
         return sessionResult
@@ -412,11 +416,13 @@ export class SessionManagerWidget{
         projectLocation,
         defaultBucketName,
         defaultBucketPath,
+        defaultOutputPathPattern,
     }: {
         sessionResult: Session,
         projectLocation?: {fs: Filesystem, path: Path,},
         defaultBucketName?: string,
         defaultBucketPath?: Path,
+        defaultOutputPathPattern?: string,
     }){
         this.sessionIdField.value = sessionResult.sessionUrl.raw
 
@@ -430,6 +436,7 @@ export class SessionManagerWidget{
             defaultBucketName,
             defaultBucketPath,
             projectLocation: projectLocation,
+            outputPathPattern: defaultOutputPathPattern,
         })
         this.sessionIdField.value = sessionResult.sessionId
         this.reminaningTimeContainer.show(true)

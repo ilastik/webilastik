@@ -197,14 +197,15 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
     private customTileShapeCheckbox: BooleanInput;
     private tileShapeInput: Shape5DInputNoChannel
 
-    public constructor({name, parentElement, session, help, viewer, defaultBucketName, defaultBucketPath}: {
+    public constructor({name, parentElement, session, help, viewer, defaultBucketName, inputBucketPath, outputPathPattern}: {
         name: string,
         parentElement: HTMLElement,
         session: Session,
         help: string[],
         viewer: Viewer,
         defaultBucketName: string,
-        defaultBucketPath: Path,
+        inputBucketPath: Path,
+        outputPathPattern?: string,
     }){
         super({
             name,
@@ -237,16 +238,21 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
 
         const datasourceFieldset = createFieldset({parentElement: this.element, legend: "Input Datasets:"})
         this.datasourceListWidget = new DataSourceListWidget({
-            parentElement: datasourceFieldset, session: this.session, defaultBucketName, defaultBucketPath
+            parentElement: datasourceFieldset, session: this.session, defaultBucketName, defaultBucketPath: inputBucketPath
         })
 
         const datasinkFieldset = createFieldset({legend: "Output: ", parentElement: this.element})
         const fileLocationInputWidget = new FileLocationPatternInputWidget({
             parentElement: datasinkFieldset,
             defaultBucketName,
-            defaultBucketPath,
-            defaultPathPattern: defaultBucketPath.joinPath("ilastik_exports").raw + "/{timestamp}/{name}_{output_type}",
-            filesystemChoices: ["data-proxy"]
+            defaultPathPattern: outputPathPattern,
+            filesystemChoices: ["data-proxy"],
+            tooltip: "You can use any of the following replacements to compose output paths for export outputs:\n" +
+                "{item_index} ordinal number representing the position of the input data source in the list of inputs\n" +
+                "{name} the name of the input datasource (e.g.: the file at '/my/file.png' is named 'file.png'\n" +
+                "{output_type} the semantic meaning of the data in the output. Either 'simple_segmentation' or 'pixel_probabilities'\n" +
+                "{timestamp} a string representing the time when the job was submitted (e.g. '2023y12m31d__13h59min58s')\n" +
+                "{extension} the file (or folder) extension, representing the data type (e.g. 'n5', 'dzi')"
         })
         const datasinkConfigWidget = new DatasinkConfigWidget({parentElement: datasinkFieldset})
 
@@ -291,7 +297,10 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                 for(let job_index=0; job_index < this.datasourceListWidget.value.length; job_index++){
                     const datasource = this.datasourceListWidget.value[job_index]
                     let fileLocation = fileLocationInputWidget.tryGetLocation({
-                        item_index: job_index, name: datasource.url.path.name, output_type: this.exportModeSelector.value
+                        item_index: job_index,
+                        name: datasource.url.path.name,
+                        output_type: this.exportModeSelector.value,
+                        extension: datasinkConfigWidget.extension,
                     });
                     if(fileLocation === undefined){
                         new ErrorPopupWidget({message: "Unexpected bad file location"}) //FIXME? Shouldn't this be impossible?

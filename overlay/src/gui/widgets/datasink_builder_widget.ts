@@ -68,7 +68,7 @@ export class UnsupportedDziPath extends DziSinkCreationError{
 class DziDatasinkConfigWidget extends DatasinkInputForm{
     private imageFormatSelector: Select<"png" | "jpg">;
     private overlapInput: NumberInput;
-    private zipCheckbox: BooleanInput
+    public zipCheckbox: BooleanInput
 
     constructor(params: {parentElement: HTMLElement | undefined}){
         const imageFormatSelector = new Select<"png" | "jpg">({
@@ -94,7 +94,12 @@ class DziDatasinkConfigWidget extends DatasinkInputForm{
                 new Paragraph({
                     parentElement: undefined,
                     children: [
-                        new Label({innerText: "Image Format: ", parentElement: undefined}),
+                        new Label({
+                            innerText: "Image Format: ",
+                            parentElement: undefined,
+                            title: "The file type of the individual tiles of the dzi dataset.\n" +
+                                "PNG is highly recommeded since its compression is lossless."
+                        }),
                         imageFormatSelector,
                     ],
                 }),
@@ -102,7 +107,12 @@ class DziDatasinkConfigWidget extends DatasinkInputForm{
                 new Paragraph({
                     parentElement: undefined,
                     children: [
-                        new Label({innerText: "Overlap: ", parentElement: undefined}),
+                        new Label({
+                            innerText: "Overlap: ",
+                            parentElement: undefined,
+                            title: "Number of pixels that should overlap inbetween tiles.\n" +
+                                "Values different from 0 not supported yet."
+                        }),
                         overlapInput
                     ]
                 }),
@@ -110,7 +120,11 @@ class DziDatasinkConfigWidget extends DatasinkInputForm{
                 new Paragraph({
                     parentElement: undefined,
                     children: [
-                        new Label({innerText: "Zip: ", parentElement: undefined}),
+                        new Label({
+                            innerText: "Zip: ",
+                            parentElement: undefined,
+                            title: "Produce a .dzip zip archive instead of a typical dzi directory."
+                        }),
                         zipCheckbox
                     ]
                 })
@@ -202,7 +216,14 @@ class PrecomputedChunksDatasinkConfigWidget extends DatasinkInputForm{
         })
         super({...params, children: [
             new Paragraph({parentElement: undefined, cssClasses: [CssClasses.ItkInputParagraph], children: [
-                new Label({innerText: "Scale Key: ", parentElement: undefined}),
+                new Label({
+                    innerText: "Scale Key: ",
+                    parentElement: undefined,
+                    title: "Path inside the precomputed chunks tree for this scale.\n" +
+                        "This is usually some representation of the scale's resolution, such\n" +
+                        "as '10_10_10', but it can also be anything and is mostly for the sake\n" +
+                        "of helping humans identify it without having to go back to the top .json file."
+                }),
                 scaleKeyInput,
             ]}),
             new Paragraph({parentElement: undefined, cssClasses: [CssClasses.ItkInputParagraph], children: [
@@ -384,18 +405,32 @@ class N5DatasinkConfigWidget extends DatasinkInputForm{
 
 export class DatasinkConfigWidget{
     public readonly element: Div;
-    private readonly tabs: TabsWidget<DatasinkInputForm>;
+    private readonly tabs: TabsWidget<PrecomputedChunksDatasinkConfigWidget | N5DatasinkConfigWidget | DziDatasinkConfigWidget>;
 
     constructor(params: {parentElement: HTMLElement}){
         this.tabs = new TabsWidget({
             parentElement: params.parentElement,
-            tabBodyWidgets: new Map<string, DatasinkInputForm>([
+            tabBodyWidgets: new Map<string, PrecomputedChunksDatasinkConfigWidget | N5DatasinkConfigWidget | DziDatasinkConfigWidget>([
                 ["Precomputed Chunks", new PrecomputedChunksDatasinkConfigWidget({parentElement: undefined, disableEncoding: true})],
                 ["N5", new N5DatasinkConfigWidget({parentElement: undefined})],
                 ["Deep Zoom", new DziDatasinkConfigWidget({parentElement: undefined})],
             ])
         })
         this.element = this.tabs.element
+    }
+
+    public get extension(): "precomputed" | "n5" | "dzi" | "dzip"{
+        let currentTab = this.tabs.current.widget
+        if(currentTab instanceof PrecomputedChunksDatasinkConfigWidget){
+            return "precomputed"
+        }
+        if(currentTab instanceof N5DatasinkConfigWidget){
+            return "n5"
+        }
+        if(currentTab instanceof DziDatasinkConfigWidget){
+            return currentTab.zipCheckbox.value ? "dzip" : "dzi"
+        }
+        assertUnreachable(currentTab)
     }
 
     public tryMakeDataSink(params: {
