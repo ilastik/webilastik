@@ -68,7 +68,7 @@ export class UnsupportedDziPath extends DziSinkCreationError{
 class DziDatasinkConfigWidget extends DatasinkInputForm{
     private imageFormatSelector: Select<"png" | "jpg">;
     private overlapInput: NumberInput;
-    private zipCheckbox: BooleanInput
+    public zipCheckbox: BooleanInput
 
     constructor(params: {parentElement: HTMLElement | undefined}){
         const imageFormatSelector = new Select<"png" | "jpg">({
@@ -384,18 +384,32 @@ class N5DatasinkConfigWidget extends DatasinkInputForm{
 
 export class DatasinkConfigWidget{
     public readonly element: Div;
-    private readonly tabs: TabsWidget<DatasinkInputForm>;
+    private readonly tabs: TabsWidget<PrecomputedChunksDatasinkConfigWidget | N5DatasinkConfigWidget | DziDatasinkConfigWidget>;
 
     constructor(params: {parentElement: HTMLElement}){
         this.tabs = new TabsWidget({
             parentElement: params.parentElement,
-            tabBodyWidgets: new Map<string, DatasinkInputForm>([
+            tabBodyWidgets: new Map<string, PrecomputedChunksDatasinkConfigWidget | N5DatasinkConfigWidget | DziDatasinkConfigWidget>([
                 ["Precomputed Chunks", new PrecomputedChunksDatasinkConfigWidget({parentElement: undefined, disableEncoding: true})],
                 ["N5", new N5DatasinkConfigWidget({parentElement: undefined})],
                 ["Deep Zoom", new DziDatasinkConfigWidget({parentElement: undefined})],
             ])
         })
         this.element = this.tabs.element
+    }
+
+    public get extension(): "precomputed" | "n5" | "dzi" | "dzip"{
+        let currentTab = this.tabs.current.widget
+        if(currentTab instanceof PrecomputedChunksDatasinkConfigWidget){
+            return "precomputed"
+        }
+        if(currentTab instanceof N5DatasinkConfigWidget){
+            return "n5"
+        }
+        if(currentTab instanceof DziDatasinkConfigWidget){
+            return currentTab.zipCheckbox.value ? "dzip" : "dzi"
+        }
+        assertUnreachable(currentTab)
     }
 
     public tryMakeDataSink(params: {

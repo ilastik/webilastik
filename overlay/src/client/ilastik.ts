@@ -133,7 +133,7 @@ export class StartupConfigs{
         if(this.output_path_pattern){
             return this.output_path_pattern
         }
-        return this.ebrains_bucket_path.joinPath("ilastik_exports").raw + "/{timestamp}/{name}_{output_type}"
+        return this.ebrains_bucket_path.joinPath("ilastik_exports").raw + "/{timestamp}/{name}_{output_type}.{extension}"
     }
 }
 

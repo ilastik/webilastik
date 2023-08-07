@@ -291,7 +291,10 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                 for(let job_index=0; job_index < this.datasourceListWidget.value.length; job_index++){
                     const datasource = this.datasourceListWidget.value[job_index]
                     let fileLocation = fileLocationInputWidget.tryGetLocation({
-                        item_index: job_index, name: datasource.url.path.name, output_type: this.exportModeSelector.value
+                        item_index: job_index,
+                        name: datasource.url.path.name,
+                        output_type: this.exportModeSelector.value,
+                        extension: datasinkConfigWidget.extension,
                     });
                     if(fileLocation === undefined){
                         new ErrorPopupWidget({message: "Unexpected bad file location"}) //FIXME? Shouldn't this be impossible?
