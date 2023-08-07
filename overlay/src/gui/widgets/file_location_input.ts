@@ -91,6 +91,7 @@ export class FileLocationPatternInputWidget{
         defaultPathPattern?: string,
         required?: boolean,
         filesystemChoices: Array<"http" | "data-proxy">,
+        tooltip?: string,
     }){
         this.fsInput = new FsInputWidget({
             parentElement: params.parentElement,
@@ -98,8 +99,8 @@ export class FileLocationPatternInputWidget{
             filesystemChoices: params.filesystemChoices,
         })
         new Paragraph({parentElement: params.parentElement, cssClasses: [CssClasses.ItkInputParagraph], children: [
-            new Label({innerText: "Path pattern: ", parentElement: undefined}),
-            this.pathPatternInput = new PathPatternInput({value: params.defaultPathPattern, parentElement: undefined})
+            new Label({innerText: "Path pattern: ", parentElement: undefined, title: params.tooltip}),
+            this.pathPatternInput = new PathPatternInput({value: params.defaultPathPattern, parentElement: undefined, title: params.tooltip})
         ]})
 
     }

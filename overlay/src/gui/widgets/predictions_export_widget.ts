@@ -246,7 +246,13 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
             parentElement: datasinkFieldset,
             defaultBucketName,
             defaultPathPattern: outputPathPattern,
-            filesystemChoices: ["data-proxy"]
+            filesystemChoices: ["data-proxy"],
+            tooltip: "You can use any of the following replacements to compose output paths for export outputs:\n" +
+                "{item_index} ordinal number representing the position of the input data source in the list of inputs\n" +
+                "{name} the name of the input datasource (e.g.: the file at '/my/file.png' is named 'file.png'\n" +
+                "{output_type} the semantic meaning of the data in the output. Either 'simple_segmentation' or 'pixel_probabilities'\n" +
+                "{timestamp} a string representing the time when the job was submitted (e.g. '2023y12m31d__13h59min58s')\n" +
+                "{extension} the file (or folder) extension, representing the data type (e.g. 'n5', 'dzi')"
         })
         const datasinkConfigWidget = new DatasinkConfigWidget({parentElement: datasinkFieldset})
 
