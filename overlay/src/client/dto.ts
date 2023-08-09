@@ -1,30 +1,75 @@
 import {
-  ensureJsonArray,
-  ensureJsonBoolean,
-  ensureJsonNumber,
-  ensureJsonObject,
-  ensureJsonString,
-  ensureJsonUndefined,
-} from "../util/safe_serialization";
-import { JsonObject, JsonValue, toJsonValue } from "../util/serialization";
+  isJsonableArray,
+  isJsonableObject,
+  JsonArray,
+  JsonObject,
+  JsonValue,
+  toJsonValue,
+} from "../util/serialization";
 
-export function parse_as_int(value: JsonValue): number | Error {
+export class MessageParsingError extends Error {
+  public readonly __class_name__ = "MessageParsingError";
+}
+
+export function ensureJsonUndefined(value: JsonValue): undefined | MessageParsingError {
+  if (value !== undefined && value !== null) { //FIXME? null AND undefined?
+    return new MessageParsingError(`Expected undefined/null, found ${JSON.stringify(value)}`);
+  }
+  return undefined;
+}
+
+export function ensureJsonBoolean(value: JsonValue): boolean | MessageParsingError {
+  if (typeof (value) !== "boolean") {
+    return new MessageParsingError(`Expected boolean, found ${JSON.stringify(value)}`);
+  }
+  return value;
+}
+
+export function ensureJsonNumber(value: JsonValue): number | MessageParsingError {
+  if (typeof (value) !== "number") {
+    return new MessageParsingError(`Expected number, found ${JSON.stringify(value)}`);
+  }
+  return value;
+}
+
+export function ensureJsonString(value: JsonValue): string | MessageParsingError {
+  if (typeof (value) !== "string") {
+    return new MessageParsingError(`Expected string, found ${JSON.stringify(value)}`);
+  }
+  return value;
+}
+
+export function ensureJsonObject(value: JsonValue): JsonObject | MessageParsingError {
+  if (!isJsonableObject(value)) {
+    return new MessageParsingError(`Expected JSON object, found this: ${JSON.stringify(value)}`);
+  }
+  return value;
+}
+
+export function ensureJsonArray(value: JsonValue): JsonArray | MessageParsingError {
+  if (!isJsonableArray(value)) {
+    return new MessageParsingError(`Expected JSON array, found this: ${JSON.stringify(value)}`);
+  }
+  return value;
+}
+
+export function parse_as_int(value: JsonValue): number | MessageParsingError {
   return ensureJsonNumber(value);
 }
-export function parse_as_ColorDto(value: JsonValue): ColorDto | Error {
+export function parse_as_ColorDto(value: JsonValue): ColorDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "ColorDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ColorDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a ColorDto`);
   }
   const temp_r = parse_as_int(valueObject.r);
-  if (temp_r instanceof Error) return temp_r;
+  if (temp_r instanceof MessageParsingError) return temp_r;
   const temp_g = parse_as_int(valueObject.g);
-  if (temp_g instanceof Error) return temp_g;
+  if (temp_g instanceof MessageParsingError) return temp_g;
   const temp_b = parse_as_int(valueObject.b);
-  if (temp_b instanceof Error) return temp_b;
+  if (temp_b instanceof MessageParsingError) return temp_b;
   return new ColorDto({
     r: temp_r,
     g: temp_g,
@@ -54,26 +99,26 @@ export class ColorDto {
       b: this.b,
     };
   }
-  public static fromJsonValue(value: JsonValue): ColorDto | Error {
+  public static fromJsonValue(value: JsonValue): ColorDto | MessageParsingError {
     return parse_as_ColorDto(value);
   }
 }
 
-export function parse_as_str(value: JsonValue): string | Error {
+export function parse_as_str(value: JsonValue): string | MessageParsingError {
   return ensureJsonString(value);
 }
-export function parse_as_LabelHeaderDto(value: JsonValue): LabelHeaderDto | Error {
+export function parse_as_LabelHeaderDto(value: JsonValue): LabelHeaderDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "LabelHeaderDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a LabelHeaderDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a LabelHeaderDto`);
   }
   const temp_name = parse_as_str(valueObject.name);
-  if (temp_name instanceof Error) return temp_name;
+  if (temp_name instanceof MessageParsingError) return temp_name;
   const temp_color = parse_as_ColorDto(valueObject.color);
-  if (temp_color instanceof Error) return temp_color;
+  if (temp_color instanceof MessageParsingError) return temp_color;
   return new LabelHeaderDto({
     name: temp_name,
     color: temp_color,
@@ -98,92 +143,94 @@ export class LabelHeaderDto {
       color: this.color.toJsonValue(),
     };
   }
-  public static fromJsonValue(value: JsonValue): LabelHeaderDto | Error {
+  public static fromJsonValue(value: JsonValue): LabelHeaderDto | MessageParsingError {
     return parse_as_LabelHeaderDto(value);
   }
 }
 
 export function parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote_0_quote_deepzoom_quote__endof_(
   value: JsonValue,
-): "precomputed" | "n5" | "deepzoom" | Error {
+): "precomputed" | "n5" | "deepzoom" | MessageParsingError {
   const tmp_0 = parse_as_str(value);
-  if (!(tmp_0 instanceof Error) && tmp_0 === "precomputed") {
+  if (!(tmp_0 instanceof MessageParsingError) && tmp_0 === "precomputed") {
     return tmp_0;
   }
   const tmp_1 = parse_as_str(value);
-  if (!(tmp_1 instanceof Error) && tmp_1 === "n5") {
+  if (!(tmp_1 instanceof MessageParsingError) && tmp_1 === "n5") {
     return tmp_1;
   }
   const tmp_2 = parse_as_str(value);
-  if (!(tmp_2 instanceof Error) && tmp_2 === "deepzoom") {
+  if (!(tmp_2 instanceof MessageParsingError) && tmp_2 === "deepzoom") {
     return tmp_2;
   }
-  return Error(`Could not parse ${value} as 'precomputed' | 'n5' | 'deepzoom'`);
+  return new MessageParsingError(`Could not parse ${value} as 'precomputed' | 'n5' | 'deepzoom'`);
 }
-export function parse_as_None(value: JsonValue): undefined | Error {
+export function parse_as_None(value: JsonValue): undefined | MessageParsingError {
   return ensureJsonUndefined(value);
 }
 export function parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote_0_quote_deepzoom_quote__endof_0None_endof_(
   value: JsonValue,
-): "precomputed" | "n5" | "deepzoom" | undefined | Error {
+): "precomputed" | "n5" | "deepzoom" | undefined | MessageParsingError {
   const parsed_option_0 = parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote_0_quote_deepzoom_quote__endof_(
     value,
   );
-  if (!(parsed_option_0 instanceof Error)) {
+  if (!(parsed_option_0 instanceof MessageParsingError)) {
     return parsed_option_0;
   }
   const parsed_option_1 = parse_as_None(value);
-  if (!(parsed_option_1 instanceof Error)) {
+  if (!(parsed_option_1 instanceof MessageParsingError)) {
     return parsed_option_1;
   }
-  return Error(`Could not parse ${JSON.stringify(value)} into 'precomputed' | 'n5' | 'deepzoom' | undefined`);
+  return new MessageParsingError(
+    `Could not parse ${JSON.stringify(value)} into 'precomputed' | 'n5' | 'deepzoom' | undefined`,
+  );
 }
 export function parse_as_Literal_of__quote_http_quote_0_quote_https_quote_0_quote_file_quote_0_quote_memory_quote__endof_(
   value: JsonValue,
-): "http" | "https" | "file" | "memory" | Error {
+): "http" | "https" | "file" | "memory" | MessageParsingError {
   const tmp_0 = parse_as_str(value);
-  if (!(tmp_0 instanceof Error) && tmp_0 === "http") {
+  if (!(tmp_0 instanceof MessageParsingError) && tmp_0 === "http") {
     return tmp_0;
   }
   const tmp_1 = parse_as_str(value);
-  if (!(tmp_1 instanceof Error) && tmp_1 === "https") {
+  if (!(tmp_1 instanceof MessageParsingError) && tmp_1 === "https") {
     return tmp_1;
   }
   const tmp_2 = parse_as_str(value);
-  if (!(tmp_2 instanceof Error) && tmp_2 === "file") {
+  if (!(tmp_2 instanceof MessageParsingError) && tmp_2 === "file") {
     return tmp_2;
   }
   const tmp_3 = parse_as_str(value);
-  if (!(tmp_3 instanceof Error) && tmp_3 === "memory") {
+  if (!(tmp_3 instanceof MessageParsingError) && tmp_3 === "memory") {
     return tmp_3;
   }
-  return Error(`Could not parse ${value} as 'http' | 'https' | 'file' | 'memory'`);
+  return new MessageParsingError(`Could not parse ${value} as 'http' | 'https' | 'file' | 'memory'`);
 }
-export function parse_as_Union_of_int0None_endof_(value: JsonValue): number | undefined | Error {
+export function parse_as_Union_of_int0None_endof_(value: JsonValue): number | undefined | MessageParsingError {
   const parsed_option_0 = parse_as_int(value);
-  if (!(parsed_option_0 instanceof Error)) {
+  if (!(parsed_option_0 instanceof MessageParsingError)) {
     return parsed_option_0;
   }
   const parsed_option_1 = parse_as_None(value);
-  if (!(parsed_option_1 instanceof Error)) {
+  if (!(parsed_option_1 instanceof MessageParsingError)) {
     return parsed_option_1;
   }
-  return Error(`Could not parse ${JSON.stringify(value)} into number | undefined`);
+  return new MessageParsingError(`Could not parse ${JSON.stringify(value)} into number | undefined`);
 }
-export function parse_as_Mapping_of_str0str_endof_(value: JsonValue): { [key: string]: string } | Error {
+export function parse_as_Mapping_of_str0str_endof_(value: JsonValue): { [key: string]: string } | MessageParsingError {
   const valueObj = ensureJsonObject(value);
-  if (valueObj instanceof Error) {
+  if (valueObj instanceof MessageParsingError) {
     return valueObj;
   }
   const out: { [key: string]: string } = {};
   for (let key in valueObj) {
     const parsed_key = parse_as_str(key);
-    if (parsed_key instanceof Error) {
+    if (parsed_key instanceof MessageParsingError) {
       return parsed_key;
     }
     const val = valueObj[key];
     const parsed_val = parse_as_str(val);
-    if (parsed_val instanceof Error) {
+    if (parsed_val instanceof MessageParsingError) {
       return parsed_val;
     }
     out[parsed_key] = parsed_val;
@@ -192,56 +239,56 @@ export function parse_as_Mapping_of_str0str_endof_(value: JsonValue): { [key: st
 }
 export function parse_as_Union_of_Mapping_of_str0str_endof_0None_endof_(
   value: JsonValue,
-): { [key: string]: string } | undefined | Error {
+): { [key: string]: string } | undefined | MessageParsingError {
   const parsed_option_0 = parse_as_Mapping_of_str0str_endof_(value);
-  if (!(parsed_option_0 instanceof Error)) {
+  if (!(parsed_option_0 instanceof MessageParsingError)) {
     return parsed_option_0;
   }
   const parsed_option_1 = parse_as_None(value);
-  if (!(parsed_option_1 instanceof Error)) {
+  if (!(parsed_option_1 instanceof MessageParsingError)) {
     return parsed_option_1;
   }
-  return Error(`Could not parse ${JSON.stringify(value)} into { [key: string]: string } | undefined`);
+  return new MessageParsingError(`Could not parse ${JSON.stringify(value)} into { [key: string]: string } | undefined`);
 }
-export function parse_as_Union_of_str0None_endof_(value: JsonValue): string | undefined | Error {
+export function parse_as_Union_of_str0None_endof_(value: JsonValue): string | undefined | MessageParsingError {
   const parsed_option_0 = parse_as_str(value);
-  if (!(parsed_option_0 instanceof Error)) {
+  if (!(parsed_option_0 instanceof MessageParsingError)) {
     return parsed_option_0;
   }
   const parsed_option_1 = parse_as_None(value);
-  if (!(parsed_option_1 instanceof Error)) {
+  if (!(parsed_option_1 instanceof MessageParsingError)) {
     return parsed_option_1;
   }
-  return Error(`Could not parse ${JSON.stringify(value)} into string | undefined`);
+  return new MessageParsingError(`Could not parse ${JSON.stringify(value)} into string | undefined`);
 }
-export function parse_as_UrlDto(value: JsonValue): UrlDto | Error {
+export function parse_as_UrlDto(value: JsonValue): UrlDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "UrlDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a UrlDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a UrlDto`);
   }
   const temp_datascheme =
     parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote_0_quote_deepzoom_quote__endof_0None_endof_(
       valueObject.datascheme,
     );
-  if (temp_datascheme instanceof Error) return temp_datascheme;
+  if (temp_datascheme instanceof MessageParsingError) return temp_datascheme;
   const temp_protocol =
     parse_as_Literal_of__quote_http_quote_0_quote_https_quote_0_quote_file_quote_0_quote_memory_quote__endof_(
       valueObject.protocol,
     );
-  if (temp_protocol instanceof Error) return temp_protocol;
+  if (temp_protocol instanceof MessageParsingError) return temp_protocol;
   const temp_hostname = parse_as_str(valueObject.hostname);
-  if (temp_hostname instanceof Error) return temp_hostname;
+  if (temp_hostname instanceof MessageParsingError) return temp_hostname;
   const temp_port = parse_as_Union_of_int0None_endof_(valueObject.port);
-  if (temp_port instanceof Error) return temp_port;
+  if (temp_port instanceof MessageParsingError) return temp_port;
   const temp_path = parse_as_str(valueObject.path);
-  if (temp_path instanceof Error) return temp_path;
+  if (temp_path instanceof MessageParsingError) return temp_path;
   const temp_search = parse_as_Union_of_Mapping_of_str0str_endof_0None_endof_(valueObject.search);
-  if (temp_search instanceof Error) return temp_search;
+  if (temp_search instanceof MessageParsingError) return temp_search;
   const temp_fragment = parse_as_Union_of_str0None_endof_(valueObject.fragment);
-  if (temp_fragment instanceof Error) return temp_fragment;
+  if (temp_fragment instanceof MessageParsingError) return temp_fragment;
   return new UrlDto({
     datascheme: temp_datascheme,
     protocol: temp_protocol,
@@ -291,29 +338,29 @@ export class UrlDto {
       fragment: toJsonValue(this.fragment),
     };
   }
-  public static fromJsonValue(value: JsonValue): UrlDto | Error {
+  public static fromJsonValue(value: JsonValue): UrlDto | MessageParsingError {
     return parse_as_UrlDto(value);
   }
 }
 
-export function parse_as_Point5DDto(value: JsonValue): Point5DDto | Error {
+export function parse_as_Point5DDto(value: JsonValue): Point5DDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "Point5DDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a Point5DDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a Point5DDto`);
   }
   const temp_x = parse_as_int(valueObject.x);
-  if (temp_x instanceof Error) return temp_x;
+  if (temp_x instanceof MessageParsingError) return temp_x;
   const temp_y = parse_as_int(valueObject.y);
-  if (temp_y instanceof Error) return temp_y;
+  if (temp_y instanceof MessageParsingError) return temp_y;
   const temp_z = parse_as_int(valueObject.z);
-  if (temp_z instanceof Error) return temp_z;
+  if (temp_z instanceof MessageParsingError) return temp_z;
   const temp_t = parse_as_int(valueObject.t);
-  if (temp_t instanceof Error) return temp_t;
+  if (temp_t instanceof MessageParsingError) return temp_t;
   const temp_c = parse_as_int(valueObject.c);
-  if (temp_c instanceof Error) return temp_c;
+  if (temp_c instanceof MessageParsingError) return temp_c;
   return new Point5DDto({
     x: temp_x,
     y: temp_y,
@@ -353,29 +400,29 @@ export class Point5DDto {
       c: this.c,
     };
   }
-  public static fromJsonValue(value: JsonValue): Point5DDto | Error {
+  public static fromJsonValue(value: JsonValue): Point5DDto | MessageParsingError {
     return parse_as_Point5DDto(value);
   }
 }
 
-export function parse_as_Shape5DDto(value: JsonValue): Shape5DDto | Error {
+export function parse_as_Shape5DDto(value: JsonValue): Shape5DDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "Shape5DDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a Shape5DDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a Shape5DDto`);
   }
   const temp_x = parse_as_int(valueObject.x);
-  if (temp_x instanceof Error) return temp_x;
+  if (temp_x instanceof MessageParsingError) return temp_x;
   const temp_y = parse_as_int(valueObject.y);
-  if (temp_y instanceof Error) return temp_y;
+  if (temp_y instanceof MessageParsingError) return temp_y;
   const temp_z = parse_as_int(valueObject.z);
-  if (temp_z instanceof Error) return temp_z;
+  if (temp_z instanceof MessageParsingError) return temp_z;
   const temp_t = parse_as_int(valueObject.t);
-  if (temp_t instanceof Error) return temp_t;
+  if (temp_t instanceof MessageParsingError) return temp_t;
   const temp_c = parse_as_int(valueObject.c);
-  if (temp_c instanceof Error) return temp_c;
+  if (temp_c instanceof MessageParsingError) return temp_c;
   return new Shape5DDto({
     x: temp_x,
     y: temp_y,
@@ -415,23 +462,23 @@ export class Shape5DDto {
       c: this.c,
     };
   }
-  public static fromJsonValue(value: JsonValue): Shape5DDto | Error {
+  public static fromJsonValue(value: JsonValue): Shape5DDto | MessageParsingError {
     return parse_as_Shape5DDto(value);
   }
 }
 
-export function parse_as_Interval5DDto(value: JsonValue): Interval5DDto | Error {
+export function parse_as_Interval5DDto(value: JsonValue): Interval5DDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "Interval5DDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a Interval5DDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a Interval5DDto`);
   }
   const temp_start = parse_as_Point5DDto(valueObject.start);
-  if (temp_start instanceof Error) return temp_start;
+  if (temp_start instanceof MessageParsingError) return temp_start;
   const temp_stop = parse_as_Point5DDto(valueObject.stop);
-  if (temp_stop instanceof Error) return temp_stop;
+  if (temp_stop instanceof MessageParsingError) return temp_stop;
   return new Interval5DDto({
     start: temp_start,
     stop: temp_stop,
@@ -456,18 +503,18 @@ export class Interval5DDto {
       stop: this.stop.toJsonValue(),
     };
   }
-  public static fromJsonValue(value: JsonValue): Interval5DDto | Error {
+  public static fromJsonValue(value: JsonValue): Interval5DDto | MessageParsingError {
     return parse_as_Interval5DDto(value);
   }
 }
 
-export function parse_as_OsfsDto(value: JsonValue): OsfsDto | Error {
+export function parse_as_OsfsDto(value: JsonValue): OsfsDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "OsfsDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a OsfsDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a OsfsDto`);
   }
   return new OsfsDto({});
 }
@@ -481,42 +528,42 @@ export class OsfsDto {
       "__class__": "OsfsDto",
     };
   }
-  public static fromJsonValue(value: JsonValue): OsfsDto | Error {
+  public static fromJsonValue(value: JsonValue): OsfsDto | MessageParsingError {
     return parse_as_OsfsDto(value);
   }
 }
 
 export function parse_as_Literal_of__quote_http_quote_0_quote_https_quote__endof_(
   value: JsonValue,
-): "http" | "https" | Error {
+): "http" | "https" | MessageParsingError {
   const tmp_0 = parse_as_str(value);
-  if (!(tmp_0 instanceof Error) && tmp_0 === "http") {
+  if (!(tmp_0 instanceof MessageParsingError) && tmp_0 === "http") {
     return tmp_0;
   }
   const tmp_1 = parse_as_str(value);
-  if (!(tmp_1 instanceof Error) && tmp_1 === "https") {
+  if (!(tmp_1 instanceof MessageParsingError) && tmp_1 === "https") {
     return tmp_1;
   }
-  return Error(`Could not parse ${value} as 'http' | 'https'`);
+  return new MessageParsingError(`Could not parse ${value} as 'http' | 'https'`);
 }
-export function parse_as_HttpFsDto(value: JsonValue): HttpFsDto | Error {
+export function parse_as_HttpFsDto(value: JsonValue): HttpFsDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "HttpFsDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a HttpFsDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a HttpFsDto`);
   }
   const temp_protocol = parse_as_Literal_of__quote_http_quote_0_quote_https_quote__endof_(valueObject.protocol);
-  if (temp_protocol instanceof Error) return temp_protocol;
+  if (temp_protocol instanceof MessageParsingError) return temp_protocol;
   const temp_hostname = parse_as_str(valueObject.hostname);
-  if (temp_hostname instanceof Error) return temp_hostname;
+  if (temp_hostname instanceof MessageParsingError) return temp_hostname;
   const temp_port = parse_as_Union_of_int0None_endof_(valueObject.port);
-  if (temp_port instanceof Error) return temp_port;
+  if (temp_port instanceof MessageParsingError) return temp_port;
   const temp_path = parse_as_str(valueObject.path);
-  if (temp_path instanceof Error) return temp_path;
+  if (temp_path instanceof MessageParsingError) return temp_path;
   const temp_search = parse_as_Union_of_Mapping_of_str0str_endof_0None_endof_(valueObject.search);
-  if (temp_search instanceof Error) return temp_search;
+  if (temp_search instanceof MessageParsingError) return temp_search;
   return new HttpFsDto({
     protocol: temp_protocol,
     hostname: temp_hostname,
@@ -556,21 +603,21 @@ export class HttpFsDto {
       search: toJsonValue(this.search),
     };
   }
-  public static fromJsonValue(value: JsonValue): HttpFsDto | Error {
+  public static fromJsonValue(value: JsonValue): HttpFsDto | MessageParsingError {
     return parse_as_HttpFsDto(value);
   }
 }
 
-export function parse_as_BucketFSDto(value: JsonValue): BucketFSDto | Error {
+export function parse_as_BucketFSDto(value: JsonValue): BucketFSDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "BucketFSDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a BucketFSDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a BucketFSDto`);
   }
   const temp_bucket_name = parse_as_str(valueObject.bucket_name);
-  if (temp_bucket_name instanceof Error) return temp_bucket_name;
+  if (temp_bucket_name instanceof MessageParsingError) return temp_bucket_name;
   return new BucketFSDto({
     bucket_name: temp_bucket_name,
   });
@@ -590,40 +637,40 @@ export class BucketFSDto {
       bucket_name: this.bucket_name,
     };
   }
-  public static fromJsonValue(value: JsonValue): BucketFSDto | Error {
+  public static fromJsonValue(value: JsonValue): BucketFSDto | MessageParsingError {
     return parse_as_BucketFSDto(value);
   }
 }
 
 export function parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
   value: JsonValue,
-): OsfsDto | HttpFsDto | BucketFSDto | Error {
+): OsfsDto | HttpFsDto | BucketFSDto | MessageParsingError {
   const parsed_option_0 = parse_as_OsfsDto(value);
-  if (!(parsed_option_0 instanceof Error)) {
+  if (!(parsed_option_0 instanceof MessageParsingError)) {
     return parsed_option_0;
   }
   const parsed_option_1 = parse_as_HttpFsDto(value);
-  if (!(parsed_option_1 instanceof Error)) {
+  if (!(parsed_option_1 instanceof MessageParsingError)) {
     return parsed_option_1;
   }
   const parsed_option_2 = parse_as_BucketFSDto(value);
-  if (!(parsed_option_2 instanceof Error)) {
+  if (!(parsed_option_2 instanceof MessageParsingError)) {
     return parsed_option_2;
   }
-  return Error(`Could not parse ${JSON.stringify(value)} into OsfsDto | HttpFsDto | BucketFSDto`);
+  return new MessageParsingError(`Could not parse ${JSON.stringify(value)} into OsfsDto | HttpFsDto | BucketFSDto`);
 }
-export function parse_as_ZipFsDto(value: JsonValue): ZipFsDto | Error {
+export function parse_as_ZipFsDto(value: JsonValue): ZipFsDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "ZipFsDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ZipFsDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a ZipFsDto`);
   }
   const temp_zip_file_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.zip_file_fs);
-  if (temp_zip_file_fs instanceof Error) return temp_zip_file_fs;
+  if (temp_zip_file_fs instanceof MessageParsingError) return temp_zip_file_fs;
   const temp_zip_file_path = parse_as_str(valueObject.zip_file_path);
-  if (temp_zip_file_path instanceof Error) return temp_zip_file_path;
+  if (temp_zip_file_path instanceof MessageParsingError) return temp_zip_file_path;
   return new ZipFsDto({
     zip_file_fs: temp_zip_file_fs,
     zip_file_path: temp_zip_file_path,
@@ -648,114 +695,122 @@ export class ZipFsDto {
       zip_file_path: this.zip_file_path,
     };
   }
-  public static fromJsonValue(value: JsonValue): ZipFsDto | Error {
+  public static fromJsonValue(value: JsonValue): ZipFsDto | MessageParsingError {
     return parse_as_ZipFsDto(value);
   }
 }
 
 export function parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
   value: JsonValue,
-): OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto | Error {
+): OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto | MessageParsingError {
   const parsed_option_0 = parse_as_OsfsDto(value);
-  if (!(parsed_option_0 instanceof Error)) {
+  if (!(parsed_option_0 instanceof MessageParsingError)) {
     return parsed_option_0;
   }
   const parsed_option_1 = parse_as_HttpFsDto(value);
-  if (!(parsed_option_1 instanceof Error)) {
+  if (!(parsed_option_1 instanceof MessageParsingError)) {
     return parsed_option_1;
   }
   const parsed_option_2 = parse_as_BucketFSDto(value);
-  if (!(parsed_option_2 instanceof Error)) {
+  if (!(parsed_option_2 instanceof MessageParsingError)) {
     return parsed_option_2;
   }
   const parsed_option_3 = parse_as_ZipFsDto(value);
-  if (!(parsed_option_3 instanceof Error)) {
+  if (!(parsed_option_3 instanceof MessageParsingError)) {
     return parsed_option_3;
   }
-  return Error(`Could not parse ${JSON.stringify(value)} into OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto`);
+  return new MessageParsingError(
+    `Could not parse ${JSON.stringify(value)} into OsfsDto | HttpFsDto | BucketFSDto | ZipFsDto`,
+  );
 }
-export function parse_as_Tuple_of_int0int0int_endof_(value: JsonValue): [number, number, number] | Error {
+export function parse_as_Tuple_of_int0int0int_endof_(value: JsonValue): [number, number, number] | MessageParsingError {
   const arr = ensureJsonArray(value);
-  if (arr instanceof Error) return arr;
+  if (arr instanceof MessageParsingError) return arr;
   const temp_0 = parse_as_int(arr[0]);
-  if (temp_0 instanceof Error) return temp_0;
+  if (temp_0 instanceof MessageParsingError) return temp_0;
   const temp_1 = parse_as_int(arr[1]);
-  if (temp_1 instanceof Error) return temp_1;
+  if (temp_1 instanceof MessageParsingError) return temp_1;
   const temp_2 = parse_as_int(arr[2]);
-  if (temp_2 instanceof Error) return temp_2;
+  if (temp_2 instanceof MessageParsingError) return temp_2;
   return [temp_0, temp_1, temp_2];
 }
 export function parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
   value: JsonValue,
-): "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32" | Error {
+): "uint8" | "uint16" | "uint32" | "uint64" | "int64" | "float32" | MessageParsingError {
   const tmp_0 = parse_as_str(value);
-  if (!(tmp_0 instanceof Error) && tmp_0 === "uint8") {
+  if (!(tmp_0 instanceof MessageParsingError) && tmp_0 === "uint8") {
     return tmp_0;
   }
   const tmp_1 = parse_as_str(value);
-  if (!(tmp_1 instanceof Error) && tmp_1 === "uint16") {
+  if (!(tmp_1 instanceof MessageParsingError) && tmp_1 === "uint16") {
     return tmp_1;
   }
   const tmp_2 = parse_as_str(value);
-  if (!(tmp_2 instanceof Error) && tmp_2 === "uint32") {
+  if (!(tmp_2 instanceof MessageParsingError) && tmp_2 === "uint32") {
     return tmp_2;
   }
   const tmp_3 = parse_as_str(value);
-  if (!(tmp_3 instanceof Error) && tmp_3 === "uint64") {
+  if (!(tmp_3 instanceof MessageParsingError) && tmp_3 === "uint64") {
     return tmp_3;
   }
   const tmp_4 = parse_as_str(value);
-  if (!(tmp_4 instanceof Error) && tmp_4 === "int64") {
+  if (!(tmp_4 instanceof MessageParsingError) && tmp_4 === "int64") {
     return tmp_4;
   }
   const tmp_5 = parse_as_str(value);
-  if (!(tmp_5 instanceof Error) && tmp_5 === "float32") {
+  if (!(tmp_5 instanceof MessageParsingError) && tmp_5 === "float32") {
     return tmp_5;
   }
-  return Error(`Could not parse ${value} as 'uint8' | 'uint16' | 'uint32' | 'uint64' | 'int64' | 'float32'`);
+  return new MessageParsingError(
+    `Could not parse ${value} as 'uint8' | 'uint16' | 'uint32' | 'uint64' | 'int64' | 'float32'`,
+  );
 }
 export function parse_as_Literal_of__quote_raw_quote_0_quote_jpeg_quote__endof_(
   value: JsonValue,
-): "raw" | "jpeg" | Error {
+): "raw" | "jpeg" | MessageParsingError {
   const tmp_0 = parse_as_str(value);
-  if (!(tmp_0 instanceof Error) && tmp_0 === "raw") {
+  if (!(tmp_0 instanceof MessageParsingError) && tmp_0 === "raw") {
     return tmp_0;
   }
   const tmp_1 = parse_as_str(value);
-  if (!(tmp_1 instanceof Error) && tmp_1 === "jpeg") {
+  if (!(tmp_1 instanceof MessageParsingError) && tmp_1 === "jpeg") {
     return tmp_1;
   }
-  return Error(`Could not parse ${value} as 'raw' | 'jpeg'`);
+  return new MessageParsingError(`Could not parse ${value} as 'raw' | 'jpeg'`);
 }
-export function parse_as_PrecomputedChunksDataSourceDto(value: JsonValue): PrecomputedChunksDataSourceDto | Error {
+export function parse_as_PrecomputedChunksDataSourceDto(
+  value: JsonValue,
+): PrecomputedChunksDataSourceDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "PrecomputedChunksDataSourceDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a PrecomputedChunksDataSourceDto`);
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a PrecomputedChunksDataSourceDto`,
+    );
   }
   const temp_url = parse_as_UrlDto(valueObject.url);
-  if (temp_url instanceof Error) return temp_url;
+  if (temp_url instanceof MessageParsingError) return temp_url;
   const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.filesystem);
-  if (temp_filesystem instanceof Error) return temp_filesystem;
+  if (temp_filesystem instanceof MessageParsingError) return temp_filesystem;
   const temp_path = parse_as_str(valueObject.path);
-  if (temp_path instanceof Error) return temp_path;
+  if (temp_path instanceof MessageParsingError) return temp_path;
   const temp_scale_key = parse_as_str(valueObject.scale_key);
-  if (temp_scale_key instanceof Error) return temp_scale_key;
+  if (temp_scale_key instanceof MessageParsingError) return temp_scale_key;
   const temp_interval = parse_as_Interval5DDto(valueObject.interval);
-  if (temp_interval instanceof Error) return temp_interval;
+  if (temp_interval instanceof MessageParsingError) return temp_interval;
   const temp_tile_shape = parse_as_Shape5DDto(valueObject.tile_shape);
-  if (temp_tile_shape instanceof Error) return temp_tile_shape;
+  if (temp_tile_shape instanceof MessageParsingError) return temp_tile_shape;
   const temp_spatial_resolution = parse_as_Tuple_of_int0int0int_endof_(valueObject.spatial_resolution);
-  if (temp_spatial_resolution instanceof Error) return temp_spatial_resolution;
+  if (temp_spatial_resolution instanceof MessageParsingError) return temp_spatial_resolution;
   const temp_dtype =
     parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
       valueObject.dtype,
     );
-  if (temp_dtype instanceof Error) return temp_dtype;
+  if (temp_dtype instanceof MessageParsingError) return temp_dtype;
   const temp_encoder = parse_as_Literal_of__quote_raw_quote_0_quote_jpeg_quote__endof_(valueObject.encoder);
-  if (temp_encoder instanceof Error) return temp_encoder;
+  if (temp_encoder instanceof MessageParsingError) return temp_encoder;
   return new PrecomputedChunksDataSourceDto({
     url: temp_url,
     filesystem: temp_filesystem,
@@ -815,23 +870,23 @@ export class PrecomputedChunksDataSourceDto {
       encoder: this.encoder,
     };
   }
-  public static fromJsonValue(value: JsonValue): PrecomputedChunksDataSourceDto | Error {
+  public static fromJsonValue(value: JsonValue): PrecomputedChunksDataSourceDto | MessageParsingError {
     return parse_as_PrecomputedChunksDataSourceDto(value);
   }
 }
 
-export function parse_as_DziSizeElementDto(value: JsonValue): DziSizeElementDto | Error {
+export function parse_as_DziSizeElementDto(value: JsonValue): DziSizeElementDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "DziSizeElementDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a DziSizeElementDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a DziSizeElementDto`);
   }
   const temp_Width = parse_as_int(valueObject.Width);
-  if (temp_Width instanceof Error) return temp_Width;
+  if (temp_Width instanceof MessageParsingError) return temp_Width;
   const temp_Height = parse_as_int(valueObject.Height);
-  if (temp_Height instanceof Error) return temp_Height;
+  if (temp_Height instanceof MessageParsingError) return temp_Height;
   return new DziSizeElementDto({
     Width: temp_Width,
     Height: temp_Height,
@@ -856,46 +911,46 @@ export class DziSizeElementDto {
       Height: this.Height,
     };
   }
-  public static fromJsonValue(value: JsonValue): DziSizeElementDto | Error {
+  public static fromJsonValue(value: JsonValue): DziSizeElementDto | MessageParsingError {
     return parse_as_DziSizeElementDto(value);
   }
 }
 
 export function parse_as_Literal_of__quote_jpeg_quote_0_quote_jpg_quote_0_quote_png_quote__endof_(
   value: JsonValue,
-): "jpeg" | "jpg" | "png" | Error {
+): "jpeg" | "jpg" | "png" | MessageParsingError {
   const tmp_0 = parse_as_str(value);
-  if (!(tmp_0 instanceof Error) && tmp_0 === "jpeg") {
+  if (!(tmp_0 instanceof MessageParsingError) && tmp_0 === "jpeg") {
     return tmp_0;
   }
   const tmp_1 = parse_as_str(value);
-  if (!(tmp_1 instanceof Error) && tmp_1 === "jpg") {
+  if (!(tmp_1 instanceof MessageParsingError) && tmp_1 === "jpg") {
     return tmp_1;
   }
   const tmp_2 = parse_as_str(value);
-  if (!(tmp_2 instanceof Error) && tmp_2 === "png") {
+  if (!(tmp_2 instanceof MessageParsingError) && tmp_2 === "png") {
     return tmp_2;
   }
-  return Error(`Could not parse ${value} as 'jpeg' | 'jpg' | 'png'`);
+  return new MessageParsingError(`Could not parse ${value} as 'jpeg' | 'jpg' | 'png'`);
 }
-export function parse_as_DziImageElementDto(value: JsonValue): DziImageElementDto | Error {
+export function parse_as_DziImageElementDto(value: JsonValue): DziImageElementDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "DziImageElementDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a DziImageElementDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a DziImageElementDto`);
   }
   const temp_Format = parse_as_Literal_of__quote_jpeg_quote_0_quote_jpg_quote_0_quote_png_quote__endof_(
     valueObject.Format,
   );
-  if (temp_Format instanceof Error) return temp_Format;
+  if (temp_Format instanceof MessageParsingError) return temp_Format;
   const temp_Overlap = parse_as_int(valueObject.Overlap);
-  if (temp_Overlap instanceof Error) return temp_Overlap;
+  if (temp_Overlap instanceof MessageParsingError) return temp_Overlap;
   const temp_TileSize = parse_as_int(valueObject.TileSize);
-  if (temp_TileSize instanceof Error) return temp_TileSize;
+  if (temp_TileSize instanceof MessageParsingError) return temp_TileSize;
   const temp_Size = parse_as_DziSizeElementDto(valueObject.Size);
-  if (temp_Size instanceof Error) return temp_Size;
+  if (temp_Size instanceof MessageParsingError) return temp_Size;
   return new DziImageElementDto({
     Format: temp_Format,
     Overlap: temp_Overlap,
@@ -930,40 +985,40 @@ export class DziImageElementDto {
       Size: this.Size.toJsonValue(),
     };
   }
-  public static fromJsonValue(value: JsonValue): DziImageElementDto | Error {
+  public static fromJsonValue(value: JsonValue): DziImageElementDto | MessageParsingError {
     return parse_as_DziImageElementDto(value);
   }
 }
 
-export function parse_as_Literal_of_103_endof_(value: JsonValue): 1 | 3 | Error {
+export function parse_as_Literal_of_103_endof_(value: JsonValue): 1 | 3 | MessageParsingError {
   const tmp_0 = parse_as_int(value);
-  if (!(tmp_0 instanceof Error) && tmp_0 === 1) {
+  if (!(tmp_0 instanceof MessageParsingError) && tmp_0 === 1) {
     return tmp_0;
   }
   const tmp_1 = parse_as_int(value);
-  if (!(tmp_1 instanceof Error) && tmp_1 === 3) {
+  if (!(tmp_1 instanceof MessageParsingError) && tmp_1 === 3) {
     return tmp_1;
   }
-  return Error(`Could not parse ${value} as 1 | 3`);
+  return new MessageParsingError(`Could not parse ${value} as 1 | 3`);
 }
-export function parse_as_DziLevelSinkDto(value: JsonValue): DziLevelSinkDto | Error {
+export function parse_as_DziLevelSinkDto(value: JsonValue): DziLevelSinkDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "DziLevelSinkDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a DziLevelSinkDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a DziLevelSinkDto`);
   }
   const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.filesystem);
-  if (temp_filesystem instanceof Error) return temp_filesystem;
+  if (temp_filesystem instanceof MessageParsingError) return temp_filesystem;
   const temp_xml_path = parse_as_str(valueObject.xml_path);
-  if (temp_xml_path instanceof Error) return temp_xml_path;
+  if (temp_xml_path instanceof MessageParsingError) return temp_xml_path;
   const temp_dzi_image = parse_as_DziImageElementDto(valueObject.dzi_image);
-  if (temp_dzi_image instanceof Error) return temp_dzi_image;
+  if (temp_dzi_image instanceof MessageParsingError) return temp_dzi_image;
   const temp_num_channels = parse_as_Literal_of_103_endof_(valueObject.num_channels);
-  if (temp_num_channels instanceof Error) return temp_num_channels;
+  if (temp_num_channels instanceof MessageParsingError) return temp_num_channels;
   const temp_level_index = parse_as_int(valueObject.level_index);
-  if (temp_level_index instanceof Error) return temp_level_index;
+  if (temp_level_index instanceof MessageParsingError) return temp_level_index;
   return new DziLevelSinkDto({
     filesystem: temp_filesystem,
     xml_path: temp_xml_path,
@@ -1003,29 +1058,29 @@ export class DziLevelSinkDto {
       level_index: this.level_index,
     };
   }
-  public static fromJsonValue(value: JsonValue): DziLevelSinkDto | Error {
+  public static fromJsonValue(value: JsonValue): DziLevelSinkDto | MessageParsingError {
     return parse_as_DziLevelSinkDto(value);
   }
 }
 
-export function parse_as_DziLevelDataSourceDto(value: JsonValue): DziLevelDataSourceDto | Error {
+export function parse_as_DziLevelDataSourceDto(value: JsonValue): DziLevelDataSourceDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "DziLevelDataSourceDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a DziLevelDataSourceDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a DziLevelDataSourceDto`);
   }
   const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.filesystem);
-  if (temp_filesystem instanceof Error) return temp_filesystem;
+  if (temp_filesystem instanceof MessageParsingError) return temp_filesystem;
   const temp_xml_path = parse_as_str(valueObject.xml_path);
-  if (temp_xml_path instanceof Error) return temp_xml_path;
+  if (temp_xml_path instanceof MessageParsingError) return temp_xml_path;
   const temp_dzi_image = parse_as_DziImageElementDto(valueObject.dzi_image);
-  if (temp_dzi_image instanceof Error) return temp_dzi_image;
+  if (temp_dzi_image instanceof MessageParsingError) return temp_dzi_image;
   const temp_num_channels = parse_as_Literal_of_103_endof_(valueObject.num_channels);
-  if (temp_num_channels instanceof Error) return temp_num_channels;
+  if (temp_num_channels instanceof MessageParsingError) return temp_num_channels;
   const temp_level_index = parse_as_int(valueObject.level_index);
-  if (temp_level_index instanceof Error) return temp_level_index;
+  if (temp_level_index instanceof MessageParsingError) return temp_level_index;
   return new DziLevelDataSourceDto({
     filesystem: temp_filesystem,
     xml_path: temp_xml_path,
@@ -1065,21 +1120,21 @@ export class DziLevelDataSourceDto {
       level_index: this.level_index,
     };
   }
-  public static fromJsonValue(value: JsonValue): DziLevelDataSourceDto | Error {
+  public static fromJsonValue(value: JsonValue): DziLevelDataSourceDto | MessageParsingError {
     return parse_as_DziLevelDataSourceDto(value);
   }
 }
 
-export function parse_as_N5GzipCompressorDto(value: JsonValue): N5GzipCompressorDto | Error {
+export function parse_as_N5GzipCompressorDto(value: JsonValue): N5GzipCompressorDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["type"] != "gzip") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5GzipCompressorDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a N5GzipCompressorDto`);
   }
   const temp_level = parse_as_int(valueObject.level);
-  if (temp_level instanceof Error) return temp_level;
+  if (temp_level instanceof MessageParsingError) return temp_level;
   return new N5GzipCompressorDto({
     level: temp_level,
   });
@@ -1099,21 +1154,21 @@ export class N5GzipCompressorDto {
       level: this.level,
     };
   }
-  public static fromJsonValue(value: JsonValue): N5GzipCompressorDto | Error {
+  public static fromJsonValue(value: JsonValue): N5GzipCompressorDto | MessageParsingError {
     return parse_as_N5GzipCompressorDto(value);
   }
 }
 
-export function parse_as_N5Bzip2CompressorDto(value: JsonValue): N5Bzip2CompressorDto | Error {
+export function parse_as_N5Bzip2CompressorDto(value: JsonValue): N5Bzip2CompressorDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["type"] != "bzip2") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5Bzip2CompressorDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a N5Bzip2CompressorDto`);
   }
   const temp_blockSize = parse_as_int(valueObject.blockSize);
-  if (temp_blockSize instanceof Error) return temp_blockSize;
+  if (temp_blockSize instanceof MessageParsingError) return temp_blockSize;
   return new N5Bzip2CompressorDto({
     blockSize: temp_blockSize,
   });
@@ -1133,21 +1188,21 @@ export class N5Bzip2CompressorDto {
       blockSize: this.blockSize,
     };
   }
-  public static fromJsonValue(value: JsonValue): N5Bzip2CompressorDto | Error {
+  public static fromJsonValue(value: JsonValue): N5Bzip2CompressorDto | MessageParsingError {
     return parse_as_N5Bzip2CompressorDto(value);
   }
 }
 
-export function parse_as_N5XzCompressorDto(value: JsonValue): N5XzCompressorDto | Error {
+export function parse_as_N5XzCompressorDto(value: JsonValue): N5XzCompressorDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["type"] != "xz") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5XzCompressorDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a N5XzCompressorDto`);
   }
   const temp_preset = parse_as_int(valueObject.preset);
-  if (temp_preset instanceof Error) return temp_preset;
+  if (temp_preset instanceof MessageParsingError) return temp_preset;
   return new N5XzCompressorDto({
     preset: temp_preset,
   });
@@ -1167,18 +1222,18 @@ export class N5XzCompressorDto {
       preset: this.preset,
     };
   }
-  public static fromJsonValue(value: JsonValue): N5XzCompressorDto | Error {
+  public static fromJsonValue(value: JsonValue): N5XzCompressorDto | MessageParsingError {
     return parse_as_N5XzCompressorDto(value);
   }
 }
 
-export function parse_as_N5RawCompressorDto(value: JsonValue): N5RawCompressorDto | Error {
+export function parse_as_N5RawCompressorDto(value: JsonValue): N5RawCompressorDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["type"] != "raw") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5RawCompressorDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a N5RawCompressorDto`);
   }
   return new N5RawCompressorDto({});
 }
@@ -1192,92 +1247,92 @@ export class N5RawCompressorDto {
       "type": "raw",
     };
   }
-  public static fromJsonValue(value: JsonValue): N5RawCompressorDto | Error {
+  public static fromJsonValue(value: JsonValue): N5RawCompressorDto | MessageParsingError {
     return parse_as_N5RawCompressorDto(value);
   }
 }
 
-export function parse_as_Tuple_of_int0_varlen__endof_(value: JsonValue): Array<number> | Error {
+export function parse_as_Tuple_of_int0_varlen__endof_(value: JsonValue): Array<number> | MessageParsingError {
   const arr = ensureJsonArray(value);
-  if (arr instanceof Error) return arr;
+  if (arr instanceof MessageParsingError) return arr;
   const out: Array<number> = [];
   for (let item of arr) {
     let parsed_item = parse_as_int(item);
-    if (parsed_item instanceof Error) return parsed_item;
+    if (parsed_item instanceof MessageParsingError) return parsed_item;
     out.push(parsed_item);
   }
   return out;
 }
-export function parse_as_Tuple_of_str0_varlen__endof_(value: JsonValue): Array<string> | Error {
+export function parse_as_Tuple_of_str0_varlen__endof_(value: JsonValue): Array<string> | MessageParsingError {
   const arr = ensureJsonArray(value);
-  if (arr instanceof Error) return arr;
+  if (arr instanceof MessageParsingError) return arr;
   const out: Array<string> = [];
   for (let item of arr) {
     let parsed_item = parse_as_str(item);
-    if (parsed_item instanceof Error) return parsed_item;
+    if (parsed_item instanceof MessageParsingError) return parsed_item;
     out.push(parsed_item);
   }
   return out;
 }
 export function parse_as_Union_of_Tuple_of_str0_varlen__endof_0None_endof_(
   value: JsonValue,
-): Array<string> | undefined | Error {
+): Array<string> | undefined | MessageParsingError {
   const parsed_option_0 = parse_as_Tuple_of_str0_varlen__endof_(value);
-  if (!(parsed_option_0 instanceof Error)) {
+  if (!(parsed_option_0 instanceof MessageParsingError)) {
     return parsed_option_0;
   }
   const parsed_option_1 = parse_as_None(value);
-  if (!(parsed_option_1 instanceof Error)) {
+  if (!(parsed_option_1 instanceof MessageParsingError)) {
     return parsed_option_1;
   }
-  return Error(`Could not parse ${JSON.stringify(value)} into Array<string> | undefined`);
+  return new MessageParsingError(`Could not parse ${JSON.stringify(value)} into Array<string> | undefined`);
 }
 export function parse_as_Union_of_N5GzipCompressorDto0N5Bzip2CompressorDto0N5XzCompressorDto0N5RawCompressorDto_endof_(
   value: JsonValue,
-): N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto | Error {
+): N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto | MessageParsingError {
   const parsed_option_0 = parse_as_N5GzipCompressorDto(value);
-  if (!(parsed_option_0 instanceof Error)) {
+  if (!(parsed_option_0 instanceof MessageParsingError)) {
     return parsed_option_0;
   }
   const parsed_option_1 = parse_as_N5Bzip2CompressorDto(value);
-  if (!(parsed_option_1 instanceof Error)) {
+  if (!(parsed_option_1 instanceof MessageParsingError)) {
     return parsed_option_1;
   }
   const parsed_option_2 = parse_as_N5XzCompressorDto(value);
-  if (!(parsed_option_2 instanceof Error)) {
+  if (!(parsed_option_2 instanceof MessageParsingError)) {
     return parsed_option_2;
   }
   const parsed_option_3 = parse_as_N5RawCompressorDto(value);
-  if (!(parsed_option_3 instanceof Error)) {
+  if (!(parsed_option_3 instanceof MessageParsingError)) {
     return parsed_option_3;
   }
-  return Error(
+  return new MessageParsingError(
     `Could not parse ${
       JSON.stringify(value)
     } into N5GzipCompressorDto | N5Bzip2CompressorDto | N5XzCompressorDto | N5RawCompressorDto`,
   );
 }
-export function parse_as_N5DatasetAttributesDto(value: JsonValue): N5DatasetAttributesDto | Error {
+export function parse_as_N5DatasetAttributesDto(value: JsonValue): N5DatasetAttributesDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   const temp_dimensions = parse_as_Tuple_of_int0_varlen__endof_(valueObject.dimensions);
-  if (temp_dimensions instanceof Error) return temp_dimensions;
+  if (temp_dimensions instanceof MessageParsingError) return temp_dimensions;
   const temp_blockSize = parse_as_Tuple_of_int0_varlen__endof_(valueObject.blockSize);
-  if (temp_blockSize instanceof Error) return temp_blockSize;
+  if (temp_blockSize instanceof MessageParsingError) return temp_blockSize;
   const temp_axes = parse_as_Union_of_Tuple_of_str0_varlen__endof_0None_endof_(valueObject.axes);
-  if (temp_axes instanceof Error) return temp_axes;
+  if (temp_axes instanceof MessageParsingError) return temp_axes;
   const temp_dataType =
     parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
       valueObject.dataType,
     );
-  if (temp_dataType instanceof Error) return temp_dataType;
+  if (temp_dataType instanceof MessageParsingError) return temp_dataType;
   const temp_compression =
     parse_as_Union_of_N5GzipCompressorDto0N5Bzip2CompressorDto0N5XzCompressorDto0N5RawCompressorDto_endof_(
       valueObject.compression,
     );
-  if (temp_compression instanceof Error) return temp_compression;
+  if (temp_compression instanceof MessageParsingError) return temp_compression;
   return new N5DatasetAttributesDto({
     dimensions: temp_dimensions,
     blockSize: temp_blockSize,
@@ -1316,43 +1371,43 @@ export class N5DatasetAttributesDto {
       compression: toJsonValue(this.compression),
     };
   }
-  public static fromJsonValue(value: JsonValue): N5DatasetAttributesDto | Error {
+  public static fromJsonValue(value: JsonValue): N5DatasetAttributesDto | MessageParsingError {
     return parse_as_N5DatasetAttributesDto(value);
   }
 }
 
-export function parse_as_N5DataSourceDto(value: JsonValue): N5DataSourceDto | Error {
+export function parse_as_N5DataSourceDto(value: JsonValue): N5DataSourceDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "N5DataSourceDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5DataSourceDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a N5DataSourceDto`);
   }
   const temp_url = parse_as_UrlDto(valueObject.url);
-  if (temp_url instanceof Error) return temp_url;
+  if (temp_url instanceof MessageParsingError) return temp_url;
   const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.filesystem);
-  if (temp_filesystem instanceof Error) return temp_filesystem;
+  if (temp_filesystem instanceof MessageParsingError) return temp_filesystem;
   const temp_path = parse_as_str(valueObject.path);
-  if (temp_path instanceof Error) return temp_path;
+  if (temp_path instanceof MessageParsingError) return temp_path;
   const temp_interval = parse_as_Interval5DDto(valueObject.interval);
-  if (temp_interval instanceof Error) return temp_interval;
+  if (temp_interval instanceof MessageParsingError) return temp_interval;
   const temp_tile_shape = parse_as_Shape5DDto(valueObject.tile_shape);
-  if (temp_tile_shape instanceof Error) return temp_tile_shape;
+  if (temp_tile_shape instanceof MessageParsingError) return temp_tile_shape;
   const temp_spatial_resolution = parse_as_Tuple_of_int0int0int_endof_(valueObject.spatial_resolution);
-  if (temp_spatial_resolution instanceof Error) return temp_spatial_resolution;
+  if (temp_spatial_resolution instanceof MessageParsingError) return temp_spatial_resolution;
   const temp_dtype =
     parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
       valueObject.dtype,
     );
-  if (temp_dtype instanceof Error) return temp_dtype;
+  if (temp_dtype instanceof MessageParsingError) return temp_dtype;
   const temp_compressor =
     parse_as_Union_of_N5GzipCompressorDto0N5Bzip2CompressorDto0N5XzCompressorDto0N5RawCompressorDto_endof_(
       valueObject.compressor,
     );
-  if (temp_compressor instanceof Error) return temp_compressor;
+  if (temp_compressor instanceof MessageParsingError) return temp_compressor;
   const temp_c_axiskeys_on_disk = parse_as_str(valueObject.c_axiskeys_on_disk);
-  if (temp_c_axiskeys_on_disk instanceof Error) return temp_c_axiskeys_on_disk;
+  if (temp_c_axiskeys_on_disk instanceof MessageParsingError) return temp_c_axiskeys_on_disk;
   return new N5DataSourceDto({
     url: temp_url,
     filesystem: temp_filesystem,
@@ -1412,36 +1467,36 @@ export class N5DataSourceDto {
       c_axiskeys_on_disk: this.c_axiskeys_on_disk,
     };
   }
-  public static fromJsonValue(value: JsonValue): N5DataSourceDto | Error {
+  public static fromJsonValue(value: JsonValue): N5DataSourceDto | MessageParsingError {
     return parse_as_N5DataSourceDto(value);
   }
 }
 
-export function parse_as_SkimageDataSourceDto(value: JsonValue): SkimageDataSourceDto | Error {
+export function parse_as_SkimageDataSourceDto(value: JsonValue): SkimageDataSourceDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "SkimageDataSourceDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a SkimageDataSourceDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a SkimageDataSourceDto`);
   }
   const temp_url = parse_as_UrlDto(valueObject.url);
-  if (temp_url instanceof Error) return temp_url;
+  if (temp_url instanceof MessageParsingError) return temp_url;
   const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.filesystem);
-  if (temp_filesystem instanceof Error) return temp_filesystem;
+  if (temp_filesystem instanceof MessageParsingError) return temp_filesystem;
   const temp_path = parse_as_str(valueObject.path);
-  if (temp_path instanceof Error) return temp_path;
+  if (temp_path instanceof MessageParsingError) return temp_path;
   const temp_interval = parse_as_Interval5DDto(valueObject.interval);
-  if (temp_interval instanceof Error) return temp_interval;
+  if (temp_interval instanceof MessageParsingError) return temp_interval;
   const temp_tile_shape = parse_as_Shape5DDto(valueObject.tile_shape);
-  if (temp_tile_shape instanceof Error) return temp_tile_shape;
+  if (temp_tile_shape instanceof MessageParsingError) return temp_tile_shape;
   const temp_spatial_resolution = parse_as_Tuple_of_int0int0int_endof_(valueObject.spatial_resolution);
-  if (temp_spatial_resolution instanceof Error) return temp_spatial_resolution;
+  if (temp_spatial_resolution instanceof MessageParsingError) return temp_spatial_resolution;
   const temp_dtype =
     parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
       valueObject.dtype,
     );
-  if (temp_dtype instanceof Error) return temp_dtype;
+  if (temp_dtype instanceof MessageParsingError) return temp_dtype;
   return new SkimageDataSourceDto({
     url: temp_url,
     filesystem: temp_filesystem,
@@ -1491,38 +1546,40 @@ export class SkimageDataSourceDto {
       dtype: this.dtype,
     };
   }
-  public static fromJsonValue(value: JsonValue): SkimageDataSourceDto | Error {
+  public static fromJsonValue(value: JsonValue): SkimageDataSourceDto | MessageParsingError {
     return parse_as_SkimageDataSourceDto(value);
   }
 }
 
-export function parse_as_PrecomputedChunksSinkDto(value: JsonValue): PrecomputedChunksSinkDto | Error {
+export function parse_as_PrecomputedChunksSinkDto(value: JsonValue): PrecomputedChunksSinkDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "PrecomputedChunksSinkDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a PrecomputedChunksSinkDto`);
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a PrecomputedChunksSinkDto`,
+    );
   }
   const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(valueObject.filesystem);
-  if (temp_filesystem instanceof Error) return temp_filesystem;
+  if (temp_filesystem instanceof MessageParsingError) return temp_filesystem;
   const temp_path = parse_as_str(valueObject.path);
-  if (temp_path instanceof Error) return temp_path;
+  if (temp_path instanceof MessageParsingError) return temp_path;
   const temp_tile_shape = parse_as_Shape5DDto(valueObject.tile_shape);
-  if (temp_tile_shape instanceof Error) return temp_tile_shape;
+  if (temp_tile_shape instanceof MessageParsingError) return temp_tile_shape;
   const temp_interval = parse_as_Interval5DDto(valueObject.interval);
-  if (temp_interval instanceof Error) return temp_interval;
+  if (temp_interval instanceof MessageParsingError) return temp_interval;
   const temp_dtype =
     parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
       valueObject.dtype,
     );
-  if (temp_dtype instanceof Error) return temp_dtype;
+  if (temp_dtype instanceof MessageParsingError) return temp_dtype;
   const temp_scale_key = parse_as_str(valueObject.scale_key);
-  if (temp_scale_key instanceof Error) return temp_scale_key;
+  if (temp_scale_key instanceof MessageParsingError) return temp_scale_key;
   const temp_resolution = parse_as_Tuple_of_int0int0int_endof_(valueObject.resolution);
-  if (temp_resolution instanceof Error) return temp_resolution;
+  if (temp_resolution instanceof MessageParsingError) return temp_resolution;
   const temp_encoding = parse_as_Literal_of__quote_raw_quote_0_quote_jpeg_quote__endof_(valueObject.encoding);
-  if (temp_encoding instanceof Error) return temp_encoding;
+  if (temp_encoding instanceof MessageParsingError) return temp_encoding;
   return new PrecomputedChunksSinkDto({
     filesystem: temp_filesystem,
     path: temp_path,
@@ -1577,41 +1634,41 @@ export class PrecomputedChunksSinkDto {
       encoding: this.encoding,
     };
   }
-  public static fromJsonValue(value: JsonValue): PrecomputedChunksSinkDto | Error {
+  public static fromJsonValue(value: JsonValue): PrecomputedChunksSinkDto | MessageParsingError {
     return parse_as_PrecomputedChunksSinkDto(value);
   }
 }
 
-export function parse_as_N5DataSinkDto(value: JsonValue): N5DataSinkDto | Error {
+export function parse_as_N5DataSinkDto(value: JsonValue): N5DataSinkDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "N5DataSinkDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a N5DataSinkDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a N5DataSinkDto`);
   }
   const temp_filesystem = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.filesystem);
-  if (temp_filesystem instanceof Error) return temp_filesystem;
+  if (temp_filesystem instanceof MessageParsingError) return temp_filesystem;
   const temp_path = parse_as_str(valueObject.path);
-  if (temp_path instanceof Error) return temp_path;
+  if (temp_path instanceof MessageParsingError) return temp_path;
   const temp_interval = parse_as_Interval5DDto(valueObject.interval);
-  if (temp_interval instanceof Error) return temp_interval;
+  if (temp_interval instanceof MessageParsingError) return temp_interval;
   const temp_tile_shape = parse_as_Shape5DDto(valueObject.tile_shape);
-  if (temp_tile_shape instanceof Error) return temp_tile_shape;
+  if (temp_tile_shape instanceof MessageParsingError) return temp_tile_shape;
   const temp_spatial_resolution = parse_as_Tuple_of_int0int0int_endof_(valueObject.spatial_resolution);
-  if (temp_spatial_resolution instanceof Error) return temp_spatial_resolution;
+  if (temp_spatial_resolution instanceof MessageParsingError) return temp_spatial_resolution;
   const temp_c_axiskeys = parse_as_str(valueObject.c_axiskeys);
-  if (temp_c_axiskeys instanceof Error) return temp_c_axiskeys;
+  if (temp_c_axiskeys instanceof MessageParsingError) return temp_c_axiskeys;
   const temp_dtype =
     parse_as_Literal_of__quote_uint8_quote_0_quote_uint16_quote_0_quote_uint32_quote_0_quote_uint64_quote_0_quote_int64_quote_0_quote_float32_quote__endof_(
       valueObject.dtype,
     );
-  if (temp_dtype instanceof Error) return temp_dtype;
+  if (temp_dtype instanceof MessageParsingError) return temp_dtype;
   const temp_compressor =
     parse_as_Union_of_N5GzipCompressorDto0N5Bzip2CompressorDto0N5XzCompressorDto0N5RawCompressorDto_endof_(
       valueObject.compressor,
     );
-  if (temp_compressor instanceof Error) return temp_compressor;
+  if (temp_compressor instanceof MessageParsingError) return temp_compressor;
   return new N5DataSinkDto({
     filesystem: temp_filesystem,
     path: temp_path,
@@ -1666,31 +1723,36 @@ export class N5DataSinkDto {
       compressor: toJsonValue(this.compressor),
     };
   }
-  public static fromJsonValue(value: JsonValue): N5DataSinkDto | Error {
+  public static fromJsonValue(value: JsonValue): N5DataSinkDto | MessageParsingError {
     return parse_as_N5DataSinkDto(value);
   }
 }
 
 export function parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
   value: JsonValue,
-): PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto | Error {
+):
+  | PrecomputedChunksDataSourceDto
+  | N5DataSourceDto
+  | SkimageDataSourceDto
+  | DziLevelDataSourceDto
+  | MessageParsingError {
   const parsed_option_0 = parse_as_PrecomputedChunksDataSourceDto(value);
-  if (!(parsed_option_0 instanceof Error)) {
+  if (!(parsed_option_0 instanceof MessageParsingError)) {
     return parsed_option_0;
   }
   const parsed_option_1 = parse_as_N5DataSourceDto(value);
-  if (!(parsed_option_1 instanceof Error)) {
+  if (!(parsed_option_1 instanceof MessageParsingError)) {
     return parsed_option_1;
   }
   const parsed_option_2 = parse_as_SkimageDataSourceDto(value);
-  if (!(parsed_option_2 instanceof Error)) {
+  if (!(parsed_option_2 instanceof MessageParsingError)) {
     return parsed_option_2;
   }
   const parsed_option_3 = parse_as_DziLevelDataSourceDto(value);
-  if (!(parsed_option_3 instanceof Error)) {
+  if (!(parsed_option_3 instanceof MessageParsingError)) {
     return parsed_option_3;
   }
-  return Error(
+  return new MessageParsingError(
     `Could not parse ${
       JSON.stringify(value)
     } into PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto`,
@@ -1698,32 +1760,32 @@ export function parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto
 }
 export function parse_as_Tuple_of_Tuple_of_int0int0int_endof_0_varlen__endof_(
   value: JsonValue,
-): Array<[number, number, number]> | Error {
+): Array<[number, number, number]> | MessageParsingError {
   const arr = ensureJsonArray(value);
-  if (arr instanceof Error) return arr;
+  if (arr instanceof MessageParsingError) return arr;
   const out: Array<[number, number, number]> = [];
   for (let item of arr) {
     let parsed_item = parse_as_Tuple_of_int0int0int_endof_(item);
-    if (parsed_item instanceof Error) return parsed_item;
+    if (parsed_item instanceof MessageParsingError) return parsed_item;
     out.push(parsed_item);
   }
   return out;
 }
-export function parse_as_PixelAnnotationDto(value: JsonValue): PixelAnnotationDto | Error {
+export function parse_as_PixelAnnotationDto(value: JsonValue): PixelAnnotationDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "PixelAnnotationDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a PixelAnnotationDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a PixelAnnotationDto`);
   }
   const temp_raw_data =
     parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
       valueObject.raw_data,
     );
-  if (temp_raw_data instanceof Error) return temp_raw_data;
+  if (temp_raw_data instanceof MessageParsingError) return temp_raw_data;
   const temp_points = parse_as_Tuple_of_Tuple_of_int0int0int_endof_0_varlen__endof_(valueObject.points);
-  if (temp_points instanceof Error) return temp_points;
+  if (temp_points instanceof MessageParsingError) return temp_points;
   return new PixelAnnotationDto({
     raw_data: temp_raw_data,
     points: temp_points,
@@ -1748,21 +1810,21 @@ export class PixelAnnotationDto {
       points: this.points.map((item) => [item[0], item[1], item[2]]),
     };
   }
-  public static fromJsonValue(value: JsonValue): PixelAnnotationDto | Error {
+  public static fromJsonValue(value: JsonValue): PixelAnnotationDto | MessageParsingError {
     return parse_as_PixelAnnotationDto(value);
   }
 }
 
-export function parse_as_RpcErrorDto(value: JsonValue): RpcErrorDto | Error {
+export function parse_as_RpcErrorDto(value: JsonValue): RpcErrorDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "RpcErrorDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a RpcErrorDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a RpcErrorDto`);
   }
   const temp_error = parse_as_str(valueObject.error);
-  if (temp_error instanceof Error) return temp_error;
+  if (temp_error instanceof MessageParsingError) return temp_error;
   return new RpcErrorDto({
     error: temp_error,
   });
@@ -1782,23 +1844,23 @@ export class RpcErrorDto {
       error: this.error,
     };
   }
-  public static fromJsonValue(value: JsonValue): RpcErrorDto | Error {
+  public static fromJsonValue(value: JsonValue): RpcErrorDto | MessageParsingError {
     return parse_as_RpcErrorDto(value);
   }
 }
 
-export function parse_as_RecolorLabelParams(value: JsonValue): RecolorLabelParams | Error {
+export function parse_as_RecolorLabelParams(value: JsonValue): RecolorLabelParams | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "RecolorLabelParams") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a RecolorLabelParams`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a RecolorLabelParams`);
   }
   const temp_label_name = parse_as_str(valueObject.label_name);
-  if (temp_label_name instanceof Error) return temp_label_name;
+  if (temp_label_name instanceof MessageParsingError) return temp_label_name;
   const temp_new_color = parse_as_ColorDto(valueObject.new_color);
-  if (temp_new_color instanceof Error) return temp_new_color;
+  if (temp_new_color instanceof MessageParsingError) return temp_new_color;
   return new RecolorLabelParams({
     label_name: temp_label_name,
     new_color: temp_new_color,
@@ -1823,23 +1885,23 @@ export class RecolorLabelParams {
       new_color: this.new_color.toJsonValue(),
     };
   }
-  public static fromJsonValue(value: JsonValue): RecolorLabelParams | Error {
+  public static fromJsonValue(value: JsonValue): RecolorLabelParams | MessageParsingError {
     return parse_as_RecolorLabelParams(value);
   }
 }
 
-export function parse_as_RenameLabelParams(value: JsonValue): RenameLabelParams | Error {
+export function parse_as_RenameLabelParams(value: JsonValue): RenameLabelParams | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "RenameLabelParams") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a RenameLabelParams`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a RenameLabelParams`);
   }
   const temp_old_name = parse_as_str(valueObject.old_name);
-  if (temp_old_name instanceof Error) return temp_old_name;
+  if (temp_old_name instanceof MessageParsingError) return temp_old_name;
   const temp_new_name = parse_as_str(valueObject.new_name);
-  if (temp_new_name instanceof Error) return temp_new_name;
+  if (temp_new_name instanceof MessageParsingError) return temp_new_name;
   return new RenameLabelParams({
     old_name: temp_old_name,
     new_name: temp_new_name,
@@ -1864,23 +1926,23 @@ export class RenameLabelParams {
       new_name: this.new_name,
     };
   }
-  public static fromJsonValue(value: JsonValue): RenameLabelParams | Error {
+  public static fromJsonValue(value: JsonValue): RenameLabelParams | MessageParsingError {
     return parse_as_RenameLabelParams(value);
   }
 }
 
-export function parse_as_CreateLabelParams(value: JsonValue): CreateLabelParams | Error {
+export function parse_as_CreateLabelParams(value: JsonValue): CreateLabelParams | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "CreateLabelParams") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a CreateLabelParams`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a CreateLabelParams`);
   }
   const temp_label_name = parse_as_str(valueObject.label_name);
-  if (temp_label_name instanceof Error) return temp_label_name;
+  if (temp_label_name instanceof MessageParsingError) return temp_label_name;
   const temp_color = parse_as_ColorDto(valueObject.color);
-  if (temp_color instanceof Error) return temp_color;
+  if (temp_color instanceof MessageParsingError) return temp_color;
   return new CreateLabelParams({
     label_name: temp_label_name,
     color: temp_color,
@@ -1905,21 +1967,21 @@ export class CreateLabelParams {
       color: this.color.toJsonValue(),
     };
   }
-  public static fromJsonValue(value: JsonValue): CreateLabelParams | Error {
+  public static fromJsonValue(value: JsonValue): CreateLabelParams | MessageParsingError {
     return parse_as_CreateLabelParams(value);
   }
 }
 
-export function parse_as_RemoveLabelParams(value: JsonValue): RemoveLabelParams | Error {
+export function parse_as_RemoveLabelParams(value: JsonValue): RemoveLabelParams | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "RemoveLabelParams") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a RemoveLabelParams`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a RemoveLabelParams`);
   }
   const temp_label_name = parse_as_str(valueObject.label_name);
-  if (temp_label_name instanceof Error) return temp_label_name;
+  if (temp_label_name instanceof MessageParsingError) return temp_label_name;
   return new RemoveLabelParams({
     label_name: temp_label_name,
   });
@@ -1939,23 +2001,25 @@ export class RemoveLabelParams {
       label_name: this.label_name,
     };
   }
-  public static fromJsonValue(value: JsonValue): RemoveLabelParams | Error {
+  public static fromJsonValue(value: JsonValue): RemoveLabelParams | MessageParsingError {
     return parse_as_RemoveLabelParams(value);
   }
 }
 
-export function parse_as_AddPixelAnnotationParams(value: JsonValue): AddPixelAnnotationParams | Error {
+export function parse_as_AddPixelAnnotationParams(value: JsonValue): AddPixelAnnotationParams | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "AddPixelAnnotationParams") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a AddPixelAnnotationParams`);
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a AddPixelAnnotationParams`,
+    );
   }
   const temp_label_name = parse_as_str(valueObject.label_name);
-  if (temp_label_name instanceof Error) return temp_label_name;
+  if (temp_label_name instanceof MessageParsingError) return temp_label_name;
   const temp_pixel_annotation = parse_as_PixelAnnotationDto(valueObject.pixel_annotation);
-  if (temp_pixel_annotation instanceof Error) return temp_pixel_annotation;
+  if (temp_pixel_annotation instanceof MessageParsingError) return temp_pixel_annotation;
   return new AddPixelAnnotationParams({
     label_name: temp_label_name,
     pixel_annotation: temp_pixel_annotation,
@@ -1980,23 +2044,27 @@ export class AddPixelAnnotationParams {
       pixel_annotation: this.pixel_annotation.toJsonValue(),
     };
   }
-  public static fromJsonValue(value: JsonValue): AddPixelAnnotationParams | Error {
+  public static fromJsonValue(value: JsonValue): AddPixelAnnotationParams | MessageParsingError {
     return parse_as_AddPixelAnnotationParams(value);
   }
 }
 
-export function parse_as_RemovePixelAnnotationParams(value: JsonValue): RemovePixelAnnotationParams | Error {
+export function parse_as_RemovePixelAnnotationParams(
+  value: JsonValue,
+): RemovePixelAnnotationParams | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "RemovePixelAnnotationParams") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a RemovePixelAnnotationParams`);
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a RemovePixelAnnotationParams`,
+    );
   }
   const temp_label_name = parse_as_str(valueObject.label_name);
-  if (temp_label_name instanceof Error) return temp_label_name;
+  if (temp_label_name instanceof MessageParsingError) return temp_label_name;
   const temp_pixel_annotation = parse_as_PixelAnnotationDto(valueObject.pixel_annotation);
-  if (temp_pixel_annotation instanceof Error) return temp_pixel_annotation;
+  if (temp_pixel_annotation instanceof MessageParsingError) return temp_pixel_annotation;
   return new RemovePixelAnnotationParams({
     label_name: temp_label_name,
     pixel_annotation: temp_pixel_annotation,
@@ -2021,38 +2089,38 @@ export class RemovePixelAnnotationParams {
       pixel_annotation: this.pixel_annotation.toJsonValue(),
     };
   }
-  public static fromJsonValue(value: JsonValue): RemovePixelAnnotationParams | Error {
+  public static fromJsonValue(value: JsonValue): RemovePixelAnnotationParams | MessageParsingError {
     return parse_as_RemovePixelAnnotationParams(value);
   }
 }
 
 export function parse_as_Tuple_of_PixelAnnotationDto0_varlen__endof_(
   value: JsonValue,
-): Array<PixelAnnotationDto> | Error {
+): Array<PixelAnnotationDto> | MessageParsingError {
   const arr = ensureJsonArray(value);
-  if (arr instanceof Error) return arr;
+  if (arr instanceof MessageParsingError) return arr;
   const out: Array<PixelAnnotationDto> = [];
   for (let item of arr) {
     let parsed_item = parse_as_PixelAnnotationDto(item);
-    if (parsed_item instanceof Error) return parsed_item;
+    if (parsed_item instanceof MessageParsingError) return parsed_item;
     out.push(parsed_item);
   }
   return out;
 }
-export function parse_as_LabelDto(value: JsonValue): LabelDto | Error {
+export function parse_as_LabelDto(value: JsonValue): LabelDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "LabelDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a LabelDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a LabelDto`);
   }
   const temp_name = parse_as_str(valueObject.name);
-  if (temp_name instanceof Error) return temp_name;
+  if (temp_name instanceof MessageParsingError) return temp_name;
   const temp_color = parse_as_ColorDto(valueObject.color);
-  if (temp_color instanceof Error) return temp_color;
+  if (temp_color instanceof MessageParsingError) return temp_color;
   const temp_annotations = parse_as_Tuple_of_PixelAnnotationDto0_varlen__endof_(valueObject.annotations);
-  if (temp_annotations instanceof Error) return temp_annotations;
+  if (temp_annotations instanceof MessageParsingError) return temp_annotations;
   return new LabelDto({
     name: temp_name,
     color: temp_color,
@@ -2082,32 +2150,32 @@ export class LabelDto {
       annotations: this.annotations.map((item) => item.toJsonValue()),
     };
   }
-  public static fromJsonValue(value: JsonValue): LabelDto | Error {
+  public static fromJsonValue(value: JsonValue): LabelDto | MessageParsingError {
     return parse_as_LabelDto(value);
   }
 }
 
-export function parse_as_Tuple_of_LabelDto0_varlen__endof_(value: JsonValue): Array<LabelDto> | Error {
+export function parse_as_Tuple_of_LabelDto0_varlen__endof_(value: JsonValue): Array<LabelDto> | MessageParsingError {
   const arr = ensureJsonArray(value);
-  if (arr instanceof Error) return arr;
+  if (arr instanceof MessageParsingError) return arr;
   const out: Array<LabelDto> = [];
   for (let item of arr) {
     let parsed_item = parse_as_LabelDto(item);
-    if (parsed_item instanceof Error) return parsed_item;
+    if (parsed_item instanceof MessageParsingError) return parsed_item;
     out.push(parsed_item);
   }
   return out;
 }
-export function parse_as_BrushingAppletStateDto(value: JsonValue): BrushingAppletStateDto | Error {
+export function parse_as_BrushingAppletStateDto(value: JsonValue): BrushingAppletStateDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "BrushingAppletStateDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a BrushingAppletStateDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a BrushingAppletStateDto`);
   }
   const temp_labels = parse_as_Tuple_of_LabelDto0_varlen__endof_(valueObject.labels);
-  if (temp_labels instanceof Error) return temp_labels;
+  if (temp_labels instanceof MessageParsingError) return temp_labels;
   return new BrushingAppletStateDto({
     labels: temp_labels,
   });
@@ -2127,21 +2195,21 @@ export class BrushingAppletStateDto {
       labels: this.labels.map((item) => item.toJsonValue()),
     };
   }
-  public static fromJsonValue(value: JsonValue): BrushingAppletStateDto | Error {
+  public static fromJsonValue(value: JsonValue): BrushingAppletStateDto | MessageParsingError {
     return parse_as_BrushingAppletStateDto(value);
   }
 }
 
-export function parse_as_JobFinishedDto(value: JsonValue): JobFinishedDto | Error {
+export function parse_as_JobFinishedDto(value: JsonValue): JobFinishedDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "JobFinishedDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a JobFinishedDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a JobFinishedDto`);
   }
   const temp_error_message = parse_as_Union_of_str0None_endof_(valueObject.error_message);
-  if (temp_error_message instanceof Error) return temp_error_message;
+  if (temp_error_message instanceof MessageParsingError) return temp_error_message;
   return new JobFinishedDto({
     error_message: temp_error_message,
   });
@@ -2161,18 +2229,18 @@ export class JobFinishedDto {
       error_message: toJsonValue(this.error_message),
     };
   }
-  public static fromJsonValue(value: JsonValue): JobFinishedDto | Error {
+  public static fromJsonValue(value: JsonValue): JobFinishedDto | MessageParsingError {
     return parse_as_JobFinishedDto(value);
   }
 }
 
-export function parse_as_JobIsPendingDto(value: JsonValue): JobIsPendingDto | Error {
+export function parse_as_JobIsPendingDto(value: JsonValue): JobIsPendingDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "JobIsPendingDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a JobIsPendingDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a JobIsPendingDto`);
   }
   return new JobIsPendingDto({});
 }
@@ -2186,23 +2254,23 @@ export class JobIsPendingDto {
       "__class__": "JobIsPendingDto",
     };
   }
-  public static fromJsonValue(value: JsonValue): JobIsPendingDto | Error {
+  public static fromJsonValue(value: JsonValue): JobIsPendingDto | MessageParsingError {
     return parse_as_JobIsPendingDto(value);
   }
 }
 
-export function parse_as_JobIsRunningDto(value: JsonValue): JobIsRunningDto | Error {
+export function parse_as_JobIsRunningDto(value: JsonValue): JobIsRunningDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "JobIsRunningDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a JobIsRunningDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a JobIsRunningDto`);
   }
   const temp_num_completed_steps = parse_as_int(valueObject.num_completed_steps);
-  if (temp_num_completed_steps instanceof Error) return temp_num_completed_steps;
+  if (temp_num_completed_steps instanceof MessageParsingError) return temp_num_completed_steps;
   const temp_num_dispatched_steps = parse_as_int(valueObject.num_dispatched_steps);
-  if (temp_num_dispatched_steps instanceof Error) return temp_num_dispatched_steps;
+  if (temp_num_dispatched_steps instanceof MessageParsingError) return temp_num_dispatched_steps;
   return new JobIsRunningDto({
     num_completed_steps: temp_num_completed_steps,
     num_dispatched_steps: temp_num_dispatched_steps,
@@ -2227,21 +2295,21 @@ export class JobIsRunningDto {
       num_dispatched_steps: this.num_dispatched_steps,
     };
   }
-  public static fromJsonValue(value: JsonValue): JobIsRunningDto | Error {
+  public static fromJsonValue(value: JsonValue): JobIsRunningDto | MessageParsingError {
     return parse_as_JobIsRunningDto(value);
   }
 }
 
-export function parse_as_JobCanceledDto(value: JsonValue): JobCanceledDto | Error {
+export function parse_as_JobCanceledDto(value: JsonValue): JobCanceledDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "JobCanceledDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a JobCanceledDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a JobCanceledDto`);
   }
   const temp_message = parse_as_str(valueObject.message);
-  if (temp_message instanceof Error) return temp_message;
+  if (temp_message instanceof MessageParsingError) return temp_message;
   return new JobCanceledDto({
     message: temp_message,
   });
@@ -2261,52 +2329,52 @@ export class JobCanceledDto {
       message: this.message,
     };
   }
-  public static fromJsonValue(value: JsonValue): JobCanceledDto | Error {
+  public static fromJsonValue(value: JsonValue): JobCanceledDto | MessageParsingError {
     return parse_as_JobCanceledDto(value);
   }
 }
 
 export function parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
   value: JsonValue,
-): JobFinishedDto | JobIsPendingDto | JobIsRunningDto | JobCanceledDto | Error {
+): JobFinishedDto | JobIsPendingDto | JobIsRunningDto | JobCanceledDto | MessageParsingError {
   const parsed_option_0 = parse_as_JobFinishedDto(value);
-  if (!(parsed_option_0 instanceof Error)) {
+  if (!(parsed_option_0 instanceof MessageParsingError)) {
     return parsed_option_0;
   }
   const parsed_option_1 = parse_as_JobIsPendingDto(value);
-  if (!(parsed_option_1 instanceof Error)) {
+  if (!(parsed_option_1 instanceof MessageParsingError)) {
     return parsed_option_1;
   }
   const parsed_option_2 = parse_as_JobIsRunningDto(value);
-  if (!(parsed_option_2 instanceof Error)) {
+  if (!(parsed_option_2 instanceof MessageParsingError)) {
     return parsed_option_2;
   }
   const parsed_option_3 = parse_as_JobCanceledDto(value);
-  if (!(parsed_option_3 instanceof Error)) {
+  if (!(parsed_option_3 instanceof MessageParsingError)) {
     return parsed_option_3;
   }
-  return Error(
+  return new MessageParsingError(
     `Could not parse ${JSON.stringify(value)} into JobFinishedDto | JobIsPendingDto | JobIsRunningDto | JobCanceledDto`,
   );
 }
-export function parse_as_JobDto(value: JsonValue): JobDto | Error {
+export function parse_as_JobDto(value: JsonValue): JobDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "JobDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a JobDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a JobDto`);
   }
   const temp_name = parse_as_str(valueObject.name);
-  if (temp_name instanceof Error) return temp_name;
+  if (temp_name instanceof MessageParsingError) return temp_name;
   const temp_num_args = parse_as_Union_of_int0None_endof_(valueObject.num_args);
-  if (temp_num_args instanceof Error) return temp_num_args;
+  if (temp_num_args instanceof MessageParsingError) return temp_num_args;
   const temp_uuid = parse_as_str(valueObject.uuid);
-  if (temp_uuid instanceof Error) return temp_uuid;
+  if (temp_uuid instanceof MessageParsingError) return temp_uuid;
   const temp_status = parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
     valueObject.status,
   );
-  if (temp_status instanceof Error) return temp_status;
+  if (temp_status instanceof MessageParsingError) return temp_status;
   return new JobDto({
     name: temp_name,
     num_args: temp_num_args,
@@ -2341,52 +2409,52 @@ export class JobDto {
       status: toJsonValue(this.status),
     };
   }
-  public static fromJsonValue(value: JsonValue): JobDto | Error {
+  public static fromJsonValue(value: JsonValue): JobDto | MessageParsingError {
     return parse_as_JobDto(value);
   }
 }
 
 export function parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto_endof_(
   value: JsonValue,
-): PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto | Error {
+): PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto | MessageParsingError {
   const parsed_option_0 = parse_as_PrecomputedChunksSinkDto(value);
-  if (!(parsed_option_0 instanceof Error)) {
+  if (!(parsed_option_0 instanceof MessageParsingError)) {
     return parsed_option_0;
   }
   const parsed_option_1 = parse_as_N5DataSinkDto(value);
-  if (!(parsed_option_1 instanceof Error)) {
+  if (!(parsed_option_1 instanceof MessageParsingError)) {
     return parsed_option_1;
   }
   const parsed_option_2 = parse_as_DziLevelSinkDto(value);
-  if (!(parsed_option_2 instanceof Error)) {
+  if (!(parsed_option_2 instanceof MessageParsingError)) {
     return parsed_option_2;
   }
-  return Error(
+  return new MessageParsingError(
     `Could not parse ${JSON.stringify(value)} into PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto`,
   );
 }
-export function parse_as_ExportJobDto(value: JsonValue): ExportJobDto | Error {
+export function parse_as_ExportJobDto(value: JsonValue): ExportJobDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "ExportJobDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ExportJobDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a ExportJobDto`);
   }
   const temp_name = parse_as_str(valueObject.name);
-  if (temp_name instanceof Error) return temp_name;
+  if (temp_name instanceof MessageParsingError) return temp_name;
   const temp_num_args = parse_as_Union_of_int0None_endof_(valueObject.num_args);
-  if (temp_num_args instanceof Error) return temp_num_args;
+  if (temp_num_args instanceof MessageParsingError) return temp_num_args;
   const temp_uuid = parse_as_str(valueObject.uuid);
-  if (temp_uuid instanceof Error) return temp_uuid;
+  if (temp_uuid instanceof MessageParsingError) return temp_uuid;
   const temp_status = parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
     valueObject.status,
   );
-  if (temp_status instanceof Error) return temp_status;
+  if (temp_status instanceof MessageParsingError) return temp_status;
   const temp_datasink = parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto_endof_(
     valueObject.datasink,
   );
-  if (temp_datasink instanceof Error) return temp_datasink;
+  if (temp_datasink instanceof MessageParsingError) return temp_datasink;
   return new ExportJobDto({
     name: temp_name,
     num_args: temp_num_args,
@@ -2426,33 +2494,33 @@ export class ExportJobDto {
       datasink: toJsonValue(this.datasink),
     };
   }
-  public static fromJsonValue(value: JsonValue): ExportJobDto | Error {
+  public static fromJsonValue(value: JsonValue): ExportJobDto | MessageParsingError {
     return parse_as_ExportJobDto(value);
   }
 }
 
-export function parse_as_OpenDatasinkJobDto(value: JsonValue): OpenDatasinkJobDto | Error {
+export function parse_as_OpenDatasinkJobDto(value: JsonValue): OpenDatasinkJobDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "OpenDatasinkJobDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a OpenDatasinkJobDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a OpenDatasinkJobDto`);
   }
   const temp_name = parse_as_str(valueObject.name);
-  if (temp_name instanceof Error) return temp_name;
+  if (temp_name instanceof MessageParsingError) return temp_name;
   const temp_num_args = parse_as_Union_of_int0None_endof_(valueObject.num_args);
-  if (temp_num_args instanceof Error) return temp_num_args;
+  if (temp_num_args instanceof MessageParsingError) return temp_num_args;
   const temp_uuid = parse_as_str(valueObject.uuid);
-  if (temp_uuid instanceof Error) return temp_uuid;
+  if (temp_uuid instanceof MessageParsingError) return temp_uuid;
   const temp_status = parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
     valueObject.status,
   );
-  if (temp_status instanceof Error) return temp_status;
+  if (temp_status instanceof MessageParsingError) return temp_status;
   const temp_datasink = parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto_endof_(
     valueObject.datasink,
   );
-  if (temp_datasink instanceof Error) return temp_datasink;
+  if (temp_datasink instanceof MessageParsingError) return temp_datasink;
   return new OpenDatasinkJobDto({
     name: temp_name,
     num_args: temp_num_args,
@@ -2492,29 +2560,29 @@ export class OpenDatasinkJobDto {
       datasink: toJsonValue(this.datasink),
     };
   }
-  public static fromJsonValue(value: JsonValue): OpenDatasinkJobDto | Error {
+  public static fromJsonValue(value: JsonValue): OpenDatasinkJobDto | MessageParsingError {
     return parse_as_OpenDatasinkJobDto(value);
   }
 }
 
-export function parse_as_CreateDziPyramidJobDto(value: JsonValue): CreateDziPyramidJobDto | Error {
+export function parse_as_CreateDziPyramidJobDto(value: JsonValue): CreateDziPyramidJobDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "CreateDziPyramidJobDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a CreateDziPyramidJobDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a CreateDziPyramidJobDto`);
   }
   const temp_name = parse_as_str(valueObject.name);
-  if (temp_name instanceof Error) return temp_name;
+  if (temp_name instanceof MessageParsingError) return temp_name;
   const temp_num_args = parse_as_Union_of_int0None_endof_(valueObject.num_args);
-  if (temp_num_args instanceof Error) return temp_num_args;
+  if (temp_num_args instanceof MessageParsingError) return temp_num_args;
   const temp_uuid = parse_as_str(valueObject.uuid);
-  if (temp_uuid instanceof Error) return temp_uuid;
+  if (temp_uuid instanceof MessageParsingError) return temp_uuid;
   const temp_status = parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
     valueObject.status,
   );
-  if (temp_status instanceof Error) return temp_status;
+  if (temp_status instanceof MessageParsingError) return temp_status;
   return new CreateDziPyramidJobDto({
     name: temp_name,
     num_args: temp_num_args,
@@ -2549,33 +2617,33 @@ export class CreateDziPyramidJobDto {
       status: toJsonValue(this.status),
     };
   }
-  public static fromJsonValue(value: JsonValue): CreateDziPyramidJobDto | Error {
+  public static fromJsonValue(value: JsonValue): CreateDziPyramidJobDto | MessageParsingError {
     return parse_as_CreateDziPyramidJobDto(value);
   }
 }
 
-export function parse_as_ZipDirectoryJobDto(value: JsonValue): ZipDirectoryJobDto | Error {
+export function parse_as_ZipDirectoryJobDto(value: JsonValue): ZipDirectoryJobDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "ZipDirectoryJobDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ZipDirectoryJobDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a ZipDirectoryJobDto`);
   }
   const temp_name = parse_as_str(valueObject.name);
-  if (temp_name instanceof Error) return temp_name;
+  if (temp_name instanceof MessageParsingError) return temp_name;
   const temp_num_args = parse_as_Union_of_int0None_endof_(valueObject.num_args);
-  if (temp_num_args instanceof Error) return temp_num_args;
+  if (temp_num_args instanceof MessageParsingError) return temp_num_args;
   const temp_uuid = parse_as_str(valueObject.uuid);
-  if (temp_uuid instanceof Error) return temp_uuid;
+  if (temp_uuid instanceof MessageParsingError) return temp_uuid;
   const temp_status = parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
     valueObject.status,
   );
-  if (temp_status instanceof Error) return temp_status;
+  if (temp_status instanceof MessageParsingError) return temp_status;
   const temp_output_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.output_fs);
-  if (temp_output_fs instanceof Error) return temp_output_fs;
+  if (temp_output_fs instanceof MessageParsingError) return temp_output_fs;
   const temp_output_path = parse_as_str(valueObject.output_path);
-  if (temp_output_path instanceof Error) return temp_output_path;
+  if (temp_output_path instanceof MessageParsingError) return temp_output_path;
   return new ZipDirectoryJobDto({
     name: temp_name,
     num_args: temp_num_args,
@@ -2620,60 +2688,60 @@ export class ZipDirectoryJobDto {
       output_path: this.output_path,
     };
   }
-  public static fromJsonValue(value: JsonValue): ZipDirectoryJobDto | Error {
+  public static fromJsonValue(value: JsonValue): ZipDirectoryJobDto | MessageParsingError {
     return parse_as_ZipDirectoryJobDto(value);
   }
 }
 
 export function parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto0None_endof_(
   value: JsonValue,
-): PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto | undefined | Error {
+): PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto | undefined | MessageParsingError {
   const parsed_option_0 = parse_as_PrecomputedChunksSinkDto(value);
-  if (!(parsed_option_0 instanceof Error)) {
+  if (!(parsed_option_0 instanceof MessageParsingError)) {
     return parsed_option_0;
   }
   const parsed_option_1 = parse_as_N5DataSinkDto(value);
-  if (!(parsed_option_1 instanceof Error)) {
+  if (!(parsed_option_1 instanceof MessageParsingError)) {
     return parsed_option_1;
   }
   const parsed_option_2 = parse_as_DziLevelSinkDto(value);
-  if (!(parsed_option_2 instanceof Error)) {
+  if (!(parsed_option_2 instanceof MessageParsingError)) {
     return parsed_option_2;
   }
   const parsed_option_3 = parse_as_None(value);
-  if (!(parsed_option_3 instanceof Error)) {
+  if (!(parsed_option_3 instanceof MessageParsingError)) {
     return parsed_option_3;
   }
-  return Error(
+  return new MessageParsingError(
     `Could not parse ${
       JSON.stringify(value)
     } into PrecomputedChunksSinkDto | N5DataSinkDto | DziLevelSinkDto | undefined`,
   );
 }
-export function parse_as_TransferFileJobDto(value: JsonValue): TransferFileJobDto | Error {
+export function parse_as_TransferFileJobDto(value: JsonValue): TransferFileJobDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "TransferFileJobDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a TransferFileJobDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a TransferFileJobDto`);
   }
   const temp_name = parse_as_str(valueObject.name);
-  if (temp_name instanceof Error) return temp_name;
+  if (temp_name instanceof MessageParsingError) return temp_name;
   const temp_num_args = parse_as_Union_of_int0None_endof_(valueObject.num_args);
-  if (temp_num_args instanceof Error) return temp_num_args;
+  if (temp_num_args instanceof MessageParsingError) return temp_num_args;
   const temp_uuid = parse_as_str(valueObject.uuid);
-  if (temp_uuid instanceof Error) return temp_uuid;
+  if (temp_uuid instanceof MessageParsingError) return temp_uuid;
   const temp_status = parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
     valueObject.status,
   );
-  if (temp_status instanceof Error) return temp_status;
+  if (temp_status instanceof MessageParsingError) return temp_status;
   const temp_target_url = parse_as_UrlDto(valueObject.target_url);
-  if (temp_target_url instanceof Error) return temp_target_url;
+  if (temp_target_url instanceof MessageParsingError) return temp_target_url;
   const temp_result_sink = parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto0None_endof_(
     valueObject.result_sink,
   );
-  if (temp_result_sink instanceof Error) return temp_result_sink;
+  if (temp_result_sink instanceof MessageParsingError) return temp_result_sink;
   return new TransferFileJobDto({
     name: temp_name,
     num_args: temp_num_args,
@@ -2718,7 +2786,7 @@ export class TransferFileJobDto {
       result_sink: toJsonValue(this.result_sink),
     };
   }
-  public static fromJsonValue(value: JsonValue): TransferFileJobDto | Error {
+  public static fromJsonValue(value: JsonValue): TransferFileJobDto | MessageParsingError {
     return parse_as_TransferFileJobDto(value);
   }
 }
@@ -2732,32 +2800,32 @@ export function parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyram
   | ZipDirectoryJobDto
   | TransferFileJobDto
   | JobDto
-  | Error {
+  | MessageParsingError {
   const parsed_option_0 = parse_as_ExportJobDto(value);
-  if (!(parsed_option_0 instanceof Error)) {
+  if (!(parsed_option_0 instanceof MessageParsingError)) {
     return parsed_option_0;
   }
   const parsed_option_1 = parse_as_OpenDatasinkJobDto(value);
-  if (!(parsed_option_1 instanceof Error)) {
+  if (!(parsed_option_1 instanceof MessageParsingError)) {
     return parsed_option_1;
   }
   const parsed_option_2 = parse_as_CreateDziPyramidJobDto(value);
-  if (!(parsed_option_2 instanceof Error)) {
+  if (!(parsed_option_2 instanceof MessageParsingError)) {
     return parsed_option_2;
   }
   const parsed_option_3 = parse_as_ZipDirectoryJobDto(value);
-  if (!(parsed_option_3 instanceof Error)) {
+  if (!(parsed_option_3 instanceof MessageParsingError)) {
     return parsed_option_3;
   }
   const parsed_option_4 = parse_as_TransferFileJobDto(value);
-  if (!(parsed_option_4 instanceof Error)) {
+  if (!(parsed_option_4 instanceof MessageParsingError)) {
     return parsed_option_4;
   }
   const parsed_option_5 = parse_as_JobDto(value);
-  if (!(parsed_option_5 instanceof Error)) {
+  if (!(parsed_option_5 instanceof MessageParsingError)) {
     return parsed_option_5;
   }
-  return Error(
+  return new MessageParsingError(
     `Could not parse ${
       JSON.stringify(value)
     } into ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipDirectoryJobDto | TransferFileJobDto | JobDto`,
@@ -2767,9 +2835,9 @@ export function parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0Creat
   value: JsonValue,
 ):
   | Array<ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipDirectoryJobDto | TransferFileJobDto | JobDto>
-  | Error {
+  | MessageParsingError {
   const arr = ensureJsonArray(value);
-  if (arr instanceof Error) return arr;
+  if (arr instanceof MessageParsingError) return arr;
   const out: Array<
     ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipDirectoryJobDto | TransferFileJobDto | JobDto
   > = [];
@@ -2778,40 +2846,44 @@ export function parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0Creat
       parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipDirectoryJobDto0TransferFileJobDto0JobDto_endof_(
         item,
       );
-    if (parsed_item instanceof Error) return parsed_item;
+    if (parsed_item instanceof MessageParsingError) return parsed_item;
     out.push(parsed_item);
   }
   return out;
 }
-export function parse_as_Tuple_of_LabelHeaderDto0_varlen__endof_(value: JsonValue): Array<LabelHeaderDto> | Error {
+export function parse_as_Tuple_of_LabelHeaderDto0_varlen__endof_(
+  value: JsonValue,
+): Array<LabelHeaderDto> | MessageParsingError {
   const arr = ensureJsonArray(value);
-  if (arr instanceof Error) return arr;
+  if (arr instanceof MessageParsingError) return arr;
   const out: Array<LabelHeaderDto> = [];
   for (let item of arr) {
     let parsed_item = parse_as_LabelHeaderDto(item);
-    if (parsed_item instanceof Error) return parsed_item;
+    if (parsed_item instanceof MessageParsingError) return parsed_item;
     out.push(parsed_item);
   }
   return out;
 }
 export function parse_as_Union_of_Tuple_of_LabelHeaderDto0_varlen__endof_0None_endof_(
   value: JsonValue,
-): Array<LabelHeaderDto> | undefined | Error {
+): Array<LabelHeaderDto> | undefined | MessageParsingError {
   const parsed_option_0 = parse_as_Tuple_of_LabelHeaderDto0_varlen__endof_(value);
-  if (!(parsed_option_0 instanceof Error)) {
+  if (!(parsed_option_0 instanceof MessageParsingError)) {
     return parsed_option_0;
   }
   const parsed_option_1 = parse_as_None(value);
-  if (!(parsed_option_1 instanceof Error)) {
+  if (!(parsed_option_1 instanceof MessageParsingError)) {
     return parsed_option_1;
   }
-  return Error(`Could not parse ${JSON.stringify(value)} into Array<LabelHeaderDto> | undefined`);
+  return new MessageParsingError(`Could not parse ${JSON.stringify(value)} into Array<LabelHeaderDto> | undefined`);
 }
 export function parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
   value: JsonValue,
-): Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto> | Error {
+):
+  | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
+  | MessageParsingError {
   const arr = ensureJsonArray(value);
-  if (arr instanceof Error) return arr;
+  if (arr instanceof MessageParsingError) return arr;
   const out: Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto> =
     [];
   for (let item of arr) {
@@ -2819,7 +2891,7 @@ export function parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5Data
       parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
         item,
       );
-    if (parsed_item instanceof Error) return parsed_item;
+    if (parsed_item instanceof MessageParsingError) return parsed_item;
     out.push(parsed_item);
   }
   return out;
@@ -2829,19 +2901,19 @@ export function parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceD
 ):
   | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
   | undefined
-  | Error {
+  | MessageParsingError {
   const parsed_option_0 =
     parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
       value,
     );
-  if (!(parsed_option_0 instanceof Error)) {
+  if (!(parsed_option_0 instanceof MessageParsingError)) {
     return parsed_option_0;
   }
   const parsed_option_1 = parse_as_None(value);
-  if (!(parsed_option_1 instanceof Error)) {
+  if (!(parsed_option_1 instanceof MessageParsingError)) {
     return parsed_option_1;
   }
-  return Error(
+  return new MessageParsingError(
     `Could not parse ${
       JSON.stringify(value)
     } into Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto> | undefined`,
@@ -2849,28 +2921,30 @@ export function parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceD
 }
 export function parse_as_PixelClassificationExportAppletStateDto(
   value: JsonValue,
-): PixelClassificationExportAppletStateDto | Error {
+): PixelClassificationExportAppletStateDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "PixelClassificationExportAppletStateDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a PixelClassificationExportAppletStateDto`);
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a PixelClassificationExportAppletStateDto`,
+    );
   }
   const temp_jobs =
     parse_as_Tuple_of_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipDirectoryJobDto0TransferFileJobDto0JobDto_endof_0_varlen__endof_(
       valueObject.jobs,
     );
-  if (temp_jobs instanceof Error) return temp_jobs;
+  if (temp_jobs instanceof MessageParsingError) return temp_jobs;
   const temp_populated_labels = parse_as_Union_of_Tuple_of_LabelHeaderDto0_varlen__endof_0None_endof_(
     valueObject.populated_labels,
   );
-  if (temp_populated_labels instanceof Error) return temp_populated_labels;
+  if (temp_populated_labels instanceof MessageParsingError) return temp_populated_labels;
   const temp_datasource_suggestions =
     parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
       valueObject.datasource_suggestions,
     );
-  if (temp_datasource_suggestions instanceof Error) return temp_datasource_suggestions;
+  if (temp_datasource_suggestions instanceof MessageParsingError) return temp_datasource_suggestions;
   return new PixelClassificationExportAppletStateDto({
     jobs: temp_jobs,
     populated_labels: temp_populated_labels,
@@ -2908,43 +2982,43 @@ export class PixelClassificationExportAppletStateDto {
       datasource_suggestions: toJsonValue(this.datasource_suggestions),
     };
   }
-  public static fromJsonValue(value: JsonValue): PixelClassificationExportAppletStateDto | Error {
+  public static fromJsonValue(value: JsonValue): PixelClassificationExportAppletStateDto | MessageParsingError {
     return parse_as_PixelClassificationExportAppletStateDto(value);
   }
 }
 
-export function parse_as_float(value: JsonValue): number | Error {
+export function parse_as_float(value: JsonValue): number | MessageParsingError {
   return ensureJsonNumber(value);
 }
 export function parse_as_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_(
   value: JsonValue,
-): "x" | "y" | "z" | Error {
+): "x" | "y" | "z" | MessageParsingError {
   const tmp_0 = parse_as_str(value);
-  if (!(tmp_0 instanceof Error) && tmp_0 === "x") {
+  if (!(tmp_0 instanceof MessageParsingError) && tmp_0 === "x") {
     return tmp_0;
   }
   const tmp_1 = parse_as_str(value);
-  if (!(tmp_1 instanceof Error) && tmp_1 === "y") {
+  if (!(tmp_1 instanceof MessageParsingError) && tmp_1 === "y") {
     return tmp_1;
   }
   const tmp_2 = parse_as_str(value);
-  if (!(tmp_2 instanceof Error) && tmp_2 === "z") {
+  if (!(tmp_2 instanceof MessageParsingError) && tmp_2 === "z") {
     return tmp_2;
   }
-  return Error(`Could not parse ${value} as 'x' | 'y' | 'z'`);
+  return new MessageParsingError(`Could not parse ${value} as 'x' | 'y' | 'z'`);
 }
 export function parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
   value: JsonValue,
-): "x" | "y" | "z" | undefined | Error {
+): "x" | "y" | "z" | undefined | MessageParsingError {
   const parsed_option_0 = parse_as_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_(value);
-  if (!(parsed_option_0 instanceof Error)) {
+  if (!(parsed_option_0 instanceof MessageParsingError)) {
     return parsed_option_0;
   }
   const parsed_option_1 = parse_as_None(value);
-  if (!(parsed_option_1 instanceof Error)) {
+  if (!(parsed_option_1 instanceof MessageParsingError)) {
     return parsed_option_1;
   }
-  return Error(`Could not parse ${JSON.stringify(value)} into 'x' | 'y' | 'z' | undefined`);
+  return new MessageParsingError(`Could not parse ${JSON.stringify(value)} into 'x' | 'y' | 'z' | undefined`);
 }
 export function parse_as_Literal_of__quote_GaussianSmoothing_quote_0_quote_LaplacianofGaussian_quote_0_quote_GaussianGradientMagnitude_quote_0_quote_DifferenceofGaussians_quote_0_quote_StructureTensorEigenvalues_quote_0_quote_HessianofGaussianEigenvalues_quote__endof_(
   value: JsonValue,
@@ -2955,54 +3029,54 @@ export function parse_as_Literal_of__quote_GaussianSmoothing_quote_0_quote_Lapla
   | "Difference of Gaussians"
   | "Structure Tensor Eigenvalues"
   | "Hessian of Gaussian Eigenvalues"
-  | Error {
+  | MessageParsingError {
   const tmp_0 = parse_as_str(value);
-  if (!(tmp_0 instanceof Error) && tmp_0 === "Gaussian Smoothing") {
+  if (!(tmp_0 instanceof MessageParsingError) && tmp_0 === "Gaussian Smoothing") {
     return tmp_0;
   }
   const tmp_1 = parse_as_str(value);
-  if (!(tmp_1 instanceof Error) && tmp_1 === "Laplacian of Gaussian") {
+  if (!(tmp_1 instanceof MessageParsingError) && tmp_1 === "Laplacian of Gaussian") {
     return tmp_1;
   }
   const tmp_2 = parse_as_str(value);
-  if (!(tmp_2 instanceof Error) && tmp_2 === "Gaussian Gradient Magnitude") {
+  if (!(tmp_2 instanceof MessageParsingError) && tmp_2 === "Gaussian Gradient Magnitude") {
     return tmp_2;
   }
   const tmp_3 = parse_as_str(value);
-  if (!(tmp_3 instanceof Error) && tmp_3 === "Difference of Gaussians") {
+  if (!(tmp_3 instanceof MessageParsingError) && tmp_3 === "Difference of Gaussians") {
     return tmp_3;
   }
   const tmp_4 = parse_as_str(value);
-  if (!(tmp_4 instanceof Error) && tmp_4 === "Structure Tensor Eigenvalues") {
+  if (!(tmp_4 instanceof MessageParsingError) && tmp_4 === "Structure Tensor Eigenvalues") {
     return tmp_4;
   }
   const tmp_5 = parse_as_str(value);
-  if (!(tmp_5 instanceof Error) && tmp_5 === "Hessian of Gaussian Eigenvalues") {
+  if (!(tmp_5 instanceof MessageParsingError) && tmp_5 === "Hessian of Gaussian Eigenvalues") {
     return tmp_5;
   }
-  return Error(
+  return new MessageParsingError(
     `Could not parse ${value} as 'Gaussian Smoothing' | 'Laplacian of Gaussian' | 'Gaussian Gradient Magnitude' | 'Difference of Gaussians' | 'Structure Tensor Eigenvalues' | 'Hessian of Gaussian Eigenvalues'`,
   );
 }
-export function parse_as_IlpFeatureExtractorDto(value: JsonValue): IlpFeatureExtractorDto | Error {
+export function parse_as_IlpFeatureExtractorDto(value: JsonValue): IlpFeatureExtractorDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "IlpFeatureExtractorDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a IlpFeatureExtractorDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a IlpFeatureExtractorDto`);
   }
   const temp_ilp_scale = parse_as_float(valueObject.ilp_scale);
-  if (temp_ilp_scale instanceof Error) return temp_ilp_scale;
+  if (temp_ilp_scale instanceof MessageParsingError) return temp_ilp_scale;
   const temp_axis_2d = parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
     valueObject.axis_2d,
   );
-  if (temp_axis_2d instanceof Error) return temp_axis_2d;
+  if (temp_axis_2d instanceof MessageParsingError) return temp_axis_2d;
   const temp_class_name =
     parse_as_Literal_of__quote_GaussianSmoothing_quote_0_quote_LaplacianofGaussian_quote_0_quote_GaussianGradientMagnitude_quote_0_quote_DifferenceofGaussians_quote_0_quote_StructureTensorEigenvalues_quote_0_quote_HessianofGaussianEigenvalues_quote__endof_(
       valueObject.class_name,
     );
-  if (temp_class_name instanceof Error) return temp_class_name;
+  if (temp_class_name instanceof MessageParsingError) return temp_class_name;
   return new IlpFeatureExtractorDto({
     ilp_scale: temp_ilp_scale,
     axis_2d: temp_axis_2d,
@@ -3044,36 +3118,40 @@ export class IlpFeatureExtractorDto {
       class_name: this.class_name,
     };
   }
-  public static fromJsonValue(value: JsonValue): IlpFeatureExtractorDto | Error {
+  public static fromJsonValue(value: JsonValue): IlpFeatureExtractorDto | MessageParsingError {
     return parse_as_IlpFeatureExtractorDto(value);
   }
 }
 
 export function parse_as_Tuple_of_IlpFeatureExtractorDto0_varlen__endof_(
   value: JsonValue,
-): Array<IlpFeatureExtractorDto> | Error {
+): Array<IlpFeatureExtractorDto> | MessageParsingError {
   const arr = ensureJsonArray(value);
-  if (arr instanceof Error) return arr;
+  if (arr instanceof MessageParsingError) return arr;
   const out: Array<IlpFeatureExtractorDto> = [];
   for (let item of arr) {
     let parsed_item = parse_as_IlpFeatureExtractorDto(item);
-    if (parsed_item instanceof Error) return parsed_item;
+    if (parsed_item instanceof MessageParsingError) return parsed_item;
     out.push(parsed_item);
   }
   return out;
 }
-export function parse_as_FeatureSelectionAppletStateDto(value: JsonValue): FeatureSelectionAppletStateDto | Error {
+export function parse_as_FeatureSelectionAppletStateDto(
+  value: JsonValue,
+): FeatureSelectionAppletStateDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "FeatureSelectionAppletStateDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a FeatureSelectionAppletStateDto`);
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a FeatureSelectionAppletStateDto`,
+    );
   }
   const temp_feature_extractors = parse_as_Tuple_of_IlpFeatureExtractorDto0_varlen__endof_(
     valueObject.feature_extractors,
   );
-  if (temp_feature_extractors instanceof Error) return temp_feature_extractors;
+  if (temp_feature_extractors instanceof MessageParsingError) return temp_feature_extractors;
   return new FeatureSelectionAppletStateDto({
     feature_extractors: temp_feature_extractors,
   });
@@ -3093,23 +3171,27 @@ export class FeatureSelectionAppletStateDto {
       feature_extractors: this.feature_extractors.map((item) => item.toJsonValue()),
     };
   }
-  public static fromJsonValue(value: JsonValue): FeatureSelectionAppletStateDto | Error {
+  public static fromJsonValue(value: JsonValue): FeatureSelectionAppletStateDto | MessageParsingError {
     return parse_as_FeatureSelectionAppletStateDto(value);
   }
 }
 
-export function parse_as_AddFeatureExtractorsParamsDto(value: JsonValue): AddFeatureExtractorsParamsDto | Error {
+export function parse_as_AddFeatureExtractorsParamsDto(
+  value: JsonValue,
+): AddFeatureExtractorsParamsDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "AddFeatureExtractorsParamsDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a AddFeatureExtractorsParamsDto`);
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a AddFeatureExtractorsParamsDto`,
+    );
   }
   const temp_feature_extractors = parse_as_Tuple_of_IlpFeatureExtractorDto0_varlen__endof_(
     valueObject.feature_extractors,
   );
-  if (temp_feature_extractors instanceof Error) return temp_feature_extractors;
+  if (temp_feature_extractors instanceof MessageParsingError) return temp_feature_extractors;
   return new AddFeatureExtractorsParamsDto({
     feature_extractors: temp_feature_extractors,
   });
@@ -3129,23 +3211,27 @@ export class AddFeatureExtractorsParamsDto {
       feature_extractors: this.feature_extractors.map((item) => item.toJsonValue()),
     };
   }
-  public static fromJsonValue(value: JsonValue): AddFeatureExtractorsParamsDto | Error {
+  public static fromJsonValue(value: JsonValue): AddFeatureExtractorsParamsDto | MessageParsingError {
     return parse_as_AddFeatureExtractorsParamsDto(value);
   }
 }
 
-export function parse_as_RemoveFeatureExtractorsParamsDto(value: JsonValue): RemoveFeatureExtractorsParamsDto | Error {
+export function parse_as_RemoveFeatureExtractorsParamsDto(
+  value: JsonValue,
+): RemoveFeatureExtractorsParamsDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "RemoveFeatureExtractorsParamsDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a RemoveFeatureExtractorsParamsDto`);
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a RemoveFeatureExtractorsParamsDto`,
+    );
   }
   const temp_feature_extractors = parse_as_Tuple_of_IlpFeatureExtractorDto0_varlen__endof_(
     valueObject.feature_extractors,
   );
-  if (temp_feature_extractors instanceof Error) return temp_feature_extractors;
+  if (temp_feature_extractors instanceof MessageParsingError) return temp_feature_extractors;
   return new RemoveFeatureExtractorsParamsDto({
     feature_extractors: temp_feature_extractors,
   });
@@ -3165,7 +3251,7 @@ export class RemoveFeatureExtractorsParamsDto {
       feature_extractors: this.feature_extractors.map((item) => item.toJsonValue()),
     };
   }
-  public static fromJsonValue(value: JsonValue): RemoveFeatureExtractorsParamsDto | Error {
+  public static fromJsonValue(value: JsonValue): RemoveFeatureExtractorsParamsDto | MessageParsingError {
     return parse_as_RemoveFeatureExtractorsParamsDto(value);
   }
 }
@@ -3197,130 +3283,130 @@ export function parse_as_Literal_of__quote_BOOT_FAIL_quote_0_quote_CANCELLED_quo
   | "STOPPED"
   | "SUSPENDED"
   | "TIMEOUT"
-  | Error {
+  | MessageParsingError {
   const tmp_0 = parse_as_str(value);
-  if (!(tmp_0 instanceof Error) && tmp_0 === "BOOT_FAIL") {
+  if (!(tmp_0 instanceof MessageParsingError) && tmp_0 === "BOOT_FAIL") {
     return tmp_0;
   }
   const tmp_1 = parse_as_str(value);
-  if (!(tmp_1 instanceof Error) && tmp_1 === "CANCELLED") {
+  if (!(tmp_1 instanceof MessageParsingError) && tmp_1 === "CANCELLED") {
     return tmp_1;
   }
   const tmp_2 = parse_as_str(value);
-  if (!(tmp_2 instanceof Error) && tmp_2 === "COMPLETED") {
+  if (!(tmp_2 instanceof MessageParsingError) && tmp_2 === "COMPLETED") {
     return tmp_2;
   }
   const tmp_3 = parse_as_str(value);
-  if (!(tmp_3 instanceof Error) && tmp_3 === "CONFIGURING") {
+  if (!(tmp_3 instanceof MessageParsingError) && tmp_3 === "CONFIGURING") {
     return tmp_3;
   }
   const tmp_4 = parse_as_str(value);
-  if (!(tmp_4 instanceof Error) && tmp_4 === "COMPLETING") {
+  if (!(tmp_4 instanceof MessageParsingError) && tmp_4 === "COMPLETING") {
     return tmp_4;
   }
   const tmp_5 = parse_as_str(value);
-  if (!(tmp_5 instanceof Error) && tmp_5 === "DEADLINE") {
+  if (!(tmp_5 instanceof MessageParsingError) && tmp_5 === "DEADLINE") {
     return tmp_5;
   }
   const tmp_6 = parse_as_str(value);
-  if (!(tmp_6 instanceof Error) && tmp_6 === "FAILED") {
+  if (!(tmp_6 instanceof MessageParsingError) && tmp_6 === "FAILED") {
     return tmp_6;
   }
   const tmp_7 = parse_as_str(value);
-  if (!(tmp_7 instanceof Error) && tmp_7 === "NODE_FAIL") {
+  if (!(tmp_7 instanceof MessageParsingError) && tmp_7 === "NODE_FAIL") {
     return tmp_7;
   }
   const tmp_8 = parse_as_str(value);
-  if (!(tmp_8 instanceof Error) && tmp_8 === "OUT_OF_MEMORY") {
+  if (!(tmp_8 instanceof MessageParsingError) && tmp_8 === "OUT_OF_MEMORY") {
     return tmp_8;
   }
   const tmp_9 = parse_as_str(value);
-  if (!(tmp_9 instanceof Error) && tmp_9 === "PENDING") {
+  if (!(tmp_9 instanceof MessageParsingError) && tmp_9 === "PENDING") {
     return tmp_9;
   }
   const tmp_10 = parse_as_str(value);
-  if (!(tmp_10 instanceof Error) && tmp_10 === "PREEMPTED") {
+  if (!(tmp_10 instanceof MessageParsingError) && tmp_10 === "PREEMPTED") {
     return tmp_10;
   }
   const tmp_11 = parse_as_str(value);
-  if (!(tmp_11 instanceof Error) && tmp_11 === "RUNNING") {
+  if (!(tmp_11 instanceof MessageParsingError) && tmp_11 === "RUNNING") {
     return tmp_11;
   }
   const tmp_12 = parse_as_str(value);
-  if (!(tmp_12 instanceof Error) && tmp_12 === "RESV_DEL_HOLD") {
+  if (!(tmp_12 instanceof MessageParsingError) && tmp_12 === "RESV_DEL_HOLD") {
     return tmp_12;
   }
   const tmp_13 = parse_as_str(value);
-  if (!(tmp_13 instanceof Error) && tmp_13 === "REQUEUE_FED") {
+  if (!(tmp_13 instanceof MessageParsingError) && tmp_13 === "REQUEUE_FED") {
     return tmp_13;
   }
   const tmp_14 = parse_as_str(value);
-  if (!(tmp_14 instanceof Error) && tmp_14 === "REQUEUE_HOLD") {
+  if (!(tmp_14 instanceof MessageParsingError) && tmp_14 === "REQUEUE_HOLD") {
     return tmp_14;
   }
   const tmp_15 = parse_as_str(value);
-  if (!(tmp_15 instanceof Error) && tmp_15 === "REQUEUED") {
+  if (!(tmp_15 instanceof MessageParsingError) && tmp_15 === "REQUEUED") {
     return tmp_15;
   }
   const tmp_16 = parse_as_str(value);
-  if (!(tmp_16 instanceof Error) && tmp_16 === "RESIZING") {
+  if (!(tmp_16 instanceof MessageParsingError) && tmp_16 === "RESIZING") {
     return tmp_16;
   }
   const tmp_17 = parse_as_str(value);
-  if (!(tmp_17 instanceof Error) && tmp_17 === "REVOKED") {
+  if (!(tmp_17 instanceof MessageParsingError) && tmp_17 === "REVOKED") {
     return tmp_17;
   }
   const tmp_18 = parse_as_str(value);
-  if (!(tmp_18 instanceof Error) && tmp_18 === "SIGNALING") {
+  if (!(tmp_18 instanceof MessageParsingError) && tmp_18 === "SIGNALING") {
     return tmp_18;
   }
   const tmp_19 = parse_as_str(value);
-  if (!(tmp_19 instanceof Error) && tmp_19 === "SPECIAL_EXIT") {
+  if (!(tmp_19 instanceof MessageParsingError) && tmp_19 === "SPECIAL_EXIT") {
     return tmp_19;
   }
   const tmp_20 = parse_as_str(value);
-  if (!(tmp_20 instanceof Error) && tmp_20 === "STAGE_OUT") {
+  if (!(tmp_20 instanceof MessageParsingError) && tmp_20 === "STAGE_OUT") {
     return tmp_20;
   }
   const tmp_21 = parse_as_str(value);
-  if (!(tmp_21 instanceof Error) && tmp_21 === "STOPPED") {
+  if (!(tmp_21 instanceof MessageParsingError) && tmp_21 === "STOPPED") {
     return tmp_21;
   }
   const tmp_22 = parse_as_str(value);
-  if (!(tmp_22 instanceof Error) && tmp_22 === "SUSPENDED") {
+  if (!(tmp_22 instanceof MessageParsingError) && tmp_22 === "SUSPENDED") {
     return tmp_22;
   }
   const tmp_23 = parse_as_str(value);
-  if (!(tmp_23 instanceof Error) && tmp_23 === "TIMEOUT") {
+  if (!(tmp_23 instanceof MessageParsingError) && tmp_23 === "TIMEOUT") {
     return tmp_23;
   }
-  return Error(
+  return new MessageParsingError(
     `Could not parse ${value} as 'BOOT_FAIL' | 'CANCELLED' | 'COMPLETED' | 'CONFIGURING' | 'COMPLETING' | 'DEADLINE' | 'FAILED' | 'NODE_FAIL' | 'OUT_OF_MEMORY' | 'PENDING' | 'PREEMPTED' | 'RUNNING' | 'RESV_DEL_HOLD' | 'REQUEUE_FED' | 'REQUEUE_HOLD' | 'REQUEUED' | 'RESIZING' | 'REVOKED' | 'SIGNALING' | 'SPECIAL_EXIT' | 'STAGE_OUT' | 'STOPPED' | 'SUSPENDED' | 'TIMEOUT'`,
   );
 }
-export function parse_as_ComputeSessionDto(value: JsonValue): ComputeSessionDto | Error {
+export function parse_as_ComputeSessionDto(value: JsonValue): ComputeSessionDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "ComputeSessionDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ComputeSessionDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a ComputeSessionDto`);
   }
   const temp_start_time_utc_sec = parse_as_Union_of_int0None_endof_(valueObject.start_time_utc_sec);
-  if (temp_start_time_utc_sec instanceof Error) return temp_start_time_utc_sec;
+  if (temp_start_time_utc_sec instanceof MessageParsingError) return temp_start_time_utc_sec;
   const temp_time_elapsed_sec = parse_as_int(valueObject.time_elapsed_sec);
-  if (temp_time_elapsed_sec instanceof Error) return temp_time_elapsed_sec;
+  if (temp_time_elapsed_sec instanceof MessageParsingError) return temp_time_elapsed_sec;
   const temp_time_limit_minutes = parse_as_int(valueObject.time_limit_minutes);
-  if (temp_time_limit_minutes instanceof Error) return temp_time_limit_minutes;
+  if (temp_time_limit_minutes instanceof MessageParsingError) return temp_time_limit_minutes;
   const temp_num_nodes = parse_as_int(valueObject.num_nodes);
-  if (temp_num_nodes instanceof Error) return temp_num_nodes;
+  if (temp_num_nodes instanceof MessageParsingError) return temp_num_nodes;
   const temp_compute_session_id = parse_as_str(valueObject.compute_session_id);
-  if (temp_compute_session_id instanceof Error) return temp_compute_session_id;
+  if (temp_compute_session_id instanceof MessageParsingError) return temp_compute_session_id;
   const temp_state =
     parse_as_Literal_of__quote_BOOT_FAIL_quote_0_quote_CANCELLED_quote_0_quote_COMPLETED_quote_0_quote_CONFIGURING_quote_0_quote_COMPLETING_quote_0_quote_DEADLINE_quote_0_quote_FAILED_quote_0_quote_NODE_FAIL_quote_0_quote_OUT_OF_MEMORY_quote_0_quote_PENDING_quote_0_quote_PREEMPTED_quote_0_quote_RUNNING_quote_0_quote_RESV_DEL_HOLD_quote_0_quote_REQUEUE_FED_quote_0_quote_REQUEUE_HOLD_quote_0_quote_REQUEUED_quote_0_quote_RESIZING_quote_0_quote_REVOKED_quote_0_quote_SIGNALING_quote_0_quote_SPECIAL_EXIT_quote_0_quote_STAGE_OUT_quote_0_quote_STOPPED_quote_0_quote_SUSPENDED_quote_0_quote_TIMEOUT_quote__endof_(
       valueObject.state,
     );
-  if (temp_state instanceof Error) return temp_state;
+  if (temp_state instanceof MessageParsingError) return temp_state;
   return new ComputeSessionDto({
     start_time_utc_sec: temp_start_time_utc_sec,
     time_elapsed_sec: temp_time_elapsed_sec,
@@ -3413,54 +3499,54 @@ export class ComputeSessionDto {
       state: this.state,
     };
   }
-  public static fromJsonValue(value: JsonValue): ComputeSessionDto | Error {
+  public static fromJsonValue(value: JsonValue): ComputeSessionDto | MessageParsingError {
     return parse_as_ComputeSessionDto(value);
   }
 }
 
 export function parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
   value: JsonValue,
-): "LOCAL_DASK" | "LOCAL_PROCESS_POOL" | "CSCS" | "JUSUF" | Error {
+): "LOCAL_DASK" | "LOCAL_PROCESS_POOL" | "CSCS" | "JUSUF" | MessageParsingError {
   const tmp_0 = parse_as_str(value);
-  if (!(tmp_0 instanceof Error) && tmp_0 === "LOCAL_DASK") {
+  if (!(tmp_0 instanceof MessageParsingError) && tmp_0 === "LOCAL_DASK") {
     return tmp_0;
   }
   const tmp_1 = parse_as_str(value);
-  if (!(tmp_1 instanceof Error) && tmp_1 === "LOCAL_PROCESS_POOL") {
+  if (!(tmp_1 instanceof MessageParsingError) && tmp_1 === "LOCAL_PROCESS_POOL") {
     return tmp_1;
   }
   const tmp_2 = parse_as_str(value);
-  if (!(tmp_2 instanceof Error) && tmp_2 === "CSCS") {
+  if (!(tmp_2 instanceof MessageParsingError) && tmp_2 === "CSCS") {
     return tmp_2;
   }
   const tmp_3 = parse_as_str(value);
-  if (!(tmp_3 instanceof Error) && tmp_3 === "JUSUF") {
+  if (!(tmp_3 instanceof MessageParsingError) && tmp_3 === "JUSUF") {
     return tmp_3;
   }
-  return Error(`Could not parse ${value} as 'LOCAL_DASK' | 'LOCAL_PROCESS_POOL' | 'CSCS' | 'JUSUF'`);
+  return new MessageParsingError(`Could not parse ${value} as 'LOCAL_DASK' | 'LOCAL_PROCESS_POOL' | 'CSCS' | 'JUSUF'`);
 }
-export function parse_as_bool(value: JsonValue): boolean | Error {
+export function parse_as_bool(value: JsonValue): boolean | MessageParsingError {
   return ensureJsonBoolean(value);
 }
-export function parse_as_ComputeSessionStatusDto(value: JsonValue): ComputeSessionStatusDto | Error {
+export function parse_as_ComputeSessionStatusDto(value: JsonValue): ComputeSessionStatusDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "ComputeSessionStatusDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ComputeSessionStatusDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a ComputeSessionStatusDto`);
   }
   const temp_compute_session = parse_as_ComputeSessionDto(valueObject.compute_session);
-  if (temp_compute_session instanceof Error) return temp_compute_session;
+  if (temp_compute_session instanceof MessageParsingError) return temp_compute_session;
   const temp_hpc_site =
     parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
       valueObject.hpc_site,
     );
-  if (temp_hpc_site instanceof Error) return temp_hpc_site;
+  if (temp_hpc_site instanceof MessageParsingError) return temp_hpc_site;
   const temp_session_url = parse_as_UrlDto(valueObject.session_url);
-  if (temp_session_url instanceof Error) return temp_session_url;
+  if (temp_session_url instanceof MessageParsingError) return temp_session_url;
   const temp_connected = parse_as_bool(valueObject.connected);
-  if (temp_connected instanceof Error) return temp_connected;
+  if (temp_connected instanceof MessageParsingError) return temp_connected;
   return new ComputeSessionStatusDto({
     compute_session: temp_compute_session,
     hpc_site: temp_hpc_site,
@@ -3495,26 +3581,30 @@ export class ComputeSessionStatusDto {
       connected: this.connected,
     };
   }
-  public static fromJsonValue(value: JsonValue): ComputeSessionStatusDto | Error {
+  public static fromJsonValue(value: JsonValue): ComputeSessionStatusDto | MessageParsingError {
     return parse_as_ComputeSessionStatusDto(value);
   }
 }
 
-export function parse_as_CreateComputeSessionParamsDto(value: JsonValue): CreateComputeSessionParamsDto | Error {
+export function parse_as_CreateComputeSessionParamsDto(
+  value: JsonValue,
+): CreateComputeSessionParamsDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "CreateComputeSessionParamsDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a CreateComputeSessionParamsDto`);
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a CreateComputeSessionParamsDto`,
+    );
   }
   const temp_session_duration_minutes = parse_as_int(valueObject.session_duration_minutes);
-  if (temp_session_duration_minutes instanceof Error) return temp_session_duration_minutes;
+  if (temp_session_duration_minutes instanceof MessageParsingError) return temp_session_duration_minutes;
   const temp_hpc_site =
     parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
       valueObject.hpc_site,
     );
-  if (temp_hpc_site instanceof Error) return temp_hpc_site;
+  if (temp_hpc_site instanceof MessageParsingError) return temp_hpc_site;
   return new CreateComputeSessionParamsDto({
     session_duration_minutes: temp_session_duration_minutes,
     hpc_site: temp_hpc_site,
@@ -3539,26 +3629,30 @@ export class CreateComputeSessionParamsDto {
       hpc_site: this.hpc_site,
     };
   }
-  public static fromJsonValue(value: JsonValue): CreateComputeSessionParamsDto | Error {
+  public static fromJsonValue(value: JsonValue): CreateComputeSessionParamsDto | MessageParsingError {
     return parse_as_CreateComputeSessionParamsDto(value);
   }
 }
 
-export function parse_as_GetComputeSessionStatusParamsDto(value: JsonValue): GetComputeSessionStatusParamsDto | Error {
+export function parse_as_GetComputeSessionStatusParamsDto(
+  value: JsonValue,
+): GetComputeSessionStatusParamsDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "GetComputeSessionStatusParamsDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a GetComputeSessionStatusParamsDto`);
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a GetComputeSessionStatusParamsDto`,
+    );
   }
   const temp_compute_session_id = parse_as_str(valueObject.compute_session_id);
-  if (temp_compute_session_id instanceof Error) return temp_compute_session_id;
+  if (temp_compute_session_id instanceof MessageParsingError) return temp_compute_session_id;
   const temp_hpc_site =
     parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
       valueObject.hpc_site,
     );
-  if (temp_hpc_site instanceof Error) return temp_hpc_site;
+  if (temp_hpc_site instanceof MessageParsingError) return temp_hpc_site;
   return new GetComputeSessionStatusParamsDto({
     compute_session_id: temp_compute_session_id,
     hpc_site: temp_hpc_site,
@@ -3583,26 +3677,30 @@ export class GetComputeSessionStatusParamsDto {
       hpc_site: this.hpc_site,
     };
   }
-  public static fromJsonValue(value: JsonValue): GetComputeSessionStatusParamsDto | Error {
+  public static fromJsonValue(value: JsonValue): GetComputeSessionStatusParamsDto | MessageParsingError {
     return parse_as_GetComputeSessionStatusParamsDto(value);
   }
 }
 
-export function parse_as_CloseComputeSessionParamsDto(value: JsonValue): CloseComputeSessionParamsDto | Error {
+export function parse_as_CloseComputeSessionParamsDto(
+  value: JsonValue,
+): CloseComputeSessionParamsDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "CloseComputeSessionParamsDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a CloseComputeSessionParamsDto`);
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a CloseComputeSessionParamsDto`,
+    );
   }
   const temp_compute_session_id = parse_as_str(valueObject.compute_session_id);
-  if (temp_compute_session_id instanceof Error) return temp_compute_session_id;
+  if (temp_compute_session_id instanceof MessageParsingError) return temp_compute_session_id;
   const temp_hpc_site =
     parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
       valueObject.hpc_site,
     );
-  if (temp_hpc_site instanceof Error) return temp_hpc_site;
+  if (temp_hpc_site instanceof MessageParsingError) return temp_hpc_site;
   return new CloseComputeSessionParamsDto({
     compute_session_id: temp_compute_session_id,
     hpc_site: temp_hpc_site,
@@ -3627,21 +3725,25 @@ export class CloseComputeSessionParamsDto {
       hpc_site: this.hpc_site,
     };
   }
-  public static fromJsonValue(value: JsonValue): CloseComputeSessionParamsDto | Error {
+  public static fromJsonValue(value: JsonValue): CloseComputeSessionParamsDto | MessageParsingError {
     return parse_as_CloseComputeSessionParamsDto(value);
   }
 }
 
-export function parse_as_CloseComputeSessionResponseDto(value: JsonValue): CloseComputeSessionResponseDto | Error {
+export function parse_as_CloseComputeSessionResponseDto(
+  value: JsonValue,
+): CloseComputeSessionResponseDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "CloseComputeSessionResponseDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a CloseComputeSessionResponseDto`);
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a CloseComputeSessionResponseDto`,
+    );
   }
   const temp_compute_session_id = parse_as_str(valueObject.compute_session_id);
-  if (temp_compute_session_id instanceof Error) return temp_compute_session_id;
+  if (temp_compute_session_id instanceof MessageParsingError) return temp_compute_session_id;
   return new CloseComputeSessionResponseDto({
     compute_session_id: temp_compute_session_id,
   });
@@ -3661,24 +3763,28 @@ export class CloseComputeSessionResponseDto {
       compute_session_id: this.compute_session_id,
     };
   }
-  public static fromJsonValue(value: JsonValue): CloseComputeSessionResponseDto | Error {
+  public static fromJsonValue(value: JsonValue): CloseComputeSessionResponseDto | MessageParsingError {
     return parse_as_CloseComputeSessionResponseDto(value);
   }
 }
 
-export function parse_as_ListComputeSessionsParamsDto(value: JsonValue): ListComputeSessionsParamsDto | Error {
+export function parse_as_ListComputeSessionsParamsDto(
+  value: JsonValue,
+): ListComputeSessionsParamsDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "ListComputeSessionsParamsDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ListComputeSessionsParamsDto`);
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a ListComputeSessionsParamsDto`,
+    );
   }
   const temp_hpc_site =
     parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
       valueObject.hpc_site,
     );
-  if (temp_hpc_site instanceof Error) return temp_hpc_site;
+  if (temp_hpc_site instanceof MessageParsingError) return temp_hpc_site;
   return new ListComputeSessionsParamsDto({
     hpc_site: temp_hpc_site,
   });
@@ -3698,36 +3804,40 @@ export class ListComputeSessionsParamsDto {
       hpc_site: this.hpc_site,
     };
   }
-  public static fromJsonValue(value: JsonValue): ListComputeSessionsParamsDto | Error {
+  public static fromJsonValue(value: JsonValue): ListComputeSessionsParamsDto | MessageParsingError {
     return parse_as_ListComputeSessionsParamsDto(value);
   }
 }
 
 export function parse_as_Tuple_of_ComputeSessionStatusDto0_varlen__endof_(
   value: JsonValue,
-): Array<ComputeSessionStatusDto> | Error {
+): Array<ComputeSessionStatusDto> | MessageParsingError {
   const arr = ensureJsonArray(value);
-  if (arr instanceof Error) return arr;
+  if (arr instanceof MessageParsingError) return arr;
   const out: Array<ComputeSessionStatusDto> = [];
   for (let item of arr) {
     let parsed_item = parse_as_ComputeSessionStatusDto(item);
-    if (parsed_item instanceof Error) return parsed_item;
+    if (parsed_item instanceof MessageParsingError) return parsed_item;
     out.push(parsed_item);
   }
   return out;
 }
-export function parse_as_ListComputeSessionsResponseDto(value: JsonValue): ListComputeSessionsResponseDto | Error {
+export function parse_as_ListComputeSessionsResponseDto(
+  value: JsonValue,
+): ListComputeSessionsResponseDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "ListComputeSessionsResponseDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ListComputeSessionsResponseDto`);
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a ListComputeSessionsResponseDto`,
+    );
   }
   const temp_compute_sessions_stati = parse_as_Tuple_of_ComputeSessionStatusDto0_varlen__endof_(
     valueObject.compute_sessions_stati,
   );
-  if (temp_compute_sessions_stati instanceof Error) return temp_compute_sessions_stati;
+  if (temp_compute_sessions_stati instanceof MessageParsingError) return temp_compute_sessions_stati;
   return new ListComputeSessionsResponseDto({
     compute_sessions_stati: temp_compute_sessions_stati,
   });
@@ -3747,40 +3857,44 @@ export class ListComputeSessionsResponseDto {
       compute_sessions_stati: this.compute_sessions_stati.map((item) => item.toJsonValue()),
     };
   }
-  public static fromJsonValue(value: JsonValue): ListComputeSessionsResponseDto | Error {
+  public static fromJsonValue(value: JsonValue): ListComputeSessionsResponseDto | MessageParsingError {
     return parse_as_ListComputeSessionsResponseDto(value);
   }
 }
 
 export function parse_as_Tuple_of_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_0_varlen__endof_(
   value: JsonValue,
-): Array<"LOCAL_DASK" | "LOCAL_PROCESS_POOL" | "CSCS" | "JUSUF"> | Error {
+): Array<"LOCAL_DASK" | "LOCAL_PROCESS_POOL" | "CSCS" | "JUSUF"> | MessageParsingError {
   const arr = ensureJsonArray(value);
-  if (arr instanceof Error) return arr;
+  if (arr instanceof MessageParsingError) return arr;
   const out: Array<"LOCAL_DASK" | "LOCAL_PROCESS_POOL" | "CSCS" | "JUSUF"> = [];
   for (let item of arr) {
     let parsed_item =
       parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
         item,
       );
-    if (parsed_item instanceof Error) return parsed_item;
+    if (parsed_item instanceof MessageParsingError) return parsed_item;
     out.push(parsed_item);
   }
   return out;
 }
-export function parse_as_GetAvailableHpcSitesResponseDto(value: JsonValue): GetAvailableHpcSitesResponseDto | Error {
+export function parse_as_GetAvailableHpcSitesResponseDto(
+  value: JsonValue,
+): GetAvailableHpcSitesResponseDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "GetAvailableHpcSitesResponseDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a GetAvailableHpcSitesResponseDto`);
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a GetAvailableHpcSitesResponseDto`,
+    );
   }
   const temp_available_sites =
     parse_as_Tuple_of_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_0_varlen__endof_(
       valueObject.available_sites,
     );
-  if (temp_available_sites instanceof Error) return temp_available_sites;
+  if (temp_available_sites instanceof MessageParsingError) return temp_available_sites;
   return new GetAvailableHpcSitesResponseDto({
     available_sites: temp_available_sites,
   });
@@ -3800,21 +3914,21 @@ export class GetAvailableHpcSitesResponseDto {
       available_sites: this.available_sites.map((item) => item),
     };
   }
-  public static fromJsonValue(value: JsonValue): GetAvailableHpcSitesResponseDto | Error {
+  public static fromJsonValue(value: JsonValue): GetAvailableHpcSitesResponseDto | MessageParsingError {
     return parse_as_GetAvailableHpcSitesResponseDto(value);
   }
 }
 
-export function parse_as_CheckLoginResultDto(value: JsonValue): CheckLoginResultDto | Error {
+export function parse_as_CheckLoginResultDto(value: JsonValue): CheckLoginResultDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "CheckLoginResultDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a CheckLoginResultDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a CheckLoginResultDto`);
   }
   const temp_logged_in = parse_as_bool(valueObject.logged_in);
-  if (temp_logged_in instanceof Error) return temp_logged_in;
+  if (temp_logged_in instanceof MessageParsingError) return temp_logged_in;
   return new CheckLoginResultDto({
     logged_in: temp_logged_in,
   });
@@ -3834,30 +3948,32 @@ export class CheckLoginResultDto {
       logged_in: this.logged_in,
     };
   }
-  public static fromJsonValue(value: JsonValue): CheckLoginResultDto | Error {
+  public static fromJsonValue(value: JsonValue): CheckLoginResultDto | MessageParsingError {
     return parse_as_CheckLoginResultDto(value);
   }
 }
 
 export function parse_as_StartPixelProbabilitiesExportJobParamsDto(
   value: JsonValue,
-): StartPixelProbabilitiesExportJobParamsDto | Error {
+): StartPixelProbabilitiesExportJobParamsDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "StartPixelProbabilitiesExportJobParamsDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a StartPixelProbabilitiesExportJobParamsDto`);
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a StartPixelProbabilitiesExportJobParamsDto`,
+    );
   }
   const temp_datasource =
     parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
       valueObject.datasource,
     );
-  if (temp_datasource instanceof Error) return temp_datasource;
+  if (temp_datasource instanceof MessageParsingError) return temp_datasource;
   const temp_datasink = parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto_endof_(
     valueObject.datasink,
   );
-  if (temp_datasink instanceof Error) return temp_datasink;
+  if (temp_datasink instanceof MessageParsingError) return temp_datasink;
   return new StartPixelProbabilitiesExportJobParamsDto({
     datasource: temp_datasource,
     datasink: temp_datasink,
@@ -3882,32 +3998,34 @@ export class StartPixelProbabilitiesExportJobParamsDto {
       datasink: toJsonValue(this.datasink),
     };
   }
-  public static fromJsonValue(value: JsonValue): StartPixelProbabilitiesExportJobParamsDto | Error {
+  public static fromJsonValue(value: JsonValue): StartPixelProbabilitiesExportJobParamsDto | MessageParsingError {
     return parse_as_StartPixelProbabilitiesExportJobParamsDto(value);
   }
 }
 
 export function parse_as_StartSimpleSegmentationExportJobParamsDto(
   value: JsonValue,
-): StartSimpleSegmentationExportJobParamsDto | Error {
+): StartSimpleSegmentationExportJobParamsDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "StartSimpleSegmentationExportJobParamsDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a StartSimpleSegmentationExportJobParamsDto`);
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a StartSimpleSegmentationExportJobParamsDto`,
+    );
   }
   const temp_datasource =
     parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
       valueObject.datasource,
     );
-  if (temp_datasource instanceof Error) return temp_datasource;
+  if (temp_datasource instanceof MessageParsingError) return temp_datasource;
   const temp_datasink = parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto_endof_(
     valueObject.datasink,
   );
-  if (temp_datasink instanceof Error) return temp_datasink;
+  if (temp_datasink instanceof MessageParsingError) return temp_datasink;
   const temp_label_header = parse_as_LabelHeaderDto(valueObject.label_header);
-  if (temp_label_header instanceof Error) return temp_label_header;
+  if (temp_label_header instanceof MessageParsingError) return temp_label_header;
   return new StartSimpleSegmentationExportJobParamsDto({
     datasource: temp_datasource,
     datasink: temp_datasink,
@@ -3937,23 +4055,23 @@ export class StartSimpleSegmentationExportJobParamsDto {
       label_header: this.label_header.toJsonValue(),
     };
   }
-  public static fromJsonValue(value: JsonValue): StartSimpleSegmentationExportJobParamsDto | Error {
+  public static fromJsonValue(value: JsonValue): StartSimpleSegmentationExportJobParamsDto | MessageParsingError {
     return parse_as_StartSimpleSegmentationExportJobParamsDto(value);
   }
 }
 
-export function parse_as_LoadProjectParamsDto(value: JsonValue): LoadProjectParamsDto | Error {
+export function parse_as_LoadProjectParamsDto(value: JsonValue): LoadProjectParamsDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "LoadProjectParamsDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a LoadProjectParamsDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a LoadProjectParamsDto`);
   }
   const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.fs);
-  if (temp_fs instanceof Error) return temp_fs;
+  if (temp_fs instanceof MessageParsingError) return temp_fs;
   const temp_project_file_path = parse_as_str(valueObject.project_file_path);
-  if (temp_project_file_path instanceof Error) return temp_project_file_path;
+  if (temp_project_file_path instanceof MessageParsingError) return temp_project_file_path;
   return new LoadProjectParamsDto({
     fs: temp_fs,
     project_file_path: temp_project_file_path,
@@ -3978,23 +4096,23 @@ export class LoadProjectParamsDto {
       project_file_path: this.project_file_path,
     };
   }
-  public static fromJsonValue(value: JsonValue): LoadProjectParamsDto | Error {
+  public static fromJsonValue(value: JsonValue): LoadProjectParamsDto | MessageParsingError {
     return parse_as_LoadProjectParamsDto(value);
   }
 }
 
-export function parse_as_SaveProjectParamsDto(value: JsonValue): SaveProjectParamsDto | Error {
+export function parse_as_SaveProjectParamsDto(value: JsonValue): SaveProjectParamsDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "SaveProjectParamsDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a SaveProjectParamsDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a SaveProjectParamsDto`);
   }
   const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.fs);
-  if (temp_fs instanceof Error) return temp_fs;
+  if (temp_fs instanceof MessageParsingError) return temp_fs;
   const temp_project_file_path = parse_as_str(valueObject.project_file_path);
-  if (temp_project_file_path instanceof Error) return temp_project_file_path;
+  if (temp_project_file_path instanceof MessageParsingError) return temp_project_file_path;
   return new SaveProjectParamsDto({
     fs: temp_fs,
     project_file_path: temp_project_file_path,
@@ -4019,21 +4137,25 @@ export class SaveProjectParamsDto {
       project_file_path: this.project_file_path,
     };
   }
-  public static fromJsonValue(value: JsonValue): SaveProjectParamsDto | Error {
+  public static fromJsonValue(value: JsonValue): SaveProjectParamsDto | MessageParsingError {
     return parse_as_SaveProjectParamsDto(value);
   }
 }
 
-export function parse_as_GetDatasourcesFromUrlParamsDto(value: JsonValue): GetDatasourcesFromUrlParamsDto | Error {
+export function parse_as_GetDatasourcesFromUrlParamsDto(
+  value: JsonValue,
+): GetDatasourcesFromUrlParamsDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "GetDatasourcesFromUrlParamsDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a GetDatasourcesFromUrlParamsDto`);
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a GetDatasourcesFromUrlParamsDto`,
+    );
   }
   const temp_url = parse_as_UrlDto(valueObject.url);
-  if (temp_url instanceof Error) return temp_url;
+  if (temp_url instanceof MessageParsingError) return temp_url;
   return new GetDatasourcesFromUrlParamsDto({
     url: temp_url,
   });
@@ -4053,24 +4175,28 @@ export class GetDatasourcesFromUrlParamsDto {
       url: this.url.toJsonValue(),
     };
   }
-  public static fromJsonValue(value: JsonValue): GetDatasourcesFromUrlParamsDto | Error {
+  public static fromJsonValue(value: JsonValue): GetDatasourcesFromUrlParamsDto | MessageParsingError {
     return parse_as_GetDatasourcesFromUrlParamsDto(value);
   }
 }
 
-export function parse_as_GetDatasourcesFromUrlResponseDto(value: JsonValue): GetDatasourcesFromUrlResponseDto | Error {
+export function parse_as_GetDatasourcesFromUrlResponseDto(
+  value: JsonValue,
+): GetDatasourcesFromUrlResponseDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "GetDatasourcesFromUrlResponseDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a GetDatasourcesFromUrlResponseDto`);
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a GetDatasourcesFromUrlResponseDto`,
+    );
   }
   const temp_datasources =
     parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
       valueObject.datasources,
     );
-  if (temp_datasources instanceof Error) return temp_datasources;
+  if (temp_datasources instanceof MessageParsingError) return temp_datasources;
   return new GetDatasourcesFromUrlResponseDto({
     datasources: temp_datasources,
   });
@@ -4094,23 +4220,25 @@ export class GetDatasourcesFromUrlResponseDto {
       datasources: toJsonValue(this.datasources),
     };
   }
-  public static fromJsonValue(value: JsonValue): GetDatasourcesFromUrlResponseDto | Error {
+  public static fromJsonValue(value: JsonValue): GetDatasourcesFromUrlResponseDto | MessageParsingError {
     return parse_as_GetDatasourcesFromUrlResponseDto(value);
   }
 }
 
 export function parse_as_GetFileSystemAndPathFromUrlParamsDto(
   value: JsonValue,
-): GetFileSystemAndPathFromUrlParamsDto | Error {
+): GetFileSystemAndPathFromUrlParamsDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "GetFileSystemAndPathFromUrlParamsDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a GetFileSystemAndPathFromUrlParamsDto`);
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a GetFileSystemAndPathFromUrlParamsDto`,
+    );
   }
   const temp_url = parse_as_UrlDto(valueObject.url);
-  if (temp_url instanceof Error) return temp_url;
+  if (temp_url instanceof MessageParsingError) return temp_url;
   return new GetFileSystemAndPathFromUrlParamsDto({
     url: temp_url,
   });
@@ -4130,25 +4258,27 @@ export class GetFileSystemAndPathFromUrlParamsDto {
       url: this.url.toJsonValue(),
     };
   }
-  public static fromJsonValue(value: JsonValue): GetFileSystemAndPathFromUrlParamsDto | Error {
+  public static fromJsonValue(value: JsonValue): GetFileSystemAndPathFromUrlParamsDto | MessageParsingError {
     return parse_as_GetFileSystemAndPathFromUrlParamsDto(value);
   }
 }
 
 export function parse_as_GetFileSystemAndPathFromUrlResponseDto(
   value: JsonValue,
-): GetFileSystemAndPathFromUrlResponseDto | Error {
+): GetFileSystemAndPathFromUrlResponseDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "GetFileSystemAndPathFromUrlResponseDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a GetFileSystemAndPathFromUrlResponseDto`);
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a GetFileSystemAndPathFromUrlResponseDto`,
+    );
   }
   const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.fs);
-  if (temp_fs instanceof Error) return temp_fs;
+  if (temp_fs instanceof MessageParsingError) return temp_fs;
   const temp_path = parse_as_str(valueObject.path);
-  if (temp_path instanceof Error) return temp_path;
+  if (temp_path instanceof MessageParsingError) return temp_path;
   return new GetFileSystemAndPathFromUrlResponseDto({
     fs: temp_fs,
     path: temp_path,
@@ -4173,26 +4303,28 @@ export class GetFileSystemAndPathFromUrlResponseDto {
       path: this.path,
     };
   }
-  public static fromJsonValue(value: JsonValue): GetFileSystemAndPathFromUrlResponseDto | Error {
+  public static fromJsonValue(value: JsonValue): GetFileSystemAndPathFromUrlResponseDto | MessageParsingError {
     return parse_as_GetFileSystemAndPathFromUrlResponseDto(value);
   }
 }
 
 export function parse_as_CheckDatasourceCompatibilityParams(
   value: JsonValue,
-): CheckDatasourceCompatibilityParams | Error {
+): CheckDatasourceCompatibilityParams | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "CheckDatasourceCompatibilityParams") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a CheckDatasourceCompatibilityParams`);
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a CheckDatasourceCompatibilityParams`,
+    );
   }
   const temp_datasources =
     parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
       valueObject.datasources,
     );
-  if (temp_datasources instanceof Error) return temp_datasources;
+  if (temp_datasources instanceof MessageParsingError) return temp_datasources;
   return new CheckDatasourceCompatibilityParams({
     datasources: temp_datasources,
   });
@@ -4214,34 +4346,36 @@ export class CheckDatasourceCompatibilityParams {
       datasources: this.datasources.map((item) => toJsonValue(item)),
     };
   }
-  public static fromJsonValue(value: JsonValue): CheckDatasourceCompatibilityParams | Error {
+  public static fromJsonValue(value: JsonValue): CheckDatasourceCompatibilityParams | MessageParsingError {
     return parse_as_CheckDatasourceCompatibilityParams(value);
   }
 }
 
-export function parse_as_Tuple_of_bool0_varlen__endof_(value: JsonValue): Array<boolean> | Error {
+export function parse_as_Tuple_of_bool0_varlen__endof_(value: JsonValue): Array<boolean> | MessageParsingError {
   const arr = ensureJsonArray(value);
-  if (arr instanceof Error) return arr;
+  if (arr instanceof MessageParsingError) return arr;
   const out: Array<boolean> = [];
   for (let item of arr) {
     let parsed_item = parse_as_bool(item);
-    if (parsed_item instanceof Error) return parsed_item;
+    if (parsed_item instanceof MessageParsingError) return parsed_item;
     out.push(parsed_item);
   }
   return out;
 }
 export function parse_as_CheckDatasourceCompatibilityResponse(
   value: JsonValue,
-): CheckDatasourceCompatibilityResponse | Error {
+): CheckDatasourceCompatibilityResponse | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "CheckDatasourceCompatibilityResponse") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a CheckDatasourceCompatibilityResponse`);
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a CheckDatasourceCompatibilityResponse`,
+    );
   }
   const temp_compatible = parse_as_Tuple_of_bool0_varlen__endof_(valueObject.compatible);
-  if (temp_compatible instanceof Error) return temp_compatible;
+  if (temp_compatible instanceof MessageParsingError) return temp_compatible;
   return new CheckDatasourceCompatibilityResponse({
     compatible: temp_compatible,
   });
@@ -4261,23 +4395,23 @@ export class CheckDatasourceCompatibilityResponse {
       compatible: this.compatible.map((item) => item),
     };
   }
-  public static fromJsonValue(value: JsonValue): CheckDatasourceCompatibilityResponse | Error {
+  public static fromJsonValue(value: JsonValue): CheckDatasourceCompatibilityResponse | MessageParsingError {
     return parse_as_CheckDatasourceCompatibilityResponse(value);
   }
 }
 
-export function parse_as_ListFsDirRequest(value: JsonValue): ListFsDirRequest | Error {
+export function parse_as_ListFsDirRequest(value: JsonValue): ListFsDirRequest | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "ListFsDirRequest") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ListFsDirRequest`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a ListFsDirRequest`);
   }
   const temp_fs = parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(valueObject.fs);
-  if (temp_fs instanceof Error) return temp_fs;
+  if (temp_fs instanceof MessageParsingError) return temp_fs;
   const temp_path = parse_as_str(valueObject.path);
-  if (temp_path instanceof Error) return temp_path;
+  if (temp_path instanceof MessageParsingError) return temp_path;
   return new ListFsDirRequest({
     fs: temp_fs,
     path: temp_path,
@@ -4302,23 +4436,23 @@ export class ListFsDirRequest {
       path: this.path,
     };
   }
-  public static fromJsonValue(value: JsonValue): ListFsDirRequest | Error {
+  public static fromJsonValue(value: JsonValue): ListFsDirRequest | MessageParsingError {
     return parse_as_ListFsDirRequest(value);
   }
 }
 
-export function parse_as_ListFsDirResponse(value: JsonValue): ListFsDirResponse | Error {
+export function parse_as_ListFsDirResponse(value: JsonValue): ListFsDirResponse | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "ListFsDirResponse") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a ListFsDirResponse`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a ListFsDirResponse`);
   }
   const temp_files = parse_as_Tuple_of_str0_varlen__endof_(valueObject.files);
-  if (temp_files instanceof Error) return temp_files;
+  if (temp_files instanceof MessageParsingError) return temp_files;
   const temp_directories = parse_as_Tuple_of_str0_varlen__endof_(valueObject.directories);
-  if (temp_directories instanceof Error) return temp_directories;
+  if (temp_directories instanceof MessageParsingError) return temp_directories;
   return new ListFsDirResponse({
     files: temp_files,
     directories: temp_directories,
@@ -4343,27 +4477,27 @@ export class ListFsDirResponse {
       directories: this.directories.map((item) => item),
     };
   }
-  public static fromJsonValue(value: JsonValue): ListFsDirResponse | Error {
+  public static fromJsonValue(value: JsonValue): ListFsDirResponse | MessageParsingError {
     return parse_as_ListFsDirResponse(value);
   }
 }
 
-export function parse_as_Literal_of__quote_hbp_quote__endof_(value: JsonValue): "hbp" | Error {
+export function parse_as_Literal_of__quote_hbp_quote__endof_(value: JsonValue): "hbp" | MessageParsingError {
   const tmp_0 = parse_as_str(value);
-  if (!(tmp_0 instanceof Error) && tmp_0 === "hbp") {
+  if (!(tmp_0 instanceof MessageParsingError) && tmp_0 === "hbp") {
     return tmp_0;
   }
-  return Error(`Could not parse ${value} as 'hbp'`);
+  return new MessageParsingError(`Could not parse ${value} as 'hbp'`);
 }
-export function parse_as_HbpIamPublicKeyDto(value: JsonValue): HbpIamPublicKeyDto | Error {
+export function parse_as_HbpIamPublicKeyDto(value: JsonValue): HbpIamPublicKeyDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   const temp_realm = parse_as_Literal_of__quote_hbp_quote__endof_(valueObject.realm);
-  if (temp_realm instanceof Error) return temp_realm;
+  if (temp_realm instanceof MessageParsingError) return temp_realm;
   const temp_public_key = parse_as_str(valueObject.public_key);
-  if (temp_public_key instanceof Error) return temp_public_key;
+  if (temp_public_key instanceof MessageParsingError) return temp_public_key;
   return new HbpIamPublicKeyDto({
     realm: temp_realm,
     public_key: temp_public_key,
@@ -4387,36 +4521,38 @@ export class HbpIamPublicKeyDto {
       public_key: this.public_key,
     };
   }
-  public static fromJsonValue(value: JsonValue): HbpIamPublicKeyDto | Error {
+  public static fromJsonValue(value: JsonValue): HbpIamPublicKeyDto | MessageParsingError {
     return parse_as_HbpIamPublicKeyDto(value);
   }
 }
 
-export function parse_as_Literal_of__quote_RS256_quote__endof_(value: JsonValue): "RS256" | Error {
+export function parse_as_Literal_of__quote_RS256_quote__endof_(value: JsonValue): "RS256" | MessageParsingError {
   const tmp_0 = parse_as_str(value);
-  if (!(tmp_0 instanceof Error) && tmp_0 === "RS256") {
+  if (!(tmp_0 instanceof MessageParsingError) && tmp_0 === "RS256") {
     return tmp_0;
   }
-  return Error(`Could not parse ${value} as 'RS256'`);
+  return new MessageParsingError(`Could not parse ${value} as 'RS256'`);
 }
-export function parse_as_Literal_of__quote_JWT_quote__endof_(value: JsonValue): "JWT" | Error {
+export function parse_as_Literal_of__quote_JWT_quote__endof_(value: JsonValue): "JWT" | MessageParsingError {
   const tmp_0 = parse_as_str(value);
-  if (!(tmp_0 instanceof Error) && tmp_0 === "JWT") {
+  if (!(tmp_0 instanceof MessageParsingError) && tmp_0 === "JWT") {
     return tmp_0;
   }
-  return Error(`Could not parse ${value} as 'JWT'`);
+  return new MessageParsingError(`Could not parse ${value} as 'JWT'`);
 }
-export function parse_as_EbrainsAccessTokenHeaderDto(value: JsonValue): EbrainsAccessTokenHeaderDto | Error {
+export function parse_as_EbrainsAccessTokenHeaderDto(
+  value: JsonValue,
+): EbrainsAccessTokenHeaderDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   const temp_alg = parse_as_Literal_of__quote_RS256_quote__endof_(valueObject.alg);
-  if (temp_alg instanceof Error) return temp_alg;
+  if (temp_alg instanceof MessageParsingError) return temp_alg;
   const temp_typ = parse_as_Literal_of__quote_JWT_quote__endof_(valueObject.typ);
-  if (temp_typ instanceof Error) return temp_typ;
+  if (temp_typ instanceof MessageParsingError) return temp_typ;
   const temp_kid = parse_as_str(valueObject.kid);
-  if (temp_kid instanceof Error) return temp_kid;
+  if (temp_kid instanceof MessageParsingError) return temp_kid;
   return new EbrainsAccessTokenHeaderDto({
     alg: temp_alg,
     typ: temp_typ,
@@ -4445,22 +4581,24 @@ export class EbrainsAccessTokenHeaderDto {
       kid: this.kid,
     };
   }
-  public static fromJsonValue(value: JsonValue): EbrainsAccessTokenHeaderDto | Error {
+  public static fromJsonValue(value: JsonValue): EbrainsAccessTokenHeaderDto | MessageParsingError {
     return parse_as_EbrainsAccessTokenHeaderDto(value);
   }
 }
 
-export function parse_as_EbrainsAccessTokenPayloadDto(value: JsonValue): EbrainsAccessTokenPayloadDto | Error {
+export function parse_as_EbrainsAccessTokenPayloadDto(
+  value: JsonValue,
+): EbrainsAccessTokenPayloadDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   const temp_exp = parse_as_int(valueObject.exp);
-  if (temp_exp instanceof Error) return temp_exp;
+  if (temp_exp instanceof MessageParsingError) return temp_exp;
   const temp_auth_time = parse_as_int(valueObject.auth_time);
-  if (temp_auth_time instanceof Error) return temp_auth_time;
+  if (temp_auth_time instanceof MessageParsingError) return temp_auth_time;
   const temp_sub = parse_as_str(valueObject.sub);
-  if (temp_sub instanceof Error) return temp_sub;
+  if (temp_sub instanceof MessageParsingError) return temp_sub;
   return new EbrainsAccessTokenPayloadDto({
     exp: temp_exp,
     auth_time: temp_auth_time,
@@ -4489,20 +4627,20 @@ export class EbrainsAccessTokenPayloadDto {
       sub: this.sub,
     };
   }
-  public static fromJsonValue(value: JsonValue): EbrainsAccessTokenPayloadDto | Error {
+  public static fromJsonValue(value: JsonValue): EbrainsAccessTokenPayloadDto | MessageParsingError {
     return parse_as_EbrainsAccessTokenPayloadDto(value);
   }
 }
 
-export function parse_as_EbrainsUserTokenDto(value: JsonValue): EbrainsUserTokenDto | Error {
+export function parse_as_EbrainsUserTokenDto(value: JsonValue): EbrainsUserTokenDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   const temp_access_token = parse_as_str(valueObject.access_token);
-  if (temp_access_token instanceof Error) return temp_access_token;
-  const temp_refresh_token = parse_as_str(valueObject.refresh_token);
-  if (temp_refresh_token instanceof Error) return temp_refresh_token;
+  if (temp_access_token instanceof MessageParsingError) return temp_access_token;
+  const temp_refresh_token = parse_as_Union_of_str0None_endof_(valueObject.refresh_token);
+  if (temp_refresh_token instanceof MessageParsingError) return temp_refresh_token;
   return new EbrainsUserTokenDto({
     access_token: temp_access_token,
     refresh_token: temp_refresh_token,
@@ -4512,10 +4650,10 @@ export function parse_as_EbrainsUserTokenDto(value: JsonValue): EbrainsUserToken
 // Do not edit!
 export class EbrainsUserTokenDto {
   public access_token: string;
-  public refresh_token: string;
+  public refresh_token: string | undefined;
   constructor(_params: {
     access_token: string;
-    refresh_token: string;
+    refresh_token: string | undefined;
   }) {
     this.access_token = _params.access_token;
     this.refresh_token = _params.refresh_token;
@@ -4523,21 +4661,21 @@ export class EbrainsUserTokenDto {
   public toJsonValue(): JsonObject {
     return {
       access_token: this.access_token,
-      refresh_token: this.refresh_token,
+      refresh_token: toJsonValue(this.refresh_token),
     };
   }
-  public static fromJsonValue(value: JsonValue): EbrainsUserTokenDto | Error {
+  public static fromJsonValue(value: JsonValue): EbrainsUserTokenDto | MessageParsingError {
     return parse_as_EbrainsUserTokenDto(value);
   }
 }
 
-export function parse_as_LoginRequiredErrorDto(value: JsonValue): LoginRequiredErrorDto | Error {
+export function parse_as_LoginRequiredErrorDto(value: JsonValue): LoginRequiredErrorDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof Error) {
+  if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   if (valueObject["__class__"] != "LoginRequiredErrorDto") {
-    return Error(`Could not deserialize ${JSON.stringify(valueObject)} as a LoginRequiredErrorDto`);
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a LoginRequiredErrorDto`);
   }
   return new LoginRequiredErrorDto({});
 }
@@ -4551,7 +4689,7 @@ export class LoginRequiredErrorDto {
       "__class__": "LoginRequiredErrorDto",
     };
   }
-  public static fromJsonValue(value: JsonValue): LoginRequiredErrorDto | Error {
+  public static fromJsonValue(value: JsonValue): LoginRequiredErrorDto | MessageParsingError {
     return parse_as_LoginRequiredErrorDto(value);
   }
 }

@@ -4739,7 +4739,7 @@ def parse_as_EbrainsUserTokenDto(
     tmp_access_token = parse_as_str(value.get("access_token"))
     if isinstance(tmp_access_token, MessageParsingError):
         return tmp_access_token
-    tmp_refresh_token = parse_as_str(value.get("refresh_token"))
+    tmp_refresh_token = parse_as_Union_of_str0None_endof_(value.get("refresh_token"))
     if isinstance(tmp_refresh_token, MessageParsingError):
         return tmp_refresh_token
     return EbrainsUserTokenDto(
@@ -4751,7 +4751,7 @@ def parse_as_EbrainsUserTokenDto(
 @dataclass
 class EbrainsUserTokenDto(DataTransferObject):
     access_token: str
-    refresh_token: str
+    refresh_token: Optional[str]
 
     @classmethod
     def tag_value(cls) -> "str | None":
@@ -4760,7 +4760,7 @@ class EbrainsUserTokenDto(DataTransferObject):
     def to_json_value(self) -> JsonObject:
         return {
             "access_token": self.access_token,
-            "refresh_token": self.refresh_token,
+            "refresh_token": convert_to_json_value(self.refresh_token),
         }
 
     @classmethod

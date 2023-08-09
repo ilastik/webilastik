@@ -16,19 +16,53 @@ GENERATED_TS_FILE_PATH = PROJECT_DIR / "overlay/src/client/dto.ts"
 GENERATED_TS_FILE_PATH.unlink(missing_ok=True)
 GENERATED_TS_FILE = open(GENERATED_TS_FILE_PATH, "w")
 _ = GENERATED_TS_FILE.write("""
-    import {
-        ensureJsonArray,
-        ensureJsonNumber,
-        ensureJsonObject,
-        ensureJsonString,
-        ensureJsonBoolean,
-        ensureJsonUndefined,
-    } from "../util/safe_serialization";
-    import {
-        JsonObject,
-        JsonValue,
-        toJsonValue,
-    } from "../util/serialization"
+    import {JsonObject, toJsonValue, JsonValue, isJsonableObject, JsonArray, isJsonableArray} from "../util/serialization"
+
+    export class MessageParsingError extends Error{
+        public readonly __class_name__ = "MessageParsingError"
+    }
+
+    export function ensureJsonUndefined(value: JsonValue): undefined | MessageParsingError{
+        if(value !== undefined && value !== null){ //FIXME? null AND undefined?
+            return new MessageParsingError(`Expected undefined/null, found ${JSON.stringify(value)}`)
+        }
+        return undefined
+    }
+
+    export function ensureJsonBoolean(value: JsonValue): boolean | MessageParsingError{
+        if(typeof(value) !== "boolean"){
+            return new MessageParsingError(`Expected boolean, found ${JSON.stringify(value)}`)
+        }
+        return value
+    }
+
+    export function ensureJsonNumber(value: JsonValue): number | MessageParsingError{
+        if(typeof(value) !== "number"){
+            return new MessageParsingError(`Expected number, found ${JSON.stringify(value)}`)
+        }
+        return value
+    }
+
+    export function ensureJsonString(value: JsonValue): string | MessageParsingError{
+        if(typeof(value) !== "string"){
+            return new MessageParsingError(`Expected string, found ${JSON.stringify(value)}`)
+        }
+        return value
+    }
+
+    export function ensureJsonObject(value: JsonValue): JsonObject | MessageParsingError{
+        if(!isJsonableObject(value)){
+            return new MessageParsingError(`Expected JSON object, found this: ${JSON.stringify(value)}`)
+        }
+        return value
+    }
+
+    export function ensureJsonArray(value: JsonValue): JsonArray | MessageParsingError{
+        if(!isJsonableArray(value)){
+            return new MessageParsingError(`Expected JSON array, found this: ${JSON.stringify(value)}`)
+        }
+        return value
+    }
 \n""")
 
 GENERATED_PY_FILE_PATH = Path(__file__).parent / "dto.py"
@@ -81,7 +115,7 @@ class TsFromJsonValueFunction:
         super().__init__()
         self.name = make_serialization_function_name(prefix="parse_as_", py_hint=py_hint)
         self.full_code = (
-            f"export function {self.name}(value: JsonValue): {ts_hint} | Error{{" + "\n" +
+            f"export function {self.name}(value: JsonValue): {ts_hint} | MessageParsingError{{" + "\n" +
                 textwrap.indent(textwrap.dedent(code), prefix="    ") + "\n" +
             f"}}"
         )
@@ -177,18 +211,18 @@ class MappingHint(Hint):
             ]),
             ts_fromJsonValue_code="\n".join([
                 "const valueObj = ensureJsonObject(value);"
-                "if(valueObj instanceof Error){",
+                "if(valueObj instanceof MessageParsingError){",
             f"    return valueObj",
                 "}",
             f"const out: {ts_hint} = {{}}",
                 "for(let key in valueObj){",
             f"    const parsed_key = {self.key_hint.ts_fromJsonValue_function.name}(key)",
-                "    if(parsed_key instanceof Error){",
+                "    if(parsed_key instanceof MessageParsingError){",
                 "        return parsed_key",
                 "    }",
                 "    const val = valueObj[key]",
             f"    const parsed_val = {self.value_hint.ts_fromJsonValue_function.name}(val)",
-                "    if(parsed_val instanceof Error){",
+                "    if(parsed_val instanceof MessageParsingError){",
                 "        return parsed_val",
                 "    }",
                 "    out[parsed_key] = parsed_val",
@@ -257,13 +291,13 @@ class LiteralHint(Hint):
                 *list(itertools.chain(*(
                     [
                         f"const tmp_{val_idx} = {hint.ts_fromJsonValue_function.name}(value)",
-                        f"if(!(tmp_{val_idx} instanceof Error) && tmp_{val_idx} === {literal_value_to_code(val)}){{",
+                        f"if(!(tmp_{val_idx} instanceof MessageParsingError) && tmp_{val_idx} === {literal_value_to_code(val)}){{",
                         f"    return tmp_{val_idx}",
                         f"}}",
                     ]
                     for val_idx, (val, hint) in enumerate(self.lit_value_hints.items())
                 ))),
-                f"return Error(`Could not parse ${{value}} as {ts_hint}`)"
+                f"return new MessageParsingError(`Could not parse ${{value}} as {ts_hint}`)"
             ]),
         )
 
@@ -320,18 +354,18 @@ class DtoHint(Hint):
             ]),
             ts_fromJsonValue_code="\n".join([
                 "const valueObject = ensureJsonObject(value);",
-                "if(valueObject instanceof Error){",
+                "if(valueObject instanceof MessageParsingError){",
                 "    return valueObject;",
                 "}",
                *([
                     f"if (valueObject['{tag_key}'] != '{tag_value_ts}') {{",
-                    f"    return Error(`Could not deserialize ${{JSON.stringify(valueObject)}} as a {class_name}`);",
+                    f"    return new MessageParsingError(`Could not deserialize ${{JSON.stringify(valueObject)}} as a {class_name}`);",
                     f"}}"
                ] if tag_value is not None else []),
                 *list(itertools.chain(*(
                     [
                     f"const temp_{field_name} = {hint.ts_fromJsonValue_function.name}(valueObject.{field_name})",
-                    f"if(temp_{field_name} instanceof Error){{ return temp_{field_name}; }}",
+                    f"if(temp_{field_name} instanceof MessageParsingError){{ return temp_{field_name}; }}",
                     ]
                     for field_name, hint in self.field_annotations.items()
                 ))),
@@ -365,7 +399,7 @@ class DtoHint(Hint):
             "        }",
             "    }",
 
-        f"    public static fromJsonValue(value: JsonValue): {self.ts_hint} | Error{{",
+        f"    public static fromJsonValue(value: JsonValue): {self.ts_hint} | MessageParsingError{{",
         f"        return {self.ts_fromJsonValue_function.name}(value)"
         f"    }}",
 
@@ -465,11 +499,11 @@ class NTuple(TupleHint):
                 ")",
             ]),
             ts_fromJsonValue_code="\n".join([
-                "const arr = ensureJsonArray(value); if(arr instanceof Error){return arr}",
+                "const arr = ensureJsonArray(value); if(arr instanceof MessageParsingError){return arr}",
                 *list(itertools.chain(*(
                     [
                         f"const temp_{arg_index} = {arg.ts_fromJsonValue_function.name}(arr[{arg_index}]);",
-                        f"if(temp_{arg_index} instanceof Error){{return temp_{arg_index}}}",
+                        f"if(temp_{arg_index} instanceof MessageParsingError){{return temp_{arg_index}}}",
                     ]
                     for arg_index, arg in enumerate(self.generic_args)
                 ))),
@@ -521,13 +555,13 @@ class VarLenTuple(TupleHint):
             ]),
             ts_fromJsonValue_code="\n".join([
                 "const arr = ensureJsonArray(value);",
-                "if(arr instanceof Error){"
+                "if(arr instanceof MessageParsingError){"
                 "    return arr",
                 "}",
             f"const out: {ts_hint} = []",
                 "for(let item of arr){",
             f"    let parsed_item = {self.element_type.ts_fromJsonValue_function.name}(item);",
-                "    if(parsed_item instanceof Error){"
+                "    if(parsed_item instanceof MessageParsingError){"
                 "        return parsed_item;"
                 "    }",
                 "    out.push(parsed_item);",
@@ -571,13 +605,13 @@ class UnionHint(Hint):
                 *list(itertools.chain(*(
                     [
                         f"const parsed_option_{arg_index} = {arg.ts_fromJsonValue_function.name}(value)",
-                        f"if(!(parsed_option_{arg_index} instanceof Error)){{",
+                        f"if(!(parsed_option_{arg_index} instanceof MessageParsingError)){{",
                         f"    return parsed_option_{arg_index};",
                         f"}}"
                     ]
                     for arg_index, arg in enumerate(self.union_args)
                 ))),
-                f"return Error(`Could not parse ${{JSON.stringify(value)}} into {ts_hint}`)"
+                f"return new MessageParsingError(`Could not parse ${{JSON.stringify(value)}} into {ts_hint}`)"
             ])
         )
 

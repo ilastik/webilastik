@@ -609,7 +609,7 @@ class EbrainsAccessTokenPayloadDto(DataTransferObject):
 @dataclass
 class EbrainsUserTokenDto(DataTransferObject):
     access_token: str
-    refresh_token: str
+    refresh_token: Optional[str]
 
     @classmethod
     def tag_value(cls) -> "str | None":
