@@ -385,7 +385,6 @@ export class SessionManagerWidget{
             return tokenResult
         }
         this.token = tokenResult
-        this.viewerDriver.setUserToken(tokenResult) //FIXME: awkward place to do this. Also, refresh??
         return {ilastikUrl, token: tokenResult}
     }
 
@@ -408,6 +407,10 @@ export class SessionManagerWidget{
         defaultBucketPath?: Path,
         defaultOutputPathPattern?: string,
     }){
+        (async () => {
+            const token = sessionResult.token instanceof Promise ? await sessionResult.token : sessionResult.token;
+            this.viewerDriver.setUserToken(token) //FIXME: awkward place to do this. Also, refresh??
+        })()
         this.sessionIdField.value = sessionResult.sessionUrl.raw
 
         this.enableSessionAccquisitionControls({enabled: false})
