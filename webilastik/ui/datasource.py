@@ -14,7 +14,7 @@ from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.datasource.precomputed_chunks_datasource import PrecomputedChunksDataSource
 from webilastik.datasource.deep_zoom_datasource import DziLevelDataSource
 from webilastik.filesystem import FsFileNotFoundException, create_filesystem_from_url
-from webilastik.libebrains.user_token import UserToken
+from webilastik.libebrains.user_token import AccessToken
 
 from webilastik.utility.url import Url
 
@@ -35,7 +35,7 @@ def get_encoded_datasource_from_url(match_info_key: str, request: web.Request) -
 def try_get_datasources_from_url(
     *,
     url: Url,
-    ebrains_user_token: Optional[UserToken] = None,
+    ebrains_user_token: Optional[AccessToken] = None,
 ) -> "Tuple[FsDataSource, ...] | None | Exception":
     fs_result = create_filesystem_from_url(url=url)
     if isinstance(fs_result, Exception):

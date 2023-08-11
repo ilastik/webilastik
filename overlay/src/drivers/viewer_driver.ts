@@ -1,4 +1,5 @@
 import { quat, vec3 } from "gl-matrix";
+import { EbrainsAccessTokenDto } from "../client/dto";
 import { Color } from "../client/ilastik";
 import { Mat4, Quat, Vec3 } from "../util/ooglmatrix";
 import { Url } from "../util/parsed_url";
@@ -39,6 +40,8 @@ export interface IViewerDriver{
      * on top of the tracked element and forces itself to have the same size as the tracked element
      */
     getTrackedElement: () => HTMLElement;
+
+    setUserToken: (token: EbrainsAccessTokenDto) => void;
 
     openUrl(params: {
         name: string,

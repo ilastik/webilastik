@@ -4727,31 +4727,31 @@ class EbrainsAccessTokenPayloadDto(DataTransferObject):
         return parse_as_EbrainsAccessTokenPayloadDto(value)
 
 
-def parse_as_EbrainsUserTokenDto(
+def parse_as_EbrainsAccessTokenDto(
     value: JsonValue,
-) -> "EbrainsUserTokenDto | MessageParsingError":
+) -> "EbrainsAccessTokenDto | MessageParsingError":
     from collections.abc import Mapping
 
     if not isinstance(value, Mapping):
         return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as EbrainsUserTokenDto"
+            f"Could not parse {json.dumps(value)} as EbrainsAccessTokenDto"
         )
     tmp_access_token = parse_as_str(value.get("access_token"))
     if isinstance(tmp_access_token, MessageParsingError):
         return tmp_access_token
-    tmp_refresh_token = parse_as_Union_of_str0None_endof_(value.get("refresh_token"))
+    tmp_refresh_token = parse_as_str(value.get("refresh_token"))
     if isinstance(tmp_refresh_token, MessageParsingError):
         return tmp_refresh_token
-    return EbrainsUserTokenDto(
+    return EbrainsAccessTokenDto(
         access_token=tmp_access_token,
         refresh_token=tmp_refresh_token,
     )
 
 
 @dataclass
-class EbrainsUserTokenDto(DataTransferObject):
+class EbrainsAccessTokenDto(DataTransferObject):
     access_token: str
-    refresh_token: Optional[str]
+    refresh_token: str
 
     @classmethod
     def tag_value(cls) -> "str | None":
@@ -4760,14 +4760,14 @@ class EbrainsUserTokenDto(DataTransferObject):
     def to_json_value(self) -> JsonObject:
         return {
             "access_token": self.access_token,
-            "refresh_token": convert_to_json_value(self.refresh_token),
+            "refresh_token": self.refresh_token,
         }
 
     @classmethod
     def from_json_value(
         cls, value: JsonValue
-    ) -> "EbrainsUserTokenDto | MessageParsingError":
-        return parse_as_EbrainsUserTokenDto(value)
+    ) -> "EbrainsAccessTokenDto | MessageParsingError":
+        return parse_as_EbrainsAccessTokenDto(value)
 
 
 def parse_as_LoginRequiredErrorDto(

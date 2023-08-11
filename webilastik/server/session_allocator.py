@@ -18,7 +18,7 @@ from cryptography.fernet import Fernet
 from ndstructs.utils.json_serializable import JsonValue
 
 from webilastik.libebrains.compute_session_launcher import JusufSshJobLauncher, LocalJobLauncher, Minutes, ComputeSession, SshJobLauncher
-from webilastik.libebrains.user_token import UserToken, AccessToken
+from webilastik.libebrains.user_token import AccessToken, CantFetchHbpIamKey, EbrainsCommunicationFailure, HbpIamPublicKey, AccessTokenExpired, AccessTokenInvalid
 from webilastik.libebrains.oidc_client import OidcClient, Scope
 from webilastik.utility import parse_uuid
 from webilastik.server.rpc.dto import (
@@ -54,17 +54,6 @@ def get_requested_url(request: web.Request) -> Url:
     url = Url(protocol=protocol, hostname=hostname, port=port, path=path)
     return  url
 
-def redirect_to_oidc_login(request: web.Request, oidc_client: OidcClient) -> web.Response:
-    return web.Response(
-        status=301,
-        headers={
-            "Location": oidc_client.create_user_login_url(
-                redirect_uri=get_requested_url(request),
-                scopes=set([Scope.OPENID, Scope.GROUP, Scope.TEAM, Scope.EMAIL, Scope.PROFILE]),
-            ).raw
-        }
-    )
-
 def uncachable_json_response(payload: JsonValue, *, status: int) -> web.Response:
     return web.json_response(
         payload,
@@ -75,72 +64,47 @@ def uncachable_json_response(payload: JsonValue, *, status: int) -> web.Response
         }
     )
 
-
-EBRAINS_USER_ACCESS_TOKEN_COOKIE_KEY="ebrains_user_access_token"
-EBRAINS_USER_REFRESH_TOKEN_COOKIE_KEY="ebrains_user_refresh_token"
-
-def set_token_cookie(response: web.Response, token: UserToken) -> web.Response:
-    response.set_cookie(
-        name=EBRAINS_USER_ACCESS_TOKEN_COOKIE_KEY, value=token.access_token.raw_token, secure=True
-    )
-    if token.refresh_token:
-        response.set_cookie(
-            name=EBRAINS_USER_REFRESH_TOKEN_COOKIE_KEY, value=token.refresh_token, secure=True
-        )
-    return response
-
-def del_token_cookie(response: web.Response):
-    response.del_cookie(EBRAINS_USER_ACCESS_TOKEN_COOKIE_KEY)
-    response.del_cookie(EBRAINS_USER_REFRESH_TOKEN_COOKIE_KEY)
-
 async def try_get_user_token_from_request(
     request: web.Request, http_client_session: ClientSession, oidc_client: OidcClient
-) -> "UserToken | None | Exception":
-    user_token_result: "UserToken | None | Exception" = None
-
-    access_token = request.cookies.get(EBRAINS_USER_ACCESS_TOKEN_COOKIE_KEY)
-    refresh_token = request.cookies.get(EBRAINS_USER_REFRESH_TOKEN_COOKIE_KEY)
-
-    if access_token is not None:
-        parsed_access_token = await AccessToken.from_raw_token_async(raw_token=access_token)
-        if isinstance(parsed_access_token, Exception):
-            return parsed_access_token
-        if parsed_access_token is not None:
-            refresh_token = request.cookies.get(EBRAINS_USER_ACCESS_TOKEN_COOKIE_KEY)
-            user_token_result = UserToken(access_token=parsed_access_token, refresh_token=refresh_token)
-
-    if refresh_token and user_token_result is None:
-        user_token_result = await UserToken.try_from_refresh_token_async(
-            http_client_session=http_client_session, oidc_client=oidc_client, refresh_token=refresh_token,
-        )
+) -> "AccessToken | AccessTokenExpired | AccessTokenInvalid | CantFetchHbpIamKey | EbrainsCommunicationFailure":
+    checking_key_result = await HbpIamPublicKey.get_async()
+    if isinstance(checking_key_result, Exception):
+        return checking_key_result
 
     auth_code = request.query.get("code")
-    if auth_code and user_token_result is None:
-        user_token_result =  await UserToken.from_code_async(
-            code=auth_code, redirect_uri=get_requested_url(request), http_client_session=http_client_session, oidc_client=oidc_client
+    if auth_code:
+        return await AccessToken.from_code_async(
+            code=auth_code,
+            redirect_uri=get_requested_url(request),
+            http_client_session=http_client_session,
+            oidc_client=oidc_client,
+            checking_key=checking_key_result,
         )
-
-    return user_token_result
-
+    raw_access_token_header = request.headers.get("Authorization")
+    raw_refresh_token_header = request.headers.get("X-Authorization-Refresh")
+    if raw_access_token_header is None or raw_refresh_token_header is None:
+        return AccessTokenInvalid("Could not get a token message form request headers")
+    access_token_result = AccessToken.from_webilastik_client_headers(
+        auth_header=raw_access_token_header, refresh_header=raw_refresh_token_header, checking_key=checking_key_result
+    )
+    if not isinstance(access_token_result, AccessTokenExpired):
+        return access_token_result
+    return await AccessToken.try_from_refresh_token_async(
+        http_client_session=http_client_session,
+        oidc_client=oidc_client,
+        refresh_token=raw_refresh_token_header,
+    )
 
 def require_user_token(
-    endpoint: Callable[["SessionAllocator", UserToken, web.Request], Coroutine[Any, Any, web.Response]]
+    endpoint: Callable[["SessionAllocator", AccessToken, web.Request], Coroutine[Any, Any, web.Response]]
 ) -> Callable[["SessionAllocator", web.Request], Coroutine[Any, Any, web.Response]]:
 
     @wraps(endpoint)
     async def wrapper(self: "SessionAllocator", request: web.Request) -> web.Response:
         user_token = await try_get_user_token_from_request(request, http_client_session=self.http_client_session, oidc_client=self.oidc_client)
-        if isinstance(user_token, (Exception, type(None))):
-            requested_path = get_requested_url(request).path.as_posix()
-            if requested_path.endswith("/api/viewer") or requested_path.endswith("/api/login_then_close"):
-                resp = redirect_to_oidc_login(request=request, oidc_client=self.oidc_client)
-            else:
-                resp = uncachable_json_response(LoginRequiredErrorDto().to_json_value(), status=401)
-            del_token_cookie(resp)
-            return resp
-        response = await endpoint(self, user_token, request)
-        set_token_cookie(response, token=user_token) #FIXME?
-        return response
+        if isinstance(user_token, Exception):
+            return uncachable_json_response(LoginRequiredErrorDto().to_json_value(), status=401)
+        return await endpoint(self, user_token, request)
 
     return wrapper
 
@@ -174,19 +138,51 @@ class SessionAllocator:
         self.app = web.Application()
         self.app.add_routes([
             web.get('/', self.welcome),
-            web.get('/api/viewer', self.login_then_open_viewer), #FIXME: this is only here because the oidc redirect URLs must start with /api
             web.get('/api/check_login', self.check_login),
-            web.get('/api/login_then_close', self.login_then_close),
+            web.post('/api/refresh_token', self.refresh_token),
+            web.get('/api/prompt_user_for_login', self.prompt_user_for_login),
+            web.get('/api/login_successful', self.login_successful),
             web.get('/api/hello', self.hello),
             web.post('/api/create_compute_session', self.create_compute_session),
             web.post('/api/list_sessions', self.list_sessions),
             web.post('/api/get_available_hpc_sites', self.get_available_hpc_sites),
             web.post('/api/get_session_status', self.get_session_status),
             web.post('/api/close_session', self.close_session),
-            web.post('/api/get_ebrains_token', self.get_ebrains_token), #FIXME: I'm using this in NG web workers
             web.get('/service_worker.js', self.serve_service_worker),
         ])
         super().__init__()
+
+    async def prompt_user_for_login(self, request: web.Request) -> web.Response:
+        return web.Response(
+            status=301,
+            headers={
+                "Location": self.oidc_client.create_user_login_url(
+                    redirect_uri=get_requested_url(request).updated_with(path=PurePosixPath("/api/login_successful")),
+                    scopes=set([Scope.OPENID, Scope.GROUP, Scope.TEAM, Scope.EMAIL, Scope.PROFILE]),
+                ).raw
+            }
+        )
+
+    @require_user_token
+    async def login_successful(self, user_token: AccessToken, request: web.Request) -> web.Response:
+        user_token_js = json.dumps(user_token.to_dto().to_json_value())
+        return web.Response(
+            text=f"""
+                <html>
+                    <head>
+                        <meta charset="UTF-8">
+                        <script>
+                            window.opener.postMessage({user_token_js}, "https://app.ilastik.org"); //FIXME: don't hardcode domain
+                            window.close();
+                        </script>
+                    </head>
+                    <body>
+                        <p>You've logged into ebrains. You can close this tab now</p>
+                    </body>
+                </html>
+            """,
+            content_type='text/html'
+        )
 
     @property
     def http_client_session(self) -> ClientSession:
@@ -194,18 +190,9 @@ class SessionAllocator:
             self._http_client_session = aiohttp.ClientSession()
         return self._http_client_session
 
-    #FIXME: I'm using this in NG web workers
-    async def get_ebrains_token(self, request: web.Request) -> web.Response:
-        origin = request.headers.get("Origin")
-        if origin != "https://app.ilastik.org":
-            return uncachable_json_response(RpcErrorDto(error=f"Bad origin: {origin}").to_json_value(), status=400)
-        user_token = await try_get_user_token_from_request(request, http_client_session=self.http_client_session, oidc_client=self.oidc_client)
-        if user_token is None:
-            return uncachable_json_response(LoginRequiredErrorDto().to_json_value(), status=400)
-        if isinstance(user_token, Exception):
-            return uncachable_json_response(RpcErrorDto(error="Could not login").to_json_value(), status=400)
-        response = uncachable_json_response({EBRAINS_USER_ACCESS_TOKEN_COOKIE_KEY: user_token.access_token.raw_token}, status=200)
-        return response
+    @require_user_token
+    async def refresh_token(self, user_token: AccessToken, request: web.Request) -> web.Response:
+        return uncachable_json_response(payload=user_token.to_dto().to_json_value(), status=200)
 
     async def serve_service_worker(self, request: web.Request) -> web.Response:
         requested_url = get_requested_url(request)
@@ -222,62 +209,22 @@ class SessionAllocator:
             headers={"Location": redirect_url.raw}
         )
 
-    @require_user_token
-    async def login_then_open_viewer(self, user_token: UserToken, request: web.Request) -> web.Response:
-        redirect_url = get_requested_url(request).updated_with(path=PurePosixPath("/public/nehuba/index.html"), hash_='!%7B"layout":"xy"%7D')
-        resp = web.Response(
-            status=301,
-            headers={"Location": redirect_url.raw}
-        )
-        return set_token_cookie(resp, token=user_token)
-
     def _make_compute_session_url(self, compute_session_id: uuid.UUID) -> Url:
         return self.external_url.joinpath(f"session-{compute_session_id}")
 
     @require_user_token
-    async def hello(self, user_token: UserToken, request: web.Request) -> web.Response:
+    async def hello(self, user_token: AccessToken, request: web.Request) -> web.Response:
         return web.json_response("hello!", status=200)
 
     async def check_login(self, request: web.Request) -> web.Response:
         user_token = await try_get_user_token_from_request(request, http_client_session=self.http_client_session, oidc_client=self.oidc_client)
-        if isinstance(user_token, Exception):
-            resp = uncachable_json_response(
-                CheckLoginResultDto(logged_in=False).to_json_value(),
-                status=200
-            )
-            del_token_cookie(resp)
-            return resp
-        if user_token is None:
-            return uncachable_json_response(
-                CheckLoginResultDto(logged_in=False).to_json_value(),
-                status=200
-            )
-        response = uncachable_json_response(
-            CheckLoginResultDto(logged_in=True).to_json_value(),\
+        return uncachable_json_response(
+            CheckLoginResultDto(logged_in=isinstance(user_token, AccessToken)).to_json_value(),
             status=200
         )
-        return set_token_cookie(response=response, token=user_token)
 
     @require_user_token
-    async def login_then_close(self, user_token: UserToken, request: web.Request) -> web.Response:
-        resp = web.Response(
-            text="""
-                <html>
-                    <head>
-                        <meta charset="UTF-8">
-                        <script>window.close()</script>
-                    </head>>
-                    <body>
-                        <p>You've logged into ebrains. You can close this tab now</p>
-                    </body>
-                </html>
-            """,
-            content_type='text/html'
-        )
-        return set_token_cookie(resp, token=user_token)
-
-    @require_user_token
-    async def create_compute_session(self, user_token: UserToken, request: web.Request) -> web.Response:
+    async def create_compute_session(self, user_token: AccessToken, request: web.Request) -> web.Response:
         raw_payload = await request.content.read()
         json_payload = json.loads(raw_payload.decode('utf8'))
         params = CreateComputeSessionParamsDto.from_json_value(json_payload)
@@ -374,7 +321,7 @@ class SessionAllocator:
             )
 
     @require_user_token
-    async def get_session_status(self, user_token: UserToken, request: web.Request) -> web.Response:
+    async def get_session_status(self, user_token: AccessToken, request: web.Request) -> web.Response:
         raw_payload = await request.content.read()
         json_payload = json.loads(raw_payload.decode('utf8'))
         params = GetComputeSessionStatusParamsDto.from_json_value(json_payload)
@@ -436,7 +383,7 @@ class SessionAllocator:
         )
 
     @require_user_token
-    async def close_session(self, user_token: UserToken, request: web.Request) -> web.Response:
+    async def close_session(self, user_token: AccessToken, request: web.Request) -> web.Response:
         raw_payload = await request.content.read()
         json_payload = json.loads(raw_payload.decode('utf8'))
         params = CloseComputeSessionParamsDto.from_json_value(json_payload)
@@ -480,7 +427,7 @@ class SessionAllocator:
         return ping_session_result.ok
 
     @require_user_token
-    async def list_sessions(self, user_token: UserToken, request: web.Request) -> web.Response:
+    async def list_sessions(self, user_token: AccessToken, request: web.Request) -> web.Response:
         json_payload = json.loads((await request.content.read()))
         params = ListComputeSessionsParamsDto.from_json_value(json_payload)
         if isinstance(params, MessageParsingError) or params.hpc_site not in self.session_launchers:

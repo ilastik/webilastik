@@ -1,5 +1,6 @@
 import { vec3, quat } from "gl-matrix"
 import { IViewportDriver, IViewerDriver } from "..";
+import { EbrainsAccessTokenDto } from "../client/dto";
 import { Color } from "../client/ilastik";
 import { CssClasses } from "../gui/css_classes";
 import { Div } from "../gui/widgets/widget";
@@ -206,6 +207,12 @@ export class NeuroglancerDriver implements IViewerDriver{
     getTrackedElement() : HTMLElement{
         return this.trackedElement
     }
+
+    setUserToken(token: EbrainsAccessTokenDto): void{
+        this.viewer.dataContext.worker.postMessage(token);
+        window.postMessage(token);
+    }
+
     getViewportDrivers(): Array<NeuroglancerViewportDriver>{
         const panels = Array(...document.querySelectorAll(".neuroglancer-panel")) as Array<HTMLElement>;
         if(panels.length == 0){

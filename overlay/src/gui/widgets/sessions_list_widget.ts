@@ -1,5 +1,5 @@
 import { HpcSiteName, Session, SESSION_DONE_STATES } from "../../client/ilastik";
-import { CloseComputeSessionParamsDto, ComputeSessionStatusDto, ListComputeSessionsParamsDto } from "../../client/dto";
+import { CloseComputeSessionParamsDto, ComputeSessionStatusDto, EbrainsAccessTokenDto, ListComputeSessionsParamsDto } from "../../client/dto";
 import { createElement, createImage, removeElement, secondsToTimeDeltaString } from "../../util/misc";
 import { Url } from "../../util/parsed_url";
 import { ErrorPopupWidget, PopupWidget } from "./popup";
@@ -14,6 +14,7 @@ class SessionItemWidget{
         status: ComputeSessionStatusDto,
         parentElement: HTMLTableElement,
         ilastikUrl: Url,
+        token: EbrainsAccessTokenDto,
         onSessionClosed: (status: ComputeSessionStatusDto) => void,
         rejoinSession?: (sessionId: string) => void,
     }){
@@ -38,6 +39,7 @@ class SessionItemWidget{
                     title: `Killing session ${comp_session.compute_session_id} at ${params.status.hpc_site}`,
                     operation: Session.cancel({
                         ilastikUrl: params.ilastikUrl,
+                        token: params.token,
                         rpcParams: new CloseComputeSessionParamsDto({
                             compute_session_id: comp_session.compute_session_id,
                             hpc_site: params.status.hpc_site,
@@ -72,6 +74,7 @@ class SessionItemWidget{
 export class SessionsPopup{
     constructor(params: {
         ilastikUrl: Url,
+        token: EbrainsAccessTokenDto,
         sessionStati: Array<ComputeSessionStatusDto>,
         onSessionClosed: (status: ComputeSessionStatusDto) => void,
         rejoinSession?: (sessionId: string) => void,
@@ -97,6 +100,7 @@ export class SessionsPopup{
 
     public static async create(params: {
         ilastikUrl: Url,
+        token: EbrainsAccessTokenDto,
         onSessionClosed: (status: ComputeSessionStatusDto) => void,
         rejoinSession?: (sessionId: string) => void,
         hpc_site: HpcSiteName,
@@ -111,6 +115,7 @@ export class SessionsPopup{
         })
         let sessionStatiResult = await Session.listSessions({
             ilastikUrl: params.ilastikUrl,
+            token: params.token,
             rpcParams: new ListComputeSessionsParamsDto({hpc_site: params.hpc_site})
         })
         if(!loadingPopup.element.parentElement){

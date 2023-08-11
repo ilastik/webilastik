@@ -4632,28 +4632,28 @@ export class EbrainsAccessTokenPayloadDto {
   }
 }
 
-export function parse_as_EbrainsUserTokenDto(value: JsonValue): EbrainsUserTokenDto | MessageParsingError {
+export function parse_as_EbrainsAccessTokenDto(value: JsonValue): EbrainsAccessTokenDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
   const temp_access_token = parse_as_str(valueObject.access_token);
   if (temp_access_token instanceof MessageParsingError) return temp_access_token;
-  const temp_refresh_token = parse_as_Union_of_str0None_endof_(valueObject.refresh_token);
+  const temp_refresh_token = parse_as_str(valueObject.refresh_token);
   if (temp_refresh_token instanceof MessageParsingError) return temp_refresh_token;
-  return new EbrainsUserTokenDto({
+  return new EbrainsAccessTokenDto({
     access_token: temp_access_token,
     refresh_token: temp_refresh_token,
   });
 }
-// Automatically generated via DataTransferObject for EbrainsUserTokenDto
+// Automatically generated via DataTransferObject for EbrainsAccessTokenDto
 // Do not edit!
-export class EbrainsUserTokenDto {
+export class EbrainsAccessTokenDto {
   public access_token: string;
-  public refresh_token: string | undefined;
+  public refresh_token: string;
   constructor(_params: {
     access_token: string;
-    refresh_token: string | undefined;
+    refresh_token: string;
   }) {
     this.access_token = _params.access_token;
     this.refresh_token = _params.refresh_token;
@@ -4661,11 +4661,11 @@ export class EbrainsUserTokenDto {
   public toJsonValue(): JsonObject {
     return {
       access_token: this.access_token,
-      refresh_token: toJsonValue(this.refresh_token),
+      refresh_token: this.refresh_token,
     };
   }
-  public static fromJsonValue(value: JsonValue): EbrainsUserTokenDto | MessageParsingError {
-    return parse_as_EbrainsUserTokenDto(value);
+  public static fromJsonValue(value: JsonValue): EbrainsAccessTokenDto | MessageParsingError {
+    return parse_as_EbrainsAccessTokenDto(value);
   }
 }
 

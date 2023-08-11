@@ -164,7 +164,7 @@ class WebIlastik:
                 lambda request: self.workflow.pixel_classifier_applet.predictions_precomputed_chunks_info(request)
             ),
             web.post("/download_project_as_ilp", self.download_project_as_ilp),
-            web.delete("/close", self.close_session),
+            web.post("/close", self.close_session),
             web.post(
                 "/get_datasources_from_url",
                 self.get_datasources_from_url
