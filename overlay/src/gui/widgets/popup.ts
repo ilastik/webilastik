@@ -80,30 +80,13 @@ export class PopupWidget extends Div{
 
     public static async WaitPopup<T>(params: {
         title: string,
-        operation: Promise<T>,
+        operation: Promise<T> | ((popup: PopupWidget) => Promise<T>),
     }): Promise<T>{
         let popup = PopupWidget.LoadingPopup({title: params.title});
-        let result = await params.operation
+        let result = await (params.operation instanceof Promise ? params.operation : params.operation(popup));
         popup.destroy()
         return result
     }
-
-    public static async AsyncDialog<RESULT>(params: {
-        title: string,
-        fillInPopup: (params: {popup: PopupWidget, resolve: (result: RESULT) => void}) => void,
-    }): Promise<RESULT>{
-        return new Promise<RESULT>(resolve => {
-            let popup = new PopupWidget(params.title);
-            params.fillInPopup({
-                popup,
-                resolve: (result: RESULT) => {
-                    popup.destroy()
-                    resolve(result)
-                }
-            })
-        })
-    }
-
 }
 
 export class ErrorPopupWidget extends PopupWidget{

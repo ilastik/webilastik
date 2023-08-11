@@ -607,7 +607,7 @@ class EbrainsAccessTokenPayloadDto(DataTransferObject):
 
 
 @dataclass
-class EbrainsUserTokenDto(DataTransferObject):
+class EbrainsAccessTokenDto(DataTransferObject):
     access_token: str
     refresh_token: str
 

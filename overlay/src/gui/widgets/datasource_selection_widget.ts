@@ -103,17 +103,18 @@ export class DataSourceSelectionWidget{
             return datasourcesResult
         }
         const datasources = datasourcesResult
-        return PopupWidget.AsyncDialog({
+        return PopupWidget.WaitPopup({
             title: "Select resolutions to open",
-            fillInPopup: (params: {popup: PopupWidget, resolve: (result: FsDataSource[]) => void}) => {
+            operation: (popup: PopupWidget) => new Promise<FsDataSource[]>(resolve => {
+
                 let datasourcesSelect = new MultiSelect<FsDataSource>({
-                    parentElement: params.popup.element,
+                    parentElement: popup.element,
                     options: datasources,
                     renderer: (ds) => new Span({parentElement: undefined, innerText: ds.getDisplayString()}),
                 })
-                new ButtonWidget({parentElement: params.popup.element, contents: "Open Selected", onClick: () => params.resolve(datasourcesSelect.value)})
-                new ButtonWidget({parentElement: params.popup.element, contents: "Skip", onClick: () => params.resolve([])})
-            }
+                new ButtonWidget({parentElement: popup.element, contents: "Open Selected", onClick: () => resolve(datasourcesSelect.value)})
+                new ButtonWidget({parentElement: popup.element, contents: "Skip", onClick: () => resolve([])})
+            })
         })
     }
 

@@ -21,7 +21,7 @@ from webilastik.config import WorkflowConfig
 
 from webilastik.libebrains.oidc_client import OidcClient
 from webilastik.libebrains.user_info import UserInfo
-from webilastik.libebrains.user_token import UserToken
+from webilastik.libebrains.user_token import AccessToken
 from webilastik.server.rpc.dto import ComputeSessionDto
 from webilastik.utility import ComputeNodes, Hostname, Minutes, NodeSeconds, Seconds, Username
 from webilastik.utility.url import Url
@@ -331,7 +331,7 @@ class SshJobLauncher:
         compute_session_id: uuid.UUID,
         allow_local_fs: bool,
         ebrains_oidc_client: OidcClient,
-        ebrains_user_token: UserToken,
+        ebrains_user_token: AccessToken,
         max_duration_minutes: Minutes,
         session_url: Url,
         session_allocator_host: Hostname,
@@ -347,7 +347,7 @@ class SshJobLauncher:
         compute_session_id: uuid.UUID,
         allow_local_fs: bool,
         ebrains_oidc_client: OidcClient,
-        ebrains_user_token: UserToken,
+        ebrains_user_token: AccessToken,
         max_duration_minutes: Minutes,
         session_url: Url,
         session_allocator_host: Hostname,
@@ -489,7 +489,7 @@ class LocalJobLauncher(SshJobLauncher):
         compute_session_id: uuid.UUID,
         allow_local_fs: bool,
         ebrains_oidc_client: OidcClient,
-        ebrains_user_token: UserToken,
+        ebrains_user_token: AccessToken,
         max_duration_minutes: Minutes,
         session_url: Url,
         session_allocator_host: Hostname,
@@ -578,7 +578,7 @@ class LocalJobLauncher(SshJobLauncher):
         compute_session_id: uuid.UUID,
         allow_local_fs: bool,
         ebrains_oidc_client: OidcClient,
-        ebrains_user_token: UserToken,
+        ebrains_user_token: AccessToken,
         max_duration_minutes: Minutes,
         session_url: Url,
         session_allocator_host: Hostname,
@@ -671,7 +671,7 @@ class JusufSshJobLauncher(SshJobLauncher):
         compute_session_id: uuid.UUID,
         allow_local_fs: bool,
         ebrains_oidc_client: OidcClient,
-        ebrains_user_token: UserToken,
+        ebrains_user_token: AccessToken,
         max_duration_minutes: Minutes,
         session_url: Url,
         session_allocator_host: Hostname,
@@ -791,7 +791,7 @@ class CscsSshJobLauncher(SshJobLauncher):
         compute_session_id: uuid.UUID,
         allow_local_fs: bool,
         ebrains_oidc_client: OidcClient,
-        ebrains_user_token: UserToken,
+        ebrains_user_token: AccessToken,
         max_duration_minutes: Minutes,
         session_url: Url,
         session_allocator_host: Hostname,

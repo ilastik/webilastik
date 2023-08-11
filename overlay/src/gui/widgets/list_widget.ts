@@ -136,10 +136,13 @@ export class DataSourceListWidget extends Div{
                     })
                     if(datasourcesResult instanceof Error){
                         const errorMessage = datasourcesResult.message;
-                        await PopupWidget.AsyncDialog<void>({title: "Error", fillInPopup: (params) => {
-                            new Paragraph({parentElement: params.popup.element, innerText: errorMessage});
-                            new ButtonWidget({parentElement: params.popup.element, contents: "Ok", onClick: () => {params.resolve()}})
-                        }})
+                        await PopupWidget.WaitPopup<void>({
+                            title: "Error",
+                            operation: (popup) => new Promise(resolve => {
+                                new Paragraph({parentElement: popup.element, innerText: errorMessage});
+                                new ButtonWidget({parentElement: popup.element, contents: "Ok", onClick: () => resolve()})
+                            })
+                        })
                         continue
                     }
                     datasourcesResult.forEach(ds => this.listWidget.push(ds))

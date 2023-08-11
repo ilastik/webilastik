@@ -9,7 +9,8 @@ from typing import ClassVar, Optional, Sequence
 from cryptography.fernet import Fernet
 from webilastik.libebrains.oidc_client import OidcClient
 
-from webilastik.libebrains.user_token import AccessToken, UserToken
+from webilastik.libebrains.user_token import AccessToken, HbpIamPublicKey
+from webilastik.server.rpc.dto import EbrainsAccessTokenDto
 from webilastik.utility import Hostname, Minutes, Username
 from webilastik.utility.url import Url
 
@@ -192,7 +193,7 @@ class WorkflowConfig(WebilastikConfig):
         scratch_dir: PurePosixPath,
         ebrains_oidc_client: OidcClient,
 
-        ebrains_user_token: UserToken,
+        ebrains_user_token: AccessToken,
         max_duration_minutes: Minutes,
         listen_socket: Path,
         session_url: Url,
@@ -206,7 +207,7 @@ class WorkflowConfig(WebilastikConfig):
         )
         self.allow_local_fs = allow_local_fs
         self.scratch_dir = scratch_dir
-        self.ebrains_user_token: UserToken = ebrains_user_token
+        self.ebrains_user_token: AccessToken = ebrains_user_token
         self.max_duration_minutes = max_duration_minutes
         self.listen_socket = listen_socket
         self.session_url = session_url
@@ -229,7 +230,7 @@ class WorkflowConfig(WebilastikConfig):
         scratch_dir: Optional[PurePosixPath] = None,
         ebrains_oidc_client: Optional[OidcClient] = None,
 
-        ebrains_user_token: Optional[UserToken] = None,
+        ebrains_user_token: Optional[AccessToken] = None,
         max_duration_minutes: Optional[Minutes] = None,
         listen_socket: Optional[Path] = None,
         session_url: Optional[Url] = None,
@@ -248,12 +249,16 @@ class WorkflowConfig(WebilastikConfig):
                 EBRAINS_USER_REFRESH_TOKEN,
                 help_text="The raw string for an ebrains user refresh token, retrieved from ebrains iam",
             )
-            access_token_result = AccessToken.from_raw_token_sync(raw_user_access_token)
+            checking_key_result = HbpIamPublicKey.get_sync()
+            if isinstance(checking_key_result, Exception):
+                raise checking_key_result
+            access_token_result = AccessToken.from_dto(
+                EbrainsAccessTokenDto(access_token=raw_user_access_token, refresh_token=raw_user_refresh_token),
+                checking_key=checking_key_result,
+            )
             if isinstance(access_token_result, Exception):
                 raise access_token_result
-            if access_token_result is None:
-                raise Exception("Could not get an access token from config")
-            ebrains_user_token = UserToken(access_token=access_token_result, refresh_token=raw_user_refresh_token or None)
+            ebrains_user_token = access_token_result
         return WorkflowConfig(
             allow_local_fs=allow_local_fs if allow_local_fs is not None else read_bool_env_var(
                 name= WEBILASTIK_ALLOW_LOCAL_FS,
@@ -299,7 +304,7 @@ class WorkflowConfig(WebilastikConfig):
             *super().to_env_vars(),
             EnvVar(name=WEBILASTIK_ALLOW_LOCAL_FS, value=str(self.allow_local_fs).lower()),
             EnvVar(name=WEBILASTIK_SCRATCH_DIR, value=str(self.scratch_dir)),
-            EnvVar(name=EBRAINS_USER_ACCESS_TOKEN, value=self.ebrains_user_token.access_token.raw_token),
+            EnvVar(name=EBRAINS_USER_ACCESS_TOKEN, value=self.ebrains_user_token.raw_token),
             EnvVar(name=EBRAINS_USER_REFRESH_TOKEN, value=self.ebrains_user_token.refresh_token or ""),
             EnvVar(name=WEBILASTIK_JOB_MAX_DURATION_MINUTES, value=str(self.max_duration_minutes.to_int())),
             EnvVar(name=WEBILASTIK_JOB_LISTEN_SOCKET, value=str(self.listen_socket)),

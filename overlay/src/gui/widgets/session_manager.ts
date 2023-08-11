@@ -1,7 +1,7 @@
 import { IViewerDriver } from "../..";
 import { Filesystem, HpcSiteName, Session, StartupConfigs } from "../../client/ilastik";
-import { CreateComputeSessionParamsDto, GetComputeSessionStatusParamsDto, GetFileSystemAndPathFromUrlParamsDto } from "../../client/dto";
-import { createElement, createInputParagraph, secondsToTimeDeltaString } from "../../util/misc";
+import { CreateComputeSessionParamsDto, EbrainsAccessTokenDto, GetComputeSessionStatusParamsDto, GetFileSystemAndPathFromUrlParamsDto } from "../../client/dto";
+import { createElement, /*createInputParagraph, */secondsToTimeDeltaString } from "../../util/misc";
 import { Path, Url } from "../../util/parsed_url";
 import { ReferencePixelClassificationWorkflowGui } from "../reference_pixel_classification_workflow";
 import { CollapsableWidget } from "./collapsable_applet_gui";
@@ -15,6 +15,7 @@ import { CssClasses } from "../css_classes";
 export class SessionManagerWidget{
     element: HTMLElement
     session: undefined | Session | Promise<Session | Error>
+    token: EbrainsAccessTokenDto | undefined;
     workflow?: ReferencePixelClassificationWorkflowGui
 
     private remainingTimeIntervalID: number = 0;
@@ -92,16 +93,17 @@ export class SessionManagerWidget{
                 parentElement: undefined,
                 onClick: async () => {
                     this.listSessionsButton.disabled = true
-                    let ilastikUrl = await PopupWidget.WaitPopup({
-                        title: "Authenticating...",
-                        operation: this.ensureLoggedInAndGetIlastikUrl()
-                    })
-                    if(!ilastikUrl){
+                    let ilastikUrlAndTokenResult = await this.getIlastikUrlAndToken()
+                    if(ilastikUrlAndTokenResult instanceof Error){
+                        new ErrorPopupWidget({message: ilastikUrlAndTokenResult.message})
                         this.listSessionsButton.disabled = false
                         return
                     }
+                    let {ilastikUrl, token} = ilastikUrlAndTokenResult;
+
                     await SessionsPopup.create({
                         ilastikUrl,
+                        token,
                         hpc_site: this.hpcSiteInput.value,
                         onSessionClosed: (status) => {
                             if(this.session instanceof Session && this.session.sessionUrl.equals(Url.fromDto(status.session_url))){
@@ -151,16 +153,17 @@ export class SessionManagerWidget{
                 return
             }
             this.enableSessionAccquisitionControls({enabled: false})
-            let ilastikUrl = await PopupWidget.WaitPopup({
-                title: "Authenticating...",
-                operation: this.ensureLoggedInAndGetIlastikUrl()
-            });
-            if(!ilastikUrl){
-                return this.enableSessionAccquisitionControls({enabled: true})
+            let ilastikUrlAndTokenResult = await this.getIlastikUrlAndToken()
+            if(ilastikUrlAndTokenResult instanceof Error){
+                new ErrorPopupWidget({message: ilastikUrlAndTokenResult.message})
+                this.enableSessionAccquisitionControls({enabled: true})
+                return
             }
+            let {ilastikUrl, token} = ilastikUrlAndTokenResult;
             let sessionDurationMinutes = this.sessionDurationInput.value
             if(sessionDurationMinutes === undefined){
                 new ErrorPopupWidget({message: `Bad session duration: ${this.sessionDurationInput.value}`})
+                this.enableSessionAccquisitionControls({enabled: true})
                 return
             }
             this.logMessage("Creating session....")
@@ -168,6 +171,7 @@ export class SessionManagerWidget{
             this.sessionIdField.value = ""
             const sessionPromise = this.session = Session.create({
                 ilastikUrl,
+                token,
                 timeout_minutes: timeoutMinutes,
                 rpcParams: new CreateComputeSessionParamsDto({
                     hpc_site: this.hpcSiteInput.value,
@@ -262,25 +266,23 @@ export class SessionManagerWidget{
         if(timeoutMinutes === undefined){
             return
         }
-        const ilastikUrl = await PopupWidget.WaitPopup({
-            title: "Authenticating...",
-            operation: this.ensureLoggedInAndGetIlastikUrl()
-        });
-        if(!ilastikUrl){
-            this.enableSessionAccquisitionControls({enabled: true})
-            new ErrorPopupWidget({message: `Bad ilasitk API url`})
+        let ilastikUrlAndTokenResult = await this.getIlastikUrlAndToken()
+        if(ilastikUrlAndTokenResult instanceof Error){
+            new ErrorPopupWidget({message: ilastikUrlAndTokenResult.message})
             return
         }
+        let {ilastikUrl, token} = ilastikUrlAndTokenResult;
         if(this.session){
             new ErrorPopupWidget({message: `Could not join session ${sessionId} because there's already a sesison runnig`})
             return
         }
         const startupConfigs = SessionManagerWidget.uiGetUrlConfigs()
-        this.session = this.doRejoinSession({sessionId, timeoutMinutes, ilastikUrl, startupConfigs})
+        this.session = this.doRejoinSession({sessionId, timeoutMinutes, ilastikUrl, token,startupConfigs})
     }
 
     private doRejoinSession = async (params: {
         sessionId: string,
+        token: EbrainsAccessTokenDto,
         timeoutMinutes: number,
         ilastikUrl: Url,
         startupConfigs: StartupConfigs,
@@ -289,6 +291,7 @@ export class SessionManagerWidget{
         this.logMessage("Joining session....")
         let sessionResult = await Session.load({
             ilastikUrl: params.ilastikUrl,
+            token: params.token,
             getStatusRpcParams: new GetComputeSessionStatusParamsDto({
                 compute_session_id: params.sessionId,
                 hpc_site: this.hpcSiteInput.value,
@@ -353,15 +356,6 @@ export class SessionManagerWidget{
         this.messagesContainer.element.scrollTop = this.messagesContainer.element.scrollHeight
     }
 
-    private getIlastikUrl(): Url | undefined{
-        const url = this.ilastikUrlInput.value;
-        if(url === undefined){
-            new ErrorPopupWidget({message: `Bad ilastik API url`})
-            return
-        }
-        return url
-    }
-
     private getWaitTimeout(): number | undefined{
         const timeoutMinutes = this.timeoutInput.value
         if(timeoutMinutes === undefined){
@@ -371,38 +365,27 @@ export class SessionManagerWidget{
         return timeoutMinutes
     }
 
-    private async ensureLoggedInAndGetIlastikUrl(): Promise<Url | undefined>{
-        let ilastikUrl = this.getIlastikUrl()
-        if(ilastikUrl === undefined){
-            return undefined
+    private async getIlastikUrlAndToken(): Promise<{ilastikUrl: Url, token: EbrainsAccessTokenDto} | Error>{
+        const maybeIlastikUrl = this.ilastikUrlInput.value
+        if(maybeIlastikUrl === undefined){
+            return new Error("Could not get an ilastik url")
         }
-        let response = await Session.check_login({ilastikUrl})
-        if(response instanceof Error){
-            new ErrorPopupWidget({message: `Could not login: ${response.message}`})
-            return
+        const ilastikUrl = maybeIlastikUrl;
+        if(this.token){ //FIXME: expired tokens and such?
+            return {ilastikUrl, token: this.token}
         }
-        if(response.logged_in === true){
-            return ilastikUrl
-        }
-
-        let popup = new PopupWidget("Not logged in")
-        const loginUrl = ilastikUrl.joinPath("api/login_then_close")
-        let loginLink = createElement({
-            tagName: "a",
-            parentElement: createElement({tagName: "p", parentElement: popup.element}),
-            innerHTML: "Login on ebrains and try again.",
-            onClick: () => popup.destroy()
+        let tokenResult = await PopupWidget.WaitPopup<EbrainsAccessTokenDto | Error>({
+            title: "Login",
+            operation: async (popupWidget) => {
+                new Paragraph({parentElement: popupWidget.element, innerText: "Waiting for login on ebrains tab..."})
+                return Session.getEbrainsUserToken({ilastikUrl})
+            }
         })
-        loginLink.target = "_blank"
-        loginLink.rel = "noopener noreferrer"
-        loginLink.href = loginUrl.raw
-
-        createInputParagraph({inputType: "button", parentElement: popup.element, value: "close", onClick: () => {
-            popup.destroy()
-        }})
-
-        window.open(loginUrl.raw)
-        return undefined
+        if(tokenResult instanceof Error){
+            return tokenResult
+        }
+        this.token = tokenResult
+        return {ilastikUrl, token: tokenResult}
     }
 
     private handleSessionFailed(error: Error){
@@ -424,6 +407,10 @@ export class SessionManagerWidget{
         defaultBucketPath?: Path,
         defaultOutputPathPattern?: string,
     }){
+        (async () => {
+            const token = sessionResult.token instanceof Promise ? await sessionResult.token : sessionResult.token;
+            this.viewerDriver.setUserToken(token) //FIXME: awkward place to do this. Also, refresh??
+        })()
         this.sessionIdField.value = sessionResult.sessionUrl.raw
 
         this.enableSessionAccquisitionControls({enabled: false})

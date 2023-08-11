@@ -475,16 +475,49 @@ export function secondsToTimeDeltaString(seconds: number): string{
     return components.join(":")
 }
 
-export async function fetchJson(...params: Parameters<typeof fetch>): Promise<JsonValue | Error>{
+export class TimeoutError extends Error{
+    public readonly __class_name__ = "TimeoutError"
+}
+export class PermissionError extends Error{
+    public readonly __class_name__ = "PermissionError"
+}
+
+export class RequestError extends Error{
+    public readonly __class_name__ = "RequestError"
+    public readonly status: number;
+    constructor(params: {message: string, status: number}){
+        super(params.message)
+        this.status = params.status
+    }
+}
+
+export class UnauthorizedRequestError extends Error{
+    public readonly __class_name__ = "UnauthorizedRequestError"
+    constructor(message: string){
+        super(message)
+    }
+}
+
+export class RequestCrashed extends Error{
+    public readonly __class_name__ = "RequestCrashed"
+}
+
+export type RequestFailure = RequestError | UnauthorizedRequestError | RequestCrashed;
+
+export async function fetchJson(...params: Parameters<typeof fetch>): Promise<JsonValue | RequestFailure>{
     try{
         let response = await fetch(...params)
+        const status = response.status
+        if(status === 401){
+            return new UnauthorizedRequestError(await response.text())
+        }
         if(!response.ok){
-            return Error(await response.text())
+            return new RequestError({message: await response.text(), status: response.status})
         }
         let payload = await response.json()
         return payload
     }catch(e: unknown){
-        return Error(`${e}`)
+        return new RequestCrashed(`${e}`)
     }
 }
 

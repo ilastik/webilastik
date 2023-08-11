@@ -32,7 +32,7 @@ def _requests_from_data_proxy(
         method=method,
         url=url,
         data=data,
-        headers=global_user_login.get_global_login_token().as_auth_header(),
+        headers=global_user_login.get_global_login_token().as_ebrains_auth_header(),
     )
     if isinstance(response_result, tuple):
         return response_result
