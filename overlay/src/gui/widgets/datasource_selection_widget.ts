@@ -105,6 +105,7 @@ export class DataSourceSelectionWidget{
         const datasources = datasourcesResult
         return PopupWidget.WaitPopup({
             title: "Select resolutions to open",
+            withSpinner: false,
             operation: (popup: PopupWidget) => new Promise<FsDataSource[]>(resolve => {
 
                 let datasourcesSelect = new MultiSelect<FsDataSource>({

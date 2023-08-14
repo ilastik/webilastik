@@ -370,6 +370,7 @@ export class SessionManagerWidget{
         }
         let tokenResult = await PopupWidget.WaitPopup<EbrainsAccessTokenDto | Error>({
             title: "Login",
+            withSpinner: false,
             operation: async (popupWidget) => {
                 new Paragraph({parentElement: popupWidget.element, innerText: "Waiting for login on ebrains tab..."})
                 return Session.getEbrainsUserToken({ilastikUrl})
