@@ -241,3 +241,9 @@ export class ImageWidget extends Widget<"img">{
         this.element.src = params.src.raw
     }
 }
+
+export class Legend extends Widget<"legend">{
+    constructor(params: WidgetParams){
+        super({...params, tagName: "legend"})
+    }
+}
