@@ -29,7 +29,7 @@ export class DataSourceSelectionWidget{
         help: string[],
     }){
         this.element = new CollapsableWidget({
-            display_name: "Data Sources", parentElement: params.parentElement, help: params.help
+            display_name: "Training Images", parentElement: params.parentElement, help: params.help
         }).element
         this.session = params.session
         this.defaultBucketName = params.defaultBucketName
