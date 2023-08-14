@@ -3,30 +3,37 @@ import { CssClasses } from "../css_classes";
 import { Button } from "./input_widget";
 import { PopupWidget } from "./popup";
 import { TitleBar } from "./title_bar";
+import { Span, Widget } from "./widget";
 
 export class CollapsableWidget{
     public readonly container: HTMLDetailsElement;
     public readonly element: HTMLDivElement;
     public readonly summary: TitleBar<"summary">;
-    public readonly help_button?: HTMLInputElement;
+    public readonly extraInfoSpan: Span
+    public readonly helpButton?: Button<"button">;
     public constructor({display_name, parentElement, help, open}:{
         display_name: string, parentElement: HTMLElement, help?: string[], open?: boolean
     }){
         this.container = createElement({tagName: "details", parentElement, cssClasses: ["ItkCollapsableApplet"]})
+        const widgetsRight: Array<Widget<any>> = [
+            this.extraInfoSpan = new Span({parentElement: undefined, cssClasses: [CssClasses.ItkCollapsableAppletExtraInfoSpan]})
+        ]
+        if(help !== undefined){
+            this.helpButton = new Button({
+                text: "?",
+                inputType: "button",
+                parentElement: undefined,
+                onClick: () => {
+                    PopupWidget.OkPopup({title: `Help: ${display_name}`, paragraphs: help})
+                }
+            })
+            widgetsRight.push(this.helpButton)
+        }
         this.summary = new TitleBar({
             tagName: "summary",
             parentElement: this.container,
             text: display_name,
-            widgetsRight: help === undefined ? [] : [
-                new Button({
-                    text: "?",
-                    inputType: "button",
-                    parentElement: undefined,
-                    onClick: () => {
-                        PopupWidget.OkPopup({title: `Help: ${display_name}`, paragraphs: help})
-                    }
-                })
-            ]
+            widgetsRight,
         });
         this.container.open = open === undefined ? false : open
         this.element = createElement({tagName: "div", parentElement: this.container, cssClasses: [CssClasses.ItkAppletContents]})

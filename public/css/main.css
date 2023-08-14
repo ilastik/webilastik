@@ -102,6 +102,13 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
     cursor: pointer;
 }
 
+.ItkCollapsableAppletExtraInfoSpan{
+    color: grey;
+    font-weight: normal;
+    margin-left: 1em;
+    margin-right: 0.1em;
+}
+
 .ItkOverlayControlsHeader{
     font-size: calc(var(--default-font-size) + 1px);
     color: white;
@@ -376,4 +383,18 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
 .ItkLaneWidget label{
     font-size: calc(var(--default-font-size) - 1px);
     margin-left: 2em;
+}
+
+.ItkSessionManagementAdvancedOptions{
+    padding-left: 0.3em;
+    padding-right: 0.3em;
+    margin-top: 0.5em;
+    border: solid 1px grey;
+    background-color: rgba(0,0,0,0.1);
+}
+.ItkSessionManagementAdvancedOptions > summary{
+    margin-left: 0;
+}
+.ItkSessionManagementAdvancedOptions > *{
+    margin-left: 1em;;
 }

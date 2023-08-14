@@ -7,7 +7,7 @@ import { ReferencePixelClassificationWorkflowGui } from "../reference_pixel_clas
 import { CollapsableWidget } from "./collapsable_applet_gui";
 import { ErrorPopupWidget, PopupWidget } from "./popup";
 import { SessionsPopup } from "./sessions_list_widget";
-import { Form, Label, Paragraph, Span } from "./widget";
+import { Details, Form, Label, Paragraph, Span, Summary } from "./widget";
 import { Button, Select } from "./input_widget";
 import { TextInput, NumberInput, UrlInput } from "./value_input_widget";
 import { CssClasses } from "../css_classes";
@@ -19,7 +19,6 @@ export class SessionManagerWidget{
     workflow?: ReferencePixelClassificationWorkflowGui
 
     private remainingTimeIntervalID: number = 0;
-    private reminaningTimeContainer: Paragraph
     private remainingTimeDisplay: TextInput
     ilastikUrlInput: UrlInput;
     timeoutInput: NumberInput;
@@ -37,6 +36,7 @@ export class SessionManagerWidget{
     private warnedUserOfImpendingClose = false
     hpcSiteInput: Select<HpcSiteName>;
     private sessionRejoinForm: Form;
+    private readonly container: CollapsableWidget;
 
     public static uiGetUrlConfigs(): StartupConfigs{
         let startupConfigs = StartupConfigs.tryFromWindowLocation()
@@ -53,7 +53,7 @@ export class SessionManagerWidget{
     }){
         this.workflowContainer = workflow_container
         this.viewerDriver = viewer_driver
-        this.element = new CollapsableWidget({
+        this.container = new CollapsableWidget({
             display_name: "Session Management",
             parentElement,
             open: true,
@@ -65,69 +65,40 @@ export class SessionManagerWidget{
                 "and click 'Create' to create a new compute session. Eventually the compute session will be allocated, " +
                 "opening up the other workflow widgets."),
 
-                ("You can also leave a session and rejoin it later if it is still running. To so so, just copy the session " +
+                ("You can also detach from a session and rejoin it later if it is still running. To so so, just copy the session " +
                 "URL from 'Rejoin Session' below and paste it in any other browser tab that is running webilastik."),
 
                 ("To close a session, click the 'Close Session' button. This will terminate the entire session and prevent " +
                 "your account from being charged more node-hours than you need for your work."),
             ]
-        }).element;
-        this.element.classList.add("ItkLauncherWidget")
-
-        new Paragraph({parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
-            new Label({parentElement: undefined, innerText: "Ilastik API URL: "}),
-            this.ilastikUrlInput = new UrlInput({parentElement: undefined, required: true, value: ilastikUrl}),
-        ]})
-
-        new Paragraph({parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
-            new Label({parentElement: undefined, innerText: "HPC site: "}),
-            this.hpcSiteInput = new Select<HpcSiteName>({
-                parentElement: undefined,
-                popupTitle: "Select an HPC Site",
-                options: hpcSiteNames,
-                renderer: (site) => new Span({parentElement: undefined, innerText: site}),
-            }),
-            this.listSessionsButton = new Button({
-                inputType: "button",
-                text: "List Sessions",
-                parentElement: undefined,
-                onClick: async () => {
-                    this.listSessionsButton.disabled = true
-                    let ilastikUrlAndTokenResult = await this.getIlastikUrlAndToken()
-                    if(ilastikUrlAndTokenResult instanceof Error){
-                        new ErrorPopupWidget({message: ilastikUrlAndTokenResult.message})
-                        this.listSessionsButton.disabled = false
-                        return
-                    }
-                    let {ilastikUrl, token} = ilastikUrlAndTokenResult;
-
-                    await SessionsPopup.create({
-                        ilastikUrl,
-                        token,
-                        hpc_site: this.hpcSiteInput.value,
-                        onSessionClosed: (status) => {
-                            if(this.session instanceof Session && this.session.sessionUrl.equals(Url.fromDto(status.session_url))){
-                                this.onLeaveSession()
-                            }
-                        },
-                        rejoinSession: this.session ? undefined : (sessionId) => {
-                            this.sessionIdField.value = sessionId;
-                            this.rejoinSession(sessionId)
-                        }
-                    });
-                    this.listSessionsButton.disabled = false
-                }
-            }),
-        ]})
-
-        new Paragraph({
-            parentElement: this.element,
-            cssClasses: [CssClasses.ItkInputParagraph],
-            children: [
-                new Label({parentElement: undefined, innerText: "Timeout (minutes): "}),
-                this.timeoutInput = new NumberInput({parentElement: undefined, value: 15, min: 1}),
-            ]
         })
+        this.element = this.container.element;
+
+        new Details({parentElement: this.element, cssClasses: [CssClasses.ItkSessionManagementAdvancedOptions], children: [
+            new Summary({parentElement: undefined, innerText: "Advanced"}),
+            new Paragraph({parentElement: undefined, cssClasses: [CssClasses.ItkInputParagraph], children: [
+                new Label({parentElement: undefined, innerText: "Ilastik API URL: "}),
+                this.ilastikUrlInput = new UrlInput({parentElement: undefined, required: true, value: ilastikUrl}),
+            ]}),
+            new Paragraph({parentElement: undefined, cssClasses: [CssClasses.ItkInputParagraph], children: [
+                new Label({parentElement: undefined, innerText: "HPC site: "}),
+                this.hpcSiteInput = new Select<HpcSiteName>({
+                    parentElement: undefined,
+                    popupTitle: "Select an HPC Site",
+                    options: hpcSiteNames,
+                    renderer: (site) => new Span({parentElement: undefined, innerText: site}),
+                }),
+            ]}),
+            new Paragraph({
+                parentElement: undefined,
+                cssClasses: [CssClasses.ItkInputParagraph],
+                children: [
+                    new Label({parentElement: undefined, innerText: "Timeout (minutes): "}),
+                    this.timeoutInput = new NumberInput({parentElement: undefined, value: 15, min: 1}),
+                ]
+            })
+        ]})
+
 
         createElement({tagName: "h3", parentElement: this.element, innerText: "Create Session"})
         const sessionCreationForm = new Form({parentElement: this.element, children: [
@@ -135,13 +106,11 @@ export class SessionManagerWidget{
                 parentElement: this.element,
                 cssClasses: [CssClasses.ItkInputParagraph],
                 children: [
-                    new Label({parentElement: undefined, innerText: "Session Duration (minutes): "}),
+                    new Label({parentElement: undefined, innerText: "Duration (minutes): "}),
                     this.sessionDurationInput = new NumberInput({parentElement: undefined, value: 60, min: 5, required: true}),
+                    this.createSessionButton = new Button({parentElement: undefined, inputType: "submit", text: "Create"}),
                 ]
             }),
-            new Paragraph({parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
-                this.createSessionButton = new Button({parentElement: undefined, inputType: "submit", text: "Create Session"}),
-            ]})
         ]})
         sessionCreationForm.preventSubmitWith(async () => {
             if(this.session){
@@ -214,10 +183,8 @@ export class SessionManagerWidget{
             new Paragraph({parentElement: undefined, cssClasses: [CssClasses.ItkInputParagraph], children: [
                 new Label({parentElement: undefined, innerText: "Session ID :"}),
                 this.sessionIdField = new TextInput({parentElement: undefined, value: undefined, required: true, }),
+                this.rejoinSessionButton = new Button({inputType: "submit", text: "Rejoin", parentElement: undefined}),
             ]}),
-            new Paragraph({parentElement: this.element, children: [
-                this.rejoinSessionButton = new Button({inputType: "submit", text: "Rejoin Session", parentElement: undefined})
-            ]})
         ]});
         this.sessionRejoinForm.preventSubmitWith(() => {
             const sessionId = this.sessionIdField.value
@@ -227,16 +194,51 @@ export class SessionManagerWidget{
             }
             this.rejoinSession(sessionId)
         })
+        new Paragraph({parentElement: this.element, children: [
+            this.listSessionsButton = new Button({
+                inputType: "button",
+                text: "List Sessions",
+                parentElement: undefined,
+                onClick: async () => {
+                    this.listSessionsButton.disabled = true
+                    let ilastikUrlAndTokenResult = await this.getIlastikUrlAndToken()
+                    if(ilastikUrlAndTokenResult instanceof Error){
+                        new ErrorPopupWidget({message: ilastikUrlAndTokenResult.message})
+                        this.listSessionsButton.disabled = false
+                        return
+                    }
+                    let {ilastikUrl, token} = ilastikUrlAndTokenResult;
 
+                    await SessionsPopup.create({
+                        ilastikUrl,
+                        token,
+                        hpc_site: this.hpcSiteInput.value,
+                        onSessionClosed: (status) => {
+                            if(this.session instanceof Session && this.session.sessionUrl.equals(Url.fromDto(status.session_url))){
+                                this.onLeaveSession()
+                            }
+                        },
+                        rejoinSession: this.session ? undefined : (sessionId) => {
+                            this.sessionIdField.value = sessionId;
+                            this.rejoinSession(sessionId)
+                        }
+                    });
+                    this.listSessionsButton.disabled = false
+                }
+            }),
+        ]})
 
 
         this.messagesContainerLabel = new Label({parentElement: this.element, innerText: "Log:", show: false});
         this.messagesContainer = new Paragraph({parentElement: this.element, cssClasses: [CssClasses.ItkLogContainer], show: false})
 
+        createElement({tagName: "h3", parentElement: this.element, innerText: "Current Session"})
         new Paragraph({parentElement: this.element, children: [
+            new Label({parentElement: undefined, innerText: " Time remaining: "}),
+            this.remainingTimeDisplay = new TextInput({parentElement: undefined, disabled: true, value: "no session attached"}),
             this.closeSessionButton = new Button({
                 inputType: "button",
-                text: "Close Session",
+                text: "Terminate",
                 parentElement: undefined,
                 onClick: () => this.closeSession(),
                 disabled: true,
@@ -244,20 +246,12 @@ export class SessionManagerWidget{
             }),
             this.leaveSessionButton = new Button({
                 inputType: "button",
-                text: "Leave Session",
+                text: "Detach",
                 parentElement: undefined,
                 onClick: this.onLeaveSession,
                 disabled: true,
                 title: "Leaves session running on the server",
             }),
-            this.reminaningTimeContainer = new Paragraph({
-                parentElement: undefined,
-                show: false,
-                children: [
-                    new Label({parentElement: undefined, innerText: " Time remaining: "}),
-                    this.remainingTimeDisplay = new TextInput({parentElement: undefined, disabled: true, value: ""}),
-                ]
-            })
         ]});
     }
 
@@ -426,19 +420,18 @@ export class SessionManagerWidget{
             outputPathPattern: defaultOutputPathPattern,
         })
         this.sessionIdField.value = sessionResult.sessionId
-        this.reminaningTimeContainer.show(true)
 
         this.warnedUserOfImpendingClose = false
         window.clearInterval(this.remainingTimeIntervalID)
         this.remainingTimeIntervalID = window.setInterval(() => {
             const startTime = sessionResult.startTime
             if(startTime === undefined){
-                this.remainingTimeDisplay.value = "Not started yet"
+                this.updateRemainingTimeDisplay("Not started yet")
                 return
             }
             const ellapsedTimeMs = new Date().getTime() - startTime.getTime()
             const remainingTimeSec = (sessionResult.timeLimitMinutes * 60 - ellapsedTimeMs / 1000)
-            this.remainingTimeDisplay.value = secondsToTimeDeltaString(Math.floor(remainingTimeSec))
+            this.updateRemainingTimeDisplay(secondsToTimeDeltaString(Math.floor(remainingTimeSec)))
             if(!this.warnedUserOfImpendingClose && remainingTimeSec < 3 * 60){
                 this.warnedUserOfImpendingClose = true
                 PopupWidget.OkPopup({title: "Session is about to close", paragraphs: ["You should save your project"]})
@@ -450,6 +443,10 @@ export class SessionManagerWidget{
         window.removeEventListener("beforeunload", this.onUnload)
         window.addEventListener("beforeunload", this.onUnload);
         this.enableSessionDismissalControls({enabled: true})
+    }
+
+    private updateRemainingTimeDisplay(value: string){
+        this.container.extraInfoSpan.setInnerText(this.remainingTimeDisplay.value = value)
     }
 
     private onUnload = (event: BeforeUnloadEvent) => {
@@ -469,7 +466,7 @@ export class SessionManagerWidget{
         session?.closeWebsocket()
         this.session = undefined
         window.clearInterval(this.remainingTimeIntervalID)
-        this.reminaningTimeContainer.show(false)
+        this.updateRemainingTimeDisplay("no session attached")
         this.workflow?.destroy()
         window.removeEventListener("beforeunload", this.onUnload);
         this.enableSessionDismissalControls({enabled: false})

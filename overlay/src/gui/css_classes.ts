@@ -51,4 +51,6 @@ export enum CssClasses{
     ItkLaneLayerWidget = "ItkLaneLayerWidget",
     ItkButtonDepressed = "ItkButtonDepressed",
     ItkAppletContents = "ItkAppletContents",
+    ItkSessionManagementAdvancedOptions = "ItkSessionManagementAdvancedOptions",
+    ItkCollapsableAppletExtraInfoSpan = "ItkCollapsableAppletExtraInfoSpan",
 }
