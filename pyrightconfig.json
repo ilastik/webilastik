@@ -14,6 +14,6 @@
   "extraPaths": ["executor_getters/default/", "caching/redis_cache/", "tests/"],
   "reportUnusedCallResult": "error",
   "reportUnusedVariable": "warning",
-  "pythonVersion": "3.8",
+  "pythonVersion": "3.9",
   "pythonPlatform": "Linux"
 }
