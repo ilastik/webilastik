@@ -19,7 +19,6 @@ export class SessionManagerWidget{
     workflow?: ReferencePixelClassificationWorkflowGui
 
     private remainingTimeIntervalID: number = 0;
-    private remainingTimeDisplay: TextInput
     ilastikUrlInput: UrlInput;
     timeoutInput: NumberInput;
     createSessionButton: Button<"button">;
@@ -234,11 +233,9 @@ export class SessionManagerWidget{
 
         createElement({tagName: "h3", parentElement: this.element, innerText: "Current Session"})
         new Paragraph({parentElement: this.element, children: [
-            new Label({parentElement: undefined, innerText: " Time remaining: "}),
-            this.remainingTimeDisplay = new TextInput({parentElement: undefined, disabled: true, value: "no session attached"}),
             this.closeSessionButton = new Button({
                 inputType: "button",
-                text: "Terminate",
+                text: "⏻ Terminate",
                 parentElement: undefined,
                 onClick: () => this.closeSession(),
                 disabled: true,
@@ -246,7 +243,7 @@ export class SessionManagerWidget{
             }),
             this.leaveSessionButton = new Button({
                 inputType: "button",
-                text: "Detach",
+                text: "↥ Detach",
                 parentElement: undefined,
                 onClick: this.onLeaveSession,
                 disabled: true,
@@ -447,7 +444,7 @@ export class SessionManagerWidget{
     }
 
     private updateRemainingTimeDisplay(value: string){
-        this.container.extraInfoSpan.setInnerText(this.remainingTimeDisplay.value = value)
+        this.container.extraInfoSpan.setInnerText(value)
     }
 
     private onUnload = (event: BeforeUnloadEvent) => {
