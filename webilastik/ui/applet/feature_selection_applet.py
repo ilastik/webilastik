@@ -2,7 +2,7 @@ import json
 from typing import Iterable, Optional, Tuple, Sequence, Set
 from ndstructs.utils.json_serializable import JsonObject, JsonValue
 from webilastik.datasource import DataSource
-from webilastik.server.rpc.dto import AddFeatureExtractorsParamsDto, FeatureSelectionAppletStateDto, MessageParsingError, RemoveFeatureExtractorsParamsDto
+from webilastik.server.rpc.dto import FeatureSelectionAppletStateDto, MessageParsingError, SetFeatureExtractorsParamsDto
 
 from webilastik.ui.applet import Applet, AppletOutput, CascadeOk, CascadeResult, UserCancelled, UserPrompt, applet_output, cascade
 from webilastik.features.ilp_filter import IlpFilter
@@ -31,11 +31,15 @@ class FeatureSelectionApplet(Applet):
     def feature_extractors(self) -> Sequence[IlpFilter]:
         return sorted(self._feature_extractors, key=lambda fe: (fe.__class__.__name__, fe.ilp_scale)) #FIXME
 
-    def _set_feature_extractors(self, user_prompt: UserPrompt, feature_extractors: Iterable[IlpFilter]) -> CascadeResult:
-        candidate_extractors = set(feature_extractors)
+    @cascade(refresh_self=True)
+    def set_feature_extractors(self, user_prompt: UserPrompt, feature_extractors: Iterable[IlpFilter]) -> CascadeResult:
+        self._feature_extractors = set(feature_extractors)
+        return CascadeOk()
+
+    def refresh(self, user_prompt: UserPrompt) -> CascadeResult:
         incompatible_extractors : Set[IlpFilter] = set()
 
-        for extractor in candidate_extractors:
+        for extractor in self._feature_extractors:
             for ds in self._in_datasources():
                 if not extractor.is_applicable_to(ds):
                     incompatible_extractors.add(extractor)
@@ -49,25 +53,7 @@ class FeatureSelectionApplet(Applet):
             options={"Drop features": True, "Abort change": False}
         ):
             return UserCancelled()
-        self._feature_extractors = candidate_extractors.difference(incompatible_extractors)
         return CascadeOk()
-
-    @cascade(refresh_self=True)
-    def add_feature_extractors(self, user_prompt: UserPrompt, feature_extractors: Iterable[IlpFilter]) -> CascadeResult:
-        return self._set_feature_extractors(
-            user_prompt=user_prompt,
-            feature_extractors=self._feature_extractors.union(feature_extractors)
-        )
-
-    @cascade(refresh_self=True)
-    def remove_feature_extractors(self, user_prompt: UserPrompt, feature_extractors: Iterable[IlpFilter]) -> CascadeResult:
-        return self._set_feature_extractors(
-            user_prompt=user_prompt,
-            feature_extractors=self._feature_extractors.difference(feature_extractors)
-        )
-
-    def refresh(self, user_prompt: UserPrompt) -> CascadeResult:
-        return self._set_feature_extractors(user_prompt=user_prompt, feature_extractors=self._feature_extractors)
 
 class WsFeatureSelectionApplet(WsApplet, FeatureSelectionApplet):
     def _get_json_state(self) -> JsonValue:
@@ -76,18 +62,11 @@ class WsFeatureSelectionApplet(WsApplet, FeatureSelectionApplet):
         ).to_json_value()
 
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
-        if method_name == "add_feature_extractors":
-            params = AddFeatureExtractorsParamsDto.from_json_value(arguments)
+        if method_name == "set_feature_extractors":
+            params = SetFeatureExtractorsParamsDto.from_json_value(arguments)
             if isinstance(params, MessageParsingError):
                 return UsageError(str(params)) #FIXME: this is a bug, not a usage error
-            return UsageError.check(self.add_feature_extractors(
-                user_prompt=user_prompt, feature_extractors=[IlpFilter.from_dto(m) for m in params.feature_extractors]
-            ))
-        if method_name == "remove_feature_extractors":
-            params = RemoveFeatureExtractorsParamsDto.from_json_value(arguments)
-            if isinstance(params, MessageParsingError):
-                return UsageError(str(params)) #FIXME: this is a bug, not a usage error
-            return UsageError.check(self.remove_feature_extractors(
+            return UsageError.check(self.set_feature_extractors(
                 user_prompt=user_prompt, feature_extractors=[IlpFilter.from_dto(m) for m in params.feature_extractors]
             ))
         raise ValueError(f"Invalid method name: '{method_name}'")

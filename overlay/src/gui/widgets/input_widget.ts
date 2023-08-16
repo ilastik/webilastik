@@ -43,6 +43,31 @@ export abstract class InputWidget<IT extends InputType> extends Widget<"input">{
     }
 }
 
+export class CheckboxWidget<T> extends InputWidget<"checkbox">{
+    public readonly valueWhenChecked: T;
+
+    constructor(params: Omit<InputWidgetParams, "onClick"> & {
+        checked?: boolean,
+        valueWhenChecked: T,
+    }){
+        super({...params, inputType: "checkbox"});
+        this.valueWhenChecked = params.valueWhenChecked
+        this.element.checked = params.checked === undefined ? false : params.checked
+    }
+    public get checked(): boolean{
+        return this.element.checked
+    }
+    public set checked(value: boolean){
+        this.element.checked = value
+    }
+    public get value(): T | undefined{
+        return this.checked ? this.valueWhenChecked : undefined
+    }
+    public toggle(){
+        this.checked = !this.checked
+    }
+}
+
 export class ButtonWidget extends Widget<"button">{
     constructor(params: Omit<WidgetParams, "onClick"> & {
         disabled?: boolean,

@@ -395,11 +395,7 @@ class FeatureSelectionAppletStateDto(DataTransferObject):
     feature_extractors: Tuple[IlpFeatureExtractorDto, ...]
 
 @dataclass
-class AddFeatureExtractorsParamsDto(DataTransferObject):
-    feature_extractors: Tuple[IlpFeatureExtractorDto, ...]
-
-@dataclass
-class RemoveFeatureExtractorsParamsDto(DataTransferObject):
+class SetFeatureExtractorsParamsDto(DataTransferObject):
     feature_extractors: Tuple[IlpFeatureExtractorDto, ...]
 
 #################################################################

@@ -3176,29 +3176,29 @@ export class FeatureSelectionAppletStateDto {
   }
 }
 
-export function parse_as_AddFeatureExtractorsParamsDto(
+export function parse_as_SetFeatureExtractorsParamsDto(
   value: JsonValue,
-): AddFeatureExtractorsParamsDto | MessageParsingError {
+): SetFeatureExtractorsParamsDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
-  if (valueObject["__class__"] != "AddFeatureExtractorsParamsDto") {
+  if (valueObject["__class__"] != "SetFeatureExtractorsParamsDto") {
     return new MessageParsingError(
-      `Could not deserialize ${JSON.stringify(valueObject)} as a AddFeatureExtractorsParamsDto`,
+      `Could not deserialize ${JSON.stringify(valueObject)} as a SetFeatureExtractorsParamsDto`,
     );
   }
   const temp_feature_extractors = parse_as_Tuple_of_IlpFeatureExtractorDto0_varlen__endof_(
     valueObject.feature_extractors,
   );
   if (temp_feature_extractors instanceof MessageParsingError) return temp_feature_extractors;
-  return new AddFeatureExtractorsParamsDto({
+  return new SetFeatureExtractorsParamsDto({
     feature_extractors: temp_feature_extractors,
   });
 }
-// Automatically generated via DataTransferObject for AddFeatureExtractorsParamsDto
+// Automatically generated via DataTransferObject for SetFeatureExtractorsParamsDto
 // Do not edit!
-export class AddFeatureExtractorsParamsDto {
+export class SetFeatureExtractorsParamsDto {
   public feature_extractors: Array<IlpFeatureExtractorDto>;
   constructor(_params: {
     feature_extractors: Array<IlpFeatureExtractorDto>;
@@ -3207,52 +3207,12 @@ export class AddFeatureExtractorsParamsDto {
   }
   public toJsonValue(): JsonObject {
     return {
-      "__class__": "AddFeatureExtractorsParamsDto",
+      "__class__": "SetFeatureExtractorsParamsDto",
       feature_extractors: this.feature_extractors.map((item) => item.toJsonValue()),
     };
   }
-  public static fromJsonValue(value: JsonValue): AddFeatureExtractorsParamsDto | MessageParsingError {
-    return parse_as_AddFeatureExtractorsParamsDto(value);
-  }
-}
-
-export function parse_as_RemoveFeatureExtractorsParamsDto(
-  value: JsonValue,
-): RemoveFeatureExtractorsParamsDto | MessageParsingError {
-  const valueObject = ensureJsonObject(value);
-  if (valueObject instanceof MessageParsingError) {
-    return valueObject;
-  }
-  if (valueObject["__class__"] != "RemoveFeatureExtractorsParamsDto") {
-    return new MessageParsingError(
-      `Could not deserialize ${JSON.stringify(valueObject)} as a RemoveFeatureExtractorsParamsDto`,
-    );
-  }
-  const temp_feature_extractors = parse_as_Tuple_of_IlpFeatureExtractorDto0_varlen__endof_(
-    valueObject.feature_extractors,
-  );
-  if (temp_feature_extractors instanceof MessageParsingError) return temp_feature_extractors;
-  return new RemoveFeatureExtractorsParamsDto({
-    feature_extractors: temp_feature_extractors,
-  });
-}
-// Automatically generated via DataTransferObject for RemoveFeatureExtractorsParamsDto
-// Do not edit!
-export class RemoveFeatureExtractorsParamsDto {
-  public feature_extractors: Array<IlpFeatureExtractorDto>;
-  constructor(_params: {
-    feature_extractors: Array<IlpFeatureExtractorDto>;
-  }) {
-    this.feature_extractors = _params.feature_extractors;
-  }
-  public toJsonValue(): JsonObject {
-    return {
-      "__class__": "RemoveFeatureExtractorsParamsDto",
-      feature_extractors: this.feature_extractors.map((item) => item.toJsonValue()),
-    };
-  }
-  public static fromJsonValue(value: JsonValue): RemoveFeatureExtractorsParamsDto | MessageParsingError {
-    return parse_as_RemoveFeatureExtractorsParamsDto(value);
+  public static fromJsonValue(value: JsonValue): SetFeatureExtractorsParamsDto | MessageParsingError {
+    return parse_as_SetFeatureExtractorsParamsDto(value);
   }
 }
 
