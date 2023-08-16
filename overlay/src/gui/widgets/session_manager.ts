@@ -11,6 +11,7 @@ import { Details, Form, Label, Paragraph, Span, Summary } from "./widget";
 import { Button, Select } from "./input_widget";
 import { TextInput, NumberInput, UrlInput } from "./value_input_widget";
 import { CssClasses } from "../css_classes";
+import { TabsWidget } from "./tabs_widget";
 
 export class SessionManagerWidget{
     element: HTMLElement
@@ -73,6 +74,71 @@ export class SessionManagerWidget{
         })
         this.element = this.container.element;
 
+        let sessionCreationForm: Form;
+
+        new TabsWidget({
+            parentElement: this.element,
+            tabBodyWidgets: new Map<string, Form>([
+                [
+                    "Create Session",
+                    sessionCreationForm = new Form({parentElement: undefined, children: [
+                        new Paragraph({
+                            parentElement: this.element,
+                            cssClasses: [CssClasses.ItkInputParagraph],
+                            children: [
+                                new Label({parentElement: undefined, innerText: "Duration (minutes): "}),
+                                this.sessionDurationInput = new NumberInput({parentElement: undefined, value: 60, min: 5, required: true}),
+                                this.createSessionButton = new Button({parentElement: undefined, inputType: "submit", text: "⏻ Create"}),
+                            ]
+                        }),
+                    ]})
+                ],
+                [
+                    "Rejoin Session",
+                    this.sessionRejoinForm = new Form({parentElement: undefined, children: [
+                        new Paragraph({parentElement: undefined, cssClasses: [CssClasses.ItkInputParagraph], children: [
+                            new Label({parentElement: undefined, innerText: "Session ID :"}),
+                            this.sessionIdField = new TextInput({parentElement: undefined, value: undefined, required: true, }),
+                            this.rejoinSessionButton = new Button({inputType: "submit", text: "↴ Rejoin", parentElement: undefined}),
+                        ]}),
+                        new Paragraph({parentElement: this.element, children: [
+                            this.listSessionsButton = new Button({
+                                inputType: "button",
+                                text: "List Sessions",
+                                parentElement: undefined,
+                                onClick: async () => {
+                                    this.listSessionsButton.disabled = true
+                                    let ilastikUrlAndTokenResult = await this.getIlastikUrlAndToken()
+                                    if(ilastikUrlAndTokenResult instanceof Error){
+                                        new ErrorPopupWidget({message: ilastikUrlAndTokenResult.message})
+                                        this.listSessionsButton.disabled = false
+                                        return
+                                    }
+                                    let {ilastikUrl, token} = ilastikUrlAndTokenResult;
+
+                                    await SessionsPopup.create({
+                                        ilastikUrl,
+                                        token,
+                                        hpc_site: this.hpcSiteInput.value,
+                                        onSessionClosed: (status) => {
+                                            if(this.session instanceof Session && this.session.sessionUrl.equals(Url.fromDto(status.session_url))){
+                                                this.onLeaveSession()
+                                            }
+                                        },
+                                        rejoinSession: this.session ? undefined : (sessionId) => {
+                                            this.sessionIdField.value = sessionId;
+                                            this.rejoinSession(sessionId)
+                                        }
+                                    });
+                                    this.listSessionsButton.disabled = false
+                                }
+                            }),
+                        ]}),
+                    ]})
+                ],
+            ])
+        })
+
         new Details({parentElement: this.element, cssClasses: [CssClasses.ItkSessionManagementAdvancedOptions], children: [
             new Summary({parentElement: undefined, innerText: "Advanced"}),
             new Paragraph({parentElement: undefined, cssClasses: [CssClasses.ItkInputParagraph], children: [
@@ -98,19 +164,6 @@ export class SessionManagerWidget{
             })
         ]})
 
-
-        createElement({tagName: "h3", parentElement: this.element, innerText: "Create Session"})
-        const sessionCreationForm = new Form({parentElement: this.element, children: [
-            new Paragraph({
-                parentElement: this.element,
-                cssClasses: [CssClasses.ItkInputParagraph],
-                children: [
-                    new Label({parentElement: undefined, innerText: "Duration (minutes): "}),
-                    this.sessionDurationInput = new NumberInput({parentElement: undefined, value: 60, min: 5, required: true}),
-                    this.createSessionButton = new Button({parentElement: undefined, inputType: "submit", text: "Create"}),
-                ]
-            }),
-        ]})
         sessionCreationForm.preventSubmitWith(async () => {
             if(this.session){
                 new ErrorPopupWidget({message: `Can't create session as one is already running`})
@@ -176,15 +229,6 @@ export class SessionManagerWidget{
             })
         })
 
-
-        createElement({tagName: "h3", parentElement: this.element, innerText: "Rejoin Session"})
-        this.sessionRejoinForm = new Form({parentElement: this.element, children: [
-            new Paragraph({parentElement: undefined, cssClasses: [CssClasses.ItkInputParagraph], children: [
-                new Label({parentElement: undefined, innerText: "Session ID :"}),
-                this.sessionIdField = new TextInput({parentElement: undefined, value: undefined, required: true, }),
-                this.rejoinSessionButton = new Button({inputType: "submit", text: "Rejoin", parentElement: undefined}),
-            ]}),
-        ]});
         this.sessionRejoinForm.preventSubmitWith(() => {
             const sessionId = this.sessionIdField.value
             if(!sessionId){
@@ -193,40 +237,6 @@ export class SessionManagerWidget{
             }
             this.rejoinSession(sessionId)
         })
-        new Paragraph({parentElement: this.element, children: [
-            this.listSessionsButton = new Button({
-                inputType: "button",
-                text: "List Sessions",
-                parentElement: undefined,
-                onClick: async () => {
-                    this.listSessionsButton.disabled = true
-                    let ilastikUrlAndTokenResult = await this.getIlastikUrlAndToken()
-                    if(ilastikUrlAndTokenResult instanceof Error){
-                        new ErrorPopupWidget({message: ilastikUrlAndTokenResult.message})
-                        this.listSessionsButton.disabled = false
-                        return
-                    }
-                    let {ilastikUrl, token} = ilastikUrlAndTokenResult;
-
-                    await SessionsPopup.create({
-                        ilastikUrl,
-                        token,
-                        hpc_site: this.hpcSiteInput.value,
-                        onSessionClosed: (status) => {
-                            if(this.session instanceof Session && this.session.sessionUrl.equals(Url.fromDto(status.session_url))){
-                                this.onLeaveSession()
-                            }
-                        },
-                        rejoinSession: this.session ? undefined : (sessionId) => {
-                            this.sessionIdField.value = sessionId;
-                            this.rejoinSession(sessionId)
-                        }
-                    });
-                    this.listSessionsButton.disabled = false
-                }
-            }),
-        ]})
-
 
         this.messagesContainerLabel = new Label({parentElement: this.element, innerText: "Log:", show: false});
         this.messagesContainer = new Paragraph({parentElement: this.element, cssClasses: [CssClasses.ItkLogContainer], show: false})
@@ -243,7 +253,7 @@ export class SessionManagerWidget{
             }),
             this.leaveSessionButton = new Button({
                 inputType: "button",
-                text: "↥ Detach",
+                text: "↱ Detach",
                 parentElement: undefined,
                 onClick: this.onLeaveSession,
                 disabled: true,

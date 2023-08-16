@@ -19,6 +19,7 @@ export enum CssClasses{
     ItkListWidget = "ItkListWidget",
     ItkListWidgetRow = "ItkListWidgetRow",
     ItkTabLabel = "ItkTabLabel",
+    ItkTabLabelSpacer = "ItkTabLabelSpacer",
     ItkActiveTabLabel = "ItkActiveTabLabel",
     ItkTabLabelWidgetsContainer = "ItkTabLabelWidgetsContainer",
     ItkTabBodyContainer = "ItkTabBodyContainer",

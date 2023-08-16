@@ -394,6 +394,7 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
     padding-left: 0.3em;
     padding-right: 0.3em;
     margin-top: 0.5em;
+    margin-bottom: 0.5em;
     border: solid 1px grey;
     background-color: rgba(0,0,0,0.1);
 }
