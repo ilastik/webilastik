@@ -5,7 +5,7 @@ from webilastik.datasource import DataSource
 from webilastik.server.rpc.dto import FeatureSelectionAppletStateDto, MessageParsingError, SetFeatureExtractorsParamsDto
 
 from webilastik.ui.applet import Applet, AppletOutput, CascadeOk, CascadeResult, UserCancelled, UserPrompt, applet_output, cascade
-from webilastik.features.ilp_filter import IlpFilter
+from webilastik.features.ilp_filter import IlpDifferenceOfGaussians, IlpFilter, IlpGaussianGradientMagnitude, IlpGaussianSmoothing, IlpHessianOfGaussianEigenvalues, IlpLaplacianOfGaussian, IlpStructureTensorEigenvalues
 from webilastik.ui.applet.ws_applet import WsApplet
 from webilastik.ui.usage_error import UsageError
 
@@ -17,8 +17,28 @@ class FeatureSelectionApplet(Applet):
         feature_extractors: "Set[IlpFilter] | None" = None,
         datasources: AppletOutput[Set[DataSource]]
     ):
+        if feature_extractors is None:
+            default_scales = [0.7, 1.0, 1.6, 3.5, 5.0, 10.0]
+            feature_extractors_classes = [
+                IlpGaussianSmoothing,
+                IlpLaplacianOfGaussian,
+                IlpGaussianGradientMagnitude,
+                IlpDifferenceOfGaussians,
+                IlpStructureTensorEigenvalues,
+                IlpHessianOfGaussianEigenvalues,
+            ]
+            feature_extractors = set(
+                [IlpGaussianSmoothing(ilp_scale=0.3, axis_2d="z")] +
+                [
+                    extractor_class(ilp_scale=scale, axis_2d="z")
+                    for extractor_class in feature_extractors_classes
+                    for scale in default_scales
+                ]
+            )
+
         self._in_datasources = datasources
-        self._feature_extractors: Set[IlpFilter] = feature_extractors or set()
+        self._feature_extractors: Set[IlpFilter] = feature_extractors
+
         super().__init__(name=name)
 
     def take_snapshot(self) -> Tuple[IlpFilter, ...]:
