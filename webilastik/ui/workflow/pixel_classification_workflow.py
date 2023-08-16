@@ -2,7 +2,7 @@
 
 from concurrent.futures import Executor
 from pathlib import PurePosixPath
-from typing import Callable, Dict, Sequence, Set
+from typing import Callable, Dict, Sequence
 from typing_extensions import Self
 
 import numpy as np
@@ -12,7 +12,7 @@ from webilastik.annotations.annotation import Color
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 
 from webilastik.datasource import FsDataSource
-from webilastik.features.ilp_filter import IlpFilter
+from webilastik.features.ilp_filter import IlpFilter, IlpFilterCollection
 from webilastik.filesystem import IFilesystem
 from webilastik.scheduling.job import PriorityExecutor
 from webilastik.ui.applet.brushing_applet import Label, WsBrushingApplet
@@ -34,7 +34,7 @@ class PixelClassificationWorkflow:
         executor: Executor,
         priority_executor: PriorityExecutor,
 
-        feature_extractors: "Set[IlpFilter] | None" = None,
+        feature_extractors: "IlpFilterCollection | None" = None,
         labels: Sequence[Label] = (),
         pixel_classifier: "VigraPixelClassifier[IlpFilter] | None" = None,
     ):
@@ -105,7 +105,7 @@ class PixelClassificationWorkflow:
             executor=executor,
             priority_executor=priority_executor,
 
-            feature_extractors=set(workflow_group.FeatureSelections.feature_extractors),
+            feature_extractors=workflow_group.FeatureSelections.feature_extractors,
             labels=workflow_group.PixelClassification.labels,
             pixel_classifier=workflow_group.PixelClassification.classifier,
         )
@@ -142,7 +142,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
         executor: Executor,
         priority_executor: PriorityExecutor,
 
-        feature_extractors: "Set[IlpFilter] | None" = None,
+        feature_extractors: "IlpFilterCollection | None" = None,
         labels: Sequence[Label] = (),
         pixel_classifier: "VigraPixelClassifier[IlpFilter] | None" = None,
     ):
@@ -161,7 +161,7 @@ class WsPixelClassificationWorkflow(PixelClassificationWorkflow):
             on_async_change=workflow.on_async_change,
             executor=workflow.executor,
             priority_executor=workflow.priority_executor,
-            feature_extractors=set(workflow.feature_selection_applet.feature_extractors()),
+            feature_extractors=workflow.feature_selection_applet.feature_extractors(),
             labels=workflow.brushing_applet.labels(),
             pixel_classifier=workflow.pixel_classifier_applet.pixel_classifier(),
         )

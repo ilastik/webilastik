@@ -3,7 +3,7 @@
 from datetime import datetime
 from abc import ABC
 from pathlib import PurePosixPath
-from typing import Callable, ClassVar, Any, Dict, List, Mapping, Sequence, Tuple, Type, TypeVar, cast
+from typing import Callable, ClassVar, Any, Dict, List, Mapping, Sequence, Tuple, Type, TypeVar, cast, Set
 from collections.abc import Mapping as AbcMapping
 from typing_extensions import TypeAlias
 import enum
@@ -19,7 +19,7 @@ import h5py
 from webilastik.annotations.annotation import Color
 from webilastik.datasource import FsDataSource
 from webilastik.features.ilp_filter import (
-    IlpDifferenceOfGaussians, IlpGaussianGradientMagnitude, IlpGaussianSmoothing, IlpHessianOfGaussianEigenvalues,
+    IlpDifferenceOfGaussians, IlpFilterCollection, IlpGaussianGradientMagnitude, IlpGaussianSmoothing, IlpHessianOfGaussianEigenvalues,
     IlpLaplacianOfGaussian, IlpStructureTensorEigenvalues
 )
 from webilastik.features.ilp_filter import IlpFilter
@@ -531,30 +531,30 @@ class IlpFeatureSelectionsGroup:
     feature_names: ClassVar[Sequence[str]] = list(named_feature_classes.keys())
     feature_classes: ClassVar[Sequence[Type[IlpFilter]]] = list(named_feature_classes.values())
 
-    def __init__(self, feature_extractors: Sequence[IlpFilter]) -> None:
-        self.feature_extractors = feature_extractors
+    def __init__(self, feature_extractors: IlpFilterCollection) -> None:
+        self.feature_extractors: IlpFilterCollection = feature_extractors
         super().__init__()
 
     def populate_group(self, group: h5py.Group):
-        if len(self.feature_extractors) == 0:
+        if len(self.feature_extractors.filters) == 0:
             return
 
         group["FeatureIds"] = [name.encode("utf8") for name in self.feature_names]
 
         default_scales = [0.3, 0.7, 1.0, 1.6, 3.5, 5.0, 10.0]
-        extra_scales = set(fe.ilp_scale for fe in self.feature_extractors if fe.ilp_scale not in default_scales)
+        extra_scales = set(fe.ilp_scale for fe in self.feature_extractors.filters if fe.ilp_scale not in default_scales)
         scales = default_scales + sorted(extra_scales)
         group["Scales"] = np.asarray(scales)
 
         SelectionMatrix: "ndarray[Any, Any]" = np.zeros((len(self.feature_classes), len(scales)), dtype=bool)
-        for fe in self.feature_extractors:
+        for fe in self.feature_extractors.filters:
             name_idx = self.feature_classes.index(fe.__class__)
             scale_idx = scales.index(fe.ilp_scale)
             SelectionMatrix[name_idx, scale_idx] = True
 
         ComputeIn2d: "ndarray[Any, Any]" = np.full(len(scales), True, dtype=bool)
         for idx, fname in enumerate(self.feature_classes):
-            ComputeIn2d[idx] = all(fe.axis_2d for fe in self.feature_extractors if fe.__class__.__name__ == fname)
+            ComputeIn2d[idx] = all(fe.axis_2d for fe in self.feature_extractors.filters if fe.__class__.__name__ == fname)
 
         group["SelectionMatrix"] = SelectionMatrix
         group["ComputeIn2d"] = ComputeIn2d  # [: len(scales)]  # weird .ilp quirk in featureTableWidget.py:524
@@ -563,7 +563,7 @@ class IlpFeatureSelectionsGroup:
     @classmethod
     def parse(cls, group: h5py.Group) -> "IlpFeatureSelectionsGroup":
         if len(group.keys()) == 0:
-            return IlpFeatureSelectionsGroup(feature_extractors=[])
+            return IlpFeatureSelectionsGroup(IlpFilterCollection.none())
         FeatureIds = ensure_encoded_string_list(group, "FeatureIds")
         Scales = ensure_list(group, key="Scales", expected_dtype=np.dtype("float64"))
         SelectionMatrix = ensure_ndarray(
@@ -576,7 +576,7 @@ class IlpFeatureSelectionsGroup:
         if StorageVersion != "0.1":
             raise IlpParsingError(f"Unexpected storage version on {group.name}: {StorageVersion}")
 
-        feature_extractors: List[IlpFilter] = []
+        feature_extractors: Set[IlpFilter] = set()
         for feature_name_index, feature_name in enumerate(FeatureIds):
             for scale_index, scale in enumerate(Scales):
                 if not SelectionMatrix[feature_name_index][scale_index]:
@@ -584,8 +584,8 @@ class IlpFeatureSelectionsGroup:
                 feature_class = cls.named_feature_classes.get(feature_name)
                 if feature_class is None:
                     raise IlpParsingError(f"Bad entry in {group.name}/FeatureIds: {feature_name}")
-                feature_extractors.append(feature_class(
+                feature_extractors.add(feature_class(
                     ilp_scale=float(scale),
                     axis_2d="z" if ComputeIn2d[feature_name_index] else None, #FIXME: always z?
                 ))
-        return IlpFeatureSelectionsGroup(feature_extractors=feature_extractors)
+        return IlpFeatureSelectionsGroup(feature_extractors=IlpFilterCollection(feature_extractors))

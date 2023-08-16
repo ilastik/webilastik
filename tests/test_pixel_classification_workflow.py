@@ -74,7 +74,7 @@ def test_pixel_classification_workflow():
 
 
 
-    _ = workflow.feature_selection_applet.add_feature_extractors(
+    _ = workflow.feature_selection_applet.set_feature_extractors(
         user_prompt=dummy_prompt,
         feature_extractors=all_feature_extractors,
     )

@@ -15,6 +15,7 @@ from webilastik.classic_ilastik.ilp.pixel_classification_ilp import IlpPixelClas
 from webilastik.datasource.skimage_datasource import SkimageDataSource
 from webilastik.features.ilp_filter import (
     IlpDifferenceOfGaussians,
+    IlpFilterCollection,
     IlpGaussianGradientMagnitude,
     IlpGaussianSmoothing,
     IlpHessianOfGaussianEigenvalues,
@@ -32,22 +33,23 @@ osfs = OsFs.create()
 assert not isinstance(osfs, Exception)
 
 def test_feature_extractor_serialization():
-    all_feature_extractors: List[IlpFilter] = []
+    all_feature_extractors: Set[IlpFilter] = set()
     for scale in [0.3, 0.7, 1.0, 1.6, 3.5, 5.0, 10.0]:
-        all_feature_extractors.append(IlpGaussianSmoothing(ilp_scale=scale, axis_2d="z"))
-        all_feature_extractors.append(IlpLaplacianOfGaussian(ilp_scale=scale, axis_2d="z"))
-        all_feature_extractors.append(IlpGaussianGradientMagnitude(ilp_scale=scale, axis_2d="z"))
-        all_feature_extractors.append(IlpDifferenceOfGaussians(ilp_scale=scale, axis_2d="z"))
-        all_feature_extractors.append(IlpStructureTensorEigenvalues(ilp_scale=scale, axis_2d="z"))
-        all_feature_extractors.append(IlpHessianOfGaussianEigenvalues(ilp_scale=scale, axis_2d="z"))
+        all_feature_extractors.add(IlpGaussianSmoothing(ilp_scale=scale, axis_2d="z"))
+        all_feature_extractors.add(IlpLaplacianOfGaussian(ilp_scale=scale, axis_2d="z"))
+        all_feature_extractors.add(IlpGaussianGradientMagnitude(ilp_scale=scale, axis_2d="z"))
+        all_feature_extractors.add(IlpDifferenceOfGaussians(ilp_scale=scale, axis_2d="z"))
+        all_feature_extractors.add(IlpStructureTensorEigenvalues(ilp_scale=scale, axis_2d="z"))
+        all_feature_extractors.add(IlpHessianOfGaussianEigenvalues(ilp_scale=scale, axis_2d="z"))
 
-    feature_selection_group = IlpFeatureSelectionsGroup(feature_extractors=all_feature_extractors)
+    filter_collection = IlpFilterCollection(all_feature_extractors)
+    feature_selection_group = IlpFeatureSelectionsGroup(feature_extractors=filter_collection)
     tmp_file = tempfile.NamedTemporaryFile()
     with h5py.File(tmp_file.name, "w") as f:
         feature_selection_group.populate_group(f)
 
         parsed = IlpFeatureSelectionsGroup.parse(f)
-        assert set(all_feature_extractors) == set(parsed.feature_extractors)
+        assert filter_collection == parsed.feature_extractors
 
 def test_pixel_classification_ilp_serialization():
     input_fs = OsFs.create()
@@ -70,13 +72,13 @@ def test_pixel_classification_ilp_serialization():
     assert not isinstance(reloaded_data, Exception), str(reloaded_data)
 
     loaded_feature_extractors = reloaded_data.FeatureSelections.feature_extractors
-    assert IlpGaussianSmoothing(ilp_scale=0.3, axis_2d="z") in loaded_feature_extractors
-    assert IlpLaplacianOfGaussian(ilp_scale=0.7, axis_2d="z") in loaded_feature_extractors
-    assert IlpGaussianGradientMagnitude(ilp_scale=1.0, axis_2d="z") in loaded_feature_extractors
-    assert IlpDifferenceOfGaussians(ilp_scale=1.6, axis_2d="z") in loaded_feature_extractors
-    assert IlpStructureTensorEigenvalues(ilp_scale=3.5, axis_2d="z") in loaded_feature_extractors
-    assert IlpHessianOfGaussianEigenvalues(ilp_scale=5.0, axis_2d="z") in loaded_feature_extractors
-    assert len(loaded_feature_extractors) == 6
+    assert IlpGaussianSmoothing(ilp_scale=0.3, axis_2d="z") in loaded_feature_extractors.filters
+    assert IlpLaplacianOfGaussian(ilp_scale=0.7, axis_2d="z") in loaded_feature_extractors.filters
+    assert IlpGaussianGradientMagnitude(ilp_scale=1.0, axis_2d="z") in loaded_feature_extractors.filters
+    assert IlpDifferenceOfGaussians(ilp_scale=1.6, axis_2d="z") in loaded_feature_extractors.filters
+    assert IlpStructureTensorEigenvalues(ilp_scale=3.5, axis_2d="z") in loaded_feature_extractors.filters
+    assert IlpHessianOfGaussianEigenvalues(ilp_scale=5.0, axis_2d="z") in loaded_feature_extractors.filters
+    assert len(loaded_feature_extractors.filters) == 6
 
     loaded_labels = reloaded_data.PixelClassification.labels
     for label in loaded_labels:
