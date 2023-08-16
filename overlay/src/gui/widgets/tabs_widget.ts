@@ -51,6 +51,7 @@ export class TabsWidget<WIDGET extends Widget<any>>{
                 }
             })
             this.tabLabelWidgets.set(labelText, labelWidget)
+            new Label({parentElement: this.tabLabelWidgetsContainer, innerText: "", cssClasses: [CssClasses.ItkTabLabelSpacer]})
         }
         new Span({parentElement: this.tabLabelWidgetsContainer, cssClasses: [CssClasses.ItkTabLabelTrailer]})
 

@@ -272,9 +272,14 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
     border: solid 2px var(--default-highlight-color);
     border-radius: 5px 5px 0 0;
     margin-top: 1px;
-    margin-right: 2px;
     display: inline-block;
     padding: 0.1em;
+}
+
+.ItkTabLabelSpacer{
+    display: inline-block;
+    width: 2px;
+    border-bottom: solid 2px var(--default-highlight-color);
 }
 
 .ItkActiveTabLabel{
