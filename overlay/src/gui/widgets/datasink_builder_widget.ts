@@ -405,7 +405,7 @@ class N5DatasinkConfigWidget extends DatasinkInputForm{
 
 export class DatasinkConfigWidget{
     public readonly element: Div;
-    private readonly tabs: TabsWidget<PrecomputedChunksDatasinkConfigWidget | N5DatasinkConfigWidget | DziDatasinkConfigWidget>;
+    private readonly tabs: TabsWidget<string, PrecomputedChunksDatasinkConfigWidget | N5DatasinkConfigWidget | DziDatasinkConfigWidget>;
 
     constructor(params: {parentElement: HTMLElement}){
         this.tabs = new TabsWidget({

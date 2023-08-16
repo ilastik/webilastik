@@ -262,10 +262,9 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
     display: flex;
 }
 
-
-.ItkTabLabelTrailer{
-    flex-grow: 1;
-    border-bottom: solid 2px var(--default-highlight-color);
+.ItkTabsWidget{
+    margin-top: 0.1em;
+    margin-bottom: 0.1em;
 }
 
 .ItkTabLabel{
@@ -280,6 +279,10 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
     display: inline-block;
     width: 2px;
     border-bottom: solid 2px var(--default-highlight-color);
+}
+
+.ItkTabLabelSpacer:last-child{
+    flex-grow: 1;
 }
 
 .ItkActiveTabLabel{

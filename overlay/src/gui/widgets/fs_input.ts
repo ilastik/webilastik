@@ -56,7 +56,7 @@ class HttpFsInputForm extends FsInputForm{
 }
 
 export class FsInputWidget{
-    tabs: TabsWidget<FsInputForm>;
+    tabs: TabsWidget<string, FsInputForm>;
     private _required: boolean;
 
     constructor(params: {

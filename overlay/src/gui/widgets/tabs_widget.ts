@@ -1,27 +1,27 @@
 import { CssClasses } from "../css_classes";
-import { Div, Label, Span, Widget } from "./widget";
+import { Div, Label, Widget } from "./widget";
 
 
-export class TabsWidget<WIDGET extends Widget<any>>{
+export class TabsWidget<LABEL extends string, WIDGET extends Widget<any>>{
     public readonly element: Div;
-    private tabLabelWidgets: Map<string, Label>;
-    private tabBodyWidgets: Map<string, WIDGET>;
+    private tabLabelWidgets: Map<LABEL, Label>;
+    private tabBodyWidgets: Map<LABEL, WIDGET>;
     private tabLabelWidgetsContainer: Div;
     private tabBodyWidgetsContainer: Div;
-    private _current: {label: string, widget: WIDGET};
+    private _current: {label: LABEL, widget: WIDGET};
 
     constructor(params: {
         parentElement: HTMLElement | undefined,
-        tabBodyWidgets: Map<string, WIDGET>,
-        onSwitch?: (label: string, activeWidget: WIDGET, allWidgets: Array<WIDGET>) => void,
+        tabBodyWidgets: Map<LABEL, WIDGET>,
+        onSwitch?: (label: LABEL, activeWidget: WIDGET, allWidgets: Array<WIDGET>) => void,
     }){
         this.tabBodyWidgets = params.tabBodyWidgets
-        this.tabLabelWidgets = new Map<string, Label>()
+        this.tabLabelWidgets = new Map<LABEL, Label>()
 
         const entries = Array.from(params.tabBodyWidgets.entries());
         this._current = {label: entries[0][0], widget: entries[0][1]}
 
-        this.element = new Div({parentElement: params.parentElement, children: [
+        this.element = new Div({parentElement: params.parentElement, cssClasses: [CssClasses.ItkTabsWidget], children: [
             this.tabLabelWidgetsContainer = new Div({parentElement: undefined, cssClasses: [CssClasses.ItkTabLabelWidgetsContainer]}),
             this.tabBodyWidgetsContainer = new Div({parentElement: undefined, cssClasses: [CssClasses.ItkTabBodyContainer]}),
         ]})
@@ -53,7 +53,6 @@ export class TabsWidget<WIDGET extends Widget<any>>{
             this.tabLabelWidgets.set(labelText, labelWidget)
             new Label({parentElement: this.tabLabelWidgetsContainer, innerText: "", cssClasses: [CssClasses.ItkTabLabelSpacer]})
         }
-        new Span({parentElement: this.tabLabelWidgetsContainer, cssClasses: [CssClasses.ItkTabLabelTrailer]})
 
         for(const t of this.tabLabelWidgets.values()){
             t.click();
@@ -61,7 +60,7 @@ export class TabsWidget<WIDGET extends Widget<any>>{
         }
     }
 
-    public get current(): {label: string, widget: WIDGET}{
+    public get current(): {label: LABEL, widget: WIDGET}{
         return this._current
     }
 
