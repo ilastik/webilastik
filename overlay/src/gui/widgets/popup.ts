@@ -80,9 +80,11 @@ export class PopupWidget extends Div{
 
     public static async WaitPopup<T>(params: {
         title: string,
+        withSpinner?: boolean,
         operation: Promise<T> | ((popup: PopupWidget) => Promise<T>),
     }): Promise<T>{
-        let popup = PopupWidget.LoadingPopup({title: params.title});
+        const withSpinner = params.withSpinner === undefined ? true : params.withSpinner
+        let popup = withSpinner ? PopupWidget.LoadingPopup({title: params.title}) : new PopupWidget(params.title);
         let result = await (params.operation instanceof Promise ? params.operation : params.operation(popup));
         popup.destroy()
         return result

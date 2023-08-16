@@ -33,7 +33,7 @@ from webilastik.classic_ilastik.ilp import (
     ensure_group, ensure_int
 )
 from webilastik.features.ilp_filter import (
-    IlpDifferenceOfGaussians, IlpGaussianGradientMagnitude, IlpGaussianSmoothing,
+    IlpDifferenceOfGaussians, IlpFilterCollection, IlpGaussianGradientMagnitude, IlpGaussianSmoothing,
     IlpHessianOfGaussianEigenvalues, IlpLaplacianOfGaussian, IlpStructureTensorEigenvalues,
 )
 from webilastik.features.ilp_filter import IlpFilter
@@ -337,7 +337,7 @@ class IlpPixelClassificationWorkflowGroup(IlpProject):
     @staticmethod
     def create(
         *,
-        feature_extractors: Sequence[IlpFilter],
+        feature_extractors: IlpFilterCollection,
         labels: Sequence[Label],
         classifier: "VigraPixelClassifier[IlpFilter] | None",
         currentApplet: "int | None" = None,

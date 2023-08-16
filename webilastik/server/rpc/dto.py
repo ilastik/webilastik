@@ -3271,36 +3271,36 @@ class FeatureSelectionAppletStateDto(DataTransferObject):
         return parse_as_FeatureSelectionAppletStateDto(value)
 
 
-def parse_as_AddFeatureExtractorsParamsDto(
+def parse_as_SetFeatureExtractorsParamsDto(
     value: JsonValue,
-) -> "AddFeatureExtractorsParamsDto | MessageParsingError":
+) -> "SetFeatureExtractorsParamsDto | MessageParsingError":
     from collections.abc import Mapping
 
     if not isinstance(value, Mapping):
         return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as AddFeatureExtractorsParamsDto"
+            f"Could not parse {json.dumps(value)} as SetFeatureExtractorsParamsDto"
         )
-    if value.get("__class__") != "AddFeatureExtractorsParamsDto":
+    if value.get("__class__") != "SetFeatureExtractorsParamsDto":
         return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as AddFeatureExtractorsParamsDto"
+            f"Could not parse {json.dumps(value)} as SetFeatureExtractorsParamsDto"
         )
     tmp_feature_extractors = parse_as_Tuple_of_IlpFeatureExtractorDto0_varlen__endof_(
         value.get("feature_extractors")
     )
     if isinstance(tmp_feature_extractors, MessageParsingError):
         return tmp_feature_extractors
-    return AddFeatureExtractorsParamsDto(
+    return SetFeatureExtractorsParamsDto(
         feature_extractors=tmp_feature_extractors,
     )
 
 
 @dataclass
-class AddFeatureExtractorsParamsDto(DataTransferObject):
+class SetFeatureExtractorsParamsDto(DataTransferObject):
     feature_extractors: Tuple[IlpFeatureExtractorDto, ...]
 
     def to_json_value(self) -> JsonObject:
         return {
-            "__class__": "AddFeatureExtractorsParamsDto",
+            "__class__": "SetFeatureExtractorsParamsDto",
             "feature_extractors": tuple(
                 item.to_json_value() for item in self.feature_extractors
             ),
@@ -3309,50 +3309,8 @@ class AddFeatureExtractorsParamsDto(DataTransferObject):
     @classmethod
     def from_json_value(
         cls, value: JsonValue
-    ) -> "AddFeatureExtractorsParamsDto | MessageParsingError":
-        return parse_as_AddFeatureExtractorsParamsDto(value)
-
-
-def parse_as_RemoveFeatureExtractorsParamsDto(
-    value: JsonValue,
-) -> "RemoveFeatureExtractorsParamsDto | MessageParsingError":
-    from collections.abc import Mapping
-
-    if not isinstance(value, Mapping):
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as RemoveFeatureExtractorsParamsDto"
-        )
-    if value.get("__class__") != "RemoveFeatureExtractorsParamsDto":
-        return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as RemoveFeatureExtractorsParamsDto"
-        )
-    tmp_feature_extractors = parse_as_Tuple_of_IlpFeatureExtractorDto0_varlen__endof_(
-        value.get("feature_extractors")
-    )
-    if isinstance(tmp_feature_extractors, MessageParsingError):
-        return tmp_feature_extractors
-    return RemoveFeatureExtractorsParamsDto(
-        feature_extractors=tmp_feature_extractors,
-    )
-
-
-@dataclass
-class RemoveFeatureExtractorsParamsDto(DataTransferObject):
-    feature_extractors: Tuple[IlpFeatureExtractorDto, ...]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "RemoveFeatureExtractorsParamsDto",
-            "feature_extractors": tuple(
-                item.to_json_value() for item in self.feature_extractors
-            ),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "RemoveFeatureExtractorsParamsDto | MessageParsingError":
-        return parse_as_RemoveFeatureExtractorsParamsDto(value)
+    ) -> "SetFeatureExtractorsParamsDto | MessageParsingError":
+        return parse_as_SetFeatureExtractorsParamsDto(value)
 
 
 def parse_as_Literal_of__quote_BOOT_FAIL_quote_0_quote_CANCELLED_quote_0_quote_COMPLETED_quote_0_quote_CONFIGURING_quote_0_quote_COMPLETING_quote_0_quote_DEADLINE_quote_0_quote_FAILED_quote_0_quote_NODE_FAIL_quote_0_quote_OUT_OF_MEMORY_quote_0_quote_PENDING_quote_0_quote_PREEMPTED_quote_0_quote_RUNNING_quote_0_quote_RESV_DEL_HOLD_quote_0_quote_REQUEUE_FED_quote_0_quote_REQUEUE_HOLD_quote_0_quote_REQUEUED_quote_0_quote_RESIZING_quote_0_quote_REVOKED_quote_0_quote_SIGNALING_quote_0_quote_SPECIAL_EXIT_quote_0_quote_STAGE_OUT_quote_0_quote_STOPPED_quote_0_quote_SUSPENDED_quote_0_quote_TIMEOUT_quote__endof_(

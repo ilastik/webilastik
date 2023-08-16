@@ -29,7 +29,7 @@ export class DataSourceSelectionWidget{
         help: string[],
     }){
         this.element = new CollapsableWidget({
-            display_name: "Data Sources", parentElement: params.parentElement, help: params.help
+            display_name: "Training Images", parentElement: params.parentElement, help: params.help
         }).element
         this.session = params.session
         this.defaultBucketName = params.defaultBucketName
@@ -105,6 +105,7 @@ export class DataSourceSelectionWidget{
         const datasources = datasourcesResult
         return PopupWidget.WaitPopup({
             title: "Select resolutions to open",
+            withSpinner: false,
             operation: (popup: PopupWidget) => new Promise<FsDataSource[]>(resolve => {
 
                 let datasourcesSelect = new MultiSelect<FsDataSource>({

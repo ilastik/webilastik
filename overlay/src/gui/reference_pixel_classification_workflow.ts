@@ -2,7 +2,7 @@ import { Filesystem, Session } from "../client/ilastik";
 import { IViewerDriver } from "../drivers/viewer_driver";
 import { createElement, removeElement } from "../util/misc";
 import { BrushingWidget } from "./widgets/brushing_overlay/brushing_widget";
-import { FeatureSelectionWidget } from "./widgets/feature_selection";
+import { FeatureSelectionApplet } from "./widgets/feature_selection_applet";
 import { PredictionsExportWidget } from "./widgets/predictions_export_widget";
 import { ProjectWidget } from "./widgets/project_widget";
 import { DataSourceSelectionWidget } from "./widgets/datasource_selection_widget";
@@ -11,7 +11,7 @@ import { Path } from "../util/parsed_url";
 export class ReferencePixelClassificationWorkflowGui{
     public readonly element: HTMLElement
     public readonly project_widget: ProjectWidget;
-    public readonly feature_selection_applet: FeatureSelectionWidget
+    public readonly feature_selection_applet: FeatureSelectionApplet
     public readonly brushing_widget: BrushingWidget;
     public readonly exporter_applet: PredictionsExportWidget;
 
@@ -51,7 +51,7 @@ export class ReferencePixelClassificationWorkflowGui{
             ]
         });
 
-        this.feature_selection_applet = new FeatureSelectionWidget({
+        this.feature_selection_applet = new FeatureSelectionApplet({
             name: "feature_selection_applet",
             session: this.session,
             parentElement: this.element,

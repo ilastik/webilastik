@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Optional, Literal
+from typing import Final, Mapping, Optional, Literal, Iterable, List, Sequence, Set
 
 
 from ndstructs.array5D import Array5D
@@ -22,6 +22,15 @@ IlpFilterName = Literal[
     "Structure Tensor Eigenvalues",
     "Hessian of Gaussian Eigenvalues"
 ]
+
+ILP_FILTER_INDICES: Mapping[IlpFilterName, int] = {
+    "Gaussian Smoothing": 0,
+    "Laplacian of Gaussian": 1,
+    "Gaussian Gradient Magnitude": 2,
+    "Difference of Gaussians": 3,
+    "Structure Tensor Eigenvalues": 4,
+    "Hessian of Gaussian Eigenvalues": 5
+}
 
 class IlpFilter(PresmoothedFilter):
     def to_dto(self) -> IlpFeatureExtractorDto:
@@ -66,8 +75,57 @@ class IlpFilter(PresmoothedFilter):
     def ilp_name(cls) -> IlpFilterName:
         pass
 
+    @property
+    @abstractmethod
+    def ilp_sorting_index(self) -> int:
+        pass
+
     def __call__(self, /, roi: DataRoi) -> FeatureData:
         return self.op(roi)
+
+    def __lt__(self, other: object) -> bool:
+        if isinstance(other, IlpFilter):
+            return (self.ilp_sorting_index, self.ilp_scale) < (other.ilp_sorting_index, other.ilp_scale)
+        return True # FIXME: ?
+
+    @classmethod
+    def ilp_sorted(cls, filters: Iterable["IlpFilter"]) -> List["IlpFilter"]:
+        return sorted(filters)
+
+class IlpFilterCollection:
+    DEFAULT_SCALES: Sequence[float] = [0.3, 0.7, 1.0, 1.6, 3.5, 5.0, 10.0]
+    def __init__(self, filters: Set[IlpFilter]) -> None:
+        self.filters: Final[Sequence[IlpFilter]] = IlpFilter.ilp_sorted(filters)
+        super().__init__()
+
+    @classmethod
+    def none(cls) -> "IlpFilterCollection":
+        return IlpFilterCollection(set())
+
+    @classmethod
+    def all(cls) -> "IlpFilterCollection":
+        feature_extractors_classes = [
+            IlpGaussianSmoothing,
+            IlpLaplacianOfGaussian,
+            IlpGaussianGradientMagnitude,
+            IlpDifferenceOfGaussians,
+            IlpStructureTensorEigenvalues,
+            IlpHessianOfGaussianEigenvalues,
+        ]
+        return IlpFilterCollection(set(
+            [IlpGaussianSmoothing(ilp_scale=0.3, axis_2d="z")] +
+            [
+                extractor_class(ilp_scale=scale, axis_2d="z")
+                for extractor_class in feature_extractors_classes
+                for scale in (cls.DEFAULT_SCALES[1:])
+            ]
+        ))
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, IlpFilterCollection):
+            return False
+        return all(f1 == f2 for f1, f2 in zip(self.filters, other.filters))
+
 
 class IlpGaussianSmoothing(IlpFilter):
     def __init__(
@@ -88,6 +146,10 @@ class IlpGaussianSmoothing(IlpFilter):
     def op(self) -> GaussianSmoothing:
         return self._op
 
+    @property
+    def ilp_sorting_index(self) -> int:
+        return 0
+
 class IlpLaplacianOfGaussian(IlpFilter):
     def __init__(
         self, ilp_scale: float, axis_2d: Optional[Axis2D], preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx")
@@ -107,6 +169,10 @@ class IlpLaplacianOfGaussian(IlpFilter):
     def op(self) -> LaplacianOfGaussian:
         return self._op
 
+    @property
+    def ilp_sorting_index(self) -> int:
+        return 1
+
 class IlpGaussianGradientMagnitude(IlpFilter):
     def __init__(
         self, ilp_scale: float, axis_2d: Optional[Axis2D], preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx")
@@ -125,6 +191,10 @@ class IlpGaussianGradientMagnitude(IlpFilter):
     @property
     def op(self) -> GaussianGradientMagnitude:
         return self._op
+
+    @property
+    def ilp_sorting_index(self) -> int:
+        return 2
 
 class IlpDifferenceOfGaussians(IlpFilter):
     def __init__(
@@ -147,6 +217,10 @@ class IlpDifferenceOfGaussians(IlpFilter):
     def op(self) -> DifferenceOfGaussians:
         return self._op
 
+    @property
+    def ilp_sorting_index(self) -> int:
+        return 3
+
 class IlpStructureTensorEigenvalues(IlpFilter):
     def __init__(
         self, *, ilp_scale: float, axis_2d: Optional[Axis2D], preprocessor: Operator[DataRoi, Array5D] = OpRetriever(axiskeys_hint="ctzyx")
@@ -168,6 +242,10 @@ class IlpStructureTensorEigenvalues(IlpFilter):
     def op(self) -> StructureTensorEigenvalues:
         return self._op
 
+    @property
+    def ilp_sorting_index(self) -> int:
+        return 4
+
 class IlpHessianOfGaussianEigenvalues(IlpFilter):
     def __init__(self, ilp_scale: float, axis_2d: Optional[Axis2D]):
         super().__init__(ilp_scale=ilp_scale, axis_2d=axis_2d)
@@ -184,3 +262,7 @@ class IlpHessianOfGaussianEigenvalues(IlpFilter):
     @property
     def op(self) -> HessianOfGaussianEigenvalues:
         return self._op
+
+    @property
+    def ilp_sorting_index(self) -> int:
+        return 5

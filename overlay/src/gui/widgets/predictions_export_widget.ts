@@ -32,6 +32,7 @@ import { Path, Url } from '../../util/parsed_url';
 import { BooleanInput } from './value_input_widget';
 import { Shape5DInputNoChannel } from './shape5d_input';
 import { DataSourceSelectionWidget } from './datasource_selection_widget';
+import { TabsWidget } from './tabs_widget';
 
 const sink_creation_stati = ["pending", "running", "cancelled", "failed", "succeeded"] as const;
 export type SinkCreationStatus = typeof sink_creation_stati[number];
@@ -192,10 +193,10 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
     private jobsDisplay: Div;
     private labelSelectorContainer: Span;
     private labelToExportSelector: Select<LabelHeader> | undefined;
-    private exportModeSelector: Select<"pixel probabilities" | "simple segmentation">;
     private datasourceListWidget: DataSourceListWidget;
     private customTileShapeCheckbox: BooleanInput;
     private tileShapeInput: Shape5DInputNoChannel
+    private exportModeSelector: TabsWidget<"pixel probabilities" | "simple segmentation", Paragraph>;
 
     public constructor({name, parentElement, session, help, viewer, defaultBucketName, inputBucketPath, outputPathPattern}: {
         name: string,
@@ -223,18 +224,10 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
         this.element = new CollapsableWidget({display_name: "Export Predictions", parentElement, help}).element
         this.element.classList.add("ItkPredictionsExportApplet")
 
-        new Paragraph({parentElement: this.element, children: [
-            new Label({parentElement: undefined, innerText: "Export mode: "}),
-            this.exportModeSelector = new Select<"pixel probabilities" | "simple segmentation">({
-                popupTitle: "Select an export mode",
-                parentElement: undefined,
-                options: ["pixel probabilities", "simple segmentation"], //FIXME?
-                renderer: (opt) => new Span({parentElement: undefined, innerText: opt}),
-                onChange: (val) => this.labelSelectorContainer.show(val == "simple segmentation"),
-            }),
-        ]})
-        this.labelSelectorContainer = new Paragraph({parentElement: this.element});
-        this.labelSelectorContainer.show(false)
+        this.exportModeSelector = new TabsWidget({parentElement: this.element, tabBodyWidgets: new Map([
+            ["pixel probabilities", new Paragraph({parentElement: undefined, innerText: "Exports an image with one float32 channel per class (brush color)"})],
+            ["simple segmentation", this.labelSelectorContainer = new Paragraph({parentElement: this.element})]
+        ])})
 
         const datasourceFieldset = createFieldset({parentElement: this.element, legend: "Input Datasets:"})
         this.datasourceListWidget = new DataSourceListWidget({
@@ -270,7 +263,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
 
         new Paragraph({parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
             new Button({parentElement: undefined, inputType: "button", text: "Start Export Jobs", onClick: async () => {
-                const exportMode = this.exportModeSelector.value
+                const exportMode = this.exportModeSelector.current.label
                 let dtype: DataType;
                 let numChannels: number;
                 if(exportMode == "pixel probabilities"){
@@ -299,7 +292,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                     let fileLocation = fileLocationInputWidget.tryGetLocation({
                         item_index: job_index,
                         name: datasource.url.path.name,
-                        output_type: this.exportModeSelector.value,
+                        output_type: exportMode,
                         extension: datasinkConfigWidget.extension,
                     });
                     if(fileLocation === undefined){
@@ -349,14 +342,14 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                         new ErrorPopupWidget({message: "Missing export parameters"})
                         return
                     }
-                    if(this.exportModeSelector.value == "pixel probabilities"){
+                    if(exportMode == "pixel probabilities"){
                         jobSubmissionPayloads.push(
                             new StartPixelProbabilitiesExportJobParamsDto({
                                 datasource: datasource.toDto(), datasink: datasink_result.toDto()
                             })
                         )
                         // this.doRPC("launch_pixel_probabilities_export_job", )
-                    }else if(this.exportModeSelector.value == "simple segmentation"){
+                    }else if(exportMode == "simple segmentation"){
                         const label_header = this.labelToExportSelector?.value;
                         if(!label_header){
                             new ErrorPopupWidget({message: "Missing export parameters"})
@@ -369,7 +362,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                         )
                         // this.doRPC("launch_simple_segmentation_export_job", )
                     }else{
-                        assertUnreachable(this.exportModeSelector.value)
+                        assertUnreachable(exportMode)
                     }
                 }
                 const jobsSubmissionResult = await PopupWidget.WaitPopup({

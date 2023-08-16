@@ -10,7 +10,7 @@ import numpy as np
 
 from webilastik.ui.applet  import Applet, AppletOutput, CascadeOk, CascadeResult, UserPrompt, applet_output, cascade
 from webilastik.annotations.annotation import Annotation, Color
-from webilastik.features.ilp_filter import IlpFilter
+from webilastik.features.ilp_filter import IlpFilter, IlpFilterCollection
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.ui.usage_error import UsageError
 
@@ -60,7 +60,7 @@ class PixelClassificationApplet(Applet):
         self,
         name: str,
         *,
-        feature_extractors: AppletOutput[Sequence[IlpFilter]],
+        feature_extractors: AppletOutput[IlpFilterCollection],
         label_classes: AppletOutput[Mapping[Color, Sequence[Annotation]]],
         executor: Executor,
         on_async_change: Callable[[], Any],
@@ -116,7 +116,7 @@ class PixelClassificationApplet(Applet):
                 return CascadeOk()
 
             classifier_future = self.executor.submit(
-                partial(Classifier.train, feature_extractors), tuple(label_classes.values())
+                partial(Classifier.train, feature_extractors.filters), tuple(label_classes.values())
             )
             previous_state = self._state = self._state.updated_with(classifier=classifier_future)
 
