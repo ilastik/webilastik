@@ -92,27 +92,44 @@ export class ExportPattern{
     }
 
     public static parse(pattern: string): ExportPattern | Error{
-        const rawComponents = pattern.match(/\{\w+\}|[^{}]+/g)
-        if(!rawComponents){
-            return new Error(`Bad pattern: ${pattern}`)
-        }
         let components = new Array<ComponentVariant>();
-        for(const rawComp of rawComponents){
-            if(!rawComp.startsWith("{")){
-                components.push(rawComp)
+
+        let componentStart = 0;
+        literalLoop: for(let i=0; i<pattern.length; i++){
+            const char = pattern[i]
+            if(char == "}"){
+                return new Error(`Unexpected '}' char ${i} in pattern ${pattern}`)
+            }
+            if(char != "{"){
                 continue
             }
-            const rawKey = rawComp.slice(1, -1)
-            const key = componentKeys.find(k => k === rawKey) //this is here for type-safety only
-            if(!key){
-                return new Error(
-                    `Bad key ${rawKey} in pattern ${pattern}. Valid keys are ${componentKeys.join(', ')}`
-                )
+            components.push(pattern.slice(componentStart, i))
+            componentStart = i = i + 1; //skip opening brace
+            keyLoop: for(; i < pattern.length; i++){
+                const char = pattern[i]
+                if(char == "}"){
+                    let slice = pattern.slice(componentStart, i)
+                    const key = componentKeys.find(k => k === slice) //this is here for type-safety only
+                    if(!key){
+                        return new Error(
+                            `Bad key '{${slice}}' in pattern ${pattern}. Valid keys are ${componentKeys.join(', ')}`
+                        )
+                    }
+                    components.push(new componentKeyMap[key]())
+                    componentStart = i + 1; //skip closing brace
+                    continue literalLoop;
+                }
+                if(char == "{"){
+                    return new Error(`Unexpected '{' at char ${i}`)
+                }
             }
-            components.push(new componentKeyMap[key]())
+            return new Error(`Unexpected end of pattern before '}'`)
         }
-        if(components.length === 0){
-            return new Error(`Could not parse any components out of ${pattern}`)
+        if(componentStart < pattern.length){
+            components.push(pattern.slice(componentStart))
+        }
+        if(components.length == 0){
+            return new Error(`Could not parse any component out of pattern ${pattern}`)
         }
         return new ExportPattern(components)
     }
