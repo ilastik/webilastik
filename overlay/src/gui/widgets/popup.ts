@@ -1,6 +1,6 @@
 import { createElement, createInput } from "../../util/misc";
 import { CssClasses } from "../css_classes";
-import { Div, ImageWidget, Paragraph, Span } from "./widget";
+import { Div, ImageWidget, Paragraph, Span, Widget } from "./widget";
 import { TitleBar } from "./title_bar";
 import { Button } from "./input_widget";
 import { Path } from "../../util/parsed_url";
@@ -92,9 +92,17 @@ export class PopupWidget extends Div{
 }
 
 export class ErrorPopupWidget extends PopupWidget{
-    constructor(params: {message: string, onClose?: () => void}){
+    constructor(params: {message: string | Widget<any>[], onClose?: () => void}){
         super("Error")
-        new Span({parentElement: this.element, innerText: params.message})
+        let contentWidgets: Array<Widget<any>>;
+        if(typeof params.message == "string"){
+            contentWidgets = [new Span({parentElement: undefined, innerText: params.message})]
+        }else{
+            contentWidgets = params.message
+        }
+        for(const widget of contentWidgets){
+            this.contents.appendChild(widget)
+        }
         new Paragraph({parentElement:  this.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
             new Button({parentElement: undefined, inputType: "button", text: "Ok", onClick: () => {
                 this.destroy()

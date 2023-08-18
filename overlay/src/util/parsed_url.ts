@@ -109,6 +109,10 @@ export class Path{
         return this.raw
     }
 
+    public get hashValue(): string{
+        return this.toString()
+    }
+
     public toJsonValue(): string{
         return this.toString()
     }

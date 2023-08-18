@@ -34,6 +34,7 @@ import { Shape5DInputNoChannel } from './shape5d_input';
 import { DataSourceSelectionWidget } from './datasource_selection_widget';
 import { TabsWidget } from './tabs_widget';
 import { ExportPattern } from '../../util/export_pattern';
+import { HashMap } from '../../util/hashmap';
 
 const sink_creation_stati = ["pending", "running", "cancelled", "failed", "succeeded"] as const;
 export type SinkCreationStatus = typeof sink_creation_stati[number];
@@ -288,6 +289,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                 }
 
                 const jobSubmissionPayloads: Array<StartPixelProbabilitiesExportJobParamsDto | StartSimpleSegmentationExportJobParamsDto> = []
+                const outputPathToInputUrl = new HashMap<Path, Url, string>();
                 for(let job_index=0; job_index < this.datasourceListWidget.value.length; job_index++){
                     const datasource = this.datasourceListWidget.value[job_index]
                     if(!(datasource instanceof FsDataSource)){
@@ -349,6 +351,30 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                         new ErrorPopupWidget({message: "Missing export parameters"})
                         return
                     }
+
+                    const outputPath = datasink_result.filesystem instanceof ZipFs ? datasink_result.filesystem.zip_file_path : datasink_result.path
+                    const conflictingInputUrl = outputPathToInputUrl.get(outputPath)
+                    if(conflictingInputUrl){
+                        new ErrorPopupWidget({
+                            message: [
+                                new Paragraph({parentElement: undefined, innerText: "Conflicting outputs:"}),
+                                new Paragraph({parentElement: undefined, children: [
+                                    new Span({parentElement: undefined, innerText: "The input image at "}),
+                                    new Span({parentElement: undefined, cssClasses: [CssClasses.ItkEmphasisText], innerText: `${conflictingInputUrl} `}),
+                                    new Span({parentElement: undefined, innerText: `would produce an output in the same path as the input image at `}),
+                                    new Span({parentElement: undefined, cssClasses: [CssClasses.ItkEmphasisText], innerText: `${datasource.url}`}),
+                                ]}),
+                                new Paragraph({parentElement: undefined, children: [
+                                    new Span({parentElement: undefined, innerText: "Both these inputs would have written to the path "}),
+                                    new Span({parentElement: undefined, cssClasses: [CssClasses.ItkEmphasisText], innerText: outputPath.raw}),
+                                ]})
+                            ]
+                        })
+                        return
+                    }
+                    outputPathToInputUrl.set(outputPath, datasource.url)
+
+                    datasink_result
                     if(exportMode == "pixel probabilities"){
                         jobSubmissionPayloads.push(
                             new StartPixelProbabilitiesExportJobParamsDto({

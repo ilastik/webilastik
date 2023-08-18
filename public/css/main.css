@@ -42,6 +42,10 @@ body{
     font-style: var(--default-info-font-style);
 }
 
+.ItkEmphasisText{
+    font-weight: bold;
+}
+
 .ItkPopupWidget{
     font-family: var(--default-font-family);
     background-color: var(--default-background-color);
