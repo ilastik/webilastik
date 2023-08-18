@@ -4728,6 +4728,43 @@ class EbrainsAccessTokenDto(DataTransferObject):
         return parse_as_EbrainsAccessTokenDto(value)
 
 
+def parse_as_DataProxyObjectUrlResponse(
+    value: JsonValue,
+) -> "DataProxyObjectUrlResponse | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as DataProxyObjectUrlResponse"
+        )
+    tmp_url = parse_as_str(value.get("url"))
+    if isinstance(tmp_url, MessageParsingError):
+        return tmp_url
+    return DataProxyObjectUrlResponse(
+        url=tmp_url,
+    )
+
+
+@dataclass
+class DataProxyObjectUrlResponse(DataTransferObject):
+    url: str
+
+    @classmethod
+    def tag_value(cls) -> "str | None":
+        return None
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "url": self.url,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "DataProxyObjectUrlResponse | MessageParsingError":
+        return parse_as_DataProxyObjectUrlResponse(value)
+
+
 def parse_as_LoginRequiredErrorDto(
     value: JsonValue,
 ) -> "LoginRequiredErrorDto | MessageParsingError":

@@ -4629,6 +4629,38 @@ export class EbrainsAccessTokenDto {
   }
 }
 
+export function parse_as_DataProxyObjectUrlResponse(
+  value: JsonValue,
+): DataProxyObjectUrlResponse | MessageParsingError {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof MessageParsingError) {
+    return valueObject;
+  }
+  const temp_url = parse_as_str(valueObject.url);
+  if (temp_url instanceof MessageParsingError) return temp_url;
+  return new DataProxyObjectUrlResponse({
+    url: temp_url,
+  });
+}
+// Automatically generated via DataTransferObject for DataProxyObjectUrlResponse
+// Do not edit!
+export class DataProxyObjectUrlResponse {
+  public url: string;
+  constructor(_params: {
+    url: string;
+  }) {
+    this.url = _params.url;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      url: this.url,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): DataProxyObjectUrlResponse | MessageParsingError {
+    return parse_as_DataProxyObjectUrlResponse(value);
+  }
+}
+
 export function parse_as_LoginRequiredErrorDto(value: JsonValue): LoginRequiredErrorDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof MessageParsingError) {

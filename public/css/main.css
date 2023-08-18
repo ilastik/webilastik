@@ -170,6 +170,10 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
     border: solid var(--default-button-border-thickness) var(--default-highlight-color);
 }
 
+input[type=text]:invalid, input[type=url]:invalid{
+    background-color: #ffc9c9;
+}
+
 .ItkAxisLengthField{
     flex-grow: 1;
     white-space: nowrap;
