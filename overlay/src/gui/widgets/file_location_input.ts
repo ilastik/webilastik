@@ -2,49 +2,30 @@ import { Filesystem } from "../../client/ilastik";
 import { Path } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
 import { FsInputWidget } from "./fs_input";
-import { PathInput } from "./value_input_widget";
+import { PathInput, ValueInputWidget } from "./value_input_widget";
 import { Div, Label, Paragraph } from "./widget";
-import { InputWidget, InputWidgetParams } from "./input_widget";
-import { getNowString } from "../../util/misc";
+import { InputWidgetParams } from "./input_widget";
+import { ExportPattern, ReplacementParams } from "../../util/export_pattern";
 
-export class PathPatternInput extends InputWidget<"text">{
-    constructor(params: InputWidgetParams & {value?: string}){ //FIXME: string really?
+
+export class ExportPatternInput extends ValueInputWidget<ExportPattern | undefined, "text">{
+    constructor(params: InputWidgetParams & {value?: ExportPattern}){
         super({...params, inputType: "text", cssClasses: [CssClasses.ItkCharacterInput].concat(params.cssClasses || [])})
-        this.element.value = params.value || ""
-        this.element.addEventListener("change", () => {
-            const value = this.tryGetPath({item_index: 1, name: "_name_", output_type: "_output_type_", extension: "_extension_"})
-            this.element.setCustomValidity(value instanceof Error ? value.message : "")
+        this.element.addEventListener("input", () => {
+            const parsed = ExportPattern.parse(this.raw)
+            this.element.setCustomValidity(parsed instanceof Error ? parsed.message : "")
+            this.element.reportValidity()
         })
+        this.value = params.value
     }
 
-    public tryGetPath(params:{
-        item_index: number,
-        name: string,
-        output_type: string,
-        extension: string,
-    }): Path | undefined | Error{
-        if(!this.element.value){
-            return undefined
-        }
-        let replaced = this.element.value
-            .replace(/\{item_index\}/g, params.item_index.toString())
-            .replace(/\{name\}/g, params.name.toString().replace(/ /g, "_")) //FIXME: use safer escape?
-            .replace(/\{output_type\}/g, params.output_type.toString().replace(/ /g, "_")) //FIXME: use safer escape?
-            .replace(/\{timestamp\}/g, getNowString())
-            .replace(/\{extension\}/g, params.extension)
+    public get value(): ExportPattern | undefined{
+        const out = ExportPattern.parse(this.raw)
+        return out instanceof Error ? undefined : out
+    }
 
-        for(const brace of "{}"){
-            let braceIndex = replaced.indexOf(brace)
-            if(braceIndex >= 0){
-                return new Error(`Unexpected '${brace}'`)
-            }
-        }
-        //FIXME: parse should check for bad paths
-        let parsed = Path.parse(replaced);
-        if(parsed instanceof Error){
-            return new Error(`Bad path`)
-        }
-        return parsed
+    public set value(pattern: ExportPattern | undefined){
+        this.raw = pattern ? pattern.toString() : ""
     }
 }
 
@@ -83,12 +64,12 @@ export class FileLocationInputWidget{
 
 export class FileLocationPatternInputWidget{
     public readonly fsInput: FsInputWidget;
-    public readonly pathPatternInput: PathPatternInput;
+    public readonly pathPatternInput: ExportPatternInput;
 
     constructor(params: {
         parentElement: HTMLElement,
         defaultBucketName?: string,
-        defaultPathPattern?: string,
+        defaultPathPattern?: ExportPattern,
         required?: boolean,
         filesystemChoices: Array<"http" | "data-proxy">,
         tooltip?: string,
@@ -100,19 +81,18 @@ export class FileLocationPatternInputWidget{
         })
         new Paragraph({parentElement: params.parentElement, cssClasses: [CssClasses.ItkInputParagraph], children: [
             new Label({innerText: "Path pattern: ", parentElement: undefined, title: params.tooltip}),
-            this.pathPatternInput = new PathPatternInput({value: params.defaultPathPattern, parentElement: undefined, title: params.tooltip})
+            this.pathPatternInput = new ExportPatternInput({value: params.defaultPathPattern, parentElement: undefined, title: params.tooltip})
         ]})
 
     }
 
-    public tryGetLocation(params: {
-        item_index: number,
-        name: string,
-        output_type: string,
-        extension: string,
-    }): {filesystem: Filesystem, path: Path} | undefined{
+    public tryGetLocation(params: ReplacementParams): {filesystem: Filesystem, path: Path} | undefined{
         const filesystem = this.fsInput.value
-        const path = this.pathPatternInput.tryGetPath(params)
+        const pattern = this.pathPatternInput.value
+        if(!pattern){
+            return undefined
+        }
+        const path = pattern.expanded(params)
         if(!filesystem || !(path instanceof Path)){
             return undefined
         }

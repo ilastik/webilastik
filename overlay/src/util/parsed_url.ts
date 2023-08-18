@@ -91,8 +91,9 @@ export class Path{
         return this.name.split(".").slice(-1)[0]
     }
 
-    public joinPath(subpath: string): Path{
-        return new Path({components: this.components.concat(subpath.split("/"))})
+    public joinPath(subpath: string | Path): Path{
+        const subcomponents = subpath instanceof Path ? subpath.components : Path.parse(subpath).components
+        return new Path({components: this.components.concat(subcomponents)})
     }
 
     public equals(other: Path): boolean{

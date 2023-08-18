@@ -2,7 +2,7 @@ import { Applet } from '../../client/applets/applet';
 import { JsonValue } from '../../util/serialization';
 import { assertUnreachable, createElement, createFieldset } from '../../util/misc';
 import { CollapsableWidget } from './collapsable_applet_gui';
-import { BucketFs, Color, FsDataSource, FsDataSink, Session, PrecomputedChunksSink, Shape5D } from '../../client/ilastik';
+import { BucketFs, Color, FsDataSource, FsDataSink, Session, PrecomputedChunksSink, Shape5D, ZipFs, DziLevelDataSource } from '../../client/ilastik';
 import { CssClasses } from '../css_classes';
 import { ErrorPopupWidget, PopupWidget } from './popup';
 import {
@@ -33,6 +33,7 @@ import { BooleanInput } from './value_input_widget';
 import { Shape5DInputNoChannel } from './shape5d_input';
 import { DataSourceSelectionWidget } from './datasource_selection_widget';
 import { TabsWidget } from './tabs_widget';
+import { ExportPattern } from '../../util/export_pattern';
 
 const sink_creation_stati = ["pending", "running", "cancelled", "failed", "succeeded"] as const;
 export type SinkCreationStatus = typeof sink_creation_stati[number];
@@ -206,7 +207,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
         viewer: Viewer,
         defaultBucketName: string,
         inputBucketPath: Path,
-        outputPathPattern?: string,
+        outputPathPattern?: ExportPattern,
     }){
         super({
             name,
@@ -289,10 +290,19 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                 const jobSubmissionPayloads: Array<StartPixelProbabilitiesExportJobParamsDto | StartSimpleSegmentationExportJobParamsDto> = []
                 for(let job_index=0; job_index < this.datasourceListWidget.value.length; job_index++){
                     const datasource = this.datasourceListWidget.value[job_index]
+                    if(!(datasource instanceof FsDataSource)){
+                        continue
+                    }
+                    let inputPath: Path;
+                    if(datasource instanceof DziLevelDataSource && datasource.filesystem instanceof ZipFs){
+                        inputPath = datasource.filesystem.zip_file_path
+                    }else{
+                        inputPath = datasource.path
+                    }
                     let fileLocation = fileLocationInputWidget.tryGetLocation({
-                        item_index: job_index,
-                        name: datasource.url.path.name,
-                        output_type: exportMode,
+                        itemIndex: job_index,
+                        inputPath: inputPath,
+                        resultType: exportMode,
                         extension: datasinkConfigWidget.extension,
                     });
                     if(fileLocation === undefined){
@@ -302,9 +312,6 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                     if(fileLocation.path.equals(Path.root)){
                         new ErrorPopupWidget({message: `Can't export directly to the root of the filesystem. Provide a file name.`})
                         return
-                    }
-                    if(!(datasource instanceof FsDataSource)){
-                        continue
                     }
                     let datasink_tile_shape: Shape5D
                     if(this.customTileShapeCheckbox.value){

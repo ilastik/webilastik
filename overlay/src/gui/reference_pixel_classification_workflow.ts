@@ -7,6 +7,7 @@ import { PredictionsExportWidget } from "./widgets/predictions_export_widget";
 import { ProjectWidget } from "./widgets/project_widget";
 import { DataSourceSelectionWidget } from "./widgets/datasource_selection_widget";
 import { Path } from "../util/parsed_url";
+import { ExportPattern } from "../util/export_pattern";
 
 export class ReferencePixelClassificationWorkflowGui{
     public readonly element: HTMLElement
@@ -27,7 +28,7 @@ export class ReferencePixelClassificationWorkflowGui{
         projectLocation?: {fs: Filesystem, path: Path},
         defaultBucketName?: string,
         defaultBucketPath?: Path,
-        outputPathPattern?: string,
+        outputPathPattern?: ExportPattern,
     }){
         defaultBucketName = defaultBucketName || "hbp-image-service"
         this.session = session

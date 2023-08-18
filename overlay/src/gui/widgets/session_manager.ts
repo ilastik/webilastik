@@ -12,6 +12,7 @@ import { Button, Select } from "./input_widget";
 import { TextInput, NumberInput, UrlInput } from "./value_input_widget";
 import { CssClasses } from "../css_classes";
 import { TabsWidget } from "./tabs_widget";
+import { ExportPattern } from "../../util/export_pattern";
 
 export class SessionManagerWidget{
     element: HTMLElement
@@ -407,7 +408,7 @@ export class SessionManagerWidget{
         projectLocation?: {fs: Filesystem, path: Path,},
         defaultBucketName?: string,
         defaultBucketPath?: Path,
-        defaultOutputPathPattern?: string,
+        defaultOutputPathPattern?: ExportPattern,
     }){
         (async () => {
             const token = sessionResult.token instanceof Promise ? await sessionResult.token : sessionResult.token;

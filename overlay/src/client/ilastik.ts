@@ -1,4 +1,5 @@
 import { vec3 } from "gl-matrix"
+import { DatasetNameComponent, ExportPattern, ExtensionComponent, OutputTypeComponent, TimestampComponent } from "../util/export_pattern"
 import { assertUnreachable, fetchJson, PermissionError, RequestFailure, sleep, UnauthorizedRequestError } from "../util/misc"
 import { Path, Url } from "../util/parsed_url"
 import { DataType, ensureDataType } from "../util/precomputed_chunks"
@@ -76,14 +77,14 @@ export class StartupConfigs{
     ebrains_bucket_name?: string
     ebrains_bucket_path: Path
     clb_collab_id?: string
-    output_path_pattern?: string
+    output_path_pattern?: ExportPattern
 
     public constructor(params: {
         project_file_url: Url | undefined,
         ebrains_bucket_name?: string,
         ebrains_bucket_path: Path,
         clb_collab_id?: string,
-        output_path_pattern?: string
+        output_path_pattern?: ExportPattern
     }){
         this.project_file_url = params.project_file_url
         this.ebrains_bucket_name = params.ebrains_bucket_name
@@ -120,7 +121,11 @@ export class StartupConfigs{
         const ebrainsBucketPathRaw = locationUrlResult.search.get(ebrains_bucket_path_key)
 
         const output_path_pattern = "output_path_pattern"
-        const outputPathPattern = locationUrlResult.search.get(output_path_pattern)
+        const rawOutputPathPattern = locationUrlResult.search.get(output_path_pattern)
+        const outputPathPattern = rawOutputPathPattern ? ExportPattern.parse(rawOutputPathPattern) : undefined
+        if(outputPathPattern instanceof Error){
+            return outputPathPattern
+        }
 
         const collabId = locationUrlResult.search.get("clb-collab-id")
 
@@ -137,11 +142,17 @@ export class StartupConfigs{
         return this.ebrains_bucket_name || this.clb_collab_id || "hbp-image-service"
     }
 
-    public get effectiveOutputPathPattern(): string{
+    public get effectiveOutputPathPattern(): ExportPattern{
         if(this.output_path_pattern){
             return this.output_path_pattern
         }
-        return this.ebrains_bucket_path.joinPath("ilastik_exports").raw + "/{timestamp}/{name}_{output_type}.{extension}"
+        return new ExportPattern([
+            this.ebrains_bucket_path.joinPath("ilastik_exports").raw,
+            "/",
+            new TimestampComponent(),
+            "/",
+            new DatasetNameComponent(), "_", new OutputTypeComponent(), ".", new ExtensionComponent()
+        ])
     }
 }
 
