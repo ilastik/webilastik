@@ -12,8 +12,9 @@ from requests.models import CaseInsensitiveDict
 from webilastik.filesystem import IFilesystem, FsIoException, FsFileNotFoundException, FsDirectoryContents
 from webilastik.filesystem.http_fs import HttpFs
 from webilastik.filesystem.os_fs import OsFs
+from webilastik.serialization.json_serialization import parse_json
 from webilastik.utility.url import Url
-from webilastik.server.rpc.dto import BucketFSDto
+from webilastik.server.rpc.dto import BucketFSDto, DataProxyObjectUrlResponse
 from webilastik.utility import Seconds
 from webilastik.utility.request import ErrRequestCompletedAsFailure, request_size, request as safe_request, ErrRequestCrashed
 
@@ -95,7 +96,7 @@ class BucketFs(IFilesystem):
         })
         response = _requests_from_data_proxy(method="get", url=list_objects_path, data=None)
         if isinstance(response, Exception):
-            raise FsIoException(response)
+            return FsIoException(response)
         payload_obj = ensureJsonObject(json.loads(response[0])) #FIXME: use DTOs everywhere?
         raw_objects = ensureJsonArray(payload_obj.get("objects"))
 
@@ -111,13 +112,26 @@ class BucketFs(IFilesystem):
                 files.append(path)
         return FsDirectoryContents(files=files, directories=directories)
 
+    def _parse_url_from_data_proxy_response(self, response_payload: bytes) -> "Url | Exception":
+        response_json_result = parse_json(response_payload)
+        if isinstance(response_json_result, Exception):
+            return response_json_result
+        response_dto_result = DataProxyObjectUrlResponse.from_json_value(response_json_result)
+        if isinstance(response_dto_result, Exception):
+            return response_dto_result
+        out_url = Url.parse(response_dto_result.url)
+        if out_url is None:
+            return Exception("Could not parse URL from data proxy response")
+        return out_url
+
     def create_file(self, *, path: PurePosixPath, contents: bytes) -> "None | FsIoException":
         response = _requests_from_data_proxy(method="put", url=self.url.concatpath(path), data=None)
         if isinstance(response, Exception):
             return FsIoException(response)
-        response_obj = ensureJsonObject(json.loads(response[0]))
-        cscs_url = Url.parse_or_raise(ensureJsonString(response_obj.get("url"))) #FIXME: could raise
-        response = safe_request(session=_cscs_session, method="put", url=cscs_url, data=contents)
+        cscs_url_result = self._parse_url_from_data_proxy_response(response[0])
+        if isinstance(cscs_url_result, Exception):
+            return FsIoException(f"Could not parse CSCS object URL (write): {cscs_url_result}")
+        response = safe_request(session=_cscs_session, method="put", url=cscs_url_result, data=contents)
         if isinstance(response, Exception):
             return FsIoException(response)
         return None
@@ -132,7 +146,10 @@ class BucketFs(IFilesystem):
             return FsFileNotFoundException(path)
         if isinstance(data_proxy_response, Exception):
             return FsIoException(data_proxy_response) # FIXME: pass exception directly into other?
-        return Url.parse_or_raise(json.loads(data_proxy_response[0])["url"]) #FIXME: fix all raises
+        cscs_url_result = self._parse_url_from_data_proxy_response(data_proxy_response[0])
+        if isinstance(cscs_url_result, Exception):
+            return FsIoException(f"Could not parse CSCS object URL (read): {cscs_url_result}")
+        return cscs_url_result
 
     def read_file(self, path: PurePosixPath, offset: int = 0, num_bytes: "int | None"  = None) -> "bytes | FsIoException | FsFileNotFoundException":
         cscs_url_result = self.get_swift_object_url(path=path)

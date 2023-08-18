@@ -614,5 +614,15 @@ class EbrainsAccessTokenDto(DataTransferObject):
 ##########################################33
 
 @dataclass
+class DataProxyObjectUrlResponse(DataTransferObject):
+    url: str
+
+    @classmethod
+    def tag_value(cls) -> "str | None":
+        return None
+
+###########################################
+
+@dataclass
 class LoginRequiredErrorDto(DataTransferObject):
     pass
