@@ -1,3 +1,10 @@
+/* hide neuroglancer's buttons */
+.neuroglancer-viewer-top-row div[title="Show layer list panel"],
+.neuroglancer-viewer-top-row div[title="Show selection details panel"],
+.neuroglancer-viewer-top-row div[title="Hide layer side panel"]{
+    display: none;
+}
+
 :root{
     --default-font-family: helvetica;
     --default-info-font-style: italic;
