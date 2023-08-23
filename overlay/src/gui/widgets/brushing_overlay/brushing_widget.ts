@@ -97,6 +97,17 @@ export class BrushingWidget{
         viewer.addViewportsChangedHandler(() => this.handleViewerDataDisplayChange())
         // this.setBrushingEnabled(false)
         this.handleViewerDataDisplayChange()
+
+        window.addEventListener("keydown", (ev) => {
+            if(ev.altKey && !this.brushingEnabledCheckbox.disabled){
+                this.setBrushingEnabled(true)
+            }
+        })
+        window.addEventListener("keyup", (ev) => {
+            if(!ev.altKey && !this.brushingEnabledCheckbox.disabled){
+                this.setBrushingEnabled(false)
+            }
+        })
     }
 
     private setBrushingEnabled(brushingEnabled: boolean){
