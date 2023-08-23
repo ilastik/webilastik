@@ -229,7 +229,7 @@ class WebIlastik:
         if isinstance(datasources_result, Exception):
             return uncachable_json_response(RpcErrorDto(error=str(datasources_result)).to_json_value(), status=400)
         if isinstance(datasources_result, type(None)):
-            return uncachable_json_response(GetDatasourcesFromUrlResponseDto(datasources=None).to_json_value(), status=400)
+            return uncachable_json_response(RpcErrorDto(error=f"Unsupported data format: {url}").to_json_value(), status=400)
         return uncachable_json_response(
             GetDatasourcesFromUrlResponseDto(datasources=tuple([ds.to_dto() for ds in datasources_result])).to_json_value(),
             status=200,

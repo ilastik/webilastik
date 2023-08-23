@@ -4153,7 +4153,7 @@ export function parse_as_GetDatasourcesFromUrlResponseDto(
     );
   }
   const temp_datasources =
-    parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
+    parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
       valueObject.datasources,
     );
   if (temp_datasources instanceof MessageParsingError) return temp_datasources;
@@ -4164,20 +4164,18 @@ export function parse_as_GetDatasourcesFromUrlResponseDto(
 // Automatically generated via DataTransferObject for GetDatasourcesFromUrlResponseDto
 // Do not edit!
 export class GetDatasourcesFromUrlResponseDto {
-  public datasources:
-    | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
-    | undefined;
+  public datasources: Array<
+    PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto
+  >;
   constructor(_params: {
-    datasources:
-      | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
-      | undefined;
+    datasources: Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>;
   }) {
     this.datasources = _params.datasources;
   }
   public toJsonValue(): JsonObject {
     return {
       "__class__": "GetDatasourcesFromUrlResponseDto",
-      datasources: toJsonValue(this.datasources),
+      datasources: this.datasources.map((item) => toJsonValue(item)),
     };
   }
   public static fromJsonValue(value: JsonValue): GetDatasourcesFromUrlResponseDto | MessageParsingError {

@@ -4201,7 +4201,7 @@ def parse_as_GetDatasourcesFromUrlResponseDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as GetDatasourcesFromUrlResponseDto"
         )
-    tmp_datasources = parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
+    tmp_datasources = parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
         value.get("datasources")
     )
     if isinstance(tmp_datasources, MessageParsingError):
@@ -4213,12 +4213,14 @@ def parse_as_GetDatasourcesFromUrlResponseDto(
 
 @dataclass
 class GetDatasourcesFromUrlResponseDto(DataTransferObject):
-    datasources: Union[Tuple[FsDataSourceDto, ...], None]
+    datasources: Tuple[FsDataSourceDto, ...]
 
     def to_json_value(self) -> JsonObject:
         return {
             "__class__": "GetDatasourcesFromUrlResponseDto",
-            "datasources": convert_to_json_value(self.datasources),
+            "datasources": tuple(
+                convert_to_json_value(item) for item in self.datasources
+            ),
         }
 
     @classmethod

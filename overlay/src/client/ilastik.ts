@@ -556,7 +556,7 @@ export class Session{
         return undefined
     }
 
-    public async getDatasourcesFromUrl(params: GetDatasourcesFromUrlParamsDto): Promise<Array<FsDataSource> | undefined | Error>{
+    public async getDatasourcesFromUrl(params: GetDatasourcesFromUrlParamsDto): Promise<Array<FsDataSource> | Error>{
         let result = await this.authenticatedFetchJson({
             url: this.sessionUrl.joinPath("get_datasources_from_url"),
             jsonablePayload: params,
@@ -567,9 +567,6 @@ export class Session{
         const responseDto =  GetDatasourcesFromUrlResponseDto.fromJsonValue(result);
         if(responseDto instanceof Error){
             return responseDto
-        }
-        if(responseDto.datasources === undefined){
-            return undefined
         }
         return responseDto.datasources.map(msg => FsDataSource.fromDto(msg))
     }
@@ -897,6 +894,10 @@ export abstract class FsDataSource{
         this.dtype = params.dtype;
     }
 
+    public hasSameScaleAs(_other: FsDataSource): boolean{
+        return false
+    }
+
     public get shape(): Shape5D{
         return this.interval.shape
     }
@@ -963,6 +964,11 @@ export class PrecomputedChunksDataSource extends FsDataSource{
         super(params)
         this.encoder = params.encoder
         this.scale_key = params.scale_key
+    }
+
+    public hasSameScaleAs(other: FsDataSource): boolean {
+        return other instanceof PrecomputedChunksDataSource &&
+            this.spatial_resolution.every((val, idx) => val == other.spatial_resolution[idx])
     }
 
     public static fromDto(dto: PrecomputedChunksDataSourceDto) : PrecomputedChunksDataSource{
@@ -1186,6 +1192,14 @@ export class DziLevelDataSource extends FsDataSource{
         this.num_channels = params.num_channels
     }
 
+    public get scale(): number{
+        return 1 / Math.pow(2, this.dzi_image.max_level_index - this.level_index)
+    }
+
+    public hasSameScaleAs(other: FsDataSource): boolean{
+        return other instanceof DziLevelDataSource && this.scale == other.scale
+    }
+
     public getDisplayString(): string {
         let name = this.url.path.name
         for(let comp of this.url.path.components){
@@ -1198,7 +1212,7 @@ export class DziLevelDataSource extends FsDataSource{
     }
 
     public get resolutionString(): string {
-        return `${this.shape.x}x${this.shape.y} px`
+        return `${(this.scale * 100).toFixed(2)}%`
     }
 
     public static fromDto(dto: DziLevelDataSourceDto) : DziLevelDataSource{
