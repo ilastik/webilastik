@@ -128,4 +128,4 @@ Once your server is up, just go to https://app.ilastik.org/
 
 # Acknowledgements
 This project received funding from the European Union’s Horizon 2020 Framework Programme for Research and Innovation
-under the Framework Partnership Agreement No. 650003 (HBP FPA).
+under the Framework Partnership Agreement No. 650003 (HBP FPA, SGA2 and SGA3).
