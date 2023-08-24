@@ -63,10 +63,6 @@ export class BrushingWidget{
                 }),
             })
 
-        viewer.addDataChangedHandler(() => this.handleViewerDataDisplayChange())
-        viewer.addViewportsChangedHandler(() => this.handleViewerDataDisplayChange())
-        // this.setBrushingEnabled(false)
-        this.handleViewerDataDisplayChange()
 
         this.enableBrushingHandler = (ev: KeyboardEvent) => {
             if(ev.code == "AltLeft" || ev.code == "AltRight"){
@@ -96,20 +92,20 @@ export class BrushingWidget{
             this.overlay.render(strokes, this.brushStrokeRenderer)
         }
         this.render()
+
+        viewer.addDataChangedHandler(this.handleViewerDataDisplayChange)
+        viewer.addViewportsChangedHandler(this.handleViewerDataDisplayChange)
+        this.handleViewerDataDisplayChange()
     }
 
-    private async handleViewerDataDisplayChange(){
+    private handleViewerDataDisplayChange = async () => {
         const lane = this.viewer.getActiveLaneWidget()
         if(lane === undefined){
-            console.log("No image, so hiding canvas")
-            console.log(this.canvas)
             this.canvas.style.display = "none"
             this.overlay?.destroy()
             this.overlay = undefined
             return
         }
-        console.log("There is an image so showng canvas...")
-        console.log(this.canvas)
         this.canvas.style.display = "block"
         this.overlay = new BrushingOverlay({
             datasource: lane.rawData,
@@ -145,6 +141,10 @@ export class BrushingWidget{
         this.predictingWidget.destroy()
         this.brushingApplet.destroy()
         removeElement(this.element)
+
+        this.viewer.removeDataChangedHandler(this.handleViewerDataDisplayChange)
+        this.viewer.removeViewportsChangedHandler(this.handleViewerDataDisplayChange)
+
         //FIXME: remove event from viewer
     }
 }
