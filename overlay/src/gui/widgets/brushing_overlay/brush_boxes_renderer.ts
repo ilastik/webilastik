@@ -235,10 +235,10 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
         this.uniformMatrix3fv(this.u_clip_to_world__location, u_clip_to_world)
 
         for(let [color, annotations] of brush_strokes){
+            if(this.color__location !== undefined){
+                this.uniform3fv(this.color__location, color.vec3f)
+            }
             for(let brush_stroke of annotations){
-                if(this.color__location !== undefined){
-                    this.uniform3fv(this.color__location, color.vec3f)
-                }
                 brush_stroke.positions_buffer.useAsInstacedAttribute({vao: this.vao, location: this.a_offset_vx__location, attributeDivisor: 1})
                 this.gl.drawArraysInstanced( //instance-draw a bunch of cubes, one cube for each voxel in the brush stroke
                 /*mode=*/this.box.getDrawingMode(),
