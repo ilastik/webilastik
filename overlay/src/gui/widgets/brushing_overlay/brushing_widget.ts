@@ -65,7 +65,7 @@ export class BrushingWidget{
 
 
         this.enableBrushingHandler = (ev: KeyboardEvent) => {
-            if(ev.code == "AltLeft" || ev.code == "AltRight"){
+            if(this.brushingApplet.currentColor && (ev.code == "AltLeft" || ev.code == "AltRight")){
                 this.overlay?.setBrushingEnabled(true)
             }
         }
