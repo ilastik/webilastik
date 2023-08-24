@@ -16,7 +16,7 @@ export class OverlayViewport{
     public readonly canvas: HTMLCanvasElement
     public readonly viewport_driver: IViewportDriver
     public readonly element: HTMLElement
-    private readonly datasource: FsDataSource
+    public readonly datasource: FsDataSource
 
     public constructor({
         datasource,
@@ -171,6 +171,7 @@ export class OverlayViewport{
 }
 
 export class BrushingOverlay{
+    public readonly datasource: FsDataSource
     public readonly trackedElement: HTMLElement
     public readonly element: HTMLCanvasElement
     private readonly brush_stroke_handler: IBrushStrokeHandler
@@ -192,6 +193,7 @@ export class BrushingOverlay{
         brush_stroke_handler: IBrushStrokeHandler,
         gl: WebGL2RenderingContext
     }){
+        this.datasource = datasource
         this.trackedElement = trackedElement;
         this.brush_stroke_handler = brush_stroke_handler
         this.gl = gl

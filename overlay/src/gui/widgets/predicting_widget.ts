@@ -5,7 +5,6 @@ import { Path } from "../../util/parsed_url";
 import { ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonObject, ensureJsonString, ensureOptional, JsonValue } from "../../util/serialization";
 import { Viewer } from "../../viewer/viewer";
 import { CssClasses } from "../css_classes";
-import { Button } from "./input_widget";
 import { BooleanInput } from "./value_input_widget";
 import { Div, ImageWidget, Label, Paragraph } from "./widget";
 
@@ -93,12 +92,6 @@ export class PredictingWidget extends Applet<State>{
                 new Label({innerText: "Live Update", parentElement: undefined}),
                 this.liveUpdateCheckbox = new BooleanInput({parentElement: undefined, onClick: () => {
                     this.doRPC("set_live_update", {live_update: this.liveUpdateCheckbox.value})
-                }}),
-                new Button({inputType: "button", text: "Clear Predictions", parentElement: undefined, onClick: (ev): false => {
-                    this.closePredictionViews()
-                    this.doRPC("set_live_update", {live_update: false})
-                    ev.preventDefault() //FIXME: is this necessary to prevent form submition?
-                    return false //FIXME: is this necessary to prevent form submition?
                 }}),
             ]}),
         ]})
