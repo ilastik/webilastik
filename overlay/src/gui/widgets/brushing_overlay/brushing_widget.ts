@@ -8,7 +8,7 @@ import { BrushingApplet } from "./brush_strokes_container"
 import { Viewer } from "../../../viewer/viewer"
 import { PredictingWidget } from "../predicting_widget";
 import { Vec3, Quat } from "../../../util/ooglmatrix"
-import { Div, Paragraph } from "../widget"
+import { Paragraph } from "../widget"
 import { CssClasses } from "../../css_classes"
 
 
@@ -51,12 +51,10 @@ export class BrushingWidget{
         this.element.classList.add("ItkBrushingWidget")
         this.viewer = viewer
 
-        const trainingWidget = new Div({parentElement: this.element, children: [
-            new Paragraph({parentElement: undefined, innerText: "Hold ALT to brush", cssClasses: [CssClasses.ItkEmphasisText]})
-        ]})
-        this.predictingWidget = new PredictingWidget({session, viewer: this.viewer, parentElement: trainingWidget})
+        this.predictingWidget = new PredictingWidget({session, viewer: this.viewer, parentElement: this.element})
+        new Paragraph({parentElement: this.element, innerText: "Hold Alt to brush!", cssClasses: [CssClasses.InfoText]})
         this.brushingApplet = new BrushingApplet({
-            parentElement: trainingWidget.element,
+            parentElement: this.element,
             session,
             applet_name,
             gl: this.gl,
