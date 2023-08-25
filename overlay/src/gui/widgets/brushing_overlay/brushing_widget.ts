@@ -8,12 +8,13 @@ import { BrushingApplet } from "./brush_strokes_container"
 import { Viewer } from "../../../viewer/viewer"
 import { PredictingWidget } from "../predicting_widget";
 import { Vec3, Quat } from "../../../util/ooglmatrix"
+import { Div, Paragraph } from "../widget"
+import { CssClasses } from "../../css_classes"
 
 
 export class BrushingWidget{
     public readonly viewer: Viewer
     public readonly element: HTMLElement
-    private readonly trainingWidget: HTMLDivElement
 
     private animationRequestId: number = 0
     session: Session
@@ -50,18 +51,19 @@ export class BrushingWidget{
         this.element.classList.add("ItkBrushingWidget")
         this.viewer = viewer
 
-        this.trainingWidget = createElement({tagName: "div", parentElement: this.element})
-            this.predictingWidget = new PredictingWidget({session, viewer: this.viewer, parentElement: this.trainingWidget})
-
-            this.brushingApplet = new BrushingApplet({
-                parentElement: this.trainingWidget,
-                session,
-                applet_name,
-                gl: this.gl,
-                onDataSourceClicked: async (rawData) => this.viewer.openLane({
-                    name: rawData.url.name, rawData, isVisible: true
-                }),
-            })
+        const trainingWidget = new Div({parentElement: this.element, children: [
+            new Paragraph({parentElement: undefined, innerText: "Hold ALT to brush", cssClasses: [CssClasses.ItkEmphasisText]})
+        ]})
+        this.predictingWidget = new PredictingWidget({session, viewer: this.viewer, parentElement: trainingWidget})
+        this.brushingApplet = new BrushingApplet({
+            parentElement: trainingWidget.element,
+            session,
+            applet_name,
+            gl: this.gl,
+            onDataSourceClicked: async (rawData) => this.viewer.openLane({
+                name: rawData.url.name, rawData, isVisible: true
+            }),
+        })
 
 
         this.enableBrushingHandler = (ev: KeyboardEvent) => {

@@ -276,6 +276,10 @@ class RpcErrorDto(DataTransferObject):
 
 #################################################################
 @dataclass
+class SetLiveUpdateParams(DataTransferObject):
+    live_update: bool
+
+@dataclass
 class RecolorLabelParams(DataTransferObject):
     label_name: str
     new_color: ColorDto
