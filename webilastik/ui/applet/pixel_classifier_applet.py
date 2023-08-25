@@ -110,8 +110,7 @@ class PixelClassificationApplet(Applet):
 
             label_classes = self._in_label_classes()
             feature_extractors = self._in_feature_extractors()
-            if sum(len(labels) for labels in label_classes.values()) == 0 or not feature_extractors:
-                # annotations or features changed, so classifier is stale
+            if sum(len(labels) for labels in label_classes.values()) == 0 or len(feature_extractors.filters) == 0:
                 self._state = self._state.updated_with(classifier=None)
                 return CascadeOk()
 
