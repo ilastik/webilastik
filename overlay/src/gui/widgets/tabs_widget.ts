@@ -1,5 +1,5 @@
 import { CssClasses } from "../css_classes";
-import { Div, Label, Widget } from "./widget";
+import { ContainerWidget, Div, Label, Widget } from "./widget";
 
 
 export class TabsWidget<LABEL extends string, WIDGET extends Widget<any>>{
@@ -11,7 +11,7 @@ export class TabsWidget<LABEL extends string, WIDGET extends Widget<any>>{
     private _current: {label: LABEL, widget: WIDGET};
 
     constructor(params: {
-        parentElement: HTMLElement | undefined,
+        parentElement: ContainerWidget<any> | HTMLElement | undefined,
         tabBodyWidgets: Map<LABEL, WIDGET>,
         onSwitch?: (label: LABEL, activeWidget: WIDGET, allWidgets: Array<WIDGET>) => void,
     }){

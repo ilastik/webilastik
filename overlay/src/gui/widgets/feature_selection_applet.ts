@@ -34,7 +34,7 @@ export class FeatureSelectionApplet extends Applet<{feature_extractors: IlpFeatu
         new Paragraph({parentElement: this.element, children: [
             new Button({parentElement: this.element, inputType: "button", text: "Select features", onClick: async () => {
                 const popup = new PopupWidget("Select Image Features", true);
-                const featureSelector = new FeatureSelector({parentElement: popup.element, value: this.state})
+                const featureSelector = new FeatureSelector({parentElement: popup.contents, value: this.state})
                 new ButtonWidget({contents: "Ok", parentElement: featureSelector.buttonsContainer, onClick: () => {
                     this.state = featureSelector.value //mask latency
                     this.doRPC(

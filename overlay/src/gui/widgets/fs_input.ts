@@ -3,7 +3,7 @@ import { Path } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
 import { TabsWidget } from "./tabs_widget";
 import { BucketFsInput, HttpFsInput } from "./value_input_widget";
-import { Div, Label, WidgetParams } from "./widget";
+import { ContainerWidget, Div, Label, WidgetParams } from "./widget";
 
 
 abstract class FsInputForm extends Div{
@@ -60,7 +60,7 @@ export class FsInputWidget{
     private _required: boolean;
 
     constructor(params: {
-        parentElement: HTMLElement, defaultBucketName?: string, required?: boolean, filesystemChoices: Array<"http" | "data-proxy">
+        parentElement: ContainerWidget<any> | HTMLElement, defaultBucketName?: string, required?: boolean, filesystemChoices: Array<"http" | "data-proxy">
     }){
         this._required = params.required === undefined ? false : params.required;
         let filesystemWidgets = new Array<[string, FsInputForm]>()

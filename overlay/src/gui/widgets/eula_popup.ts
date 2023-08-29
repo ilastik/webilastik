@@ -6,11 +6,11 @@ import { Anchor, Paragraph } from "./widget";
 export class EulaPopup{
     constructor(){
         let popup = new PopupWidget("Using webilastik: Terms and Conditions")
-        new Paragraph({parentElement: popup.element, innerText: (
+        new Paragraph({parentElement: popup.contents, innerText: (
             "webilastik's computation is backed by the HPCs in CSCS and Juelich; Therefore, in order to use this application, " +
             "you agree to the terms and conditions of using each of those HPC sites:"
         )})
-        new Paragraph({parentElement: popup.element, children: [
+        new Paragraph({parentElement: popup.contents, children: [
             new Anchor({
                 parentElement: undefined,
                 innerText: "CSCS user regulations",
@@ -19,7 +19,7 @@ export class EulaPopup{
                 rel: "noopener noreferrer",
             }),
         ]})
-        new Paragraph({parentElement: popup.element, children: [
+        new Paragraph({parentElement: popup.contents, children: [
             new Anchor({
                 parentElement: undefined,
                 innerText: "Juelich user regulations",
@@ -27,12 +27,12 @@ export class EulaPopup{
                 target: "_blank",
                 rel: "noopener noreferrer",
             }),
-            new Paragraph({parentElement: popup.element, innerText: `
+            new Paragraph({parentElement: popup.contents, innerText: `
                 Further, you agree to not use this application to process any personal data as defined by the GDPR.
             `})
         ]})
         new Button({
-            inputType: "button", parentElement: popup.element, text: "I accept the agreement", onClick: () => popup.destroy()
+            inputType: "button", parentElement: popup.contents, text: "I accept the agreement", onClick: () => popup.destroy()
         })
     }
 }

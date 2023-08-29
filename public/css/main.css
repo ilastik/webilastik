@@ -61,6 +61,9 @@ body{
     font-family: var(--default-font-family);
     background-color: var(--default-background-color);
     color: var(--default-text-color);
+}
+
+.ItkPopupContents{
     padding: var(--default-content-padding);
 }
 
@@ -144,6 +147,11 @@ details.ItkCollapsableApplet .ItkTitleBar::before{
     border-bottom: solid var(--default-button-border-thickness) var(--default-highlight-dark-color);
     border-right: solid var(--default-button-border-thickness) var(--default-highlight-dark-color);
     cursor: default;
+}
+
+.ItkButton[type="color"]{
+    padding: 0;
+    border: 0;
 }
 
 .ItkButton:hover:not(.ItkDisabled):not(disabled){

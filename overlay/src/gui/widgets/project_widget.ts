@@ -5,7 +5,7 @@ import { Path } from "../../util/parsed_url";
 import { CollapsableWidget } from "./collapsable_applet_gui";
 import { ErrorPopupWidget, PopupWidget } from "./popup";
 import { FileLocationInputWidget } from "./file_location_input";
-import { Div, Form, Label, Paragraph } from "./widget";
+import { ContainerWidget, Div, Form, Label, Paragraph } from "./widget";
 import { CssClasses } from "../css_classes";
 import { Button } from "./input_widget";
 import { TabsWidget } from "./tabs_widget";
@@ -31,7 +31,7 @@ export class ProjectLoaderWidget{
     onSuccess: () => void;
 
     constructor(params: {
-        parentElement: HTMLElement | undefined,
+        parentElement: ContainerWidget<any> | undefined,
         session: Session,
         defaultBucketName: string,
         onSuccess: () => void,
@@ -122,7 +122,7 @@ export class ProjectWidget{
             new Button({inputType: "button", parentElement: undefined, text: "Load Project", onClick: () => {
                 let popup = new PopupWidget("Select a project file to load", true)
                 new ProjectLoaderWidget({
-                    parentElement: popup.element,
+                    parentElement: popup.contents,
                     session: params.session,
                     defaultBucketName: this.defaultBucketName,
                     onSuccess: () => popup.destroy(),
@@ -145,12 +145,12 @@ export class ProjectWidget{
     private popupSaveProject = () => {
         const popup = new PopupWidget("Save Project", true);
         const fileLocationInput = new FileLocationInputWidget({
-            parentElement: popup.element,
+            parentElement: popup.contents,
             filesystemChoices: ["data-proxy"],
             defaultBucketName: this.defaultBucketName,
             defaultPath: this.savedPath || this.defaultPath,
         })
-        new Paragraph({parentElement: popup.element, children: [
+        new Paragraph({parentElement: popup.contents, children: [
             new Button({inputType: "button", text: "Save Project", parentElement: undefined, onClick: async () => {
                 const fileLocation = fileLocationInput.value
                 if(fileLocation === undefined){

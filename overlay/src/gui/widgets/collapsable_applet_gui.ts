@@ -27,9 +27,9 @@ export class CollapsableWidget{
                     let popup = PopupWidget.ClosablePopup({title: `Help: ${display_name}`});
                     for(const helpWidget of help){
                         if(typeof helpWidget == "string"){
-                            new Paragraph({parentElement: popup.element, innerText: helpWidget})
+                            new Paragraph({parentElement: popup.contents, innerText: helpWidget})
                         }else{
-                            popup.appendChild(helpWidget)
+                            popup.contents.appendChild(helpWidget)
                         }
                     }
                 }
