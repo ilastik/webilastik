@@ -28,7 +28,7 @@ export class FeatureSelectionApplet extends Applet<{feature_extractors: IlpFeatu
             },
             onNewState: (new_state) => this.onNewState(new_state)
         })
-        this.element = new CollapsableWidget({display_name: "Select Image Features", parentElement, help}).element
+        this.element = new CollapsableWidget({display_name: "Image Features", parentElement, help}).element
         this.element.classList.add("ItkFeatureSelectionWidget")
 
         new Paragraph({parentElement: this.element, children: [
