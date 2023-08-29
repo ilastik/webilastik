@@ -1849,6 +1849,43 @@ export class RpcErrorDto {
   }
 }
 
+export function parse_as_bool(value: JsonValue): boolean | MessageParsingError {
+  return ensureJsonBoolean(value);
+}
+export function parse_as_SetLiveUpdateParams(value: JsonValue): SetLiveUpdateParams | MessageParsingError {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof MessageParsingError) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "SetLiveUpdateParams") {
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a SetLiveUpdateParams`);
+  }
+  const temp_live_update = parse_as_bool(valueObject.live_update);
+  if (temp_live_update instanceof MessageParsingError) return temp_live_update;
+  return new SetLiveUpdateParams({
+    live_update: temp_live_update,
+  });
+}
+// Automatically generated via DataTransferObject for SetLiveUpdateParams
+// Do not edit!
+export class SetLiveUpdateParams {
+  public live_update: boolean;
+  constructor(_params: {
+    live_update: boolean;
+  }) {
+    this.live_update = _params.live_update;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "SetLiveUpdateParams",
+      live_update: this.live_update,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): SetLiveUpdateParams | MessageParsingError {
+    return parse_as_SetLiveUpdateParams(value);
+  }
+}
+
 export function parse_as_RecolorLabelParams(value: JsonValue): RecolorLabelParams | MessageParsingError {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof MessageParsingError) {
@@ -3485,9 +3522,6 @@ export function parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCES
   }
   return new MessageParsingError(`Could not parse ${value} as 'LOCAL_DASK' | 'LOCAL_PROCESS_POOL' | 'CSCS' | 'JUSUF'`);
 }
-export function parse_as_bool(value: JsonValue): boolean | MessageParsingError {
-  return ensureJsonBoolean(value);
-}
 export function parse_as_ComputeSessionStatusDto(value: JsonValue): ComputeSessionStatusDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof MessageParsingError) {
@@ -4153,7 +4187,7 @@ export function parse_as_GetDatasourcesFromUrlResponseDto(
     );
   }
   const temp_datasources =
-    parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
+    parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
       valueObject.datasources,
     );
   if (temp_datasources instanceof MessageParsingError) return temp_datasources;
@@ -4164,20 +4198,18 @@ export function parse_as_GetDatasourcesFromUrlResponseDto(
 // Automatically generated via DataTransferObject for GetDatasourcesFromUrlResponseDto
 // Do not edit!
 export class GetDatasourcesFromUrlResponseDto {
-  public datasources:
-    | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
-    | undefined;
+  public datasources: Array<
+    PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto
+  >;
   constructor(_params: {
-    datasources:
-      | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
-      | undefined;
+    datasources: Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>;
   }) {
     this.datasources = _params.datasources;
   }
   public toJsonValue(): JsonObject {
     return {
       "__class__": "GetDatasourcesFromUrlResponseDto",
-      datasources: toJsonValue(this.datasources),
+      datasources: this.datasources.map((item) => toJsonValue(item)),
     };
   }
   public static fromJsonValue(value: JsonValue): GetDatasourcesFromUrlResponseDto | MessageParsingError {

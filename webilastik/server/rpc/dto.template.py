@@ -276,6 +276,10 @@ class RpcErrorDto(DataTransferObject):
 
 #################################################################
 @dataclass
+class SetLiveUpdateParams(DataTransferObject):
+    live_update: bool
+
+@dataclass
 class RecolorLabelParams(DataTransferObject):
     label_name: str
     new_color: ColorDto
@@ -515,7 +519,7 @@ class GetDatasourcesFromUrlParamsDto(DataTransferObject):
 
 @dataclass
 class GetDatasourcesFromUrlResponseDto(DataTransferObject):
-    datasources: Union[Tuple[FsDataSourceDto, ...], None]
+    datasources: Tuple[FsDataSourceDto, ...]
 
 
 @dataclass

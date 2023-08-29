@@ -1,13 +1,12 @@
 import { Applet } from "../../client/applets/applet";
-import { CheckDatasourceCompatibilityParams, CheckDatasourceCompatibilityResponse, Shape5DDto } from "../../client/dto";
+import { CheckDatasourceCompatibilityParams, CheckDatasourceCompatibilityResponse, SetLiveUpdateParams, Shape5DDto } from "../../client/dto";
 import { Color, FsDataSource, Session, Shape5D } from "../../client/ilastik";
 import { Path } from "../../util/parsed_url";
 import { ensureJsonArray, ensureJsonBoolean, ensureJsonNumber, ensureJsonObject, ensureJsonString, ensureOptional, JsonValue } from "../../util/serialization";
 import { Viewer } from "../../viewer/viewer";
 import { CssClasses } from "../css_classes";
-import { Button } from "./input_widget";
-import { BooleanInput } from "./value_input_widget";
-import { Div, ImageWidget, Label, Paragraph } from "./widget";
+import { ToggleButtonWidget } from "./input_widget";
+import { ContainerWidget, Div, ImageWidget, Paragraph, Span } from "./widget";
 
 const classifier_descriptions = ["disabled", "waiting for inputs", "training", "ready", "error"] as const;
 export type ClassifierDescription = typeof classifier_descriptions[number];
@@ -60,8 +59,8 @@ export class PredictingWidget extends Applet<State>{
     public readonly session: Session
 
     public readonly element: Div
-    private classifierDescriptionDisplay: Paragraph
-    private liveUpdateCheckbox: BooleanInput
+    private classifierDescriptionDisplay: Span
+    private liveUpdateButton: ToggleButtonWidget<boolean>
     private state: State = {
         generation: -1,
         description: "waiting for inputs",
@@ -70,7 +69,7 @@ export class PredictingWidget extends Applet<State>{
         minInputShape: undefined,
     }
 
-    constructor({session, viewer, parentElement}: {session: Session, viewer: Viewer, parentElement: HTMLElement}){
+    constructor({session, viewer, parentElement}: {session: Session, viewer: Viewer, parentElement: HTMLElement | ContainerWidget<any>}){
         super({
             deserializer: deserializeState,
             name: "pixel_classification_applet",
@@ -78,7 +77,7 @@ export class PredictingWidget extends Applet<State>{
             onNewState: (new_state: State) => {
                 this.state = new_state
                 this.showInfo(new_state.description)
-                this.liveUpdateCheckbox.value = new_state.live_update
+                this.liveUpdateButton.depressed = new_state.live_update
                 this.refreshPredictions()
             },
         })
@@ -87,19 +86,19 @@ export class PredictingWidget extends Applet<State>{
         viewer.addViewportsChangedHandler(() => this.refreshPredictions())
         this.session = session
 
+        let buttonContents: Span;
         this.element = new Div({parentElement, children: [
-            this.classifierDescriptionDisplay = new Paragraph({parentElement: undefined}),
             new Paragraph({parentElement: undefined, cssClasses: [CssClasses.ItkInputParagraph], children: [
-                new Label({innerText: "Live Update", parentElement: undefined}),
-                this.liveUpdateCheckbox = new BooleanInput({parentElement: undefined, onClick: () => {
-                    this.doRPC("set_live_update", {live_update: this.liveUpdateCheckbox.value})
-                }}),
-                new Button({inputType: "button", text: "Clear Predictions", parentElement: undefined, onClick: (ev): false => {
-                    this.closePredictionViews()
-                    this.doRPC("set_live_update", {live_update: false})
-                    ev.preventDefault() //FIXME: is this necessary to prevent form submition?
-                    return false //FIXME: is this necessary to prevent form submition?
-                }}),
+                this.liveUpdateButton = new ToggleButtonWidget({
+                    parentElement: undefined,
+                    contents: [buttonContents = new Span({parentElement: undefined, innerText: "▷ Live Update"})],
+                    valueWhenDepressed: true,
+                    onClick: () => {
+                        this.doRPC("set_live_update", new SetLiveUpdateParams({live_update: this.liveUpdateButton.depressed}))
+                        buttonContents.setInnerText(this.liveUpdateButton.depressed ? "⏸︎ Live Update" : "⏵︎ Live Update")
+                    }
+                }),
+                this.classifierDescriptionDisplay = new Span({parentElement: undefined, inlineCss: {marginLeft: "0.5ex"}}),
             ]}),
         ]})
     }
@@ -132,7 +131,11 @@ export class PredictingWidget extends Applet<State>{
         this.classifierDescriptionDisplay.clear()
         this.classifierDescriptionDisplay.setInnerText(`Classifier status: ${description} `)
         if(description == "training"){
-            new ImageWidget({src: Path.parse("/public/images/loading.gif"), parentElement: this.classifierDescriptionDisplay})
+            new ImageWidget({
+                src: Path.parse("/public/images/loading.gif"),
+                parentElement: this.classifierDescriptionDisplay,
+                inlineCss: {height: "1.7ex"}
+            })
         }
 
         if(description == "error"){

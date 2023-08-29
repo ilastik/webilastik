@@ -10,7 +10,7 @@ from webilastik.classifiers.pixel_classifier import PixelClassifier, VigraPixelC
 from webilastik.datasource import DataRoi, FsDataSource
 from webilastik.datasource.precomputed_chunks_info import PrecomputedChunksInfo, PrecomputedChunksScale, RawEncoder
 from webilastik.server.rpc import MessageParsingError
-from webilastik.server.rpc.dto import CheckDatasourceCompatibilityParams, CheckDatasourceCompatibilityResponse, RpcErrorDto, Shape5DDto
+from webilastik.server.rpc.dto import CheckDatasourceCompatibilityParams, CheckDatasourceCompatibilityResponse, RpcErrorDto, SetLiveUpdateParams, Shape5DDto
 from webilastik.ui.applet import CascadeError, UserPrompt
 from webilastik.ui.applet.pixel_classifier_applet import PixelClassificationApplet
 from webilastik.ui.applet.ws_applet import WsApplet
@@ -39,8 +39,10 @@ class WsPixelClassificationApplet(WsApplet, PixelClassificationApplet):
 
     def run_rpc(self, *, user_prompt: UserPrompt, method_name: str, arguments: JsonObject) -> Optional[UsageError]:
         if(method_name == "set_live_update"):
-            live_update = ensureJsonBoolean(arguments.get("live_update"))
-            result = self.set_live_update(user_prompt=user_prompt, live_update=live_update)
+            params = SetLiveUpdateParams.from_json_value(arguments)
+            if isinstance(params, Exception):
+                return UsageError(params) # FIXME: not a usage error. a bug, rather
+            result = self.set_live_update(user_prompt=user_prompt, live_update=params.live_update)
             if isinstance(result, CascadeError):
                 return UsageError(result.message)
             return None

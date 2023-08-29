@@ -1,10 +1,9 @@
-import { GetDatasourcesFromUrlParamsDto } from "../../client/dto";
 import { FsDataSource, Session } from "../../client/ilastik";
 import { Path, Url } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
 import { DataSourceSelectionWidget } from "./datasource_selection_widget";
 import { DataProxyFilePicker } from "./data_proxy_file_picker";
-import { Button, ButtonWidget } from "./input_widget";
+import { Button } from "./input_widget";
 import { LiveFsTree } from "./live_fs_tree";
 import { PopupWidget } from "./popup";
 import { ContainerWidget, Div, Paragraph, Span, Table, TableData, TableRow, TagName, Widget } from "./widget";
@@ -82,16 +81,16 @@ export class DataSourceFetchError extends Error{
 }
 
 export class DataSourceListWidget extends Div{
-    listWidget: ListWidget<FsDataSource | DataSourceFetchError>;
+    listWidget: ListWidget<FsDataSource>;
     session: Session;
     private defaultBucketName: string;
     private defaultBucketPath: Path;
 
     constructor(params: {
         parentElement: HTMLElement,
-        itemRenderer?: (value: FsDataSource | DataSourceFetchError) => Widget<TagName>,
-        onItemRemoved?: (value: FsDataSource | DataSourceFetchError) => void,
-        items?: Array<FsDataSource | DataSourceFetchError>,
+        itemRenderer?: (value: FsDataSource) => Widget<TagName>,
+        onItemRemoved?: (value: FsDataSource) => void,
+        items?: Array<FsDataSource>,
         session: Session,
         defaultBucketName: string,
         defaultBucketPath: Path,
@@ -126,26 +125,29 @@ export class DataSourceListWidget extends Div{
                 this.defaultBucketName = filePicker.bucketName || this.defaultBucketName;
                 this.defaultBucketPath = filePicker.bucketPath || this.defaultBucketPath;
 
-                let datasourcePromises = liveFsTree.getSelectedUrls().map(url => this.session.getDatasourcesFromUrl(
-                    new GetDatasourcesFromUrlParamsDto({url: url.toDto()})
-                ))
+                let datasourcesMap = await DataSourceSelectionWidget.tryResolveDataSources({
+                    urls: liveFsTree.getSelectedUrls(), session: this.session
+                })
 
-                for(let dsPromise of datasourcePromises){
-                    let datasourcesResult = await DataSourceSelectionWidget.uiResolveUrlToDatasource({
-                        datasources: dsPromise, session: this.session
-                    })
-                    if(datasourcesResult instanceof Error){
-                        const errorMessage = datasourcesResult.message;
-                        await PopupWidget.WaitPopup<void>({
-                            title: "Error",
-                            operation: (popup) => new Promise(resolve => {
-                                new Paragraph({parentElement: popup.element, innerText: errorMessage});
-                                new ButtonWidget({parentElement: popup.element, contents: "Ok", onClick: () => resolve()})
-                            })
-                        })
+                let errors = new Array<[Url, Error]>();
+                for(const [url, results] of datasourcesMap.entries()){
+                    if(results instanceof Error){
+                        errors.push([url, results])
                         continue
                     }
-                    datasourcesResult.forEach(ds => this.listWidget.push(ds))
+                    results.forEach(ds => this.listWidget.push(ds))
+                }
+                if(errors.length > 0){
+                    return PopupWidget.WaitOkPopup({
+                        title: "Errors opening URLs",
+                        contents: [
+                            new Paragraph({parentElement: undefined, innerText: "Some URLs could not be resolved:"}),
+                            ...errors.map(([url, err]) => new Paragraph({
+                                parentElement: undefined,
+                                innerText: `Could not open datasource at ${url.raw}: ${err.message}`
+                            }))
+                        ]
+                    })
                 }
             },
             okButtonValue: "Add",

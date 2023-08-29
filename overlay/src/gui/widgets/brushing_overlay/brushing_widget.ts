@@ -1,5 +1,5 @@
 import { BrushStroke } from "../../.."
-import { Color, FsDataSource, Session } from "../../../client/ilastik"
+import { Color, Session } from "../../../client/ilastik"
 import { createElement, removeElement } from "../../../util/misc"
 import { CollapsableWidget } from "../collapsable_applet_gui"
 import { BrushingOverlay } from "./brushing_overlay"
@@ -7,17 +7,14 @@ import { BrushelBoxRenderer } from "./brush_boxes_renderer"
 import { BrushingApplet } from "./brush_strokes_container"
 import { Viewer } from "../../../viewer/viewer"
 import { PredictingWidget } from "../predicting_widget";
-import { BooleanInput } from "../value_input_widget"
 import { Vec3, Quat } from "../../../util/ooglmatrix"
+import { Paragraph, Widget } from "../widget"
+import { CssClasses } from "../../css_classes"
 
 
 export class BrushingWidget{
     public readonly viewer: Viewer
     public readonly element: HTMLElement
-    private readonly status_display: HTMLElement
-    private readonly resolutionSelectionContainer: HTMLElement
-    private readonly trainingWidget: HTMLDivElement
-    private readonly brushingEnabledCheckbox: BooleanInput
 
     private animationRequestId: number = 0
     session: Session
@@ -28,7 +25,9 @@ export class BrushingWidget{
     private brushingApplet: BrushingApplet
     private predictingWidget: PredictingWidget
     private brushStrokeRenderer: BrushelBoxRenderer
-    private readonly toggleBrushingKeyHandler: (e: KeyboardEvent) => void
+    enableBrushingHandler: (ev: KeyboardEvent) => void
+    disableBrushingHandler: (ev: KeyboardEvent) => void
+    render: () => void
 
     constructor({
         applet_name,
@@ -41,7 +40,7 @@ export class BrushingWidget{
         session: Session,
         parentElement: HTMLElement,
         viewer: Viewer,
-        help: string[],
+        help: Array<string | Widget<any>>,
     }){
         this.session = session
         this.canvas = createElement({tagName: "canvas", parentElement: document.body, inlineCss: {display: "none"}})
@@ -52,137 +51,88 @@ export class BrushingWidget{
         this.element.classList.add("ItkBrushingWidget")
         this.viewer = viewer
 
+        this.predictingWidget = new PredictingWidget({session, viewer: this.viewer, parentElement: this.element})
+        new Paragraph({parentElement: this.element, innerText: "Hold Alt to brush!", cssClasses: [CssClasses.InfoText]})
+        this.brushingApplet = new BrushingApplet({
+            parentElement: this.element,
+            session,
+            applet_name,
+            gl: this.gl,
+            onDataSourceClicked: async (rawData) => this.viewer.openLane({
+                name: rawData.url.name, rawData, isVisible: true
+            }),
+        })
 
-        this.status_display = createElement({tagName:"p", parentElement: this.element, cssClasses: ["ItkBrushingWidget_status_display"]})
 
-        this.resolutionSelectionContainer = createElement({tagName: "p", parentElement: this.element})
-
-        this.trainingWidget = createElement({tagName: "div", parentElement: this.element})
-            this.predictingWidget = new PredictingWidget({session, viewer: this.viewer, parentElement: this.trainingWidget})
-
-            let brushingEnabledParagraph = createElement({tagName: "p", parentElement: this.trainingWidget})
-            createElement({tagName: "label", parentElement: brushingEnabledParagraph, innerText: "Enable Brushing: "})
-            this.brushingEnabledCheckbox = new BooleanInput({
-                parentElement: brushingEnabledParagraph,
-                title: "(B) Enable to draw annotations by clicking and dragging. Disable to use the viewer's controls to navigate over the data.",
-                valueExplanations: {on: "Navigating is disabled", off: "Navigating is enabled"},
-                disabled: true,
-                onClick: () => {
-                    this.setBrushingEnabled(this.brushingEnabledCheckbox.value)
-                }
-            })
-            this.toggleBrushingKeyHandler = (e: KeyboardEvent) => {
-                if(e.key == "b"){
-                    this.setBrushingEnabled(!this.brushingEnabledCheckbox.value)
-                }
+        this.enableBrushingHandler = (ev: KeyboardEvent) => {
+            if(this.brushingApplet.currentColor && (ev.code == "AltLeft" || ev.code == "AltRight")){
+                this.overlay?.setBrushingEnabled(true)
             }
-            window.addEventListener("keyup", this.toggleBrushingKeyHandler)
+        }
+        this.disableBrushingHandler = (ev: KeyboardEvent) => {
+            if(ev.code == "AltLeft" || ev.code == "AltRight"){
+                this.overlay?.setBrushingEnabled(false)
+            }
+        }
 
-            this.brushingApplet = new BrushingApplet({
-                parentElement: this.trainingWidget,
-                session,
-                applet_name,
-                gl: this.gl,
-                onDataSourceClicked: async (rawData) => this.viewer.openLane({
-                    name: rawData.url.name, rawData, isVisible: true
-                }),
-                onLabelSelected: () => {
-                    if(!this.brushingEnabledCheckbox.disabled){
-                        this.setBrushingEnabled(true)
-                    }
-                }
-            })
+        window.addEventListener("keydown", this.enableBrushingHandler)
+        window.addEventListener("keyup", this.disableBrushingHandler)
 
-        viewer.addDataChangedHandler(() => this.handleViewerDataDisplayChange())
-        viewer.addViewportsChangedHandler(() => this.handleViewerDataDisplayChange())
-        // this.setBrushingEnabled(false)
+
+        this.render = () => {
+            this.animationRequestId = window.requestAnimationFrame(this.render)
+            if(!this.overlay){
+                return
+            }
+            let strokes = new Array<[Color, BrushStroke[]]>();
+            if(this.stagingStroke && this.brushingApplet.currentColor){
+                strokes.push([this.brushingApplet.currentColor, [this.stagingStroke]])
+            }
+            strokes = strokes.concat(this.brushingApplet.getBrushStrokes(this.overlay.datasource))
+            this.overlay.render(strokes, this.brushStrokeRenderer)
+        }
+        this.render()
+
+        viewer.addDataChangedHandler(this.handleViewerDataDisplayChange)
+        viewer.addViewportsChangedHandler(this.handleViewerDataDisplayChange)
         this.handleViewerDataDisplayChange()
     }
 
-    private setBrushingEnabled(brushingEnabled: boolean){
-        this.brushingEnabledCheckbox.value = brushingEnabled
-        this.overlay?.setBrushingEnabled(brushingEnabled)
-    }
-
-    private setMode(
-        mode: {name: "training", trainingDatasource: FsDataSource} |
-              {name:"no data"}
-    ){
-        const lastBrushingEnabledValue = this.brushingEnabledCheckbox.value
-
-        this.brushingEnabledCheckbox.disabled = true
-        this.setBrushingEnabled(false)
-        this.resolutionSelectionContainer.innerHTML = ""
-        this.clearStatus()
-        window.cancelAnimationFrame(this.animationRequestId)
-        this.canvas.style.display = "none"
-        this.overlay?.destroy()
-        this.overlay = undefined
-
-        if(mode.name == "no data"){
-            //noop
-        }else if(mode.name == "training"){
-            this.brushingEnabledCheckbox.disabled = false
-            this.canvas.style.display = "block"
-            let overlay = this.overlay = new BrushingOverlay({
-                datasource: mode.trainingDatasource,
-                gl: this.gl,
-                trackedElement: this.viewer.getTrackedElement(),
-                viewport_drivers: this.viewer.getViewportDrivers(),
-                brush_stroke_handler: {
-                    handleNewBrushStroke: (params: {start_position: Vec3<"voxel">, camera_orientation: Quat<"voxel">}) => {
-                        this.stagingStroke = BrushStroke.create({
-                            gl: this.gl,
-                            start_postition_uvw: params.start_position.raw, //FIXME put scale somewhere
-                            annotated_data_source: mode.trainingDatasource,
-                            camera_orientation: params.camera_orientation.raw, //FIXME: realy data space? rename param in BrushStroke?
-                        })
-                        return this.stagingStroke
-                    },
-                    handleFinishedBrushStroke: (stagingStroke: BrushStroke) => {
-                        this.stagingStroke = undefined
-                        this.brushingApplet.addBrushStroke(stagingStroke)
-                    }
-                },
-            })
-            this.setBrushingEnabled(lastBrushingEnabledValue)
-            const render = () => {
-                let strokes = new Array<[Color, BrushStroke[]]>();
-                if(this.stagingStroke){
-                    if(!this.brushingApplet.currentColor){
-                        console.error("FIXME: no color selected but still brushing")
-                    }else{
-                        strokes.push([this.brushingApplet.currentColor, [this.stagingStroke]])
-                    }
-                }
-                strokes = strokes.concat(this.brushingApplet.getBrushStrokes(mode.trainingDatasource))
-                overlay.render(strokes, this.brushStrokeRenderer) //FIXME? remove this optional override?
-                this.animationRequestId = window.requestAnimationFrame(render)
-            }
-            render()
-        }
-    }
-
-    public showStatus(message: string){
-        this.status_display.innerHTML = message
-        this.status_display.style.display = "block"
-    }
-
-    public clearStatus(){
-        this.status_display.innerHTML = ""
-        this.status_display.style.display = "none"
-    }
-
-    private async handleViewerDataDisplayChange(){
+    private handleViewerDataDisplayChange = async () => {
         const lane = this.viewer.getActiveLaneWidget()
         if(lane === undefined){
-            return this.setMode({name: "no data"})
+            this.canvas.style.display = "none"
+            this.overlay?.destroy()
+            this.overlay = undefined
+            return
         }
-        return this.setMode({name: "training", trainingDatasource: lane.rawData})
+        this.canvas.style.display = "block"
+        this.overlay = new BrushingOverlay({
+            datasource: lane.rawData,
+            gl: this.gl,
+            trackedElement: this.viewer.getTrackedElement(),
+            viewport_drivers: this.viewer.getViewportDrivers(),
+            brush_stroke_handler: {
+                handleNewBrushStroke: (params: {start_position: Vec3<"voxel">, camera_orientation: Quat<"voxel">}) => {
+                    this.stagingStroke = BrushStroke.create({
+                        gl: this.gl,
+                        start_postition_uvw: params.start_position.raw, //FIXME put scale somewhere
+                        annotated_data_source: lane.rawData,
+                        camera_orientation: params.camera_orientation.raw, //FIXME: realy data space? rename param in BrushStroke?
+                    })
+                    return this.stagingStroke
+                },
+                handleFinishedBrushStroke: (stagingStroke: BrushStroke) => {
+                    this.stagingStroke = undefined
+                    this.brushingApplet.addBrushStroke(stagingStroke)
+                }
+            },
+        })
     }
 
     public destroy(){
-        window.removeEventListener("keyup", this.toggleBrushingKeyHandler)
+        window.removeEventListener("keydown", this.enableBrushingHandler)
+        window.removeEventListener("keyup", this.disableBrushingHandler)
         window.cancelAnimationFrame(this.animationRequestId)
         this.overlay?.destroy()
         removeElement(this.gl.canvas as HTMLElement) //FIXME?
@@ -191,6 +141,10 @@ export class BrushingWidget{
         this.predictingWidget.destroy()
         this.brushingApplet.destroy()
         removeElement(this.element)
+
+        this.viewer.removeDataChangedHandler(this.handleViewerDataDisplayChange)
+        this.viewer.removeViewportsChangedHandler(this.handleViewerDataDisplayChange)
+
         //FIXME: remove event from viewer
     }
 }

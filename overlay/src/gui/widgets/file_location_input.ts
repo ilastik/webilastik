@@ -3,7 +3,7 @@ import { Path } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
 import { FsInputWidget } from "./fs_input";
 import { PathInput, ValueInputWidget } from "./value_input_widget";
-import { Div, Label, Paragraph } from "./widget";
+import { ContainerWidget, Div, Label, Paragraph } from "./widget";
 import { InputWidgetParams } from "./input_widget";
 import { ExportPattern, ReplacementParams } from "../../util/export_pattern";
 
@@ -34,7 +34,7 @@ export class FileLocationInputWidget{
     public readonly pathInput: PathInput;
 
     constructor(params: {
-        parentElement: HTMLElement,
+        parentElement: ContainerWidget<any> | HTMLElement,
         defaultBucketName?: string,
         defaultPath?: Path,
         required?: boolean,

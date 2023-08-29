@@ -1,73 +1,80 @@
 import { HpcSiteName, Session, SESSION_DONE_STATES } from "../../client/ilastik";
 import { CloseComputeSessionParamsDto, ComputeSessionStatusDto, EbrainsAccessTokenDto, ListComputeSessionsParamsDto } from "../../client/dto";
-import { createElement, createImage, removeElement, secondsToTimeDeltaString } from "../../util/misc";
-import { Url } from "../../util/parsed_url";
+import { secondsToTimeDeltaString } from "../../util/misc";
+import { Path, Url } from "../../util/parsed_url";
 import { ErrorPopupWidget, PopupWidget } from "./popup";
 import { Button, ButtonWidget } from "./input_widget";
+import { ImageWidget, Paragraph, Table, TableData, TableHeader, TableRow } from "./widget";
+import { CssClasses } from "../css_classes";
 
 class SessionItemWidget{
     public readonly status: ComputeSessionStatusDto;
-    public readonly element: HTMLTableRowElement;
-    private cancelButton: Button<"button">
+    public readonly element: TableRow;
+    private cancelButton: ButtonWidget
+    private rejoinButton: ButtonWidget;
 
     constructor(params: {
         status: ComputeSessionStatusDto,
-        parentElement: HTMLTableElement,
+        parentElement: Table,
         ilastikUrl: Url,
         token: EbrainsAccessTokenDto,
         onSessionClosed: (status: ComputeSessionStatusDto) => void,
         rejoinSession?: (sessionId: string) => void,
     }){
         this.status = params.status
-        this.element = createElement({tagName: "tr", parentElement: params.parentElement})
         const comp_session = params.status.compute_session
         const startTimeString = comp_session.start_time_utc_sec ? new Date(comp_session.start_time_utc_sec * 1000).toLocaleString() : "not started"
 
-        createElement({tagName: "td", parentElement: this.element, innerText: comp_session.compute_session_id})
-        createElement({tagName: "td", parentElement: this.element, innerText: startTimeString})
-        createElement({tagName: "td", parentElement: this.element, innerText: secondsToTimeDeltaString(comp_session.time_elapsed_sec)})
-        createElement({tagName: "td", parentElement: this.element, innerText: comp_session.state})
-        let cancelButtonTd = createElement({tagName: "td", parentElement: this.element})
-        this.cancelButton = new Button({
-            inputType: "button",
-            parentElement: cancelButtonTd,
-            disabled: SESSION_DONE_STATES.includes(comp_session.state) ,
-            text: "Kill",
-            onClick: async () => {
-                this.cancelButton.disabled = true;
-                let cancellationResult = await PopupWidget.WaitPopup({
-                    title: `Killing session ${comp_session.compute_session_id} at ${params.status.hpc_site}`,
-                    operation: Session.cancel({
-                        ilastikUrl: params.ilastikUrl,
-                        token: params.token,
-                        rpcParams: new CloseComputeSessionParamsDto({
-                            compute_session_id: comp_session.compute_session_id,
-                            hpc_site: params.status.hpc_site,
-                        })
-                    })
-                });
-                if(cancellationResult instanceof Error){
-                    new ErrorPopupWidget({
-                        message: `Could not delete session: ${cancellationResult.message}`,
-                        onClose: () => {this.cancelButton.disabled = false}
-                    })
-                    this.cancelButton.disabled = false;
-                    return
-                }else{
-                    removeElement(this.element)
-                    params.onSessionClosed(this.status)
-                }
-            }
-        })
-        new ButtonWidget({
-            parentElement: cancelButtonTd,
-            contents: "Rejoin",
-            disabled: SESSION_DONE_STATES.includes(comp_session.state) || params.rejoinSession === undefined,
-            onClick: () => {
-                if(params.rejoinSession){
-                    params.rejoinSession(comp_session.compute_session_id)
-                }
-            }})
+        this.element = new TableRow({parentElement: params.parentElement, children: [
+            new TableData({parentElement: undefined, innerText: comp_session.compute_session_id}),
+            new TableData({parentElement: undefined, innerText: startTimeString}),
+            new TableData({parentElement: undefined, innerText: secondsToTimeDeltaString(comp_session.time_elapsed_sec)}),
+            new TableData({parentElement: undefined, innerText: comp_session.state}),
+            new TableData({parentElement: undefined, children: [
+                this.cancelButton = new ButtonWidget({
+                    parentElement: undefined,
+                    disabled: SESSION_DONE_STATES.includes(comp_session.state) ,
+                    contents: "Kill",
+                    onClick: async () => {
+                        this.cancelButton.disabled = true;
+                        this.rejoinButton.disabled = true;
+                        let sessionKillResult = await PopupWidget.WaitPopup({
+                            title: `Killing session ${comp_session.compute_session_id} at ${params.status.hpc_site}`,
+                            operation: Session.cancel({
+                                ilastikUrl: params.ilastikUrl,
+                                token: params.token,
+                                rpcParams: new CloseComputeSessionParamsDto({
+                                    compute_session_id: comp_session.compute_session_id,
+                                    hpc_site: params.status.hpc_site,
+                                })
+                            })
+                        });
+                        if(sessionKillResult instanceof Error){
+                            new ErrorPopupWidget({
+                                message: `Could not delete session: ${sessionKillResult.message}`,
+                                onClose: () => {this.cancelButton.disabled = false}
+                            })
+                            this.cancelButton.disabled = false;
+                            this.rejoinButton.disabled = false;
+                            return
+                        }else{
+                            // removeElement(this.element) //FIXME: is this right?
+                            params.onSessionClosed(this.status)
+                        }
+                    }
+                }),
+                this.rejoinButton = new ButtonWidget({
+                    parentElement: undefined,
+                    contents: "Rejoin",
+                    disabled: SESSION_DONE_STATES.includes(comp_session.state) || params.rejoinSession === undefined,
+                    onClick: () => {
+                        if(params.rejoinSession){
+                            params.rejoinSession(comp_session.compute_session_id)
+                        }
+                    }
+                }),
+            ]})
+        ]})
     }
 }
 
@@ -79,13 +86,16 @@ export class SessionsPopup{
         onSessionClosed: (status: ComputeSessionStatusDto) => void,
         rejoinSession?: (sessionId: string) => void,
     }){
-        let popup = new PopupWidget("Sessions:")
-        let table = createElement({tagName: "table", parentElement: popup.element, cssClasses: ["ItkTable"]})
-        createElement({tagName: "th", parentElement: table, innerText: "Session ID"})
-        createElement({tagName: "th", parentElement: table, innerText: "Start Time"})
-        createElement({tagName: "th", parentElement: table, innerText: "Duration"})
-        createElement({tagName: "th", parentElement: table, innerText: "Status"})
-        createElement({tagName: "th", parentElement: table, innerText: "Actions"})
+        let popup = new PopupWidget("Sessions:", true)
+        let table = new Table({parentElement: popup.contents, cssClasses: [CssClasses.ItkTable], children: [
+            new TableRow({parentElement: undefined, children: [
+                new TableHeader({parentElement: undefined, innerText: "Session ID"}),
+                new TableHeader({parentElement: undefined, innerText: "Start Time"}),
+                new TableHeader({parentElement: undefined, innerText: "Duration"}),
+                new TableHeader({parentElement: undefined, innerText: "Status"}),
+                new TableHeader({parentElement: undefined, innerText: "Actions"}),
+            ]})
+        ]})
         params.sessionStati.forEach(status => new SessionItemWidget({
             ...params, status, parentElement: table, rejoinSession: params.rejoinSession === undefined ? undefined : (sessionId) => {
                 popup.destroy()
@@ -94,8 +104,6 @@ export class SessionsPopup{
                 }
             }
         }))
-
-        new Button({inputType: "button", parentElement: popup.element, text: "OK", onClick: () => popup.destroy()})
     }
 
     public static async create(params: {
@@ -106,13 +114,15 @@ export class SessionsPopup{
         hpc_site: HpcSiteName,
     }): Promise<SessionsPopup | Error | undefined>{
         const loadingPopup = new PopupWidget("Fetching sessions...");
-        createImage({
-            src: "/public/images/loading.gif",
-            parentElement: createElement({tagName: "p", parentElement: loadingPopup.element}),
-        })
-        new Button({
-            inputType: "button", parentElement: loadingPopup.element, text: "Cancel", onClick: () => loadingPopup.destroy()
-        })
+        new Paragraph({parentElement: loadingPopup.contents, children: [
+            new ImageWidget({src: Path.parse("/public/images/loading.gif"), parentElement: undefined})
+        ]})
+        new Paragraph({parentElement: loadingPopup.contents, children: [
+            new Button({
+                inputType: "button", parentElement: undefined, text: "Cancel", onClick: () => loadingPopup.destroy()
+            })
+        ]})
+
         let sessionStatiResult = await Session.listSessions({
             ilastikUrl: params.ilastikUrl,
             token: params.token,

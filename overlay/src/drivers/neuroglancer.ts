@@ -177,6 +177,12 @@ export class NeuroglancerDriver implements IViewerDriver{
             ev.stopImmediatePropagation();
         }
     }
+    private readonly suppressShiftPointermove = (ev: PointerEvent) => {
+        if (ev.shiftKey && ev.target == document.querySelector('.neuroglancer-rendered-data-panel.neuroglancer-panel.neuroglancer-noselect')!){
+            ev.stopPropagation();
+            ev.stopImmediatePropagation();
+        }
+    }
     private trackedElement: HTMLElement;
 
     constructor(public readonly viewer: any){
@@ -239,6 +245,7 @@ export class NeuroglancerDriver implements IViewerDriver{
         const styleElementClassName = "neuroglancer_driver__hide_layout_controls";
         if(enable){
             window.removeEventListener("wheel", this.suppressMouseWheel, true)
+            window.removeEventListener("pointermove", this.suppressShiftPointermove, true)
             document.head.querySelector("." + styleElementClassName)?.remove()
         }else{
             createElement({
@@ -249,6 +256,7 @@ export class NeuroglancerDriver implements IViewerDriver{
             })
             this.viewer.layout.restoreState("xy")
             window.addEventListener("wheel", this.suppressMouseWheel, true)
+            window.addEventListener("pointermove", this.suppressShiftPointermove, true)
         }
     }
     public addViewportsChangedHandler(handler: () => void){

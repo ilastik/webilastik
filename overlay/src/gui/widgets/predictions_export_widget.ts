@@ -71,7 +71,7 @@ class Job{
     }
 
     private makeProgressDisplay(params: {
-        openInViewer: (datasource: FsDataSource) => void,
+        viewer: Viewer,
         session: Session,
     }): TableData{
         const jobDto = this.jobDto
@@ -113,19 +113,9 @@ class Job{
         if(jobDto instanceof TransferFileJobDto){
             const targetUrl = Url.fromDto(jobDto.target_url);
             dataProxyGuiUrl = BucketFs.tryGetDataProxyGuiUrl({url: targetUrl.parent})
-            new ButtonWidget({parentElement: out, contents: "Open", onClick: async () => {
-                const datasourcesResult = await DataSourceSelectionWidget.uiResolveUrlToDatasource({
-                    datasources: targetUrl,
-                    session: params.session,
-                })
-                if(datasourcesResult instanceof Error){
-                    new ErrorPopupWidget({message: `Could not open URL: ${datasourcesResult}`})
-                    return
-                }
-                for(let ds of datasourcesResult){
-                    params.openInViewer(ds)
-                }
-            }})
+            new ButtonWidget({parentElement: out, contents: "Open", onClick: async () => DataSourceSelectionWidget.tryOpenViews({
+                urls: [targetUrl], viewer: params.viewer, session: params.session
+            })})
         }else if(jobDto instanceof ExportJobDto){
             const sink = FsDataSink.fromDto(jobDto.datasink)
             if(sink.filesystem instanceof BucketFs){
@@ -133,7 +123,9 @@ class Job{
             }
             if(sink instanceof PrecomputedChunksSink){
                 new Button({parentElement: out, inputType: "button", text: "Open", onClick: () => {
-                    params.openInViewer(sink.toDataSource())
+                    DataSourceSelectionWidget.tryOpenViews({
+                        urls: [sink.toDataSource().url], viewer: params.viewer, session: params.session
+                    })
                 }})
                 createElement({parentElement: out.element, tagName: "br"}) //FIXME?
             }
@@ -154,7 +146,7 @@ class Job{
         return out
     }
     public toTableRow(params: {
-        openInViewer: (datasource: FsDataSource) => void,
+        viewer: Viewer,
         session: Session,
     }): {name: TableData, progress: TableData}{
         return {
@@ -467,13 +459,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
         new_state.jobs.forEach(job => {
             const row = job.toTableRow({
                 session: this.session,
-                openInViewer: (datasource) => {
-                    this.viewer.openLane({
-                        rawData: datasource,
-                        name: datasource.getDisplayString(), //FIXME?
-                        isVisible: true,
-                    })
-                }
+                viewer: this.viewer
             })
             new TableRow({parentElement: jobsTable, children: [row.name, row.progress]})
         })

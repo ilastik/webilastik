@@ -2,7 +2,7 @@ import { createElement, createInput } from "../../util/misc";
 import { CssClasses } from "../css_classes";
 import { Div, ImageWidget, Paragraph, Span, Widget } from "./widget";
 import { TitleBar } from "./title_bar";
-import { Button } from "./input_widget";
+import { Button, ButtonWidget } from "./input_widget";
 import { Path } from "../../util/parsed_url";
 
 export class PopupWidget extends Div{
@@ -88,6 +88,41 @@ export class PopupWidget extends Div{
         let result = await (params.operation instanceof Promise ? params.operation : params.operation(popup));
         popup.destroy()
         return result
+    }
+
+    public static async WaitOkPopup(params: {
+        title: string,
+        contents: Widget<any>[],
+    }): Promise<void>{
+        return this.WaitPopup<void>({
+            title: params.title,
+            withSpinner: false,
+            operation: async (popup) => new Promise<void>(resolve => {
+                params.contents.forEach(widg => popup.contents.appendChild(widg))
+                new Paragraph({parentElement: popup.contents, children: [
+                    new ButtonWidget({
+                        parentElement: undefined, contents: "Ok", onClick: () => resolve()
+                    })
+                ]})
+            })
+        })
+    }
+
+    public static async ButtonOptions<T>(params: {
+        title: string, explanation: Widget<any>, options: Array<[string, T]>
+    }): Promise<T>{
+        return PopupWidget.WaitPopup({
+            title: params.title,
+            withSpinner: false,
+            operation: async (popup) => new Promise(resolve => {
+                popup.contents.appendChild(params.explanation)
+                new Paragraph({parentElement: popup.contents, children: params.options.map(opt => {
+                    return new ButtonWidget({
+                        parentElement: undefined, contents: opt[0], onClick: () => resolve(opt[1])
+                    })
+                })});
+            })
+        })
     }
 }
 

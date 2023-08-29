@@ -55,4 +55,6 @@ export enum CssClasses{
     ItkSessionManagementAdvancedOptions = "ItkSessionManagementAdvancedOptions",
     ItkCollapsableAppletExtraInfoSpan = "ItkCollapsableAppletExtraInfoSpan",
     ItkEmphasisText = "ItkEmphasisText",
+    ItkHelpTextHeading = "ItkHelpTextHeading",
+    ItkHelpVideo = "ItkHelpVideo",
 }

@@ -1934,6 +1934,51 @@ class RpcErrorDto(DataTransferObject):
         return parse_as_RpcErrorDto(value)
 
 
+def parse_as_bool(value: JsonValue) -> "bool | MessageParsingError":
+    if isinstance(value, bool):
+        return value
+
+    return MessageParsingError(f"Could not parse {json.dumps(value)} as bool")
+
+
+def parse_as_SetLiveUpdateParams(
+    value: JsonValue,
+) -> "SetLiveUpdateParams | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as SetLiveUpdateParams"
+        )
+    if value.get("__class__") != "SetLiveUpdateParams":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as SetLiveUpdateParams"
+        )
+    tmp_live_update = parse_as_bool(value.get("live_update"))
+    if isinstance(tmp_live_update, MessageParsingError):
+        return tmp_live_update
+    return SetLiveUpdateParams(
+        live_update=tmp_live_update,
+    )
+
+
+@dataclass
+class SetLiveUpdateParams(DataTransferObject):
+    live_update: bool
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "SetLiveUpdateParams",
+            "live_update": self.live_update,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "SetLiveUpdateParams | MessageParsingError":
+        return parse_as_SetLiveUpdateParams(value)
+
+
 def parse_as_RecolorLabelParams(
     value: JsonValue,
 ) -> "RecolorLabelParams | MessageParsingError":
@@ -3515,13 +3560,6 @@ def parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote
     )
 
 
-def parse_as_bool(value: JsonValue) -> "bool | MessageParsingError":
-    if isinstance(value, bool):
-        return value
-
-    return MessageParsingError(f"Could not parse {json.dumps(value)} as bool")
-
-
 def parse_as_ComputeSessionStatusDto(
     value: JsonValue,
 ) -> "ComputeSessionStatusDto | MessageParsingError":
@@ -4201,7 +4239,7 @@ def parse_as_GetDatasourcesFromUrlResponseDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as GetDatasourcesFromUrlResponseDto"
         )
-    tmp_datasources = parse_as_Union_of_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_0None_endof_(
+    tmp_datasources = parse_as_Tuple_of_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_0_varlen__endof_(
         value.get("datasources")
     )
     if isinstance(tmp_datasources, MessageParsingError):
@@ -4213,12 +4251,14 @@ def parse_as_GetDatasourcesFromUrlResponseDto(
 
 @dataclass
 class GetDatasourcesFromUrlResponseDto(DataTransferObject):
-    datasources: Union[Tuple[FsDataSourceDto, ...], None]
+    datasources: Tuple[FsDataSourceDto, ...]
 
     def to_json_value(self) -> JsonObject:
         return {
             "__class__": "GetDatasourcesFromUrlResponseDto",
-            "datasources": convert_to_json_value(self.datasources),
+            "datasources": tuple(
+                convert_to_json_value(item) for item in self.datasources
+            ),
         }
 
     @classmethod

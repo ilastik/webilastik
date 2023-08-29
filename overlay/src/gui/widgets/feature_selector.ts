@@ -1,7 +1,7 @@
 import { FeatureClassName, IlpFeatureExtractor } from "../../client/ilastik"
 import { CssClasses } from "../css_classes"
 import { Button, CheckboxWidget } from "./input_widget"
-import { Div, Paragraph, Table, TableData, TableHeader, TableRow } from "./widget"
+import { ContainerWidget, Div, Paragraph, Table, TableData, TableHeader, TableRow } from "./widget"
 
 type FeatureSelectionCheckbox = CheckboxWidget<IlpFeatureExtractor>
 
@@ -111,7 +111,7 @@ export class FeatureSelector{
     }
 
     constructor(params: {
-        parentElement: HTMLElement,
+        parentElement: ContainerWidget<any>,
         baseScales?: Array<number>,
         value?: FeatureExtractorSet,
     }){
