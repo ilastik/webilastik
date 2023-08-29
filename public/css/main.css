@@ -426,3 +426,14 @@ input[type=text]:invalid, input[type=url]:invalid{
 .ItkSessionManagementAdvancedOptions > *{
     margin-left: 1em;;
 }
+
+.ItkHelpTextHeading{
+    font-weight: bold;
+}
+
+.ItkHelpVideo{
+    border-radius: 7px;
+    border: solid 3px var(--default-highlight-color);
+    margin: 1em;
+    max-width: 800px;
+}

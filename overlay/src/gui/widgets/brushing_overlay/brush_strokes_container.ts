@@ -78,7 +78,7 @@ export class BrushingApplet extends Applet<State>{
         ]});
 
 
-        new Button({inputType: "button", text: "✚", parentElement: this.element, onClick: () => {
+        new Button({inputType: "button", text: "✚ New Label", parentElement: this.element, onClick: () => {
             let popup = new PopupWidget("Create Label")
             let labelForm = createElement({tagName: "form", parentElement: popup.element})
 

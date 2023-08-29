@@ -3,7 +3,7 @@ import { CssClasses } from "../css_classes";
 import { Button } from "./input_widget";
 import { PopupWidget } from "./popup";
 import { TitleBar } from "./title_bar";
-import { Span, Widget } from "./widget";
+import { Paragraph, Span, Widget } from "./widget";
 
 export class CollapsableWidget{
     public readonly container: HTMLDetailsElement;
@@ -12,7 +12,7 @@ export class CollapsableWidget{
     public readonly extraInfoSpan: Span
     public readonly helpButton?: Button<"button">;
     public constructor({display_name, parentElement, help, open}:{
-        display_name: string, parentElement: HTMLElement, help?: string[], open?: boolean
+        display_name: string, parentElement: HTMLElement, help?: Array<string | Widget<any>>, open?: boolean
     }){
         this.container = createElement({tagName: "details", parentElement, cssClasses: ["ItkCollapsableApplet"]})
         const widgetsRight: Array<Widget<any>> = [
@@ -24,7 +24,14 @@ export class CollapsableWidget{
                 inputType: "button",
                 parentElement: undefined,
                 onClick: () => {
-                    PopupWidget.OkPopup({title: `Help: ${display_name}`, paragraphs: help})
+                    let popup = PopupWidget.ClosablePopup({title: `Help: ${display_name}`});
+                    for(const helpWidget of help){
+                        if(typeof helpWidget == "string"){
+                            new Paragraph({parentElement: popup.element, innerText: helpWidget})
+                        }else{
+                            popup.appendChild(helpWidget)
+                        }
+                    }
                 }
             })
             widgetsRight.push(this.helpButton)

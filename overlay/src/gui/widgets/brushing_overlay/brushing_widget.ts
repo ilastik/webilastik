@@ -8,7 +8,7 @@ import { BrushingApplet } from "./brush_strokes_container"
 import { Viewer } from "../../../viewer/viewer"
 import { PredictingWidget } from "../predicting_widget";
 import { Vec3, Quat } from "../../../util/ooglmatrix"
-import { Paragraph } from "../widget"
+import { Paragraph, Widget } from "../widget"
 import { CssClasses } from "../../css_classes"
 
 
@@ -40,7 +40,7 @@ export class BrushingWidget{
         session: Session,
         parentElement: HTMLElement,
         viewer: Viewer,
-        help: string[],
+        help: Array<string | Widget<any>>,
     }){
         this.session = session
         this.canvas = createElement({tagName: "canvas", parentElement: document.body, inlineCss: {display: "none"}})

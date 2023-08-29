@@ -1,4 +1,4 @@
-import { applyInlineCss, InlineCss } from "../../util/misc";
+import { applyInlineCss, createElement, InlineCss } from "../../util/misc";
 import { Path, Url } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
 
@@ -239,6 +239,24 @@ export class ImageWidget extends Widget<"img">{
     }){
         super({...params, tagName: "img"})
         this.element.src = params.src.raw
+    }
+}
+
+export class VideoWidget extends Widget<"video">{
+    constructor(params: Omit<WidgetParams, "innerText"> & {
+        controls?: boolean,
+        autoplay?: boolean,
+        sources: Array<Url | Path>,
+    }){
+        super({...params, tagName: "video"})
+        this.element.controls = params.controls === undefined ? true : params.controls
+        if(params.autoplay !== undefined){
+            this.element.autoplay = params.autoplay
+        }
+        for(const sourceUrl of params.sources){
+            const sourceElement = createElement({tagName: "source", parentElement: this.element})
+            sourceElement.src = sourceUrl.raw
+        }
     }
 }
 
