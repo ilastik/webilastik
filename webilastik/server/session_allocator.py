@@ -123,8 +123,8 @@ class SessionAllocator:
         self.fernet = fernet
         self.session_launchers: Dict[HpcSiteName, SshJobLauncher] = {}
         if allow_local_sessions:
-            self.session_launchers["LOCAL_DASK"] = LocalJobLauncher(fernet=fernet, executor_getter="dask")
             self.session_launchers["LOCAL_PROCESS_POOL"] = LocalJobLauncher(fernet=fernet, executor_getter="default")
+            self.session_launchers["LOCAL_DASK"] = LocalJobLauncher(fernet=fernet, executor_getter="dask")
         self.session_launchers.update({
             "JUSUF": JusufSshJobLauncher(fernet=fernet),
         })
