@@ -1,7 +1,7 @@
 import { removeElement } from "../../util/misc";
 import { Path } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
-import { Details, Paragraph, Span, Summary } from "./widget";
+import { ContainerWidget, Details, Paragraph, Span, Summary } from "./widget";
 
 export class FsFileWidget extends Paragraph{
     public readonly parent: FsFolderWidget;
@@ -66,7 +66,7 @@ export class FsFolderWidget extends Details{
     private readonly expandWidget: Span;
 
     constructor(params: {
-        parent: HTMLElement | FsFolderWidget,
+        parent: ContainerWidget<any> | FsFolderWidget,
         path: Path,
         onOpen?: (widget: FsFolderWidget) => void,
     }){

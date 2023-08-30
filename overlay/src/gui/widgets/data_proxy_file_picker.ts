@@ -5,7 +5,7 @@ import { Button } from "./input_widget";
 import { LiveFsTree } from "./live_fs_tree";
 import { ErrorPopupWidget, PopupWidget } from "./popup";
 import { PathInput, TextInput } from "./value_input_widget";
-import { Form, Label, Paragraph } from "./widget";
+import { ContainerWidget, Form, Label, Paragraph } from "./widget";
 
 export class DataProxyFilePicker{
     element: Form;
@@ -14,7 +14,7 @@ export class DataProxyFilePicker{
 
 
     constructor(params: {
-        parentElement: HTMLElement | undefined,
+        parentElement: ContainerWidget<any> | undefined,
         session: Session,
         defaultBucketName: string,
         defaultBucketPath?: Path,
@@ -49,10 +49,10 @@ export class DataProxyFilePicker{
             const fsTreeWidget = new LiveFsTree({
                 fs,
                 dirPath: dirPath,
-                parentElement: popup.element,
+                parentElement: popup.contents,
                 session: params.session,
             })
-            new Paragraph({parentElement: popup.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
+            new Paragraph({parentElement: popup.contents, cssClasses: [CssClasses.ItkInputParagraph], children: [
                 new Button({inputType: "button", parentElement: undefined, text: params.okButtonValue || "Ok", onClick: () => {
                     popup.destroy()
                     params.onOk(fsTreeWidget)

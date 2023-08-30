@@ -3,16 +3,17 @@ import { Filesystem, Session } from "../../client/ilastik";
 import { createElement, createImage, removeElement } from "../../util/misc";
 import { Path, Url } from "../../util/parsed_url";
 import { FsFileWidget, FsFolderWidget } from "./fs_tree";
+import { ContainerWidget, Div } from "./widget";
 
 export class LiveFsTree{
     fs: Filesystem;
-    element: HTMLDivElement;
+    element: Div;
     root: FsFolderWidget;
     session: Session;
-    constructor(params: {fs: Filesystem, dirPath?: Path, session: Session, parentElement: HTMLElement}){
+    constructor(params: {fs: Filesystem, dirPath?: Path, session: Session, parentElement: ContainerWidget<any>}){
         this.fs = params.fs
         this.session = params.session
-        this.element = createElement({tagName: "div", parentElement: params.parentElement})
+        this.element = new Div({parentElement: params.parentElement})
 
         const onOpen = async (folderWidget: FsFolderWidget) => {
             folderWidget.clear()

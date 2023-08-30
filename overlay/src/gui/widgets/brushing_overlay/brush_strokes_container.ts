@@ -3,13 +3,13 @@ import { Applet } from "../../../client/applets/applet";
 import { Color, FsDataSource, Session } from "../../../client/ilastik";
 import * as schema from "../../../client/dto";
 import { HashMap } from "../../../util/hashmap";
-import { createElement, vecToString } from "../../../util/misc";
+import { vecToString } from "../../../util/misc";
 import { JsonValue } from "../../../util/serialization";
 import { CssClasses } from "../../css_classes";
 import { ErrorPopupWidget, PopupWidget } from "../popup";
 import { BrushStroke } from "./brush_stroke";
-import { Paragraph, Span, Label as LabelElement, Div, ContainerWidget } from "../widget";
-import { Button, Select } from "../input_widget";
+import { Paragraph, Span, Label as LabelElement, Div, ContainerWidget, Form } from "../widget";
+import { Button, ButtonWidget, Select } from "../input_widget";
 import { ColorPicker, TextInput } from "../value_input_widget";
 
 export type resolution = vec3;
@@ -80,31 +80,28 @@ export class BrushingApplet extends Applet<State>{
 
         new Button({inputType: "button", text: "✚ New Label", parentElement: this.element, onClick: () => {
             let popup = new PopupWidget("Create Label")
-            let labelForm = createElement({tagName: "form", parentElement: popup.element})
-
             let labelNameInput: TextInput;
-            new Paragraph({parentElement: labelForm, children: [
-                new LabelElement({parentElement: undefined, innerText: "Label Name: "}),
-                labelNameInput = new TextInput({parentElement: undefined, required: true}),
-            ]})
-
             let colorPicker: ColorPicker;
-            new Paragraph({parentElement: labelForm, children: [
-                new LabelElement({parentElement: undefined, innerText: "Label Color: "}),
-                colorPicker = new ColorPicker({parentElement: undefined, value: new Color({r: 255, g: 0, b:0})}),
-            ]});
 
-            new Paragraph({parentElement: labelForm, children: [
-                new Button({inputType: "submit", text: "Ok", parentElement: undefined}),
-                new Button({inputType: "button", text: "Cancel", parentElement: undefined, onClick: (ev): false => {
-                    ev.preventDefault()
-                    ev.stopPropagation()
-                    popup.destroy()
-                    return false
-                }})
-            ]})
-
-            labelForm.addEventListener("submit", (ev): false => { //use submit to leverage native form validation
+            new Form({parentElement: popup.contents, children: [
+                new Paragraph({parentElement: undefined, children: [
+                    new LabelElement({parentElement: undefined, innerText: "Label Name: "}),
+                    labelNameInput = new TextInput({parentElement: undefined, required: true}),
+                ]}),
+                new Paragraph({parentElement: undefined, children: [
+                    new LabelElement({parentElement: undefined, innerText: "Label Color: "}),
+                    colorPicker = new ColorPicker({parentElement: undefined, value: new Color({r: 255, g: 0, b:0})}),
+                ]}),
+                new Paragraph({parentElement: undefined, children: [
+                    new ButtonWidget({buttonType: "submit", contents: "Ok", parentElement: undefined, onClick: () => {}}),
+                    new ButtonWidget({buttonType: "button", contents: "Cancel", parentElement: undefined, onClick: (ev): false => {
+                        ev.preventDefault()
+                        ev.stopPropagation()
+                        popup.destroy()
+                        return false
+                    }})
+                ]}),
+            ]}).preventSubmitWith(() => {
                 if(!labelNameInput.value){
                     new ErrorPopupWidget({message: `Missing input name`})
                 }else if(this.labelWidgets.has(labelNameInput.value)){
@@ -116,10 +113,6 @@ export class BrushingApplet extends Applet<State>{
                     }))
                     popup.destroy()
                 }
-                //don't submit synchronously
-                ev.preventDefault()
-                ev.stopPropagation()
-                return false
             })
         }})
     }
