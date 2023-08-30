@@ -8,10 +8,11 @@ import { Viewer } from "../../viewer/viewer";
 import { CssClasses } from "../css_classes";
 import { CollapsableWidget } from "./collapsable_applet_gui";
 import { DataProxyFilePicker } from "./data_proxy_file_picker";
-import { Button, ButtonWidget, MultiSelect } from "./input_widget";
+import { ButtonWidget, MultiSelect } from "./input_widget";
 import { LiveFsTree } from "./live_fs_tree";
 import { PopupWidget } from "./popup";
-import { Anchor, Div, Li, Paragraph, Span, Ul } from "./widget";
+import { UrlInput } from "./value_input_widget";
+import { Anchor, Div, Form, Li, Paragraph, Span, Ul } from "./widget";
 
 type ChoiceTransition = {
     nextState: AutoChooseScaleState,
@@ -106,7 +107,33 @@ export class DataSourceSelectionWidget{
         this.defaultBucketPath = params.defaultBucketPath
 
         new Paragraph({parentElement: this.element, children: [
-            new Button({inputType: "button", text: "Open...", parentElement: undefined, onClick: () => {
+            new ButtonWidget({contents: "🔗 Enter URL", parentElement: undefined, onClick: () => {
+                const popup = PopupWidget.ClosablePopup({title: "Enter dataset URL"})
+                let urlInput: UrlInput;
+                new Form({parentElement: popup.contents, children: [
+                    urlInput = new UrlInput({
+                        parentElement: popup.contents, required: true, inlineCss: {width: "30em"}
+                    }),
+                    new Paragraph({parentElement: popup.contents, children: [
+                        new ButtonWidget({buttonType: "submit", parentElement: undefined, contents: "Open", onClick: () => {}})
+                    ]})
+                ]}).preventSubmitWith(() => {
+                    const url = urlInput.value
+                    if(!url){
+                        return
+                    }
+                    popup.destroy()
+                    PopupWidget.WaitPopup({
+                        title: "Loading data sources...",
+                        operation: DataSourceSelectionWidget.tryOpenViews({
+                            urls: [url],
+                            session: this.session,
+                            viewer: this.viewer,
+                        }),
+                    })
+                })
+            }}),
+            new ButtonWidget({contents: "🪣 Open from Data Proxy", parentElement: undefined, onClick: () => {
                 const popup = PopupWidget.ClosablePopup({title: "Select datasets from Data Proxy"})
                 const filePicker = new DataProxyFilePicker({
                     parentElement: popup.contents.element,
@@ -128,7 +155,7 @@ export class DataSourceSelectionWidget{
                     },
                     okButtonValue: "Open",
                 })
-            }})
+            }}),
         ]})
 
         this.lanesContainer = new Div({parentElement: this.element})

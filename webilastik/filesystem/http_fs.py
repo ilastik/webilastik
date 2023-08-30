@@ -102,19 +102,20 @@ class HttpFs(IFilesystem):
             offset=offset,
             num_bytes=num_bytes,
         )
-        if isinstance(result, bytes):
-            return result
-        if isinstance(result, ErrRequestCompletedAsFailure) and result.status_code == 404:
-            return FsFileNotFoundException(path=path)
-        return FsIoException(result)
+        if isinstance(result, ErrRequestCrashed):
+            return FsIoException(result)
+        if isinstance(result, ErrRequestCompletedAsFailure):
+            if result.status_code == 404:
+                return FsFileNotFoundException(path)
+            return FsIoException(result)
+        return result[0]
 
     def get_size(self, path: PurePosixPath) -> "int | FsIoException | FsFileNotFoundException":
         size_result = request_size(session=self.session, url=self.base.concatpath(path))
         if isinstance(size_result, ErrRequestCompletedAsFailure):
             if size_result.status_code == 404:
                 return FsFileNotFoundException(path)
-            else:
-                return FsIoException(size_result)
+            return FsIoException(size_result)
         if isinstance(size_result, Exception):
             return FsIoException(size_result)
         return size_result
