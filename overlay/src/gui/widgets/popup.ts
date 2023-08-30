@@ -74,7 +74,12 @@ export class PopupWidget extends Div{
 
     public static LoadingPopup(params: {title: string}): PopupWidget{
         let popup = new PopupWidget(params.title);
-        new ImageWidget({src: Path.parse("/public/images/loading.gif"), parentElement: popup.element})
+        new Paragraph({parentElement: popup.contents, inlineCss: {textAlign: "center"}, children: [
+            new ImageWidget({
+                src: Path.parse("/public/images/loading.gif"), parentElement: popup.contents
+            })
+        ]})
+
         return popup
     }
 
