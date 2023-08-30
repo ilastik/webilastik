@@ -64,9 +64,9 @@ export class PopupWidget extends Div{
     public static OkPopup(params: {title: string, paragraphs: string[]}): PopupWidget{
         let popup = new PopupWidget(params.title);
         for(let paragraph of params.paragraphs){
-            new Paragraph({parentElement: popup.element, innerText: paragraph})
+            new Paragraph({parentElement: popup.contents, innerText: paragraph})
         }
-        new Paragraph({parentElement:  popup.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
+        new Paragraph({parentElement:  popup.contents, cssClasses: [CssClasses.ItkInputParagraph], children: [
             new Button({parentElement: undefined, inputType: "button", text: "Ok", onClick: () => popup.destroy()})
         ]})
         return popup

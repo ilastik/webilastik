@@ -117,7 +117,7 @@ export class DataSourceListWidget extends Div{
     private openFilePicker = () => {
         const popup = PopupWidget.ClosablePopup({title: "Select datasets from Data Proxy"})
         const filePicker = new DataProxyFilePicker({
-            parentElement: popup.element,
+            parentElement: popup.contents,
             session: this.session,
             defaultBucketName: this.defaultBucketName,
             defaultBucketPath: this.defaultBucketPath,

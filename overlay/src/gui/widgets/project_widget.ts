@@ -40,7 +40,7 @@ export class ProjectLoaderWidget{
 
         let dataProxyFilePickerContainer = new Div({parentElement: params.parentElement})
         new DataProxyFilePicker({
-            parentElement: dataProxyFilePickerContainer.element, //FIXME
+            parentElement: dataProxyFilePickerContainer,
             session: params.session,
             defaultBucketName: params.defaultBucketName,
             onOk: (liveFsTree: LiveFsTree) => {
