@@ -14,13 +14,16 @@ from webilastik.server.rpc.dto import EbrainsAccessTokenDto
 from webilastik.utility import Hostname, Minutes, Username
 from webilastik.utility.url import Url
 
+class ConfigurationException(Exception):
+    pass
+
 
 def read_str_env_var(name: str, *, help_text: str, allow_empty: bool = False) -> str:
     value = os.environ.get(name)
     if value is None:
-        raise Exception(f"Configuration variable '{name}' is unset. {help_text}")
+        raise ConfigurationException(f"Configuration variable '{name}' is unset. {help_text}")
     if len(value) == 0 and not allow_empty:
-        raise Exception(f"Configuration variable '{name}' is empty.")
+        raise ConfigurationException(f"Configuration variable '{name}' is empty.")
     return value
 
 def read_bool_env_var(name: str, *, help_text: str) -> bool:
@@ -32,19 +35,19 @@ def read_bool_env_var(name: str, *, help_text: str) -> bool:
         return True
     if value in valid_false_values:
         return False
-    raise Exception(f"Configuration variable {name} has a bad value: {value}. Expected one of {[*valid_true_values, *valid_false_values]}")
+    raise ConfigurationException(f"Configuration variable {name} has a bad value: {value}. Expected one of {[*valid_true_values, *valid_false_values]}")
 
 def read_int_env_var(name: str, *, help_text: str) -> int:
     raw_value = read_str_env_var(name, help_text=help_text)
     try:
         return int(raw_value)
     except ValueError:
-        raise Exception(f"Could not parse env var {name} as int: {raw_value}")
+        raise ConfigurationException(f"Could not parse env var {name} as int: {raw_value}")
 
 def read_url_env_var(name: str, *, help_text: str) -> Url:
     url = Url.parse(read_str_env_var(name, help_text=help_text))
     if url is None:
-        raise Exception(f"Bad url in env var {name}")
+        raise ConfigurationException(f"Bad url in env var {name}")
     return url
 
 @dataclass
@@ -138,7 +141,7 @@ class SessionAllocatorConfig(WebilastikConfig):
         try:
             self.fernet=Fernet(key=session_allocator_b64_fernet_key.encode('utf8'))
         except Exception:
-            raise Exception(f"Bad fernet key")
+            raise ConfigurationException(f"Bad fernet key")
         self.fernet = Fernet(key=session_allocator_b64_fernet_key.encode("utf8"))
 
     @classmethod
