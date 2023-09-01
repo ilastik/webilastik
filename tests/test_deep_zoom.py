@@ -8,6 +8,7 @@ from typing import Any, Tuple, Mapping
 from ndstructs.array5D import Array5D
 from ndstructs.point5D import Interval5D, Point5D
 from skimage.transform import resize_local_mean # pyright: ignore [reportMissingTypeStubs, reportUnknownVariableType]
+from tests import get_sample_c_cells_datasource
 
 from webilastik.datasink.deep_zoom_sink import DziLevelSink
 from webilastik.datasource.deep_zoom_datasource import DziImageElement, DziLevelDataSource
@@ -140,13 +141,7 @@ def convert_to_deep_zoom():
 def convert_to_deep_zoom_lazily():
     osfs = OsFs.create(); assert not isinstance(osfs, Exception)
 
-    source = PrecomputedChunksDataSource.try_load(
-        filesystem=osfs,
-        path=PurePosixPath("/home/builder/source/webilastik/public/images/c_cells_2.precomputed"),
-        # path=PurePosixPath("/home/builder/Downloads/openseadragon/tiled_images/church_dzi/church.dzie"),
-        spatial_resolution=(1,1,1),
-    )
-    assert source and not isinstance(source, Exception)
+    source = get_sample_c_cells_datasource()
 
     dzi_image = DziImageElement(
         Format="png",
