@@ -170,16 +170,15 @@ class AccessTokenPayload:
         pass
 
     def __init__(
-        self, _marker: _PrivateMarker, raw: str, exp: datetime, iat: datetime, auth_time: datetime, sub: uuid.UUID
+        self, _marker: _PrivateMarker, raw: str, exp: datetime, auth_time: datetime, sub: uuid.UUID
     ) -> None:
         super().__init__()
         self.raw: Final[str] = raw
         self.exp = exp
-        self.iat = iat
         self.auth_time = auth_time
         self.sub = sub
-        my_timezone = datetime.now(timezone.utc).astimezone().tzinfo
-        print(f"%%%%%%% AccessToken auth time is {self.auth_time.astimezone(my_timezone)} and issue time is {iat.astimezone(my_timezone)}")
+        # my_timezone = datetime.now(timezone.utc).astimezone().tzinfo
+        # print(f"%%%%%%% AccessToken auth time is {self.auth_time.astimezone(my_timezone)}")
 
     @classmethod
     def from_raw(cls, raw: str) -> "AccessTokenPayload | AccessTokenInvalid":
@@ -200,7 +199,6 @@ class AccessTokenPayload:
             _marker=cls._PrivateMarker(),
             raw=raw,
             exp=datetime.fromtimestamp(payload_dto.exp, timezone.utc),
-            iat=datetime.fromtimestamp(payload_dto.iat, timezone.utc),
             auth_time=datetime.fromtimestamp(payload_dto.auth_time, timezone.utc),
             sub=sub_result,
         )
