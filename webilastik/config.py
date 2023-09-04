@@ -4,7 +4,7 @@ import os
 
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import ClassVar, Optional, Sequence
+from typing import ClassVar, Optional, Protocol, Sequence
 
 from cryptography.fernet import Fernet
 from webilastik.libebrains.oidc_client import OidcClient
@@ -77,39 +77,9 @@ WEBILASTIK_SESSION_ALLOCATOR_HOST="WEBILASTIK_SESSION_ALLOCATOR_HOST"
 WEBILASTIK_SESSION_ALLOCATOR_USERNAME="WEBILASTIK_SESSION_ALLOCATOR_USERNAME"
 WEBILASTIK_SESSION_ALLOCATOR_SOCKET_PATH="WEBILASTIK_SESSION_ALLOCATOR_SOCKET_PATH"
 
-class WebilastikConfig:
-    def __init__(
-        self,
-        *,
-        ebrains_oidc_client: OidcClient,
-    ) -> None:
-        super().__init__()
-        self.ebrains_oidc_client = ebrains_oidc_client
-
-    @classmethod
-    def from_env(
-        cls,
-        *,
-        ebrains_oidc_client: Optional[OidcClient] = None,
-    ) -> "WebilastikConfig":
-        return WebilastikConfig(
-            ebrains_oidc_client=ebrains_oidc_client if ebrains_oidc_client is not None else OidcClient(
-                client_id=read_str_env_var(
-                    EBRAINS_CLIENT_ID,
-                    help_text="The client ID that is registered in Ebrains' keycloak. Should be a simple string like 'webilastik'",
-                ),
-                client_secret=read_str_env_var(
-                    EBRAINS_CLIENT_SECRET,
-                    help_text="The client secret for the Oidc client",
-                ),
-            ),
-        )
-
+class WebilastikConfig(Protocol):
     def to_env_vars(self) -> Sequence[EnvVar]:
-        return [
-            EnvVar(name=EBRAINS_CLIENT_ID, value=self.ebrains_oidc_client.client_id),
-            EnvVar(name=EBRAINS_CLIENT_SECRET, value=self.ebrains_oidc_client.client_secret),
-        ]
+        ...
 
     def to_bash_exports(self) -> str:
         return "\n".join(ev.to_bash_export() for ev in self.to_env_vars())
@@ -130,9 +100,8 @@ class SessionAllocatorConfig(WebilastikConfig):
         session_allocator_b64_fernet_key: str,
         external_url: Url
     ) -> None:
-        super().__init__(
-            ebrains_oidc_client=ebrains_oidc_client,
-        )
+        super().__init__()
+        self.ebrains_oidc_client = ebrains_oidc_client
         self.allow_local_compute_sessions = allow_local_compute_sessions
         self.ebrains_oidc_client = ebrains_oidc_client
         self.session_allocator_b64_fernet_key = session_allocator_b64_fernet_key
@@ -160,10 +129,18 @@ class SessionAllocatorConfig(WebilastikConfig):
         session_allocator_b64_fernet_key: Optional[str] = None,
         external_url: Optional[Url] = None
     ) -> "SessionAllocatorConfig":
-        base_config = WebilastikConfig.from_env(ebrains_oidc_client=ebrains_oidc_client)
-
+        ebrains_oidc_client=ebrains_oidc_client if ebrains_oidc_client is not None else OidcClient(
+            client_id=read_str_env_var(
+                EBRAINS_CLIENT_ID,
+                help_text="The client ID that is registered in Ebrains' keycloak. Should be a simple string like 'webilastik'",
+            ),
+            client_secret=read_str_env_var(
+                EBRAINS_CLIENT_SECRET,
+                help_text="The client secret for the Oidc client",
+            ),
+        )
         return SessionAllocatorConfig(
-            ebrains_oidc_client=base_config.ebrains_oidc_client,
+            ebrains_oidc_client=ebrains_oidc_client,
             allow_local_compute_sessions=allow_local_compute_sessions if allow_local_compute_sessions is not None else read_bool_env_var(
                 name=WEBILASTIK_ALLOW_LOCAL_COMPUTE_SESSIONS,
                 help_text="Allow compute sessions to be allocated in the machine running the webilastik server",
@@ -180,7 +157,8 @@ class SessionAllocatorConfig(WebilastikConfig):
 
     def to_env_vars(self) -> Sequence[EnvVar]:
         return [
-            *super().to_env_vars(),
+            EnvVar(name=EBRAINS_CLIENT_ID, value=self.ebrains_oidc_client.client_id),
+            EnvVar(name=EBRAINS_CLIENT_SECRET, value=self.ebrains_oidc_client.client_secret),
             EnvVar(name=WEBILASTIK_ALLOW_LOCAL_COMPUTE_SESSIONS, value=str(self.allow_local_compute_sessions).lower()),
             EnvVar(name=WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY, value=self.session_allocator_b64_fernet_key),
             EnvVar(name=WEBILASTIK_EXTERNAL_URL, value=self.external_url.raw),
@@ -194,7 +172,6 @@ class WorkflowConfig(WebilastikConfig):
         *,
         allow_local_fs: bool,
         scratch_dir: PurePosixPath,
-        ebrains_oidc_client: OidcClient,
 
         ebrains_user_token: AccessToken,
         max_duration_minutes: Minutes,
@@ -205,9 +182,7 @@ class WorkflowConfig(WebilastikConfig):
         session_allocator_username: Username,
         session_allocator_socket_path: Path
     ) -> None:
-        super().__init__(
-            ebrains_oidc_client=ebrains_oidc_client,
-        )
+        super().__init__()
         self.allow_local_fs = allow_local_fs
         self.scratch_dir = scratch_dir
         self.ebrains_user_token: AccessToken = ebrains_user_token
@@ -242,7 +217,6 @@ class WorkflowConfig(WebilastikConfig):
         session_allocator_username: Optional[Username] = None,
         session_allocator_socket_path: Optional[Path] = None
     ) -> "WorkflowConfig":
-        base_config = WebilastikConfig.from_env(ebrains_oidc_client=ebrains_oidc_client)
         if ebrains_user_token is None:
             raw_user_access_token = read_str_env_var(
                 EBRAINS_USER_ACCESS_TOKEN,
@@ -271,7 +245,6 @@ class WorkflowConfig(WebilastikConfig):
                 name= WEBILASTIK_SCRATCH_DIR,
                 help_text="base path where temporary files can be created",
             )),
-            ebrains_oidc_client=base_config.ebrains_oidc_client,
             ebrains_user_token=ebrains_user_token,
             max_duration_minutes=max_duration_minutes if max_duration_minutes is not None else Minutes(float(read_int_env_var(
                 WEBILASTIK_JOB_MAX_DURATION_MINUTES,
@@ -301,10 +274,8 @@ class WorkflowConfig(WebilastikConfig):
             )),
         )
 
-
     def to_env_vars(self) -> Sequence[EnvVar]:
         return [
-            *super().to_env_vars(),
             EnvVar(name=WEBILASTIK_ALLOW_LOCAL_FS, value=str(self.allow_local_fs).lower()),
             EnvVar(name=WEBILASTIK_SCRATCH_DIR, value=str(self.scratch_dir)),
             EnvVar(name=EBRAINS_USER_ACCESS_TOKEN, value=self.ebrains_user_token.raw_token),

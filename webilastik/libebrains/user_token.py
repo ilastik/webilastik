@@ -20,6 +20,9 @@ from webilastik.serialization.json_serialization import parse_json, JsonValue
 from webilastik.server.util import urlsafe_b64decode
 from webilastik.utility.url import Url
 from webilastik.utility import parse_uuid
+from webilastik.utility.log import Logger
+
+logger = Logger()
 
 class EbrainsCommunicationFailure(Exception):
     def __init__(self, message: str = "") -> None:
@@ -166,14 +169,17 @@ class AccessTokenPayload:
     class _PrivateMarker:
         pass
 
-    def __init__(self, _marker: _PrivateMarker, raw: str, exp: datetime, auth_time: datetime, sub: uuid.UUID) -> None:
+    def __init__(
+        self, _marker: _PrivateMarker, raw: str, exp: datetime, iat: datetime, auth_time: datetime, sub: uuid.UUID
+    ) -> None:
         super().__init__()
         self.raw: Final[str] = raw
         self.exp = exp
+        self.iat = iat
         self.auth_time = auth_time
         self.sub = sub
-        # my_timezone = datetime.now(timezone.utc).astimezone().tzinfo
-        # print(f"%%%%%%% AccessToken auth time is {self.auth_time.astimezone(my_timezone)}")
+        my_timezone = datetime.now(timezone.utc).astimezone().tzinfo
+        print(f"%%%%%%% AccessToken auth time is {self.auth_time.astimezone(my_timezone)} and issue time is {iat.astimezone(my_timezone)}")
 
     @classmethod
     def from_raw(cls, raw: str) -> "AccessTokenPayload | AccessTokenInvalid":
@@ -194,6 +200,7 @@ class AccessTokenPayload:
             _marker=cls._PrivateMarker(),
             raw=raw,
             exp=datetime.fromtimestamp(payload_dto.exp, timezone.utc),
+            iat=datetime.fromtimestamp(payload_dto.iat, timezone.utc),
             auth_time=datetime.fromtimestamp(payload_dto.auth_time, timezone.utc),
             sub=sub_result,
         )
@@ -224,6 +231,11 @@ class AccessToken:
         self.payload = payload
         self.raw_token: Final[str] = header.raw + "." + payload.raw + "." + raw_signature
         self.refresh_token = refresh_token
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, AccessToken):
+            return False
+        return self.raw_token == other.raw_token
 
     @property
     def user_id(self) -> uuid.UUID:

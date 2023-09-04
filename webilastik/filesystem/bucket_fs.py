@@ -13,6 +13,7 @@ from webilastik.filesystem import IFilesystem, FsIoException, FsFileNotFoundExce
 from webilastik.filesystem.http_fs import HttpFs
 from webilastik.filesystem.os_fs import OsFs
 from webilastik.serialization.json_serialization import parse_json
+from webilastik.utility.log import Logger
 from webilastik.utility.url import Url
 from webilastik.server.rpc.dto import BucketFSDto, DataProxyObjectUrlResponse
 from webilastik.utility import Seconds
@@ -21,19 +22,22 @@ from webilastik.utility.request import ErrRequestCompletedAsFailure, request_siz
 _cscs_session = requests.Session()
 _data_proxy_session = requests.Session()
 
+logger = Logger()
+
 def _requests_from_data_proxy(
     method: Literal["get", "put", "delete"],
     url: Url,
     data: Optional[bytes],
     refresh_on_401: bool = True,
 ) -> "Tuple[bytes, CaseInsensitiveDict[str]] | FsFileNotFoundException | Exception":
-    from webilastik.libebrains import global_user_login
+    from webilastik.libebrains.global_user_login import GlobalLogin
+    user_token = GlobalLogin.get_token()
     response_result = safe_request(
         session=_data_proxy_session,
         method=method,
         url=url,
         data=data,
-        headers=global_user_login.get_global_login_token().as_ebrains_auth_header(),
+        headers=user_token.as_ebrains_auth_header(),
     )
     if isinstance(response_result, tuple):
         return response_result
@@ -43,11 +47,10 @@ def _requests_from_data_proxy(
         return FsFileNotFoundException(url.path) #FIXME
     if response_result.status_code != 401 or not refresh_on_401:
         return response_result
-    print(f"Asking to refresh token in BucketFS.........................")
-    refreshed_token_result = global_user_login.refresh_global_login_token()
+    refreshed_token_result = GlobalLogin.refresh_token(stale_token=user_token)
     if isinstance(refreshed_token_result, Exception):
+        logger.error(f"Could not refreshed ebrains token in BucketFS")
         return refreshed_token_result
-    print(f"Successfully refreshed token in BucketFS...................")
     return _requests_from_data_proxy(
         method=method, url=url, data=data, refresh_on_401=False
     )

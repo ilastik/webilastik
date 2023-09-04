@@ -288,13 +288,10 @@ class SessionAllocator:
 
             ###################################################################
 
-            server_config = SessionAllocatorConfig.get()
-
             session_result = await session_launcher.launch(
                 user_id=user_token.user_id,
                 compute_session_id=compute_session_id,
                 allow_local_fs=False, #FIXME: maybe allow when local sessions are allowed?
-                ebrains_oidc_client=server_config.ebrains_oidc_client,
                 ebrains_user_token=user_token,
                 max_duration_minutes=Minutes(params.session_duration_minutes),
                 session_allocator_host=Hostname("app.ilastik.org"),

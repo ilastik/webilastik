@@ -19,7 +19,6 @@ from ndstructs.utils.json_serializable import ensureJsonObject, ensureJsonString
 from cryptography.fernet import Fernet
 from webilastik.config import WorkflowConfig
 
-from webilastik.libebrains.oidc_client import OidcClient
 from webilastik.libebrains.user_info import UserInfo
 from webilastik.libebrains.user_token import AccessToken
 from webilastik.server.rpc.dto import ComputeSessionDto
@@ -330,7 +329,6 @@ class SshJobLauncher:
         *,
         compute_session_id: uuid.UUID,
         allow_local_fs: bool,
-        ebrains_oidc_client: OidcClient,
         ebrains_user_token: AccessToken,
         max_duration_minutes: Minutes,
         session_url: Url,
@@ -346,7 +344,6 @@ class SshJobLauncher:
         user_id: uuid.UUID,
         compute_session_id: uuid.UUID,
         allow_local_fs: bool,
-        ebrains_oidc_client: OidcClient,
         ebrains_user_token: AccessToken,
         max_duration_minutes: Minutes,
         session_url: Url,
@@ -364,7 +361,6 @@ class SshJobLauncher:
             stdin=self.get_sbatch_launch_script(
                 compute_session_id=compute_session_id,
                 allow_local_fs=allow_local_fs,
-                ebrains_oidc_client=ebrains_oidc_client,
                 ebrains_user_token=ebrains_user_token,
                 max_duration_minutes=max_duration_minutes,
                 session_url=session_url,
@@ -488,7 +484,6 @@ class LocalJobLauncher(SshJobLauncher):
         *,
         compute_session_id: uuid.UUID,
         allow_local_fs: bool,
-        ebrains_oidc_client: OidcClient,
         ebrains_user_token: AccessToken,
         max_duration_minutes: Minutes,
         session_url: Url,
@@ -500,7 +495,6 @@ class LocalJobLauncher(SshJobLauncher):
         job_config = WorkflowConfig(
             allow_local_fs=allow_local_fs,
             scratch_dir=PurePosixPath(f"/tmp/webilastik_scratch"),
-            ebrains_oidc_client=ebrains_oidc_client,
             ebrains_user_token=ebrains_user_token,
             max_duration_minutes=max_duration_minutes,
             listen_socket=working_dir / "to-master.sock",
@@ -577,7 +571,6 @@ class LocalJobLauncher(SshJobLauncher):
         user_id: uuid.UUID,
         compute_session_id: uuid.UUID,
         allow_local_fs: bool,
-        ebrains_oidc_client: OidcClient,
         ebrains_user_token: AccessToken,
         max_duration_minutes: Minutes,
         session_url: Url,
@@ -590,7 +583,6 @@ class LocalJobLauncher(SshJobLauncher):
             self.get_sbatch_launch_script(
                 compute_session_id=compute_session_id,
                 allow_local_fs=allow_local_fs,
-                ebrains_oidc_client=ebrains_oidc_client,
                 ebrains_user_token=ebrains_user_token,
                 max_duration_minutes=max_duration_minutes,
                 session_url=session_url,
@@ -670,7 +662,6 @@ class JusufSshJobLauncher(SshJobLauncher):
         *,
         compute_session_id: uuid.UUID,
         allow_local_fs: bool,
-        ebrains_oidc_client: OidcClient,
         ebrains_user_token: AccessToken,
         max_duration_minutes: Minutes,
         session_url: Url,
@@ -682,7 +673,6 @@ class JusufSshJobLauncher(SshJobLauncher):
         job_config = WorkflowConfig(
             allow_local_fs=allow_local_fs,
             scratch_dir=PurePosixPath(f"/p/scratch/{self.account}"),
-            ebrains_oidc_client=ebrains_oidc_client,
             ebrains_user_token=ebrains_user_token,
             max_duration_minutes=max_duration_minutes,
             listen_socket=working_dir / "to-master.sock",
@@ -790,7 +780,6 @@ class CscsSshJobLauncher(SshJobLauncher):
         *,
         compute_session_id: uuid.UUID,
         allow_local_fs: bool,
-        ebrains_oidc_client: OidcClient,
         ebrains_user_token: AccessToken,
         max_duration_minutes: Minutes,
         session_url: Url,
@@ -802,7 +791,6 @@ class CscsSshJobLauncher(SshJobLauncher):
         job_config = WorkflowConfig(
             allow_local_fs=allow_local_fs,
             scratch_dir=PurePosixPath(f"/scratch/snx3000/bp000188"),
-            ebrains_oidc_client=ebrains_oidc_client,
             ebrains_user_token=ebrains_user_token,
             max_duration_minutes=max_duration_minutes,
             listen_socket=working_dir / "to-master.sock",
