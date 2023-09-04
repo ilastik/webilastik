@@ -107,6 +107,29 @@ export class DataSourceSelectionWidget{
         this.defaultBucketPath = params.defaultBucketPath
 
         new Paragraph({parentElement: this.element, children: [
+            new ButtonWidget({contents: "🪣 Open from Data Proxy", parentElement: undefined, onClick: () => {
+                const popup = PopupWidget.ClosablePopup({title: "Select datasets from Data Proxy"})
+                const filePicker = new DataProxyFilePicker({
+                    parentElement: popup.contents,
+                    session: this.session,
+                    defaultBucketName: this.defaultBucketName,
+                    defaultBucketPath: this.defaultBucketPath,
+                    onOk: (liveFsTree: LiveFsTree) => {
+                        popup.destroy()
+                        this.defaultBucketName = filePicker.bucketName || this.defaultBucketName;
+                        this.defaultBucketPath = filePicker.bucketPath || this.defaultBucketPath;
+                        PopupWidget.WaitPopup({
+                            title: "Loading data sources...",
+                            operation: DataSourceSelectionWidget.tryOpenViews({
+                                urls: liveFsTree.getSelectedUrls(),
+                                session: this.session,
+                                viewer: this.viewer,
+                            }),
+                        })
+                    },
+                    okButtonValue: "Open",
+                })
+            }}),
             new ButtonWidget({contents: "🔗 Enter URL", parentElement: undefined, onClick: () => {
                 const popup = PopupWidget.ClosablePopup({title: "Enter dataset URL"})
                 let urlInput: UrlInput;
@@ -131,29 +154,6 @@ export class DataSourceSelectionWidget{
                             viewer: this.viewer,
                         }),
                     })
-                })
-            }}),
-            new ButtonWidget({contents: "🪣 Open from Data Proxy", parentElement: undefined, onClick: () => {
-                const popup = PopupWidget.ClosablePopup({title: "Select datasets from Data Proxy"})
-                const filePicker = new DataProxyFilePicker({
-                    parentElement: popup.contents,
-                    session: this.session,
-                    defaultBucketName: this.defaultBucketName,
-                    defaultBucketPath: this.defaultBucketPath,
-                    onOk: (liveFsTree: LiveFsTree) => {
-                        popup.destroy()
-                        this.defaultBucketName = filePicker.bucketName || this.defaultBucketName;
-                        this.defaultBucketPath = filePicker.bucketPath || this.defaultBucketPath;
-                        PopupWidget.WaitPopup({
-                            title: "Loading data sources...",
-                            operation: DataSourceSelectionWidget.tryOpenViews({
-                                urls: liveFsTree.getSelectedUrls(),
-                                session: this.session,
-                                viewer: this.viewer,
-                            }),
-                        })
-                    },
-                    okButtonValue: "Open",
                 })
             }}),
         ]})
