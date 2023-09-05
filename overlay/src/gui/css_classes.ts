@@ -50,6 +50,7 @@ export enum CssClasses{
     ItkContainerForWebilastikControls = "ItkContainerForWebilastikControls",
     ItkLaneWidget = "ItkLaneWidget",
     ItkLaneLayerWidget = "ItkLaneLayerWidget",
+    ItkLaneLayerName = "ItkLaneLayerName",
     ItkButtonDepressed = "ItkButtonDepressed",
     ItkAppletContents = "ItkAppletContents",
     ItkSessionManagementAdvancedOptions = "ItkSessionManagementAdvancedOptions",

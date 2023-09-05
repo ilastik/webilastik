@@ -407,17 +407,10 @@ input[type=text]:invalid, input[type=url]:invalid{
     margin-left: 1em;
 }
 
-.ItkLaneWidget:last-child{
-    border-bottom: solid 1px var(--default-highlight-color);
-}
-
-.ItkLaneWidget > p{
-    margin: 0;
-}
-
-.ItkLaneWidget label{
+.ItkLaneLayerName{
     font-size: calc(var(--default-font-size) - 1px);
-    margin-left: 2em;
+    padding-left: 2em !important;
+    font-style: italic;
 }
 
 .ItkSessionManagementAdvancedOptions{

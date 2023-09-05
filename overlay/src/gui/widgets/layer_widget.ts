@@ -3,49 +3,36 @@ import { INativeView, IViewerDriver } from "../../drivers/viewer_driver";
 import { uuidv4 } from "../../util/misc";
 import { Url } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
-import { Button } from "./input_widget";
-import { ToggleButton } from "./value_input_widget";
-import { ContainerWidget, Div, Label, Paragraph, Span } from "./widget";
+import { Button, CheckboxWidget } from "./input_widget";
+import { ContainerWidget, Table, TBody, Td, Tr } from "./widget";
 
 class LayerWidget{
     public readonly nativeView: INativeView;
 
-    public readonly element: Div;
-    private readonly visibilityInput: ToggleButton;
+    public readonly element: Tr;
+    private readonly visibilityInput: CheckboxWidget<true>;
     // private readonly opacitySlider: RangeInput;
 
     public constructor(params: {
-        parentElement: ContainerWidget<any> | undefined,
+        parentElement: TBody | undefined,
         nativeView: INativeView,
         name: string,
     }){
         this.nativeView = params.nativeView
 
-        this.element = new Div({parentElement: params.parentElement, cssClasses: [CssClasses.ItkLaneLayerWidget]})
-
-        new Label({parentElement: this.element, innerText: params.name})
-        this.visibilityInput = new ToggleButton({
-            text: "👁️",
-            parentElement: this.element,
-            value: true,
-            onClick: () => {
-                this.nativeView.reconfigure({isVisible: this.visibilityInput.value})
-            }
-        })
-
-        // new ToggleVisibilityButton({
-        //     parentElement: this.element,
-        //     text: "⚙",
-        //     subject: new Div({
-        //         parentElement: this.element,
-        //         children: [
-        //             new Label({parentElement: undefined, innerText: "opacity: "}),
-        //             this.opacitySlider = new RangeInput({parentElement: undefined, min: 0, max: 1, value: 0.5, step: 0.05, onChange: () => {
-        //                 this.nativeView.reconfigure({opacity: this.opacitySlider.value})
-        //             }})
-        //         ]
-        //     })
-        // })
+        this.element = new Tr({parentElement: params.parentElement, children: [
+            new Td({parentElement: undefined, innerText: params.name, cssClasses: [CssClasses.ItkLaneLayerName]}),
+            new Td({parentElement: undefined, children: [
+                this.visibilityInput = new CheckboxWidget<true>({
+                    parentElement: undefined,
+                    valueWhenChecked: true,
+                    checked: true,
+                    onClick: () => {
+                        this.nativeView.reconfigure({isVisible: this.visibilityInput.checked})
+                    }
+                })
+            ]})
+        ]})
     }
 
     public enableVisibilityControls(enable: boolean){
@@ -53,7 +40,7 @@ class LayerWidget{
     }
 
     public get isVisible(): boolean{
-        return this.visibilityInput.value
+        return this.visibilityInput.checked
     }
 
     public destroy(){
@@ -92,7 +79,7 @@ export class RawDataLayerWidget extends LayerWidget{
     ]
 
     constructor(params: {
-        parentElement: ContainerWidget<any> | undefined,
+        parentElement: TBody | undefined,
         datasource: FsDataSource,
         opacity: number,
         nativeView: INativeView,
@@ -102,7 +89,7 @@ export class RawDataLayerWidget extends LayerWidget{
     }
 
     public static async create(params: {
-        parentElement: ContainerWidget<any> | undefined,
+        parentElement: TBody | undefined,
         driver: IViewerDriver,
         session: Session,
         datasource: FsDataSource,
@@ -154,7 +141,7 @@ export class PredictionsLayerWidget extends LayerWidget{
     public channelColors: Color[]
 
     constructor(params: {
-        parentElement: ContainerWidget<any>,
+        parentElement: TBody,
         rawData: FsDataSource,
         classifierGeneration: number,
         channelColors: Color[],
@@ -168,7 +155,7 @@ export class PredictionsLayerWidget extends LayerWidget{
     }
 
     public static async create(params: {
-        parentElement: ContainerWidget<any>,
+        parentElement: TBody,
         driver: IViewerDriver,
         session: Session,
         rawData: FsDataSource,
@@ -245,10 +232,10 @@ export class PredictionsParams{
 }
 
 export class PixelClassificationLaneWidget{
-    private element: Div;
+    private element: TBody;
     private rawDataWidget: RawDataLayerWidget;
     private driver: IViewerDriver;
-    private readonly visibilityInput: ToggleButton;
+    private readonly visibilityInput: CheckboxWidget<true>;
 
     private _predictionsWidget: PredictionsLayerWidget | undefined | PredictionsParams = undefined
     private get predictionsWidget(): PredictionsLayerWidget | undefined{
@@ -259,7 +246,7 @@ export class PixelClassificationLaneWidget{
     }
 
     private constructor(params: {
-        parentElement: ContainerWidget<any>,
+        parentElement: Table,
         name: string,
         rawDataWidget: RawDataLayerWidget,
         driver: IViewerDriver,
@@ -267,22 +254,26 @@ export class PixelClassificationLaneWidget{
         onDestroyed: (lane: PixelClassificationLaneWidget) => void,
         onVisibilityChanged: (lane: PixelClassificationLaneWidget) => void,
     }){
-        this.element = new Div({parentElement: params.parentElement, cssClasses: [CssClasses.ItkLaneWidget], children: [
-            new Paragraph({parentElement: undefined, children: [
-                new Span({parentElement: undefined, innerText: params.name, title: params.rawDataWidget.datasource.url.raw}),
-                this.visibilityInput = new ToggleButton({
-                    parentElement: undefined,
-                    text: "👁️",
-                    value: params.isVisible,
-                    onClick: () => {
-                        this.setVisible(this.visibilityInput.value)
-                        params.onVisibilityChanged(this)
-                    }
-                }),
-                new Button({inputType: "button", text: "✖", parentElement: undefined, onClick: () => {
-                    this.destroy()
-                    params.onDestroyed(this)
-                }}),
+        this.element = new TBody({parentElement: params.parentElement, children: [
+            new Tr({parentElement: undefined, children: [
+                new Td({parentElement: undefined, innerText: params.name, title: params.rawDataWidget.datasource.url.raw}),
+                new Td({parentElement: undefined, children: [
+                    this.visibilityInput = new CheckboxWidget<true>({
+                        parentElement: undefined,
+                        checked: params.isVisible,
+                        valueWhenChecked: true,
+                        onClick: () => {
+                            this.setVisible(this.visibilityInput.checked)
+                            params.onVisibilityChanged(this)
+                        }
+                    }),
+                ]}),
+                new Td({parentElement: undefined, children: [
+                    new Button({inputType: "button", text: "✖", parentElement: undefined, onClick: () => {
+                        this.destroy()
+                        params.onDestroyed(this)
+                    }}),
+                ]}),
             ]}),
 
         ]})
@@ -334,7 +325,7 @@ export class PixelClassificationLaneWidget{
     }
 
     public get isVisible(): boolean{
-        return this.visibilityInput.value
+        return this.visibilityInput.checked
     }
     public get rawData(): FsDataSource{
         return this.rawDataWidget.datasource
@@ -348,7 +339,7 @@ export class PixelClassificationLaneWidget{
             this.rawDataWidget.nativeView.reconfigure({isVisible: false})
             this.predictionsWidget?.nativeView.reconfigure({isVisible: false})
         }
-        this.visibilityInput.value = isVisible
+        this.visibilityInput.checked = isVisible
         this.rawDataWidget.enableVisibilityControls(isVisible)
         this.predictionsWidget?.enableVisibilityControls(isVisible)
     }

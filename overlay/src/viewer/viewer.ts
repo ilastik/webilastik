@@ -6,7 +6,7 @@ import { CssClasses } from "../gui/css_classes";
 import { Button } from "../gui/widgets/input_widget";
 import { PixelClassificationLaneWidget } from "../gui/widgets/layer_widget";
 // import { ErrorPopupWidget } from "../gui/widgets/popup";
-import { Div } from "../gui/widgets/widget";
+import { Table, Th, THead } from "../gui/widgets/widget";
 import { Quat, Vec3 } from "../util/ooglmatrix";
 
 
@@ -18,7 +18,7 @@ export class Viewer{
     private onViewportsChangedHandlers: Array<() => void> = []
     private onDataChangedHandlers: Array<() => void> = []
 
-    private element: Div;
+    private element: Table;
     private laneWidgets: PixelClassificationLaneWidget[] = []
 
     public constructor(params: {
@@ -29,7 +29,13 @@ export class Viewer{
         this.session = params.session
         this.driver = params.driver
 
-        this.element = new Div({parentElement: params.parentElement})
+        this.element = new Table({parentElement: params.parentElement, cssClasses: [CssClasses.ItkTable], children: [
+            new THead({parentElement: undefined, children: [
+                new Th({parentElement: undefined, innerText: "Name"}),
+                new Th({parentElement: undefined, innerText: "Visible"}),
+                new Th({parentElement: undefined, innerText: "Controls"}),
+            ]})
+        ]})
         this.recenterButton = new Button({
             inputType: "button",
             parentElement: document.body,

@@ -46,7 +46,7 @@ export abstract class InputWidget<IT extends InputType> extends Widget<"input">{
 export class CheckboxWidget<T> extends InputWidget<"checkbox">{
     public readonly valueWhenChecked: T;
 
-    constructor(params: Omit<InputWidgetParams, "onClick"> & {
+    constructor(params: InputWidgetParams & {
         checked?: boolean,
         valueWhenChecked: T,
     }){
