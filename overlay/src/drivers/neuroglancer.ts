@@ -148,7 +148,6 @@ class Layer{
         }
 
         layerState.shader = Layer.makeShader({channelColors: this.channelColors, opacity: this.opacity})
-        console.log(`This is the actual shader I wanted to use: \n ${layerState.shader}`)
         if(params.isVisible !== undefined){
             layerState.visible = params.isVisible
         }

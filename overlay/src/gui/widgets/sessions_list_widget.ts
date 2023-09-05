@@ -4,12 +4,12 @@ import { secondsToTimeDeltaString } from "../../util/misc";
 import { Path, Url } from "../../util/parsed_url";
 import { ErrorPopupWidget, PopupWidget } from "./popup";
 import { Button, ButtonWidget } from "./input_widget";
-import { ImageWidget, Paragraph, Table, TableData, TableHeader, TableRow } from "./widget";
+import { ImageWidget, Paragraph, Table, Td, Th, THead, Tr } from "./widget";
 import { CssClasses } from "../css_classes";
 
 class SessionItemWidget{
     public readonly status: ComputeSessionStatusDto;
-    public readonly element: TableRow;
+    public readonly element: Tr;
     private cancelButton: ButtonWidget
     private rejoinButton: ButtonWidget;
 
@@ -25,12 +25,12 @@ class SessionItemWidget{
         const comp_session = params.status.compute_session
         const startTimeString = comp_session.start_time_utc_sec ? new Date(comp_session.start_time_utc_sec * 1000).toLocaleString() : "not started"
 
-        this.element = new TableRow({parentElement: params.parentElement, children: [
-            new TableData({parentElement: undefined, innerText: comp_session.compute_session_id}),
-            new TableData({parentElement: undefined, innerText: startTimeString}),
-            new TableData({parentElement: undefined, innerText: secondsToTimeDeltaString(comp_session.time_elapsed_sec)}),
-            new TableData({parentElement: undefined, innerText: comp_session.state}),
-            new TableData({parentElement: undefined, children: [
+        this.element = new Tr({parentElement: params.parentElement, children: [
+            new Td({parentElement: undefined, innerText: comp_session.compute_session_id}),
+            new Td({parentElement: undefined, innerText: startTimeString}),
+            new Td({parentElement: undefined, innerText: secondsToTimeDeltaString(comp_session.time_elapsed_sec)}),
+            new Td({parentElement: undefined, innerText: comp_session.state}),
+            new Td({parentElement: undefined, children: [
                 this.cancelButton = new ButtonWidget({
                     parentElement: undefined,
                     disabled: SESSION_DONE_STATES.includes(comp_session.state) ,
@@ -88,12 +88,12 @@ export class SessionsPopup{
     }){
         let popup = new PopupWidget("Sessions:", true)
         let table = new Table({parentElement: popup.contents, cssClasses: [CssClasses.ItkTable], children: [
-            new TableRow({parentElement: undefined, children: [
-                new TableHeader({parentElement: undefined, innerText: "Session ID"}),
-                new TableHeader({parentElement: undefined, innerText: "Start Time"}),
-                new TableHeader({parentElement: undefined, innerText: "Duration"}),
-                new TableHeader({parentElement: undefined, innerText: "Status"}),
-                new TableHeader({parentElement: undefined, innerText: "Actions"}),
+            new THead({parentElement: undefined, children: [
+                new Th({parentElement: undefined, innerText: "Session ID"}),
+                new Th({parentElement: undefined, innerText: "Start Time"}),
+                new Th({parentElement: undefined, innerText: "Duration"}),
+                new Th({parentElement: undefined, innerText: "Status"}),
+                new Th({parentElement: undefined, innerText: "Actions"}),
             ]})
         ]})
         params.sessionStati.forEach(status => new SessionItemWidget({

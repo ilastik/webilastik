@@ -27,7 +27,7 @@ import { DatasinkConfigWidget, UnsupportedDziDataType } from './datasink_builder
 import { DataType } from '../../util/precomputed_chunks';
 import { FileLocationPatternInputWidget } from './file_location_input';
 import { Button, ButtonWidget, Select } from './input_widget';
-import { Anchor, Div, Label, Paragraph, Span, Table, TableData, TableHeader, TableRow } from './widget';
+import { Anchor, Div, Label, Paragraph, Span, Table, Td, Th, Tr, THead } from './widget';
 import { Path, Url } from '../../util/parsed_url';
 import { BooleanInput } from './value_input_widget';
 import { Shape5DInputNoChannel } from './shape5d_input';
@@ -73,15 +73,15 @@ class Job{
     private makeProgressDisplay(params: {
         viewer: Viewer,
         session: Session,
-    }): TableData{
+    }): Td{
         const jobDto = this.jobDto
 
         if(jobDto.status instanceof JobIsPendingDto){
-            return new TableData({parentElement: undefined, innerText: "pending"})
+            return new Td({parentElement: undefined, innerText: "pending"})
         }
         if(jobDto.status instanceof JobCanceledDto){
             const cancellationMessage = jobDto.status.message;
-            return new TableData({parentElement: undefined, children: [
+            return new Td({parentElement: undefined, children: [
                 new Label({parentElement: undefined, innerText: "cancelled"}),
                 new ButtonWidget({
                     parentElement: undefined, contents: "?", onClick: () => PopupWidget.OkPopup({
@@ -91,7 +91,7 @@ class Job{
             ]})
         }
         if(jobDto.status instanceof JobIsRunningDto){
-            return new TableData({
+            return new Td({
                 parentElement: undefined,
                 innerText: jobDto.num_args === undefined ?
                     "unknwown" :
@@ -102,11 +102,11 @@ class Job{
             assertUnreachable(jobDto.status)
         }
         if(jobDto.status.error_message){
-            let td = new TableData({parentElement: undefined, innerText: "failed"})
+            let td = new Td({parentElement: undefined, innerText: "failed"})
             td.element.title = jobDto.status.error_message
             return td
         }
-        let out = new TableData({parentElement: undefined})
+        let out = new Td({parentElement: undefined})
 
         let dataProxyGuiUrl: Url | undefined = undefined;
 
@@ -145,12 +145,12 @@ class Job{
 
         return out
     }
-    public toTableRow(params: {
+    public toTr(params: {
         viewer: Viewer,
         session: Session,
-    }): {name: TableData, progress: TableData}{
+    }): {name: Td, progress: Td}{
         return {
-            name: new TableData({parentElement: undefined, innerText: this.jobDto.name}),
+            name: new Td({parentElement: undefined, innerText: this.jobDto.name}),
             progress: this.makeProgressDisplay(params),
         }
     }
@@ -450,18 +450,18 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
         }
 
         const jobsTable = new Table({parentElement: this.jobsDisplay, cssClasses: [CssClasses.ItkTable], children: [
-            new TableRow({parentElement: undefined, children: [
-                new TableHeader({parentElement: undefined, innerText: "Name"}), //FIXME: mode? name?
-                new TableHeader({parentElement: undefined, innerText: "Progress"}),
+            new THead({parentElement: undefined, children: [
+                new Th({parentElement: undefined, innerText: "Name"}), //FIXME: mode? name?
+                new Th({parentElement: undefined, innerText: "Progress"}),
             ]}),
         ]})
 
         new_state.jobs.forEach(job => {
-            const row = job.toTableRow({
+            const row = job.toTr({
                 session: this.session,
                 viewer: this.viewer
             })
-            new TableRow({parentElement: jobsTable, children: [row.name, row.progress]})
+            new Tr({parentElement: jobsTable, children: [row.name, row.progress]})
         })
     }
 }

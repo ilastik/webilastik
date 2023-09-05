@@ -6,8 +6,6 @@ from pathlib import PurePosixPath
 from typing import Literal, cast, Any, Sequence, TypeVar, Iterable, Generic
 from functools import partial
 from zipfile import ZipFile, ZIP_STORED
-import threading
-import time
 
 from ndstructs.point5D import Interval5D, Point5D
 from ndstructs.array5D import Array5D
@@ -36,7 +34,7 @@ class _ExportTask(Generic[_IN]):
 
     def __call__(self, step_arg: _IN) -> "None | Exception":
         tile = self.operator(step_arg)
-        print(f"Writing tile {tile}")
+        # print(f"Writing tile {tile}")
         return self.sink_writer.write(tile)
 
 class ExportJob(IteratingJob[Exception]):
@@ -91,11 +89,6 @@ class DownscaleDatasource(IteratingJob[Exception]):
 
     @staticmethod
     def downscale(sink_tile: Interval5D, source: DataSource, sink_writer: IDataSinkWriter) -> "None | Exception":
-        prefix = f"########### thread: {threading.get_native_id()} {sink_tile}"
-        def pt(*, msg: str, t1: float, t0: float):
-            if sink_writer.data_sink.shape.x == 697:
-                print(f"{prefix} {msg} {t1 - t0}")
-
         sink = sink_writer.data_sink
         ratio_x = source.shape.x / sink.shape.x
         ratio_y = source.shape.y / sink.shape.y
@@ -119,13 +112,9 @@ class DownscaleDatasource(IteratingJob[Exception]):
             c=source.interval.c,
         ).clamped(source.interval)
 
-        t0 = time.time()
         source_data_with_halo = source.retrieve(source_interval_plus_halo)
-        t1 = time.time()
-        pt(msg="Retrieval time:",  t1=t1, t0=t0)
 
 
-        t0 = time.time()
         sink_tile_data_with_halo_raw: np.ndarray[Any, np.dtype[np.float32]] = cast(
             "np.ndarray[Any, np.dtype[np.float32]]",
             resize_local_mean(
@@ -134,9 +123,6 @@ class DownscaleDatasource(IteratingJob[Exception]):
                 output_shape=sink_roi_plus_halo.shape.to_tuple("zyx"),
             )
         )
-        t1 = time.time()
-        pt(msg="Downscaling time:", t1=t1, t0=t0)
-
 
         sink_tile_data_with_halo = Array5D(sink_tile_data_with_halo_raw, axiskeys="zyxc", location=sink_roi_plus_halo.start).as_uint8()
         sink_tile_data = sink_tile_data_with_halo.cut(sink_tile)

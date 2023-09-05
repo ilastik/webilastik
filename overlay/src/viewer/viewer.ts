@@ -6,7 +6,7 @@ import { CssClasses } from "../gui/css_classes";
 import { Button } from "../gui/widgets/input_widget";
 import { PixelClassificationLaneWidget } from "../gui/widgets/layer_widget";
 // import { ErrorPopupWidget } from "../gui/widgets/popup";
-import { Div } from "../gui/widgets/widget";
+import { Table, Th, THead } from "../gui/widgets/widget";
 import { Quat, Vec3 } from "../util/ooglmatrix";
 
 
@@ -18,7 +18,7 @@ export class Viewer{
     private onViewportsChangedHandlers: Array<() => void> = []
     private onDataChangedHandlers: Array<() => void> = []
 
-    private element: Div;
+    private element: Table;
     private laneWidgets: PixelClassificationLaneWidget[] = []
 
     public constructor(params: {
@@ -29,7 +29,13 @@ export class Viewer{
         this.session = params.session
         this.driver = params.driver
 
-        this.element = new Div({parentElement: params.parentElement})
+        this.element = new Table({parentElement: params.parentElement, cssClasses: [CssClasses.ItkTable], show: false, children: [
+            new THead({parentElement: undefined, children: [
+                new Th({parentElement: undefined, innerText: "Name"}),
+                new Th({parentElement: undefined, innerText: "Visible"}),
+                new Th({parentElement: undefined, innerText: "Controls"}),
+            ]})
+        ]})
         this.recenterButton = new Button({
             inputType: "button",
             parentElement: document.body,
@@ -133,11 +139,15 @@ export class Viewer{
                 let laneIndex = this.laneWidgets.indexOf(lane);
                 (this.laneWidgets[laneIndex + 1] || this.laneWidgets[laneIndex - 1])?.setVisible(true)
                 this.laneWidgets.splice(laneIndex, 1)
+                if(this.laneWidgets.length == 0){
+                    this.element.show(false)
+                }
             },
         })
         if(laneResult instanceof Error){
             return laneResult
         }
+        this.element.show(true)
         this.laneWidgets.push(laneResult)
         this.handleLaneVisibilityChange(laneResult)
         return laneResult

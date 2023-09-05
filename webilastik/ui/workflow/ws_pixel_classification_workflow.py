@@ -313,11 +313,9 @@ class WebIlastik:
         )
 
     def _do_rpc(self, json_payload: JsonValue) -> "None | Exception":
-        logger.debug(f"Got new rpc call:\n{json.dumps(json_payload, indent=4)}\n")
         payload = RPCPayload.from_json_value(json_payload)
         if isinstance(payload, MessageParsingError):
             return payload
-        logger.debug("GOT PAYLOAD OK")
 
         try:
             return self.workflow.run_rpc(

@@ -6,7 +6,7 @@ import { DataProxyFilePicker } from "./data_proxy_file_picker";
 import { Button } from "./input_widget";
 import { LiveFsTree } from "./live_fs_tree";
 import { PopupWidget } from "./popup";
-import { ContainerWidget, Div, Paragraph, Span, Table, TableData, TableRow, TagName, Widget } from "./widget";
+import { ContainerWidget, Div, Paragraph, Span, Table, Td, Tr, TagName, Widget } from "./widget";
 
 export class ListWidget<T> extends Table{
     private items = new Array<T>();
@@ -50,9 +50,9 @@ export class ListWidget<T> extends Table{
         for(let i=0; i<this.items.length; i++){
             const item = this.items[i];
 
-            new TableRow({parentElement: this, cssClasses: [CssClasses.ItkListWidgetRow], children: [
-                new TableData({parentElement: undefined, children: [this.itemRenderer(item)]}),
-                new TableData({parentElement: undefined, children: [
+            new Tr({parentElement: this, cssClasses: [CssClasses.ItkListWidgetRow], children: [
+                new Td({parentElement: undefined, children: [this.itemRenderer(item)]}),
+                new Td({parentElement: undefined, children: [
                     new Button({inputType: "button", parentElement: undefined, text: "✖", title: "Remove this item", onClick: () => {
                         this.items.splice(i, 1);
                         this.redraw()

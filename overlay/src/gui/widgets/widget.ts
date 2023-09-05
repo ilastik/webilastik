@@ -15,6 +15,8 @@ export type WidgetParams = {
     show?: boolean,
 }
 
+export type ParentlessWidgetPrams = Omit<WidgetParams,"parentElement">
+
 export abstract class Widget<T extends TagName>{
     public readonly element: HTMLElementTagNameMap[T];
 
@@ -210,25 +212,52 @@ export class Paragraph extends ContainerWidget<"p">{
 }
 
 export class Table extends ContainerWidget<"table">{
-    constructor(params: WidgetParams & {children?: Array<Widget<"tr" | "caption">>}){
+    constructor(params: WidgetParams & {children?: Array<Widget<"tr" | "tbody" | "caption">>}){
         super({...params, tagName: "table"})
     }
 }
 
-export class TableRow extends ContainerWidget<"tr">{
-    constructor(params: WidgetParams & {children?: Array<Widget<"td"> | Widget<"th">>}){
+export class TBody extends ContainerWidget<"tbody">{
+    constructor(params: ParentlessWidgetPrams & {
+        parentElement: Table | undefined,
+        children?: Array<Widget<"tr" | "caption">>
+    }){
+        super({...params, tagName: "tbody"})
+    }
+}
+
+export class THead extends ContainerWidget<"thead">{
+    constructor(params: ParentlessWidgetPrams & {
+        parentElement: Table | undefined,
+        children?: Array<Widget<"th">>
+    }){
+        super({...params, tagName: "thead"})
+    }
+}
+
+export class Tr extends ContainerWidget<"tr">{
+    constructor(params: ParentlessWidgetPrams & {
+        parentElement: TBody | Table | undefined,
+        children?: Array<Widget<"td">>
+    }){
         super({...params, tagName: "tr"})
     }
 }
 
-export class TableHeader extends ContainerWidget<"th">{
-    constructor(params: WidgetParams & {children?: Array<Widget<TagName>>}){
+export class Th extends ContainerWidget<"th">{
+    constructor(params: ParentlessWidgetPrams & {
+        parentElement: THead | undefined,
+        children?: Array<Widget<TagName>>
+    }){
         super({...params, tagName: "th"})
     }
 }
 
-export class TableData extends ContainerWidget<"td">{
-    constructor(params: WidgetParams & {children?: Array<Widget<TagName>>}){
+export class Td extends ContainerWidget<"td">{
+    constructor(params: ParentlessWidgetPrams & {
+        parentElement: Tr | undefined,
+        children?: Array<Widget<TagName>>
+    }){
         super({...params, tagName: "td"})
     }
 }

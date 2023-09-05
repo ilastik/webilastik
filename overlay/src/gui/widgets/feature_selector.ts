@@ -1,7 +1,7 @@
 import { FeatureClassName, IlpFeatureExtractor } from "../../client/ilastik"
 import { CssClasses } from "../css_classes"
 import { Button, CheckboxWidget } from "./input_widget"
-import { ContainerWidget, Div, Paragraph, Table, TableData, TableHeader, TableRow } from "./widget"
+import { ContainerWidget, Div, Paragraph, Table, Td, Th, Tr } from "./widget"
 
 type FeatureSelectionCheckbox = CheckboxWidget<IlpFeatureExtractor>
 
@@ -54,7 +54,7 @@ export class FeatureSelector{
     public readonly element: Div
     private baseScales: Array<number>
     private checkboxes: Map<FeatureClassName, Map<number, FeatureSelectionCheckbox>>
-    checkboxesContainer: Paragraph
+    checkboxesContainer: Table
     public readonly buttonsContainer: Paragraph
 
     public get value(): FeatureExtractorSet{
@@ -78,14 +78,14 @@ export class FeatureSelector{
         val.getScales().forEach(s => scalesSet.add(s))
         let scales = Array.from(scalesSet).sort((a, b) => a - b)
 
-        new TableRow({parentElement: this.checkboxesContainer, children: [
-            new TableHeader({innerText: 'Feature / sigma', parentElement: undefined}),
-            ...scales.map(scale => new TableHeader({parentElement: undefined, innerText: scale.toFixed(1).toString()}))
+        new Tr({parentElement: this.checkboxesContainer, children: [
+            new Th({innerText: 'Feature / sigma', parentElement: undefined}),
+            ...scales.map(scale => new Th({parentElement: undefined, innerText: scale.toFixed(1).toString()}))
         ]})
 
         featureNames.forEach(feature_name => {
-            let tr = new TableRow({parentElement: this.checkboxesContainer, children: [
-                new TableData({parentElement: undefined, innerText: feature_name})
+            let tr = new Tr({parentElement: this.checkboxesContainer, children: [
+                new Td({parentElement: undefined, innerText: feature_name})
             ]})
             const checkboxLine = new Map<number, FeatureSelectionCheckbox>()
             this.checkboxes.set(feature_name, checkboxLine)
@@ -96,7 +96,7 @@ export class FeatureSelector{
                     axis_2d: "z", //FIXME
                     __class__: feature_name,
                 });
-                let td = new TableData({parentElement: tr});
+                let td = new Td({parentElement: tr});
                 let checked = val.contains(featureExtractor);
                 if(scale == 0.3 && feature_name != "Gaussian Smoothing" && !checked){
                     return

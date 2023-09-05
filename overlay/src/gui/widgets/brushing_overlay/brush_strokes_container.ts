@@ -441,7 +441,9 @@ class BrushStrokeWidget extends Paragraph{
     }
 
     public destroy(){
-        this.brushStroke.destroy()
+        //some animation frame might still have ref to this brush stroke,
+        //so we trust the GC to dealloc the GPU buffer
+        // this.brushStroke.destroy()
         super.destroy()
     }
 }
