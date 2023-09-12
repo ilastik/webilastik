@@ -58,7 +58,7 @@ export class FirstPersonCamera extends OrthoCamera{
                 forward_velocity[2] + left_velocity[2] + up_velocity[2],
             ));
             console.log(`Adjusting camera by ${vec3.str(resultant_velocity)}`)
-            this.moveInViewSpace(vec3.scale(vec3.create(), resultant_velocity, 0.01))
+            this.moveInViewSpace(vec3.scale(vec3.create(), resultant_velocity, 0.20))
         })
 
         document.addEventListener("keydown", (ev) => {
@@ -79,8 +79,8 @@ export class FirstPersonCamera extends OrthoCamera{
                     return
             }
             console.log(`ROTATING camera! ${Date.now()}`)
-            this.tiltUp((this.rotating_up - this.rotating_down) * 0.001)
-            this.rotateLeft((this.rotating_left - this.rotating_right) * 0.001)
+            this.tiltUp((this.rotating_up - this.rotating_down) * 0.01)
+            this.rotateLeft((this.rotating_left - this.rotating_right) * 0.01)
         })
 
         document.addEventListener("keyup", (ev) => {

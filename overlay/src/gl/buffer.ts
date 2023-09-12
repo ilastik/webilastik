@@ -106,7 +106,7 @@ export abstract class VertexAttributeBuffer<Arr extends BinaryArray> extends Buf
         gl: WebGL2RenderingContext,
         data: Arr,
         usageHint: BufferUsageHint,
-        numComponents: 1 | 2 | 3 | 4,
+        numComponents: number,
         name?: string,
     }){
         super({bindTarget: BindTarget.ARRAY_BUFFER, ...params})
@@ -153,6 +153,35 @@ export class VecAttributeBuffer<NUM_COMPONENTS extends 2 | 3 | 4, Arr extends Bi
         vao: VertexArrayObject,
         location: AttributeLocation,
     }){
+        this.vertexAttribPointer({vao, location, numComponents: 3, elementType: AttributeElementType.FLOAT, normalize: false})
+    }
+
+    public useAsInstacedAttribute({vao, location, attributeDivisor=1}:{
+        vao: VertexArrayObject,
+        location: AttributeLocation,
+        attributeDivisor?: number //number of instances that will pass between updates of the generic attribute.
+    }){
+        this.useWithAttribute({vao, location})
+        this.bind()
+        this.gl.vertexAttribDivisor(location.raw, attributeDivisor);
+    }
+}
+
+export class Mat4AttributeBuffer extends VertexAttributeBuffer<Float32Array>{
+    constructor(params: {
+        gl: WebGL2RenderingContext,
+        data: Float32Array,
+        usageHint: BufferUsageHint,
+        name?: string,
+    }){
+        if(params.data.length % 16 != 0){
+            debugger
+            throw new Error(`Expected data's length to be multiple of 16. Found this: ${params.data.length}`)
+        }
+        super({...params, numComponents: 16})
+    }
+
+    public useWithAttribute({vao, location}:{vao: VertexArrayObject, location: AttributeLocation}){
         this.vertexAttribPointer({vao, location, numComponents: 3, elementType: AttributeElementType.FLOAT, normalize: false})
     }
 

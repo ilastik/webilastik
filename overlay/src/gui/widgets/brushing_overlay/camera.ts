@@ -1,5 +1,6 @@
 import { mat3, mat4, quat, ReadonlyVec3, vec3 } from "gl-matrix";
 import { Mat4 } from "../../../util/ooglmatrix";
+import { vecToString } from "../../../util/misc";
 
 export const forward_c = vec3.fromValues( 0,  0, -1);
 export const    left_c = vec3.fromValues(-1,  0,  0);
@@ -12,8 +13,10 @@ export abstract class Camera{
 
     view_to_clip: mat4 = mat4.create()
     world_to_view: mat4 = mat4.create()
+    worldToView: Mat4<"world", "view"> = new Mat4(mat4.create())
     view_to_world: mat4 = mat4.create()
     world_to_clip: mat4 = mat4.create()
+    worldToClip: Mat4<"world", "clip"> = new Mat4(mat4.create())
     clip_to_world: mat4 = mat4.create()
 
     public constructor({position, orientation}: {
@@ -32,8 +35,12 @@ export abstract class Camera{
     protected refreshMatrices(){
         mat4.fromRotationTranslation(this.view_to_world, this.orientation, this.position_w)
         mat4.invert(this.world_to_view, this.view_to_world)
+        this.worldToView = new Mat4(mat4.clone(this.world_to_view))
         mat4.multiply(this.world_to_clip, this.view_to_clip, this.world_to_view)
+        this.worldToClip = new Mat4(mat4.clone(this.world_to_clip))
         mat4.invert(this.clip_to_world, this.world_to_clip)
+
+        console.log(`Camera is now at ${vecToString(this.position_w)} ${quat.str(this.orientation)}`)
     }
 
     public reorient(orientation: quat){

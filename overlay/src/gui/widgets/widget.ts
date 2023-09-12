@@ -97,6 +97,22 @@ export abstract class Widget<T extends TagName>{
     }
 }
 
+export class Canvas extends Widget<"canvas">{
+    constructor(params: WidgetParams & {width: number, height: number}){
+        super({...params, tagName: "canvas"})
+        this.element.height = params.height
+        this.element.width = params.width
+    }
+
+    public getContext(): WebGL2RenderingContext | Error{
+        let context = this.element.getContext("webgl2");
+        if(!context){
+            return new Error(`Could not get webgl2 context`)
+        }
+        return context
+    }
+}
+
 export class Label extends Widget<"label">{
     constructor(params: WidgetParams){
         super({...params, tagName: "label"})

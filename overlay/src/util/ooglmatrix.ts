@@ -1,6 +1,7 @@
 import {mat4, quat, vec3} from "gl-matrix";
+import { UniformLocation } from "../gl/shader";
 
-type Space = "voxel" | "object" | "world" | "view" | "ndc";
+type Space = "voxel" | "object" | "world" | "view" | "ndc" | "clip"; //fixme: remove ndc?
 export class Vec3<SPACE extends Space>{
     public readonly x: number;
     public readonly y: number;
@@ -32,6 +33,10 @@ export class Vec3<SPACE extends Space>{
     public div(other: Vec3<SPACE>): Vec3<SPACE>{
         return new Vec3(vec3.div(vec3.create(), this.raw, other.raw))
     }
+
+    public useAsUniform(gl: WebGL2RenderingContext, location: UniformLocation){
+        gl.uniform3fv(location.raw, this.raw)
+    }
 }
 
 export class Mat4<FROM extends Space, TARGET extends Space>{
@@ -50,6 +55,16 @@ export class Mat4<FROM extends Space, TARGET extends Space>{
         return new Mat4(
             mat4.invert(mat4.create(), this.raw)
         )
+    }
+
+    public mul<OTHER_FROM extends Space, OTHER_TARGET extends Space>(other: Mat4<OTHER_FROM, OTHER_TARGET>): Mat4<OTHER_FROM, TARGET>{
+        return new Mat4(
+            mat4.multiply(mat4.create(), this.raw, other.raw)
+        )
+    }
+
+    public useAsUniform(gl: WebGL2RenderingContext, location: UniformLocation){
+        gl.uniformMatrix4fv(location.raw, false, this.raw);
     }
 }
 
