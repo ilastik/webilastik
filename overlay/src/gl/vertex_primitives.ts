@@ -36,7 +36,7 @@ export abstract class VertexPrimitive extends VertexArray{
     }
 }
 
-export class TriangleArray extends VertexPrimitive{
+export class Triangles extends VertexPrimitive{
     public readonly vertexOrder: FrontFace
     public readonly numTriangles: number
 

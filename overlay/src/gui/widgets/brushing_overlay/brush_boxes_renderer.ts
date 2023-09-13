@@ -4,7 +4,7 @@ import { Color } from "../../../client/ilastik";
 import { VertexArrayObject, BufferUsageHint } from "../../../gl/buffer";
 import { RenderParams } from "../../../gl/gl";
 import { ShaderProgram, VertexShader, FragmentShader, UniformLocation, AttributeLocation } from "../../../gl/shader";
-import { TriangleArray } from "../../../gl/vertex_primitives";
+import { Triangles } from "../../../gl/vertex_primitives";
 import { Mat4 } from "../../../util/ooglmatrix";
 import { BrushRenderer } from "./brush_renderer"
 import { Camera } from "./camera"
@@ -43,7 +43,7 @@ enum Z{
 /**
  * A cube of side 1, centered on 0,0,0
 */
-export class Cube extends TriangleArray{
+export class Cube extends Triangles{
     public static readonly radius_o = vec3.fromValues(X.RIGHT, Y.TOP, Z.BACK)
     constructor(){
         super(new Float32Array([
