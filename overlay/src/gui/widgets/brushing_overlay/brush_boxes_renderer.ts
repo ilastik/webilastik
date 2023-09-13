@@ -1,4 +1,4 @@
-import { mat3, mat4 } from "gl-matrix"
+import { mat3, mat4, vec3 } from "gl-matrix"
 import { BrushStroke } from "../../..";
 import { Color } from "../../../client/ilastik";
 import { VertexArrayObject, BufferUsageHint } from "../../../gl/buffer";
@@ -44,6 +44,7 @@ enum Z{
  * A cube of side 1, centered on 0,0,0
 */
 export class Cube extends TriangleArray{
+    public static readonly radius_o = vec3.fromValues(X.RIGHT, Y.TOP, Z.BACK)
     constructor(){
         super(new Float32Array([
             // front face,
@@ -101,6 +102,7 @@ export class Cube extends TriangleArray{
             X.RIGHT, Y.BOTTOM, Z.FRONT,
         ]));
     }
+
 }
 
 export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{

@@ -1,4 +1,3 @@
-import { vec3 } from "gl-matrix";
 import { VertexArrayObject, BufferUsageHint } from "../../../gl/buffer";
 import { RenderParams } from "../../../gl/gl";
 import { ShaderProgram, UniformLocation, VertexShader, FragmentShader } from "../../../gl/shader";
@@ -125,7 +124,7 @@ export class TexturedBoxRenderer extends ShaderProgram{
         u_ObjectToClip.inverted().useAsUniform(this.gl, this.u_ClipToObject__location);
 
         //FIXME: asumes box has 1 unit of length. Can the ObjectToWorld matrix compensate for that?
-        this.uniform3fv(this.u_BoxRadius_o__location, vec3.fromValues(0.5, 0.5, 0.5))
+        this.uniform3fv(this.u_BoxRadius_o__location, Cube.radius_o)
 
 
         //setup attributes =========
