@@ -1,10 +1,9 @@
 import { mat3, mat4, vec3 } from "gl-matrix"
 import { BrushStroke } from "../../..";
 import { Color } from "../../../client/ilastik";
-import { VertexArrayObject, BufferUsageHint } from "../../../gl/buffer";
-import { RenderParams } from "../../../gl/gl";
+import { VertexArrayObject, BufferUsageHint, VecAttributeBuffer } from "../../../gl/buffer";
+import { DrawingMode, RenderParams } from "../../../gl/gl";
 import { ShaderProgram, VertexShader, FragmentShader, UniformLocation, AttributeLocation } from "../../../gl/shader";
-import { Triangles } from "../../../gl/vertex_primitives";
 import { Mat4 } from "../../../util/ooglmatrix";
 import { BrushRenderer } from "./brush_renderer"
 import { Camera } from "./camera"
@@ -22,6 +21,21 @@ enum Y{
 enum Z{
     BACK = 0.5,
     FRONT = -0.5, //forwards is -z like in the camera
+}
+
+enum U{
+    LEFT = 0.0,
+    RIGHT = 1.0,
+}
+
+enum V{
+    TOP = 0.0,
+    BOTTOM = 1.0,
+}
+
+enum W{
+    FRONT = 0.0,
+    BACK = 0.0,
 }
 
 
@@ -43,70 +57,150 @@ enum Z{
 /**
  * A cube of side 1, centered on 0,0,0
 */
-export class Cube extends Triangles{
+export class Cube{
     public static readonly radius_o = vec3.fromValues(X.RIGHT, Y.TOP, Z.BACK)
-    constructor(){
-        super(new Float32Array([
-            // front face,
-            X.RIGHT, Y.BOTTOM, Z.FRONT,
-            X.LEFT,  Y.BOTTOM, Z.FRONT,
-            X.LEFT,  Y.TOP,    Z.FRONT,
+    public static numVerts = 36;
+    public static drawingMode = DrawingMode.TRIANGLES;
 
-            X.RIGHT, Y.TOP,    Z.FRONT,
-            X.RIGHT, Y.BOTTOM, Z.FRONT,
-            X.LEFT,  Y.TOP,    Z.FRONT,
+    private static vertPositions_o: VecAttributeBuffer<3, Float32Array> | undefined = undefined
+    private static vertTexCoords_uvw: VecAttributeBuffer<3, Float32Array> | undefined = undefined
 
-            //back face,
-            X.LEFT,  Y.TOP,    Z.BACK,
-            X.LEFT,  Y.BOTTOM, Z.BACK,
-            X.RIGHT, Y.BOTTOM, Z.BACK,
+    public static getVertPositions_o(gl: WebGL2RenderingContext): VecAttributeBuffer<3, Float32Array>{
+        if(Cube.vertPositions_o === undefined){
+            Cube.vertPositions_o = new VecAttributeBuffer({
+                gl,
+                numComponents: 3, //i.e.: 3 floats per "value" (value is a vec3)
+                usageHint: BufferUsageHint.STATIC_DRAW,
+                data: new Float32Array([
+                    // front face
+                    X.RIGHT, Y.BOTTOM, Z.FRONT,
+                    X.LEFT,  Y.BOTTOM, Z.FRONT,
+                    X.LEFT,  Y.TOP,    Z.FRONT,
 
-            X.LEFT,  Y.TOP,    Z.BACK,
-            X.RIGHT, Y.BOTTOM, Z.BACK,
-            X.RIGHT, Y.TOP,    Z.BACK,
+                    X.RIGHT, Y.TOP,    Z.FRONT,
+                    X.RIGHT, Y.BOTTOM, Z.FRONT,
+                    X.LEFT,  Y.TOP,    Z.FRONT,
 
-            // right face,
-            X.RIGHT, Y.TOP,    Z.BACK,
-            X.RIGHT, Y.BOTTOM, Z.BACK,
-            X.RIGHT, Y.BOTTOM, Z.FRONT,
+                    //back face
+                    X.LEFT,  Y.TOP,    Z.BACK,
+                    X.LEFT,  Y.BOTTOM, Z.BACK,
+                    X.RIGHT, Y.BOTTOM, Z.BACK,
 
-            X.RIGHT, Y.TOP,    Z.BACK,
-            X.RIGHT, Y.BOTTOM, Z.FRONT,
-            X.RIGHT, Y.TOP,    Z.FRONT,
+                    X.LEFT,  Y.TOP,    Z.BACK,
+                    X.RIGHT, Y.BOTTOM, Z.BACK,
+                    X.RIGHT, Y.TOP,    Z.BACK,
 
-            // left face,
-            X.LEFT, Y.BOTTOM, Z.FRONT,
-            X.LEFT, Y.BOTTOM, Z.BACK,
-            X.LEFT, Y.TOP,    Z.BACK,
+                    // right face
+                    X.RIGHT, Y.TOP,    Z.BACK,
+                    X.RIGHT, Y.BOTTOM, Z.BACK,
+                    X.RIGHT, Y.BOTTOM, Z.FRONT,
 
-            X.LEFT, Y.TOP,    Z.FRONT,
-            X.LEFT, Y.BOTTOM, Z.FRONT,
-            X.LEFT, Y.TOP,    Z.BACK,
+                    X.RIGHT, Y.TOP,    Z.BACK,
+                    X.RIGHT, Y.BOTTOM, Z.FRONT,
+                    X.RIGHT, Y.TOP,    Z.FRONT,
 
-            // top face,
-            X.LEFT,  Y.TOP, Z.FRONT,
-            X.LEFT,  Y.TOP, Z.BACK,
-            X.RIGHT, Y.TOP, Z.BACK,
+                    // left face
+                    X.LEFT, Y.BOTTOM, Z.FRONT,
+                    X.LEFT, Y.BOTTOM, Z.BACK,
+                    X.LEFT, Y.TOP,    Z.BACK,
 
-            X.LEFT,  Y.TOP, Z.FRONT,
-            X.RIGHT, Y.TOP, Z.BACK,
-            X.RIGHT, Y.TOP, Z.FRONT,
+                    X.LEFT, Y.TOP,    Z.FRONT,
+                    X.LEFT, Y.BOTTOM, Z.FRONT,
+                    X.LEFT, Y.TOP,    Z.BACK,
 
-            // bottom face()
-            X.RIGHT, Y.BOTTOM, Z.BACK,
-            X.LEFT, Y.BOTTOM, Z.BACK,
-            X.LEFT, Y.BOTTOM, Z.FRONT,
+                    // top face
+                    X.LEFT,  Y.TOP, Z.FRONT,
+                    X.LEFT,  Y.TOP, Z.BACK,
+                    X.RIGHT, Y.TOP, Z.BACK,
 
-            X.RIGHT, Y.BOTTOM, Z.BACK,
-            X.LEFT, Y.BOTTOM, Z.FRONT,
-            X.RIGHT, Y.BOTTOM, Z.FRONT,
-        ]));
+                    X.LEFT,  Y.TOP, Z.FRONT,
+                    X.RIGHT, Y.TOP, Z.BACK,
+                    X.RIGHT, Y.TOP, Z.FRONT,
+
+                    // bottom face
+                    X.RIGHT, Y.BOTTOM, Z.BACK,
+                    X.LEFT, Y.BOTTOM, Z.BACK,
+                    X.LEFT, Y.BOTTOM, Z.FRONT,
+
+                    X.RIGHT, Y.BOTTOM, Z.BACK,
+                    X.LEFT, Y.BOTTOM, Z.FRONT,
+                    X.RIGHT, Y.BOTTOM, Z.FRONT,
+                ])
+            })
+        }
+        return Cube.vertPositions_o
     }
 
+    public static getVertTexCoords_uvw(gl: WebGL2RenderingContext): VecAttributeBuffer<3, Float32Array>{
+        if(Cube.vertTexCoords_uvw === undefined){
+            Cube.vertTexCoords_uvw = new VecAttributeBuffer({
+                gl,
+                numComponents: 3, //i.e.: 3 floats per "value" (value is a vec3)
+                usageHint: BufferUsageHint.STATIC_DRAW,
+                data: new Float32Array([
+                    // front face
+                    U.RIGHT, V.BOTTOM, W.FRONT,
+                    U.LEFT,  V.BOTTOM, W.FRONT,
+                    U.LEFT,  V.TOP,    W.FRONT,
+
+                    U.RIGHT, V.TOP,    W.FRONT,
+                    U.RIGHT, V.BOTTOM, W.FRONT,
+                    U.LEFT,  V.TOP,    W.FRONT,
+
+                    //back face
+                    U.LEFT,  V.TOP,    W.BACK,
+                    U.LEFT,  V.BOTTOM, W.BACK,
+                    U.RIGHT, V.BOTTOM, W.BACK,
+
+                    U.LEFT,  V.TOP,    W.BACK,
+                    U.RIGHT, V.BOTTOM, W.BACK,
+                    U.RIGHT, V.TOP,    W.BACK,
+
+                    // right face
+                    U.RIGHT, V.TOP,    W.BACK,
+                    U.RIGHT, V.BOTTOM, W.BACK,
+                    U.RIGHT, V.BOTTOM, W.FRONT,
+
+                    U.RIGHT, V.TOP,    W.BACK,
+                    U.RIGHT, V.BOTTOM, W.FRONT,
+                    U.RIGHT, V.TOP,    W.FRONT,
+
+                    // left face
+                    U.LEFT, V.BOTTOM, W.FRONT,
+                    U.LEFT, V.BOTTOM, W.BACK,
+                    U.LEFT, V.TOP,    W.BACK,
+
+                    U.LEFT, V.TOP,    W.FRONT,
+                    U.LEFT, V.BOTTOM, W.FRONT,
+                    U.LEFT, V.TOP,    W.BACK,
+
+                    // top face
+                    U.LEFT,  V.TOP, W.FRONT,
+                    U.LEFT,  V.TOP, W.BACK,
+                    U.RIGHT, V.TOP, W.BACK,
+
+                    U.LEFT,  V.TOP, W.FRONT,
+                    U.RIGHT, V.TOP, W.BACK,
+                    U.RIGHT, V.TOP, W.FRONT,
+
+                    // bottom face
+                    U.RIGHT, V.BOTTOM, W.BACK,
+                    U.LEFT, V.BOTTOM, W.BACK,
+                    U.LEFT, V.BOTTOM, W.FRONT,
+
+                    U.RIGHT, V.BOTTOM, W.BACK,
+                    U.LEFT, V.BOTTOM, W.FRONT,
+                    U.RIGHT, V.BOTTOM, W.FRONT,
+                ])
+            })
+        }
+        return Cube.vertTexCoords_uvw
+    }
+
+    constructor(){}
 }
 
 export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
-    readonly box : Cube
     readonly vao: VertexArrayObject
     readonly debugColors: boolean
     private readonly u_voxel_to_world__location: UniformLocation;
@@ -191,7 +285,6 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
             `)
         )
         this.debugColors = debugColors
-        this.box = new Cube()
         this.vao = new VertexArrayObject(gl) //FIXME: cleanup the vao and box buffer (but vao autodelets on GC anyway...)
 
         this.u_voxel_to_world__location = this.getUniformLocation("u_voxel_to_world")
@@ -200,6 +293,9 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
         this.a_offset_vx__location = this.getAttribLocation("a_offset_vx")
         this.color__location = debugColors ? undefined : this.getUniformLocation("color")
 
+        Cube.getVertPositions_o(this.gl).enable({
+            vao: this.vao, location: this.getAttribLocation("a_vert_pos_o"), normalize: false
+        })
     }
 
     public destroy(){
@@ -221,10 +317,6 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
         this.use()
         this.vao.bind()
 
-        this.box.getPositionsBuffer(this.gl, BufferUsageHint.STATIC_DRAW).useWithAttribute({
-            vao: this.vao, location: this.getAttribLocation("a_vert_pos_o")
-        })
-
         let u_voxel_to_world = voxelToWorld.clone();
         this.uniformMatrix4fv(this.u_voxel_to_world__location, u_voxel_to_world.raw);
 
@@ -241,11 +333,13 @@ export class BrushelBoxRenderer extends ShaderProgram implements BrushRenderer{
                 this.uniform3fv(this.color__location, color.vec3f)
             }
             for(let brush_stroke of annotations){
-                brush_stroke.positions_buffer.useAsInstacedAttribute({vao: this.vao, location: this.a_offset_vx__location, attributeDivisor: 1})
+                brush_stroke.positions_buffer.enableAsInstacedAttribute({
+                    vao: this.vao, location: this.a_offset_vx__location, attributeDivisor: 1, normalize: false,
+                })
                 this.gl.drawArraysInstanced( //instance-draw a bunch of cubes, one cube for each voxel in the brush stroke
-                /*mode=*/this.box.getDrawingMode(),
+                /*mode=*/Cube.drawingMode,
                 /*first=*/0,
-                /*count=*/this.box.vertCapacity,
+                /*count=*/Cube.numVerts,
                 /*instanceCount=*/brush_stroke.num_points
                 );
             }

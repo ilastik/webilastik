@@ -1,4 +1,4 @@
-import { AttributeElementType, AttributeNumComponents } from "./gl";
+import { AttributeElementType } from "./gl";
 import { AttributeLocation } from "./shader";
 
 export type BinaryArray =
@@ -98,47 +98,10 @@ export abstract class Buffer<Arr extends BinaryArray>{
     }
 }
 
-export abstract class VertexAttributeBuffer<Arr extends BinaryArray> extends Buffer<Arr>{
+export class VecAttributeBuffer<NUM_COMPONENTS extends 2 | 3 | 4, Arr extends BinaryArray> extends Buffer<Arr>{
     public readonly elementType: AttributeElementType;
-    public readonly numComponents: number;
+    public readonly numComponents: NUM_COMPONENTS;
 
-    constructor(params: {
-        gl: WebGL2RenderingContext,
-        data: Arr,
-        usageHint: BufferUsageHint,
-        numComponents: number,
-        name?: string,
-    }){
-        super({bindTarget: BindTarget.ARRAY_BUFFER, ...params})
-        this.elementType = AttributeElementType.fromBinaryArray(params.data)
-        this.numComponents = params.numComponents
-    }
-
-    /** Configures the VertexArrayObject 'vao' to use this buffer as an attribute in location 'location'*/
-    protected vertexAttribPointer({vao, location, byteOffset=0, normalize, numComponents}:{
-        vao: VertexArrayObject,
-        location: AttributeLocation,
-        byteOffset?: number,
-        normalize: boolean,
-        numComponents: AttributeNumComponents,
-        elementType: AttributeElementType
-    }){
-        vao.bind();
-        this.gl.enableVertexAttribArray(location.raw);
-        this.bind()
-        this.gl.vertexAttribPointer(
-            /*index=*/location.raw,
-            /*size=*/numComponents,
-            /*type=*/this.elementType.raw,
-            /*normalize=*/normalize,
-            /*stride=*/0,
-            /*offset=*/byteOffset
-        )
-    }
-}
-
-
-export class VecAttributeBuffer<NUM_COMPONENTS extends 2 | 3 | 4, Arr extends BinaryArray> extends VertexAttributeBuffer<Arr>{
     constructor(params: {
         gl: WebGL2RenderingContext,
         data: Arr,
@@ -146,51 +109,38 @@ export class VecAttributeBuffer<NUM_COMPONENTS extends 2 | 3 | 4, Arr extends Bi
         numComponents: NUM_COMPONENTS,
         name?: string,
     }){
-        super(params)
+        super({bindTarget: BindTarget.ARRAY_BUFFER, ...params})
+        this.elementType = AttributeElementType.fromBinaryArray(params.data)
+        this.numComponents = params.numComponents
     }
 
-    public useWithAttribute({vao, location}:{
+    public enable(params:{
         vao: VertexArrayObject,
         location: AttributeLocation,
+        normalize: boolean,
     }){
-        this.vertexAttribPointer({vao, location, numComponents: 3, elementType: AttributeElementType.FLOAT, normalize: false})
-    }
-
-    public useAsInstacedAttribute({vao, location, attributeDivisor=1}:{
-        vao: VertexArrayObject,
-        location: AttributeLocation,
-        attributeDivisor?: number //number of instances that will pass between updates of the generic attribute.
-    }){
-        this.useWithAttribute({vao, location})
+        // this.vertexAttribPointer({vao, location, numComponents: 3, elementType: AttributeElementType.FLOAT, normalize: false})
+        params.vao.bind();
+        this.gl.enableVertexAttribArray(params.location.raw);
         this.bind()
-        this.gl.vertexAttribDivisor(location.raw, attributeDivisor);
-    }
-}
-
-export class Mat4AttributeBuffer extends VertexAttributeBuffer<Float32Array>{
-    constructor(params: {
-        gl: WebGL2RenderingContext,
-        data: Float32Array,
-        usageHint: BufferUsageHint,
-        name?: string,
-    }){
-        if(params.data.length % 16 != 0){
-            debugger
-            throw new Error(`Expected data's length to be multiple of 16. Found this: ${params.data.length}`)
-        }
-        super({...params, numComponents: 16})
+        this.gl.vertexAttribPointer(
+            /*index=*/params.location.raw,
+            /*size=*/this.numComponents,
+            /*type=*/this.elementType.raw,
+            /*normalize=*/params.normalize,
+            /*stride=*/0,
+            /*offset=*/0,
+        )
     }
 
-    public useWithAttribute({vao, location}:{vao: VertexArrayObject, location: AttributeLocation}){
-        this.vertexAttribPointer({vao, location, numComponents: 3, elementType: AttributeElementType.FLOAT, normalize: false})
-    }
-
-    public useAsInstacedAttribute({vao, location, attributeDivisor=1}:{
+    public enableAsInstacedAttribute(params: {
         vao: VertexArrayObject,
         location: AttributeLocation,
+        normalize: boolean,
         attributeDivisor?: number //number of instances that will pass between updates of the generic attribute.
     }){
-        this.useWithAttribute({vao, location})
+        let {vao, location, normalize, attributeDivisor=1} = params;
+        this.enable({vao, location, normalize})
         this.bind()
         this.gl.vertexAttribDivisor(location.raw, attributeDivisor);
     }

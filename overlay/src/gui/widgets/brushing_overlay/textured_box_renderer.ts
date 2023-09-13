@@ -1,4 +1,4 @@
-import { VertexArrayObject, BufferUsageHint } from "../../../gl/buffer";
+import { VertexArrayObject } from "../../../gl/buffer";
 import { RenderParams } from "../../../gl/gl";
 import { ShaderProgram, UniformLocation, VertexShader, FragmentShader } from "../../../gl/shader";
 import { Mat4 } from "../../../util/ooglmatrix";
@@ -93,8 +93,8 @@ export class TexturedBoxRenderer extends ShaderProgram{
         this.u_BoxRadius_o__location = this.getUniformLocation("u_BoxRadius_o")
 
         this.vao.bind()
-        this.box.getPositionsBuffer(this.gl, BufferUsageHint.STATIC_DRAW).useWithAttribute({
-            vao: this.vao, location: this.getAttribLocation("a_vertPos_o")
+        Cube.getVertPositions_o(this.gl).enable({
+            vao: this.vao, location: this.getAttribLocation("a_vertPos_o"), normalize: false
         })
     }
 
@@ -134,9 +134,9 @@ export class TexturedBoxRenderer extends ShaderProgram{
 
         // render ================
         this.gl.drawArrays( //instance-draw a bunch of cubes, one cube for each voxel in the brush stroke
-        /*mode=*/this.box.getDrawingMode(),
+        /*mode=*/Cube.drawingMode,
         /*first=*/0,
-        /*count=*/this.box.vertCapacity,
+        /*count=*/Cube.numVerts,
         );
         // this.gl.drawArraysInstanced( //instance-draw a bunch of cubes, one cube for each voxel in the brush stroke
         // /*mode=*/this.box.getDrawingMode(),

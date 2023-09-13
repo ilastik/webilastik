@@ -71,7 +71,7 @@ export class BrushelLinesRenderer extends ShaderProgram implements BrushRenderer
         for(let [color, annotations] of brush_strokes){
             for(let brush_stroke of annotations){
                 this.uniform3fv(this.color__location, color.vec3f)
-                brush_stroke.positions_buffer.useWithAttribute({vao: this.vao, location: a_offset_vx_location})
+                brush_stroke.positions_buffer.enable({vao: this.vao, location: a_offset_vx_location, normalize: false})
                 this.gl.drawArrays(brush_stroke.num_points == 1 ? DrawingMode.POINTS : DrawingMode.LINE_STRIP, 0, brush_stroke.num_points)
             }
         }
