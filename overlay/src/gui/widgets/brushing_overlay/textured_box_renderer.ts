@@ -2,16 +2,16 @@ import { vec3 } from "gl-matrix";
 import { VertexArrayObject, BufferUsageHint } from "../../../gl/buffer";
 import { RenderParams } from "../../../gl/gl";
 import { ShaderProgram, UniformLocation, VertexShader, FragmentShader } from "../../../gl/shader";
-import { Mat4, Vec3 } from "../../../util/ooglmatrix";
+import { Mat4 } from "../../../util/ooglmatrix";
 import { Cube } from "./brush_boxes_renderer";
 import { Camera } from "./camera";
 
 export class TexturedBoxRenderer extends ShaderProgram{
     readonly box : Cube
     readonly vao: VertexArrayObject
-    private u_BoxRadius_v__location: UniformLocation;
-    private u_ObjectToView__location: UniformLocation;
+    private u_BoxRadius_o__location: UniformLocation;
     private u_ObjectToClip__location: UniformLocation;
+    private u_ClipToObject__location: UniformLocation;
 
     constructor({gl, highlightCrossSection, onlyCrossSection}: {
         gl: WebGL2RenderingContext, debugColors?: boolean, highlightCrossSection: boolean, onlyCrossSection: boolean
@@ -21,12 +21,14 @@ export class TexturedBoxRenderer extends ShaderProgram{
             new VertexShader(gl, `
                 precision highp float;
 
+                const vec3 boxCenter_o = vec3(0,0,0); //FIXME?
+
+                uniform mat4 u_ObjectToClip;
+                uniform mat4 u_ClipToObject;
+
                 in vec3 a_vertPos_o;
 
-                uniform mat4 u_ObjectToView;
-                uniform mat4 u_ObjectToClip;
-
-                out vec3 v_Dist_from_VertProj_to_BoxCenter_v;
+                out vec3 v_Dist_from_VertProj_to_BoxCenter_o;
                 out vec3 debugColor;
 
                 vec3 face_colors[6] = vec3[](
@@ -36,39 +38,41 @@ export class TexturedBoxRenderer extends ShaderProgram{
 
 
                 void main(){
-                    vec4 boxCenter_o = vec4(0,0,0, 1);
-                    vec4 boxCenter_v = u_ObjectToView * boxCenter_o;
+                    vec4 vertPos_c =   u_ObjectToClip * vec4(a_vertPos_o, 1.0);
 
-                    vec4 vertPos_v =   u_ObjectToView * vec4(a_vertPos_o, 1.0);
+                    //FIXME?: assuming slicing plane is the Z=0 plane (middle of clip space), so proj is just setting z to 0
+                    vec4 vertProj_on_SlcPlane_c = vec4(vertPos_c.xy, 0, 1);
+                    vec4 vertProj_on_SlcPlane_o = u_ClipToObject * vertProj_on_SlcPlane_c;
 
-                    //FIXME: assuming slicing plane is the Z=0 plane, so proj is just setting z to 0
-                    vec3 vertPos_proj_on_SlcPlane_v = vec3(vertPos_v.xy, 0);
-                    vec3 v_Dist_from_VertProj_to_BoxCenter_v = vertPos_proj_on_SlcPlane_v - boxCenter_v.xyz;
-
-                    gl_Position = u_ObjectToClip * vec4(a_vertPos_o, 1.0);
+                    v_Dist_from_VertProj_to_BoxCenter_o = vertProj_on_SlcPlane_o.xyz - boxCenter_o;
+                    gl_Position = vertPos_c;
                     debugColor = face_colors[gl_VertexID / 6]; //2 tris per side, 3 verts per tri
                 }
             `),
             new FragmentShader(gl, `
                 precision highp float;
 
-                uniform mat4 u_ObjectToView;
-                uniform vec3 u_BoxRadius_v;
+                uniform vec3 u_BoxRadius_o;
 
+                in vec3 v_Dist_from_VertProj_to_BoxCenter_o;
                 in vec3 debugColor;
-                in vec3 v_Dist_from_VertProj_to_BoxCenter_v;
-
 
                 out highp vec4 outf_color;
 
                 void main(){
-                    vec3 fragProj_distanceToCenter_v = abs(v_Dist_from_VertProj_to_BoxCenter_v);
-                    bool projected_frag_is_strictly_inside_box = all( lessThan(fragProj_distanceToCenter_v, u_BoxRadius_v) );
-                    bool projected_frag_is_on_face = fragProj_distanceToCenter_v == u_BoxRadius_v;
+                    vec3 fragProj_distanceToCenter_o = abs(v_Dist_from_VertProj_to_BoxCenter_o);
+
+                    bool fragProj_is_strictly_inside_box = all( lessThan(fragProj_distanceToCenter_o, u_BoxRadius_o) );
+                    bool fragProj_is_on_face = (
+                        all(lessThanEqual(fragProj_distanceToCenter_o, u_BoxRadius_o)) &&
+                        any(equal(fragProj_distanceToCenter_o, u_BoxRadius_o))
+                    );
+
                     if(
-                        projected_frag_is_strictly_inside_box ||
-                        gl_FrontFacing && projected_frag_is_on_face ||
+                        fragProj_is_strictly_inside_box ||
+                        gl_FrontFacing && fragProj_is_on_face /*||
                         gl_FragCoord.z == 0.5 //FIXME: double check: this assumes frag depth is in 0 to 1 range (not -1 to +1), so midpoint is 0.5
+                        */
                     ){
                         ${highlightCrossSection
                           ? 'outf_color = vec4(mix(debugColor, vec3(1,1,1), 0.5), 1); //increase brightness'
@@ -85,9 +89,9 @@ export class TexturedBoxRenderer extends ShaderProgram{
         this.vao = new VertexArrayObject(gl) //FIXME: cleanup the vao and box buffer (but vao autodelets on GC anyway...)
 
 
-        this.u_ObjectToView__location = this.getUniformLocation("u_ObjectToView")
         this.u_ObjectToClip__location = this.getUniformLocation("u_ObjectToClip")
-        this.u_BoxRadius_v__location = this.getUniformLocation("u_BoxRadius_v")
+        this.u_ClipToObject__location = this.getUniformLocation("u_ClipToObject")
+        this.u_BoxRadius_o__location = this.getUniformLocation("u_BoxRadius_o")
 
         this.vao.bind()
         this.box.getPositionsBuffer(this.gl, BufferUsageHint.STATIC_DRAW).useWithAttribute({
@@ -115,16 +119,13 @@ export class TexturedBoxRenderer extends ShaderProgram{
         // show_if_changed("u_voxel_to_world", mat4.str(u_voxel_to_world))
 
         //setup uniforms ========
-        // let u_ObjectToView: Mat4<"object", "view"> = camera.worldToView.mul(objectToWorld)
-        let u_ObjectToView = camera.worldToView.mul(objectToWorld)
-        u_ObjectToView.useAsUniform(this.gl, this.u_ObjectToView__location)
-
         let u_ObjectToClip = camera.worldToClip.mul(objectToWorld)
         u_ObjectToClip.useAsUniform(this.gl, this.u_ObjectToClip__location)
 
+        u_ObjectToClip.inverted().useAsUniform(this.gl, this.u_ClipToObject__location);
+
         //FIXME: asumes box has 1 unit of length. Can the ObjectToWorld matrix compensate for that?
-        const u_BoxRadius_v = new Vec3<"object">(vec3.fromValues(1,1,1)).transformedWith(u_ObjectToView)
-        u_BoxRadius_v.useAsUniform(this.gl, this.u_BoxRadius_v__location)
+        this.uniform3fv(this.u_BoxRadius_o__location, vec3.fromValues(0.5, 0.5, 0.5))
 
 
         //setup attributes =========

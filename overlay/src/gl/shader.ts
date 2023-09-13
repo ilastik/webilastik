@@ -1,4 +1,4 @@
-import { vec3, mat4, mat3 } from "gl-matrix"
+import { vec3, mat4, mat3, vec4 } from "gl-matrix"
 
 export enum ShaderType{
     FRAGMENT_SHADER = WebGL2RenderingContext.FRAGMENT_SHADER,
@@ -82,6 +82,10 @@ export class ShaderProgram{
 
     public uniform3fv(location: UniformLocation, value: vec3){
         this.gl.uniform3fv(location.raw, value);
+    }
+
+    public uniform4fv(location: UniformLocation, value: vec4){
+        this.gl.uniform4fv(location.raw, value);
     }
 
     public uniformMatrix4fv(location: UniformLocation, value: mat4){
