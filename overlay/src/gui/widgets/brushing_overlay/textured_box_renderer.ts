@@ -6,7 +6,6 @@ import { Cube } from "./brush_boxes_renderer";
 import { Camera } from "./camera";
 
 export class TexturedBoxRenderer extends ShaderProgram{
-    readonly box : Cube
     readonly vao: VertexArrayObject
     private u_BoxRadius_o__location: UniformLocation;
     private u_ObjectToClip__location: UniformLocation;
@@ -84,9 +83,7 @@ export class TexturedBoxRenderer extends ShaderProgram{
                 }
             `)
         )
-        this.box = new Cube()
         this.vao = new VertexArrayObject(gl) //FIXME: cleanup the vao and box buffer (but vao autodelets on GC anyway...)
-
 
         this.u_ObjectToClip__location = this.getUniformLocation("u_ObjectToClip")
         this.u_ClipToObject__location = this.getUniformLocation("u_ClipToObject")
