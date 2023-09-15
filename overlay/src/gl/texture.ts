@@ -3,6 +3,7 @@ import { AttributeElementType } from "./gl";
 
 
 export type TextureUnit = |
+    WebGL2RenderingContext["TEXTURE0"] |
     WebGL2RenderingContext["TEXTURE1"] |
     WebGL2RenderingContext["TEXTURE2"] |
     WebGL2RenderingContext["TEXTURE3"] |
@@ -74,11 +75,15 @@ export class Texture3D{
         format: TextureFormat
         pixels: Arr,
         offset: number,
-        UNPACK_FLIP_Y_WEBGL: boolean, //webgl assumes first pixel is at the bottom. Setting 'true' makes first pixel be on top
     }){
         this.gl.activeTexture(params.textureUnit)
         this.gl.bindTexture(this.gl.TEXTURE_3D, this.glTexture);
-        this.gl.pixelStorei(WebGL2RenderingContext.UNPACK_FLIP_Y_WEBGL, params.UNPACK_FLIP_Y_WEBGL);
+        // this.gl.pixelStorei(WebGL2RenderingContext.UNPACK_FLIP_Y_WEBGL, params.UNPACK_FLIP_Y_WEBGL);
+        this.gl.texParameteri(this.gl.TEXTURE_3D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+        this.gl.texParameteri(this.gl.TEXTURE_3D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+        this.gl.texParameteri(this.gl.TEXTURE_3D, this.gl.TEXTURE_WRAP_R, this.gl.CLAMP_TO_EDGE);
+        this.gl.texParameteri(this.gl.TEXTURE_3D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST);
+        this.gl.texParameteri(this.gl.TEXTURE_3D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST);
 
         // Fill the texture with a 1x1 blue pixel.
         this.gl.texImage3D(
@@ -94,6 +99,11 @@ export class Texture3D{
             /*pixels=*/params.pixels,
             /*offset=*/params.offset,
         );
+    }
+
+    public bind(params: {textureUnit: TextureUnit}){
+        this.gl.activeTexture(params.textureUnit)
+        this.gl.bindTexture(WebGL2RenderingContext.TEXTURE_3D, this.glTexture)
     }
 
     public static defaultDebug(params: {
@@ -115,6 +125,18 @@ export class Texture3D{
             ...blu, ...blu, ...blu, ...blu, ...blu,
         ])
 
+        // const pixels = new Uint8Array([
+        //     ...RED, ...RED, ...RED, ...RED, ...RED,
+        //     ...RED, ...RED, ...RED, ...RED, ...RED,
+        //     ...RED, ...RED, ...RED, ...RED, ...RED,
+        //     ...RED, ...RED, ...RED, ...RED, ...RED,
+        //     ...RED, ...RED, ...RED, ...RED, ...RED,
+        //     ...RED, ...RED, ...RED, ...RED, ...RED,
+        //     ...RED, ...RED, ...RED, ...RED, ...RED,
+        //     ...RED, ...RED, ...RED, ...RED, ...RED,
+        //     ...RED, ...RED, ...RED, ...RED, ...RED,
+        // ])
+
         const width = 5;
         const height = 9;
         const depth = 1;
@@ -131,7 +153,6 @@ export class Texture3D{
                 internalformat: WebGL2RenderingContext.RGBA,
                 offset: 0,
                 pixels: pixels,
-                UNPACK_FLIP_Y_WEBGL: true,
             }
         })
     }

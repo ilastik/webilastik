@@ -1,6 +1,7 @@
 import { VertexArrayObject } from "../../../gl/buffer";
 import { RenderParams } from "../../../gl/gl";
 import { ShaderProgram, UniformLocation, VertexShader, FragmentShader } from "../../../gl/shader";
+import { Texture3D } from "../../../gl/texture";
 import { Mat4 } from "../../../util/ooglmatrix";
 import { Cube } from "./brush_boxes_renderer";
 import { Camera } from "./camera";
@@ -10,10 +11,14 @@ export class TexturedBoxRenderer extends ShaderProgram{
     private u_BoxRadius_o__location: UniformLocation;
     private u_ObjectToClip__location: UniformLocation;
     private u_ClipToObject__location: UniformLocation;
+    texture: Texture3D;
+    u_ObjectToTexture__location: UniformLocation;
+    u_texture__location: UniformLocation;
 
     constructor({gl, highlightCrossSection, onlyCrossSection}: {
         gl: WebGL2RenderingContext, debugColors?: boolean, highlightCrossSection: boolean, onlyCrossSection: boolean
     }){
+        console.log(`highlightCrossSection is ${highlightCrossSection}`)
         super(
             gl,
             new VertexShader(gl, `
@@ -23,10 +28,12 @@ export class TexturedBoxRenderer extends ShaderProgram{
 
                 uniform mat4 u_ObjectToClip;
                 uniform mat4 u_ClipToObject;
+                uniform mat4 u_ObjectToTexture;
 
                 in vec3 a_vertPos_o;
 
                 out vec3 v_Dist_from_VertProj_to_BoxCenter_o;
+                out highp vec3 v_vertProj_on_SlcPlane_tx;
                 out vec3 debugColor;
 
                 vec3 face_colors[6] = vec3[](
@@ -36,11 +43,12 @@ export class TexturedBoxRenderer extends ShaderProgram{
 
 
                 void main(){
-                    vec4 vertPos_c =   u_ObjectToClip * vec4(a_vertPos_o, 1.0);
+                    vec4 vertPos_c = u_ObjectToClip * vec4(a_vertPos_o, 1.0);
 
                     //FIXME?: assuming slicing plane is the Z=0 plane (middle of clip space), so proj is just setting z to 0
                     vec4 vertProj_on_SlcPlane_c = vec4(vertPos_c.xy, 0, 1);
                     vec4 vertProj_on_SlcPlane_o = u_ClipToObject * vertProj_on_SlcPlane_c;
+                    v_vertProj_on_SlcPlane_tx = (u_ObjectToTexture * vertProj_on_SlcPlane_o).xyz;
 
                     v_Dist_from_VertProj_to_BoxCenter_o = vertProj_on_SlcPlane_o.xyz - boxCenter_o;
                     gl_Position = vertPos_c;
@@ -50,8 +58,10 @@ export class TexturedBoxRenderer extends ShaderProgram{
             new FragmentShader(gl, `
                 precision highp float;
 
+                uniform highp sampler3D u_texture;
                 uniform vec3 u_BoxRadius_o;
 
+                in highp vec3 v_vertProj_on_SlcPlane_tx;
                 in vec3 v_Dist_from_VertProj_to_BoxCenter_o;
                 in vec3 debugColor;
 
@@ -72,9 +82,9 @@ export class TexturedBoxRenderer extends ShaderProgram{
                         gl_FragCoord.z == 0.5 //FIXME: double check: this assumes frag depth is in 0 to 1 range (not -1 to +1), so midpoint is 0.5
                         */
                     ){
-                        ${highlightCrossSection
-                          ? 'outf_color = vec4(mix(debugColor, vec3(1,1,1), 0.5), 1); //increase brightness'
-                          : 'outf_color = vec4(debugColor, 1);'}
+                        vec4 texelColor = texture(u_texture, v_vertProj_on_SlcPlane_tx);
+                        // vec4 texelColor = texture(u_texture, vec3(0.5, 0.5, 0.5));
+                        outf_color = texelColor; //increase brightness
                     }else{
                         ${onlyCrossSection
                           ? "discard;"
@@ -88,11 +98,14 @@ export class TexturedBoxRenderer extends ShaderProgram{
         this.u_ObjectToClip__location = this.getUniformLocation("u_ObjectToClip")
         this.u_ClipToObject__location = this.getUniformLocation("u_ClipToObject")
         this.u_BoxRadius_o__location = this.getUniformLocation("u_BoxRadius_o")
+        this.u_ObjectToTexture__location = this.getUniformLocation("u_ObjectToTexture")
+        this.u_texture__location = this.getUniformLocation("u_texture")
 
         this.vao.bind()
         Cube.getVertPositions_o(this.gl).enable({
             vao: this.vao, location: this.getAttribLocation("a_vertPos_o"), normalize: false
         })
+        this.texture = Texture3D.defaultDebug({gl: this.gl, textureUnit: WebGL2RenderingContext.TEXTURE0})
     }
 
     public destroy(){
@@ -120,14 +133,15 @@ export class TexturedBoxRenderer extends ShaderProgram{
 
         u_ObjectToClip.inverted().useAsUniform(this.gl, this.u_ClipToObject__location);
 
-        //FIXME: asumes box has 1 unit of length. Can the ObjectToWorld matrix compensate for that?
+        Cube.objectToTexture.useAsUniform(this.gl, this.u_ObjectToTexture__location);
+
         this.uniform3fv(this.u_BoxRadius_o__location, Cube.radius_o)
 
+        this.texture.bind({textureUnit: WebGL2RenderingContext.TEXTURE0})
+        this.uniform1i(this.u_texture__location, 0);
 
         //setup attributes =========
-        // boxTransforms.useAsInstacedAttribute({
-        //     vao: this.vao, location: this.a_offset_vx__location, attributeDivisor: 1
-        // })
+
 
         // render ================
         this.gl.drawArrays( //instance-draw a bunch of cubes, one cube for each voxel in the brush stroke

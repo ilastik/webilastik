@@ -84,6 +84,10 @@ export class ShaderProgram{
         this.gl.uniform3fv(location.raw, value);
     }
 
+    public uniform1i(location: UniformLocation, value: number){
+        this.gl.uniform1i(location.raw, value);
+    }
+
     public uniform4fv(location: UniformLocation, value: vec4){
         this.gl.uniform4fv(location.raw, value);
     }

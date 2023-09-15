@@ -1,7 +1,7 @@
 import {mat4, quat, vec3} from "gl-matrix";
 import { UniformLocation } from "../gl/shader";
 
-type Space = "voxel" | "object" | "world" | "view" | "ndc" | "clip"; //fixme: remove ndc?
+type Space = "voxel" | "object" | "world" | "view" | "ndc" | "clip" | "texture"; //fixme: remove ndc?
 export class Vec3<SPACE extends Space>{
     public readonly x: number;
     public readonly y: number;
@@ -49,6 +49,10 @@ export class Mat4<FROM extends Space, TARGET extends Space>{
 
     public static fromScaling<FROM extends Space, TARGET extends Space>(scaling: vec3): Mat4<FROM, TARGET>{
         return new Mat4(mat4.fromScaling(mat4.create(), scaling))
+    }
+
+    public static fromTranslation<FROM extends Space, TARGET extends Space>(scaling: vec3): Mat4<FROM, TARGET>{
+        return new Mat4(mat4.fromTranslation(mat4.create(), scaling))
     }
 
     public inverted(): Mat4<TARGET, FROM>{

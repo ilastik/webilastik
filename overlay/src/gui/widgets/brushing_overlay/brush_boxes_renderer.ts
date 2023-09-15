@@ -23,22 +23,6 @@ enum Z{
     FRONT = -0.5, //forwards is -z like in the camera
 }
 
-enum U{
-    LEFT = 0.0,
-    RIGHT = 1.0,
-}
-
-enum V{
-    TOP = 0.0,
-    BOTTOM = 1.0,
-}
-
-enum W{
-    FRONT = 0.0,
-    BACK = 0.0,
-}
-
-
 /**
          +y (top)                            +---------+ (right, top, front)
         ^                                   /   top   /|
@@ -63,7 +47,6 @@ export class Cube{
     public static drawingMode = DrawingMode.TRIANGLES;
 
     private static vertPositions_o: VecAttributeBuffer<3, Float32Array> | undefined = undefined
-    private static vertTexCoords_uvw: VecAttributeBuffer<3, Float32Array> | undefined = undefined
 
     public static getVertPositions_o(gl: WebGL2RenderingContext): VecAttributeBuffer<3, Float32Array>{
         if(Cube.vertPositions_o === undefined){
@@ -131,71 +114,7 @@ export class Cube{
         return Cube.vertPositions_o
     }
 
-    public static getVertTexCoords_uvw(gl: WebGL2RenderingContext): VecAttributeBuffer<3, Float32Array>{
-        if(Cube.vertTexCoords_uvw === undefined){
-            Cube.vertTexCoords_uvw = new VecAttributeBuffer({
-                gl,
-                numComponents: 3, //i.e.: 3 floats per "value" (value is a vec3)
-                usageHint: BufferUsageHint.STATIC_DRAW,
-                data: new Float32Array([
-                    // front face
-                    U.RIGHT, V.BOTTOM, W.FRONT,
-                    U.LEFT,  V.BOTTOM, W.FRONT,
-                    U.LEFT,  V.TOP,    W.FRONT,
-
-                    U.RIGHT, V.TOP,    W.FRONT,
-                    U.RIGHT, V.BOTTOM, W.FRONT,
-                    U.LEFT,  V.TOP,    W.FRONT,
-
-                    //back face
-                    U.LEFT,  V.TOP,    W.BACK,
-                    U.LEFT,  V.BOTTOM, W.BACK,
-                    U.RIGHT, V.BOTTOM, W.BACK,
-
-                    U.LEFT,  V.TOP,    W.BACK,
-                    U.RIGHT, V.BOTTOM, W.BACK,
-                    U.RIGHT, V.TOP,    W.BACK,
-
-                    // right face
-                    U.RIGHT, V.TOP,    W.BACK,
-                    U.RIGHT, V.BOTTOM, W.BACK,
-                    U.RIGHT, V.BOTTOM, W.FRONT,
-
-                    U.RIGHT, V.TOP,    W.BACK,
-                    U.RIGHT, V.BOTTOM, W.FRONT,
-                    U.RIGHT, V.TOP,    W.FRONT,
-
-                    // left face
-                    U.LEFT, V.BOTTOM, W.FRONT,
-                    U.LEFT, V.BOTTOM, W.BACK,
-                    U.LEFT, V.TOP,    W.BACK,
-
-                    U.LEFT, V.TOP,    W.FRONT,
-                    U.LEFT, V.BOTTOM, W.FRONT,
-                    U.LEFT, V.TOP,    W.BACK,
-
-                    // top face
-                    U.LEFT,  V.TOP, W.FRONT,
-                    U.LEFT,  V.TOP, W.BACK,
-                    U.RIGHT, V.TOP, W.BACK,
-
-                    U.LEFT,  V.TOP, W.FRONT,
-                    U.RIGHT, V.TOP, W.BACK,
-                    U.RIGHT, V.TOP, W.FRONT,
-
-                    // bottom face
-                    U.RIGHT, V.BOTTOM, W.BACK,
-                    U.LEFT, V.BOTTOM, W.BACK,
-                    U.LEFT, V.BOTTOM, W.FRONT,
-
-                    U.RIGHT, V.BOTTOM, W.BACK,
-                    U.LEFT, V.BOTTOM, W.FRONT,
-                    U.RIGHT, V.BOTTOM, W.FRONT,
-                ])
-            })
-        }
-        return Cube.vertTexCoords_uvw
-    }
+    public static objectToTexture: Mat4<"object", "texture"> = Mat4.fromTranslation(vec3.fromValues(0.5, 0.5, 0.5))
 
     constructor(){}
 }
