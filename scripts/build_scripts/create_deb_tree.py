@@ -22,24 +22,7 @@ class DebTree:
         self.path: Final[Path] = path
         super().__init__()
 
-class CondaEnvironment:
-    def __init__(self, path: Path, __private_marker: None) -> None:
-        self.path : Final[Path] = path
-        super().__init__()
 
-class CondaEnvironmentTask:
-    def __init__(self, project_root: ProjectRoot) -> None:
-        self.project_root = project_root
-        self.conda_env_path = self.project_root.build_dir / "webilastik_conda_env"
-        super().__init__()
-
-    def run(self) -> "CondaEnvironment":
-        if self.conda_env_path.exists():
-            shutil.rmtree(self.conda_env_path)
-        _ = subprocess.check_output([
-            "mamba", "env", "create", "--prefix", str(self.conda_env_path), "-f", str(self.project_root.environment_file)
-        ])
-        return CondaEnvironment(path=self.conda_env_path, __private_marker=None)
 
 class PackedCondaEnv:
     @classmethod
@@ -54,7 +37,7 @@ class CreateDebTree:
         super().__init__()
 
 
-    def run(self, *, packed_conda_env: Path) -> DebTree:
+    def run(self, *, packed_conda_env: Path) -> "DebTree | Exception":
         session_allocator_server_config = SessionAllocatorServerConfig.from_env()
         if isinstance(session_allocator_server_config, Exception):
             print(f"Could not get session allocator config form environment: {session_allocator_server_config}", file=stderr)
@@ -139,6 +122,5 @@ class CreateDebTree:
 
         return DebTree(path=self.deb_tree_path)
 
-    @classmethod
-    def clean(cls):
+    def clean(self):
         shutil.rmtree(path=self.deb_tree_path)

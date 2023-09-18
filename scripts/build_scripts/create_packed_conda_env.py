@@ -4,7 +4,7 @@ import subprocess
 from typing import Final, Optional
 from concurrent.futures import Future
 
-from build_scripts import ProjectRoot
+from build_scripts import ProjectRoot, run_subprocess
 from build_scripts.create_conda_env import CondaEnvironment, CreateCondaEnvironment
 from webilastik.utility.log import Logger
 
@@ -26,26 +26,22 @@ class CreatePackedCondaEnv:
     def run(self, use_cache: bool = True) -> "PackedCondaEnv | Exception":
         cache = use_cache and self.cached()
         if cache:
+            logger.info(f"Using cached packed env at {self.packed_env_path}")
             return cache
         if self.packed_env_path.exists():
             logger.info(f"Deleting old packed env at {self.packed_env_path}")
             self.packed_env_path.unlink()
 
-        pack_process = subprocess.Popen([
+        pack_result = run_subprocess([
             "conda", "pack", "-p", str(self.conda_env.path), "-o", str(self.packed_env_path)
         ])
-        pack_output = pack_process.communicate()
-        if pack_process.returncode != 0:
-            return Exception(
-                f"Something failed while packing the conda env: " +
-                f"stdout:\n{pack_output[0].decode('utf8')}\n\n" +
-                f"stderr:\n{pack_output[1].decode('utf8')}\n"
-            )
+        if isinstance(pack_result, Exception):
+            return pack_result
+
         return PackedCondaEnv(path=self.packed_env_path, _private_marker=None)
 
     def cached(self) -> Optional[PackedCondaEnv]:
         if self.packed_env_path.exists() and self.packed_env_path.lstat().st_mtime > self.conda_env.mtime:
-            logger.info(f"Using cached packed env at {self.packed_env_path}")
             return PackedCondaEnv(path=self.packed_env_path, _private_marker=None)
         return None
 

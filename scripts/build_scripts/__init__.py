@@ -4,8 +4,10 @@ from dataclasses import dataclass
 import re
 from pathlib import Path
 from sys import stderr
-from typing import Final, Sequence
+from typing import Final, List, Mapping, Optional, Sequence
 import subprocess
+
+from webilastik.utility.url import Url
 
 PROJECT_ROOT: Final[Path] = Path(__file__).parent.parent
 
@@ -63,12 +65,38 @@ def force_update_dir(*, source: Path, dest: Path, exclude_pattern: "str | None" 
 
 
 def _do_get_dir_effective_mtime(path: Path) -> float:
+    children = list(path.iterdir())
+    if len(children) == 0:
+        return 0
     return max(
         _do_get_dir_effective_mtime(child) if child.is_dir() else child.lstat().st_mtime
-        for child in path.iterdir()
+        for child in children
     )
 
 def get_dir_effective_mtime(path: Path) -> "float":
     if not path.exists():
         return 0
     return _do_get_dir_effective_mtime(path)
+
+def run_subprocess(args: List[str], env: Optional[Mapping[str, str]] = None, cwd: Optional[Path] = None) -> "bytes | subprocess.CalledProcessError":
+    try:
+        return subprocess.check_output(args, env=env, cwd=cwd)
+    except subprocess.CalledProcessError as e:
+        return e
+
+def git_checkout(*, url: Url, destination: Path, commit_ref: str) -> "None | Exception":
+    clone_result = run_subprocess(["git", "clone", url.raw, str(destination)])
+    if isinstance(clone_result, Exception):
+        return clone_result
+
+    fetch_result = run_subprocess(
+        ["git", "fetch"], cwd=destination
+    )
+    if isinstance(fetch_result, Exception):
+        return fetch_result
+
+    checkout_result = run_subprocess(
+        ["git", "checkout", commit_ref], cwd=destination
+    )
+    if isinstance(checkout_result, Exception):
+        return checkout_result

@@ -3,7 +3,7 @@ import shutil
 import subprocess
 from typing import Final, Optional
 
-from build_scripts import ProjectRoot, get_dir_effective_mtime
+from build_scripts import ProjectRoot, get_dir_effective_mtime, run_subprocess
 from webilastik.utility.log import Logger
 
 logger = Logger()
@@ -30,16 +30,11 @@ class CreateCondaEnvironment:
             shutil.rmtree(self.conda_env_path)
 
         logger.info(f"Creating conda env at {self.conda_env_path} at {self.project_root.environment_file}")
-        mamba_process = subprocess.Popen([
+        mamba_result = run_subprocess([
             "mamba", "env", "create", "--prefix", str(self.conda_env_path), "-f", str(self.project_root.environment_file)
         ])
-        mamba_output = mamba_process.communicate()
-        if mamba_process.returncode != 0:
-            return Exception(
-                f"Something failed while building the conda env: " +
-                f"stdout:\n{mamba_output[0].decode('utf8')}\n\n" +
-                f"stderr:\n{mamba_output[1].decode('utf8')}\n"
-            )
+        if isinstance(mamba_result, Exception):
+            return mamba_result
 
         return CondaEnvironment(path=self.conda_env_path, _private_marker=None)
 
