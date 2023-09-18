@@ -11,9 +11,10 @@ logger = Logger()
 class CondaEnvironment:
     def __init__(self, path: Path, _private_marker: None) -> None:
         self.path : Final[Path] = path
+        self.mtime: Final[float] = get_dir_effective_mtime(self.path)
         super().__init__()
 
-class CondaEnvironmentTask:
+class CreateCondaEnvironment:
     def __init__(self, project_root: ProjectRoot) -> None:
         self.project_root = project_root
         self.conda_env_path = self.project_root.build_dir / "webilastik_conda_env"
@@ -49,4 +50,4 @@ class CondaEnvironmentTask:
         return None
 
 if __name__ == "__main__":
-    _ = CondaEnvironmentTask(project_root=ProjectRoot()).run(use_cache=True)
+    _ = CreateCondaEnvironment(project_root=ProjectRoot()).run(use_cache=True)

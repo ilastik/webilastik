@@ -39,7 +39,6 @@ SOURCES_DIRS: Final[Sequence[Path]] = [
 class ProjectRoot:
     def __init__(self) -> None:
         self.root_path: Final[Path] = Path(__file__).parent.parent.parent
-        print(f"root path: {self.root_path}")
         self.build_dir: Final[Path] = self.root_path / "build"
         self.environment_file: Final[Path] = self.root_path / "environment.yml"
         super().__init__()
