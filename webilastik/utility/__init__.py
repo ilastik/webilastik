@@ -189,3 +189,6 @@ class Nanometers(NewTypeNumber):
 
 class Nanoseconds(NewTypeNumber):
     pass
+
+class Gigabytes(NewTypeNumber):
+    pass
