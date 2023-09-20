@@ -30,10 +30,10 @@ class OverlayBundle:
         target_bundle_path = self.installation_dir / self.bundle_path.name
         target_src_map_path = self.installation_dir / self.src_map_path.name
         if not target_bundle_path.exists() or self.bundle_mtime > target_bundle_path.lstat().st_mtime:
-            logger.warn("overlay is not current!! 1")
+            logger.debug("overlay is not current!! 1")
             return False
         if not target_src_map_path.exists() or self.src_map_mtime > target_src_map_path.lstat().st_mtime:
-            logger.warn("overlay is not current!! 2")
+            logger.debug("overlay is not current!! 2")
             return False
         return True
 

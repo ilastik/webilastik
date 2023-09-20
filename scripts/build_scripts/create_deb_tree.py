@@ -41,7 +41,7 @@ class DebControlFile(PackageSourceFile):
                 Depends: nginx
                 Maintainer: ilastik Team <team@ilastik.org>
                 Description: Webilastik
-                Server and frontend for the web version of ilastik
+                 Server and frontend for the web version of ilastik
             """[1:]).encode("utf8"),
         )
 
@@ -155,6 +155,7 @@ class CreateDebTree:
             self.neuroglancer_dist,
         ]):
             return None
+        logger.info("Using cached deb package")
         return DebTree(path=self.project_root.deb_tree_path, _private_marker=None)
 
     def clean(self):
