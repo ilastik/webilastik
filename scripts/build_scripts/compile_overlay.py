@@ -9,10 +9,33 @@ from webilastik.utility.log import Logger
 logger = Logger()
 
 class OverlayBundle:
-    def __init__(self, bundle_path: Path, _private_marker: None) -> None:
+    def __init__(self, bundle_path: Path, project_root: ProjectRoot, _private_marker: None) -> None:
         self.bundle_path: Final[Path] = bundle_path
-        self.bundle_src_map_path: Final[Path] = Path(str(bundle_path) + ".map")
+        self.installation_dir = project_root.deb_tree_path / "opt/webilastik/public/js"
+        self.bundle_mtime = bundle_path.lstat().st_mtime
+        self.src_map_path: Final[Path] = Path(str(bundle_path) + ".map")
+        self.src_map_mtime = self.src_map_path.lstat().st_mtime
+        self.mtime = max(self.bundle_mtime, self.src_map_mtime)
         super().__init__()
+
+    def install(self, use_cache: bool = True):
+        if use_cache and self.is_current():
+            return
+        logger.info("Copying overlay bundle to package tree")
+        self.installation_dir.mkdir(parents=True)
+        shutil.copy(self.bundle_path, self.installation_dir)
+        shutil.copy(self.src_map_path, self.installation_dir)
+
+    def is_current(self) -> bool:
+        target_bundle_path = self.installation_dir / self.bundle_path.name
+        target_src_map_path = self.installation_dir / self.src_map_path.name
+        if not target_bundle_path.exists() or self.bundle_mtime > target_bundle_path.lstat().st_mtime:
+            logger.warn("overlay is not current!! 1")
+            return False
+        if not target_src_map_path.exists() or self.src_map_mtime > target_src_map_path.lstat().st_mtime:
+            logger.warn("overlay is not current!! 2")
+            return False
+        return True
 
 class CompileOverlay:
     def __init__(self, project_root: ProjectRoot) -> None:
@@ -28,9 +51,7 @@ class CompileOverlay:
         if cache:
             return cache
 
-        npm_ci_result = run_subprocess(
-            ["npm", "ci"], cwd=self.overlay_source_dir
-        )
+        npm_ci_result = run_subprocess(["npm", "ci"], cwd=self.overlay_source_dir)
         if isinstance(npm_ci_result, Exception):
             return npm_ci_result
         bundle_result = run_subprocess(["npm", "run", "bundle-ng-inject"], cwd=self.overlay_source_dir)
@@ -40,21 +61,18 @@ class CompileOverlay:
         shutil.move(self.build_path / "inject_into_neuroglancer.js.map", self.output_src_map)
         shutil.rmtree(self.build_path)
 
-        return OverlayBundle(bundle_path=self.output_bundle, _private_marker=None)
+        return OverlayBundle(bundle_path=self.output_bundle, project_root=self.project_root, _private_marker=None)
 
     def cached(self) -> "OverlayBundle | Exception | None":
         if not self.output_bundle.exists() or not self.output_src_map.exists():
-            logger.warn("Some files don't exist")
             return None
         source_mtime = get_dir_effective_mtime(self.overlay_source_dir)
         if self.output_bundle.lstat().st_mtime < source_mtime:
-            logger.warn("Bundle is old")
             return None
         if self.output_src_map.lstat().st_mtime < source_mtime:
-            logger.warn("Map is old")
             return None
         logger.info("Using cached overlay bundle")
-        return OverlayBundle(bundle_path=self.output_bundle, _private_marker=None)
+        return OverlayBundle(bundle_path=self.output_bundle, project_root=self.project_root, _private_marker=None)
 
 if __name__ == "__main__":
     project_root = ProjectRoot()

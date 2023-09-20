@@ -9,16 +9,31 @@ from webilastik.utility.log import Logger
 logger = Logger()
 
 class NeuroglancerDistribution:
-    def __init__(self, *, bundle_path: Path, _private_marker: None) -> None:
+    def __init__(self, *, bundle_path: Path, project_root: ProjectRoot, _private_marker: None) -> None:
         super().__init__()
         self.bundle_path: Final[Path] = bundle_path
+        self.installation_dir = project_root.deb_tree_path / "opt/webilastik/public/nehuba"
+        self.mtime = self.bundle_path.lstat().st_mtime
+
+    def install(self, use_cache: bool = True):
+        if use_cache and self.is_current():
+            return
+        logger.debug('Copying nehuba to public dir')
+        self.installation_dir.mkdir(parents=True)
+        shutil.copy(self.bundle_path, self.installation_dir)
+
+    def is_current(self) -> bool:
+        target_bundle_path = self.installation_dir / self.bundle_path.name
+        if not target_bundle_path.exists() or self.mtime > target_bundle_path.lstat().st_mtime:
+            return False
+        return True
 
 class BuildNeuroglancer:
     def __init__(self, project_root: ProjectRoot, ng_source: NeuroglancerSource) -> None:
         self.project_root: Final[ProjectRoot] = project_root
         self.ng_source: Final[NeuroglancerSource] = ng_source
         self.dist_path: Final[Path] = self.ng_source.path / "dist/min"
-        self.bundle_path: Final[Path] = project_root.build_dir / "neuroglancer.bundle.js"
+        self.output_bundle_path: Final[Path] = project_root.build_dir / "neuroglancer.bundle.js"
         super().__init__()
 
     def run(self, use_cache: bool = True) -> "NeuroglancerDistribution | Exception":
@@ -40,16 +55,16 @@ class BuildNeuroglancer:
         if isinstance(build_result, Exception):
             return build_result
 
-        shutil.move(self.dist_path / "main.bundle.js", self.bundle_path)
+        shutil.move(self.dist_path / "main.bundle.js", self.output_bundle_path)
         shutil.rmtree(self.dist_path)
 
-        return NeuroglancerDistribution(bundle_path=self.bundle_path, _private_marker=None)
+        return NeuroglancerDistribution(bundle_path=self.output_bundle_path, project_root=self.project_root, _private_marker=None)
 
     def cached(self) -> "NeuroglancerDistribution | None | Exception":
-        if self.bundle_path.stat().st_mtime > get_dir_effective_mtime(self.ng_source.path):
-            logger.info("Using cached neuroglancer bundle dist")
-            return NeuroglancerDistribution(bundle_path=self.bundle_path, _private_marker=None)
-        return None
+        if not self.output_bundle_path.exists() or get_dir_effective_mtime(self.ng_source.path) > self.output_bundle_path.stat().st_mtime:
+            return None
+        logger.info("Using cached neuroglancer bundle dist")
+        return NeuroglancerDistribution(bundle_path=self.output_bundle_path, project_root=self.project_root, _private_marker=None)
 
 if __name__ == "__main__":
     project_root = ProjectRoot()
