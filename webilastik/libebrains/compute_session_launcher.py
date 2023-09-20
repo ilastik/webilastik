@@ -511,7 +511,7 @@ class LocalJobLauncher(SshJobLauncher):
         out = textwrap.dedent(textwrap.indent(f"""
             #!/bin/bash -l
 
-            {job_config.to_bash_exports()}
+            {job_config.to_env_export()}
 
             set -xeu
             set -o pipefail
@@ -704,7 +704,7 @@ class JusufSshJobLauncher(SshJobLauncher):
             #SBATCH --hint=nomultithread
 
             jutil env activate -p {self.account}
-            {job_config.to_bash_exports()}
+            {job_config.to_env_export()}
 
             set -xeu
             set -o pipefail
@@ -814,7 +814,7 @@ class CscsSshJobLauncher(SshJobLauncher):
             #SBATCH --hint=nomultithread
             #SBATCH --constraint=mc
 
-            {job_config.to_bash_exports()}
+            {job_config.to_env_export()}
 
             set -xeu
             set -o pipefail

@@ -1,289 +1,197 @@
 # pyright: strict
 
 import os
-
+import json
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import ClassVar, Optional, Protocol, Sequence
+from typing import ClassVar, cast
 
 from cryptography.fernet import Fernet
 from webilastik.libebrains.oidc_client import OidcClient
 
 from webilastik.libebrains.user_token import AccessToken, HbpIamPublicKey
-from webilastik.server.rpc.dto import EbrainsAccessTokenDto
+from webilastik.serialization.json_serialization import parse_json
+from webilastik.server.rpc.dto import SessionAllocatorServerConfigDto, WorkflowConfigDto
 from webilastik.utility import Hostname, Minutes, Username
 from webilastik.utility.url import Url
 
 class ConfigurationException(Exception):
     pass
 
-
-def read_str_env_var(name: str, *, help_text: str, allow_empty: bool = False) -> str:
-    value = os.environ.get(name)
-    if value is None:
-        raise ConfigurationException(f"Configuration variable '{name}' is unset. {help_text}")
-    if len(value) == 0 and not allow_empty:
-        raise ConfigurationException(f"Configuration variable '{name}' is empty.")
-    return value
-
-def read_bool_env_var(name: str, *, help_text: str) -> bool:
-    valid_true_values = ["true", "1"]
-    valid_false_values = ["false", "0"]
-
-    value = read_str_env_var(name, help_text=help_text)
-    if value in valid_true_values:
-        return True
-    if value in valid_false_values:
-        return False
-    raise ConfigurationException(f"Configuration variable {name} has a bad value: {value}. Expected one of {[*valid_true_values, *valid_false_values]}")
-
-def read_int_env_var(name: str, *, help_text: str) -> int:
-    raw_value = read_str_env_var(name, help_text=help_text)
-    try:
-        return int(raw_value)
-    except ValueError:
-        raise ConfigurationException(f"Could not parse env var {name} as int: {raw_value}")
-
-def read_url_env_var(name: str, *, help_text: str) -> Url:
-    url = Url.parse(read_str_env_var(name, help_text=help_text))
-    if url is None:
-        raise ConfigurationException(f"Bad url in env var {name}")
-    return url
+WEBILASTIK_SESSION_ALLOCATOR_SERVER_CONFIG = "WEBILASTIK_SESSION_ALLOCATOR_SERVER_CONFIG"
 
 @dataclass
-class EnvVar:
-    name: str
-    value: str
+class SessionAllocatorServerConfig:
+    _global_config: ClassVar["SessionAllocatorServerConfig | None"] = None
 
-    def to_bash_export(self) -> str:
-        return f'export {self.name}="{self.value}"'
+    class _PrivateMarker:
+        pass
 
-    def to_systemd_environment_conf(self) -> str:
-        return f'Environment={self.name}={self.value}'
-
-WEBILASTIK_ALLOW_LOCAL_FS="WEBILASTIK_ALLOW_LOCAL_FS"
-WEBILASTIK_SCRATCH_DIR="WEBILASTIK_SCRATCH_DIR"
-WEBILASTIK_ALLOW_LOCAL_COMPUTE_SESSIONS="WEBILASTIK_ALLOW_LOCAL_COMPUTE_SESSIONS"
-WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY="WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY"
-WEBILASTIK_EXTERNAL_URL="WEBILASTIK_EXTERNAL_URL"
-EBRAINS_CLIENT_ID="EBRAINS_CLIENT_ID"
-EBRAINS_CLIENT_SECRET="EBRAINS_CLIENT_SECRET"
-EBRAINS_USER_ACCESS_TOKEN="EBRAINS_USER_ACCESS_TOKEN"
-EBRAINS_USER_REFRESH_TOKEN="EBRAINS_USER_REFRESH_TOKEN"
-WEBILASTIK_JOB_MAX_DURATION_MINUTES="WEBILASTIK_JOB_MAX_DURATION_MINUTES"
-WEBILASTIK_JOB_LISTEN_SOCKET="WEBILASTIK_JOB_LISTEN_SOCKET"
-WEBILASTIK_JOB_SESSION_URL="WEBILASTIK_JOB_SESSION_URL"
-WEBILASTIK_SESSION_ALLOCATOR_HOST="WEBILASTIK_SESSION_ALLOCATOR_HOST"
-WEBILASTIK_SESSION_ALLOCATOR_USERNAME="WEBILASTIK_SESSION_ALLOCATOR_USERNAME"
-WEBILASTIK_SESSION_ALLOCATOR_SOCKET_PATH="WEBILASTIK_SESSION_ALLOCATOR_SOCKET_PATH"
-
-class WebilastikConfig(Protocol):
-    def to_env_vars(self) -> Sequence[EnvVar]:
-        ...
-
-    def to_bash_exports(self) -> str:
-        return "\n".join(ev.to_bash_export() for ev in self.to_env_vars())
-
-    def to_systemd_environment_confs(self) -> str:
-        return "\n".join(ev.to_systemd_environment_conf() for ev in self.to_env_vars())
-
-
-class SessionAllocatorConfig(WebilastikConfig):
-    _global_config: ClassVar["SessionAllocatorConfig | None"] = None
-
-    def __init__(
-        self,
-        *,
-        ebrains_oidc_client: OidcClient,
-
-        allow_local_compute_sessions: bool,
-        session_allocator_b64_fernet_key: str,
-        external_url: Url
-    ) -> None:
-        super().__init__()
-        self.ebrains_oidc_client = ebrains_oidc_client
-        self.allow_local_compute_sessions = allow_local_compute_sessions
-        self.ebrains_oidc_client = ebrains_oidc_client
-        self.session_allocator_b64_fernet_key = session_allocator_b64_fernet_key
-        self.external_url = external_url
-
-        try:
-            self.fernet=Fernet(key=session_allocator_b64_fernet_key.encode('utf8'))
-        except Exception:
-            raise ConfigurationException(f"Bad fernet key")
-        self.fernet = Fernet(key=session_allocator_b64_fernet_key.encode("utf8"))
+    ebrains_oidc_client: OidcClient
+    allow_local_compute_sessions: bool
+    fernet: Fernet
+    b64_fernet_key: str
+    external_url: Url
+    marker: _PrivateMarker
 
     @classmethod
-    def get(cls) -> "SessionAllocatorConfig":
+    def from_dto(cls, dto: SessionAllocatorServerConfigDto) -> "SessionAllocatorServerConfig | ConfigurationException":
+        try:
+            fernet=Fernet(key=dto.b64_fernet_key.encode('utf8'))
+        except Exception:
+            raise ConfigurationException(f"Bad fernet key")
+        return SessionAllocatorServerConfig(
+            ebrains_oidc_client=OidcClient.from_dto(dto.ebrains_oidc_client),
+            allow_local_compute_sessions=dto.allow_local_compute_sessions,
+            external_url=Url.from_dto(dto.external_url),
+            fernet=fernet,
+            b64_fernet_key=dto.b64_fernet_key,
+            marker=cls._PrivateMarker()
+        )
+
+    def to_dto(self) -> SessionAllocatorServerConfigDto:
+        return SessionAllocatorServerConfigDto(
+            ebrains_oidc_client=self.ebrains_oidc_client.to_dto(),
+            allow_local_compute_sessions=self.allow_local_compute_sessions,
+            b64_fernet_key=self.b64_fernet_key,
+            external_url=self.external_url.to_dto(),
+        )
+
+    @classmethod
+    def get(cls) -> "SessionAllocatorServerConfig":
         if cls._global_config is None:
-            cls._global_config = cls.from_env()
+            config = cls.from_env()
+            if isinstance(config, Exception):
+                raise config
+            cls._global_config = config
         return cls._global_config
 
     @classmethod
-    def from_env(
-        cls,
-        *,
-        ebrains_oidc_client: Optional[OidcClient] = None,
+    def from_env(cls) -> "SessionAllocatorServerConfig | ConfigurationException":
+        config_raw = os.environ.get(WEBILASTIK_SESSION_ALLOCATOR_SERVER_CONFIG)
+        if config_raw is None:
+            return ConfigurationException(f"Could not find configuraiton json in env var {WEBILASTIK_WORKFLOW_CONFIG}")
+        config_json_result = parse_json(config_raw)
+        if isinstance(config_json_result, Exception):
+            return ConfigurationException(config_json_result)
+        config_dto_result = SessionAllocatorServerConfigDto.from_json_value(config_json_result)
+        if isinstance(config_dto_result, Exception):
+            return ConfigurationException(config_dto_result)
+        return SessionAllocatorServerConfig.from_dto(config_dto_result)
 
-        allow_local_compute_sessions: Optional[bool] = None,
-        session_allocator_b64_fernet_key: Optional[str] = None,
-        external_url: Optional[Url] = None
-    ) -> "SessionAllocatorConfig":
-        ebrains_oidc_client=ebrains_oidc_client if ebrains_oidc_client is not None else OidcClient(
-            client_id=read_str_env_var(
-                EBRAINS_CLIENT_ID,
-                help_text="The client ID that is registered in Ebrains' keycloak. Should be a simple string like 'webilastik'",
-            ),
-            client_secret=read_str_env_var(
-                EBRAINS_CLIENT_SECRET,
-                help_text="The client secret for the Oidc client",
-            ),
-        )
-        return SessionAllocatorConfig(
-            ebrains_oidc_client=ebrains_oidc_client,
-            allow_local_compute_sessions=allow_local_compute_sessions if allow_local_compute_sessions is not None else read_bool_env_var(
-                name=WEBILASTIK_ALLOW_LOCAL_COMPUTE_SESSIONS,
-                help_text="Allow compute sessions to be allocated in the machine running the webilastik server",
-            ),
-            external_url=external_url if external_url is not None else read_url_env_var(
-                name=WEBILASTIK_EXTERNAL_URL,
-                help_text="Url from which sessions can be accessed (where the session sockets live)",
-            ),
-            session_allocator_b64_fernet_key = session_allocator_b64_fernet_key if session_allocator_b64_fernet_key is not None else read_str_env_var(
-                name=WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY,
-                help_text="A Fernet key used to encrypt data that is publicly visible in HPCs, like job names",
-            ),
-        )
+    def to_systemd_environment_conf(self) -> str:
+        json_str = json.dumps(self.to_dto().to_json_value())
+        escaped_json_str = json_str.replace("'", r"\'")
+        return f"Environment={WEBILASTIK_SESSION_ALLOCATOR_SERVER_CONFIG}={escaped_json_str}"
 
-    def to_env_vars(self) -> Sequence[EnvVar]:
-        return [
-            EnvVar(name=EBRAINS_CLIENT_ID, value=self.ebrains_oidc_client.client_id),
-            EnvVar(name=EBRAINS_CLIENT_SECRET, value=self.ebrains_oidc_client.client_secret),
-            EnvVar(name=WEBILASTIK_ALLOW_LOCAL_COMPUTE_SESSIONS, value=str(self.allow_local_compute_sessions).lower()),
-            EnvVar(name=WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY, value=self.session_allocator_b64_fernet_key),
-            EnvVar(name=WEBILASTIK_EXTERNAL_URL, value=self.external_url.raw),
-        ]
+WEBILASTIK_WORKFLOW_CONFIG = "WEBILASTIK_WORKFLOW_CONFIG"
 
-class WorkflowConfig(WebilastikConfig):
+@dataclass
+class WorkflowConfig:
     _global_config: ClassVar["WorkflowConfig | None"] = None
 
-    def __init__(
-        self,
-        *,
-        allow_local_fs: bool,
-        scratch_dir: PurePosixPath,
+    allow_local_fs: bool
+    scratch_dir: PurePosixPath
+    ebrains_user_token: AccessToken
+    max_duration_minutes: Minutes
+    listen_socket: Path
+    session_url: Url
+    session_allocator_host: Hostname
+    session_allocator_username: Username
+    session_allocator_socket_path: Path
 
-        ebrains_user_token: AccessToken,
-        max_duration_minutes: Minutes,
-        listen_socket: Path,
-        session_url: Url,
-        #tunnel parameters
-        session_allocator_host: Hostname,
-        session_allocator_username: Username,
-        session_allocator_socket_path: Path
-    ) -> None:
-        super().__init__()
-        self.allow_local_fs = allow_local_fs
-        self.scratch_dir = scratch_dir
-        self.ebrains_user_token: AccessToken = ebrains_user_token
-        self.max_duration_minutes = max_duration_minutes
-        self.listen_socket = listen_socket
-        self.session_url = session_url
+    def to_dto(self) -> WorkflowConfigDto:
+        return WorkflowConfigDto(
+            allow_local_fs=self.allow_local_fs,
+            scratch_dir=str(self.scratch_dir),
+            ebrains_user_token=self.ebrains_user_token.to_dto(),
+            max_duration_minutes=self.max_duration_minutes.to_int(),
+            listen_socket=str(self.listen_socket),
+            session_url=self.session_url.to_dto(),
+            session_allocator_host=self.session_allocator_host,
+            session_allocator_username=self.session_allocator_username,
+            session_allocator_socket_path=str(self.session_allocator_socket_path),
+        )
 
-        self.session_allocator_host = session_allocator_host
-        self.session_allocator_username = session_allocator_username
-        self.session_allocator_socket_path = session_allocator_socket_path
+    @classmethod
+    def from_dto(cls, dto: WorkflowConfigDto) -> "WorkflowConfig | ConfigurationException":
+        checking_key_result = HbpIamPublicKey.get_sync()
+        if isinstance(checking_key_result, Exception):
+            return ConfigurationException(f"Could not validate user token: {checking_key_result}")
+        ebrains_user_token_result = AccessToken.from_dto(dto.ebrains_user_token, checking_key=checking_key_result)
+        if isinstance(ebrains_user_token_result, Exception):
+            return ConfigurationException(f"Could not get a user token: {ebrains_user_token_result}")
+        return WorkflowConfig(
+            allow_local_fs=dto.allow_local_fs,
+            scratch_dir=PurePosixPath(dto.scratch_dir),
+            ebrains_user_token=ebrains_user_token_result,
+            max_duration_minutes=Minutes(dto.max_duration_minutes),
+            listen_socket=Path(dto.listen_socket),
+            session_url=Url.from_dto(dto.session_url),
+            session_allocator_host=Hostname(dto.session_allocator_host),
+            session_allocator_username=Username(dto.session_allocator_username),
+            session_allocator_socket_path=Path(dto.session_allocator_socket_path),
+        )
 
     @classmethod
     def get(cls) -> "WorkflowConfig":
         if cls._global_config is None:
-            cls._global_config = cls.from_env()
+            config = cls.from_env()
+            if isinstance(config, Exception):
+                raise config
+            cls._global_config = config
         return cls._global_config
 
     @classmethod
-    def from_env(
-        cls,
-        *,
-        allow_local_fs: Optional[bool] = None,
-        scratch_dir: Optional[PurePosixPath] = None,
-        ebrains_oidc_client: Optional[OidcClient] = None,
+    def from_env(cls) -> "WorkflowConfig | ConfigurationException":
+        config_raw = os.environ.get(WEBILASTIK_WORKFLOW_CONFIG)
+        if config_raw is None:
+            return ConfigurationException(f"Could not find configuraiton json in env var {WEBILASTIK_WORKFLOW_CONFIG}")
+        config_json_result = parse_json(config_raw)
+        if isinstance(config_json_result, Exception):
+            return ConfigurationException(config_json_result)
+        config_dto_result = WorkflowConfigDto.from_json_value(config_json_result)
+        if isinstance(config_dto_result, Exception):
+            return ConfigurationException(config_dto_result)
+        return WorkflowConfig.from_dto(config_dto_result)
 
-        ebrains_user_token: Optional[AccessToken] = None,
-        max_duration_minutes: Optional[Minutes] = None,
-        listen_socket: Optional[Path] = None,
-        session_url: Optional[Url] = None,
-        # tunnel parameters
-        session_allocator_host: Optional[Hostname] = None,
-        session_allocator_username: Optional[Username] = None,
-        session_allocator_socket_path: Optional[Path] = None
-    ) -> "WorkflowConfig":
-        if ebrains_user_token is None:
-            raw_user_access_token = read_str_env_var(
-                EBRAINS_USER_ACCESS_TOKEN,
-                help_text="The raw string for an ebrains user access token, retrieved from ebrains iam",
-            )
-            raw_user_refresh_token = read_str_env_var(
-                EBRAINS_USER_REFRESH_TOKEN,
-                help_text="The raw string for an ebrains user refresh token, retrieved from ebrains iam",
-            )
-            checking_key_result = HbpIamPublicKey.get_sync()
-            if isinstance(checking_key_result, Exception):
-                raise checking_key_result
-            access_token_result = AccessToken.from_dto(
-                EbrainsAccessTokenDto(access_token=raw_user_access_token, refresh_token=raw_user_refresh_token),
-                checking_key=checking_key_result,
-            )
-            if isinstance(access_token_result, Exception):
-                raise access_token_result
-            ebrains_user_token = access_token_result
-        return WorkflowConfig(
-            allow_local_fs=allow_local_fs if allow_local_fs is not None else read_bool_env_var(
-                name= WEBILASTIK_ALLOW_LOCAL_FS,
-                help_text="Allow ilastik to read and write to the local filesystem",
-            ),
-            scratch_dir=scratch_dir if scratch_dir is not None else PurePosixPath(read_str_env_var(
-                name= WEBILASTIK_SCRATCH_DIR,
-                help_text="base path where temporary files can be created",
-            )),
-            ebrains_user_token=ebrains_user_token,
-            max_duration_minutes=max_duration_minutes if max_duration_minutes is not None else Minutes(float(read_int_env_var(
-                WEBILASTIK_JOB_MAX_DURATION_MINUTES,
-                help_text="Maximum job duration in minutes"
-            ))),
-            listen_socket=listen_socket if listen_socket is not None else Path(read_str_env_var(
-                WEBILASTIK_JOB_LISTEN_SOCKET,
-                help_text="Path to the socket on which the job server will listen for frontend requests"
-            )),
-            session_url=session_url if session_url is not None else Url.parse_or_raise(read_str_env_var(
-                WEBILASTIK_JOB_SESSION_URL,
-                help_text="The session URL as seen from the frontend"
-            )),
+    def to_env_export(self) -> str:
+        json_str = json.dumps(self.to_dto().to_json_value())
+        escaped_json_str = json_str.replace("'", r"\'")
+        return f"export {WEBILASTIK_WORKFLOW_CONFIG}='{escaped_json_str}'"
 
-            # tunnel parameters
-            session_allocator_host=session_allocator_host if session_allocator_host is not None else Hostname(read_str_env_var(
-                WEBILASTIK_SESSION_ALLOCATOR_HOST,
-                help_text="The hostname of the session allocator, to which an SSH conection can be made"
-            )),
-            session_allocator_username=session_allocator_username if session_allocator_username is not None else Username(read_str_env_var(
-                WEBILASTIK_SESSION_ALLOCATOR_USERNAME,
-                help_text="A existing username on the session allocator, with which an SSH conection can be made"
-            )),
-            session_allocator_socket_path=session_allocator_socket_path if session_allocator_socket_path is not None else Path(read_str_env_var(
-                WEBILASTIK_SESSION_ALLOCATOR_SOCKET_PATH,
-                help_text="The path where a socket connecting back to the job is to be created"
-            )),
-        )
+if __name__ == "__main__":
+    import argparse
 
-    def to_env_vars(self) -> Sequence[EnvVar]:
-        return [
-            EnvVar(name=WEBILASTIK_ALLOW_LOCAL_FS, value=str(self.allow_local_fs).lower()),
-            EnvVar(name=WEBILASTIK_SCRATCH_DIR, value=str(self.scratch_dir)),
-            EnvVar(name=EBRAINS_USER_ACCESS_TOKEN, value=self.ebrains_user_token.raw_token),
-            EnvVar(name=EBRAINS_USER_REFRESH_TOKEN, value=self.ebrains_user_token.refresh_token or ""),
-            EnvVar(name=WEBILASTIK_JOB_MAX_DURATION_MINUTES, value=str(self.max_duration_minutes.to_int())),
-            EnvVar(name=WEBILASTIK_JOB_LISTEN_SOCKET, value=str(self.listen_socket)),
-            EnvVar(name=WEBILASTIK_JOB_SESSION_URL, value=self.session_url.raw),
-            EnvVar(name=WEBILASTIK_SESSION_ALLOCATOR_HOST, value=self.session_allocator_host),
-            EnvVar(name=WEBILASTIK_SESSION_ALLOCATOR_USERNAME, value=self.session_allocator_username),
-            EnvVar(name=WEBILASTIK_SESSION_ALLOCATOR_SOCKET_PATH, value=str(self.session_allocator_socket_path)),
-        ]
+    parser = argparse.ArgumentParser("simple_example")
+    _ = parser.add_argument("--b64-fernet-key", help="The fernet key to encrypt stuff on the HPCs", required=True)
+    _ = parser.add_argument("--oidc-client-secret", help="The oidc client key", required=True)
+    _ = parser.add_argument(
+        "--allow-local-compute-sessions",
+        help="Allow compute sessions to be spawned as local processes",
+        action='store_true',
+        required=True,
+    )
+    args = parser.parse_args()
+
+    b64_fernet_key = cast(str, args.b64_fernet_key)
+    assert isinstance(b64_fernet_key, str)
+
+    fernet = Fernet(key=b64_fernet_key.encode('utf8'))
+
+    oidc_client_secret = cast(str, args.oidc_client_secret)
+    assert isinstance(oidc_client_secret, str)
+
+    allow_local_compute_sessions = cast(bool, args.allow_local_compute_sessions)
+    assert isinstance(allow_local_compute_sessions, bool)
+
+    config_str = json.dumps(SessionAllocatorServerConfig(
+        ebrains_oidc_client=OidcClient(client_id="webilastik", client_secret=oidc_client_secret),
+        allow_local_compute_sessions=allow_local_compute_sessions,
+        b64_fernet_key=b64_fernet_key,
+        fernet=fernet,
+        external_url=Url.parse_or_raise('https://app.ilastik.org/'),
+        marker=SessionAllocatorServerConfig._PrivateMarker() #pyright: ignore [reportPrivateUsage]
+    ).to_dto().to_json_value())#.replace("{", "\\{").replace("}", "\\}").replace('"', '\\"')
+
+    print(f"export {WEBILASTIK_SESSION_ALLOCATOR_SERVER_CONFIG}='{config_str}'")

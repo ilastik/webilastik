@@ -4835,3 +4835,199 @@ class LoginRequiredErrorDto(DataTransferObject):
         cls, value: JsonValue
     ) -> "LoginRequiredErrorDto | MessageParsingError":
         return parse_as_LoginRequiredErrorDto(value)
+
+
+def parse_as_EbrainsOidcClientDto(
+    value: JsonValue,
+) -> "EbrainsOidcClientDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as EbrainsOidcClientDto"
+        )
+    if value.get("__class__") != "EbrainsOidcClientDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as EbrainsOidcClientDto"
+        )
+    tmp_client_id = parse_as_str(value.get("client_id"))
+    if isinstance(tmp_client_id, MessageParsingError):
+        return tmp_client_id
+    tmp_client_secret = parse_as_str(value.get("client_secret"))
+    if isinstance(tmp_client_secret, MessageParsingError):
+        return tmp_client_secret
+    return EbrainsOidcClientDto(
+        client_id=tmp_client_id,
+        client_secret=tmp_client_secret,
+    )
+
+
+@dataclass
+class EbrainsOidcClientDto(DataTransferObject):
+    client_id: str
+    client_secret: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "EbrainsOidcClientDto",
+            "client_id": self.client_id,
+            "client_secret": self.client_secret,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "EbrainsOidcClientDto | MessageParsingError":
+        return parse_as_EbrainsOidcClientDto(value)
+
+
+def parse_as_SessionAllocatorServerConfigDto(
+    value: JsonValue,
+) -> "SessionAllocatorServerConfigDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as SessionAllocatorServerConfigDto"
+        )
+    if value.get("__class__") != "SessionAllocatorServerConfigDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as SessionAllocatorServerConfigDto"
+        )
+    tmp_ebrains_oidc_client = parse_as_EbrainsOidcClientDto(
+        value.get("ebrains_oidc_client")
+    )
+    if isinstance(tmp_ebrains_oidc_client, MessageParsingError):
+        return tmp_ebrains_oidc_client
+    tmp_allow_local_compute_sessions = parse_as_bool(
+        value.get("allow_local_compute_sessions")
+    )
+    if isinstance(tmp_allow_local_compute_sessions, MessageParsingError):
+        return tmp_allow_local_compute_sessions
+    tmp_b64_fernet_key = parse_as_str(value.get("b64_fernet_key"))
+    if isinstance(tmp_b64_fernet_key, MessageParsingError):
+        return tmp_b64_fernet_key
+    tmp_external_url = parse_as_UrlDto(value.get("external_url"))
+    if isinstance(tmp_external_url, MessageParsingError):
+        return tmp_external_url
+    return SessionAllocatorServerConfigDto(
+        ebrains_oidc_client=tmp_ebrains_oidc_client,
+        allow_local_compute_sessions=tmp_allow_local_compute_sessions,
+        b64_fernet_key=tmp_b64_fernet_key,
+        external_url=tmp_external_url,
+    )
+
+
+@dataclass
+class SessionAllocatorServerConfigDto(DataTransferObject):
+    ebrains_oidc_client: EbrainsOidcClientDto
+    allow_local_compute_sessions: bool
+    b64_fernet_key: str
+    external_url: UrlDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "SessionAllocatorServerConfigDto",
+            "ebrains_oidc_client": self.ebrains_oidc_client.to_json_value(),
+            "allow_local_compute_sessions": self.allow_local_compute_sessions,
+            "b64_fernet_key": self.b64_fernet_key,
+            "external_url": self.external_url.to_json_value(),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "SessionAllocatorServerConfigDto | MessageParsingError":
+        return parse_as_SessionAllocatorServerConfigDto(value)
+
+
+def parse_as_WorkflowConfigDto(
+    value: JsonValue,
+) -> "WorkflowConfigDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as WorkflowConfigDto"
+        )
+    if value.get("__class__") != "WorkflowConfigDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as WorkflowConfigDto"
+        )
+    tmp_allow_local_fs = parse_as_bool(value.get("allow_local_fs"))
+    if isinstance(tmp_allow_local_fs, MessageParsingError):
+        return tmp_allow_local_fs
+    tmp_scratch_dir = parse_as_str(value.get("scratch_dir"))
+    if isinstance(tmp_scratch_dir, MessageParsingError):
+        return tmp_scratch_dir
+    tmp_ebrains_user_token = parse_as_EbrainsAccessTokenDto(
+        value.get("ebrains_user_token")
+    )
+    if isinstance(tmp_ebrains_user_token, MessageParsingError):
+        return tmp_ebrains_user_token
+    tmp_max_duration_minutes = parse_as_int(value.get("max_duration_minutes"))
+    if isinstance(tmp_max_duration_minutes, MessageParsingError):
+        return tmp_max_duration_minutes
+    tmp_listen_socket = parse_as_str(value.get("listen_socket"))
+    if isinstance(tmp_listen_socket, MessageParsingError):
+        return tmp_listen_socket
+    tmp_session_url = parse_as_UrlDto(value.get("session_url"))
+    if isinstance(tmp_session_url, MessageParsingError):
+        return tmp_session_url
+    tmp_session_allocator_host = parse_as_str(value.get("session_allocator_host"))
+    if isinstance(tmp_session_allocator_host, MessageParsingError):
+        return tmp_session_allocator_host
+    tmp_session_allocator_username = parse_as_str(
+        value.get("session_allocator_username")
+    )
+    if isinstance(tmp_session_allocator_username, MessageParsingError):
+        return tmp_session_allocator_username
+    tmp_session_allocator_socket_path = parse_as_str(
+        value.get("session_allocator_socket_path")
+    )
+    if isinstance(tmp_session_allocator_socket_path, MessageParsingError):
+        return tmp_session_allocator_socket_path
+    return WorkflowConfigDto(
+        allow_local_fs=tmp_allow_local_fs,
+        scratch_dir=tmp_scratch_dir,
+        ebrains_user_token=tmp_ebrains_user_token,
+        max_duration_minutes=tmp_max_duration_minutes,
+        listen_socket=tmp_listen_socket,
+        session_url=tmp_session_url,
+        session_allocator_host=tmp_session_allocator_host,
+        session_allocator_username=tmp_session_allocator_username,
+        session_allocator_socket_path=tmp_session_allocator_socket_path,
+    )
+
+
+@dataclass
+class WorkflowConfigDto(DataTransferObject):
+    allow_local_fs: bool
+    scratch_dir: str
+    ebrains_user_token: EbrainsAccessTokenDto
+    max_duration_minutes: int
+    listen_socket: str
+    session_url: UrlDto
+    session_allocator_host: str
+    session_allocator_username: str
+    session_allocator_socket_path: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "WorkflowConfigDto",
+            "allow_local_fs": self.allow_local_fs,
+            "scratch_dir": self.scratch_dir,
+            "ebrains_user_token": self.ebrains_user_token.to_json_value(),
+            "max_duration_minutes": self.max_duration_minutes,
+            "listen_socket": self.listen_socket,
+            "session_url": self.session_url.to_json_value(),
+            "session_allocator_host": self.session_allocator_host,
+            "session_allocator_username": self.session_allocator_username,
+            "session_allocator_socket_path": self.session_allocator_socket_path,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "WorkflowConfigDto | MessageParsingError":
+        return parse_as_WorkflowConfigDto(value)

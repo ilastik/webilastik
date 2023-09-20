@@ -12,6 +12,8 @@ from webilastik.utility import Seconds
 class _PrivateMarker:
     pass
 
+_WORKFLOW_CONFIG = WorkflowConfig.get()
+
 class OsFs(IFilesystem):
     def __init__(self, _marker: _PrivateMarker, base: Path = Path("/")) -> None:
         self.base: Final[Path] = base
@@ -19,7 +21,7 @@ class OsFs(IFilesystem):
 
     @classmethod
     def create_scratch_dir(cls) -> "OsFs | FsIoException":
-        scratch_dir_path = Path(WorkflowConfig.from_env().scratch_dir) / str(uuid.uuid4())
+        scratch_dir_path = Path(_WORKFLOW_CONFIG.scratch_dir) / str(uuid.uuid4())
         try:
             scratch_dir_path.mkdir(parents=True)
         except Exception as e:
@@ -40,8 +42,7 @@ class OsFs(IFilesystem):
 
     @classmethod
     def create(cls) -> "OsFs | Exception":
-        from webilastik.config import WebilastikConfig
-        if WorkflowConfig.from_env().allow_local_fs:
+        if _WORKFLOW_CONFIG.allow_local_fs:
             return OsFs(_marker=_PrivateMarker())
         return Exception("OsFs not allowed")
 

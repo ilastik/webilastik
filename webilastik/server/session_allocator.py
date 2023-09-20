@@ -35,7 +35,6 @@ from webilastik.server.rpc.dto import (
     MessageParsingError,
     RpcErrorDto,
 )
-from webilastik.config import SessionAllocatorConfig
 from webilastik.utility import ComputeNodes, Hostname, NodeHours, Username
 from webilastik.utility.url import Url
 
@@ -467,7 +466,8 @@ class SessionAllocator:
         web.run_app(self.app, port=port) #type: ignore
 
 if __name__ == '__main__':
-    server_config = SessionAllocatorConfig.get()
+    from webilastik.config import SessionAllocatorServerConfig
+    server_config = SessionAllocatorServerConfig.get()
 
     SessionAllocator(
         fernet=server_config.fernet,

@@ -630,3 +630,30 @@ class DataProxyObjectUrlResponse(DataTransferObject):
 @dataclass
 class LoginRequiredErrorDto(DataTransferObject):
     pass
+
+#######################################
+
+@dataclass
+class EbrainsOidcClientDto(DataTransferObject):
+    client_id: str
+    client_secret: str
+
+@dataclass
+class SessionAllocatorServerConfigDto(DataTransferObject):
+    ebrains_oidc_client: EbrainsOidcClientDto
+    allow_local_compute_sessions: bool
+    b64_fernet_key: str
+    external_url: UrlDto # blas
+
+
+@dataclass
+class WorkflowConfigDto(DataTransferObject):
+    allow_local_fs: bool
+    scratch_dir: str
+    ebrains_user_token: EbrainsAccessTokenDto
+    max_duration_minutes: int
+    listen_socket: str
+    session_url: UrlDto
+    session_allocator_host: str
+    session_allocator_username: str
+    session_allocator_socket_path: str
