@@ -137,12 +137,10 @@ class CreateDebTree:
 
         for src_dir, dest_dir in self.src_to_dest.items():
             if not dest_dir.exists():
-                logger.error(f"dewst dir doesn't exit:> {dest_dir}")
                 return None
             dest_dir_mtime = get_dir_effective_mtime(dest_dir)
             src_dir_mtime = get_dir_effective_mtime(src_dir)
             if src_dir_mtime > dest_dir_mtime:
-                logger.error(f"Outdated dest: {dest_dir_mtime=} {src_dir_mtime=} at {dest_dir}")
                 return None
 
         if any(not artifact.is_current() for artifact in [
