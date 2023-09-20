@@ -109,12 +109,16 @@ class CreateDebTree:
         if cache:
             return cache
         logger.info('Generating basic package tree')
-        force_update_dir(source=self.package_tree_base, dest=self.project_root.deb_tree_path)
+        force_update_dir(
+            source=self.package_tree_base, dest=self.project_root.deb_tree_path, delete_extraneous=False
+        )
 
         logger.debug('Copying webilastik files')
         for src_dir, dest_dir in self.src_to_dest.items():
-            dest_dir.mkdir(parents=True)
-            force_update_dir(source=src_dir, dest=dest_dir, exclude_pattern="__pycache__")
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            force_update_dir(
+                source=src_dir, dest=dest_dir, exclude_pattern="__pycache__", delete_extraneous=True
+            )
 
         self.overlay_bundle.install()
         self.deb_control_file.install()

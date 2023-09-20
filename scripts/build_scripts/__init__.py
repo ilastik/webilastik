@@ -4,7 +4,6 @@ import re
 from pathlib import Path
 from typing import Final, List, Mapping, Optional
 import subprocess
-import datetime
 
 from webilastik.utility.log import Logger
 from webilastik.utility.url import Url
@@ -43,7 +42,7 @@ class PackageSourceFile:
         with open(self.target_path, "rb") as f:
             return f.read() == self.contents
 
-def force_update_dir(*, source: Path, dest: Path, exclude_pattern: "str | None" = None):
+def force_update_dir(*, source: Path, dest: Path, delete_extraneous: bool, exclude_pattern: "str | None" = None):
     if not dest.exists():
         dest.mkdir(parents=True)
     assert source.is_dir()
@@ -51,7 +50,7 @@ def force_update_dir(*, source: Path, dest: Path, exclude_pattern: "str | None" 
     _  = subprocess.check_output([
         "rsync",
         "-av",
-        "--delete",
+        *(["--delete"] if delete_extraneous else []),
         *(["--exclude", exclude_pattern] if exclude_pattern else []),
         str(source).rstrip("/") + "/",
         str(dest).rstrip("/") + "/"
