@@ -66,11 +66,15 @@ class BuildNeuroglancer:
         logger.info("Using cached neuroglancer bundle dist")
         return NeuroglancerDistribution(bundle_path=self.output_bundle_path, project_root=self.project_root, _private_marker=None)
 
+    @classmethod
+    def execute(cls) -> "NeuroglancerDistribution | Exception":
+        project_root = ProjectRoot()
+        ng_source = FetchNeuroglancerSource(project_root=project_root).run()
+        if isinstance(ng_source, Exception):
+            return  ng_source #FIXME?
+        return BuildNeuroglancer(project_root=project_root, ng_source=ng_source).run()
+
 if __name__ == "__main__":
-    project_root = ProjectRoot()
-    ng_source = FetchNeuroglancerSource(project_root=project_root).run()
-    if isinstance(ng_source, Exception):
-        raise ng_source #FIXME?
-    neuroglancer_dist = BuildNeuroglancer(project_root=project_root, ng_source=ng_source).run()
-    if isinstance(neuroglancer_dist, Exception):
-        raise neuroglancer_dist #FIXME?
+    result = BuildNeuroglancer.execute()
+    if isinstance(result, Exception):
+        raise result

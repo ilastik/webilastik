@@ -5,6 +5,8 @@ import textwrap
 import shutil
 from pathlib import Path
 from typing import Final, Mapping
+from concurrent.futures import Executor
+
 from build_scripts.compile_overlay import CompileOverlay, OverlayBundle
 from build_scripts.create_conda_env import CreateCondaEnvironment
 from build_scripts.create_packed_conda_env import CreatePackedCondaEnv, PackedCondaEnv
@@ -14,14 +16,16 @@ from build_scripts.neuroglancer.fetch_neuroglancer_source import FetchNeuroglanc
 from webilastik.config import SessionAllocatorServerConfig
 
 from build_scripts import PackageSourceFile, ProjectRoot, force_update_dir, get_dir_effective_mtime
+from webilastik.scheduling import SerialExecutor
 from webilastik.utility.log import Logger
 
 logger = Logger()
 
 
 class DebTree:
-    def __init__(self, project_root: ProjectRoot, _private_marker: None) -> None:
-        self.project_root = project_root
+    def __init__(self, path: Path, _private_marker: None) -> None:
+        self.path = path
+        self.mtime = get_dir_effective_mtime(path)
         super().__init__()
 
 class DebControlFile(PackageSourceFile):
@@ -126,7 +130,7 @@ class CreateDebTree:
         self.packed_conda_env.install()
         self.neuroglancer_dist.install()
 
-        return DebTree(project_root=self.project_root, _private_marker=None)
+        return DebTree(path=self.project_root.deb_tree_path, _private_marker=None)
 
     def cached(self) -> "DebTree | Exception | None":
         if not self.project_root.deb_tree_path.exists():
@@ -151,45 +155,47 @@ class CreateDebTree:
             self.neuroglancer_dist,
         ]):
             return None
-        return DebTree(project_root=self.project_root, _private_marker=None)
+        return DebTree(path=self.project_root.deb_tree_path, _private_marker=None)
 
     def clean(self):
         shutil.rmtree(path=self.project_root.deb_tree_path)
 
+    @classmethod
+    def execute(cls, *, project_root: ProjectRoot, executor: Executor) -> "DebTree | Exception":
+        session_allocator_server_config = SessionAllocatorServerConfig.from_env()
+        if isinstance(session_allocator_server_config, Exception):
+            return session_allocator_server_config
+
+        conda_env = CreateCondaEnvironment(project_root=project_root).run()
+        if isinstance(conda_env, Exception):
+            return conda_env
+
+        packed_conda_env = CreatePackedCondaEnv(project_root=project_root, conda_env=conda_env).run()
+        if isinstance(packed_conda_env, Exception):
+            return packed_conda_env
+
+        ng_source = FetchNeuroglancerSource(project_root=project_root).run()
+        if isinstance(ng_source, Exception):
+            return ng_source
+
+        neuroglancer_dist = BuildNeuroglancer(project_root=project_root, ng_source=ng_source).run()
+        if isinstance(neuroglancer_dist, Exception):
+            return neuroglancer_dist
+
+        overlay_bundle = CompileOverlay(project_root=project_root).run()
+        if isinstance(overlay_bundle, Exception):
+            return overlay_bundle
+
+        return CreateDebTree(
+            project_root=project_root,
+            overlay_bundle=overlay_bundle,
+            neuroglancer_dist=neuroglancer_dist,
+            packed_conda_env=packed_conda_env,
+            session_allocator_server_config=session_allocator_server_config,
+        ).run()
+
 
 if __name__ == "__main__":
-    project_root = ProjectRoot()
-
-    session_allocator_server_config = SessionAllocatorServerConfig.from_env()
-    if isinstance(session_allocator_server_config, Exception):
-        raise session_allocator_server_config
-
-    conda_env = CreateCondaEnvironment(project_root=project_root).run()
-    if isinstance(conda_env, Exception):
-        raise conda_env
-
-    packed_conda_env = CreatePackedCondaEnv(project_root=project_root, conda_env=conda_env).run()
-    if isinstance(packed_conda_env, Exception):
-        raise packed_conda_env
-
-    ng_source = FetchNeuroglancerSource(project_root=project_root).run()
-    if isinstance(ng_source, Exception):
-        raise ng_source
-
-    neuroglancer_dist = BuildNeuroglancer(project_root=project_root, ng_source=ng_source).run()
-    if isinstance(neuroglancer_dist, Exception):
-        raise neuroglancer_dist
-
-    overlay_bundle = CompileOverlay(project_root=project_root).run()
-    if isinstance(overlay_bundle, Exception):
-        raise overlay_bundle
-
-    deb_tree = CreateDebTree(
-        project_root=project_root,
-        overlay_bundle=overlay_bundle,
-        neuroglancer_dist=neuroglancer_dist,
-        packed_conda_env=packed_conda_env,
-        session_allocator_server_config=session_allocator_server_config,
-    ).run()
-    if isinstance(deb_tree, Exception):
-        raise deb_tree
+    result = CreateDebTree.execute(project_root=ProjectRoot(), executor=SerialExecutor())
+    if isinstance(result, Exception):
+        raise result

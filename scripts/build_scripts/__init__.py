@@ -19,7 +19,7 @@ class ProjectRoot:
 
         git_raw_version = subprocess.check_output(["git", "describe", "--tags",  "HEAD"], cwd=self.root_path).decode("utf8").strip()
         self.pkg_version: Final[str] = re.sub("^[a-zA-Z]+|-[^-]*$", "", git_raw_version)
-
+        self.pkg_name: Final[str] = f"webilastik_{self.pkg_version}"
         super().__init__()
 
 

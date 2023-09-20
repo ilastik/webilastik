@@ -62,12 +62,16 @@ class CreatePackedCondaEnv:
             return PackedCondaEnv(path=self.packed_env_path, project_root=self.project_root, _private_marker=None)
         return None
 
-if __name__ == "__main__":
-    project_root = ProjectRoot()
-    conda_env = CreateCondaEnvironment(project_root=project_root).run()
-    if isinstance(conda_env, Exception):
-        raise conda_env #FIXME?
+    @classmethod
+    def execute(cls) -> "PackedCondaEnv | Exception":
+        project_root = ProjectRoot()
+        conda_env = CreateCondaEnvironment(project_root=project_root).run()
+        if isinstance(conda_env, Exception):
+            return conda_env #FIXME?
 
-    packed_env = CreatePackedCondaEnv(project_root=ProjectRoot(), conda_env=conda_env).run()
-    if isinstance(packed_env, Exception):
-        raise packed_env #FIXME?
+        return CreatePackedCondaEnv(project_root=ProjectRoot(), conda_env=conda_env).run()
+
+if __name__ == "__main__":
+    result = CreatePackedCondaEnv.execute()
+    if isinstance(result, Exception):
+        raise result

@@ -45,4 +45,6 @@ class CreateCondaEnvironment:
         return None
 
 if __name__ == "__main__":
-    _ = CreateCondaEnvironment(project_root=ProjectRoot()).run(use_cache=True)
+    result = CreateCondaEnvironment(project_root=ProjectRoot()).run(use_cache=True)
+    if isinstance(result, Exception):
+        raise result
