@@ -178,9 +178,6 @@ if __name__ == "__main__":
     if isinstance(neuroglancer_dist, Exception):
         raise neuroglancer_dist
 
-    logger.warn("gonna compile overlay?")
-
-
     overlay_bundle = CompileOverlay(project_root=project_root).run()
     if isinstance(overlay_bundle, Exception):
         raise overlay_bundle

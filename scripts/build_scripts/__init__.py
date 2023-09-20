@@ -4,9 +4,12 @@ import re
 from pathlib import Path
 from typing import Final, List, Mapping, Optional
 import subprocess
+import datetime
 
+from webilastik.utility.log import Logger
 from webilastik.utility.url import Url
 
+logger = Logger()
 
 class ProjectRoot:
     def __init__(self) -> None:
@@ -54,22 +57,36 @@ def force_update_dir(*, source: Path, dest: Path, exclude_pattern: "str | None" 
         str(dest).rstrip("/") + "/"
     ])
 
+npm_package_mtime = 499162500.0 # mtime used by npm for reproducible builds
 
 def _do_get_dir_effective_mtime(path: Path) -> float:
-    children = list(path.iterdir())
-    if len(children) == 0:
+    if path.name == "__pycache__":
         return 0
-    return max(
-        _do_get_dir_effective_mtime(child) if child.is_dir() else child.lstat().st_mtime
-        for child in children
-    )
+    if path.suffix == "pyc":
+        return 0
+
+    out: float = 0
+    for child in path.iterdir():
+        if child.is_dir():
+            child_mtime = _do_get_dir_effective_mtime(child)
+        else:
+            child_stat = child.lstat()
+            child_mtime = child_stat.st_ctime if child_stat.st_mtime == npm_package_mtime else child_stat.st_mtime
+        if child_mtime > out:
+            out = child_mtime
+    # if out != 0:
+    #     logger.debug(f"mtime for {path} is {datetime.datetime.fromtimestamp(out)}")
+
+    return out
 
 def get_dir_effective_mtime(path: Path) -> "float":
     if not path.exists():
         return 0
     return _do_get_dir_effective_mtime(path)
 
-def run_subprocess(args: List[str], env: Optional[Mapping[str, str]] = None, cwd: Optional[Path] = None) -> "bytes | subprocess.CalledProcessError":
+def run_subprocess(
+    args: List[str], env: Optional[Mapping[str, str]] = None, cwd: Optional[Path] = None
+) -> "bytes | subprocess.CalledProcessError":
     try:
         return subprocess.check_output(args, env=env, cwd=cwd)
     except subprocess.CalledProcessError as e:

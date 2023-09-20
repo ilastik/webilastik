@@ -30,7 +30,7 @@ class PackedCondaEnv:
     def is_current(self) -> bool:
         if not self.installation_dir.exists():
             return False
-        return get_dir_effective_mtime(self.installation_dir) < self.mtime
+        return self.mtime <= get_dir_effective_mtime(self.installation_dir)
 
 
 class CreatePackedCondaEnv:
