@@ -1,5 +1,5 @@
 {
-  "include": ["webilastik/", "tests/", "caching/", "executor_getters/", "examples/"],
+  "include": ["webilastik/", "tests/", "scripts/build_scripts", "caching/", "executor_getters/", "examples/"],
   "exclude": ["build/"],
   "strict": ["webilastik/datasource", "webilastik/datasink"],
   "typeCheckingMode": "basic",

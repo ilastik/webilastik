@@ -43,8 +43,9 @@ class CreateDebPackage:
         )
         if isinstance(git_status_result, Exception):
             return git_status_result
-        if len(git_status_result.decode("utf8").strip().split("\n")) != 0:
-            return Exception(f"There are some modified or untracked files in the working tree")
+        status_lines = [line for line in git_status_result.decode("utf8").strip().split("\n") if line]
+        if len(status_lines) != 0:
+            return Exception(f"There are some modified or untracked files in the working tree: {status_lines}")
 
         git_revparse_head_result = run_subprocess(["git", "rev-parse", "HEAD"])
         git_revparse_originMaster_result = run_subprocess(["git", "rev-parse", "origin/master"])
