@@ -17,6 +17,7 @@ from aiohttp.client import ClientSession
 from cryptography.fernet import Fernet
 from ndstructs.utils.json_serializable import JsonValue
 
+from webilastik.config import SessionAllocatorServerConfig
 from webilastik.libebrains.compute_session_launcher import JusufSshJobLauncher, LocalJobLauncher, Minutes, ComputeSession, SshJobLauncher
 from webilastik.libebrains.user_token import AccessToken, CantFetchHbpIamKey, EbrainsCommunicationFailure, HbpIamPublicKey, AccessTokenExpired, AccessTokenInvalid
 from webilastik.libebrains.oidc_client import OidcClient, Scope
@@ -465,13 +466,14 @@ class SessionAllocator:
     def run(self, port: int):
         web.run_app(self.app, port=port) #type: ignore
 
-if __name__ == '__main__':
-    from webilastik.config import SessionAllocatorServerConfig
-    server_config = SessionAllocatorServerConfig.get()
+    @classmethod
+    def execute(cls, server_config: SessionAllocatorServerConfig):
+        SessionAllocator(
+            fernet=server_config.fernet,
+            external_url=server_config.external_url,
+            oidc_client=server_config.ebrains_oidc_client,
+            allow_local_sessions=server_config.allow_local_compute_sessions
+        ).run(port=5000)
 
-    SessionAllocator(
-        fernet=server_config.fernet,
-        external_url=server_config.external_url,
-        oidc_client=server_config.ebrains_oidc_client,
-        allow_local_sessions=server_config.allow_local_compute_sessions
-    ).run(port=5000)
+if __name__ == '__main__':
+    SessionAllocator.execute(server_config=SessionAllocatorServerConfig.get())
