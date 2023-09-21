@@ -16,6 +16,10 @@ class ProjectRoot:
         self.build_dir: Final[Path] = self.root_path / "build"
         self.deb_tree_path = self.build_dir / "deb_tree"
         self.environment_file: Final[Path] = self.root_path / "environment.yml"
+        self.web_server_ip = "148.187.149.187"
+        self.web_server_user = "ubuntu"
+        self.systemd_unit_config_dir = Path("/etc/systemd/system/webilastik.service.d")
+        self.systemd_unit_install_path = Path("/lib/systemd/system/webilastik.service")
 
         git_raw_version = subprocess.check_output(["git", "describe", "--tags",  "HEAD"], cwd=self.root_path).decode("utf8").strip()
         self.pkg_version: Final[str] = re.sub("^[a-zA-Z]+|-[^-]*$", "", git_raw_version)
@@ -35,6 +39,9 @@ class PackageSourceFile:
         self.target_path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.target_path, "wb") as f:
             _ = f.write(self.contents)
+
+    def uninstall(self):
+        self.target_path.unlink(missing_ok=True)
 
     def is_current(self) -> bool:
         if not self.target_path.exists():

@@ -1,10 +1,9 @@
-from dataclasses import dataclass
-import subprocess
-from sys import stderr
+# pyright: strict
+
 import textwrap
 import shutil
 from pathlib import Path
-from typing import Final, Mapping
+from typing import Mapping
 from concurrent.futures import Executor
 
 from build_scripts.compile_overlay import CompileOverlay, OverlayBundle
