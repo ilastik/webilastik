@@ -69,5 +69,13 @@ if __name__ == "__main__":
             writing_result = DownscaleDatasource.downscale(sink_tile=sink_tile, source=datasource, sink_writer=sink_writer)
             assert not isinstance(writing_result, Exception), str(writing_result)
 
+        # Uncomment these to show the downscaled imags in your web browser. Be careful with huge or 3D images, though
+        #import PIL
+        #import tempfile
+        #temp_f = tempfile.NamedTemporaryFile(suffix=".png")
+        #PIL.Image.fromarray(sink.to_datasource().retrieve().raw("yxc")).save(temp_f)
+        #import webbrowser
+        #_ = webbrowser.open_new_tab(f"file://{temp_f.name}")
+
         if sink_shape.x == 1 and sink_shape.y == 1:
             break
