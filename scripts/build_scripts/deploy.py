@@ -3,8 +3,8 @@ from typing import Final
 from concurrent.futures import Executor
 
 
-from build_scripts import ProjectRoot, run_subprocess
-from build_scripts.create_deb_package import CreateDebPackage, DebPackage
+from scripts.build_scripts import ProjectRoot, run_subprocess
+from scripts.build_scripts.create_deb_package import CreateDebPackage, DebPackage
 from webilastik.scheduling import SerialExecutor
 
 

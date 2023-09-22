@@ -3,7 +3,7 @@ import shutil
 import subprocess
 from typing import Final, Optional
 
-from build_scripts import ProjectRoot, get_dir_effective_mtime, run_subprocess
+from scripts.build_scripts import ProjectRoot, get_dir_effective_mtime, run_subprocess
 from webilastik.utility.log import Logger
 
 logger = Logger()

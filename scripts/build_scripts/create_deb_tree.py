@@ -3,29 +3,36 @@
 import textwrap
 import shutil
 from pathlib import Path
-from typing import Mapping
+from typing import Literal, Mapping
 from concurrent.futures import Executor
+import subprocess
+import os
 
-from build_scripts.compile_overlay import CompileOverlay, OverlayBundle
-from build_scripts.create_conda_env import CreateCondaEnvironment
-from build_scripts.create_packed_conda_env import CreatePackedCondaEnv, PackedCondaEnv
-from build_scripts.neuroglancer.compile_neuroglancer import BuildNeuroglancer, NeuroglancerDistribution
-from build_scripts.neuroglancer.fetch_neuroglancer_source import FetchNeuroglancerSource
+from scripts.build_scripts.compile_overlay import CompileOverlay, OverlayBundle
+from scripts.build_scripts.create_conda_env import CreateCondaEnvironment
+from scripts.build_scripts.create_packed_conda_env import CreatePackedCondaEnv, PackedCondaEnv
+from scripts.build_scripts.neuroglancer.compile_neuroglancer import BuildNeuroglancer, NeuroglancerDistribution
+from scripts.build_scripts.neuroglancer.fetch_neuroglancer_source import FetchNeuroglancerSource
 
 from webilastik.config import SessionAllocatorServerConfig
 
-from build_scripts import PackageSourceFile, ProjectRoot, force_update_dir, get_dir_effective_mtime
+from scripts.build_scripts import PackageSourceFile, ProjectRoot, force_update_dir, get_dir_effective_mtime
 from webilastik.scheduling import SerialExecutor
 from webilastik.utility.log import Logger
 
 logger = Logger()
 
-
-class DebTree:
-    def __init__(self, path: Path, _private_marker: None) -> None:
-        self.path = path
-        self.mtime = get_dir_effective_mtime(path)
-        super().__init__()
+class LocalServerSystemdServiceDropIn(PackageSourceFile):
+    def __init__(self, *, project_root: ProjectRoot) -> None:
+        super().__init__(
+            target_path=project_root.systemd_unit_config_dir / "output_to_tty.conf",
+            contents=textwrap.dedent(f"""
+                [Service]
+                TTYPath={subprocess.check_output(["tty"]).decode("utf8").strip()}
+                StandardOutput=tty
+                StandardError=inherit
+            """[1:]).encode("utf8")
+        )
 
 class DebControlFile(PackageSourceFile):
     def __init__(self, project_root: ProjectRoot) -> None:
@@ -45,9 +52,11 @@ class DebControlFile(PackageSourceFile):
         )
 
 class WebilastikServiceFile(PackageSourceFile):
-    def __init__(self, *, project_root: ProjectRoot, session_allocator_server_config: SessionAllocatorServerConfig) -> None:
+    INSTALL_PATH = Path("/lib/systemd/system/webilastik.service")
+
+    def __init__(self, *, target_path: Path, session_allocator_server_config: SessionAllocatorServerConfig) -> None:
         super().__init__(
-            target_path=project_root.deb_tree_path / "lib/systemd/system/webilastik.service",
+            target_path=target_path,
             contents=textwrap.dedent(f"""
                 [Unit]
                 Description=Webilastik session allocator server
@@ -80,6 +89,47 @@ class WebilastikServiceFile(PackageSourceFile):
             """[1:]).encode("utf8")
         )
 
+class DebTree:
+    def __init__(self, project_root: ProjectRoot, _private_marker: None) -> None:
+        self.project_root = project_root
+        self.path = project_root.deb_tree_path
+        self.mtime = get_dir_effective_mtime(self.path)
+        super().__init__()
+
+    def fake_install(
+        self,
+        *,
+        session_allocator_server_config: SessionAllocatorServerConfig,
+        action: Literal["install", "uninstall"],
+    ) -> "Exception | None":
+        if os.geteuid() != 0:
+            return Exception("Must run as root")
+
+        if action == "install":
+            logger.debug("Symlinking package tree to root filesystem")
+            Path("/opt/webilastik").symlink_to(self.project_root.deb_tree_path / "opt/webilastik")
+        else:
+            logger.debug("Removing symlink from package tree to root filesystem")
+            Path("/opt/webilastik").unlink(missing_ok=True)
+
+        service_unit_file = WebilastikServiceFile(
+            target_path=WebilastikServiceFile.INSTALL_PATH, session_allocator_server_config=session_allocator_server_config
+        )
+        if action == "install":
+            logger.debug("Installing systemd service file")
+            service_unit_file.install()
+        else:
+            logger.debug("Removing systemd service file")
+            service_unit_file.uninstall()
+
+        drop_in_conf = LocalServerSystemdServiceDropIn(project_root=self.project_root)
+        if action == "install":
+            logger.debug("Installing the drop in service file conf to log to this tty")
+            drop_in_conf.install()
+        else:
+            logger.debug("Removing the drop in service file conf to log to this tty")
+            drop_in_conf.uninstall()
+
 class CreateDebTree:
     def __init__(
         self,
@@ -97,7 +147,7 @@ class CreateDebTree:
         self.package_tree_base = project_root.root_path / "package_tree"
         self.deb_control_file = DebControlFile(project_root=project_root)
         self.service_file = WebilastikServiceFile(
-            project_root=project_root, session_allocator_server_config=session_allocator_server_config
+            target_path=project_root.deb_tree_path / str(WebilastikServiceFile.INSTALL_PATH).lstrip("/"), session_allocator_server_config=session_allocator_server_config
         )
         self.src_to_dest: Mapping[Path, Path] = {
             **{
@@ -129,7 +179,7 @@ class CreateDebTree:
         self.packed_conda_env.install()
         self.neuroglancer_dist.install()
 
-        return DebTree(path=self.project_root.deb_tree_path, _private_marker=None)
+        return DebTree(project_root=self.project_root, _private_marker=None)
 
     def cached(self) -> "DebTree | Exception | None":
         if not self.project_root.deb_tree_path.exists():
@@ -155,7 +205,7 @@ class CreateDebTree:
         ]):
             return None
         logger.info("Using cached deb package")
-        return DebTree(path=self.project_root.deb_tree_path, _private_marker=None)
+        return DebTree(project_root=self.project_root, _private_marker=None)
 
     def clean(self):
         shutil.rmtree(path=self.project_root.deb_tree_path)

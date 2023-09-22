@@ -4,9 +4,9 @@ from concurrent.futures import Executor
 import shutil
 from pathlib import Path
 from typing import Final
-from build_scripts.create_deb_tree import CreateDebTree, DebTree
+from scripts.build_scripts.create_deb_tree import CreateDebTree, DebTree
 
-from build_scripts import ProjectRoot, run_subprocess
+from scripts.build_scripts import ProjectRoot, run_subprocess
 from webilastik.scheduling import SerialExecutor
 from webilastik.utility.log import Logger
 

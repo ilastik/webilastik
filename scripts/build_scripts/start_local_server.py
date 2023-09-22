@@ -2,8 +2,8 @@ import socket
 import os
 import subprocess
 import textwrap
-from build_scripts import PackageSourceFile, ProjectRoot
-from build_scripts.create_deb_tree import CreateDebTree, DebTree
+from scripts.build_scripts import PackageSourceFile, ProjectRoot
+from scripts.build_scripts.create_deb_tree import CreateDebTree, DebTree
 from webilastik.config import SessionAllocatorServerConfig
 from webilastik.scheduling import SerialExecutor
 from webilastik.server.session_allocator import SessionAllocator
@@ -13,25 +13,24 @@ from webilastik.utility.log import Logger
 
 logger = Logger()
 
-class LocalServerSystemdServiceDropIn(PackageSourceFile):
-    def __init__(self, *, project_root: ProjectRoot) -> None:
-        super().__init__(
-            target_path=project_root.systemd_unit_config_dir / "output_to_tty.conf",
-            contents=textwrap.dedent(f"""
-                [Service]
-                TTYPath={subprocess.check_output(["tty"]).decode("utf8").strip()}
-                StandardOutput=tty
-                StandardError=inherit
-            """[1:]).encode("utf8")
-        )
 
 class StartLocalServer:
-    def __init__(self, project_root: ProjectRoot, deb_tree: DebTree) -> None:
+    def __init__(
+        self,
+        *,
+        project_root: ProjectRoot,
+        deb_tree: DebTree,
+        session_allocator_server_config: SessionAllocatorServerConfig,
+    ) -> None:
         self.project_root = project_root
         self.deb_tree = deb_tree
+        self.session_allocator_server_config = session_allocator_server_config
         super().__init__()
 
     def run(self) -> "Exception | None":
+        if os.geteuid() != 0:
+            return Exception("Must run as root")
+
         logger.debug("Ensuring that app.ilastik.org points to localhost")
         if socket.gethostbyname('app.ilastik.org') != "127.0.0.1":
             return Exception("app.ilastik.org does not map to 127.0.0.1")
@@ -49,22 +48,33 @@ class StartLocalServer:
         # the ssh happen for the user www-data is one way to do that
         # FIXME: investigate "-oStreamLocalBindMask=0111" in tunnel.py
         logger.debug("Checking that www-data can ssh into itself to create local sessions")
-        if os.system("sudo -u www-data -g www-data ssh -oBatchMode=yes www-data@localhost echo success") != 0:
-            return Exception("www-data can't ssh to itself, so local sessions won't be able to create tunnels")
+        _ = subprocess.check_call(["sudo", "-u", "www-data", "-g", "www-data", "ssh" "-oBatchMode=yes" "www-data@localhost", "true"])
 
-        logger.debug("Installing the drop in file to log to this tty")
-        LocalServerSystemdServiceDropIn(project_root=project_root).install()
+        result = self.deb_tree.fake_install(action="install", session_allocator_server_config=self.session_allocator_server_config)
+        if isinstance(result, Exception):
+            return result
 
-
+        logger.debug(f"Reloading systemd configs")
+        _ = subprocess.check_call(["systemctl", "daemon-reload"])
+        logger.debug(f"Restarting webilastik service")
+        _ = subprocess.check_call(["systemctl", "restart", "webilastik.service"])
 
 
 if __name__ == "__main__":
     project_root = ProjectRoot()
     executor = SerialExecutor()
+
+    session_allocator_server_config = SessionAllocatorServerConfig.from_env()
+    if isinstance(session_allocator_server_config, Exception):
+        raise session_allocator_server_config
+
     deb_tree  = CreateDebTree.execute(project_root=project_root, executor=executor)
     if isinstance(deb_tree, Exception):
         raise deb_tree
-    result = StartLocalServer(project_root=project_root, deb_tree=deb_tree)
+
+    result = StartLocalServer(
+        project_root=project_root, deb_tree=deb_tree, session_allocator_server_config=session_allocator_server_config
+    ).run()
     if isinstance(result, Exception):
         raise result
 

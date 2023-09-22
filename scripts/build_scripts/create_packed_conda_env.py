@@ -1,11 +1,12 @@
 # pyright: strict
 
 from pathlib import Path
+import shutil
 import subprocess
 from typing import Final, Optional
 
-from build_scripts import ProjectRoot, get_dir_effective_mtime, run_subprocess
-from build_scripts.create_conda_env import CondaEnvironment, CreateCondaEnvironment
+from scripts.build_scripts import ProjectRoot, get_dir_effective_mtime, run_subprocess
+from scripts.build_scripts.create_conda_env import CondaEnvironment, CreateCondaEnvironment
 from webilastik.utility.log import Logger
 
 logger = Logger()
@@ -21,10 +22,15 @@ class PackedCondaEnv:
         if use_cache and self.is_current():
             logger.info("Packed conda env is already installed")
             return
+
+        if self.installation_dir.exists():
+            logger.info("Removing old unpacked env")
+            shutil.rmtree(self.installation_dir)
+
         logger.info("Unpacking conda env is already installed")
-        self.installation_dir.mkdir(parents=True)
-        _ = subprocess.check_output([
-            "tar", "-xzf", str(self.path), "-C", str(self.installation_dir)
+        self.installation_dir.mkdir(parents=True, exist_ok=True)
+        _ = subprocess.check_call([
+            "tar", "--touch", "-xzf", str(self.path), "-C", str(self.installation_dir)
         ])
 
     def is_current(self) -> bool:

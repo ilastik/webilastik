@@ -2,7 +2,7 @@ from pathlib import Path
 import shutil
 from typing import Final, Mapping
 
-from build_scripts import ProjectRoot, get_dir_effective_mtime, git_checkout, run_subprocess
+from scripts.build_scripts import ProjectRoot, get_dir_effective_mtime, git_checkout, run_subprocess
 from webilastik.utility.log import Logger
 from webilastik.utility.url import Url
 

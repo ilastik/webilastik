@@ -1,8 +1,8 @@
 from pathlib import Path
 import shutil
 from typing import Final
-from build_scripts import ProjectRoot, get_dir_effective_mtime, run_subprocess
-from build_scripts.neuroglancer.fetch_neuroglancer_source import FetchNeuroglancerSource, NeuroglancerSource
+from scripts.build_scripts import ProjectRoot, get_dir_effective_mtime, run_subprocess
+from scripts.build_scripts.neuroglancer.fetch_neuroglancer_source import FetchNeuroglancerSource, NeuroglancerSource
 from webilastik.utility.log import Logger
 
 
