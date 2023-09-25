@@ -65,30 +65,25 @@ def force_update_dir(*, source: Path, dest: Path, delete_extraneous: bool, exclu
 
 npm_package_mtime = 499162500.0 # mtime used by npm for reproducible builds
 
-def _do_get_dir_effective_mtime(path: Path) -> float:
+def _do_get_effective_mtime(path: Path) -> float:
     if path.name == "__pycache__":
         return 0
     if path.suffix == "pyc":
         return 0
 
+    if not path.is_dir():
+        stat = path.lstat()
+        return stat.st_ctime if stat.st_mtime == npm_package_mtime else stat.st_mtime
+
     out: float = 0
     for child in path.iterdir():
-        if child.is_dir():
-            child_mtime = _do_get_dir_effective_mtime(child)
-        else:
-            child_stat = child.lstat()
-            child_mtime = child_stat.st_ctime if child_stat.st_mtime == npm_package_mtime else child_stat.st_mtime
-        if child_mtime > out:
-            out = child_mtime
-    # if out != 0:
-    #     logger.debug(f"mtime for {path} is {datetime.datetime.fromtimestamp(out)}")
-
+        out = max(out, _do_get_effective_mtime(child))
     return out
 
-def get_dir_effective_mtime(path: Path) -> "float":
+def get_effective_mtime(path: Path) -> "float":
     if not path.exists():
         return 0
-    return _do_get_dir_effective_mtime(path)
+    return _do_get_effective_mtime(path)
 
 def run_subprocess(
     args: List[str], env: Optional[Mapping[str, str]] = None, cwd: Optional[Path] = None

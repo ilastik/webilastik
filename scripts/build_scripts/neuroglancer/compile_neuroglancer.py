@@ -1,7 +1,9 @@
+# pyright: strict
+
 from pathlib import Path
 import shutil
 from typing import Final
-from scripts.build_scripts import ProjectRoot, get_dir_effective_mtime, run_subprocess
+from scripts.build_scripts import ProjectRoot, get_effective_mtime, run_subprocess
 from scripts.build_scripts.neuroglancer.fetch_neuroglancer_source import FetchNeuroglancerSource, NeuroglancerSource
 from webilastik.utility.log import Logger
 
@@ -13,7 +15,7 @@ class NeuroglancerDistribution:
         super().__init__()
         self.bundle_path: Final[Path] = bundle_path
         self.installation_dir = project_root.deb_tree_path / "opt/webilastik/public/nehuba"
-        self.mtime = self.bundle_path.lstat().st_mtime
+        self.mtime = get_effective_mtime(self.bundle_path)
 
     def install(self, use_cache: bool = True):
         if use_cache and self.is_current():
@@ -24,7 +26,7 @@ class NeuroglancerDistribution:
 
     def is_current(self) -> bool:
         target_bundle_path = self.installation_dir / self.bundle_path.name
-        if not target_bundle_path.exists() or self.mtime > target_bundle_path.lstat().st_mtime:
+        if not target_bundle_path.exists() or self.mtime > get_effective_mtime(target_bundle_path):
             return False
         return True
 
@@ -61,7 +63,7 @@ class BuildNeuroglancer:
         return NeuroglancerDistribution(bundle_path=self.output_bundle_path, project_root=self.project_root, _private_marker=None)
 
     def cached(self) -> "NeuroglancerDistribution | None | Exception":
-        if not self.output_bundle_path.exists() or get_dir_effective_mtime(self.ng_source.path) > self.output_bundle_path.stat().st_mtime:
+        if not self.output_bundle_path.exists() or get_effective_mtime(self.ng_source.path) > self.output_bundle_path.stat().st_mtime:
             return None
         logger.info("Using cached neuroglancer bundle dist")
         return NeuroglancerDistribution(bundle_path=self.output_bundle_path, project_root=self.project_root, _private_marker=None)

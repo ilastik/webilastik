@@ -1,7 +1,7 @@
 import socket
 import os
+import sys
 import subprocess
-import textwrap
 from scripts.build_scripts import PackageSourceFile, ProjectRoot
 from scripts.build_scripts.create_deb_tree import CreateDebTree, DebTree
 from webilastik.config import SessionAllocatorServerConfig
@@ -36,7 +36,7 @@ class StartLocalServer:
             return Exception("app.ilastik.org does not map to 127.0.0.1")
 
         logger.debug("Checking that nginx is running - it redirects requests to compute the sessions")
-        if os.system("ps -ef | grep -q nginx | grep -v grep") != 0:
+        if os.system("ps -ef | grep nginx | grep -q -v grep") != 0:
             return Exception("nginx doesn't seem to be running")
 
         logger.debug("Checking that webilastik.conf is installed in nginx's config files")
@@ -56,6 +56,8 @@ class StartLocalServer:
 
         logger.debug(f"Reloading systemd configs")
         _ = subprocess.check_call(["systemctl", "daemon-reload"])
+        logger.debug(f"Enabling webilastik.service")
+        _ = subprocess.check_call(["systemctl", "enable", "webilastik.service"])
         logger.debug(f"Restarting webilastik service")
         _ = subprocess.check_call(["systemctl", "restart", "webilastik.service"])
 
@@ -71,6 +73,13 @@ if __name__ == "__main__":
     deb_tree  = CreateDebTree.execute(project_root=project_root, executor=executor)
     if isinstance(deb_tree, Exception):
         raise deb_tree
+
+    if os.geteuid() != 0:
+        print(f"!!!!!!!!!!!!!!!!!!!!!!!!!1 {__loader__.name}")
+        exit(subprocess.check_call(
+            ["sudo", "--preserve-env", sys.executable, "-m", __loader__.name, *sys.argv]
+        ))
+
 
     result = StartLocalServer(
         project_root=project_root, deb_tree=deb_tree, session_allocator_server_config=session_allocator_server_config

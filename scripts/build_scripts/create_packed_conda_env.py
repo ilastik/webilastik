@@ -5,7 +5,7 @@ import shutil
 import subprocess
 from typing import Final, Optional
 
-from scripts.build_scripts import ProjectRoot, get_dir_effective_mtime, run_subprocess
+from scripts.build_scripts import ProjectRoot, get_effective_mtime, run_subprocess
 from scripts.build_scripts.create_conda_env import CondaEnvironment, CreateCondaEnvironment
 from webilastik.utility.log import Logger
 
@@ -14,8 +14,8 @@ logger = Logger()
 class PackedCondaEnv:
     def __init__(self, *, path: Path, project_root: ProjectRoot, _private_marker: None) -> None:
         self.path: Final[Path] = path
-        self.mtime = path.lstat().st_mtime
-        self.installation_dir = project_root.deb_tree_path / "opt/conda_env"
+        self.mtime = get_effective_mtime(path)
+        self.installation_dir = project_root.deb_tree_path / "opt/webilastik/conda_env"
         super().__init__()
 
     def install(self, use_cache: bool = True):
@@ -27,7 +27,7 @@ class PackedCondaEnv:
             logger.info("Removing old unpacked env")
             shutil.rmtree(self.installation_dir)
 
-        logger.info("Unpacking conda env is already installed")
+        logger.info("Unpacking conda env")
         self.installation_dir.mkdir(parents=True, exist_ok=True)
         _ = subprocess.check_call([
             "tar", "--touch", "-xzf", str(self.path), "-C", str(self.installation_dir)
@@ -36,7 +36,7 @@ class PackedCondaEnv:
     def is_current(self) -> bool:
         if not self.installation_dir.exists():
             return False
-        return self.mtime <= get_dir_effective_mtime(self.installation_dir)
+        return self.mtime <= get_effective_mtime(self.installation_dir)
 
 
 class CreatePackedCondaEnv:
@@ -64,7 +64,7 @@ class CreatePackedCondaEnv:
         return PackedCondaEnv(path=self.packed_env_path, project_root=self.project_root, _private_marker=None)
 
     def cached(self) -> Optional[PackedCondaEnv]:
-        if self.packed_env_path.exists() and self.packed_env_path.lstat().st_mtime > self.conda_env.mtime:
+        if self.packed_env_path.exists() and get_effective_mtime(self.packed_env_path) > self.conda_env.mtime:
             return PackedCondaEnv(path=self.packed_env_path, project_root=self.project_root, _private_marker=None)
         return None
 

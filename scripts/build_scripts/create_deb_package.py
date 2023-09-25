@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Final
 from scripts.build_scripts.create_deb_tree import CreateDebTree, DebTree
 
-from scripts.build_scripts import ProjectRoot, run_subprocess
+from scripts.build_scripts import ProjectRoot, get_effective_mtime, run_subprocess
 from webilastik.scheduling import SerialExecutor
 from webilastik.utility.log import Logger
 
@@ -16,7 +16,7 @@ logger = Logger()
 class DebPackage:
     def __init__(self, path: Path, _private_marker: None) -> None:
         self.path: Final[Path] = path
-        self.mtime: Final[float] = self.path.lstat().st_mtime
+        self.mtime: Final[float] = get_effective_mtime(self.path)
         super().__init__()
 
 

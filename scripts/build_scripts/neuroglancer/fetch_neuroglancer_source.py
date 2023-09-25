@@ -1,8 +1,10 @@
+# pyright: strict
+
 from pathlib import Path
 import shutil
 from typing import Final, Mapping
 
-from scripts.build_scripts import ProjectRoot, get_dir_effective_mtime, git_checkout, run_subprocess
+from scripts.build_scripts import ProjectRoot, get_effective_mtime, git_checkout, run_subprocess
 from webilastik.utility.log import Logger
 from webilastik.utility.url import Url
 
@@ -11,7 +13,7 @@ logger = Logger()
 class NeuroglancerSource:
     def __init__(self, *, path: Path, _private_marker: None) -> None:
         self.path: Final[Path] = path
-        self.mtime: Final[float] = get_dir_effective_mtime(path)
+        self.mtime: Final[float] = get_effective_mtime(path)
         super().__init__()
 
 class FetchNeuroglancerSource:

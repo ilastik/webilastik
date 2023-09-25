@@ -81,8 +81,7 @@ class SessionAllocatorServerConfig:
 
     def to_systemd_environment_conf(self) -> str:
         json_str = json.dumps(self.to_dto().to_json_value())
-        escaped_json_str = json_str.replace("'", r"\'")
-        return f"Environment={WEBILASTIK_SESSION_ALLOCATOR_SERVER_CONFIG}={escaped_json_str}"
+        return f"Environment={WEBILASTIK_SESSION_ALLOCATOR_SERVER_CONFIG}='{json_str}'"
 
 WEBILASTIK_WORKFLOW_CONFIG = "WEBILASTIK_WORKFLOW_CONFIG"
 

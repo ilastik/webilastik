@@ -16,7 +16,7 @@ from scripts.build_scripts.neuroglancer.fetch_neuroglancer_source import FetchNe
 
 from webilastik.config import SessionAllocatorServerConfig
 
-from scripts.build_scripts import PackageSourceFile, ProjectRoot, force_update_dir, get_dir_effective_mtime
+from scripts.build_scripts import PackageSourceFile, ProjectRoot, force_update_dir, get_effective_mtime
 from webilastik.scheduling import SerialExecutor
 from webilastik.utility.log import Logger
 
@@ -93,7 +93,7 @@ class DebTree:
     def __init__(self, project_root: ProjectRoot, _private_marker: None) -> None:
         self.project_root = project_root
         self.path = project_root.deb_tree_path
-        self.mtime = get_dir_effective_mtime(self.path)
+        self.mtime = get_effective_mtime(self.path)
         super().__init__()
 
     def fake_install(
@@ -105,15 +105,15 @@ class DebTree:
         if os.geteuid() != 0:
             return Exception("Must run as root")
 
+        logger.debug("Removing symlink from package tree to root filesystem")
+        Path("/opt/webilastik").unlink(missing_ok=True)
         if action == "install":
             logger.debug("Symlinking package tree to root filesystem")
             Path("/opt/webilastik").symlink_to(self.project_root.deb_tree_path / "opt/webilastik")
-        else:
-            logger.debug("Removing symlink from package tree to root filesystem")
-            Path("/opt/webilastik").unlink(missing_ok=True)
 
         service_unit_file = WebilastikServiceFile(
-            target_path=WebilastikServiceFile.INSTALL_PATH, session_allocator_server_config=session_allocator_server_config
+            target_path=WebilastikServiceFile.INSTALL_PATH,
+            session_allocator_server_config=session_allocator_server_config
         )
         if action == "install":
             logger.debug("Installing systemd service file")
@@ -184,15 +184,15 @@ class CreateDebTree:
     def cached(self) -> "DebTree | Exception | None":
         if not self.project_root.deb_tree_path.exists():
             return None
-        deb_tree_mtime = get_dir_effective_mtime(self.project_root.deb_tree_path)
-        if deb_tree_mtime < get_dir_effective_mtime(self.package_tree_base):
+        deb_tree_mtime = get_effective_mtime(self.project_root.deb_tree_path)
+        if deb_tree_mtime < get_effective_mtime(self.package_tree_base):
             return None
 
         for src_dir, dest_dir in self.src_to_dest.items():
             if not dest_dir.exists():
                 return None
-            dest_dir_mtime = get_dir_effective_mtime(dest_dir)
-            src_dir_mtime = get_dir_effective_mtime(src_dir)
+            dest_dir_mtime = get_effective_mtime(dest_dir)
+            src_dir_mtime = get_effective_mtime(src_dir)
             if src_dir_mtime > dest_dir_mtime:
                 return None
 

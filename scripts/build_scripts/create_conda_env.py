@@ -1,9 +1,10 @@
+# pyright: strict
+
 from pathlib import Path
 import shutil
-import subprocess
 from typing import Final, Optional
 
-from scripts.build_scripts import ProjectRoot, get_dir_effective_mtime, run_subprocess
+from scripts.build_scripts import ProjectRoot, get_effective_mtime, run_subprocess
 from webilastik.utility.log import Logger
 
 logger = Logger()
@@ -11,7 +12,7 @@ logger = Logger()
 class CondaEnvironment:
     def __init__(self, path: Path, _private_marker: None) -> None:
         self.path : Final[Path] = path
-        self.mtime: Final[float] = get_dir_effective_mtime(self.path)
+        self.mtime: Final[float] = get_effective_mtime(self.path)
         super().__init__()
 
 class CreateCondaEnvironment:
@@ -39,7 +40,7 @@ class CreateCondaEnvironment:
         return CondaEnvironment(path=self.conda_env_path, _private_marker=None)
 
     def cached(self) -> Optional[CondaEnvironment]:
-        if get_dir_effective_mtime(self.conda_env_path) > self.project_root.environment_file.lstat().st_mtime:
+        if get_effective_mtime(self.conda_env_path) > get_effective_mtime(self.project_root.environment_file):
             logger.info(f"Using cached conda environment at {self.conda_env_path}")
             return CondaEnvironment(path=self.conda_env_path, _private_marker=None)
         return None
