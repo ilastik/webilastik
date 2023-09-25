@@ -148,12 +148,12 @@ class WsBrushingApplet(WsApplet, BrushingApplet):
         return WsBrushingApplet(name=name, labels=[
             Label(
                 name="Foreground",
-                color=Color(r=np.uint8(255), g=np.uint8(0), b=np.uint8(0)),
+                color=Color(r=np.uint8(0), g=np.uint8(130), b=np.uint8(200)),
                 annotations=[]
             ),
             Label(
                 name="Background",
-                color=Color(r=np.uint8(0), g=np.uint8(255), b=np.uint8(0)),
+                color=Color(r=np.uint8(255), g=np.uint8(225), b=np.uint8(25)),
                 annotations=[]
             ),
         ])
