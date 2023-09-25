@@ -76,28 +76,50 @@ An HTTP server to expose webilastik should be configured with options analogous 
 
 # Client (Overlay)
 
-This project contains an npm project in `./overlay`, which can be used to build the ilastik client. It is an overlay that can be applied on top of neuroglancer or vanilla HTML `<img/>` tags (for now, via bookmarklet injection), and contains all controls required to request a session, add brush strokes, select image features and visualize predictions.
+This project contains an npm project in `./overlay`, which can be used to build the ilastik client. It is an overlay that can be applied on top of neuroglancer and contains all controls required to request a session, add brush strokes, select image features and visualize predictions.
 
 # Building
  - Install build dependencies:
     - [conda-pack](https://conda.github.io/conda-pack/) (for wrapping the conda environment)
     - [go-task](https://taskfile.dev/installation) (make-like application to build the targets in Taskfile.yml)
-    - npm (for building neuroglancer and the overlay)
- - Grab the oidc client json from Ebrains:
-    - Go to https://lab.ch.ebrains.eu/hub/user-redirect/lab/tree/shared/Collaboratory%20Community%20Apps/Managing%20an%20OpenID%20Connect%20client%20-%20V2.ipynb
-    - Grab the output of `Fetching your OIDC client settings` and save it somewhere
- - Build the `.deb` package: `task create-deb-package -- --oidc-client-json-path PATH_TO_OIDC_CLIENT_JSON_FILE_YOU_JUST_CREATED`
+    - npm (for building neuroglancer and the overlay. using version `6.14.16` at the time of writing)
+ - Set up environment variables:
+    - `EBRAINS_CLIENT_ID`: the `cliend-id` of the app as defined by the EBRAINS OIDC. Right now it's `webilastik`
+    - `EBRAINS_CLIENT_SECRET`: the `client-secret` of the OIDC app, which you have to either retrieve from the OIDC itself or from a human that has it stored somewhere safe. It looks like a uuid.
+    - `WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY`: this is a base64-encoded [Fernet key](https://cryptography.io/en/41.0.4/fernet/) that is used to encrypt data on the HPCs that are not meant to be visible to other users of SLURM
+ - Build the `.deb` package: `task create-deb-package`
 
-# Running
- Right now webilastik _needs_ to run via HTTPS because, as it is meant to be used as an overlay, it must be able to set cookies in cross origin sites, and that is only posible (or at least, way easier) via HTTPS.
+| :warning: WARNING!                                                                                                         |
+|:---------------------------------------------------------------------------------------------------------------------------|
+| Do not publish this `.deb` package as an artifact anywhere, as it contains the app secrets from your environment variables |
 
-## Production
-- Configure SSL if that's the first time setup (e.g.: `sudo certbot --nginx -d app.ilastik.org`)
-- Install the newly created `.deb` package: `sudo apt install ./webilastik*.deb`
-- Install nginx (installing the `.deb` package via apt should do this automatically)
-- And start the service if it doesn't automatically: `systemctl start webilastik@-opt-webilastik.service`
+The resulting `.deb` package is the one installed in the VM at app.ilastik.org. It will contain the web server, the conda environment required to run it, the neuroglancer-based frontend as well as the Systemd `.service` (with all relevant keys) file needed to automatically start the service on boot. Updating the server is just reinstalling the old `.deb` and installing the new one, which will also take care of stopping and restarting the service.
 
-## Local dev server
+# Deploying to production
+
+## Deploying the web server to app.ilastik.org
+- Build the `.deb` package as explained in the `Building` session
+- Install the newly created `.deb` package (e.g. `sudo apt install ./webilastik*.deb`)
+- Configure SSL if that's the first time you install webilastik on this server (e.g.: `sudo certbot --nginx -d app.ilastik.org`)
+
+This is usually automated via the `deploy` task in the `Taskfile.yml`
+
+## Deploying the code the HPCs
+This part has to be done manually for the first time, as each HPC has its own particularities that need to we worked with (or around). This should be more configurable in the future, but right now the source of truth are the job launcher classes in `compute_session_launcher.py`
+
+### JUSUF
+- Install `miniconda`
+- Run the `./scripts/configure_jusuf.sh` on the HPC only once to configure it
+- If you update the `environment.yml` file you will have to destroy the conda env and run the script again
+- Simply updating the webilastik source code will be accounted for automatically by the `deploy` target
+
+## Configuring SSH keys
+For communication between the web server and the HPC, these steps must be done only once:
+
+- The web server at app.ilastik.org must be able to SSH to the HPCs, to you must install the www-data SSH key in the HPCs
+- The HPCs must be able to SSH back to app.ilastik.org to stabilish reverse tunnels, so their keys have to be installed in the allowed keys of of the `www-data` user in `app.ilastik.org`
+
+# Local dev server
 Even the local server needs Nginx to be running. This is because webilastik allocates worker sessions for the users, and those sessions can be running in remote worker servers. These worker sessions create SSH tunnels on the main server, and nginx will redirect session requests into those tunnels sockets.
 
 - Install nginx
