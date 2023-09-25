@@ -25,8 +25,8 @@ export class BrushingWidget{
     private brushingApplet: BrushingApplet
     private predictingWidget: PredictingWidget
     private brushStrokeRenderer: BrushelBoxRenderer
-    enableBrushingHandler: (ev: KeyboardEvent) => void
-    disableBrushingHandler: (ev: KeyboardEvent) => void
+    private clearEventListeners: () => void
+
     render: () => void
 
     constructor({
@@ -61,22 +61,36 @@ export class BrushingWidget{
             onDataSourceClicked: async (rawData) => this.viewer.openLane({
                 name: rawData.url.name, rawData, isVisible: true
             }),
-        })
+        });
 
+        (() => {
+            const enableBrushingOnAltDown = (ev: KeyboardEvent) => {
+                if(ev.code == "AltLeft" || ev.code == "AltRight"){
+                    this.overlay?.setBrushingEnabled(true)
+                }
+            };
+            window.addEventListener("keydown", enableBrushingOnAltDown)
 
-        this.enableBrushingHandler = (ev: KeyboardEvent) => {
-            if(this.brushingApplet.currentColor && (ev.code == "AltLeft" || ev.code == "AltRight")){
-                this.overlay?.setBrushingEnabled(true)
+            const disableBrushingOnAltUp = (ev: KeyboardEvent) => {
+                if(ev.code == "AltLeft" || ev.code == "AltRight"){
+                    this.overlay?.setBrushingEnabled(false)
+                }
             }
-        }
-        this.disableBrushingHandler = (ev: KeyboardEvent) => {
-            if(ev.code == "AltLeft" || ev.code == "AltRight"){
-                this.overlay?.setBrushingEnabled(false)
-            }
-        }
+            window.addEventListener("keyup", disableBrushingOnAltUp)
 
-        window.addEventListener("keydown", this.enableBrushingHandler)
-        window.addEventListener("keyup", this.disableBrushingHandler)
+            const disableBrushingOnDocumentHidden = () => {
+                if(document.visibilityState === "hidden"){
+                    this.overlay?.setBrushingEnabled(false)
+                }
+            }
+            document.addEventListener("visibilitychange", disableBrushingOnDocumentHidden);
+
+            this.clearEventListeners = () => {
+                window.removeEventListener("keydown", enableBrushingOnAltDown)
+                window.removeEventListener("keyup", disableBrushingOnAltUp)
+                document.removeEventListener("visibilitychange", disableBrushingOnDocumentHidden)
+            }
+        })();
 
 
         this.render = () => {
@@ -107,6 +121,7 @@ export class BrushingWidget{
             return
         }
         this.canvas.style.display = "block"
+        this.overlay?.destroy()
         this.overlay = new BrushingOverlay({
             datasource: lane.rawData,
             gl: this.gl,
@@ -131,8 +146,7 @@ export class BrushingWidget{
     }
 
     public destroy(){
-        window.removeEventListener("keydown", this.enableBrushingHandler)
-        window.removeEventListener("keyup", this.disableBrushingHandler)
+        this.clearEventListeners()
         window.cancelAnimationFrame(this.animationRequestId)
         this.overlay?.destroy()
         removeElement(this.gl.canvas as HTMLElement) //FIXME?
