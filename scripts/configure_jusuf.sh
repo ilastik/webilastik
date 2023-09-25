@@ -38,4 +38,5 @@ echo "Creating the base conda environment without the pip pacakges"
 echo "Installing the pip packages, giving them  a chance to compile with the HPC compilers"
 ENVIRONMENT_YML_NUM_LINES=$(cat $ENVIRONMENT_YML_PATH | wc -l)
 PIP_PACKAGE_NUM_LINES=$(expr $ENVIRONMENT_YML_NUM_LINES - $PIP_BLOCK_START_LINE)
-PIP_PACKAGE_NAMES=$(cat $ENVIRONMENT_YML_PATH | tail -n $PIP_PACKAGE_NUM_LINES)
+PIP_PACKAGE_NAMES=$(cat $ENVIRONMENT_YML_PATH | tail -n $PIP_PACKAGE_NUM_LINES | sed 's@^ *- *@@' | tr '\n' ' ')
+pip install $PIP_PACKAGE_NAMES
