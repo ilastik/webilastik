@@ -239,8 +239,10 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
             defaultPathPattern: outputPathPattern,
             filesystemChoices: ["data-proxy"],
             tooltip: "You can use any of the following replacements to compose output paths for export outputs:\n" +
-                "{item_index} ordinal number representing the position of the input data source in the list of inputs\n" +
                 "{name} the name of the input datasource (e.g.: the file at '/my/file.png' is named 'file.png'\n" +
+                "{item_index} ordinal number representing the position of the input data source in the list of inputs\n" +
+                "{parent_dir_name} The name of the directory in which the input is\n" +
+                "{parent_dir_path} The full path of the directory in which the input is\n" +
                 "{output_type} the semantic meaning of the data in the output. Either 'simple_segmentation' or 'pixel_probabilities'\n" +
                 "{timestamp} a string representing the time when the job was submitted (e.g. '2023y12m31d__13h59min58s')\n" +
                 "{extension} the file (or folder) extension, representing the data type (e.g. 'n5', 'dzi')"
