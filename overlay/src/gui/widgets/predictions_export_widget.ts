@@ -161,15 +161,18 @@ class Job{
 }
 
 class PixelClassificationExportAppletState{
+    public readonly upstream_ready: boolean
     jobs: Array<Job>
     populated_labels: LabelHeader[] | undefined
     datasource_suggestions: FsDataSource[]
 
     constructor(params: {
+        upstream_ready: boolean,
         jobs: Array<Job>
         populated_labels: LabelHeaderDto[] | undefined
         datasource_suggestions: FsDataSource[]
     }){
+        this.upstream_ready = params.upstream_ready
         this.jobs = params.jobs
         this.populated_labels = params.populated_labels?.map(msg => LabelHeader.fromDto(msg))
         this.datasource_suggestions = params.datasource_suggestions
@@ -177,6 +180,7 @@ class PixelClassificationExportAppletState{
 
     public static fromDto(message: PixelClassificationExportAppletStateDto): PixelClassificationExportAppletState{
         return new this({
+            upstream_ready: message.upstream_ready,
             jobs: message.jobs.map(dto => new Job(dto)),
             datasource_suggestions: (message.datasource_suggestions || []).map(msg => FsDataSource.fromDto(msg)), //FIXME?
             populated_labels: message.populated_labels
@@ -195,6 +199,8 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
     private customTileShapeCheckbox: BooleanInput;
     private tileShapeInput: Shape5DInputNoChannel
     private exportModeSelector: TabsWidget<"pixel probabilities" | "simple segmentation", Paragraph>;
+    private startExportsButton: Button<"button">;
+    private startExportButtonStatusText: Label;
 
     public constructor({name, parentElement, session, help, viewer, defaultBucketName, inputBucketPath, outputPathPattern}: {
         name: string,
@@ -239,8 +245,10 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
             defaultPathPattern: outputPathPattern,
             filesystemChoices: ["data-proxy"],
             tooltip: "You can use any of the following replacements to compose output paths for export outputs:\n" +
-                "{item_index} ordinal number representing the position of the input data source in the list of inputs\n" +
                 "{name} the name of the input datasource (e.g.: the file at '/my/file.png' is named 'file.png'\n" +
+                "{item_index} ordinal number representing the position of the input data source in the list of inputs\n" +
+                "{parent_dir_name} The name of the directory in which the input is\n" +
+                "{parent_dir_path} The full path of the directory in which the input is\n" +
                 "{output_type} the semantic meaning of the data in the output. Either 'simple_segmentation' or 'pixel_probabilities'\n" +
                 "{timestamp} a string representing the time when the job was submitted (e.g. '2023y12m31d__13h59min58s')\n" +
                 "{extension} the file (or folder) extension, representing the data type (e.g. 'n5', 'dzi')"
@@ -260,7 +268,7 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
 
 
         new Paragraph({parentElement: this.element, cssClasses: [CssClasses.ItkInputParagraph], children: [
-            new Button({parentElement: undefined, inputType: "button", text: "Start Export Jobs", onClick: async () => {
+            this.startExportsButton = new Button({parentElement: undefined, inputType: "button", text: "Start Export Jobs", onClick: async () => {
                 const exportMode = this.exportModeSelector.current.label
                 let dtype: DataType;
                 let numChannels: number;
@@ -410,12 +418,23 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
                     new ErrorPopupWidget({message: "Some job submissions failed."})
                 }
             }}),
+            this.startExportButtonStatusText = new Label({parentElement: undefined, cssClasses: [CssClasses.InfoText]})
         ]})
 
         this.jobsDisplay = new Div({parentElement: this.element});
     }
 
     protected onNewState(new_state: PixelClassificationExportAppletState){
+        this.startExportsButton.disabled = !new_state.upstream_ready;
+        if(new_state.upstream_ready){
+            this.startExportsButton.setTitle("Apply the trained classifier on all of the inputs")
+            this.startExportButtonStatusText.setInnerText("")
+        }else{
+            const explanationText = " Classifier is not trained yet"
+            this.startExportsButton.setTitle(explanationText)
+            this.startExportButtonStatusText.setInnerText(explanationText)
+        }
+
         this.jobsDisplay.clear()
 
         let previousLabelSelection = this.labelToExportSelector?.value;

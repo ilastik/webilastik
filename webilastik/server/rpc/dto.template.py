@@ -376,6 +376,7 @@ class PixelClassificationExportAppletStateDto(DataTransferObject):
     jobs: Tuple[ExportJobDtoUnion, ...]
     populated_labels: Optional[Tuple[LabelHeaderDto, ...]]
     datasource_suggestions: Optional[Tuple[FsDataSourceDto, ...]]
+    upstream_ready: bool
 
 
 
