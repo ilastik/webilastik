@@ -150,7 +150,11 @@ class Job{
         session: Session,
     }): {name: Td, progress: Td}{
         return {
-            name: new Td({parentElement: undefined, innerText: this.jobDto.name}),
+            name: new Td({
+                parentElement: undefined,
+                innerText: this.jobDto.status instanceof JobFinishedDto ? "Done" : this.jobDto.name ,
+                title: JSON.stringify(this.jobDto, null, 2),
+            }),
             progress: this.makeProgressDisplay(params),
         }
     }
