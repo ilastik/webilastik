@@ -329,7 +329,9 @@ class WsPixelClassificationExportApplet(WsApplet, PixelClassificationExportApple
         with self._lock:
             labels = self._in_populated_labels()
             datasource_suggestions = self._in_datasource_suggestions()
+            upstream_operator = self._in_operator()
             return PixelClassificationExportAppletStateDto(
+                upstream_ready=upstream_operator is not None,
                 jobs=tuple(job.to_dto() for job in self._jobs.values()),
                 populated_labels=None if not labels else tuple(l.to_header_message() for l in labels),
                 datasource_suggestions=None if datasource_suggestions is None else tuple(ds.to_dto() for ds in datasource_suggestions)
