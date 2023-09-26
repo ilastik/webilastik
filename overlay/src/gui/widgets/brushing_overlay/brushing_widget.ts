@@ -79,16 +79,16 @@ export class BrushingWidget{
             window.addEventListener("keyup", disableBrushingOnAltUp)
 
             const disableBrushingOnDocumentHidden = () => {
-                if(document.visibilityState === "hidden"){
-                    this.overlay?.setBrushingEnabled(false)
-                }
+                this.overlay?.setBrushingEnabled(false)
             }
             document.addEventListener("visibilitychange", disableBrushingOnDocumentHidden);
+            window.addEventListener("blur", disableBrushingOnDocumentHidden);
 
             this.clearEventListeners = () => {
                 window.removeEventListener("keydown", enableBrushingOnAltDown)
                 window.removeEventListener("keyup", disableBrushingOnAltUp)
                 document.removeEventListener("visibilitychange", disableBrushingOnDocumentHidden)
+                window.removeEventListener("blur", disableBrushingOnDocumentHidden);
             }
         })();
 
