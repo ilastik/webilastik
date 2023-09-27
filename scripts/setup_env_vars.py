@@ -19,8 +19,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     out = f"export PYTHONPATH={project_root_path}"
-    out += os.pathsep + str(project_root_path / 'caching' / args.cache_implementation)
-    out += os.pathsep + str(project_root_path / 'executor_getters' / args.executor_implementation)
+
+    cache_impl = args.cache_implementation
+    if cache_impl != "default":
+        out += os.pathsep + str(project_root_path / 'global_cache_impls' / cache_impl)
+
+    executor_impl = args.executor_implementation
+    if executor_impl != "default":
+        out += os.pathsep + str(project_root_path / 'executor_getter_impls' / executor_impl)
+
     out += f"\nexport WEBILASTIK_ALLOW_LOCAL_FS=true"
 
     print(out)

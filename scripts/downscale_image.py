@@ -10,14 +10,6 @@ if __name__ == "__main__":
     project_root_dir = Path(__file__).parent.parent
     sys.path.append(str(project_root_dir))
 
-    # selecting a caching implementation is usually done in load-time, by setting PYTHONPATH
-    # and pointing to something in project_root_dir / caching
-    sys.path.append(str(project_root_dir / "caching/lru_cache"))
-
-    # selecting an executor implementation is usually done in load-time, by setting PYTHONPATH
-    # and pointing to something in project_root_dir / executor_getters
-    sys.path.append(str(project_root_dir / "executor_getters/default"))
-
     # This security env var flag should usually be set before running webilastik
     os.environ["WEBILASTIK_ALLOW_LOCAL_FS"] = "true"
 

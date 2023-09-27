@@ -20,7 +20,7 @@ vars:
   NEUROGLANCER_BUNDLE_PATH: "{{.NEUROGLANCER_BUILD_PATH}}/main.bundle.js"
   OVERLAY_DIR: "{{.PROJECT_ROOT}}/overlay"
   OVERLAY_BUNDLE_PATH: "{{.OVERLAY_DIR}}/build/inject_into_neuroglancer.js"
-  SOURCES_DIR_NAMES: "webilastik caching executor_getters"
+  SOURCES_DIR_NAMES: "webilastik global_cache_impls executor_getters"
 
 tasks:
   generate-message-schemas:
@@ -54,7 +54,7 @@ tasks:
       # ensure aiohttp will use the mkcert certts. I don't really know where it otherwise gets its certs from
       SSL_CERT_DIR: "/etc/ssl/certs/"
       WEBILASTIK_SCRATCH_DIR: "/tmp/ilastik_tests_scratch/"
-      PYTHONPATH: "{{.PYTHONPATH}}:./caching/lru_cache/:./executor_getters/default/:./ndstructs/"
+      PYTHONPATH: "{{.PYTHONPATH}}:./ndstructs/"
     cmds:
       - find tests/ -iname 'test_*.py' | grep -v test_hashing_mpi_executor.py | parallel --group -t --halt now,fail=1 python
 
@@ -134,8 +134,8 @@ tasks:
       - "{{.PROJECT_ROOT}}/public/**/*"
       - "{{.PACKED_ENV_PATH}}"
       - "{{.PROJECT_ROOT}}/webilastik/**/*.py"
-      - "{{.PROJECT_ROOT}}/caching/**/*.py"
-      - "{{.PROJECT_ROOT}}/executor_getters/**/*.py"
+      - "{{.PROJECT_ROOT}}/global_cache_impls/**/*.py"
+      - "{{.PROJECT_ROOT}}/executor_getter_impls/**/*.py"
       - "{{.OVERLAY_BUNDLE_PATH}}"
       - "{{.OVERLAY_BUNDLE_PATH}}.map"
       - "{{.NEUROGLANCER_BUNDLE_PATH}}"
