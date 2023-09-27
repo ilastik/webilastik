@@ -56,7 +56,7 @@ tasks:
       WEBILASTIK_SCRATCH_DIR: "/tmp/ilastik_tests_scratch/"
       PYTHONPATH: "{{.PYTHONPATH}}:./ndstructs/"
     cmds:
-      - find tests/ -iname 'test_*.py' | grep -v test_hashing_mpi_executor.py | parallel --group -t --halt now,fail=1 python
+      - find tests/ -iname 'test_*.py' | grep -v test_hashing_mpi_executor.py | tr '/' '.' | sed 's@\.py$@@' | parallel --group -t --halt now,fail=1 python -m
 
   create-conda-environment:
     deps: [create-build-dir]
