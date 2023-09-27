@@ -477,7 +477,7 @@ class LocalJobLauncher(SshJobLauncher):
             fernet=fernet,
         )
         self.sessions: Dict[NativeComputeSessionId, Tuple[ComputeSession, Popen[bytes]]] = {}
-        self.executor_getter = executor_getter
+        self.executor_getter: Literal["dask", "default"] = executor_getter
 
     def get_sbatch_launch_script(
         self,
@@ -507,6 +507,10 @@ class LocalJobLauncher(SshJobLauncher):
         redis_pid_file = f"{working_dir}/redis.pid"
         redis_unix_socket_path = f"{working_dir}/redis.sock"
         conda_env_dir = Path(os.path.realpath(sys.executable)).parent.parent
+
+        executor_getter_pythonpath = ""
+        if self.executor_getter != "default":
+            executor_getter_pythonpath = f":{webilastik_source_dir}/executor_getter_impls/{self.executor_getter}/"
 
         out = textwrap.dedent(textwrap.indent(f"""
             #!/bin/bash -l
@@ -551,7 +555,7 @@ class LocalJobLauncher(SshJobLauncher):
 
             PYTHONPATH="{webilastik_source_dir}"
             PYTHONPATH+=":{webilastik_source_dir}/ndstructs/"
-            PYTHONPATH+=":{webilastik_source_dir}/executor_getter_impls/{self.executor_getter}/"
+            PYTHONPATH+="{executor_getter_pythonpath}"
             PYTHONPATH+=":{webilastik_source_dir}/global_cache_impls/redis_cache/"
 
             export PYTHONPATH
@@ -694,7 +698,6 @@ class JusufSshJobLauncher(SshJobLauncher):
             workflow_slurm_prefix = "srun -n 10 --overlap -u --cpus-per-task 10 --threads-per-core=1"
         else:
             assert_never(self.executor_getter)
-
 
         out = textwrap.dedent(textwrap.indent(f"""\
             #!/bin/bash -l

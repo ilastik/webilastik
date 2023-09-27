@@ -20,7 +20,7 @@ vars:
   NEUROGLANCER_BUNDLE_PATH: "{{.NEUROGLANCER_BUILD_PATH}}/main.bundle.js"
   OVERLAY_DIR: "{{.PROJECT_ROOT}}/overlay"
   OVERLAY_BUNDLE_PATH: "{{.OVERLAY_DIR}}/build/inject_into_neuroglancer.js"
-  SOURCES_DIR_NAMES: "webilastik global_cache_impls executor_getters"
+  SOURCES_DIR_NAMES: "webilastik global_cache global_cache_impls executor_getter executor_getter_impls"
 
 tasks:
   generate-message-schemas:
