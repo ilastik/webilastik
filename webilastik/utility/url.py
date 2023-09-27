@@ -143,7 +143,7 @@ class Url:
     def parse_or_raise(url: str) -> "Url":
         parsed = Url.parse(url)
         if parsed is None:
-            raise ValueError("Could not parse {str} as an Url")
+            raise ValueError(f"Could not parse {url} as an Url")
         return parsed
 
     @classmethod
