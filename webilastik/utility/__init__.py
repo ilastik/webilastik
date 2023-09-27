@@ -11,6 +11,9 @@ from typing_extensions import Protocol, Self
 from ndstructs.utils.json_serializable import JsonObject, JsonValue
 import datetime
 
+def eprint(message: str):
+    print(message, file=sys.stderr)
+
 def parse_uuid(raw: str) -> "uuid.UUID | Exception":
     try:
         return uuid.UUID(raw)
@@ -185,4 +188,7 @@ class Nanometers(NewTypeNumber):
     pass
 
 class Nanoseconds(NewTypeNumber):
+    pass
+
+class Gigabytes(NewTypeNumber):
     pass
