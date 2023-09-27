@@ -15,6 +15,8 @@ from h5py import AttributeManager
 from ndstructs.point5D import Point5D, Shape5D
 import numpy as np
 from ndstructs.utils.json_serializable import JsonObject, JsonValue
+from cryptography.fernet import Fernet
+
 
 from webilastik.annotations.annotation import Annotation, Color
 from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
@@ -30,6 +32,41 @@ from webilastik.filesystem.bucket_fs import BucketFs
 from webilastik.ui.applet.brushing_applet import Label
 from webilastik.ui.datasource import try_get_datasources_from_url
 from webilastik.utility import get_now_string
+
+from webilastik.config import (
+    WEBILASTIK_ALLOW_LOCAL_FS,
+    WEBILASTIK_SCRATCH_DIR,
+    WEBILASTIK_ALLOW_LOCAL_COMPUTE_SESSIONS,
+    WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY,
+    WEBILASTIK_EXTERNAL_URL,
+    EBRAINS_CLIENT_ID,
+    EBRAINS_CLIENT_SECRET,
+    # EBRAINS_USER_ACCESS_TOKEN,
+    # EBRAINS_USER_REFRESH_TOKEN,
+    WEBILASTIK_JOB_MAX_DURATION_MINUTES,
+    WEBILASTIK_JOB_LISTEN_SOCKET,
+    WEBILASTIK_JOB_SESSION_URL,
+    WEBILASTIK_SESSION_ALLOCATOR_HOST,
+    WEBILASTIK_SESSION_ALLOCATOR_USERNAME,
+    WEBILASTIK_SESSION_ALLOCATOR_SOCKET_PATH,
+)
+
+os.environ[WEBILASTIK_ALLOW_LOCAL_FS] = "true"
+os.environ[WEBILASTIK_SCRATCH_DIR] = "/tmp/webilastik_tests_scratch"
+os.environ[WEBILASTIK_ALLOW_LOCAL_COMPUTE_SESSIONS] = "true"
+os.environ[WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY] = Fernet.generate_key().decode("utf8") # dummy
+os.environ[WEBILASTIK_EXTERNAL_URL] = "https://app.ilastik.org"
+os.environ[EBRAINS_CLIENT_ID] = "webilastik"
+os.environ[EBRAINS_CLIENT_SECRET] = "dummy_secret"
+# os.environ[EBRAINS_USER_ACCESS_TOKEN] = "you can set this in your env"
+# os.environ[EBRAINS_USER_REFRESH_TOKEN] = "you can set this in your env"
+os.environ[WEBILASTIK_JOB_MAX_DURATION_MINUTES] = "10"
+os.environ[WEBILASTIK_JOB_LISTEN_SOCKET] = "/tmp/webilastik_tests_scratch/compute_session.socket"
+os.environ[WEBILASTIK_JOB_SESSION_URL] = "https://app.ilastik.org/dummy/url"
+os.environ[WEBILASTIK_SESSION_ALLOCATOR_HOST] = "app.ilastik.org"
+os.environ[WEBILASTIK_SESSION_ALLOCATOR_USERNAME] = "www-data"
+os.environ[WEBILASTIK_SESSION_ALLOCATOR_SOCKET_PATH] = "/tmp/webilastik_tests_scratch/tunnel_to_compute_session.socket"
+
 
 def get_project_root_dir() -> PurePosixPath:
     return PurePosixPath(__file__).parent.parent

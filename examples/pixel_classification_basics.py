@@ -2,13 +2,10 @@
 
 #pyright: strict
 
-# in real applications, select your caching and executor_get implementation via PYTHONPATH
 import sys
 from pathlib import PurePosixPath
 project_root_dir = PurePosixPath(__file__).parent.parent
 sys.path.insert(0, project_root_dir.as_posix())
-sys.path.insert(0, project_root_dir.joinpath('caching/no_cache').as_posix())
-sys.path.insert(0, project_root_dir.joinpath('executor_getters/default').as_posix())
 
 
 from ndstructs.point5D import Interval5D, Point5D

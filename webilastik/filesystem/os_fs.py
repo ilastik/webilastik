@@ -40,8 +40,8 @@ class OsFs(IFilesystem):
 
     @classmethod
     def create(cls) -> "OsFs | Exception":
-        from webilastik.config import WebilastikConfig
-        if WorkflowConfig.from_env().allow_local_fs:
+        from webilastik.config import WEBILASTIK_ALLOW_LOCAL_FS
+        if os.environ.get(WEBILASTIK_ALLOW_LOCAL_FS) in ("yes", "true", "1") or WorkflowConfig.from_env().allow_local_fs:
             return OsFs(_marker=_PrivateMarker())
         return Exception("OsFs not allowed")
 

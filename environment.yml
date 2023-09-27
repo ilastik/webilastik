@@ -27,4 +27,5 @@ dependencies:
     - git+https://git@github.com/ilastik/ndstructs@43b27382e964211a5e4d94148f826ec83d514636
     - git+https://github.com/ilastik/netzip@83d30fffe9c73136f19f18430acfb3eda7670f3a
     - dask-mpi==2022.4.0
+    - distributed==2022.4.0
     - mpi4py==3.1.4
