@@ -39,7 +39,7 @@ tasks:
     env:
       PYTHONPATH: "{{.PROJECT_ROOT}}"
     cmds:
-      - pylint -j 0 --disable=all --enable=trailing-comma-tuple,expression-not-assigned {{.SOURCES_DIR_NAMES}} tests benchmarks
+      - pylint -j 0 --disable=all --enable=trailing-comma-tuple,expression-not-assigned,implicit-str-concat {{.SOURCES_DIR_NAMES}} tests benchmarks
       - npx pyright
   create-build-dir:
     cmds:

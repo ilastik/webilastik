@@ -25,12 +25,1966 @@ import numpy as np
 
 from webilastik.server.rpc import DataTransferObject
 
+Axis2D = Literal["x", "y", "z"]
+
+Preprocessor = Union[
+    "StructureTensorEigenvaluesDto",
+    "GaussianGradientMagnitudeDto"
+    # "GaussianSmoothingDto",
+    # "DifferenceOfGaussiansDto",
+    # "HessianOfGaussianEigenvalues",
+    # "LaplacianOfGaussian",
+    # "OpRetrieverDto",
+]
+
+
+@dataclass
+class StructureTensorEigenvaluesDto(DataTransferObject):
+    preprocessor: Optional[Preprocessor]
+    innerScale: float
+    outerScale: float
+    window_size: float
+    axis_2d: Optional[Axis2D]
+    channel_index: int
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "StructureTensorEigenvaluesDto",
+            "preprocessor": convert_to_json_value(self.preprocessor),
+            "innerScale": self.innerScale,
+            "outerScale": self.outerScale,
+            "window_size": self.window_size,
+            "axis_2d": convert_to_json_value(self.axis_2d),
+            "channel_index": self.channel_index,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "StructureTensorEigenvaluesDto | MessageParsingError":
+        return parse_as_StructureTensorEigenvaluesDto(value)
+
+
+@dataclass
+class GaussianGradientMagnitudeDto(DataTransferObject):
+    sigma: float
+    window_size: float
+    axis_2d: Optional[Axis2D]
+    channel_index: int
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "GaussianGradientMagnitudeDto",
+            "sigma": self.sigma,
+            "window_size": self.window_size,
+            "axis_2d": convert_to_json_value(self.axis_2d),
+            "channel_index": self.channel_index,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "GaussianGradientMagnitudeDto | MessageParsingError":
+        return parse_as_GaussianGradientMagnitudeDto(value)
+
+
+@dataclass
+class ColorDto(DataTransferObject):
+    r: int
+    g: int
+    b: int
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "ColorDto",
+            "r": self.r,
+            "g": self.g,
+            "b": self.b,
+        }
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "ColorDto | MessageParsingError":
+        return parse_as_ColorDto(value)
+
+
+@dataclass
+class LabelHeaderDto(DataTransferObject):
+    name: str
+    color: ColorDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "LabelHeaderDto",
+            "name": self.name,
+            "color": self.color.to_json_value(),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "LabelHeaderDto | MessageParsingError":
+        return parse_as_LabelHeaderDto(value)
+
+
+Protocol = Literal["http", "https", "file", "memory"]
+
+
+@dataclass
+class UrlDto(DataTransferObject):
+    datascheme: Optional[Literal["precomputed", "n5", "deepzoom"]]
+    protocol: Literal["http", "https", "file", "memory"]
+    hostname: str
+    port: Optional[int]
+    path: str
+    search: Optional[Mapping[str, str]]
+    fragment: Optional[str]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "UrlDto",
+            "datascheme": convert_to_json_value(self.datascheme),
+            "protocol": self.protocol,
+            "hostname": self.hostname,
+            "port": convert_to_json_value(self.port),
+            "path": self.path,
+            "search": convert_to_json_value(self.search),
+            "fragment": convert_to_json_value(self.fragment),
+        }
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "UrlDto | MessageParsingError":
+        return parse_as_UrlDto(value)
+
+
+@dataclass
+class Point5DDto(DataTransferObject):
+    x: int
+    y: int
+    z: int
+    t: int
+    c: int
+
+    @classmethod
+    def from_point5d(cls, point: Point5D) -> "Point5DDto":
+        return Point5DDto(x=point.x, y=point.y, z=point.z, t=point.t, c=point.c)
+
+    def to_point5d(self) -> Point5D:
+        return Point5D(x=self.x, y=self.y, z=self.z, t=self.t, c=self.c)
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "Point5DDto",
+            "x": self.x,
+            "y": self.y,
+            "z": self.z,
+            "t": self.t,
+            "c": self.c,
+        }
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "Point5DDto | MessageParsingError":
+        return parse_as_Point5DDto(value)
+
+
+@dataclass
+class Shape5DDto(Point5DDto):
+    @classmethod
+    def from_shape5d(cls, shape: Shape5D) -> "Shape5DDto":
+        return Shape5DDto(x=shape.x, y=shape.y, z=shape.z, t=shape.t, c=shape.c)
+
+    def to_shape5d(self) -> Shape5D:
+        return Shape5D(x=self.x, y=self.y, z=self.z, t=self.t, c=self.c)
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "Shape5DDto",
+            "x": self.x,
+            "y": self.y,
+            "z": self.z,
+            "t": self.t,
+            "c": self.c,
+        }
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "Shape5DDto | MessageParsingError":
+        return parse_as_Shape5DDto(value)
+
+
+@dataclass
+class Interval5DDto(DataTransferObject):
+    start: Point5DDto
+    stop: Point5DDto
+
+    @classmethod
+    def from_interval5d(cls, interval: Interval5D) -> "Interval5DDto":
+        return Interval5DDto(
+            start=Point5DDto.from_point5d(interval.start),
+            stop=Point5DDto.from_point5d(interval.stop),
+        )
+
+    def to_interval5d(self) -> Interval5D:
+        return Interval5D.create_from_start_stop(
+            start=self.start.to_point5d(), stop=self.stop.to_point5d()
+        )
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "Interval5DDto",
+            "start": self.start.to_json_value(),
+            "stop": self.stop.to_json_value(),
+        }
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "Interval5DDto | MessageParsingError":
+        return parse_as_Interval5DDto(value)
+
+
+@dataclass
+class OsfsDto(DataTransferObject):
+    pass
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "OsfsDto",
+        }
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "OsfsDto | MessageParsingError":
+        return parse_as_OsfsDto(value)
+
+
+@dataclass
+class HttpFsDto(DataTransferObject):
+    protocol: Literal["http", "https"]
+    hostname: str
+    port: Optional[int]
+    path: str
+    search: Optional[Mapping[str, str]]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "HttpFsDto",
+            "protocol": self.protocol,
+            "hostname": self.hostname,
+            "port": convert_to_json_value(self.port),
+            "path": self.path,
+            "search": convert_to_json_value(self.search),
+        }
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "HttpFsDto | MessageParsingError":
+        return parse_as_HttpFsDto(value)
+
+
+@dataclass
+class BucketFSDto(DataTransferObject):
+    bucket_name: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "BucketFSDto",
+            "bucket_name": self.bucket_name,
+        }
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "BucketFSDto | MessageParsingError":
+        return parse_as_BucketFSDto(value)
+
+
+@dataclass
+class ZipFsDto(DataTransferObject):
+    zip_file_fs: Union[OsfsDto, HttpFsDto, BucketFSDto]  # FIXME: no other ZipFs?
+    zip_file_path: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "ZipFsDto",
+            "zip_file_fs": convert_to_json_value(self.zip_file_fs),
+            "zip_file_path": self.zip_file_path,
+        }
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "ZipFsDto | MessageParsingError":
+        return parse_as_ZipFsDto(value)
+
+
+FsDto = Union[OsfsDto, HttpFsDto, BucketFSDto, ZipFsDto]
+
+DtypeDto = Literal["uint8", "uint16", "uint32", "uint64", "int64", "float32"]
+
+
+def dtype_to_dto(dtype: "np.dtype[Any]") -> DtypeDto:
+    return cast(DtypeDto, str(dtype))
+
+
+@dataclass
+class PrecomputedChunksDataSourceDto(DataTransferObject):
+    url: UrlDto
+    filesystem: FsDto
+    path: str
+    scale_key: str
+    interval: Interval5DDto
+    tile_shape: Shape5DDto
+    spatial_resolution: Tuple[int, int, int]
+    dtype: DtypeDto
+    encoder: Literal["raw", "jpeg"]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "PrecomputedChunksDataSourceDto",
+            "url": self.url.to_json_value(),
+            "filesystem": convert_to_json_value(self.filesystem),
+            "path": self.path,
+            "scale_key": self.scale_key,
+            "interval": self.interval.to_json_value(),
+            "tile_shape": self.tile_shape.to_json_value(),
+            "spatial_resolution": (
+                self.spatial_resolution[0],
+                self.spatial_resolution[1],
+                self.spatial_resolution[2],
+            ),
+            "dtype": self.dtype,
+            "encoder": self.encoder,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "PrecomputedChunksDataSourceDto | MessageParsingError":
+        return parse_as_PrecomputedChunksDataSourceDto(value)
+
+
+ImageFormatDto = Literal["jpeg", "jpg", "png"]
+
+
+@dataclass
+class DziSizeElementDto(DataTransferObject):
+    Width: int
+    Height: int
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "DziSizeElementDto",
+            "Width": self.Width,
+            "Height": self.Height,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "DziSizeElementDto | MessageParsingError":
+        return parse_as_DziSizeElementDto(value)
+
+
+@dataclass
+class DziImageElementDto(DataTransferObject):
+    Format: ImageFormatDto
+    Overlap: int
+    TileSize: int
+    Size: DziSizeElementDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "DziImageElementDto",
+            "Format": self.Format,
+            "Overlap": self.Overlap,
+            "TileSize": self.TileSize,
+            "Size": self.Size.to_json_value(),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "DziImageElementDto | MessageParsingError":
+        return parse_as_DziImageElementDto(value)
+
+
+@dataclass
+class DziLevelSinkDto(DataTransferObject):
+    filesystem: FsDto
+    xml_path: str
+    dzi_image: DziImageElementDto
+    num_channels: Literal[1, 3]
+    level_index: int
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "DziLevelSinkDto",
+            "filesystem": convert_to_json_value(self.filesystem),
+            "xml_path": self.xml_path,
+            "dzi_image": self.dzi_image.to_json_value(),
+            "num_channels": self.num_channels,
+            "level_index": self.level_index,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "DziLevelSinkDto | MessageParsingError":
+        return parse_as_DziLevelSinkDto(value)
+
+
+@dataclass
+class DziLevelDataSourceDto(DataTransferObject):
+    filesystem: FsDto
+    xml_path: str
+    dzi_image: DziImageElementDto
+    num_channels: Literal[1, 3]
+    level_index: int
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "DziLevelDataSourceDto",
+            "filesystem": convert_to_json_value(self.filesystem),
+            "xml_path": self.xml_path,
+            "dzi_image": self.dzi_image.to_json_value(),
+            "num_channels": self.num_channels,
+            "level_index": self.level_index,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "DziLevelDataSourceDto | MessageParsingError":
+        return parse_as_DziLevelDataSourceDto(value)
+
+
+@dataclass
+class N5GzipCompressorDto(DataTransferObject):
+    level: int
+
+    @classmethod
+    def tag_key(cls) -> str:
+        return "type"
+
+    @classmethod
+    def tag_value(cls) -> str:
+        return "gzip"
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "type": "gzip",
+            "level": self.level,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "N5GzipCompressorDto | MessageParsingError":
+        return parse_as_N5GzipCompressorDto(value)
+
+
+@dataclass
+class N5Bzip2CompressorDto(DataTransferObject):
+    blockSize: int  # name doesn't make sense but is what is in the n5 'spec'
+
+    @classmethod
+    def tag_key(cls) -> str:
+        return "type"
+
+    @classmethod
+    def tag_value(cls) -> str:
+        return "bzip2"
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "type": "bzip2",
+            "blockSize": self.blockSize,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "N5Bzip2CompressorDto | MessageParsingError":
+        return parse_as_N5Bzip2CompressorDto(value)
+
+
+@dataclass
+class N5XzCompressorDto(DataTransferObject):
+    preset: int
+
+    @classmethod
+    def tag_key(cls) -> str:
+        return "type"
+
+    @classmethod
+    def tag_value(cls) -> str:
+        return "xz"
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "type": "xz",
+            "preset": self.preset,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "N5XzCompressorDto | MessageParsingError":
+        return parse_as_N5XzCompressorDto(value)
+
+
+@dataclass
+class N5RawCompressorDto(DataTransferObject):
+    @classmethod
+    def tag_key(cls) -> str:
+        return "type"
+
+    @classmethod
+    def tag_value(cls) -> str:
+        return "raw"
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "type": "raw",
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "N5RawCompressorDto | MessageParsingError":
+        return parse_as_N5RawCompressorDto(value)
+
+
+N5CompressorDto = Union[
+    N5GzipCompressorDto, N5Bzip2CompressorDto, N5XzCompressorDto, N5RawCompressorDto
+]
+
+
+@dataclass
+class N5DatasetAttributesDto(DataTransferObject):
+    dimensions: Tuple[int, ...]
+    blockSize: Tuple[int, ...]
+    # axes: Optional[Tuple[Literal["x", "y", "z", "t", "c"], ...]] # FIXME: retore this
+    axes: Optional[Tuple[str, ...]]  # FIXME: retore this
+    dataType: DtypeDto
+    compression: N5CompressorDto
+
+    @classmethod
+    def tag_value(cls) -> None:
+        return None
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "dimensions": tuple(item for item in self.dimensions),
+            "blockSize": tuple(item for item in self.blockSize),
+            "axes": convert_to_json_value(self.axes),
+            "dataType": self.dataType,
+            "compression": convert_to_json_value(self.compression),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "N5DatasetAttributesDto | MessageParsingError":
+        return parse_as_N5DatasetAttributesDto(value)
+
+
+@dataclass
+class N5DataSourceDto(DataTransferObject):
+    url: UrlDto
+    filesystem: FsDto
+    path: str
+    interval: Interval5DDto
+    tile_shape: Shape5DDto
+    spatial_resolution: Tuple[int, int, int]
+    dtype: DtypeDto
+    compressor: N5CompressorDto
+    c_axiskeys_on_disk: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "N5DataSourceDto",
+            "url": self.url.to_json_value(),
+            "filesystem": convert_to_json_value(self.filesystem),
+            "path": self.path,
+            "interval": self.interval.to_json_value(),
+            "tile_shape": self.tile_shape.to_json_value(),
+            "spatial_resolution": (
+                self.spatial_resolution[0],
+                self.spatial_resolution[1],
+                self.spatial_resolution[2],
+            ),
+            "dtype": self.dtype,
+            "compressor": convert_to_json_value(self.compressor),
+            "c_axiskeys_on_disk": self.c_axiskeys_on_disk,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "N5DataSourceDto | MessageParsingError":
+        return parse_as_N5DataSourceDto(value)
+
+
+@dataclass
+class SkimageDataSourceDto(DataTransferObject):
+    url: UrlDto
+    filesystem: FsDto
+    path: str
+    interval: Interval5DDto
+    tile_shape: Shape5DDto
+    spatial_resolution: Tuple[int, int, int]
+    dtype: DtypeDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "SkimageDataSourceDto",
+            "url": self.url.to_json_value(),
+            "filesystem": convert_to_json_value(self.filesystem),
+            "path": self.path,
+            "interval": self.interval.to_json_value(),
+            "tile_shape": self.tile_shape.to_json_value(),
+            "spatial_resolution": (
+                self.spatial_resolution[0],
+                self.spatial_resolution[1],
+                self.spatial_resolution[2],
+            ),
+            "dtype": self.dtype,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "SkimageDataSourceDto | MessageParsingError":
+        return parse_as_SkimageDataSourceDto(value)
+
+
+FsDataSourceDto = Union[
+    PrecomputedChunksDataSourceDto,
+    N5DataSourceDto,
+    SkimageDataSourceDto,
+    DziLevelDataSourceDto,
+]
+
+
+@dataclass
+class PrecomputedChunksSinkDto(DataTransferObject):
+    filesystem: Union[OsfsDto, HttpFsDto, BucketFSDto]
+    path: str  # FIXME?
+    tile_shape: Shape5DDto
+    interval: Interval5DDto
+    dtype: DtypeDto
+    scale_key: str  # fixme?
+    resolution: Tuple[int, int, int]
+    encoding: Literal["raw", "jpeg"]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "PrecomputedChunksSinkDto",
+            "filesystem": convert_to_json_value(self.filesystem),
+            "path": self.path,
+            "tile_shape": self.tile_shape.to_json_value(),
+            "interval": self.interval.to_json_value(),
+            "dtype": self.dtype,
+            "scale_key": self.scale_key,
+            "resolution": (
+                self.resolution[0],
+                self.resolution[1],
+                self.resolution[2],
+            ),
+            "encoding": self.encoding,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "PrecomputedChunksSinkDto | MessageParsingError":
+        return parse_as_PrecomputedChunksSinkDto(value)
+
+
+@dataclass
+class N5DataSinkDto(DataTransferObject):
+    filesystem: FsDto
+    path: str
+    interval: Interval5DDto
+    tile_shape: Shape5DDto
+    spatial_resolution: Tuple[int, int, int]
+    c_axiskeys: str
+    dtype: DtypeDto
+    compressor: N5CompressorDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "N5DataSinkDto",
+            "filesystem": convert_to_json_value(self.filesystem),
+            "path": self.path,
+            "interval": self.interval.to_json_value(),
+            "tile_shape": self.tile_shape.to_json_value(),
+            "spatial_resolution": (
+                self.spatial_resolution[0],
+                self.spatial_resolution[1],
+                self.spatial_resolution[2],
+            ),
+            "c_axiskeys": self.c_axiskeys,
+            "dtype": self.dtype,
+            "compressor": convert_to_json_value(self.compressor),
+        }
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "N5DataSinkDto | MessageParsingError":
+        return parse_as_N5DataSinkDto(value)
+
+
+DataSinkDto = Union[PrecomputedChunksSinkDto, N5DataSinkDto, DziLevelSinkDto]
+
+
+@dataclass
+class PixelAnnotationDto(DataTransferObject):
+    raw_data: FsDataSourceDto
+    points: Tuple[Tuple[int, int, int], ...]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "PixelAnnotationDto",
+            "raw_data": convert_to_json_value(self.raw_data),
+            "points": tuple(
+                (
+                    item[0],
+                    item[1],
+                    item[2],
+                )
+                for item in self.points
+            ),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "PixelAnnotationDto | MessageParsingError":
+        return parse_as_PixelAnnotationDto(value)
+
+
+@dataclass
+class RpcErrorDto(DataTransferObject):
+    error: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "RpcErrorDto",
+            "error": self.error,
+        }
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "RpcErrorDto | MessageParsingError":
+        return parse_as_RpcErrorDto(value)
+
+
+@dataclass
+class SetLiveUpdateParams(DataTransferObject):
+    live_update: bool
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "SetLiveUpdateParams",
+            "live_update": self.live_update,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "SetLiveUpdateParams | MessageParsingError":
+        return parse_as_SetLiveUpdateParams(value)
+
+
+@dataclass
+class RecolorLabelParams(DataTransferObject):
+    label_name: str
+    new_color: ColorDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "RecolorLabelParams",
+            "label_name": self.label_name,
+            "new_color": self.new_color.to_json_value(),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "RecolorLabelParams | MessageParsingError":
+        return parse_as_RecolorLabelParams(value)
+
+
+@dataclass
+class RenameLabelParams(DataTransferObject):
+    old_name: str
+    new_name: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "RenameLabelParams",
+            "old_name": self.old_name,
+            "new_name": self.new_name,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "RenameLabelParams | MessageParsingError":
+        return parse_as_RenameLabelParams(value)
+
+
+@dataclass
+class CreateLabelParams(DataTransferObject):
+    label_name: str
+    color: ColorDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "CreateLabelParams",
+            "label_name": self.label_name,
+            "color": self.color.to_json_value(),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "CreateLabelParams | MessageParsingError":
+        return parse_as_CreateLabelParams(value)
+
+
+@dataclass
+class RemoveLabelParams(DataTransferObject):
+    label_name: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "RemoveLabelParams",
+            "label_name": self.label_name,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "RemoveLabelParams | MessageParsingError":
+        return parse_as_RemoveLabelParams(value)
+
+
+@dataclass
+class AddPixelAnnotationParams(DataTransferObject):
+    label_name: str
+    pixel_annotation: PixelAnnotationDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "AddPixelAnnotationParams",
+            "label_name": self.label_name,
+            "pixel_annotation": self.pixel_annotation.to_json_value(),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "AddPixelAnnotationParams | MessageParsingError":
+        return parse_as_AddPixelAnnotationParams(value)
+
+
+@dataclass
+class RemovePixelAnnotationParams(DataTransferObject):
+    label_name: str
+    pixel_annotation: PixelAnnotationDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "RemovePixelAnnotationParams",
+            "label_name": self.label_name,
+            "pixel_annotation": self.pixel_annotation.to_json_value(),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "RemovePixelAnnotationParams | MessageParsingError":
+        return parse_as_RemovePixelAnnotationParams(value)
+
+
+@dataclass
+class LabelDto(DataTransferObject):
+    name: str
+    color: ColorDto
+    annotations: Tuple[PixelAnnotationDto, ...]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "LabelDto",
+            "name": self.name,
+            "color": self.color.to_json_value(),
+            "annotations": tuple(item.to_json_value() for item in self.annotations),
+        }
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "LabelDto | MessageParsingError":
+        return parse_as_LabelDto(value)
+
+
+@dataclass
+class BrushingAppletStateDto(DataTransferObject):
+    labels: Tuple[LabelDto, ...]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "BrushingAppletStateDto",
+            "labels": tuple(item.to_json_value() for item in self.labels),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "BrushingAppletStateDto | MessageParsingError":
+        return parse_as_BrushingAppletStateDto(value)
+
+
+@dataclass
+class JobFinishedDto(DataTransferObject):
+    error_message: Optional[str]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "JobFinishedDto",
+            "error_message": convert_to_json_value(self.error_message),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "JobFinishedDto | MessageParsingError":
+        return parse_as_JobFinishedDto(value)
+
+
+@dataclass
+class JobIsPendingDto(DataTransferObject):
+    pass
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "JobIsPendingDto",
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "JobIsPendingDto | MessageParsingError":
+        return parse_as_JobIsPendingDto(value)
+
+
+@dataclass
+class JobIsRunningDto(DataTransferObject):
+    num_completed_steps: int
+    num_dispatched_steps: int
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "JobIsRunningDto",
+            "num_completed_steps": self.num_completed_steps,
+            "num_dispatched_steps": self.num_dispatched_steps,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "JobIsRunningDto | MessageParsingError":
+        return parse_as_JobIsRunningDto(value)
+
+
+@dataclass
+class JobCanceledDto(DataTransferObject):
+    message: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "JobCanceledDto",
+            "message": self.message,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "JobCanceledDto | MessageParsingError":
+        return parse_as_JobCanceledDto(value)
+
+
+JobStatusDto = Union[JobFinishedDto, JobIsPendingDto, JobIsRunningDto, JobCanceledDto]
+
+
+@dataclass
+class JobDto(DataTransferObject):
+    name: str
+    num_args: Optional[int]
+    uuid: str
+    status: JobStatusDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "JobDto",
+            "name": self.name,
+            "num_args": convert_to_json_value(self.num_args),
+            "uuid": self.uuid,
+            "status": convert_to_json_value(self.status),
+        }
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "JobDto | MessageParsingError":
+        return parse_as_JobDto(value)
+
+
+@dataclass
+class ExportJobDto(JobDto):
+    datasink: DataSinkDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "ExportJobDto",
+            "name": self.name,
+            "num_args": convert_to_json_value(self.num_args),
+            "uuid": self.uuid,
+            "status": convert_to_json_value(self.status),
+            "datasink": convert_to_json_value(self.datasink),
+        }
+
+    @classmethod
+    def from_json_value(cls, value: JsonValue) -> "ExportJobDto | MessageParsingError":
+        return parse_as_ExportJobDto(value)
+
+
+@dataclass
+class OpenDatasinkJobDto(JobDto):
+    datasink: DataSinkDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "OpenDatasinkJobDto",
+            "name": self.name,
+            "num_args": convert_to_json_value(self.num_args),
+            "uuid": self.uuid,
+            "status": convert_to_json_value(self.status),
+            "datasink": convert_to_json_value(self.datasink),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "OpenDatasinkJobDto | MessageParsingError":
+        return parse_as_OpenDatasinkJobDto(value)
+
+
+@dataclass
+class CreateDziPyramidJobDto(JobDto):
+    pass
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "CreateDziPyramidJobDto",
+            "name": self.name,
+            "num_args": convert_to_json_value(self.num_args),
+            "uuid": self.uuid,
+            "status": convert_to_json_value(self.status),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "CreateDziPyramidJobDto | MessageParsingError":
+        return parse_as_CreateDziPyramidJobDto(value)
+
+
+@dataclass
+class ZipDirectoryJobDto(JobDto):
+    output_fs: FsDto
+    output_path: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "ZipDirectoryJobDto",
+            "name": self.name,
+            "num_args": convert_to_json_value(self.num_args),
+            "uuid": self.uuid,
+            "status": convert_to_json_value(self.status),
+            "output_fs": convert_to_json_value(self.output_fs),
+            "output_path": self.output_path,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "ZipDirectoryJobDto | MessageParsingError":
+        return parse_as_ZipDirectoryJobDto(value)
+
+
+@dataclass
+class TransferFileJobDto(JobDto):
+    target_url: UrlDto
+    result_sink: Optional[DataSinkDto]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "TransferFileJobDto",
+            "name": self.name,
+            "num_args": convert_to_json_value(self.num_args),
+            "uuid": self.uuid,
+            "status": convert_to_json_value(self.status),
+            "target_url": self.target_url.to_json_value(),
+            "result_sink": convert_to_json_value(self.result_sink),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "TransferFileJobDto | MessageParsingError":
+        return parse_as_TransferFileJobDto(value)
+
+
+ExportJobDtoUnion = Union[
+    ExportJobDto,
+    OpenDatasinkJobDto,
+    CreateDziPyramidJobDto,
+    ZipDirectoryJobDto,
+    TransferFileJobDto,
+    JobDto,
+]
+
+
+@dataclass
+class PixelClassificationExportAppletStateDto(DataTransferObject):
+    jobs: Tuple[ExportJobDtoUnion, ...]
+    populated_labels: Optional[Tuple[LabelHeaderDto, ...]]
+    datasource_suggestions: Optional[Tuple[FsDataSourceDto, ...]]
+    upstream_ready: bool
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "PixelClassificationExportAppletStateDto",
+            "jobs": tuple(convert_to_json_value(item) for item in self.jobs),
+            "populated_labels": convert_to_json_value(self.populated_labels),
+            "datasource_suggestions": convert_to_json_value(
+                self.datasource_suggestions
+            ),
+            "upstream_ready": self.upstream_ready,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "PixelClassificationExportAppletStateDto | MessageParsingError":
+        return parse_as_PixelClassificationExportAppletStateDto(value)
+
+
+@dataclass
+class IlpFeatureExtractorDto(DataTransferObject):
+    ilp_scale: float
+    axis_2d: Optional[Literal["x", "y", "z"]]
+    class_name: Literal[
+        "Gaussian Smoothing",
+        "Laplacian of Gaussian",
+        "Gaussian Gradient Magnitude",
+        "Difference of Gaussians",
+        "Structure Tensor Eigenvalues",
+        "Hessian of Gaussian Eigenvalues",
+    ]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "IlpFeatureExtractorDto",
+            "ilp_scale": self.ilp_scale,
+            "axis_2d": convert_to_json_value(self.axis_2d),
+            "class_name": self.class_name,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "IlpFeatureExtractorDto | MessageParsingError":
+        return parse_as_IlpFeatureExtractorDto(value)
+
+
+@dataclass
+class FeatureSelectionAppletStateDto(DataTransferObject):
+    feature_extractors: Tuple[IlpFeatureExtractorDto, ...]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "FeatureSelectionAppletStateDto",
+            "feature_extractors": tuple(
+                item.to_json_value() for item in self.feature_extractors
+            ),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "FeatureSelectionAppletStateDto | MessageParsingError":
+        return parse_as_FeatureSelectionAppletStateDto(value)
+
+
+@dataclass
+class SetFeatureExtractorsParamsDto(DataTransferObject):
+    feature_extractors: Tuple[IlpFeatureExtractorDto, ...]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "SetFeatureExtractorsParamsDto",
+            "feature_extractors": tuple(
+                item.to_json_value() for item in self.feature_extractors
+            ),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "SetFeatureExtractorsParamsDto | MessageParsingError":
+        return parse_as_SetFeatureExtractorsParamsDto(value)
+
+
+@dataclass
+class ComputeSessionDto(DataTransferObject):
+    start_time_utc_sec: Optional[int]
+    time_elapsed_sec: int
+    time_limit_minutes: int
+    num_nodes: int
+    compute_session_id: str
+    state: Literal[
+        "BOOT_FAIL",
+        "CANCELLED",
+        "COMPLETED",
+        "CONFIGURING",
+        "COMPLETING",
+        "DEADLINE",
+        "FAILED",
+        "NODE_FAIL",
+        "OUT_OF_MEMORY",
+        "PENDING",
+        "PREEMPTED",
+        "RUNNING",
+        "RESV_DEL_HOLD",
+        "REQUEUE_FED",
+        "REQUEUE_HOLD",
+        "REQUEUED",
+        "RESIZING",
+        "REVOKED",
+        "SIGNALING",
+        "SPECIAL_EXIT",
+        "STAGE_OUT",
+        "STOPPED",
+        "SUSPENDED",
+        "TIMEOUT",
+    ]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "ComputeSessionDto",
+            "start_time_utc_sec": convert_to_json_value(self.start_time_utc_sec),
+            "time_elapsed_sec": self.time_elapsed_sec,
+            "time_limit_minutes": self.time_limit_minutes,
+            "num_nodes": self.num_nodes,
+            "compute_session_id": self.compute_session_id,
+            "state": self.state,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "ComputeSessionDto | MessageParsingError":
+        return parse_as_ComputeSessionDto(value)
+
+
+HpcSiteName = Literal["LOCAL_DASK", "LOCAL_PROCESS_POOL", "CSCS", "JUSUF"]
+
+
+@dataclass
+class ComputeSessionStatusDto(DataTransferObject):
+    compute_session: ComputeSessionDto
+    hpc_site: HpcSiteName
+    session_url: UrlDto
+    connected: bool
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "ComputeSessionStatusDto",
+            "compute_session": self.compute_session.to_json_value(),
+            "hpc_site": self.hpc_site,
+            "session_url": self.session_url.to_json_value(),
+            "connected": self.connected,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "ComputeSessionStatusDto | MessageParsingError":
+        return parse_as_ComputeSessionStatusDto(value)
+
+
+@dataclass
+class CreateComputeSessionParamsDto(DataTransferObject):
+    session_duration_minutes: int
+    hpc_site: HpcSiteName
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "CreateComputeSessionParamsDto",
+            "session_duration_minutes": self.session_duration_minutes,
+            "hpc_site": self.hpc_site,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "CreateComputeSessionParamsDto | MessageParsingError":
+        return parse_as_CreateComputeSessionParamsDto(value)
+
+
+@dataclass
+class GetComputeSessionStatusParamsDto(DataTransferObject):
+    compute_session_id: str
+    hpc_site: HpcSiteName
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "GetComputeSessionStatusParamsDto",
+            "compute_session_id": self.compute_session_id,
+            "hpc_site": self.hpc_site,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "GetComputeSessionStatusParamsDto | MessageParsingError":
+        return parse_as_GetComputeSessionStatusParamsDto(value)
+
+
+@dataclass
+class CloseComputeSessionParamsDto(DataTransferObject):
+    compute_session_id: str
+    hpc_site: HpcSiteName
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "CloseComputeSessionParamsDto",
+            "compute_session_id": self.compute_session_id,
+            "hpc_site": self.hpc_site,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "CloseComputeSessionParamsDto | MessageParsingError":
+        return parse_as_CloseComputeSessionParamsDto(value)
+
+
+@dataclass
+class CloseComputeSessionResponseDto(DataTransferObject):
+    compute_session_id: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "CloseComputeSessionResponseDto",
+            "compute_session_id": self.compute_session_id,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "CloseComputeSessionResponseDto | MessageParsingError":
+        return parse_as_CloseComputeSessionResponseDto(value)
+
+
+@dataclass
+class ListComputeSessionsParamsDto(DataTransferObject):
+    hpc_site: HpcSiteName
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "ListComputeSessionsParamsDto",
+            "hpc_site": self.hpc_site,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "ListComputeSessionsParamsDto | MessageParsingError":
+        return parse_as_ListComputeSessionsParamsDto(value)
+
+
+@dataclass
+class ListComputeSessionsResponseDto(DataTransferObject):
+    compute_sessions_stati: Tuple[ComputeSessionStatusDto, ...]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "ListComputeSessionsResponseDto",
+            "compute_sessions_stati": tuple(
+                item.to_json_value() for item in self.compute_sessions_stati
+            ),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "ListComputeSessionsResponseDto | MessageParsingError":
+        return parse_as_ListComputeSessionsResponseDto(value)
+
+
+@dataclass
+class GetAvailableHpcSitesResponseDto(DataTransferObject):
+    available_sites: Tuple[HpcSiteName, ...]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "GetAvailableHpcSitesResponseDto",
+            "available_sites": tuple(item for item in self.available_sites),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "GetAvailableHpcSitesResponseDto | MessageParsingError":
+        return parse_as_GetAvailableHpcSitesResponseDto(value)
+
+
+@dataclass
+class CheckLoginResultDto(DataTransferObject):
+    logged_in: bool
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "CheckLoginResultDto",
+            "logged_in": self.logged_in,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "CheckLoginResultDto | MessageParsingError":
+        return parse_as_CheckLoginResultDto(value)
+
+
+@dataclass
+class StartPixelProbabilitiesExportJobParamsDto(DataTransferObject):
+    datasource: FsDataSourceDto
+    datasink: DataSinkDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "StartPixelProbabilitiesExportJobParamsDto",
+            "datasource": convert_to_json_value(self.datasource),
+            "datasink": convert_to_json_value(self.datasink),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "StartPixelProbabilitiesExportJobParamsDto | MessageParsingError":
+        return parse_as_StartPixelProbabilitiesExportJobParamsDto(value)
+
+
+@dataclass
+class StartSimpleSegmentationExportJobParamsDto(DataTransferObject):
+    datasource: FsDataSourceDto
+    datasink: DataSinkDto
+    label_header: LabelHeaderDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "StartSimpleSegmentationExportJobParamsDto",
+            "datasource": convert_to_json_value(self.datasource),
+            "datasink": convert_to_json_value(self.datasink),
+            "label_header": self.label_header.to_json_value(),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "StartSimpleSegmentationExportJobParamsDto | MessageParsingError":
+        return parse_as_StartSimpleSegmentationExportJobParamsDto(value)
+
+
+@dataclass
+class LoadProjectParamsDto(DataTransferObject):
+    fs: FsDto
+    project_file_path: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "LoadProjectParamsDto",
+            "fs": convert_to_json_value(self.fs),
+            "project_file_path": self.project_file_path,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "LoadProjectParamsDto | MessageParsingError":
+        return parse_as_LoadProjectParamsDto(value)
+
+
+@dataclass
+class SaveProjectParamsDto(DataTransferObject):
+    fs: FsDto
+    project_file_path: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "SaveProjectParamsDto",
+            "fs": convert_to_json_value(self.fs),
+            "project_file_path": self.project_file_path,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "SaveProjectParamsDto | MessageParsingError":
+        return parse_as_SaveProjectParamsDto(value)
+
+
+@dataclass
+class GetDatasourcesFromUrlParamsDto(DataTransferObject):
+    url: UrlDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "GetDatasourcesFromUrlParamsDto",
+            "url": self.url.to_json_value(),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "GetDatasourcesFromUrlParamsDto | MessageParsingError":
+        return parse_as_GetDatasourcesFromUrlParamsDto(value)
+
+
+@dataclass
+class GetDatasourcesFromUrlResponseDto(DataTransferObject):
+    datasources: Tuple[FsDataSourceDto, ...]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "GetDatasourcesFromUrlResponseDto",
+            "datasources": tuple(
+                convert_to_json_value(item) for item in self.datasources
+            ),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "GetDatasourcesFromUrlResponseDto | MessageParsingError":
+        return parse_as_GetDatasourcesFromUrlResponseDto(value)
+
+
+@dataclass
+class GetFileSystemAndPathFromUrlParamsDto(DataTransferObject):
+    url: UrlDto
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "GetFileSystemAndPathFromUrlParamsDto",
+            "url": self.url.to_json_value(),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "GetFileSystemAndPathFromUrlParamsDto | MessageParsingError":
+        return parse_as_GetFileSystemAndPathFromUrlParamsDto(value)
+
+
+@dataclass
+class GetFileSystemAndPathFromUrlResponseDto(DataTransferObject):
+    fs: FsDto
+    path: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "GetFileSystemAndPathFromUrlResponseDto",
+            "fs": convert_to_json_value(self.fs),
+            "path": self.path,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "GetFileSystemAndPathFromUrlResponseDto | MessageParsingError":
+        return parse_as_GetFileSystemAndPathFromUrlResponseDto(value)
+
+
+@dataclass
+class CheckDatasourceCompatibilityParams(DataTransferObject):
+    datasources: Tuple[FsDataSourceDto, ...]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "CheckDatasourceCompatibilityParams",
+            "datasources": tuple(
+                convert_to_json_value(item) for item in self.datasources
+            ),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "CheckDatasourceCompatibilityParams | MessageParsingError":
+        return parse_as_CheckDatasourceCompatibilityParams(value)
+
+
+@dataclass
+class CheckDatasourceCompatibilityResponse(DataTransferObject):
+    compatible: Tuple[bool, ...]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "CheckDatasourceCompatibilityResponse",
+            "compatible": tuple(item for item in self.compatible),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "CheckDatasourceCompatibilityResponse | MessageParsingError":
+        return parse_as_CheckDatasourceCompatibilityResponse(value)
+
+
+@dataclass
+class ListFsDirRequest(DataTransferObject):
+    fs: FsDto
+    path: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "ListFsDirRequest",
+            "fs": convert_to_json_value(self.fs),
+            "path": self.path,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "ListFsDirRequest | MessageParsingError":
+        return parse_as_ListFsDirRequest(value)
+
+
+@dataclass
+class ListFsDirResponse(DataTransferObject):
+    files: Tuple[str, ...]
+    directories: Tuple[str, ...]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "ListFsDirResponse",
+            "files": tuple(item for item in self.files),
+            "directories": tuple(item for item in self.directories),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "ListFsDirResponse | MessageParsingError":
+        return parse_as_ListFsDirResponse(value)
+
+
+@dataclass
+class HbpIamPublicKeyDto(DataTransferObject):
+    realm: Literal["hbp"]
+    public_key: str
+
+    @classmethod
+    def tag_value(cls) -> "str | None":
+        return None
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "realm": self.realm,
+            "public_key": self.public_key,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "HbpIamPublicKeyDto | MessageParsingError":
+        return parse_as_HbpIamPublicKeyDto(value)
+
+
+@dataclass
+class EbrainsAccessTokenHeaderDto(DataTransferObject):
+    alg: Literal["RS256"]
+    typ: Literal["JWT"]
+    kid: str
+
+    @classmethod
+    def tag_value(cls) -> "str | None":
+        return None
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "alg": self.alg,
+            "typ": self.typ,
+            "kid": self.kid,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "EbrainsAccessTokenHeaderDto | MessageParsingError":
+        return parse_as_EbrainsAccessTokenHeaderDto(value)
+
+
+@dataclass
+class EbrainsAccessTokenPayloadDto(DataTransferObject):
+    exp: int  # e.g. 1689775678
+    # iat: int # e.g. 1689334268
+    auth_time: int  # e.g. 1689170878
+    # jti: str # e.g. "1740e10e-b09c-4db8-acf8-63d1b417763a"
+    # iss: str # e.g. "https://iam.ebrains.eu/auth/realms/hbp"
+    # aud: Tuple[str] # e.g.: ["jupyterhub", "tutorialOidcApi", "jupyterhub-jsc", "xwiki", "team", "plus", "group"]
+    sub: str  # this is the user ID, e.g. "bdca269c-f207-4cdb-8b68-a562e434faed"
+    # typ: Literal["Bearer"]
+    # azp: str # e.g. "webilastik",
+    # session_state: str # e.g. "e29d75a2-0dfe-4a4c-a800-c35eae234a47"
+    # acr: str # e.g. "0"
+    # allowed-origins: Tuple[str] #e.g. ["https://app.ilastik.org"]
+    # scope: str # actually a list of strings concatenated with spaces: e.g. "profile roles email openid group team"
+    # sid: str # e.g.: "e29d75a2-0dfe-4a4c-a800-c35e12334a47"
+    # email_verified: bool # e.g. true
+    # gender: str # e.g. "null"
+    # name: str # e.g. "John Doe"
+    # mitreid-sub: str # e.g. "301234"
+    # preferred_username: str # e.g. "johndoe"
+    # given_name: str # e.g. "John"
+    # family_name: str # e.g. "Doe"
+    # email: str # e.g. "john.doe@example.com"
+
+    @classmethod
+    def tag_value(cls) -> "str | None":
+        return None
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "exp": self.exp,
+            "auth_time": self.auth_time,
+            "sub": self.sub,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "EbrainsAccessTokenPayloadDto | MessageParsingError":
+        return parse_as_EbrainsAccessTokenPayloadDto(value)
+
+
+@dataclass
+class EbrainsAccessTokenDto(DataTransferObject):
+    access_token: str
+    refresh_token: str
+
+    @classmethod
+    def tag_value(cls) -> "str | None":
+        return None
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "access_token": self.access_token,
+            "refresh_token": self.refresh_token,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "EbrainsAccessTokenDto | MessageParsingError":
+        return parse_as_EbrainsAccessTokenDto(value)
+
+
+@dataclass
+class DataProxyObjectUrlResponse(DataTransferObject):
+    url: str
+
+    @classmethod
+    def tag_value(cls) -> "str | None":
+        return None
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "url": self.url,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "DataProxyObjectUrlResponse | MessageParsingError":
+        return parse_as_DataProxyObjectUrlResponse(value)
+
+
+@dataclass
+class LoginRequiredErrorDto(DataTransferObject):
+    pass
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "LoginRequiredErrorDto",
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "LoginRequiredErrorDto | MessageParsingError":
+        return parse_as_LoginRequiredErrorDto(value)
+
+
+def parse_as_None(value: JsonValue) -> "None | MessageParsingError":
+    if isinstance(value, type(None)):
+        return value
+
+    return MessageParsingError(f"Could not parse {json.dumps(value)} as None")
+
+
+def parse_as_Union_of_StructureTensorEigenvaluesDto0GaussianGradientMagnitudeDto0None_endof_(
+    value: JsonValue,
+) -> "Union[StructureTensorEigenvaluesDto, GaussianGradientMagnitudeDto, None] | MessageParsingError":
+    parsed_option_0 = parse_as_StructureTensorEigenvaluesDto(value)
+    if not isinstance(parsed_option_0, MessageParsingError):
+        return parsed_option_0
+    parsed_option_1 = parse_as_GaussianGradientMagnitudeDto(value)
+    if not isinstance(parsed_option_1, MessageParsingError):
+        return parsed_option_1
+    parsed_option_2 = parse_as_None(value)
+    if not isinstance(parsed_option_2, MessageParsingError):
+        return parsed_option_2
+    return MessageParsingError(
+        f"Could not parse {json.dumps(value)} into Union[StructureTensorEigenvaluesDto, GaussianGradientMagnitudeDto, None]"
+    )
+
+
+def parse_as_float(value: JsonValue) -> "float | MessageParsingError":
+    if isinstance(value, float):
+        return value
+    if isinstance(value, int):
+        return float(value)
+    return MessageParsingError(f"Could not parse {json.dumps(value)} as float")
+
+
+def parse_as_str(value: JsonValue) -> "str | MessageParsingError":
+    if isinstance(value, str):
+        return value
+
+    return MessageParsingError(f"Could not parse {json.dumps(value)} as str")
+
+
+def parse_as_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_(
+    value: JsonValue,
+) -> "Literal['x', 'y', 'z'] | MessageParsingError":
+    tmp_0 = parse_as_str(value)
+    if not isinstance(tmp_0, MessageParsingError) and tmp_0 == "x":
+        return tmp_0
+    tmp_1 = parse_as_str(value)
+    if not isinstance(tmp_1, MessageParsingError) and tmp_1 == "y":
+        return tmp_1
+    tmp_2 = parse_as_str(value)
+    if not isinstance(tmp_2, MessageParsingError) and tmp_2 == "z":
+        return tmp_2
+    return MessageParsingError(f"Could not parse {value} as Literal['x', 'y', 'z']")
+
+
+def parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
+    value: JsonValue,
+) -> "Union[Literal['x', 'y', 'z'], None] | MessageParsingError":
+    parsed_option_0 = (
+        parse_as_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_(
+            value
+        )
+    )
+    if not isinstance(parsed_option_0, MessageParsingError):
+        return parsed_option_0
+    parsed_option_1 = parse_as_None(value)
+    if not isinstance(parsed_option_1, MessageParsingError):
+        return parsed_option_1
+    return MessageParsingError(
+        f"Could not parse {json.dumps(value)} into Union[Literal['x', 'y', 'z'], None]"
+    )
+
 
 def parse_as_int(value: JsonValue) -> "int | MessageParsingError":
     if isinstance(value, int):
         return value
 
     return MessageParsingError(f"Could not parse {json.dumps(value)} as int")
+
+
+def parse_as_StructureTensorEigenvaluesDto(
+    value: JsonValue,
+) -> "StructureTensorEigenvaluesDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as StructureTensorEigenvaluesDto"
+        )
+    if value.get("__class__") != "StructureTensorEigenvaluesDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as StructureTensorEigenvaluesDto"
+        )
+    tmp_preprocessor = parse_as_Union_of_StructureTensorEigenvaluesDto0GaussianGradientMagnitudeDto0None_endof_(
+        value.get("preprocessor")
+    )
+    if isinstance(tmp_preprocessor, MessageParsingError):
+        return tmp_preprocessor
+    tmp_innerScale = parse_as_float(value.get("innerScale"))
+    if isinstance(tmp_innerScale, MessageParsingError):
+        return tmp_innerScale
+    tmp_outerScale = parse_as_float(value.get("outerScale"))
+    if isinstance(tmp_outerScale, MessageParsingError):
+        return tmp_outerScale
+    tmp_window_size = parse_as_float(value.get("window_size"))
+    if isinstance(tmp_window_size, MessageParsingError):
+        return tmp_window_size
+    tmp_axis_2d = parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
+        value.get("axis_2d")
+    )
+    if isinstance(tmp_axis_2d, MessageParsingError):
+        return tmp_axis_2d
+    tmp_channel_index = parse_as_int(value.get("channel_index"))
+    if isinstance(tmp_channel_index, MessageParsingError):
+        return tmp_channel_index
+    return StructureTensorEigenvaluesDto(
+        preprocessor=tmp_preprocessor,
+        innerScale=tmp_innerScale,
+        outerScale=tmp_outerScale,
+        window_size=tmp_window_size,
+        axis_2d=tmp_axis_2d,
+        channel_index=tmp_channel_index,
+    )
+
+
+def parse_as_GaussianGradientMagnitudeDto(
+    value: JsonValue,
+) -> "GaussianGradientMagnitudeDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as GaussianGradientMagnitudeDto"
+        )
+    if value.get("__class__") != "GaussianGradientMagnitudeDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as GaussianGradientMagnitudeDto"
+        )
+    tmp_sigma = parse_as_float(value.get("sigma"))
+    if isinstance(tmp_sigma, MessageParsingError):
+        return tmp_sigma
+    tmp_window_size = parse_as_float(value.get("window_size"))
+    if isinstance(tmp_window_size, MessageParsingError):
+        return tmp_window_size
+    tmp_axis_2d = parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
+        value.get("axis_2d")
+    )
+    if isinstance(tmp_axis_2d, MessageParsingError):
+        return tmp_axis_2d
+    tmp_channel_index = parse_as_int(value.get("channel_index"))
+    if isinstance(tmp_channel_index, MessageParsingError):
+        return tmp_channel_index
+    return GaussianGradientMagnitudeDto(
+        sigma=tmp_sigma,
+        window_size=tmp_window_size,
+        axis_2d=tmp_axis_2d,
+        channel_index=tmp_channel_index,
+    )
 
 
 def parse_as_ColorDto(value: JsonValue) -> "ColorDto | MessageParsingError":
@@ -56,32 +2010,6 @@ def parse_as_ColorDto(value: JsonValue) -> "ColorDto | MessageParsingError":
     )
 
 
-@dataclass
-class ColorDto(DataTransferObject):
-    r: int
-    g: int
-    b: int
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "ColorDto",
-            "r": self.r,
-            "g": self.g,
-            "b": self.b,
-        }
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "ColorDto | MessageParsingError":
-        return parse_as_ColorDto(value)
-
-
-def parse_as_str(value: JsonValue) -> "str | MessageParsingError":
-    if isinstance(value, str):
-        return value
-
-    return MessageParsingError(f"Could not parse {json.dumps(value)} as str")
-
-
 def parse_as_LabelHeaderDto(value: JsonValue) -> "LabelHeaderDto | MessageParsingError":
     from collections.abc import Mapping
 
@@ -105,28 +2033,6 @@ def parse_as_LabelHeaderDto(value: JsonValue) -> "LabelHeaderDto | MessageParsin
     )
 
 
-@dataclass
-class LabelHeaderDto(DataTransferObject):
-    name: str
-    color: ColorDto
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "LabelHeaderDto",
-            "name": self.name,
-            "color": self.color.to_json_value(),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "LabelHeaderDto | MessageParsingError":
-        return parse_as_LabelHeaderDto(value)
-
-
-Protocol = Literal["http", "https", "file", "memory"]
-
-
 def parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote_0_quote_deepzoom_quote__endof_(
     value: JsonValue,
 ) -> "Literal['precomputed', 'n5', 'deepzoom'] | MessageParsingError":
@@ -142,13 +2048,6 @@ def parse_as_Literal_of__quote_precomputed_quote_0_quote_n5_quote_0_quote_deepzo
     return MessageParsingError(
         f"Could not parse {value} as Literal['precomputed', 'n5', 'deepzoom']"
     )
-
-
-def parse_as_None(value: JsonValue) -> "None | MessageParsingError":
-    if isinstance(value, type(None)):
-        return value
-
-    return MessageParsingError(f"Could not parse {json.dumps(value)} as None")
 
 
 def parse_as_Union_of_Literal_of__quote_precomputed_quote_0_quote_n5_quote_0_quote_deepzoom_quote__endof_0None_endof_(
@@ -295,33 +2194,6 @@ def parse_as_UrlDto(value: JsonValue) -> "UrlDto | MessageParsingError":
     )
 
 
-@dataclass
-class UrlDto(DataTransferObject):
-    datascheme: Optional[Literal["precomputed", "n5", "deepzoom"]]
-    protocol: Literal["http", "https", "file", "memory"]
-    hostname: str
-    port: Optional[int]
-    path: str
-    search: Optional[Mapping[str, str]]
-    fragment: Optional[str]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "UrlDto",
-            "datascheme": convert_to_json_value(self.datascheme),
-            "protocol": self.protocol,
-            "hostname": self.hostname,
-            "port": convert_to_json_value(self.port),
-            "path": self.path,
-            "search": convert_to_json_value(self.search),
-            "fragment": convert_to_json_value(self.fragment),
-        }
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "UrlDto | MessageParsingError":
-        return parse_as_UrlDto(value)
-
-
 def parse_as_Point5DDto(value: JsonValue) -> "Point5DDto | MessageParsingError":
     from collections.abc import Mapping
 
@@ -351,36 +2223,6 @@ def parse_as_Point5DDto(value: JsonValue) -> "Point5DDto | MessageParsingError":
         t=tmp_t,
         c=tmp_c,
     )
-
-
-@dataclass
-class Point5DDto(DataTransferObject):
-    x: int
-    y: int
-    z: int
-    t: int
-    c: int
-
-    @classmethod
-    def from_point5d(cls, point: Point5D) -> "Point5DDto":
-        return Point5DDto(x=point.x, y=point.y, z=point.z, t=point.t, c=point.c)
-
-    def to_point5d(self) -> Point5D:
-        return Point5D(x=self.x, y=self.y, z=self.z, t=self.t, c=self.c)
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "Point5DDto",
-            "x": self.x,
-            "y": self.y,
-            "z": self.z,
-            "t": self.t,
-            "c": self.c,
-        }
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "Point5DDto | MessageParsingError":
-        return parse_as_Point5DDto(value)
 
 
 def parse_as_Shape5DDto(value: JsonValue) -> "Shape5DDto | MessageParsingError":
@@ -414,30 +2256,6 @@ def parse_as_Shape5DDto(value: JsonValue) -> "Shape5DDto | MessageParsingError":
     )
 
 
-@dataclass
-class Shape5DDto(Point5DDto):
-    @classmethod
-    def from_shape5d(cls, shape: Shape5D) -> "Shape5DDto":
-        return Shape5DDto(x=shape.x, y=shape.y, z=shape.z, t=shape.t, c=shape.c)
-
-    def to_shape5d(self) -> Shape5D:
-        return Shape5D(x=self.x, y=self.y, z=self.z, t=self.t, c=self.c)
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "Shape5DDto",
-            "x": self.x,
-            "y": self.y,
-            "z": self.z,
-            "t": self.t,
-            "c": self.c,
-        }
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "Shape5DDto | MessageParsingError":
-        return parse_as_Shape5DDto(value)
-
-
 def parse_as_Interval5DDto(value: JsonValue) -> "Interval5DDto | MessageParsingError":
     from collections.abc import Mapping
 
@@ -461,35 +2279,6 @@ def parse_as_Interval5DDto(value: JsonValue) -> "Interval5DDto | MessageParsingE
     )
 
 
-@dataclass
-class Interval5DDto(DataTransferObject):
-    start: Point5DDto
-    stop: Point5DDto
-
-    @classmethod
-    def from_interval5d(cls, interval: Interval5D) -> "Interval5DDto":
-        return Interval5DDto(
-            start=Point5DDto.from_point5d(interval.start),
-            stop=Point5DDto.from_point5d(interval.stop),
-        )
-
-    def to_interval5d(self) -> Interval5D:
-        return Interval5D.create_from_start_stop(
-            start=self.start.to_point5d(), stop=self.stop.to_point5d()
-        )
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "Interval5DDto",
-            "start": self.start.to_json_value(),
-            "stop": self.stop.to_json_value(),
-        }
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "Interval5DDto | MessageParsingError":
-        return parse_as_Interval5DDto(value)
-
-
 def parse_as_OsfsDto(value: JsonValue) -> "OsfsDto | MessageParsingError":
     from collections.abc import Mapping
 
@@ -498,20 +2287,6 @@ def parse_as_OsfsDto(value: JsonValue) -> "OsfsDto | MessageParsingError":
     if value.get("__class__") != "OsfsDto":
         return MessageParsingError(f"Could not parse {json.dumps(value)} as OsfsDto")
     return OsfsDto()
-
-
-@dataclass
-class OsfsDto(DataTransferObject):
-    pass
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "OsfsDto",
-        }
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "OsfsDto | MessageParsingError":
-        return parse_as_OsfsDto(value)
 
 
 def parse_as_Literal_of__quote_http_quote_0_quote_https_quote__endof_(
@@ -561,29 +2336,6 @@ def parse_as_HttpFsDto(value: JsonValue) -> "HttpFsDto | MessageParsingError":
     )
 
 
-@dataclass
-class HttpFsDto(DataTransferObject):
-    protocol: Literal["http", "https"]
-    hostname: str
-    port: Optional[int]
-    path: str
-    search: Optional[Mapping[str, str]]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "HttpFsDto",
-            "protocol": self.protocol,
-            "hostname": self.hostname,
-            "port": convert_to_json_value(self.port),
-            "path": self.path,
-            "search": convert_to_json_value(self.search),
-        }
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "HttpFsDto | MessageParsingError":
-        return parse_as_HttpFsDto(value)
-
-
 def parse_as_BucketFSDto(value: JsonValue) -> "BucketFSDto | MessageParsingError":
     from collections.abc import Mapping
 
@@ -601,21 +2353,6 @@ def parse_as_BucketFSDto(value: JsonValue) -> "BucketFSDto | MessageParsingError
     return BucketFSDto(
         bucket_name=tmp_bucket_name,
     )
-
-
-@dataclass
-class BucketFSDto(DataTransferObject):
-    bucket_name: str
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "BucketFSDto",
-            "bucket_name": self.bucket_name,
-        }
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "BucketFSDto | MessageParsingError":
-        return parse_as_BucketFSDto(value)
 
 
 def parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto_endof_(
@@ -654,32 +2391,6 @@ def parse_as_ZipFsDto(value: JsonValue) -> "ZipFsDto | MessageParsingError":
         zip_file_fs=tmp_zip_file_fs,
         zip_file_path=tmp_zip_file_path,
     )
-
-
-@dataclass
-class ZipFsDto(DataTransferObject):
-    zip_file_fs: Union[OsfsDto, HttpFsDto, BucketFSDto]  # FIXME: no other ZipFs?
-    zip_file_path: str
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "ZipFsDto",
-            "zip_file_fs": convert_to_json_value(self.zip_file_fs),
-            "zip_file_path": self.zip_file_path,
-        }
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "ZipFsDto | MessageParsingError":
-        return parse_as_ZipFsDto(value)
-
-
-FsDto = Union[OsfsDto, HttpFsDto, BucketFSDto, ZipFsDto]
-
-DtypeDto = Literal["uint8", "uint16", "uint32", "uint64", "int64", "float32"]
-
-
-def dtype_to_dto(dtype: "np.dtype[Any]") -> DtypeDto:
-    return cast(DtypeDto, str(dtype))
 
 
 def parse_as_Union_of_OsfsDto0HttpFsDto0BucketFSDto0ZipFsDto_endof_(
@@ -824,46 +2535,6 @@ def parse_as_PrecomputedChunksDataSourceDto(
     )
 
 
-@dataclass
-class PrecomputedChunksDataSourceDto(DataTransferObject):
-    url: UrlDto
-    filesystem: FsDto
-    path: str
-    scale_key: str
-    interval: Interval5DDto
-    tile_shape: Shape5DDto
-    spatial_resolution: Tuple[int, int, int]
-    dtype: DtypeDto
-    encoder: Literal["raw", "jpeg"]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "PrecomputedChunksDataSourceDto",
-            "url": self.url.to_json_value(),
-            "filesystem": convert_to_json_value(self.filesystem),
-            "path": self.path,
-            "scale_key": self.scale_key,
-            "interval": self.interval.to_json_value(),
-            "tile_shape": self.tile_shape.to_json_value(),
-            "spatial_resolution": (
-                self.spatial_resolution[0],
-                self.spatial_resolution[1],
-                self.spatial_resolution[2],
-            ),
-            "dtype": self.dtype,
-            "encoder": self.encoder,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "PrecomputedChunksDataSourceDto | MessageParsingError":
-        return parse_as_PrecomputedChunksDataSourceDto(value)
-
-
-ImageFormatDto = Literal["jpeg", "jpg", "png"]
-
-
 def parse_as_DziSizeElementDto(
     value: JsonValue,
 ) -> "DziSizeElementDto | MessageParsingError":
@@ -887,25 +2558,6 @@ def parse_as_DziSizeElementDto(
         Width=tmp_Width,
         Height=tmp_Height,
     )
-
-
-@dataclass
-class DziSizeElementDto(DataTransferObject):
-    Width: int
-    Height: int
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "DziSizeElementDto",
-            "Width": self.Width,
-            "Height": self.Height,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "DziSizeElementDto | MessageParsingError":
-        return parse_as_DziSizeElementDto(value)
 
 
 def parse_as_Literal_of__quote_jpeg_quote_0_quote_jpg_quote_0_quote_png_quote__endof_(
@@ -960,29 +2612,6 @@ def parse_as_DziImageElementDto(
     )
 
 
-@dataclass
-class DziImageElementDto(DataTransferObject):
-    Format: ImageFormatDto
-    Overlap: int
-    TileSize: int
-    Size: DziSizeElementDto
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "DziImageElementDto",
-            "Format": self.Format,
-            "Overlap": self.Overlap,
-            "TileSize": self.TileSize,
-            "Size": self.Size.to_json_value(),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "DziImageElementDto | MessageParsingError":
-        return parse_as_DziImageElementDto(value)
-
-
 def parse_as_Literal_of_103_endof_(
     value: JsonValue,
 ) -> "Literal[1, 3] | MessageParsingError":
@@ -1034,31 +2663,6 @@ def parse_as_DziLevelSinkDto(
     )
 
 
-@dataclass
-class DziLevelSinkDto(DataTransferObject):
-    filesystem: FsDto
-    xml_path: str
-    dzi_image: DziImageElementDto
-    num_channels: Literal[1, 3]
-    level_index: int
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "DziLevelSinkDto",
-            "filesystem": convert_to_json_value(self.filesystem),
-            "xml_path": self.xml_path,
-            "dzi_image": self.dzi_image.to_json_value(),
-            "num_channels": self.num_channels,
-            "level_index": self.level_index,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "DziLevelSinkDto | MessageParsingError":
-        return parse_as_DziLevelSinkDto(value)
-
-
 def parse_as_DziLevelDataSourceDto(
     value: JsonValue,
 ) -> "DziLevelDataSourceDto | MessageParsingError":
@@ -1098,31 +2702,6 @@ def parse_as_DziLevelDataSourceDto(
     )
 
 
-@dataclass
-class DziLevelDataSourceDto(DataTransferObject):
-    filesystem: FsDto
-    xml_path: str
-    dzi_image: DziImageElementDto
-    num_channels: Literal[1, 3]
-    level_index: int
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "DziLevelDataSourceDto",
-            "filesystem": convert_to_json_value(self.filesystem),
-            "xml_path": self.xml_path,
-            "dzi_image": self.dzi_image.to_json_value(),
-            "num_channels": self.num_channels,
-            "level_index": self.level_index,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "DziLevelDataSourceDto | MessageParsingError":
-        return parse_as_DziLevelDataSourceDto(value)
-
-
 def parse_as_N5GzipCompressorDto(
     value: JsonValue,
 ) -> "N5GzipCompressorDto | MessageParsingError":
@@ -1142,31 +2721,6 @@ def parse_as_N5GzipCompressorDto(
     return N5GzipCompressorDto(
         level=tmp_level,
     )
-
-
-@dataclass
-class N5GzipCompressorDto(DataTransferObject):
-    level: int
-
-    @classmethod
-    def tag_key(cls) -> str:
-        return "type"
-
-    @classmethod
-    def tag_value(cls) -> str:
-        return "gzip"
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "type": "gzip",
-            "level": self.level,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "N5GzipCompressorDto | MessageParsingError":
-        return parse_as_N5GzipCompressorDto(value)
 
 
 def parse_as_N5Bzip2CompressorDto(
@@ -1190,31 +2744,6 @@ def parse_as_N5Bzip2CompressorDto(
     )
 
 
-@dataclass
-class N5Bzip2CompressorDto(DataTransferObject):
-    blockSize: int  # name doesn't make sense but is what is in the n5 'spec'
-
-    @classmethod
-    def tag_key(cls) -> str:
-        return "type"
-
-    @classmethod
-    def tag_value(cls) -> str:
-        return "bzip2"
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "type": "bzip2",
-            "blockSize": self.blockSize,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "N5Bzip2CompressorDto | MessageParsingError":
-        return parse_as_N5Bzip2CompressorDto(value)
-
-
 def parse_as_N5XzCompressorDto(
     value: JsonValue,
 ) -> "N5XzCompressorDto | MessageParsingError":
@@ -1236,31 +2765,6 @@ def parse_as_N5XzCompressorDto(
     )
 
 
-@dataclass
-class N5XzCompressorDto(DataTransferObject):
-    preset: int
-
-    @classmethod
-    def tag_key(cls) -> str:
-        return "type"
-
-    @classmethod
-    def tag_value(cls) -> str:
-        return "xz"
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "type": "xz",
-            "preset": self.preset,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "N5XzCompressorDto | MessageParsingError":
-        return parse_as_N5XzCompressorDto(value)
-
-
 def parse_as_N5RawCompressorDto(
     value: JsonValue,
 ) -> "N5RawCompressorDto | MessageParsingError":
@@ -1275,33 +2779,6 @@ def parse_as_N5RawCompressorDto(
             f"Could not parse {json.dumps(value)} as N5RawCompressorDto"
         )
     return N5RawCompressorDto()
-
-
-@dataclass
-class N5RawCompressorDto(DataTransferObject):
-    @classmethod
-    def tag_key(cls) -> str:
-        return "type"
-
-    @classmethod
-    def tag_value(cls) -> str:
-        return "raw"
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "type": "raw",
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "N5RawCompressorDto | MessageParsingError":
-        return parse_as_N5RawCompressorDto(value)
-
-
-N5CompressorDto = Union[
-    N5GzipCompressorDto, N5Bzip2CompressorDto, N5XzCompressorDto, N5RawCompressorDto
-]
 
 
 def parse_as_Tuple_of_int0_varlen__endof_(
@@ -1409,35 +2886,6 @@ def parse_as_N5DatasetAttributesDto(
     )
 
 
-@dataclass
-class N5DatasetAttributesDto(DataTransferObject):
-    dimensions: Tuple[int, ...]
-    blockSize: Tuple[int, ...]
-    # axes: Optional[Tuple[Literal["x", "y", "z", "t", "c"], ...]] # FIXME: retore this
-    axes: Optional[Tuple[str, ...]]  # FIXME: retore this
-    dataType: DtypeDto
-    compression: N5CompressorDto
-
-    @classmethod
-    def tag_value(cls) -> None:
-        return None
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "dimensions": tuple(item for item in self.dimensions),
-            "blockSize": tuple(item for item in self.blockSize),
-            "axes": convert_to_json_value(self.axes),
-            "dataType": self.dataType,
-            "compression": convert_to_json_value(self.compression),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "N5DatasetAttributesDto | MessageParsingError":
-        return parse_as_N5DatasetAttributesDto(value)
-
-
 def parse_as_N5DataSourceDto(
     value: JsonValue,
 ) -> "N5DataSourceDto | MessageParsingError":
@@ -1499,43 +2947,6 @@ def parse_as_N5DataSourceDto(
     )
 
 
-@dataclass
-class N5DataSourceDto(DataTransferObject):
-    url: UrlDto
-    filesystem: FsDto
-    path: str
-    interval: Interval5DDto
-    tile_shape: Shape5DDto
-    spatial_resolution: Tuple[int, int, int]
-    dtype: DtypeDto
-    compressor: N5CompressorDto
-    c_axiskeys_on_disk: str
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "N5DataSourceDto",
-            "url": self.url.to_json_value(),
-            "filesystem": convert_to_json_value(self.filesystem),
-            "path": self.path,
-            "interval": self.interval.to_json_value(),
-            "tile_shape": self.tile_shape.to_json_value(),
-            "spatial_resolution": (
-                self.spatial_resolution[0],
-                self.spatial_resolution[1],
-                self.spatial_resolution[2],
-            ),
-            "dtype": self.dtype,
-            "compressor": convert_to_json_value(self.compressor),
-            "c_axiskeys_on_disk": self.c_axiskeys_on_disk,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "N5DataSourceDto | MessageParsingError":
-        return parse_as_N5DataSourceDto(value)
-
-
 def parse_as_SkimageDataSourceDto(
     value: JsonValue,
 ) -> "SkimageDataSourceDto | MessageParsingError":
@@ -1585,47 +2996,6 @@ def parse_as_SkimageDataSourceDto(
         spatial_resolution=tmp_spatial_resolution,
         dtype=tmp_dtype,
     )
-
-
-@dataclass
-class SkimageDataSourceDto(DataTransferObject):
-    url: UrlDto
-    filesystem: FsDto
-    path: str
-    interval: Interval5DDto
-    tile_shape: Shape5DDto
-    spatial_resolution: Tuple[int, int, int]
-    dtype: DtypeDto
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "SkimageDataSourceDto",
-            "url": self.url.to_json_value(),
-            "filesystem": convert_to_json_value(self.filesystem),
-            "path": self.path,
-            "interval": self.interval.to_json_value(),
-            "tile_shape": self.tile_shape.to_json_value(),
-            "spatial_resolution": (
-                self.spatial_resolution[0],
-                self.spatial_resolution[1],
-                self.spatial_resolution[2],
-            ),
-            "dtype": self.dtype,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "SkimageDataSourceDto | MessageParsingError":
-        return parse_as_SkimageDataSourceDto(value)
-
-
-FsDataSourceDto = Union[
-    PrecomputedChunksDataSourceDto,
-    N5DataSourceDto,
-    SkimageDataSourceDto,
-    DziLevelDataSourceDto,
-]
 
 
 def parse_as_PrecomputedChunksSinkDto(
@@ -1683,41 +3053,6 @@ def parse_as_PrecomputedChunksSinkDto(
     )
 
 
-@dataclass
-class PrecomputedChunksSinkDto(DataTransferObject):
-    filesystem: Union[OsfsDto, HttpFsDto, BucketFSDto]
-    path: str  # FIXME?
-    tile_shape: Shape5DDto
-    interval: Interval5DDto
-    dtype: DtypeDto
-    scale_key: str  # fixme?
-    resolution: Tuple[int, int, int]
-    encoding: Literal["raw", "jpeg"]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "PrecomputedChunksSinkDto",
-            "filesystem": convert_to_json_value(self.filesystem),
-            "path": self.path,
-            "tile_shape": self.tile_shape.to_json_value(),
-            "interval": self.interval.to_json_value(),
-            "dtype": self.dtype,
-            "scale_key": self.scale_key,
-            "resolution": (
-                self.resolution[0],
-                self.resolution[1],
-                self.resolution[2],
-            ),
-            "encoding": self.encoding,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "PrecomputedChunksSinkDto | MessageParsingError":
-        return parse_as_PrecomputedChunksSinkDto(value)
-
-
 def parse_as_N5DataSinkDto(value: JsonValue) -> "N5DataSinkDto | MessageParsingError":
     from collections.abc import Mapping
 
@@ -1771,42 +3106,6 @@ def parse_as_N5DataSinkDto(value: JsonValue) -> "N5DataSinkDto | MessageParsingE
         dtype=tmp_dtype,
         compressor=tmp_compressor,
     )
-
-
-@dataclass
-class N5DataSinkDto(DataTransferObject):
-    filesystem: FsDto
-    path: str
-    interval: Interval5DDto
-    tile_shape: Shape5DDto
-    spatial_resolution: Tuple[int, int, int]
-    c_axiskeys: str
-    dtype: DtypeDto
-    compressor: N5CompressorDto
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "N5DataSinkDto",
-            "filesystem": convert_to_json_value(self.filesystem),
-            "path": self.path,
-            "interval": self.interval.to_json_value(),
-            "tile_shape": self.tile_shape.to_json_value(),
-            "spatial_resolution": (
-                self.spatial_resolution[0],
-                self.spatial_resolution[1],
-                self.spatial_resolution[2],
-            ),
-            "c_axiskeys": self.c_axiskeys,
-            "dtype": self.dtype,
-            "compressor": convert_to_json_value(self.compressor),
-        }
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "N5DataSinkDto | MessageParsingError":
-        return parse_as_N5DataSinkDto(value)
-
-
-DataSinkDto = Union[PrecomputedChunksSinkDto, N5DataSinkDto, DziLevelSinkDto]
 
 
 def parse_as_Union_of_PrecomputedChunksDataSourceDto0N5DataSourceDto0SkimageDataSourceDto0DziLevelDataSourceDto_endof_(
@@ -1874,32 +3173,6 @@ def parse_as_PixelAnnotationDto(
     )
 
 
-@dataclass
-class PixelAnnotationDto(DataTransferObject):
-    raw_data: FsDataSourceDto
-    points: Tuple[Tuple[int, int, int], ...]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "PixelAnnotationDto",
-            "raw_data": convert_to_json_value(self.raw_data),
-            "points": tuple(
-                (
-                    item[0],
-                    item[1],
-                    item[2],
-                )
-                for item in self.points
-            ),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "PixelAnnotationDto | MessageParsingError":
-        return parse_as_PixelAnnotationDto(value)
-
-
 def parse_as_RpcErrorDto(value: JsonValue) -> "RpcErrorDto | MessageParsingError":
     from collections.abc import Mapping
 
@@ -1917,21 +3190,6 @@ def parse_as_RpcErrorDto(value: JsonValue) -> "RpcErrorDto | MessageParsingError
     return RpcErrorDto(
         error=tmp_error,
     )
-
-
-@dataclass
-class RpcErrorDto(DataTransferObject):
-    error: str
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "RpcErrorDto",
-            "error": self.error,
-        }
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "RpcErrorDto | MessageParsingError":
-        return parse_as_RpcErrorDto(value)
 
 
 def parse_as_bool(value: JsonValue) -> "bool | MessageParsingError":
@@ -1962,23 +3220,6 @@ def parse_as_SetLiveUpdateParams(
     )
 
 
-@dataclass
-class SetLiveUpdateParams(DataTransferObject):
-    live_update: bool
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "SetLiveUpdateParams",
-            "live_update": self.live_update,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "SetLiveUpdateParams | MessageParsingError":
-        return parse_as_SetLiveUpdateParams(value)
-
-
 def parse_as_RecolorLabelParams(
     value: JsonValue,
 ) -> "RecolorLabelParams | MessageParsingError":
@@ -2002,25 +3243,6 @@ def parse_as_RecolorLabelParams(
         label_name=tmp_label_name,
         new_color=tmp_new_color,
     )
-
-
-@dataclass
-class RecolorLabelParams(DataTransferObject):
-    label_name: str
-    new_color: ColorDto
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "RecolorLabelParams",
-            "label_name": self.label_name,
-            "new_color": self.new_color.to_json_value(),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "RecolorLabelParams | MessageParsingError":
-        return parse_as_RecolorLabelParams(value)
 
 
 def parse_as_RenameLabelParams(
@@ -2048,25 +3270,6 @@ def parse_as_RenameLabelParams(
     )
 
 
-@dataclass
-class RenameLabelParams(DataTransferObject):
-    old_name: str
-    new_name: str
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "RenameLabelParams",
-            "old_name": self.old_name,
-            "new_name": self.new_name,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "RenameLabelParams | MessageParsingError":
-        return parse_as_RenameLabelParams(value)
-
-
 def parse_as_CreateLabelParams(
     value: JsonValue,
 ) -> "CreateLabelParams | MessageParsingError":
@@ -2092,25 +3295,6 @@ def parse_as_CreateLabelParams(
     )
 
 
-@dataclass
-class CreateLabelParams(DataTransferObject):
-    label_name: str
-    color: ColorDto
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "CreateLabelParams",
-            "label_name": self.label_name,
-            "color": self.color.to_json_value(),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "CreateLabelParams | MessageParsingError":
-        return parse_as_CreateLabelParams(value)
-
-
 def parse_as_RemoveLabelParams(
     value: JsonValue,
 ) -> "RemoveLabelParams | MessageParsingError":
@@ -2130,23 +3314,6 @@ def parse_as_RemoveLabelParams(
     return RemoveLabelParams(
         label_name=tmp_label_name,
     )
-
-
-@dataclass
-class RemoveLabelParams(DataTransferObject):
-    label_name: str
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "RemoveLabelParams",
-            "label_name": self.label_name,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "RemoveLabelParams | MessageParsingError":
-        return parse_as_RemoveLabelParams(value)
 
 
 def parse_as_AddPixelAnnotationParams(
@@ -2174,25 +3341,6 @@ def parse_as_AddPixelAnnotationParams(
     )
 
 
-@dataclass
-class AddPixelAnnotationParams(DataTransferObject):
-    label_name: str
-    pixel_annotation: PixelAnnotationDto
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "AddPixelAnnotationParams",
-            "label_name": self.label_name,
-            "pixel_annotation": self.pixel_annotation.to_json_value(),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "AddPixelAnnotationParams | MessageParsingError":
-        return parse_as_AddPixelAnnotationParams(value)
-
-
 def parse_as_RemovePixelAnnotationParams(
     value: JsonValue,
 ) -> "RemovePixelAnnotationParams | MessageParsingError":
@@ -2216,25 +3364,6 @@ def parse_as_RemovePixelAnnotationParams(
         label_name=tmp_label_name,
         pixel_annotation=tmp_pixel_annotation,
     )
-
-
-@dataclass
-class RemovePixelAnnotationParams(DataTransferObject):
-    label_name: str
-    pixel_annotation: PixelAnnotationDto
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "RemovePixelAnnotationParams",
-            "label_name": self.label_name,
-            "pixel_annotation": self.pixel_annotation.to_json_value(),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "RemovePixelAnnotationParams | MessageParsingError":
-        return parse_as_RemovePixelAnnotationParams(value)
 
 
 def parse_as_Tuple_of_PixelAnnotationDto0_varlen__endof_(
@@ -2278,25 +3407,6 @@ def parse_as_LabelDto(value: JsonValue) -> "LabelDto | MessageParsingError":
     )
 
 
-@dataclass
-class LabelDto(DataTransferObject):
-    name: str
-    color: ColorDto
-    annotations: Tuple[PixelAnnotationDto, ...]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "LabelDto",
-            "name": self.name,
-            "color": self.color.to_json_value(),
-            "annotations": tuple(item.to_json_value() for item in self.annotations),
-        }
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "LabelDto | MessageParsingError":
-        return parse_as_LabelDto(value)
-
-
 def parse_as_Tuple_of_LabelDto0_varlen__endof_(
     value: JsonValue,
 ) -> "Tuple[LabelDto, ...] | MessageParsingError":
@@ -2334,23 +3444,6 @@ def parse_as_BrushingAppletStateDto(
     )
 
 
-@dataclass
-class BrushingAppletStateDto(DataTransferObject):
-    labels: Tuple[LabelDto, ...]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "BrushingAppletStateDto",
-            "labels": tuple(item.to_json_value() for item in self.labels),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "BrushingAppletStateDto | MessageParsingError":
-        return parse_as_BrushingAppletStateDto(value)
-
-
 def parse_as_JobFinishedDto(value: JsonValue) -> "JobFinishedDto | MessageParsingError":
     from collections.abc import Mapping
 
@@ -2370,23 +3463,6 @@ def parse_as_JobFinishedDto(value: JsonValue) -> "JobFinishedDto | MessageParsin
     )
 
 
-@dataclass
-class JobFinishedDto(DataTransferObject):
-    error_message: Optional[str]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "JobFinishedDto",
-            "error_message": convert_to_json_value(self.error_message),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "JobFinishedDto | MessageParsingError":
-        return parse_as_JobFinishedDto(value)
-
-
 def parse_as_JobIsPendingDto(
     value: JsonValue,
 ) -> "JobIsPendingDto | MessageParsingError":
@@ -2401,22 +3477,6 @@ def parse_as_JobIsPendingDto(
             f"Could not parse {json.dumps(value)} as JobIsPendingDto"
         )
     return JobIsPendingDto()
-
-
-@dataclass
-class JobIsPendingDto(DataTransferObject):
-    pass
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "JobIsPendingDto",
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "JobIsPendingDto | MessageParsingError":
-        return parse_as_JobIsPendingDto(value)
 
 
 def parse_as_JobIsRunningDto(
@@ -2444,25 +3504,6 @@ def parse_as_JobIsRunningDto(
     )
 
 
-@dataclass
-class JobIsRunningDto(DataTransferObject):
-    num_completed_steps: int
-    num_dispatched_steps: int
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "JobIsRunningDto",
-            "num_completed_steps": self.num_completed_steps,
-            "num_dispatched_steps": self.num_dispatched_steps,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "JobIsRunningDto | MessageParsingError":
-        return parse_as_JobIsRunningDto(value)
-
-
 def parse_as_JobCanceledDto(value: JsonValue) -> "JobCanceledDto | MessageParsingError":
     from collections.abc import Mapping
 
@@ -2480,26 +3521,6 @@ def parse_as_JobCanceledDto(value: JsonValue) -> "JobCanceledDto | MessageParsin
     return JobCanceledDto(
         message=tmp_message,
     )
-
-
-@dataclass
-class JobCanceledDto(DataTransferObject):
-    message: str
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "JobCanceledDto",
-            "message": self.message,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "JobCanceledDto | MessageParsingError":
-        return parse_as_JobCanceledDto(value)
-
-
-JobStatusDto = Union[JobFinishedDto, JobIsPendingDto, JobIsRunningDto, JobCanceledDto]
 
 
 def parse_as_Union_of_JobFinishedDto0JobIsPendingDto0JobIsRunningDto0JobCanceledDto_endof_(
@@ -2549,27 +3570,6 @@ def parse_as_JobDto(value: JsonValue) -> "JobDto | MessageParsingError":
         uuid=tmp_uuid,
         status=tmp_status,
     )
-
-
-@dataclass
-class JobDto(DataTransferObject):
-    name: str
-    num_args: Optional[int]
-    uuid: str
-    status: JobStatusDto
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "JobDto",
-            "name": self.name,
-            "num_args": convert_to_json_value(self.num_args),
-            "uuid": self.uuid,
-            "status": convert_to_json_value(self.status),
-        }
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "JobDto | MessageParsingError":
-        return parse_as_JobDto(value)
 
 
 def parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto_endof_(
@@ -2630,25 +3630,6 @@ def parse_as_ExportJobDto(value: JsonValue) -> "ExportJobDto | MessageParsingErr
     )
 
 
-@dataclass
-class ExportJobDto(JobDto):
-    datasink: DataSinkDto
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "ExportJobDto",
-            "name": self.name,
-            "num_args": convert_to_json_value(self.num_args),
-            "uuid": self.uuid,
-            "status": convert_to_json_value(self.status),
-            "datasink": convert_to_json_value(self.datasink),
-        }
-
-    @classmethod
-    def from_json_value(cls, value: JsonValue) -> "ExportJobDto | MessageParsingError":
-        return parse_as_ExportJobDto(value)
-
-
 def parse_as_OpenDatasinkJobDto(
     value: JsonValue,
 ) -> "OpenDatasinkJobDto | MessageParsingError":
@@ -2692,27 +3673,6 @@ def parse_as_OpenDatasinkJobDto(
     )
 
 
-@dataclass
-class OpenDatasinkJobDto(JobDto):
-    datasink: DataSinkDto
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "OpenDatasinkJobDto",
-            "name": self.name,
-            "num_args": convert_to_json_value(self.num_args),
-            "uuid": self.uuid,
-            "status": convert_to_json_value(self.status),
-            "datasink": convert_to_json_value(self.datasink),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "OpenDatasinkJobDto | MessageParsingError":
-        return parse_as_OpenDatasinkJobDto(value)
-
-
 def parse_as_CreateDziPyramidJobDto(
     value: JsonValue,
 ) -> "CreateDziPyramidJobDto | MessageParsingError":
@@ -2746,26 +3706,6 @@ def parse_as_CreateDziPyramidJobDto(
         uuid=tmp_uuid,
         status=tmp_status,
     )
-
-
-@dataclass
-class CreateDziPyramidJobDto(JobDto):
-    pass
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "CreateDziPyramidJobDto",
-            "name": self.name,
-            "num_args": convert_to_json_value(self.num_args),
-            "uuid": self.uuid,
-            "status": convert_to_json_value(self.status),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "CreateDziPyramidJobDto | MessageParsingError":
-        return parse_as_CreateDziPyramidJobDto(value)
 
 
 def parse_as_ZipDirectoryJobDto(
@@ -2811,29 +3751,6 @@ def parse_as_ZipDirectoryJobDto(
         output_fs=tmp_output_fs,
         output_path=tmp_output_path,
     )
-
-
-@dataclass
-class ZipDirectoryJobDto(JobDto):
-    output_fs: FsDto
-    output_path: str
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "ZipDirectoryJobDto",
-            "name": self.name,
-            "num_args": convert_to_json_value(self.num_args),
-            "uuid": self.uuid,
-            "status": convert_to_json_value(self.status),
-            "output_fs": convert_to_json_value(self.output_fs),
-            "output_path": self.output_path,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "ZipDirectoryJobDto | MessageParsingError":
-        return parse_as_ZipDirectoryJobDto(value)
 
 
 def parse_as_Union_of_PrecomputedChunksSinkDto0N5DataSinkDto0DziLevelSinkDto0None_endof_(
@@ -2899,39 +3816,6 @@ def parse_as_TransferFileJobDto(
         target_url=tmp_target_url,
         result_sink=tmp_result_sink,
     )
-
-
-@dataclass
-class TransferFileJobDto(JobDto):
-    target_url: UrlDto
-    result_sink: Optional[DataSinkDto]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "TransferFileJobDto",
-            "name": self.name,
-            "num_args": convert_to_json_value(self.num_args),
-            "uuid": self.uuid,
-            "status": convert_to_json_value(self.status),
-            "target_url": self.target_url.to_json_value(),
-            "result_sink": convert_to_json_value(self.result_sink),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "TransferFileJobDto | MessageParsingError":
-        return parse_as_TransferFileJobDto(value)
-
-
-ExportJobDtoUnion = Union[
-    ExportJobDto,
-    OpenDatasinkJobDto,
-    CreateDziPyramidJobDto,
-    ZipDirectoryJobDto,
-    TransferFileJobDto,
-    JobDto,
-]
 
 
 def parse_as_Union_of_ExportJobDto0OpenDatasinkJobDto0CreateDziPyramidJobDto0ZipDirectoryJobDto0TransferFileJobDto0JobDto_endof_(
@@ -3099,72 +3983,6 @@ def parse_as_PixelClassificationExportAppletStateDto(
     )
 
 
-@dataclass
-class PixelClassificationExportAppletStateDto(DataTransferObject):
-    jobs: Tuple[ExportJobDtoUnion, ...]
-    populated_labels: Optional[Tuple[LabelHeaderDto, ...]]
-    datasource_suggestions: Optional[Tuple[FsDataSourceDto, ...]]
-    upstream_ready: bool
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "PixelClassificationExportAppletStateDto",
-            "jobs": tuple(convert_to_json_value(item) for item in self.jobs),
-            "populated_labels": convert_to_json_value(self.populated_labels),
-            "datasource_suggestions": convert_to_json_value(
-                self.datasource_suggestions
-            ),
-            "upstream_ready": self.upstream_ready,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "PixelClassificationExportAppletStateDto | MessageParsingError":
-        return parse_as_PixelClassificationExportAppletStateDto(value)
-
-
-def parse_as_float(value: JsonValue) -> "float | MessageParsingError":
-    if isinstance(value, float):
-        return value
-    if isinstance(value, int):
-        return float(value)
-    return MessageParsingError(f"Could not parse {json.dumps(value)} as float")
-
-
-def parse_as_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_(
-    value: JsonValue,
-) -> "Literal['x', 'y', 'z'] | MessageParsingError":
-    tmp_0 = parse_as_str(value)
-    if not isinstance(tmp_0, MessageParsingError) and tmp_0 == "x":
-        return tmp_0
-    tmp_1 = parse_as_str(value)
-    if not isinstance(tmp_1, MessageParsingError) and tmp_1 == "y":
-        return tmp_1
-    tmp_2 = parse_as_str(value)
-    if not isinstance(tmp_2, MessageParsingError) and tmp_2 == "z":
-        return tmp_2
-    return MessageParsingError(f"Could not parse {value} as Literal['x', 'y', 'z']")
-
-
-def parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
-    value: JsonValue,
-) -> "Union[Literal['x', 'y', 'z'], None] | MessageParsingError":
-    parsed_option_0 = (
-        parse_as_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_(
-            value
-        )
-    )
-    if not isinstance(parsed_option_0, MessageParsingError):
-        return parsed_option_0
-    parsed_option_1 = parse_as_None(value)
-    if not isinstance(parsed_option_1, MessageParsingError):
-        return parsed_option_1
-    return MessageParsingError(
-        f"Could not parse {json.dumps(value)} into Union[Literal['x', 'y', 'z'], None]"
-    )
-
-
 def parse_as_Literal_of__quote_GaussianSmoothing_quote_0_quote_LaplacianofGaussian_quote_0_quote_GaussianGradientMagnitude_quote_0_quote_DifferenceofGaussians_quote_0_quote_StructureTensorEigenvalues_quote_0_quote_HessianofGaussianEigenvalues_quote__endof_(
     value: JsonValue,
 ) -> "Literal['Gaussian Smoothing', 'Laplacian of Gaussian', 'Gaussian Gradient Magnitude', 'Difference of Gaussians', 'Structure Tensor Eigenvalues', 'Hessian of Gaussian Eigenvalues'] | MessageParsingError":
@@ -3236,34 +4054,6 @@ def parse_as_IlpFeatureExtractorDto(
     )
 
 
-@dataclass
-class IlpFeatureExtractorDto(DataTransferObject):
-    ilp_scale: float
-    axis_2d: Optional[Literal["x", "y", "z"]]
-    class_name: Literal[
-        "Gaussian Smoothing",
-        "Laplacian of Gaussian",
-        "Gaussian Gradient Magnitude",
-        "Difference of Gaussians",
-        "Structure Tensor Eigenvalues",
-        "Hessian of Gaussian Eigenvalues",
-    ]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "IlpFeatureExtractorDto",
-            "ilp_scale": self.ilp_scale,
-            "axis_2d": convert_to_json_value(self.axis_2d),
-            "class_name": self.class_name,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "IlpFeatureExtractorDto | MessageParsingError":
-        return parse_as_IlpFeatureExtractorDto(value)
-
-
 def parse_as_Tuple_of_IlpFeatureExtractorDto0_varlen__endof_(
     value: JsonValue,
 ) -> "Tuple[IlpFeatureExtractorDto, ...] | MessageParsingError":
@@ -3303,25 +4093,6 @@ def parse_as_FeatureSelectionAppletStateDto(
     )
 
 
-@dataclass
-class FeatureSelectionAppletStateDto(DataTransferObject):
-    feature_extractors: Tuple[IlpFeatureExtractorDto, ...]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "FeatureSelectionAppletStateDto",
-            "feature_extractors": tuple(
-                item.to_json_value() for item in self.feature_extractors
-            ),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "FeatureSelectionAppletStateDto | MessageParsingError":
-        return parse_as_FeatureSelectionAppletStateDto(value)
-
-
 def parse_as_SetFeatureExtractorsParamsDto(
     value: JsonValue,
 ) -> "SetFeatureExtractorsParamsDto | MessageParsingError":
@@ -3343,25 +4114,6 @@ def parse_as_SetFeatureExtractorsParamsDto(
     return SetFeatureExtractorsParamsDto(
         feature_extractors=tmp_feature_extractors,
     )
-
-
-@dataclass
-class SetFeatureExtractorsParamsDto(DataTransferObject):
-    feature_extractors: Tuple[IlpFeatureExtractorDto, ...]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "SetFeatureExtractorsParamsDto",
-            "feature_extractors": tuple(
-                item.to_json_value() for item in self.feature_extractors
-            ),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "SetFeatureExtractorsParamsDto | MessageParsingError":
-        return parse_as_SetFeatureExtractorsParamsDto(value)
 
 
 def parse_as_Literal_of__quote_BOOT_FAIL_quote_0_quote_CANCELLED_quote_0_quote_COMPLETED_quote_0_quote_CONFIGURING_quote_0_quote_COMPLETING_quote_0_quote_DEADLINE_quote_0_quote_FAILED_quote_0_quote_NODE_FAIL_quote_0_quote_OUT_OF_MEMORY_quote_0_quote_PENDING_quote_0_quote_PREEMPTED_quote_0_quote_RUNNING_quote_0_quote_RESV_DEL_HOLD_quote_0_quote_REQUEUE_FED_quote_0_quote_REQUEUE_HOLD_quote_0_quote_REQUEUED_quote_0_quote_RESIZING_quote_0_quote_REVOKED_quote_0_quote_SIGNALING_quote_0_quote_SPECIAL_EXIT_quote_0_quote_STAGE_OUT_quote_0_quote_STOPPED_quote_0_quote_SUSPENDED_quote_0_quote_TIMEOUT_quote__endof_(
@@ -3489,61 +4241,6 @@ def parse_as_ComputeSessionDto(
     )
 
 
-@dataclass
-class ComputeSessionDto(DataTransferObject):
-    start_time_utc_sec: Optional[int]
-    time_elapsed_sec: int
-    time_limit_minutes: int
-    num_nodes: int
-    compute_session_id: str
-    state: Literal[
-        "BOOT_FAIL",
-        "CANCELLED",
-        "COMPLETED",
-        "CONFIGURING",
-        "COMPLETING",
-        "DEADLINE",
-        "FAILED",
-        "NODE_FAIL",
-        "OUT_OF_MEMORY",
-        "PENDING",
-        "PREEMPTED",
-        "RUNNING",
-        "RESV_DEL_HOLD",
-        "REQUEUE_FED",
-        "REQUEUE_HOLD",
-        "REQUEUED",
-        "RESIZING",
-        "REVOKED",
-        "SIGNALING",
-        "SPECIAL_EXIT",
-        "STAGE_OUT",
-        "STOPPED",
-        "SUSPENDED",
-        "TIMEOUT",
-    ]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "ComputeSessionDto",
-            "start_time_utc_sec": convert_to_json_value(self.start_time_utc_sec),
-            "time_elapsed_sec": self.time_elapsed_sec,
-            "time_limit_minutes": self.time_limit_minutes,
-            "num_nodes": self.num_nodes,
-            "compute_session_id": self.compute_session_id,
-            "state": self.state,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "ComputeSessionDto | MessageParsingError":
-        return parse_as_ComputeSessionDto(value)
-
-
-HpcSiteName = Literal["LOCAL_DASK", "LOCAL_PROCESS_POOL", "CSCS", "JUSUF"]
-
-
 def parse_as_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_(
     value: JsonValue,
 ) -> (
@@ -3601,29 +4298,6 @@ def parse_as_ComputeSessionStatusDto(
     )
 
 
-@dataclass
-class ComputeSessionStatusDto(DataTransferObject):
-    compute_session: ComputeSessionDto
-    hpc_site: HpcSiteName
-    session_url: UrlDto
-    connected: bool
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "ComputeSessionStatusDto",
-            "compute_session": self.compute_session.to_json_value(),
-            "hpc_site": self.hpc_site,
-            "session_url": self.session_url.to_json_value(),
-            "connected": self.connected,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "ComputeSessionStatusDto | MessageParsingError":
-        return parse_as_ComputeSessionStatusDto(value)
-
-
 def parse_as_CreateComputeSessionParamsDto(
     value: JsonValue,
 ) -> "CreateComputeSessionParamsDto | MessageParsingError":
@@ -3649,25 +4323,6 @@ def parse_as_CreateComputeSessionParamsDto(
         session_duration_minutes=tmp_session_duration_minutes,
         hpc_site=tmp_hpc_site,
     )
-
-
-@dataclass
-class CreateComputeSessionParamsDto(DataTransferObject):
-    session_duration_minutes: int
-    hpc_site: HpcSiteName
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "CreateComputeSessionParamsDto",
-            "session_duration_minutes": self.session_duration_minutes,
-            "hpc_site": self.hpc_site,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "CreateComputeSessionParamsDto | MessageParsingError":
-        return parse_as_CreateComputeSessionParamsDto(value)
 
 
 def parse_as_GetComputeSessionStatusParamsDto(
@@ -3697,25 +4352,6 @@ def parse_as_GetComputeSessionStatusParamsDto(
     )
 
 
-@dataclass
-class GetComputeSessionStatusParamsDto(DataTransferObject):
-    compute_session_id: str
-    hpc_site: HpcSiteName
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "GetComputeSessionStatusParamsDto",
-            "compute_session_id": self.compute_session_id,
-            "hpc_site": self.hpc_site,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "GetComputeSessionStatusParamsDto | MessageParsingError":
-        return parse_as_GetComputeSessionStatusParamsDto(value)
-
-
 def parse_as_CloseComputeSessionParamsDto(
     value: JsonValue,
 ) -> "CloseComputeSessionParamsDto | MessageParsingError":
@@ -3743,25 +4379,6 @@ def parse_as_CloseComputeSessionParamsDto(
     )
 
 
-@dataclass
-class CloseComputeSessionParamsDto(DataTransferObject):
-    compute_session_id: str
-    hpc_site: HpcSiteName
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "CloseComputeSessionParamsDto",
-            "compute_session_id": self.compute_session_id,
-            "hpc_site": self.hpc_site,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "CloseComputeSessionParamsDto | MessageParsingError":
-        return parse_as_CloseComputeSessionParamsDto(value)
-
-
 def parse_as_CloseComputeSessionResponseDto(
     value: JsonValue,
 ) -> "CloseComputeSessionResponseDto | MessageParsingError":
@@ -3781,23 +4398,6 @@ def parse_as_CloseComputeSessionResponseDto(
     return CloseComputeSessionResponseDto(
         compute_session_id=tmp_compute_session_id,
     )
-
-
-@dataclass
-class CloseComputeSessionResponseDto(DataTransferObject):
-    compute_session_id: str
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "CloseComputeSessionResponseDto",
-            "compute_session_id": self.compute_session_id,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "CloseComputeSessionResponseDto | MessageParsingError":
-        return parse_as_CloseComputeSessionResponseDto(value)
 
 
 def parse_as_ListComputeSessionsParamsDto(
@@ -3821,23 +4421,6 @@ def parse_as_ListComputeSessionsParamsDto(
     return ListComputeSessionsParamsDto(
         hpc_site=tmp_hpc_site,
     )
-
-
-@dataclass
-class ListComputeSessionsParamsDto(DataTransferObject):
-    hpc_site: HpcSiteName
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "ListComputeSessionsParamsDto",
-            "hpc_site": self.hpc_site,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "ListComputeSessionsParamsDto | MessageParsingError":
-        return parse_as_ListComputeSessionsParamsDto(value)
 
 
 def parse_as_Tuple_of_ComputeSessionStatusDto0_varlen__endof_(
@@ -3881,25 +4464,6 @@ def parse_as_ListComputeSessionsResponseDto(
     )
 
 
-@dataclass
-class ListComputeSessionsResponseDto(DataTransferObject):
-    compute_sessions_stati: Tuple[ComputeSessionStatusDto, ...]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "ListComputeSessionsResponseDto",
-            "compute_sessions_stati": tuple(
-                item.to_json_value() for item in self.compute_sessions_stati
-            ),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "ListComputeSessionsResponseDto | MessageParsingError":
-        return parse_as_ListComputeSessionsResponseDto(value)
-
-
 def parse_as_Tuple_of_Literal_of__quote_LOCAL_DASK_quote_0_quote_LOCAL_PROCESS_POOL_quote_0_quote_CSCS_quote_0_quote_JUSUF_quote__endof_0_varlen__endof_(
     value: JsonValue,
 ) -> "Tuple[Literal['LOCAL_DASK', 'LOCAL_PROCESS_POOL', 'CSCS', 'JUSUF'], ...] | MessageParsingError":
@@ -3941,23 +4505,6 @@ def parse_as_GetAvailableHpcSitesResponseDto(
     )
 
 
-@dataclass
-class GetAvailableHpcSitesResponseDto(DataTransferObject):
-    available_sites: Tuple[HpcSiteName, ...]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "GetAvailableHpcSitesResponseDto",
-            "available_sites": tuple(item for item in self.available_sites),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "GetAvailableHpcSitesResponseDto | MessageParsingError":
-        return parse_as_GetAvailableHpcSitesResponseDto(value)
-
-
 def parse_as_CheckLoginResultDto(
     value: JsonValue,
 ) -> "CheckLoginResultDto | MessageParsingError":
@@ -3977,23 +4524,6 @@ def parse_as_CheckLoginResultDto(
     return CheckLoginResultDto(
         logged_in=tmp_logged_in,
     )
-
-
-@dataclass
-class CheckLoginResultDto(DataTransferObject):
-    logged_in: bool
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "CheckLoginResultDto",
-            "logged_in": self.logged_in,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "CheckLoginResultDto | MessageParsingError":
-        return parse_as_CheckLoginResultDto(value)
 
 
 def parse_as_StartPixelProbabilitiesExportJobParamsDto(
@@ -4025,25 +4555,6 @@ def parse_as_StartPixelProbabilitiesExportJobParamsDto(
         datasource=tmp_datasource,
         datasink=tmp_datasink,
     )
-
-
-@dataclass
-class StartPixelProbabilitiesExportJobParamsDto(DataTransferObject):
-    datasource: FsDataSourceDto
-    datasink: DataSinkDto
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "StartPixelProbabilitiesExportJobParamsDto",
-            "datasource": convert_to_json_value(self.datasource),
-            "datasink": convert_to_json_value(self.datasink),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "StartPixelProbabilitiesExportJobParamsDto | MessageParsingError":
-        return parse_as_StartPixelProbabilitiesExportJobParamsDto(value)
 
 
 def parse_as_StartSimpleSegmentationExportJobParamsDto(
@@ -4081,27 +4592,6 @@ def parse_as_StartSimpleSegmentationExportJobParamsDto(
     )
 
 
-@dataclass
-class StartSimpleSegmentationExportJobParamsDto(DataTransferObject):
-    datasource: FsDataSourceDto
-    datasink: DataSinkDto
-    label_header: LabelHeaderDto
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "StartSimpleSegmentationExportJobParamsDto",
-            "datasource": convert_to_json_value(self.datasource),
-            "datasink": convert_to_json_value(self.datasink),
-            "label_header": self.label_header.to_json_value(),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "StartSimpleSegmentationExportJobParamsDto | MessageParsingError":
-        return parse_as_StartSimpleSegmentationExportJobParamsDto(value)
-
-
 def parse_as_LoadProjectParamsDto(
     value: JsonValue,
 ) -> "LoadProjectParamsDto | MessageParsingError":
@@ -4127,25 +4617,6 @@ def parse_as_LoadProjectParamsDto(
         fs=tmp_fs,
         project_file_path=tmp_project_file_path,
     )
-
-
-@dataclass
-class LoadProjectParamsDto(DataTransferObject):
-    fs: FsDto
-    project_file_path: str
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "LoadProjectParamsDto",
-            "fs": convert_to_json_value(self.fs),
-            "project_file_path": self.project_file_path,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "LoadProjectParamsDto | MessageParsingError":
-        return parse_as_LoadProjectParamsDto(value)
 
 
 def parse_as_SaveProjectParamsDto(
@@ -4175,25 +4646,6 @@ def parse_as_SaveProjectParamsDto(
     )
 
 
-@dataclass
-class SaveProjectParamsDto(DataTransferObject):
-    fs: FsDto
-    project_file_path: str
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "SaveProjectParamsDto",
-            "fs": convert_to_json_value(self.fs),
-            "project_file_path": self.project_file_path,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "SaveProjectParamsDto | MessageParsingError":
-        return parse_as_SaveProjectParamsDto(value)
-
-
 def parse_as_GetDatasourcesFromUrlParamsDto(
     value: JsonValue,
 ) -> "GetDatasourcesFromUrlParamsDto | MessageParsingError":
@@ -4213,23 +4665,6 @@ def parse_as_GetDatasourcesFromUrlParamsDto(
     return GetDatasourcesFromUrlParamsDto(
         url=tmp_url,
     )
-
-
-@dataclass
-class GetDatasourcesFromUrlParamsDto(DataTransferObject):
-    url: UrlDto
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "GetDatasourcesFromUrlParamsDto",
-            "url": self.url.to_json_value(),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "GetDatasourcesFromUrlParamsDto | MessageParsingError":
-        return parse_as_GetDatasourcesFromUrlParamsDto(value)
 
 
 def parse_as_GetDatasourcesFromUrlResponseDto(
@@ -4255,25 +4690,6 @@ def parse_as_GetDatasourcesFromUrlResponseDto(
     )
 
 
-@dataclass
-class GetDatasourcesFromUrlResponseDto(DataTransferObject):
-    datasources: Tuple[FsDataSourceDto, ...]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "GetDatasourcesFromUrlResponseDto",
-            "datasources": tuple(
-                convert_to_json_value(item) for item in self.datasources
-            ),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "GetDatasourcesFromUrlResponseDto | MessageParsingError":
-        return parse_as_GetDatasourcesFromUrlResponseDto(value)
-
-
 def parse_as_GetFileSystemAndPathFromUrlParamsDto(
     value: JsonValue,
 ) -> "GetFileSystemAndPathFromUrlParamsDto | MessageParsingError":
@@ -4293,23 +4709,6 @@ def parse_as_GetFileSystemAndPathFromUrlParamsDto(
     return GetFileSystemAndPathFromUrlParamsDto(
         url=tmp_url,
     )
-
-
-@dataclass
-class GetFileSystemAndPathFromUrlParamsDto(DataTransferObject):
-    url: UrlDto
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "GetFileSystemAndPathFromUrlParamsDto",
-            "url": self.url.to_json_value(),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "GetFileSystemAndPathFromUrlParamsDto | MessageParsingError":
-        return parse_as_GetFileSystemAndPathFromUrlParamsDto(value)
 
 
 def parse_as_GetFileSystemAndPathFromUrlResponseDto(
@@ -4339,25 +4738,6 @@ def parse_as_GetFileSystemAndPathFromUrlResponseDto(
     )
 
 
-@dataclass
-class GetFileSystemAndPathFromUrlResponseDto(DataTransferObject):
-    fs: FsDto
-    path: str
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "GetFileSystemAndPathFromUrlResponseDto",
-            "fs": convert_to_json_value(self.fs),
-            "path": self.path,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "GetFileSystemAndPathFromUrlResponseDto | MessageParsingError":
-        return parse_as_GetFileSystemAndPathFromUrlResponseDto(value)
-
-
 def parse_as_CheckDatasourceCompatibilityParams(
     value: JsonValue,
 ) -> "CheckDatasourceCompatibilityParams | MessageParsingError":
@@ -4379,25 +4759,6 @@ def parse_as_CheckDatasourceCompatibilityParams(
     return CheckDatasourceCompatibilityParams(
         datasources=tmp_datasources,
     )
-
-
-@dataclass
-class CheckDatasourceCompatibilityParams(DataTransferObject):
-    datasources: Tuple[FsDataSourceDto, ...]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "CheckDatasourceCompatibilityParams",
-            "datasources": tuple(
-                convert_to_json_value(item) for item in self.datasources
-            ),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "CheckDatasourceCompatibilityParams | MessageParsingError":
-        return parse_as_CheckDatasourceCompatibilityParams(value)
 
 
 def parse_as_Tuple_of_bool0_varlen__endof_(
@@ -4437,23 +4798,6 @@ def parse_as_CheckDatasourceCompatibilityResponse(
     )
 
 
-@dataclass
-class CheckDatasourceCompatibilityResponse(DataTransferObject):
-    compatible: Tuple[bool, ...]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "CheckDatasourceCompatibilityResponse",
-            "compatible": tuple(item for item in self.compatible),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "CheckDatasourceCompatibilityResponse | MessageParsingError":
-        return parse_as_CheckDatasourceCompatibilityResponse(value)
-
-
 def parse_as_ListFsDirRequest(
     value: JsonValue,
 ) -> "ListFsDirRequest | MessageParsingError":
@@ -4481,25 +4825,6 @@ def parse_as_ListFsDirRequest(
     )
 
 
-@dataclass
-class ListFsDirRequest(DataTransferObject):
-    fs: FsDto
-    path: str
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "ListFsDirRequest",
-            "fs": convert_to_json_value(self.fs),
-            "path": self.path,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "ListFsDirRequest | MessageParsingError":
-        return parse_as_ListFsDirRequest(value)
-
-
 def parse_as_ListFsDirResponse(
     value: JsonValue,
 ) -> "ListFsDirResponse | MessageParsingError":
@@ -4523,25 +4848,6 @@ def parse_as_ListFsDirResponse(
         files=tmp_files,
         directories=tmp_directories,
     )
-
-
-@dataclass
-class ListFsDirResponse(DataTransferObject):
-    files: Tuple[str, ...]
-    directories: Tuple[str, ...]
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "ListFsDirResponse",
-            "files": tuple(item for item in self.files),
-            "directories": tuple(item for item in self.directories),
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "ListFsDirResponse | MessageParsingError":
-        return parse_as_ListFsDirResponse(value)
 
 
 def parse_as_Literal_of__quote_hbp_quote__endof_(
@@ -4572,28 +4878,6 @@ def parse_as_HbpIamPublicKeyDto(
         realm=tmp_realm,
         public_key=tmp_public_key,
     )
-
-
-@dataclass
-class HbpIamPublicKeyDto(DataTransferObject):
-    realm: Literal["hbp"]
-    public_key: str
-
-    @classmethod
-    def tag_value(cls) -> "str | None":
-        return None
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "realm": self.realm,
-            "public_key": self.public_key,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "HbpIamPublicKeyDto | MessageParsingError":
-        return parse_as_HbpIamPublicKeyDto(value)
 
 
 def parse_as_Literal_of__quote_RS256_quote__endof_(
@@ -4639,30 +4923,6 @@ def parse_as_EbrainsAccessTokenHeaderDto(
     )
 
 
-@dataclass
-class EbrainsAccessTokenHeaderDto(DataTransferObject):
-    alg: Literal["RS256"]
-    typ: Literal["JWT"]
-    kid: str
-
-    @classmethod
-    def tag_value(cls) -> "str | None":
-        return None
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "alg": self.alg,
-            "typ": self.typ,
-            "kid": self.kid,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "EbrainsAccessTokenHeaderDto | MessageParsingError":
-        return parse_as_EbrainsAccessTokenHeaderDto(value)
-
-
 def parse_as_EbrainsAccessTokenPayloadDto(
     value: JsonValue,
 ) -> "EbrainsAccessTokenPayloadDto | MessageParsingError":
@@ -4688,49 +4948,6 @@ def parse_as_EbrainsAccessTokenPayloadDto(
     )
 
 
-@dataclass
-class EbrainsAccessTokenPayloadDto(DataTransferObject):
-    exp: int  # e.g. 1689775678
-    # iat: int # e.g. 1689334268
-    auth_time: int  # e.g. 1689170878
-    # jti: str # e.g. "1740e10e-b09c-4db8-acf8-63d1b417763a"
-    # iss: str # e.g. "https://iam.ebrains.eu/auth/realms/hbp"
-    # aud: Tuple[str] # e.g.: ["jupyterhub", "tutorialOidcApi", "jupyterhub-jsc", "xwiki", "team", "plus", "group"]
-    sub: str  # this is the user ID, e.g. "bdca269c-f207-4cdb-8b68-a562e434faed"
-    # typ: Literal["Bearer"]
-    # azp: str # e.g. "webilastik",
-    # session_state: str # e.g. "e29d75a2-0dfe-4a4c-a800-c35eae234a47"
-    # acr: str # e.g. "0"
-    # allowed-origins: Tuple[str] #e.g. ["https://app.ilastik.org"]
-    # scope: str # actually a list of strings concatenated with spaces: e.g. "profile roles email openid group team"
-    # sid: str # e.g.: "e29d75a2-0dfe-4a4c-a800-c35e12334a47"
-    # email_verified: bool # e.g. true
-    # gender: str # e.g. "null"
-    # name: str # e.g. "John Doe"
-    # mitreid-sub: str # e.g. "301234"
-    # preferred_username: str # e.g. "johndoe"
-    # given_name: str # e.g. "John"
-    # family_name: str # e.g. "Doe"
-    # email: str # e.g. "john.doe@example.com"
-
-    @classmethod
-    def tag_value(cls) -> "str | None":
-        return None
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "exp": self.exp,
-            "auth_time": self.auth_time,
-            "sub": self.sub,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "EbrainsAccessTokenPayloadDto | MessageParsingError":
-        return parse_as_EbrainsAccessTokenPayloadDto(value)
-
-
 def parse_as_EbrainsAccessTokenDto(
     value: JsonValue,
 ) -> "EbrainsAccessTokenDto | MessageParsingError":
@@ -4752,28 +4969,6 @@ def parse_as_EbrainsAccessTokenDto(
     )
 
 
-@dataclass
-class EbrainsAccessTokenDto(DataTransferObject):
-    access_token: str
-    refresh_token: str
-
-    @classmethod
-    def tag_value(cls) -> "str | None":
-        return None
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "access_token": self.access_token,
-            "refresh_token": self.refresh_token,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "EbrainsAccessTokenDto | MessageParsingError":
-        return parse_as_EbrainsAccessTokenDto(value)
-
-
 def parse_as_DataProxyObjectUrlResponse(
     value: JsonValue,
 ) -> "DataProxyObjectUrlResponse | MessageParsingError":
@@ -4791,26 +4986,6 @@ def parse_as_DataProxyObjectUrlResponse(
     )
 
 
-@dataclass
-class DataProxyObjectUrlResponse(DataTransferObject):
-    url: str
-
-    @classmethod
-    def tag_value(cls) -> "str | None":
-        return None
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "url": self.url,
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "DataProxyObjectUrlResponse | MessageParsingError":
-        return parse_as_DataProxyObjectUrlResponse(value)
-
-
 def parse_as_LoginRequiredErrorDto(
     value: JsonValue,
 ) -> "LoginRequiredErrorDto | MessageParsingError":
@@ -4825,19 +5000,3 @@ def parse_as_LoginRequiredErrorDto(
             f"Could not parse {json.dumps(value)} as LoginRequiredErrorDto"
         )
     return LoginRequiredErrorDto()
-
-
-@dataclass
-class LoginRequiredErrorDto(DataTransferObject):
-    pass
-
-    def to_json_value(self) -> JsonObject:
-        return {
-            "__class__": "LoginRequiredErrorDto",
-        }
-
-    @classmethod
-    def from_json_value(
-        cls, value: JsonValue
-    ) -> "LoginRequiredErrorDto | MessageParsingError":
-        return parse_as_LoginRequiredErrorDto(value)

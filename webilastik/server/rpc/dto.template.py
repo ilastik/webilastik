@@ -12,6 +12,69 @@ from webilastik.server.rpc import DataTransferObject
 # class DataType(DataTransferObject):
 #     type_name: Literal["uint8", "uint16", "uint32", "uint64", "float32"]
 
+Axis2D = Literal["x", "y", "z"]
+
+Preprocessor = Union[
+    "StructureTensorEigenvaluesDto",
+    "GaussianGradientMagnitudeDto"
+    # "GaussianSmoothingDto",
+    # "DifferenceOfGaussiansDto",
+    # "HessianOfGaussianEigenvalues",
+    # "LaplacianOfGaussian",
+    # "OpRetrieverDto",
+]
+
+@dataclass
+class StructureTensorEigenvaluesDto(DataTransferObject):
+    preprocessor: Optional[Preprocessor]
+    innerScale: float
+    outerScale: float
+    window_size: float
+    axis_2d: Optional[Axis2D]
+    channel_index: int
+
+@dataclass
+class GaussianGradientMagnitudeDto(DataTransferObject):
+    sigma: float
+    window_size: float
+    axis_2d: Optional[Axis2D]
+    channel_index: int
+
+# @dataclass
+# class GaussianSmoothingDto(DataTransferObject):
+#     sigma: float
+#     window_size: float
+#     axis_2d: Optional[Axis2D]
+#     channel_index: int
+
+# @dataclass
+# class DifferenceOfGaussiansDto(DataTransferObject):
+#     sigma0: float
+#     sigma1: float
+#     window_size: float
+#     axis_2d: Optional[Axis2D]
+#     channel_index: int
+
+# @dataclass
+# class HessianOfGaussianEigenvalues(DataTransferObject):
+#     scale: float
+#     window_size: float
+#     axis_2d: Optional[Axis2D]
+#     channel_index: int
+
+# @dataclass
+# class LaplacianOfGaussian(DataTransferObject):
+#     scale: float
+#     window_size: float
+#     axis_2d: Optional[Axis2D]
+#     channel_index: int
+
+# @dataclass
+# class OpRetrieverDto(DataTransferObject):
+#     axiskeys_hint: str
+
+###################################################333
+
 @dataclass
 class ColorDto(DataTransferObject):
     r: int
