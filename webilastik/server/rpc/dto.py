@@ -19,6 +19,8 @@ from typing import Literal, Optional, Tuple, Union, Mapping, Any, cast
 
 from dataclasses import dataclass
 
+from typing_extensions import TypeAlias
+
 from ndstructs.point5D import Interval5D, Point5D, Shape5D
 
 import numpy as np
@@ -27,20 +29,36 @@ from webilastik.server.rpc import DataTransferObject
 
 Axis2D = Literal["x", "y", "z"]
 
-Preprocessor = Union[
+IlpFilterDto: TypeAlias = Union[
+    "IlpGaussianSmoothingDto",
+    "IlpLaplacianOfGaussianDto",
+    "IlpGaussianGradientMagnitudeDto",
+    "IlpDifferenceOfGaussiansDto",
+    "IlpStructureTensorEigenvaluesDto",
+    "IlpHessianOfGaussianEigenvaluesDto",
+]
+
+FastFilterDto: TypeAlias = Union[
+    "GaussianSmoothingDto",
+    "LaplacianOfGaussianDto",
+    "GaussianGradientMagnitudeDto",
+    "DifferenceOfGaussiansDto",
     "StructureTensorEigenvaluesDto",
-    "GaussianGradientMagnitudeDto"
-    # "GaussianSmoothingDto",
-    # "DifferenceOfGaussiansDto",
-    # "HessianOfGaussianEigenvalues",
-    # "LaplacianOfGaussian",
-    # "OpRetrieverDto",
+    "HessianOfGaussianEigenvaluesDto",
+]
+
+PreprocessorDto = Union[
+    "OpRetrieverDto",
+    "FeatureExtractorCollectionDto",
+    # "IlpFilterCollectionDto",
+    FastFilterDto,
+    IlpFilterDto,
 ]
 
 
 @dataclass
 class StructureTensorEigenvaluesDto(DataTransferObject):
-    preprocessor: Optional[Preprocessor]
+    preprocessor: PreprocessorDto
     innerScale: float
     outerScale: float
     window_size: float
@@ -67,6 +85,7 @@ class StructureTensorEigenvaluesDto(DataTransferObject):
 
 @dataclass
 class GaussianGradientMagnitudeDto(DataTransferObject):
+    preprocessor: PreprocessorDto
     sigma: float
     window_size: float
     axis_2d: Optional[Axis2D]
@@ -75,6 +94,7 @@ class GaussianGradientMagnitudeDto(DataTransferObject):
     def to_json_value(self) -> JsonObject:
         return {
             "__class__": "GaussianGradientMagnitudeDto",
+            "preprocessor": convert_to_json_value(self.preprocessor),
             "sigma": self.sigma,
             "window_size": self.window_size,
             "axis_2d": convert_to_json_value(self.axis_2d),
@@ -86,6 +106,144 @@ class GaussianGradientMagnitudeDto(DataTransferObject):
         cls, value: JsonValue
     ) -> "GaussianGradientMagnitudeDto | MessageParsingError":
         return parse_as_GaussianGradientMagnitudeDto(value)
+
+
+@dataclass
+class GaussianSmoothingDto(DataTransferObject):
+    preprocessor: PreprocessorDto
+    sigma: float
+    window_size: float
+    axis_2d: Optional[Axis2D]
+    channel_index: int
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "GaussianSmoothingDto",
+            "preprocessor": convert_to_json_value(self.preprocessor),
+            "sigma": self.sigma,
+            "window_size": self.window_size,
+            "axis_2d": convert_to_json_value(self.axis_2d),
+            "channel_index": self.channel_index,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "GaussianSmoothingDto | MessageParsingError":
+        return parse_as_GaussianSmoothingDto(value)
+
+
+@dataclass
+class DifferenceOfGaussiansDto(DataTransferObject):
+    preprocessor: PreprocessorDto
+    sigma0: float
+    sigma1: float
+    window_size: float
+    axis_2d: Optional[Axis2D]
+    channel_index: int
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "DifferenceOfGaussiansDto",
+            "preprocessor": convert_to_json_value(self.preprocessor),
+            "sigma0": self.sigma0,
+            "sigma1": self.sigma1,
+            "window_size": self.window_size,
+            "axis_2d": convert_to_json_value(self.axis_2d),
+            "channel_index": self.channel_index,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "DifferenceOfGaussiansDto | MessageParsingError":
+        return parse_as_DifferenceOfGaussiansDto(value)
+
+
+@dataclass
+class HessianOfGaussianEigenvaluesDto(DataTransferObject):
+    preprocessor: PreprocessorDto
+    scale: float
+    window_size: float
+    axis_2d: Optional[Axis2D]
+    channel_index: int
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "HessianOfGaussianEigenvaluesDto",
+            "preprocessor": convert_to_json_value(self.preprocessor),
+            "scale": self.scale,
+            "window_size": self.window_size,
+            "axis_2d": convert_to_json_value(self.axis_2d),
+            "channel_index": self.channel_index,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "HessianOfGaussianEigenvaluesDto | MessageParsingError":
+        return parse_as_HessianOfGaussianEigenvaluesDto(value)
+
+
+@dataclass
+class LaplacianOfGaussianDto(DataTransferObject):
+    preprocessor: PreprocessorDto
+    scale: float
+    window_size: float
+    axis_2d: Optional[Axis2D]
+    channel_index: int
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "LaplacianOfGaussianDto",
+            "preprocessor": convert_to_json_value(self.preprocessor),
+            "scale": self.scale,
+            "window_size": self.window_size,
+            "axis_2d": convert_to_json_value(self.axis_2d),
+            "channel_index": self.channel_index,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "LaplacianOfGaussianDto | MessageParsingError":
+        return parse_as_LaplacianOfGaussianDto(value)
+
+
+@dataclass
+class OpRetrieverDto(DataTransferObject):
+    axiskeys_hint: str
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "OpRetrieverDto",
+            "axiskeys_hint": self.axiskeys_hint,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "OpRetrieverDto | MessageParsingError":
+        return parse_as_OpRetrieverDto(value)
+
+
+@dataclass
+class FeatureExtractorCollectionDto(DataTransferObject):
+    extractors: Tuple[PreprocessorDto, ...]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "FeatureExtractorCollectionDto",
+            "extractors": tuple(
+                convert_to_json_value(item) for item in self.extractors
+            ),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "FeatureExtractorCollectionDto | MessageParsingError":
+        return parse_as_FeatureExtractorCollectionDto(value)
 
 
 @dataclass
@@ -1170,43 +1328,156 @@ class PixelClassificationExportAppletStateDto(DataTransferObject):
 
 
 @dataclass
-class IlpFeatureExtractorDto(DataTransferObject):
+class IlpGaussianSmoothingDto(DataTransferObject):
     ilp_scale: float
-    axis_2d: Optional[Literal["x", "y", "z"]]
-    class_name: Literal[
-        "Gaussian Smoothing",
-        "Laplacian of Gaussian",
-        "Gaussian Gradient Magnitude",
-        "Difference of Gaussians",
-        "Structure Tensor Eigenvalues",
-        "Hessian of Gaussian Eigenvalues",
-    ]
+    axis_2d: Optional[Axis2D]
+    channel_index: int
 
     def to_json_value(self) -> JsonObject:
         return {
-            "__class__": "IlpFeatureExtractorDto",
+            "__class__": "IlpGaussianSmoothingDto",
             "ilp_scale": self.ilp_scale,
             "axis_2d": convert_to_json_value(self.axis_2d),
-            "class_name": self.class_name,
+            "channel_index": self.channel_index,
         }
 
     @classmethod
     def from_json_value(
         cls, value: JsonValue
-    ) -> "IlpFeatureExtractorDto | MessageParsingError":
-        return parse_as_IlpFeatureExtractorDto(value)
+    ) -> "IlpGaussianSmoothingDto | MessageParsingError":
+        return parse_as_IlpGaussianSmoothingDto(value)
+
+
+@dataclass
+class IlpLaplacianOfGaussianDto(DataTransferObject):
+    ilp_scale: float
+    axis_2d: Optional[Axis2D]
+    channel_index: int
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "IlpLaplacianOfGaussianDto",
+            "ilp_scale": self.ilp_scale,
+            "axis_2d": convert_to_json_value(self.axis_2d),
+            "channel_index": self.channel_index,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "IlpLaplacianOfGaussianDto | MessageParsingError":
+        return parse_as_IlpLaplacianOfGaussianDto(value)
+
+
+@dataclass
+class IlpGaussianGradientMagnitudeDto(DataTransferObject):
+    ilp_scale: float
+    axis_2d: Optional[Axis2D]
+    channel_index: int
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "IlpGaussianGradientMagnitudeDto",
+            "ilp_scale": self.ilp_scale,
+            "axis_2d": convert_to_json_value(self.axis_2d),
+            "channel_index": self.channel_index,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "IlpGaussianGradientMagnitudeDto | MessageParsingError":
+        return parse_as_IlpGaussianGradientMagnitudeDto(value)
+
+
+@dataclass
+class IlpDifferenceOfGaussiansDto(DataTransferObject):
+    ilp_scale: float
+    axis_2d: Optional[Axis2D]
+    channel_index: int
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "IlpDifferenceOfGaussiansDto",
+            "ilp_scale": self.ilp_scale,
+            "axis_2d": convert_to_json_value(self.axis_2d),
+            "channel_index": self.channel_index,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "IlpDifferenceOfGaussiansDto | MessageParsingError":
+        return parse_as_IlpDifferenceOfGaussiansDto(value)
+
+
+@dataclass
+class IlpStructureTensorEigenvaluesDto(DataTransferObject):
+    ilp_scale: float
+    axis_2d: Optional[Axis2D]
+    channel_index: int
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "IlpStructureTensorEigenvaluesDto",
+            "ilp_scale": self.ilp_scale,
+            "axis_2d": convert_to_json_value(self.axis_2d),
+            "channel_index": self.channel_index,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "IlpStructureTensorEigenvaluesDto | MessageParsingError":
+        return parse_as_IlpStructureTensorEigenvaluesDto(value)
+
+
+@dataclass
+class IlpHessianOfGaussianEigenvaluesDto(DataTransferObject):
+    ilp_scale: float
+    axis_2d: Optional[Axis2D]
+    channel_index: int
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "IlpHessianOfGaussianEigenvaluesDto",
+            "ilp_scale": self.ilp_scale,
+            "axis_2d": convert_to_json_value(self.axis_2d),
+            "channel_index": self.channel_index,
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "IlpHessianOfGaussianEigenvaluesDto | MessageParsingError":
+        return parse_as_IlpHessianOfGaussianEigenvaluesDto(value)
+
+
+@dataclass
+class IlpFilterCollectionDto(DataTransferObject):
+    filters: Tuple[IlpFilterDto, ...]
+
+    def to_json_value(self) -> JsonObject:
+        return {
+            "__class__": "IlpFilterCollectionDto",
+            "filters": tuple(convert_to_json_value(item) for item in self.filters),
+        }
+
+    @classmethod
+    def from_json_value(
+        cls, value: JsonValue
+    ) -> "IlpFilterCollectionDto | MessageParsingError":
+        return parse_as_IlpFilterCollectionDto(value)
 
 
 @dataclass
 class FeatureSelectionAppletStateDto(DataTransferObject):
-    feature_extractors: Tuple[IlpFeatureExtractorDto, ...]
+    feature_extractors: IlpFilterCollectionDto
 
     def to_json_value(self) -> JsonObject:
         return {
             "__class__": "FeatureSelectionAppletStateDto",
-            "feature_extractors": tuple(
-                item.to_json_value() for item in self.feature_extractors
-            ),
+            "feature_extractors": self.feature_extractors.to_json_value(),
         }
 
     @classmethod
@@ -1218,14 +1489,12 @@ class FeatureSelectionAppletStateDto(DataTransferObject):
 
 @dataclass
 class SetFeatureExtractorsParamsDto(DataTransferObject):
-    feature_extractors: Tuple[IlpFeatureExtractorDto, ...]
+    feature_extractors: IlpFilterCollectionDto
 
     def to_json_value(self) -> JsonObject:
         return {
             "__class__": "SetFeatureExtractorsParamsDto",
-            "feature_extractors": tuple(
-                item.to_json_value() for item in self.feature_extractors
-            ),
+            "feature_extractors": self.feature_extractors.to_json_value(),
         }
 
     @classmethod
@@ -1828,27 +2097,53 @@ class LoginRequiredErrorDto(DataTransferObject):
         return parse_as_LoginRequiredErrorDto(value)
 
 
-def parse_as_None(value: JsonValue) -> "None | MessageParsingError":
-    if isinstance(value, type(None)):
-        return value
-
-    return MessageParsingError(f"Could not parse {json.dumps(value)} as None")
-
-
-def parse_as_Union_of_StructureTensorEigenvaluesDto0GaussianGradientMagnitudeDto0None_endof_(
+def parse_as_Union_of_OpRetrieverDto0FeatureExtractorCollectionDto0GaussianSmoothingDto0LaplacianOfGaussianDto0GaussianGradientMagnitudeDto0DifferenceOfGaussiansDto0StructureTensorEigenvaluesDto0HessianOfGaussianEigenvaluesDto0IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_(
     value: JsonValue,
-) -> "Union[StructureTensorEigenvaluesDto, GaussianGradientMagnitudeDto, None] | MessageParsingError":
-    parsed_option_0 = parse_as_StructureTensorEigenvaluesDto(value)
+) -> "Union[OpRetrieverDto, FeatureExtractorCollectionDto, GaussianSmoothingDto, LaplacianOfGaussianDto, GaussianGradientMagnitudeDto, DifferenceOfGaussiansDto, StructureTensorEigenvaluesDto, HessianOfGaussianEigenvaluesDto, IlpGaussianSmoothingDto, IlpLaplacianOfGaussianDto, IlpGaussianGradientMagnitudeDto, IlpDifferenceOfGaussiansDto, IlpStructureTensorEigenvaluesDto, IlpHessianOfGaussianEigenvaluesDto] | MessageParsingError":
+    parsed_option_0 = parse_as_OpRetrieverDto(value)
     if not isinstance(parsed_option_0, MessageParsingError):
         return parsed_option_0
-    parsed_option_1 = parse_as_GaussianGradientMagnitudeDto(value)
+    parsed_option_1 = parse_as_FeatureExtractorCollectionDto(value)
     if not isinstance(parsed_option_1, MessageParsingError):
         return parsed_option_1
-    parsed_option_2 = parse_as_None(value)
+    parsed_option_2 = parse_as_GaussianSmoothingDto(value)
     if not isinstance(parsed_option_2, MessageParsingError):
         return parsed_option_2
+    parsed_option_3 = parse_as_LaplacianOfGaussianDto(value)
+    if not isinstance(parsed_option_3, MessageParsingError):
+        return parsed_option_3
+    parsed_option_4 = parse_as_GaussianGradientMagnitudeDto(value)
+    if not isinstance(parsed_option_4, MessageParsingError):
+        return parsed_option_4
+    parsed_option_5 = parse_as_DifferenceOfGaussiansDto(value)
+    if not isinstance(parsed_option_5, MessageParsingError):
+        return parsed_option_5
+    parsed_option_6 = parse_as_StructureTensorEigenvaluesDto(value)
+    if not isinstance(parsed_option_6, MessageParsingError):
+        return parsed_option_6
+    parsed_option_7 = parse_as_HessianOfGaussianEigenvaluesDto(value)
+    if not isinstance(parsed_option_7, MessageParsingError):
+        return parsed_option_7
+    parsed_option_8 = parse_as_IlpGaussianSmoothingDto(value)
+    if not isinstance(parsed_option_8, MessageParsingError):
+        return parsed_option_8
+    parsed_option_9 = parse_as_IlpLaplacianOfGaussianDto(value)
+    if not isinstance(parsed_option_9, MessageParsingError):
+        return parsed_option_9
+    parsed_option_10 = parse_as_IlpGaussianGradientMagnitudeDto(value)
+    if not isinstance(parsed_option_10, MessageParsingError):
+        return parsed_option_10
+    parsed_option_11 = parse_as_IlpDifferenceOfGaussiansDto(value)
+    if not isinstance(parsed_option_11, MessageParsingError):
+        return parsed_option_11
+    parsed_option_12 = parse_as_IlpStructureTensorEigenvaluesDto(value)
+    if not isinstance(parsed_option_12, MessageParsingError):
+        return parsed_option_12
+    parsed_option_13 = parse_as_IlpHessianOfGaussianEigenvaluesDto(value)
+    if not isinstance(parsed_option_13, MessageParsingError):
+        return parsed_option_13
     return MessageParsingError(
-        f"Could not parse {json.dumps(value)} into Union[StructureTensorEigenvaluesDto, GaussianGradientMagnitudeDto, None]"
+        f"Could not parse {json.dumps(value)} into Union[OpRetrieverDto, FeatureExtractorCollectionDto, GaussianSmoothingDto, LaplacianOfGaussianDto, GaussianGradientMagnitudeDto, DifferenceOfGaussiansDto, StructureTensorEigenvaluesDto, HessianOfGaussianEigenvaluesDto, IlpGaussianSmoothingDto, IlpLaplacianOfGaussianDto, IlpGaussianGradientMagnitudeDto, IlpDifferenceOfGaussiansDto, IlpStructureTensorEigenvaluesDto, IlpHessianOfGaussianEigenvaluesDto]"
     )
 
 
@@ -1880,6 +2175,13 @@ def parse_as_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_(
     if not isinstance(tmp_2, MessageParsingError) and tmp_2 == "z":
         return tmp_2
     return MessageParsingError(f"Could not parse {value} as Literal['x', 'y', 'z']")
+
+
+def parse_as_None(value: JsonValue) -> "None | MessageParsingError":
+    if isinstance(value, type(None)):
+        return value
+
+    return MessageParsingError(f"Could not parse {json.dumps(value)} as None")
 
 
 def parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
@@ -1920,7 +2222,7 @@ def parse_as_StructureTensorEigenvaluesDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as StructureTensorEigenvaluesDto"
         )
-    tmp_preprocessor = parse_as_Union_of_StructureTensorEigenvaluesDto0GaussianGradientMagnitudeDto0None_endof_(
+    tmp_preprocessor = parse_as_Union_of_OpRetrieverDto0FeatureExtractorCollectionDto0GaussianSmoothingDto0LaplacianOfGaussianDto0GaussianGradientMagnitudeDto0DifferenceOfGaussiansDto0StructureTensorEigenvaluesDto0HessianOfGaussianEigenvaluesDto0IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_(
         value.get("preprocessor")
     )
     if isinstance(tmp_preprocessor, MessageParsingError):
@@ -1965,6 +2267,11 @@ def parse_as_GaussianGradientMagnitudeDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as GaussianGradientMagnitudeDto"
         )
+    tmp_preprocessor = parse_as_Union_of_OpRetrieverDto0FeatureExtractorCollectionDto0GaussianSmoothingDto0LaplacianOfGaussianDto0GaussianGradientMagnitudeDto0DifferenceOfGaussiansDto0StructureTensorEigenvaluesDto0HessianOfGaussianEigenvaluesDto0IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_(
+        value.get("preprocessor")
+    )
+    if isinstance(tmp_preprocessor, MessageParsingError):
+        return tmp_preprocessor
     tmp_sigma = parse_as_float(value.get("sigma"))
     if isinstance(tmp_sigma, MessageParsingError):
         return tmp_sigma
@@ -1980,10 +2287,256 @@ def parse_as_GaussianGradientMagnitudeDto(
     if isinstance(tmp_channel_index, MessageParsingError):
         return tmp_channel_index
     return GaussianGradientMagnitudeDto(
+        preprocessor=tmp_preprocessor,
         sigma=tmp_sigma,
         window_size=tmp_window_size,
         axis_2d=tmp_axis_2d,
         channel_index=tmp_channel_index,
+    )
+
+
+def parse_as_GaussianSmoothingDto(
+    value: JsonValue,
+) -> "GaussianSmoothingDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as GaussianSmoothingDto"
+        )
+    if value.get("__class__") != "GaussianSmoothingDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as GaussianSmoothingDto"
+        )
+    tmp_preprocessor = parse_as_Union_of_OpRetrieverDto0FeatureExtractorCollectionDto0GaussianSmoothingDto0LaplacianOfGaussianDto0GaussianGradientMagnitudeDto0DifferenceOfGaussiansDto0StructureTensorEigenvaluesDto0HessianOfGaussianEigenvaluesDto0IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_(
+        value.get("preprocessor")
+    )
+    if isinstance(tmp_preprocessor, MessageParsingError):
+        return tmp_preprocessor
+    tmp_sigma = parse_as_float(value.get("sigma"))
+    if isinstance(tmp_sigma, MessageParsingError):
+        return tmp_sigma
+    tmp_window_size = parse_as_float(value.get("window_size"))
+    if isinstance(tmp_window_size, MessageParsingError):
+        return tmp_window_size
+    tmp_axis_2d = parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
+        value.get("axis_2d")
+    )
+    if isinstance(tmp_axis_2d, MessageParsingError):
+        return tmp_axis_2d
+    tmp_channel_index = parse_as_int(value.get("channel_index"))
+    if isinstance(tmp_channel_index, MessageParsingError):
+        return tmp_channel_index
+    return GaussianSmoothingDto(
+        preprocessor=tmp_preprocessor,
+        sigma=tmp_sigma,
+        window_size=tmp_window_size,
+        axis_2d=tmp_axis_2d,
+        channel_index=tmp_channel_index,
+    )
+
+
+def parse_as_DifferenceOfGaussiansDto(
+    value: JsonValue,
+) -> "DifferenceOfGaussiansDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as DifferenceOfGaussiansDto"
+        )
+    if value.get("__class__") != "DifferenceOfGaussiansDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as DifferenceOfGaussiansDto"
+        )
+    tmp_preprocessor = parse_as_Union_of_OpRetrieverDto0FeatureExtractorCollectionDto0GaussianSmoothingDto0LaplacianOfGaussianDto0GaussianGradientMagnitudeDto0DifferenceOfGaussiansDto0StructureTensorEigenvaluesDto0HessianOfGaussianEigenvaluesDto0IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_(
+        value.get("preprocessor")
+    )
+    if isinstance(tmp_preprocessor, MessageParsingError):
+        return tmp_preprocessor
+    tmp_sigma0 = parse_as_float(value.get("sigma0"))
+    if isinstance(tmp_sigma0, MessageParsingError):
+        return tmp_sigma0
+    tmp_sigma1 = parse_as_float(value.get("sigma1"))
+    if isinstance(tmp_sigma1, MessageParsingError):
+        return tmp_sigma1
+    tmp_window_size = parse_as_float(value.get("window_size"))
+    if isinstance(tmp_window_size, MessageParsingError):
+        return tmp_window_size
+    tmp_axis_2d = parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
+        value.get("axis_2d")
+    )
+    if isinstance(tmp_axis_2d, MessageParsingError):
+        return tmp_axis_2d
+    tmp_channel_index = parse_as_int(value.get("channel_index"))
+    if isinstance(tmp_channel_index, MessageParsingError):
+        return tmp_channel_index
+    return DifferenceOfGaussiansDto(
+        preprocessor=tmp_preprocessor,
+        sigma0=tmp_sigma0,
+        sigma1=tmp_sigma1,
+        window_size=tmp_window_size,
+        axis_2d=tmp_axis_2d,
+        channel_index=tmp_channel_index,
+    )
+
+
+def parse_as_HessianOfGaussianEigenvaluesDto(
+    value: JsonValue,
+) -> "HessianOfGaussianEigenvaluesDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as HessianOfGaussianEigenvaluesDto"
+        )
+    if value.get("__class__") != "HessianOfGaussianEigenvaluesDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as HessianOfGaussianEigenvaluesDto"
+        )
+    tmp_preprocessor = parse_as_Union_of_OpRetrieverDto0FeatureExtractorCollectionDto0GaussianSmoothingDto0LaplacianOfGaussianDto0GaussianGradientMagnitudeDto0DifferenceOfGaussiansDto0StructureTensorEigenvaluesDto0HessianOfGaussianEigenvaluesDto0IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_(
+        value.get("preprocessor")
+    )
+    if isinstance(tmp_preprocessor, MessageParsingError):
+        return tmp_preprocessor
+    tmp_scale = parse_as_float(value.get("scale"))
+    if isinstance(tmp_scale, MessageParsingError):
+        return tmp_scale
+    tmp_window_size = parse_as_float(value.get("window_size"))
+    if isinstance(tmp_window_size, MessageParsingError):
+        return tmp_window_size
+    tmp_axis_2d = parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
+        value.get("axis_2d")
+    )
+    if isinstance(tmp_axis_2d, MessageParsingError):
+        return tmp_axis_2d
+    tmp_channel_index = parse_as_int(value.get("channel_index"))
+    if isinstance(tmp_channel_index, MessageParsingError):
+        return tmp_channel_index
+    return HessianOfGaussianEigenvaluesDto(
+        preprocessor=tmp_preprocessor,
+        scale=tmp_scale,
+        window_size=tmp_window_size,
+        axis_2d=tmp_axis_2d,
+        channel_index=tmp_channel_index,
+    )
+
+
+def parse_as_LaplacianOfGaussianDto(
+    value: JsonValue,
+) -> "LaplacianOfGaussianDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as LaplacianOfGaussianDto"
+        )
+    if value.get("__class__") != "LaplacianOfGaussianDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as LaplacianOfGaussianDto"
+        )
+    tmp_preprocessor = parse_as_Union_of_OpRetrieverDto0FeatureExtractorCollectionDto0GaussianSmoothingDto0LaplacianOfGaussianDto0GaussianGradientMagnitudeDto0DifferenceOfGaussiansDto0StructureTensorEigenvaluesDto0HessianOfGaussianEigenvaluesDto0IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_(
+        value.get("preprocessor")
+    )
+    if isinstance(tmp_preprocessor, MessageParsingError):
+        return tmp_preprocessor
+    tmp_scale = parse_as_float(value.get("scale"))
+    if isinstance(tmp_scale, MessageParsingError):
+        return tmp_scale
+    tmp_window_size = parse_as_float(value.get("window_size"))
+    if isinstance(tmp_window_size, MessageParsingError):
+        return tmp_window_size
+    tmp_axis_2d = parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
+        value.get("axis_2d")
+    )
+    if isinstance(tmp_axis_2d, MessageParsingError):
+        return tmp_axis_2d
+    tmp_channel_index = parse_as_int(value.get("channel_index"))
+    if isinstance(tmp_channel_index, MessageParsingError):
+        return tmp_channel_index
+    return LaplacianOfGaussianDto(
+        preprocessor=tmp_preprocessor,
+        scale=tmp_scale,
+        window_size=tmp_window_size,
+        axis_2d=tmp_axis_2d,
+        channel_index=tmp_channel_index,
+    )
+
+
+def parse_as_OpRetrieverDto(value: JsonValue) -> "OpRetrieverDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as OpRetrieverDto"
+        )
+    if value.get("__class__") != "OpRetrieverDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as OpRetrieverDto"
+        )
+    tmp_axiskeys_hint = parse_as_str(value.get("axiskeys_hint"))
+    if isinstance(tmp_axiskeys_hint, MessageParsingError):
+        return tmp_axiskeys_hint
+    return OpRetrieverDto(
+        axiskeys_hint=tmp_axiskeys_hint,
+    )
+
+
+def parse_as_Tuple_of_Union_of_OpRetrieverDto0FeatureExtractorCollectionDto0GaussianSmoothingDto0LaplacianOfGaussianDto0GaussianGradientMagnitudeDto0DifferenceOfGaussiansDto0StructureTensorEigenvaluesDto0HessianOfGaussianEigenvaluesDto0IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_0_varlen__endof_(
+    value: JsonValue,
+) -> "Tuple[Union[OpRetrieverDto, FeatureExtractorCollectionDto, GaussianSmoothingDto, LaplacianOfGaussianDto, GaussianGradientMagnitudeDto, DifferenceOfGaussiansDto, StructureTensorEigenvaluesDto, HessianOfGaussianEigenvaluesDto, IlpGaussianSmoothingDto, IlpLaplacianOfGaussianDto, IlpGaussianGradientMagnitudeDto, IlpDifferenceOfGaussiansDto, IlpStructureTensorEigenvaluesDto, IlpHessianOfGaussianEigenvaluesDto], ...] | MessageParsingError":
+    if not isinstance(value, (list, tuple)):
+        return MessageParsingError(
+            f"Could not parse Tuple[Union[OpRetrieverDto, FeatureExtractorCollectionDto, GaussianSmoothingDto, LaplacianOfGaussianDto, GaussianGradientMagnitudeDto, DifferenceOfGaussiansDto, StructureTensorEigenvaluesDto, HessianOfGaussianEigenvaluesDto, IlpGaussianSmoothingDto, IlpLaplacianOfGaussianDto, IlpGaussianGradientMagnitudeDto, IlpDifferenceOfGaussiansDto, IlpStructureTensorEigenvaluesDto, IlpHessianOfGaussianEigenvaluesDto], ...] from {json.dumps(value)}"
+        )
+    items: List[
+        Union[
+            OpRetrieverDto,
+            FeatureExtractorCollectionDto,
+            GaussianSmoothingDto,
+            LaplacianOfGaussianDto,
+            GaussianGradientMagnitudeDto,
+            DifferenceOfGaussiansDto,
+            StructureTensorEigenvaluesDto,
+            HessianOfGaussianEigenvaluesDto,
+            IlpGaussianSmoothingDto,
+            IlpLaplacianOfGaussianDto,
+            IlpGaussianGradientMagnitudeDto,
+            IlpDifferenceOfGaussiansDto,
+            IlpStructureTensorEigenvaluesDto,
+            IlpHessianOfGaussianEigenvaluesDto,
+        ]
+    ] = []
+    for item in value:
+        parsed = parse_as_Union_of_OpRetrieverDto0FeatureExtractorCollectionDto0GaussianSmoothingDto0LaplacianOfGaussianDto0GaussianGradientMagnitudeDto0DifferenceOfGaussiansDto0StructureTensorEigenvaluesDto0HessianOfGaussianEigenvaluesDto0IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_(
+            item
+        )
+        if isinstance(parsed, MessageParsingError):
+            return parsed
+        items.append(parsed)
+    return tuple(items)
+
+
+def parse_as_FeatureExtractorCollectionDto(
+    value: JsonValue,
+) -> "FeatureExtractorCollectionDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as FeatureExtractorCollectionDto"
+        )
+    if value.get("__class__") != "FeatureExtractorCollectionDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as FeatureExtractorCollectionDto"
+        )
+    tmp_extractors = parse_as_Tuple_of_Union_of_OpRetrieverDto0FeatureExtractorCollectionDto0GaussianSmoothingDto0LaplacianOfGaussianDto0GaussianGradientMagnitudeDto0DifferenceOfGaussiansDto0StructureTensorEigenvaluesDto0HessianOfGaussianEigenvaluesDto0IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_0_varlen__endof_(
+        value.get("extractors")
+    )
+    if isinstance(tmp_extractors, MessageParsingError):
+        return tmp_extractors
+    return FeatureExtractorCollectionDto(
+        extractors=tmp_extractors,
     )
 
 
@@ -3983,56 +4536,18 @@ def parse_as_PixelClassificationExportAppletStateDto(
     )
 
 
-def parse_as_Literal_of__quote_GaussianSmoothing_quote_0_quote_LaplacianofGaussian_quote_0_quote_GaussianGradientMagnitude_quote_0_quote_DifferenceofGaussians_quote_0_quote_StructureTensorEigenvalues_quote_0_quote_HessianofGaussianEigenvalues_quote__endof_(
+def parse_as_IlpGaussianSmoothingDto(
     value: JsonValue,
-) -> "Literal['Gaussian Smoothing', 'Laplacian of Gaussian', 'Gaussian Gradient Magnitude', 'Difference of Gaussians', 'Structure Tensor Eigenvalues', 'Hessian of Gaussian Eigenvalues'] | MessageParsingError":
-    tmp_0 = parse_as_str(value)
-    if not isinstance(tmp_0, MessageParsingError) and tmp_0 == "Gaussian Smoothing":
-        return tmp_0
-    tmp_1 = parse_as_str(value)
-    if not isinstance(tmp_1, MessageParsingError) and tmp_1 == "Laplacian of Gaussian":
-        return tmp_1
-    tmp_2 = parse_as_str(value)
-    if (
-        not isinstance(tmp_2, MessageParsingError)
-        and tmp_2 == "Gaussian Gradient Magnitude"
-    ):
-        return tmp_2
-    tmp_3 = parse_as_str(value)
-    if (
-        not isinstance(tmp_3, MessageParsingError)
-        and tmp_3 == "Difference of Gaussians"
-    ):
-        return tmp_3
-    tmp_4 = parse_as_str(value)
-    if (
-        not isinstance(tmp_4, MessageParsingError)
-        and tmp_4 == "Structure Tensor Eigenvalues"
-    ):
-        return tmp_4
-    tmp_5 = parse_as_str(value)
-    if (
-        not isinstance(tmp_5, MessageParsingError)
-        and tmp_5 == "Hessian of Gaussian Eigenvalues"
-    ):
-        return tmp_5
-    return MessageParsingError(
-        f"Could not parse {value} as Literal['Gaussian Smoothing', 'Laplacian of Gaussian', 'Gaussian Gradient Magnitude', 'Difference of Gaussians', 'Structure Tensor Eigenvalues', 'Hessian of Gaussian Eigenvalues']"
-    )
-
-
-def parse_as_IlpFeatureExtractorDto(
-    value: JsonValue,
-) -> "IlpFeatureExtractorDto | MessageParsingError":
+) -> "IlpGaussianSmoothingDto | MessageParsingError":
     from collections.abc import Mapping
 
     if not isinstance(value, Mapping):
         return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as IlpFeatureExtractorDto"
+            f"Could not parse {json.dumps(value)} as IlpGaussianSmoothingDto"
         )
-    if value.get("__class__") != "IlpFeatureExtractorDto":
+    if value.get("__class__") != "IlpGaussianSmoothingDto":
         return MessageParsingError(
-            f"Could not parse {json.dumps(value)} as IlpFeatureExtractorDto"
+            f"Could not parse {json.dumps(value)} as IlpGaussianSmoothingDto"
         )
     tmp_ilp_scale = parse_as_float(value.get("ilp_scale"))
     if isinstance(tmp_ilp_scale, MessageParsingError):
@@ -4042,32 +4557,245 @@ def parse_as_IlpFeatureExtractorDto(
     )
     if isinstance(tmp_axis_2d, MessageParsingError):
         return tmp_axis_2d
-    tmp_class_name = parse_as_Literal_of__quote_GaussianSmoothing_quote_0_quote_LaplacianofGaussian_quote_0_quote_GaussianGradientMagnitude_quote_0_quote_DifferenceofGaussians_quote_0_quote_StructureTensorEigenvalues_quote_0_quote_HessianofGaussianEigenvalues_quote__endof_(
-        value.get("class_name")
-    )
-    if isinstance(tmp_class_name, MessageParsingError):
-        return tmp_class_name
-    return IlpFeatureExtractorDto(
+    tmp_channel_index = parse_as_int(value.get("channel_index"))
+    if isinstance(tmp_channel_index, MessageParsingError):
+        return tmp_channel_index
+    return IlpGaussianSmoothingDto(
         ilp_scale=tmp_ilp_scale,
         axis_2d=tmp_axis_2d,
-        class_name=tmp_class_name,
+        channel_index=tmp_channel_index,
     )
 
 
-def parse_as_Tuple_of_IlpFeatureExtractorDto0_varlen__endof_(
+def parse_as_IlpLaplacianOfGaussianDto(
     value: JsonValue,
-) -> "Tuple[IlpFeatureExtractorDto, ...] | MessageParsingError":
+) -> "IlpLaplacianOfGaussianDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as IlpLaplacianOfGaussianDto"
+        )
+    if value.get("__class__") != "IlpLaplacianOfGaussianDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as IlpLaplacianOfGaussianDto"
+        )
+    tmp_ilp_scale = parse_as_float(value.get("ilp_scale"))
+    if isinstance(tmp_ilp_scale, MessageParsingError):
+        return tmp_ilp_scale
+    tmp_axis_2d = parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
+        value.get("axis_2d")
+    )
+    if isinstance(tmp_axis_2d, MessageParsingError):
+        return tmp_axis_2d
+    tmp_channel_index = parse_as_int(value.get("channel_index"))
+    if isinstance(tmp_channel_index, MessageParsingError):
+        return tmp_channel_index
+    return IlpLaplacianOfGaussianDto(
+        ilp_scale=tmp_ilp_scale,
+        axis_2d=tmp_axis_2d,
+        channel_index=tmp_channel_index,
+    )
+
+
+def parse_as_IlpGaussianGradientMagnitudeDto(
+    value: JsonValue,
+) -> "IlpGaussianGradientMagnitudeDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as IlpGaussianGradientMagnitudeDto"
+        )
+    if value.get("__class__") != "IlpGaussianGradientMagnitudeDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as IlpGaussianGradientMagnitudeDto"
+        )
+    tmp_ilp_scale = parse_as_float(value.get("ilp_scale"))
+    if isinstance(tmp_ilp_scale, MessageParsingError):
+        return tmp_ilp_scale
+    tmp_axis_2d = parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
+        value.get("axis_2d")
+    )
+    if isinstance(tmp_axis_2d, MessageParsingError):
+        return tmp_axis_2d
+    tmp_channel_index = parse_as_int(value.get("channel_index"))
+    if isinstance(tmp_channel_index, MessageParsingError):
+        return tmp_channel_index
+    return IlpGaussianGradientMagnitudeDto(
+        ilp_scale=tmp_ilp_scale,
+        axis_2d=tmp_axis_2d,
+        channel_index=tmp_channel_index,
+    )
+
+
+def parse_as_IlpDifferenceOfGaussiansDto(
+    value: JsonValue,
+) -> "IlpDifferenceOfGaussiansDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as IlpDifferenceOfGaussiansDto"
+        )
+    if value.get("__class__") != "IlpDifferenceOfGaussiansDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as IlpDifferenceOfGaussiansDto"
+        )
+    tmp_ilp_scale = parse_as_float(value.get("ilp_scale"))
+    if isinstance(tmp_ilp_scale, MessageParsingError):
+        return tmp_ilp_scale
+    tmp_axis_2d = parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
+        value.get("axis_2d")
+    )
+    if isinstance(tmp_axis_2d, MessageParsingError):
+        return tmp_axis_2d
+    tmp_channel_index = parse_as_int(value.get("channel_index"))
+    if isinstance(tmp_channel_index, MessageParsingError):
+        return tmp_channel_index
+    return IlpDifferenceOfGaussiansDto(
+        ilp_scale=tmp_ilp_scale,
+        axis_2d=tmp_axis_2d,
+        channel_index=tmp_channel_index,
+    )
+
+
+def parse_as_IlpStructureTensorEigenvaluesDto(
+    value: JsonValue,
+) -> "IlpStructureTensorEigenvaluesDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as IlpStructureTensorEigenvaluesDto"
+        )
+    if value.get("__class__") != "IlpStructureTensorEigenvaluesDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as IlpStructureTensorEigenvaluesDto"
+        )
+    tmp_ilp_scale = parse_as_float(value.get("ilp_scale"))
+    if isinstance(tmp_ilp_scale, MessageParsingError):
+        return tmp_ilp_scale
+    tmp_axis_2d = parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
+        value.get("axis_2d")
+    )
+    if isinstance(tmp_axis_2d, MessageParsingError):
+        return tmp_axis_2d
+    tmp_channel_index = parse_as_int(value.get("channel_index"))
+    if isinstance(tmp_channel_index, MessageParsingError):
+        return tmp_channel_index
+    return IlpStructureTensorEigenvaluesDto(
+        ilp_scale=tmp_ilp_scale,
+        axis_2d=tmp_axis_2d,
+        channel_index=tmp_channel_index,
+    )
+
+
+def parse_as_IlpHessianOfGaussianEigenvaluesDto(
+    value: JsonValue,
+) -> "IlpHessianOfGaussianEigenvaluesDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as IlpHessianOfGaussianEigenvaluesDto"
+        )
+    if value.get("__class__") != "IlpHessianOfGaussianEigenvaluesDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as IlpHessianOfGaussianEigenvaluesDto"
+        )
+    tmp_ilp_scale = parse_as_float(value.get("ilp_scale"))
+    if isinstance(tmp_ilp_scale, MessageParsingError):
+        return tmp_ilp_scale
+    tmp_axis_2d = parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
+        value.get("axis_2d")
+    )
+    if isinstance(tmp_axis_2d, MessageParsingError):
+        return tmp_axis_2d
+    tmp_channel_index = parse_as_int(value.get("channel_index"))
+    if isinstance(tmp_channel_index, MessageParsingError):
+        return tmp_channel_index
+    return IlpHessianOfGaussianEigenvaluesDto(
+        ilp_scale=tmp_ilp_scale,
+        axis_2d=tmp_axis_2d,
+        channel_index=tmp_channel_index,
+    )
+
+
+def parse_as_Union_of_IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_(
+    value: JsonValue,
+) -> "Union[IlpGaussianSmoothingDto, IlpLaplacianOfGaussianDto, IlpGaussianGradientMagnitudeDto, IlpDifferenceOfGaussiansDto, IlpStructureTensorEigenvaluesDto, IlpHessianOfGaussianEigenvaluesDto] | MessageParsingError":
+    parsed_option_0 = parse_as_IlpGaussianSmoothingDto(value)
+    if not isinstance(parsed_option_0, MessageParsingError):
+        return parsed_option_0
+    parsed_option_1 = parse_as_IlpLaplacianOfGaussianDto(value)
+    if not isinstance(parsed_option_1, MessageParsingError):
+        return parsed_option_1
+    parsed_option_2 = parse_as_IlpGaussianGradientMagnitudeDto(value)
+    if not isinstance(parsed_option_2, MessageParsingError):
+        return parsed_option_2
+    parsed_option_3 = parse_as_IlpDifferenceOfGaussiansDto(value)
+    if not isinstance(parsed_option_3, MessageParsingError):
+        return parsed_option_3
+    parsed_option_4 = parse_as_IlpStructureTensorEigenvaluesDto(value)
+    if not isinstance(parsed_option_4, MessageParsingError):
+        return parsed_option_4
+    parsed_option_5 = parse_as_IlpHessianOfGaussianEigenvaluesDto(value)
+    if not isinstance(parsed_option_5, MessageParsingError):
+        return parsed_option_5
+    return MessageParsingError(
+        f"Could not parse {json.dumps(value)} into Union[IlpGaussianSmoothingDto, IlpLaplacianOfGaussianDto, IlpGaussianGradientMagnitudeDto, IlpDifferenceOfGaussiansDto, IlpStructureTensorEigenvaluesDto, IlpHessianOfGaussianEigenvaluesDto]"
+    )
+
+
+def parse_as_Tuple_of_Union_of_IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_0_varlen__endof_(
+    value: JsonValue,
+) -> "Tuple[Union[IlpGaussianSmoothingDto, IlpLaplacianOfGaussianDto, IlpGaussianGradientMagnitudeDto, IlpDifferenceOfGaussiansDto, IlpStructureTensorEigenvaluesDto, IlpHessianOfGaussianEigenvaluesDto], ...] | MessageParsingError":
     if not isinstance(value, (list, tuple)):
         return MessageParsingError(
-            f"Could not parse Tuple[IlpFeatureExtractorDto, ...] from {json.dumps(value)}"
+            f"Could not parse Tuple[Union[IlpGaussianSmoothingDto, IlpLaplacianOfGaussianDto, IlpGaussianGradientMagnitudeDto, IlpDifferenceOfGaussiansDto, IlpStructureTensorEigenvaluesDto, IlpHessianOfGaussianEigenvaluesDto], ...] from {json.dumps(value)}"
         )
-    items: List[IlpFeatureExtractorDto] = []
+    items: List[
+        Union[
+            IlpGaussianSmoothingDto,
+            IlpLaplacianOfGaussianDto,
+            IlpGaussianGradientMagnitudeDto,
+            IlpDifferenceOfGaussiansDto,
+            IlpStructureTensorEigenvaluesDto,
+            IlpHessianOfGaussianEigenvaluesDto,
+        ]
+    ] = []
     for item in value:
-        parsed = parse_as_IlpFeatureExtractorDto(item)
+        parsed = parse_as_Union_of_IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_(
+            item
+        )
         if isinstance(parsed, MessageParsingError):
             return parsed
         items.append(parsed)
     return tuple(items)
+
+
+def parse_as_IlpFilterCollectionDto(
+    value: JsonValue,
+) -> "IlpFilterCollectionDto | MessageParsingError":
+    from collections.abc import Mapping
+
+    if not isinstance(value, Mapping):
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as IlpFilterCollectionDto"
+        )
+    if value.get("__class__") != "IlpFilterCollectionDto":
+        return MessageParsingError(
+            f"Could not parse {json.dumps(value)} as IlpFilterCollectionDto"
+        )
+    tmp_filters = parse_as_Tuple_of_Union_of_IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_0_varlen__endof_(
+        value.get("filters")
+    )
+    if isinstance(tmp_filters, MessageParsingError):
+        return tmp_filters
+    return IlpFilterCollectionDto(
+        filters=tmp_filters,
+    )
 
 
 def parse_as_FeatureSelectionAppletStateDto(
@@ -4083,7 +4811,7 @@ def parse_as_FeatureSelectionAppletStateDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as FeatureSelectionAppletStateDto"
         )
-    tmp_feature_extractors = parse_as_Tuple_of_IlpFeatureExtractorDto0_varlen__endof_(
+    tmp_feature_extractors = parse_as_IlpFilterCollectionDto(
         value.get("feature_extractors")
     )
     if isinstance(tmp_feature_extractors, MessageParsingError):
@@ -4106,7 +4834,7 @@ def parse_as_SetFeatureExtractorsParamsDto(
         return MessageParsingError(
             f"Could not parse {json.dumps(value)} as SetFeatureExtractorsParamsDto"
         )
-    tmp_feature_extractors = parse_as_Tuple_of_IlpFeatureExtractorDto0_varlen__endof_(
+    tmp_feature_extractors = parse_as_IlpFilterCollectionDto(
         value.get("feature_extractors")
     )
     if isinstance(tmp_feature_extractors, MessageParsingError):

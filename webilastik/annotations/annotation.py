@@ -72,7 +72,8 @@ class FeatureSamples(FeatureData, StaticLine):
     top of an annotated pixel. Features are assumed to be relative to a single label (annotation color)"""
 
     @classmethod
-    def create(cls, annotation: "Annotation", data: FeatureData):
+    def create(cls, annotation: "Annotation", data: Array5D):
+        # FIXME: remove type ignore
         samples = data.sample_channels(annotation.as_mask()) #type: ignore
         return cls.fromArray5D(samples)
 
@@ -193,13 +194,13 @@ class Annotation(ScalarData):
     def to_raw_points(self) -> Tuple[Tuple[int, int, int], ...]:
         return tuple(
             (int(x) + self.location.x, int(y) + self.location.y, int(z) + self.location.z)
-            for x, y, z in zip(*self.raw("xyz").nonzero()) # type: ignore
+            for x, y, z in zip(*self.raw("xyz").nonzero())
         )
 
 
     def to_points(self) -> Iterable[Point5D]:
         # FIXME: annotation should probably not be an Array6D
-        for x, y, z in zip(*self.raw("xyz").nonzero()): # type: ignore
+        for x, y, z in zip(*self.raw("xyz").nonzero()):
             yield Point5D(x=x, y=y, z=z) + self.location
 
     def get_feature_samples(self, feature_extractor: FeatureExtractor) -> FeatureSamples:

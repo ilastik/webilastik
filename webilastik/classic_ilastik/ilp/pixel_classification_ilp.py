@@ -85,12 +85,14 @@ VIGRA_ILP_CLASSIFIER_FACTORY = textwrap.dedent(
 
 class IlpPixelClassificationGroup:
     feature_name_to_class: ClassVar[Mapping[str, Type[IlpFilter]]] = {
-        "Gaussian Smoothing": IlpGaussianSmoothing,
-        "Laplacian of Gaussian": IlpLaplacianOfGaussian,
-        "Gaussian Gradient Magnitude": IlpGaussianGradientMagnitude,
-        "Difference of Gaussians": IlpDifferenceOfGaussians,
-        "Structure Tensor Eigenvalues": IlpStructureTensorEigenvalues,
-        "Hessian of Gaussian Eigenvalues": IlpHessianOfGaussianEigenvalues,
+        klass.ilp_name(): klass for klass in (
+            IlpGaussianSmoothing,
+            IlpLaplacianOfGaussian,
+            IlpGaussianGradientMagnitude,
+            IlpDifferenceOfGaussians,
+            IlpStructureTensorEigenvalues,
+            IlpHessianOfGaussianEigenvalues,
+        )
     }
     class_to_feature_name: ClassVar[Mapping[Type[IlpFilter], str]] = {v: k for k, v in feature_name_to_class.items()}
     feature_names: ClassVar[Sequence[str]] = list(feature_name_to_class.keys())
@@ -112,11 +114,13 @@ class IlpPixelClassificationGroup:
         return sorted(filters, key=get_feature_extractor_order)
 
     @classmethod
-    def ilp_filters_and_expected_num_channels_from_names(cls, feature_names: Sequence[str]) -> Tuple[Sequence[IlpFilter], int]:
+    def ilp_filters_from_names(cls, feature_names: Sequence[str]) -> Sequence[IlpFilter]:
         out: List[IlpFilter] = []
 
         expected_num_channels = 0
         for name in feature_names:
+            if not name.endswith("]"):
+                name += " [0]"
             parts = name.split()
             channel_index = int(parts[-1][1:-1]) # strip square brackets off of something like '[3]'
             in_2D = parts[-2] == "2D"
@@ -135,7 +139,7 @@ class IlpPixelClassificationGroup:
 
         out = cls.sort_filters(out)
 
-        return (out, expected_num_channels)
+        return out
 
 
     def __init__(

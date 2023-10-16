@@ -53,29 +53,84 @@ export function ensureJsonArray(value: JsonValue): JsonArray | MessageParsingErr
   return value;
 }
 
-export function parse_as_None(value: JsonValue): undefined | MessageParsingError {
-  return ensureJsonUndefined(value);
-}
-
-export function parse_as_Union_of_StructureTensorEigenvaluesDto0GaussianGradientMagnitudeDto0None_endof_(
+export function parse_as_Union_of_OpRetrieverDto0FeatureExtractorCollectionDto0GaussianSmoothingDto0LaplacianOfGaussianDto0GaussianGradientMagnitudeDto0DifferenceOfGaussiansDto0StructureTensorEigenvaluesDto0HessianOfGaussianEigenvaluesDto0IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_(
   value: JsonValue,
-): StructureTensorEigenvaluesDto | GaussianGradientMagnitudeDto | undefined | MessageParsingError {
-  const parsed_option_0 = parse_as_StructureTensorEigenvaluesDto(value);
+):
+  | OpRetrieverDto
+  | FeatureExtractorCollectionDto
+  | GaussianSmoothingDto
+  | LaplacianOfGaussianDto
+  | GaussianGradientMagnitudeDto
+  | DifferenceOfGaussiansDto
+  | StructureTensorEigenvaluesDto
+  | HessianOfGaussianEigenvaluesDto
+  | IlpGaussianSmoothingDto
+  | IlpLaplacianOfGaussianDto
+  | IlpGaussianGradientMagnitudeDto
+  | IlpDifferenceOfGaussiansDto
+  | IlpStructureTensorEigenvaluesDto
+  | IlpHessianOfGaussianEigenvaluesDto
+  | MessageParsingError {
+  const parsed_option_0 = parse_as_OpRetrieverDto(value);
   if (!(parsed_option_0 instanceof MessageParsingError)) {
     return parsed_option_0;
   }
-  const parsed_option_1 = parse_as_GaussianGradientMagnitudeDto(value);
+  const parsed_option_1 = parse_as_FeatureExtractorCollectionDto(value);
   if (!(parsed_option_1 instanceof MessageParsingError)) {
     return parsed_option_1;
   }
-  const parsed_option_2 = parse_as_None(value);
+  const parsed_option_2 = parse_as_GaussianSmoothingDto(value);
   if (!(parsed_option_2 instanceof MessageParsingError)) {
     return parsed_option_2;
+  }
+  const parsed_option_3 = parse_as_LaplacianOfGaussianDto(value);
+  if (!(parsed_option_3 instanceof MessageParsingError)) {
+    return parsed_option_3;
+  }
+  const parsed_option_4 = parse_as_GaussianGradientMagnitudeDto(value);
+  if (!(parsed_option_4 instanceof MessageParsingError)) {
+    return parsed_option_4;
+  }
+  const parsed_option_5 = parse_as_DifferenceOfGaussiansDto(value);
+  if (!(parsed_option_5 instanceof MessageParsingError)) {
+    return parsed_option_5;
+  }
+  const parsed_option_6 = parse_as_StructureTensorEigenvaluesDto(value);
+  if (!(parsed_option_6 instanceof MessageParsingError)) {
+    return parsed_option_6;
+  }
+  const parsed_option_7 = parse_as_HessianOfGaussianEigenvaluesDto(value);
+  if (!(parsed_option_7 instanceof MessageParsingError)) {
+    return parsed_option_7;
+  }
+  const parsed_option_8 = parse_as_IlpGaussianSmoothingDto(value);
+  if (!(parsed_option_8 instanceof MessageParsingError)) {
+    return parsed_option_8;
+  }
+  const parsed_option_9 = parse_as_IlpLaplacianOfGaussianDto(value);
+  if (!(parsed_option_9 instanceof MessageParsingError)) {
+    return parsed_option_9;
+  }
+  const parsed_option_10 = parse_as_IlpGaussianGradientMagnitudeDto(value);
+  if (!(parsed_option_10 instanceof MessageParsingError)) {
+    return parsed_option_10;
+  }
+  const parsed_option_11 = parse_as_IlpDifferenceOfGaussiansDto(value);
+  if (!(parsed_option_11 instanceof MessageParsingError)) {
+    return parsed_option_11;
+  }
+  const parsed_option_12 = parse_as_IlpStructureTensorEigenvaluesDto(value);
+  if (!(parsed_option_12 instanceof MessageParsingError)) {
+    return parsed_option_12;
+  }
+  const parsed_option_13 = parse_as_IlpHessianOfGaussianEigenvaluesDto(value);
+  if (!(parsed_option_13 instanceof MessageParsingError)) {
+    return parsed_option_13;
   }
   return new MessageParsingError(
     `Could not parse ${
       JSON.stringify(value)
-    } into StructureTensorEigenvaluesDto | GaussianGradientMagnitudeDto | undefined`,
+    } into OpRetrieverDto | FeatureExtractorCollectionDto | GaussianSmoothingDto | LaplacianOfGaussianDto | GaussianGradientMagnitudeDto | DifferenceOfGaussiansDto | StructureTensorEigenvaluesDto | HessianOfGaussianEigenvaluesDto | IlpGaussianSmoothingDto | IlpLaplacianOfGaussianDto | IlpGaussianGradientMagnitudeDto | IlpDifferenceOfGaussiansDto | IlpStructureTensorEigenvaluesDto | IlpHessianOfGaussianEigenvaluesDto`,
   );
 }
 
@@ -103,6 +158,10 @@ export function parse_as_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quo
     return tmp_2;
   }
   return new MessageParsingError(`Could not parse ${value} as 'x' | 'y' | 'z'`);
+}
+
+export function parse_as_None(value: JsonValue): undefined | MessageParsingError {
+  return ensureJsonUndefined(value);
 }
 
 export function parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
@@ -135,9 +194,10 @@ export function parse_as_StructureTensorEigenvaluesDto(
       `Could not deserialize ${JSON.stringify(valueObject)} as a StructureTensorEigenvaluesDto`,
     );
   }
-  const temp_preprocessor = parse_as_Union_of_StructureTensorEigenvaluesDto0GaussianGradientMagnitudeDto0None_endof_(
-    valueObject.preprocessor,
-  );
+  const temp_preprocessor =
+    parse_as_Union_of_OpRetrieverDto0FeatureExtractorCollectionDto0GaussianSmoothingDto0LaplacianOfGaussianDto0GaussianGradientMagnitudeDto0DifferenceOfGaussiansDto0StructureTensorEigenvaluesDto0HessianOfGaussianEigenvaluesDto0IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_(
+      valueObject.preprocessor,
+    );
   if (temp_preprocessor instanceof MessageParsingError) {
     return temp_preprocessor;
   }
@@ -176,14 +236,42 @@ export function parse_as_StructureTensorEigenvaluesDto(
 // Automatically generated via DataTransferObject for StructureTensorEigenvaluesDto
 // Do not edit!
 export class StructureTensorEigenvaluesDto {
-  public preprocessor: StructureTensorEigenvaluesDto | GaussianGradientMagnitudeDto | undefined;
+  public preprocessor:
+    | OpRetrieverDto
+    | FeatureExtractorCollectionDto
+    | GaussianSmoothingDto
+    | LaplacianOfGaussianDto
+    | GaussianGradientMagnitudeDto
+    | DifferenceOfGaussiansDto
+    | StructureTensorEigenvaluesDto
+    | HessianOfGaussianEigenvaluesDto
+    | IlpGaussianSmoothingDto
+    | IlpLaplacianOfGaussianDto
+    | IlpGaussianGradientMagnitudeDto
+    | IlpDifferenceOfGaussiansDto
+    | IlpStructureTensorEigenvaluesDto
+    | IlpHessianOfGaussianEigenvaluesDto;
   public innerScale: number;
   public outerScale: number;
   public window_size: number;
   public axis_2d: "x" | "y" | "z" | undefined;
   public channel_index: number;
   constructor(_params: {
-    preprocessor: StructureTensorEigenvaluesDto | GaussianGradientMagnitudeDto | undefined;
+    preprocessor:
+      | OpRetrieverDto
+      | FeatureExtractorCollectionDto
+      | GaussianSmoothingDto
+      | LaplacianOfGaussianDto
+      | GaussianGradientMagnitudeDto
+      | DifferenceOfGaussiansDto
+      | StructureTensorEigenvaluesDto
+      | HessianOfGaussianEigenvaluesDto
+      | IlpGaussianSmoothingDto
+      | IlpLaplacianOfGaussianDto
+      | IlpGaussianGradientMagnitudeDto
+      | IlpDifferenceOfGaussiansDto
+      | IlpStructureTensorEigenvaluesDto
+      | IlpHessianOfGaussianEigenvaluesDto;
     innerScale: number;
     outerScale: number;
     window_size: number;
@@ -225,6 +313,13 @@ export function parse_as_GaussianGradientMagnitudeDto(
       `Could not deserialize ${JSON.stringify(valueObject)} as a GaussianGradientMagnitudeDto`,
     );
   }
+  const temp_preprocessor =
+    parse_as_Union_of_OpRetrieverDto0FeatureExtractorCollectionDto0GaussianSmoothingDto0LaplacianOfGaussianDto0GaussianGradientMagnitudeDto0DifferenceOfGaussiansDto0StructureTensorEigenvaluesDto0HessianOfGaussianEigenvaluesDto0IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_(
+      valueObject.preprocessor,
+    );
+  if (temp_preprocessor instanceof MessageParsingError) {
+    return temp_preprocessor;
+  }
   const temp_sigma = parse_as_float(valueObject.sigma);
   if (temp_sigma instanceof MessageParsingError) {
     return temp_sigma;
@@ -244,6 +339,7 @@ export function parse_as_GaussianGradientMagnitudeDto(
     return temp_channel_index;
   }
   return new GaussianGradientMagnitudeDto({
+    preprocessor: temp_preprocessor,
     sigma: temp_sigma,
     window_size: temp_window_size,
     axis_2d: temp_axis_2d,
@@ -254,16 +350,47 @@ export function parse_as_GaussianGradientMagnitudeDto(
 // Automatically generated via DataTransferObject for GaussianGradientMagnitudeDto
 // Do not edit!
 export class GaussianGradientMagnitudeDto {
+  public preprocessor:
+    | OpRetrieverDto
+    | FeatureExtractorCollectionDto
+    | GaussianSmoothingDto
+    | LaplacianOfGaussianDto
+    | GaussianGradientMagnitudeDto
+    | DifferenceOfGaussiansDto
+    | StructureTensorEigenvaluesDto
+    | HessianOfGaussianEigenvaluesDto
+    | IlpGaussianSmoothingDto
+    | IlpLaplacianOfGaussianDto
+    | IlpGaussianGradientMagnitudeDto
+    | IlpDifferenceOfGaussiansDto
+    | IlpStructureTensorEigenvaluesDto
+    | IlpHessianOfGaussianEigenvaluesDto;
   public sigma: number;
   public window_size: number;
   public axis_2d: "x" | "y" | "z" | undefined;
   public channel_index: number;
   constructor(_params: {
+    preprocessor:
+      | OpRetrieverDto
+      | FeatureExtractorCollectionDto
+      | GaussianSmoothingDto
+      | LaplacianOfGaussianDto
+      | GaussianGradientMagnitudeDto
+      | DifferenceOfGaussiansDto
+      | StructureTensorEigenvaluesDto
+      | HessianOfGaussianEigenvaluesDto
+      | IlpGaussianSmoothingDto
+      | IlpLaplacianOfGaussianDto
+      | IlpGaussianGradientMagnitudeDto
+      | IlpDifferenceOfGaussiansDto
+      | IlpStructureTensorEigenvaluesDto
+      | IlpHessianOfGaussianEigenvaluesDto;
     sigma: number;
     window_size: number;
     axis_2d: "x" | "y" | "z" | undefined;
     channel_index: number;
   }) {
+    this.preprocessor = _params.preprocessor;
     this.sigma = _params.sigma;
     this.window_size = _params.window_size;
     this.axis_2d = _params.axis_2d;
@@ -272,6 +399,7 @@ export class GaussianGradientMagnitudeDto {
   public toJsonValue(): JsonObject {
     return {
       "__class__": "GaussianGradientMagnitudeDto",
+      preprocessor: toJsonValue(this.preprocessor),
       sigma: this.sigma,
       window_size: this.window_size,
       axis_2d: toJsonValue(this.axis_2d),
@@ -280,6 +408,609 @@ export class GaussianGradientMagnitudeDto {
   }
   public static fromJsonValue(value: JsonValue): GaussianGradientMagnitudeDto | MessageParsingError {
     return parse_as_GaussianGradientMagnitudeDto(value);
+  }
+}
+
+export function parse_as_GaussianSmoothingDto(value: JsonValue): GaussianSmoothingDto | MessageParsingError {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof MessageParsingError) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "GaussianSmoothingDto") {
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a GaussianSmoothingDto`);
+  }
+  const temp_preprocessor =
+    parse_as_Union_of_OpRetrieverDto0FeatureExtractorCollectionDto0GaussianSmoothingDto0LaplacianOfGaussianDto0GaussianGradientMagnitudeDto0DifferenceOfGaussiansDto0StructureTensorEigenvaluesDto0HessianOfGaussianEigenvaluesDto0IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_(
+      valueObject.preprocessor,
+    );
+  if (temp_preprocessor instanceof MessageParsingError) {
+    return temp_preprocessor;
+  }
+  const temp_sigma = parse_as_float(valueObject.sigma);
+  if (temp_sigma instanceof MessageParsingError) {
+    return temp_sigma;
+  }
+  const temp_window_size = parse_as_float(valueObject.window_size);
+  if (temp_window_size instanceof MessageParsingError) {
+    return temp_window_size;
+  }
+  const temp_axis_2d = parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
+    valueObject.axis_2d,
+  );
+  if (temp_axis_2d instanceof MessageParsingError) {
+    return temp_axis_2d;
+  }
+  const temp_channel_index = parse_as_int(valueObject.channel_index);
+  if (temp_channel_index instanceof MessageParsingError) {
+    return temp_channel_index;
+  }
+  return new GaussianSmoothingDto({
+    preprocessor: temp_preprocessor,
+    sigma: temp_sigma,
+    window_size: temp_window_size,
+    axis_2d: temp_axis_2d,
+    channel_index: temp_channel_index,
+  });
+}
+
+// Automatically generated via DataTransferObject for GaussianSmoothingDto
+// Do not edit!
+export class GaussianSmoothingDto {
+  public preprocessor:
+    | OpRetrieverDto
+    | FeatureExtractorCollectionDto
+    | GaussianSmoothingDto
+    | LaplacianOfGaussianDto
+    | GaussianGradientMagnitudeDto
+    | DifferenceOfGaussiansDto
+    | StructureTensorEigenvaluesDto
+    | HessianOfGaussianEigenvaluesDto
+    | IlpGaussianSmoothingDto
+    | IlpLaplacianOfGaussianDto
+    | IlpGaussianGradientMagnitudeDto
+    | IlpDifferenceOfGaussiansDto
+    | IlpStructureTensorEigenvaluesDto
+    | IlpHessianOfGaussianEigenvaluesDto;
+  public sigma: number;
+  public window_size: number;
+  public axis_2d: "x" | "y" | "z" | undefined;
+  public channel_index: number;
+  constructor(_params: {
+    preprocessor:
+      | OpRetrieverDto
+      | FeatureExtractorCollectionDto
+      | GaussianSmoothingDto
+      | LaplacianOfGaussianDto
+      | GaussianGradientMagnitudeDto
+      | DifferenceOfGaussiansDto
+      | StructureTensorEigenvaluesDto
+      | HessianOfGaussianEigenvaluesDto
+      | IlpGaussianSmoothingDto
+      | IlpLaplacianOfGaussianDto
+      | IlpGaussianGradientMagnitudeDto
+      | IlpDifferenceOfGaussiansDto
+      | IlpStructureTensorEigenvaluesDto
+      | IlpHessianOfGaussianEigenvaluesDto;
+    sigma: number;
+    window_size: number;
+    axis_2d: "x" | "y" | "z" | undefined;
+    channel_index: number;
+  }) {
+    this.preprocessor = _params.preprocessor;
+    this.sigma = _params.sigma;
+    this.window_size = _params.window_size;
+    this.axis_2d = _params.axis_2d;
+    this.channel_index = _params.channel_index;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "GaussianSmoothingDto",
+      preprocessor: toJsonValue(this.preprocessor),
+      sigma: this.sigma,
+      window_size: this.window_size,
+      axis_2d: toJsonValue(this.axis_2d),
+      channel_index: this.channel_index,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): GaussianSmoothingDto | MessageParsingError {
+    return parse_as_GaussianSmoothingDto(value);
+  }
+}
+
+export function parse_as_DifferenceOfGaussiansDto(value: JsonValue): DifferenceOfGaussiansDto | MessageParsingError {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof MessageParsingError) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "DifferenceOfGaussiansDto") {
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a DifferenceOfGaussiansDto`,
+    );
+  }
+  const temp_preprocessor =
+    parse_as_Union_of_OpRetrieverDto0FeatureExtractorCollectionDto0GaussianSmoothingDto0LaplacianOfGaussianDto0GaussianGradientMagnitudeDto0DifferenceOfGaussiansDto0StructureTensorEigenvaluesDto0HessianOfGaussianEigenvaluesDto0IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_(
+      valueObject.preprocessor,
+    );
+  if (temp_preprocessor instanceof MessageParsingError) {
+    return temp_preprocessor;
+  }
+  const temp_sigma0 = parse_as_float(valueObject.sigma0);
+  if (temp_sigma0 instanceof MessageParsingError) {
+    return temp_sigma0;
+  }
+  const temp_sigma1 = parse_as_float(valueObject.sigma1);
+  if (temp_sigma1 instanceof MessageParsingError) {
+    return temp_sigma1;
+  }
+  const temp_window_size = parse_as_float(valueObject.window_size);
+  if (temp_window_size instanceof MessageParsingError) {
+    return temp_window_size;
+  }
+  const temp_axis_2d = parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
+    valueObject.axis_2d,
+  );
+  if (temp_axis_2d instanceof MessageParsingError) {
+    return temp_axis_2d;
+  }
+  const temp_channel_index = parse_as_int(valueObject.channel_index);
+  if (temp_channel_index instanceof MessageParsingError) {
+    return temp_channel_index;
+  }
+  return new DifferenceOfGaussiansDto({
+    preprocessor: temp_preprocessor,
+    sigma0: temp_sigma0,
+    sigma1: temp_sigma1,
+    window_size: temp_window_size,
+    axis_2d: temp_axis_2d,
+    channel_index: temp_channel_index,
+  });
+}
+
+// Automatically generated via DataTransferObject for DifferenceOfGaussiansDto
+// Do not edit!
+export class DifferenceOfGaussiansDto {
+  public preprocessor:
+    | OpRetrieverDto
+    | FeatureExtractorCollectionDto
+    | GaussianSmoothingDto
+    | LaplacianOfGaussianDto
+    | GaussianGradientMagnitudeDto
+    | DifferenceOfGaussiansDto
+    | StructureTensorEigenvaluesDto
+    | HessianOfGaussianEigenvaluesDto
+    | IlpGaussianSmoothingDto
+    | IlpLaplacianOfGaussianDto
+    | IlpGaussianGradientMagnitudeDto
+    | IlpDifferenceOfGaussiansDto
+    | IlpStructureTensorEigenvaluesDto
+    | IlpHessianOfGaussianEigenvaluesDto;
+  public sigma0: number;
+  public sigma1: number;
+  public window_size: number;
+  public axis_2d: "x" | "y" | "z" | undefined;
+  public channel_index: number;
+  constructor(_params: {
+    preprocessor:
+      | OpRetrieverDto
+      | FeatureExtractorCollectionDto
+      | GaussianSmoothingDto
+      | LaplacianOfGaussianDto
+      | GaussianGradientMagnitudeDto
+      | DifferenceOfGaussiansDto
+      | StructureTensorEigenvaluesDto
+      | HessianOfGaussianEigenvaluesDto
+      | IlpGaussianSmoothingDto
+      | IlpLaplacianOfGaussianDto
+      | IlpGaussianGradientMagnitudeDto
+      | IlpDifferenceOfGaussiansDto
+      | IlpStructureTensorEigenvaluesDto
+      | IlpHessianOfGaussianEigenvaluesDto;
+    sigma0: number;
+    sigma1: number;
+    window_size: number;
+    axis_2d: "x" | "y" | "z" | undefined;
+    channel_index: number;
+  }) {
+    this.preprocessor = _params.preprocessor;
+    this.sigma0 = _params.sigma0;
+    this.sigma1 = _params.sigma1;
+    this.window_size = _params.window_size;
+    this.axis_2d = _params.axis_2d;
+    this.channel_index = _params.channel_index;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "DifferenceOfGaussiansDto",
+      preprocessor: toJsonValue(this.preprocessor),
+      sigma0: this.sigma0,
+      sigma1: this.sigma1,
+      window_size: this.window_size,
+      axis_2d: toJsonValue(this.axis_2d),
+      channel_index: this.channel_index,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): DifferenceOfGaussiansDto | MessageParsingError {
+    return parse_as_DifferenceOfGaussiansDto(value);
+  }
+}
+
+export function parse_as_HessianOfGaussianEigenvaluesDto(
+  value: JsonValue,
+): HessianOfGaussianEigenvaluesDto | MessageParsingError {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof MessageParsingError) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "HessianOfGaussianEigenvaluesDto") {
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a HessianOfGaussianEigenvaluesDto`,
+    );
+  }
+  const temp_preprocessor =
+    parse_as_Union_of_OpRetrieverDto0FeatureExtractorCollectionDto0GaussianSmoothingDto0LaplacianOfGaussianDto0GaussianGradientMagnitudeDto0DifferenceOfGaussiansDto0StructureTensorEigenvaluesDto0HessianOfGaussianEigenvaluesDto0IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_(
+      valueObject.preprocessor,
+    );
+  if (temp_preprocessor instanceof MessageParsingError) {
+    return temp_preprocessor;
+  }
+  const temp_scale = parse_as_float(valueObject.scale);
+  if (temp_scale instanceof MessageParsingError) {
+    return temp_scale;
+  }
+  const temp_window_size = parse_as_float(valueObject.window_size);
+  if (temp_window_size instanceof MessageParsingError) {
+    return temp_window_size;
+  }
+  const temp_axis_2d = parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
+    valueObject.axis_2d,
+  );
+  if (temp_axis_2d instanceof MessageParsingError) {
+    return temp_axis_2d;
+  }
+  const temp_channel_index = parse_as_int(valueObject.channel_index);
+  if (temp_channel_index instanceof MessageParsingError) {
+    return temp_channel_index;
+  }
+  return new HessianOfGaussianEigenvaluesDto({
+    preprocessor: temp_preprocessor,
+    scale: temp_scale,
+    window_size: temp_window_size,
+    axis_2d: temp_axis_2d,
+    channel_index: temp_channel_index,
+  });
+}
+
+// Automatically generated via DataTransferObject for HessianOfGaussianEigenvaluesDto
+// Do not edit!
+export class HessianOfGaussianEigenvaluesDto {
+  public preprocessor:
+    | OpRetrieverDto
+    | FeatureExtractorCollectionDto
+    | GaussianSmoothingDto
+    | LaplacianOfGaussianDto
+    | GaussianGradientMagnitudeDto
+    | DifferenceOfGaussiansDto
+    | StructureTensorEigenvaluesDto
+    | HessianOfGaussianEigenvaluesDto
+    | IlpGaussianSmoothingDto
+    | IlpLaplacianOfGaussianDto
+    | IlpGaussianGradientMagnitudeDto
+    | IlpDifferenceOfGaussiansDto
+    | IlpStructureTensorEigenvaluesDto
+    | IlpHessianOfGaussianEigenvaluesDto;
+  public scale: number;
+  public window_size: number;
+  public axis_2d: "x" | "y" | "z" | undefined;
+  public channel_index: number;
+  constructor(_params: {
+    preprocessor:
+      | OpRetrieverDto
+      | FeatureExtractorCollectionDto
+      | GaussianSmoothingDto
+      | LaplacianOfGaussianDto
+      | GaussianGradientMagnitudeDto
+      | DifferenceOfGaussiansDto
+      | StructureTensorEigenvaluesDto
+      | HessianOfGaussianEigenvaluesDto
+      | IlpGaussianSmoothingDto
+      | IlpLaplacianOfGaussianDto
+      | IlpGaussianGradientMagnitudeDto
+      | IlpDifferenceOfGaussiansDto
+      | IlpStructureTensorEigenvaluesDto
+      | IlpHessianOfGaussianEigenvaluesDto;
+    scale: number;
+    window_size: number;
+    axis_2d: "x" | "y" | "z" | undefined;
+    channel_index: number;
+  }) {
+    this.preprocessor = _params.preprocessor;
+    this.scale = _params.scale;
+    this.window_size = _params.window_size;
+    this.axis_2d = _params.axis_2d;
+    this.channel_index = _params.channel_index;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "HessianOfGaussianEigenvaluesDto",
+      preprocessor: toJsonValue(this.preprocessor),
+      scale: this.scale,
+      window_size: this.window_size,
+      axis_2d: toJsonValue(this.axis_2d),
+      channel_index: this.channel_index,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): HessianOfGaussianEigenvaluesDto | MessageParsingError {
+    return parse_as_HessianOfGaussianEigenvaluesDto(value);
+  }
+}
+
+export function parse_as_LaplacianOfGaussianDto(value: JsonValue): LaplacianOfGaussianDto | MessageParsingError {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof MessageParsingError) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "LaplacianOfGaussianDto") {
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a LaplacianOfGaussianDto`);
+  }
+  const temp_preprocessor =
+    parse_as_Union_of_OpRetrieverDto0FeatureExtractorCollectionDto0GaussianSmoothingDto0LaplacianOfGaussianDto0GaussianGradientMagnitudeDto0DifferenceOfGaussiansDto0StructureTensorEigenvaluesDto0HessianOfGaussianEigenvaluesDto0IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_(
+      valueObject.preprocessor,
+    );
+  if (temp_preprocessor instanceof MessageParsingError) {
+    return temp_preprocessor;
+  }
+  const temp_scale = parse_as_float(valueObject.scale);
+  if (temp_scale instanceof MessageParsingError) {
+    return temp_scale;
+  }
+  const temp_window_size = parse_as_float(valueObject.window_size);
+  if (temp_window_size instanceof MessageParsingError) {
+    return temp_window_size;
+  }
+  const temp_axis_2d = parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
+    valueObject.axis_2d,
+  );
+  if (temp_axis_2d instanceof MessageParsingError) {
+    return temp_axis_2d;
+  }
+  const temp_channel_index = parse_as_int(valueObject.channel_index);
+  if (temp_channel_index instanceof MessageParsingError) {
+    return temp_channel_index;
+  }
+  return new LaplacianOfGaussianDto({
+    preprocessor: temp_preprocessor,
+    scale: temp_scale,
+    window_size: temp_window_size,
+    axis_2d: temp_axis_2d,
+    channel_index: temp_channel_index,
+  });
+}
+
+// Automatically generated via DataTransferObject for LaplacianOfGaussianDto
+// Do not edit!
+export class LaplacianOfGaussianDto {
+  public preprocessor:
+    | OpRetrieverDto
+    | FeatureExtractorCollectionDto
+    | GaussianSmoothingDto
+    | LaplacianOfGaussianDto
+    | GaussianGradientMagnitudeDto
+    | DifferenceOfGaussiansDto
+    | StructureTensorEigenvaluesDto
+    | HessianOfGaussianEigenvaluesDto
+    | IlpGaussianSmoothingDto
+    | IlpLaplacianOfGaussianDto
+    | IlpGaussianGradientMagnitudeDto
+    | IlpDifferenceOfGaussiansDto
+    | IlpStructureTensorEigenvaluesDto
+    | IlpHessianOfGaussianEigenvaluesDto;
+  public scale: number;
+  public window_size: number;
+  public axis_2d: "x" | "y" | "z" | undefined;
+  public channel_index: number;
+  constructor(_params: {
+    preprocessor:
+      | OpRetrieverDto
+      | FeatureExtractorCollectionDto
+      | GaussianSmoothingDto
+      | LaplacianOfGaussianDto
+      | GaussianGradientMagnitudeDto
+      | DifferenceOfGaussiansDto
+      | StructureTensorEigenvaluesDto
+      | HessianOfGaussianEigenvaluesDto
+      | IlpGaussianSmoothingDto
+      | IlpLaplacianOfGaussianDto
+      | IlpGaussianGradientMagnitudeDto
+      | IlpDifferenceOfGaussiansDto
+      | IlpStructureTensorEigenvaluesDto
+      | IlpHessianOfGaussianEigenvaluesDto;
+    scale: number;
+    window_size: number;
+    axis_2d: "x" | "y" | "z" | undefined;
+    channel_index: number;
+  }) {
+    this.preprocessor = _params.preprocessor;
+    this.scale = _params.scale;
+    this.window_size = _params.window_size;
+    this.axis_2d = _params.axis_2d;
+    this.channel_index = _params.channel_index;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "LaplacianOfGaussianDto",
+      preprocessor: toJsonValue(this.preprocessor),
+      scale: this.scale,
+      window_size: this.window_size,
+      axis_2d: toJsonValue(this.axis_2d),
+      channel_index: this.channel_index,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): LaplacianOfGaussianDto | MessageParsingError {
+    return parse_as_LaplacianOfGaussianDto(value);
+  }
+}
+
+export function parse_as_OpRetrieverDto(value: JsonValue): OpRetrieverDto | MessageParsingError {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof MessageParsingError) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "OpRetrieverDto") {
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a OpRetrieverDto`);
+  }
+  const temp_axiskeys_hint = parse_as_str(valueObject.axiskeys_hint);
+  if (temp_axiskeys_hint instanceof MessageParsingError) {
+    return temp_axiskeys_hint;
+  }
+  return new OpRetrieverDto({
+    axiskeys_hint: temp_axiskeys_hint,
+  });
+}
+
+// Automatically generated via DataTransferObject for OpRetrieverDto
+// Do not edit!
+export class OpRetrieverDto {
+  public axiskeys_hint: string;
+  constructor(_params: {
+    axiskeys_hint: string;
+  }) {
+    this.axiskeys_hint = _params.axiskeys_hint;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "OpRetrieverDto",
+      axiskeys_hint: this.axiskeys_hint,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): OpRetrieverDto | MessageParsingError {
+    return parse_as_OpRetrieverDto(value);
+  }
+}
+
+export function parse_as_Tuple_of_Union_of_OpRetrieverDto0FeatureExtractorCollectionDto0GaussianSmoothingDto0LaplacianOfGaussianDto0GaussianGradientMagnitudeDto0DifferenceOfGaussiansDto0StructureTensorEigenvaluesDto0HessianOfGaussianEigenvaluesDto0IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_0_varlen__endof_(
+  value: JsonValue,
+):
+  | Array<
+    | OpRetrieverDto
+    | FeatureExtractorCollectionDto
+    | GaussianSmoothingDto
+    | LaplacianOfGaussianDto
+    | GaussianGradientMagnitudeDto
+    | DifferenceOfGaussiansDto
+    | StructureTensorEigenvaluesDto
+    | HessianOfGaussianEigenvaluesDto
+    | IlpGaussianSmoothingDto
+    | IlpLaplacianOfGaussianDto
+    | IlpGaussianGradientMagnitudeDto
+    | IlpDifferenceOfGaussiansDto
+    | IlpStructureTensorEigenvaluesDto
+    | IlpHessianOfGaussianEigenvaluesDto
+  >
+  | MessageParsingError {
+  const arr = ensureJsonArray(value);
+  if (arr instanceof MessageParsingError) {
+    return arr;
+  }
+  const out: Array<
+    | OpRetrieverDto
+    | FeatureExtractorCollectionDto
+    | GaussianSmoothingDto
+    | LaplacianOfGaussianDto
+    | GaussianGradientMagnitudeDto
+    | DifferenceOfGaussiansDto
+    | StructureTensorEigenvaluesDto
+    | HessianOfGaussianEigenvaluesDto
+    | IlpGaussianSmoothingDto
+    | IlpLaplacianOfGaussianDto
+    | IlpGaussianGradientMagnitudeDto
+    | IlpDifferenceOfGaussiansDto
+    | IlpStructureTensorEigenvaluesDto
+    | IlpHessianOfGaussianEigenvaluesDto
+  > = [];
+  for (let item of arr) {
+    let parsed_item =
+      parse_as_Union_of_OpRetrieverDto0FeatureExtractorCollectionDto0GaussianSmoothingDto0LaplacianOfGaussianDto0GaussianGradientMagnitudeDto0DifferenceOfGaussiansDto0StructureTensorEigenvaluesDto0HessianOfGaussianEigenvaluesDto0IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_(
+        item,
+      );
+    if (parsed_item instanceof MessageParsingError) {
+      return parsed_item;
+    }
+    out.push(parsed_item);
+  }
+  return out;
+}
+
+export function parse_as_FeatureExtractorCollectionDto(
+  value: JsonValue,
+): FeatureExtractorCollectionDto | MessageParsingError {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof MessageParsingError) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "FeatureExtractorCollectionDto") {
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a FeatureExtractorCollectionDto`,
+    );
+  }
+  const temp_extractors =
+    parse_as_Tuple_of_Union_of_OpRetrieverDto0FeatureExtractorCollectionDto0GaussianSmoothingDto0LaplacianOfGaussianDto0GaussianGradientMagnitudeDto0DifferenceOfGaussiansDto0StructureTensorEigenvaluesDto0HessianOfGaussianEigenvaluesDto0IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_0_varlen__endof_(
+      valueObject.extractors,
+    );
+  if (temp_extractors instanceof MessageParsingError) {
+    return temp_extractors;
+  }
+  return new FeatureExtractorCollectionDto({
+    extractors: temp_extractors,
+  });
+}
+
+// Automatically generated via DataTransferObject for FeatureExtractorCollectionDto
+// Do not edit!
+export class FeatureExtractorCollectionDto {
+  public extractors: Array<
+    | OpRetrieverDto
+    | FeatureExtractorCollectionDto
+    | GaussianSmoothingDto
+    | LaplacianOfGaussianDto
+    | GaussianGradientMagnitudeDto
+    | DifferenceOfGaussiansDto
+    | StructureTensorEigenvaluesDto
+    | HessianOfGaussianEigenvaluesDto
+    | IlpGaussianSmoothingDto
+    | IlpLaplacianOfGaussianDto
+    | IlpGaussianGradientMagnitudeDto
+    | IlpDifferenceOfGaussiansDto
+    | IlpStructureTensorEigenvaluesDto
+    | IlpHessianOfGaussianEigenvaluesDto
+  >;
+  constructor(_params: {
+    extractors: Array<
+      | OpRetrieverDto
+      | FeatureExtractorCollectionDto
+      | GaussianSmoothingDto
+      | LaplacianOfGaussianDto
+      | GaussianGradientMagnitudeDto
+      | DifferenceOfGaussiansDto
+      | StructureTensorEigenvaluesDto
+      | HessianOfGaussianEigenvaluesDto
+      | IlpGaussianSmoothingDto
+      | IlpLaplacianOfGaussianDto
+      | IlpGaussianGradientMagnitudeDto
+      | IlpDifferenceOfGaussiansDto
+      | IlpStructureTensorEigenvaluesDto
+      | IlpHessianOfGaussianEigenvaluesDto
+    >;
+  }) {
+    this.extractors = _params.extractors;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "FeatureExtractorCollectionDto",
+      extractors: this.extractors.map((item) => toJsonValue(item)),
+    };
+  }
+  public static fromJsonValue(value: JsonValue): FeatureExtractorCollectionDto | MessageParsingError {
+    return parse_as_FeatureExtractorCollectionDto(value);
   }
 }
 
@@ -3681,52 +4412,13 @@ export class PixelClassificationExportAppletStateDto {
   }
 }
 
-export function parse_as_Literal_of__quote_GaussianSmoothing_quote_0_quote_LaplacianofGaussian_quote_0_quote_GaussianGradientMagnitude_quote_0_quote_DifferenceofGaussians_quote_0_quote_StructureTensorEigenvalues_quote_0_quote_HessianofGaussianEigenvalues_quote__endof_(
-  value: JsonValue,
-):
-  | "Gaussian Smoothing"
-  | "Laplacian of Gaussian"
-  | "Gaussian Gradient Magnitude"
-  | "Difference of Gaussians"
-  | "Structure Tensor Eigenvalues"
-  | "Hessian of Gaussian Eigenvalues"
-  | MessageParsingError {
-  const tmp_0 = parse_as_str(value);
-  if (!(tmp_0 instanceof MessageParsingError) && tmp_0 === "Gaussian Smoothing") {
-    return tmp_0;
-  }
-  const tmp_1 = parse_as_str(value);
-  if (!(tmp_1 instanceof MessageParsingError) && tmp_1 === "Laplacian of Gaussian") {
-    return tmp_1;
-  }
-  const tmp_2 = parse_as_str(value);
-  if (!(tmp_2 instanceof MessageParsingError) && tmp_2 === "Gaussian Gradient Magnitude") {
-    return tmp_2;
-  }
-  const tmp_3 = parse_as_str(value);
-  if (!(tmp_3 instanceof MessageParsingError) && tmp_3 === "Difference of Gaussians") {
-    return tmp_3;
-  }
-  const tmp_4 = parse_as_str(value);
-  if (!(tmp_4 instanceof MessageParsingError) && tmp_4 === "Structure Tensor Eigenvalues") {
-    return tmp_4;
-  }
-  const tmp_5 = parse_as_str(value);
-  if (!(tmp_5 instanceof MessageParsingError) && tmp_5 === "Hessian of Gaussian Eigenvalues") {
-    return tmp_5;
-  }
-  return new MessageParsingError(
-    `Could not parse ${value} as 'Gaussian Smoothing' | 'Laplacian of Gaussian' | 'Gaussian Gradient Magnitude' | 'Difference of Gaussians' | 'Structure Tensor Eigenvalues' | 'Hessian of Gaussian Eigenvalues'`,
-  );
-}
-
-export function parse_as_IlpFeatureExtractorDto(value: JsonValue): IlpFeatureExtractorDto | MessageParsingError {
+export function parse_as_IlpGaussianSmoothingDto(value: JsonValue): IlpGaussianSmoothingDto | MessageParsingError {
   const valueObject = ensureJsonObject(value);
   if (valueObject instanceof MessageParsingError) {
     return valueObject;
   }
-  if (valueObject["__class__"] != "IlpFeatureExtractorDto") {
-    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a IlpFeatureExtractorDto`);
+  if (valueObject["__class__"] != "IlpGaussianSmoothingDto") {
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a IlpGaussianSmoothingDto`);
   }
   const temp_ilp_scale = parse_as_float(valueObject.ilp_scale);
   if (temp_ilp_scale instanceof MessageParsingError) {
@@ -3738,76 +4430,478 @@ export function parse_as_IlpFeatureExtractorDto(value: JsonValue): IlpFeatureExt
   if (temp_axis_2d instanceof MessageParsingError) {
     return temp_axis_2d;
   }
-  const temp_class_name =
-    parse_as_Literal_of__quote_GaussianSmoothing_quote_0_quote_LaplacianofGaussian_quote_0_quote_GaussianGradientMagnitude_quote_0_quote_DifferenceofGaussians_quote_0_quote_StructureTensorEigenvalues_quote_0_quote_HessianofGaussianEigenvalues_quote__endof_(
-      valueObject.class_name,
-    );
-  if (temp_class_name instanceof MessageParsingError) {
-    return temp_class_name;
+  const temp_channel_index = parse_as_int(valueObject.channel_index);
+  if (temp_channel_index instanceof MessageParsingError) {
+    return temp_channel_index;
   }
-  return new IlpFeatureExtractorDto({
+  return new IlpGaussianSmoothingDto({
     ilp_scale: temp_ilp_scale,
     axis_2d: temp_axis_2d,
-    class_name: temp_class_name,
+    channel_index: temp_channel_index,
   });
 }
 
-// Automatically generated via DataTransferObject for IlpFeatureExtractorDto
+// Automatically generated via DataTransferObject for IlpGaussianSmoothingDto
 // Do not edit!
-export class IlpFeatureExtractorDto {
+export class IlpGaussianSmoothingDto {
   public ilp_scale: number;
   public axis_2d: "x" | "y" | "z" | undefined;
-  public class_name:
-    | "Gaussian Smoothing"
-    | "Laplacian of Gaussian"
-    | "Gaussian Gradient Magnitude"
-    | "Difference of Gaussians"
-    | "Structure Tensor Eigenvalues"
-    | "Hessian of Gaussian Eigenvalues";
+  public channel_index: number;
   constructor(_params: {
     ilp_scale: number;
     axis_2d: "x" | "y" | "z" | undefined;
-    class_name:
-      | "Gaussian Smoothing"
-      | "Laplacian of Gaussian"
-      | "Gaussian Gradient Magnitude"
-      | "Difference of Gaussians"
-      | "Structure Tensor Eigenvalues"
-      | "Hessian of Gaussian Eigenvalues";
+    channel_index: number;
   }) {
     this.ilp_scale = _params.ilp_scale;
     this.axis_2d = _params.axis_2d;
-    this.class_name = _params.class_name;
+    this.channel_index = _params.channel_index;
   }
   public toJsonValue(): JsonObject {
     return {
-      "__class__": "IlpFeatureExtractorDto",
+      "__class__": "IlpGaussianSmoothingDto",
       ilp_scale: this.ilp_scale,
       axis_2d: toJsonValue(this.axis_2d),
-      class_name: this.class_name,
+      channel_index: this.channel_index,
     };
   }
-  public static fromJsonValue(value: JsonValue): IlpFeatureExtractorDto | MessageParsingError {
-    return parse_as_IlpFeatureExtractorDto(value);
+  public static fromJsonValue(value: JsonValue): IlpGaussianSmoothingDto | MessageParsingError {
+    return parse_as_IlpGaussianSmoothingDto(value);
   }
 }
 
-export function parse_as_Tuple_of_IlpFeatureExtractorDto0_varlen__endof_(
+export function parse_as_IlpLaplacianOfGaussianDto(value: JsonValue): IlpLaplacianOfGaussianDto | MessageParsingError {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof MessageParsingError) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "IlpLaplacianOfGaussianDto") {
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a IlpLaplacianOfGaussianDto`,
+    );
+  }
+  const temp_ilp_scale = parse_as_float(valueObject.ilp_scale);
+  if (temp_ilp_scale instanceof MessageParsingError) {
+    return temp_ilp_scale;
+  }
+  const temp_axis_2d = parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
+    valueObject.axis_2d,
+  );
+  if (temp_axis_2d instanceof MessageParsingError) {
+    return temp_axis_2d;
+  }
+  const temp_channel_index = parse_as_int(valueObject.channel_index);
+  if (temp_channel_index instanceof MessageParsingError) {
+    return temp_channel_index;
+  }
+  return new IlpLaplacianOfGaussianDto({
+    ilp_scale: temp_ilp_scale,
+    axis_2d: temp_axis_2d,
+    channel_index: temp_channel_index,
+  });
+}
+
+// Automatically generated via DataTransferObject for IlpLaplacianOfGaussianDto
+// Do not edit!
+export class IlpLaplacianOfGaussianDto {
+  public ilp_scale: number;
+  public axis_2d: "x" | "y" | "z" | undefined;
+  public channel_index: number;
+  constructor(_params: {
+    ilp_scale: number;
+    axis_2d: "x" | "y" | "z" | undefined;
+    channel_index: number;
+  }) {
+    this.ilp_scale = _params.ilp_scale;
+    this.axis_2d = _params.axis_2d;
+    this.channel_index = _params.channel_index;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "IlpLaplacianOfGaussianDto",
+      ilp_scale: this.ilp_scale,
+      axis_2d: toJsonValue(this.axis_2d),
+      channel_index: this.channel_index,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): IlpLaplacianOfGaussianDto | MessageParsingError {
+    return parse_as_IlpLaplacianOfGaussianDto(value);
+  }
+}
+
+export function parse_as_IlpGaussianGradientMagnitudeDto(
   value: JsonValue,
-): Array<IlpFeatureExtractorDto> | MessageParsingError {
+): IlpGaussianGradientMagnitudeDto | MessageParsingError {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof MessageParsingError) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "IlpGaussianGradientMagnitudeDto") {
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a IlpGaussianGradientMagnitudeDto`,
+    );
+  }
+  const temp_ilp_scale = parse_as_float(valueObject.ilp_scale);
+  if (temp_ilp_scale instanceof MessageParsingError) {
+    return temp_ilp_scale;
+  }
+  const temp_axis_2d = parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
+    valueObject.axis_2d,
+  );
+  if (temp_axis_2d instanceof MessageParsingError) {
+    return temp_axis_2d;
+  }
+  const temp_channel_index = parse_as_int(valueObject.channel_index);
+  if (temp_channel_index instanceof MessageParsingError) {
+    return temp_channel_index;
+  }
+  return new IlpGaussianGradientMagnitudeDto({
+    ilp_scale: temp_ilp_scale,
+    axis_2d: temp_axis_2d,
+    channel_index: temp_channel_index,
+  });
+}
+
+// Automatically generated via DataTransferObject for IlpGaussianGradientMagnitudeDto
+// Do not edit!
+export class IlpGaussianGradientMagnitudeDto {
+  public ilp_scale: number;
+  public axis_2d: "x" | "y" | "z" | undefined;
+  public channel_index: number;
+  constructor(_params: {
+    ilp_scale: number;
+    axis_2d: "x" | "y" | "z" | undefined;
+    channel_index: number;
+  }) {
+    this.ilp_scale = _params.ilp_scale;
+    this.axis_2d = _params.axis_2d;
+    this.channel_index = _params.channel_index;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "IlpGaussianGradientMagnitudeDto",
+      ilp_scale: this.ilp_scale,
+      axis_2d: toJsonValue(this.axis_2d),
+      channel_index: this.channel_index,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): IlpGaussianGradientMagnitudeDto | MessageParsingError {
+    return parse_as_IlpGaussianGradientMagnitudeDto(value);
+  }
+}
+
+export function parse_as_IlpDifferenceOfGaussiansDto(
+  value: JsonValue,
+): IlpDifferenceOfGaussiansDto | MessageParsingError {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof MessageParsingError) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "IlpDifferenceOfGaussiansDto") {
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a IlpDifferenceOfGaussiansDto`,
+    );
+  }
+  const temp_ilp_scale = parse_as_float(valueObject.ilp_scale);
+  if (temp_ilp_scale instanceof MessageParsingError) {
+    return temp_ilp_scale;
+  }
+  const temp_axis_2d = parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
+    valueObject.axis_2d,
+  );
+  if (temp_axis_2d instanceof MessageParsingError) {
+    return temp_axis_2d;
+  }
+  const temp_channel_index = parse_as_int(valueObject.channel_index);
+  if (temp_channel_index instanceof MessageParsingError) {
+    return temp_channel_index;
+  }
+  return new IlpDifferenceOfGaussiansDto({
+    ilp_scale: temp_ilp_scale,
+    axis_2d: temp_axis_2d,
+    channel_index: temp_channel_index,
+  });
+}
+
+// Automatically generated via DataTransferObject for IlpDifferenceOfGaussiansDto
+// Do not edit!
+export class IlpDifferenceOfGaussiansDto {
+  public ilp_scale: number;
+  public axis_2d: "x" | "y" | "z" | undefined;
+  public channel_index: number;
+  constructor(_params: {
+    ilp_scale: number;
+    axis_2d: "x" | "y" | "z" | undefined;
+    channel_index: number;
+  }) {
+    this.ilp_scale = _params.ilp_scale;
+    this.axis_2d = _params.axis_2d;
+    this.channel_index = _params.channel_index;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "IlpDifferenceOfGaussiansDto",
+      ilp_scale: this.ilp_scale,
+      axis_2d: toJsonValue(this.axis_2d),
+      channel_index: this.channel_index,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): IlpDifferenceOfGaussiansDto | MessageParsingError {
+    return parse_as_IlpDifferenceOfGaussiansDto(value);
+  }
+}
+
+export function parse_as_IlpStructureTensorEigenvaluesDto(
+  value: JsonValue,
+): IlpStructureTensorEigenvaluesDto | MessageParsingError {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof MessageParsingError) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "IlpStructureTensorEigenvaluesDto") {
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a IlpStructureTensorEigenvaluesDto`,
+    );
+  }
+  const temp_ilp_scale = parse_as_float(valueObject.ilp_scale);
+  if (temp_ilp_scale instanceof MessageParsingError) {
+    return temp_ilp_scale;
+  }
+  const temp_axis_2d = parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
+    valueObject.axis_2d,
+  );
+  if (temp_axis_2d instanceof MessageParsingError) {
+    return temp_axis_2d;
+  }
+  const temp_channel_index = parse_as_int(valueObject.channel_index);
+  if (temp_channel_index instanceof MessageParsingError) {
+    return temp_channel_index;
+  }
+  return new IlpStructureTensorEigenvaluesDto({
+    ilp_scale: temp_ilp_scale,
+    axis_2d: temp_axis_2d,
+    channel_index: temp_channel_index,
+  });
+}
+
+// Automatically generated via DataTransferObject for IlpStructureTensorEigenvaluesDto
+// Do not edit!
+export class IlpStructureTensorEigenvaluesDto {
+  public ilp_scale: number;
+  public axis_2d: "x" | "y" | "z" | undefined;
+  public channel_index: number;
+  constructor(_params: {
+    ilp_scale: number;
+    axis_2d: "x" | "y" | "z" | undefined;
+    channel_index: number;
+  }) {
+    this.ilp_scale = _params.ilp_scale;
+    this.axis_2d = _params.axis_2d;
+    this.channel_index = _params.channel_index;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "IlpStructureTensorEigenvaluesDto",
+      ilp_scale: this.ilp_scale,
+      axis_2d: toJsonValue(this.axis_2d),
+      channel_index: this.channel_index,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): IlpStructureTensorEigenvaluesDto | MessageParsingError {
+    return parse_as_IlpStructureTensorEigenvaluesDto(value);
+  }
+}
+
+export function parse_as_IlpHessianOfGaussianEigenvaluesDto(
+  value: JsonValue,
+): IlpHessianOfGaussianEigenvaluesDto | MessageParsingError {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof MessageParsingError) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "IlpHessianOfGaussianEigenvaluesDto") {
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a IlpHessianOfGaussianEigenvaluesDto`,
+    );
+  }
+  const temp_ilp_scale = parse_as_float(valueObject.ilp_scale);
+  if (temp_ilp_scale instanceof MessageParsingError) {
+    return temp_ilp_scale;
+  }
+  const temp_axis_2d = parse_as_Union_of_Literal_of__quote_x_quote_0_quote_y_quote_0_quote_z_quote__endof_0None_endof_(
+    valueObject.axis_2d,
+  );
+  if (temp_axis_2d instanceof MessageParsingError) {
+    return temp_axis_2d;
+  }
+  const temp_channel_index = parse_as_int(valueObject.channel_index);
+  if (temp_channel_index instanceof MessageParsingError) {
+    return temp_channel_index;
+  }
+  return new IlpHessianOfGaussianEigenvaluesDto({
+    ilp_scale: temp_ilp_scale,
+    axis_2d: temp_axis_2d,
+    channel_index: temp_channel_index,
+  });
+}
+
+// Automatically generated via DataTransferObject for IlpHessianOfGaussianEigenvaluesDto
+// Do not edit!
+export class IlpHessianOfGaussianEigenvaluesDto {
+  public ilp_scale: number;
+  public axis_2d: "x" | "y" | "z" | undefined;
+  public channel_index: number;
+  constructor(_params: {
+    ilp_scale: number;
+    axis_2d: "x" | "y" | "z" | undefined;
+    channel_index: number;
+  }) {
+    this.ilp_scale = _params.ilp_scale;
+    this.axis_2d = _params.axis_2d;
+    this.channel_index = _params.channel_index;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "IlpHessianOfGaussianEigenvaluesDto",
+      ilp_scale: this.ilp_scale,
+      axis_2d: toJsonValue(this.axis_2d),
+      channel_index: this.channel_index,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): IlpHessianOfGaussianEigenvaluesDto | MessageParsingError {
+    return parse_as_IlpHessianOfGaussianEigenvaluesDto(value);
+  }
+}
+
+export function parse_as_Union_of_IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_(
+  value: JsonValue,
+):
+  | IlpGaussianSmoothingDto
+  | IlpLaplacianOfGaussianDto
+  | IlpGaussianGradientMagnitudeDto
+  | IlpDifferenceOfGaussiansDto
+  | IlpStructureTensorEigenvaluesDto
+  | IlpHessianOfGaussianEigenvaluesDto
+  | MessageParsingError {
+  const parsed_option_0 = parse_as_IlpGaussianSmoothingDto(value);
+  if (!(parsed_option_0 instanceof MessageParsingError)) {
+    return parsed_option_0;
+  }
+  const parsed_option_1 = parse_as_IlpLaplacianOfGaussianDto(value);
+  if (!(parsed_option_1 instanceof MessageParsingError)) {
+    return parsed_option_1;
+  }
+  const parsed_option_2 = parse_as_IlpGaussianGradientMagnitudeDto(value);
+  if (!(parsed_option_2 instanceof MessageParsingError)) {
+    return parsed_option_2;
+  }
+  const parsed_option_3 = parse_as_IlpDifferenceOfGaussiansDto(value);
+  if (!(parsed_option_3 instanceof MessageParsingError)) {
+    return parsed_option_3;
+  }
+  const parsed_option_4 = parse_as_IlpStructureTensorEigenvaluesDto(value);
+  if (!(parsed_option_4 instanceof MessageParsingError)) {
+    return parsed_option_4;
+  }
+  const parsed_option_5 = parse_as_IlpHessianOfGaussianEigenvaluesDto(value);
+  if (!(parsed_option_5 instanceof MessageParsingError)) {
+    return parsed_option_5;
+  }
+  return new MessageParsingError(
+    `Could not parse ${
+      JSON.stringify(value)
+    } into IlpGaussianSmoothingDto | IlpLaplacianOfGaussianDto | IlpGaussianGradientMagnitudeDto | IlpDifferenceOfGaussiansDto | IlpStructureTensorEigenvaluesDto | IlpHessianOfGaussianEigenvaluesDto`,
+  );
+}
+
+export function parse_as_Tuple_of_Union_of_IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_0_varlen__endof_(
+  value: JsonValue,
+):
+  | Array<
+    | IlpGaussianSmoothingDto
+    | IlpLaplacianOfGaussianDto
+    | IlpGaussianGradientMagnitudeDto
+    | IlpDifferenceOfGaussiansDto
+    | IlpStructureTensorEigenvaluesDto
+    | IlpHessianOfGaussianEigenvaluesDto
+  >
+  | MessageParsingError {
   const arr = ensureJsonArray(value);
   if (arr instanceof MessageParsingError) {
     return arr;
   }
-  const out: Array<IlpFeatureExtractorDto> = [];
+  const out: Array<
+    | IlpGaussianSmoothingDto
+    | IlpLaplacianOfGaussianDto
+    | IlpGaussianGradientMagnitudeDto
+    | IlpDifferenceOfGaussiansDto
+    | IlpStructureTensorEigenvaluesDto
+    | IlpHessianOfGaussianEigenvaluesDto
+  > = [];
   for (let item of arr) {
-    let parsed_item = parse_as_IlpFeatureExtractorDto(item);
+    let parsed_item =
+      parse_as_Union_of_IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_(
+        item,
+      );
     if (parsed_item instanceof MessageParsingError) {
       return parsed_item;
     }
     out.push(parsed_item);
   }
   return out;
+}
+
+export function parse_as_IlpFilterCollectionDto(value: JsonValue): IlpFilterCollectionDto | MessageParsingError {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof MessageParsingError) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "IlpFilterCollectionDto") {
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a IlpFilterCollectionDto`);
+  }
+  const temp_filters =
+    parse_as_Tuple_of_Union_of_IlpGaussianSmoothingDto0IlpLaplacianOfGaussianDto0IlpGaussianGradientMagnitudeDto0IlpDifferenceOfGaussiansDto0IlpStructureTensorEigenvaluesDto0IlpHessianOfGaussianEigenvaluesDto_endof_0_varlen__endof_(
+      valueObject.filters,
+    );
+  if (temp_filters instanceof MessageParsingError) {
+    return temp_filters;
+  }
+  return new IlpFilterCollectionDto({
+    filters: temp_filters,
+  });
+}
+
+// Automatically generated via DataTransferObject for IlpFilterCollectionDto
+// Do not edit!
+export class IlpFilterCollectionDto {
+  public filters: Array<
+    | IlpGaussianSmoothingDto
+    | IlpLaplacianOfGaussianDto
+    | IlpGaussianGradientMagnitudeDto
+    | IlpDifferenceOfGaussiansDto
+    | IlpStructureTensorEigenvaluesDto
+    | IlpHessianOfGaussianEigenvaluesDto
+  >;
+  constructor(_params: {
+    filters: Array<
+      | IlpGaussianSmoothingDto
+      | IlpLaplacianOfGaussianDto
+      | IlpGaussianGradientMagnitudeDto
+      | IlpDifferenceOfGaussiansDto
+      | IlpStructureTensorEigenvaluesDto
+      | IlpHessianOfGaussianEigenvaluesDto
+    >;
+  }) {
+    this.filters = _params.filters;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "IlpFilterCollectionDto",
+      filters: this.filters.map((item) => toJsonValue(item)),
+    };
+  }
+  public static fromJsonValue(value: JsonValue): IlpFilterCollectionDto | MessageParsingError {
+    return parse_as_IlpFilterCollectionDto(value);
+  }
 }
 
 export function parse_as_FeatureSelectionAppletStateDto(
@@ -3822,9 +4916,7 @@ export function parse_as_FeatureSelectionAppletStateDto(
       `Could not deserialize ${JSON.stringify(valueObject)} as a FeatureSelectionAppletStateDto`,
     );
   }
-  const temp_feature_extractors = parse_as_Tuple_of_IlpFeatureExtractorDto0_varlen__endof_(
-    valueObject.feature_extractors,
-  );
+  const temp_feature_extractors = parse_as_IlpFilterCollectionDto(valueObject.feature_extractors);
   if (temp_feature_extractors instanceof MessageParsingError) {
     return temp_feature_extractors;
   }
@@ -3836,16 +4928,16 @@ export function parse_as_FeatureSelectionAppletStateDto(
 // Automatically generated via DataTransferObject for FeatureSelectionAppletStateDto
 // Do not edit!
 export class FeatureSelectionAppletStateDto {
-  public feature_extractors: Array<IlpFeatureExtractorDto>;
+  public feature_extractors: IlpFilterCollectionDto;
   constructor(_params: {
-    feature_extractors: Array<IlpFeatureExtractorDto>;
+    feature_extractors: IlpFilterCollectionDto;
   }) {
     this.feature_extractors = _params.feature_extractors;
   }
   public toJsonValue(): JsonObject {
     return {
       "__class__": "FeatureSelectionAppletStateDto",
-      feature_extractors: this.feature_extractors.map((item) => item.toJsonValue()),
+      feature_extractors: this.feature_extractors.toJsonValue(),
     };
   }
   public static fromJsonValue(value: JsonValue): FeatureSelectionAppletStateDto | MessageParsingError {
@@ -3865,9 +4957,7 @@ export function parse_as_SetFeatureExtractorsParamsDto(
       `Could not deserialize ${JSON.stringify(valueObject)} as a SetFeatureExtractorsParamsDto`,
     );
   }
-  const temp_feature_extractors = parse_as_Tuple_of_IlpFeatureExtractorDto0_varlen__endof_(
-    valueObject.feature_extractors,
-  );
+  const temp_feature_extractors = parse_as_IlpFilterCollectionDto(valueObject.feature_extractors);
   if (temp_feature_extractors instanceof MessageParsingError) {
     return temp_feature_extractors;
   }
@@ -3879,16 +4969,16 @@ export function parse_as_SetFeatureExtractorsParamsDto(
 // Automatically generated via DataTransferObject for SetFeatureExtractorsParamsDto
 // Do not edit!
 export class SetFeatureExtractorsParamsDto {
-  public feature_extractors: Array<IlpFeatureExtractorDto>;
+  public feature_extractors: IlpFilterCollectionDto;
   constructor(_params: {
-    feature_extractors: Array<IlpFeatureExtractorDto>;
+    feature_extractors: IlpFilterCollectionDto;
   }) {
     this.feature_extractors = _params.feature_extractors;
   }
   public toJsonValue(): JsonObject {
     return {
       "__class__": "SetFeatureExtractorsParamsDto",
-      feature_extractors: this.feature_extractors.map((item) => item.toJsonValue()),
+      feature_extractors: this.feature_extractors.toJsonValue(),
     };
   }
   public static fromJsonValue(value: JsonValue): SetFeatureExtractorsParamsDto | MessageParsingError {

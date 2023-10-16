@@ -8,8 +8,9 @@ from ndstructs.array5D import Array5D
 
 from webilastik.serialization.json_serialization import IJsonable
 from webilastik.datasource import DataSource, DataRoi
-from webilastik.operator import Operator
+from webilastik.operator import Operator, Preprocessor, preprocessor_from_dto
 from executor_getter import get_executor
+from webilastik.server.rpc.dto import FeatureExtractorCollectionDto
 
 class FeatureData(Array5D):
     def __init__(self, arr: "np.ndarray[Any, np.dtype[np.float32]]", axiskeys: str, location: Point5D = Point5D.zero()):
@@ -22,20 +23,8 @@ class FeatureDataMismatchException(Exception):
         super().__init__(f"Feature {feature_extractor} can't be cleanly applied to {data_source}")
 
 
-class FeatureExtractor(Operator[DataRoi, FeatureData], Protocol):
+class FeatureExtractor(Preprocessor, Protocol):
     """A specification of how feature data is to be (reproducibly) computed"""
-
-    @abstractmethod
-    def __call__(self, /, roi: DataRoi) -> FeatureData:
-        pass
-
-    @abstractmethod
-    def is_applicable_to(self, datasource: DataSource) -> bool:
-        pass
-
-    def ensure_applicable(self, datasource: DataSource):
-        if not self.is_applicable_to(datasource):
-            raise FeatureDataMismatchException(self, datasource)
 
     def __hash__(self):
         return hash((self.__class__, tuple(self.__dict__.values())))
@@ -45,7 +34,7 @@ class FeatureExtractor(Operator[DataRoi, FeatureData], Protocol):
 
 
 class FeatureExtractorCollection(FeatureExtractor):
-    def __init__(self, extractors: Iterable[FeatureExtractor]):
+    def __init__(self, extractors: Iterable[Preprocessor]):
         self.extractors = tuple(extractors)
         assert len(self.extractors) > 0
         super().__init__()
@@ -53,9 +42,21 @@ class FeatureExtractorCollection(FeatureExtractor):
     def is_applicable_to(self, datasource: DataSource) -> bool:
         return all(fx.is_applicable_to(datasource) for fx in self.extractors)
 
-    def __call__(self, /, roi: DataRoi) -> FeatureData:
+    def to_dto(self) -> FeatureExtractorCollectionDto:
+        return FeatureExtractorCollectionDto(
+            extractors=tuple(fx.to_dto() for fx in self.extractors)
+        )
+
+    @classmethod
+    def from_dto(cls, dto: FeatureExtractorCollectionDto) -> "FeatureExtractorCollection":
+        return FeatureExtractorCollection(
+            extractors=[preprocessor_from_dto(fx_dto) for fx_dto in dto.extractors]
+        )
+
+    # FIXME: careful when pasing this into vigra classifier
+    def __call__(self, /, roi: DataRoi) -> Array5D:
         assert roi.interval.c[0] == 0
-        feature_promises: Dict[int, Future[FeatureData]] = {}
+        feature_promises: Dict[int, Future[Array5D]] = {}
 
         executor = get_executor(hint="feature_extraction", max_workers=len(self.extractors))
         from webilastik.features.ilp_filter import IlpGaussianSmoothing
@@ -89,6 +90,3 @@ class FeatureExtractorCollection(FeatureExtractor):
             axiskeys=out.axiskeys,
             location=out.location
         )
-
-class JsonableFeatureExtractor(IJsonable, FeatureExtractor, Protocol):
-    pass

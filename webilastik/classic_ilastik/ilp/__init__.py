@@ -112,7 +112,8 @@ def ensure_int_tuple(group: h5py.Group, key: str) -> Tuple[int, ...]:
 def ensure_drange(group: h5py.Group, key: str) -> "Tuple[int, int] | Tuple[float, float]":
     dataset = ensure_dataset(group, key)
     if len(dataset.shape) == 2 and (dataset.dtype == np.dtype("int64") or dataset.dtype == np.dtype("float32")):
-        return tuple(dataset[()])
+        data = dataset[()]
+        return (data[0], data[1])
     raise IlpParsingError(f"Expected {key} to be a Tuple[Number, Number], found {dataset.dtype} {dataset.shape}")
 
 def ensure_bytes(group: h5py.Group, key: str) -> bytes:
@@ -548,9 +549,8 @@ class IlpFeatureSelectionsGroup:
 
         SelectionMatrix: "ndarray[Any, Any]" = np.zeros((len(self.feature_classes), len(scales)), dtype=bool)
         for fe in self.feature_extractors.filters:
-            name_idx = self.feature_classes.index(fe.__class__)
             scale_idx = scales.index(fe.ilp_scale)
-            SelectionMatrix[name_idx, scale_idx] = True
+            SelectionMatrix[fe.ilp_sorting_index, scale_idx] = True
 
         ComputeIn2d: "ndarray[Any, Any]" = np.full(len(scales), True, dtype=bool)
         for idx, fname in enumerate(self.feature_classes):
@@ -561,7 +561,7 @@ class IlpFeatureSelectionsGroup:
         group["StorageVersion"] = "0.1"
 
     @classmethod
-    def parse(cls, group: h5py.Group) -> "IlpFeatureSelectionsGroup":
+    def parse(cls, *, group: h5py.Group, num_input_channels: int) -> "IlpFeatureSelectionsGroup":
         if len(group.keys()) == 0:
             return IlpFeatureSelectionsGroup(IlpFilterCollection.none())
         FeatureIds = ensure_encoded_string_list(group, "FeatureIds")
@@ -584,8 +584,12 @@ class IlpFeatureSelectionsGroup:
                 feature_class = cls.named_feature_classes.get(feature_name)
                 if feature_class is None:
                     raise IlpParsingError(f"Bad entry in {group.name}/FeatureIds: {feature_name}")
-                feature_extractors.add(feature_class(
-                    ilp_scale=float(scale),
-                    axis_2d="z" if ComputeIn2d[feature_name_index] else None, #FIXME: always z?
-                ))
+                feature_extractors.update(
+                    feature_class(
+                        ilp_scale=float(scale),
+                        channel_index=channel_index,
+                        axis_2d="z" if ComputeIn2d[feature_name_index] else None, #FIXME: always z?
+                    )
+                    for channel_index in range(num_input_channels)
+                )
         return IlpFeatureSelectionsGroup(feature_extractors=IlpFilterCollection(feature_extractors))

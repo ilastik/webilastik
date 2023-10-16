@@ -2,6 +2,7 @@
 
 from typing import Literal, Optional, Tuple, Union, Mapping, Any, cast
 from dataclasses import dataclass
+from typing_extensions import TypeAlias
 
 from ndstructs.point5D import Interval5D, Point5D, Shape5D
 import numpy as np
@@ -13,20 +14,35 @@ from webilastik.server.rpc import DataTransferObject
 #     type_name: Literal["uint8", "uint16", "uint32", "uint64", "float32"]
 
 Axis2D = Literal["x", "y", "z"]
+IlpFilterDto: TypeAlias = Union[
+    "IlpGaussianSmoothingDto",
+    "IlpLaplacianOfGaussianDto",
+    "IlpGaussianGradientMagnitudeDto",
+    "IlpDifferenceOfGaussiansDto",
+    "IlpStructureTensorEigenvaluesDto",
+    "IlpHessianOfGaussianEigenvaluesDto",
+]
 
-Preprocessor = Union[
+FastFilterDto: TypeAlias = Union[
+    "GaussianSmoothingDto",
+    "LaplacianOfGaussianDto",
+    "GaussianGradientMagnitudeDto",
+    "DifferenceOfGaussiansDto",
     "StructureTensorEigenvaluesDto",
-    "GaussianGradientMagnitudeDto"
-    # "GaussianSmoothingDto",
-    # "DifferenceOfGaussiansDto",
-    # "HessianOfGaussianEigenvalues",
-    # "LaplacianOfGaussian",
-    # "OpRetrieverDto",
+    "HessianOfGaussianEigenvaluesDto",
+]
+
+PreprocessorDto = Union[
+    "OpRetrieverDto",
+    "FeatureExtractorCollectionDto",
+    # "IlpFilterCollectionDto",
+    FastFilterDto,
+    IlpFilterDto,
 ]
 
 @dataclass
 class StructureTensorEigenvaluesDto(DataTransferObject):
-    preprocessor: Optional[Preprocessor]
+    preprocessor: PreprocessorDto
     innerScale: float
     outerScale: float
     window_size: float
@@ -35,43 +51,52 @@ class StructureTensorEigenvaluesDto(DataTransferObject):
 
 @dataclass
 class GaussianGradientMagnitudeDto(DataTransferObject):
+    preprocessor: PreprocessorDto
     sigma: float
     window_size: float
     axis_2d: Optional[Axis2D]
     channel_index: int
 
-# @dataclass
-# class GaussianSmoothingDto(DataTransferObject):
-#     sigma: float
-#     window_size: float
-#     axis_2d: Optional[Axis2D]
-#     channel_index: int
+@dataclass
+class GaussianSmoothingDto(DataTransferObject):
+    preprocessor: PreprocessorDto
+    sigma: float
+    window_size: float
+    axis_2d: Optional[Axis2D]
+    channel_index: int
 
-# @dataclass
-# class DifferenceOfGaussiansDto(DataTransferObject):
-#     sigma0: float
-#     sigma1: float
-#     window_size: float
-#     axis_2d: Optional[Axis2D]
-#     channel_index: int
+@dataclass
+class DifferenceOfGaussiansDto(DataTransferObject):
+    preprocessor: PreprocessorDto
+    sigma0: float
+    sigma1: float
+    window_size: float
+    axis_2d: Optional[Axis2D]
+    channel_index: int
 
-# @dataclass
-# class HessianOfGaussianEigenvalues(DataTransferObject):
-#     scale: float
-#     window_size: float
-#     axis_2d: Optional[Axis2D]
-#     channel_index: int
+@dataclass
+class HessianOfGaussianEigenvaluesDto(DataTransferObject):
+    preprocessor: PreprocessorDto
+    scale: float
+    window_size: float
+    axis_2d: Optional[Axis2D]
+    channel_index: int
 
-# @dataclass
-# class LaplacianOfGaussian(DataTransferObject):
-#     scale: float
-#     window_size: float
-#     axis_2d: Optional[Axis2D]
-#     channel_index: int
+@dataclass
+class LaplacianOfGaussianDto(DataTransferObject):
+    preprocessor: PreprocessorDto
+    scale: float
+    window_size: float
+    axis_2d: Optional[Axis2D]
+    channel_index: int
 
-# @dataclass
-# class OpRetrieverDto(DataTransferObject):
-#     axiskeys_hint: str
+@dataclass
+class OpRetrieverDto(DataTransferObject):
+    axiskeys_hint: str
+
+@dataclass
+class FeatureExtractorCollectionDto(DataTransferObject):
+    extractors: Tuple[PreprocessorDto, ...]
 
 ###################################################333
 
@@ -446,25 +471,52 @@ class PixelClassificationExportAppletStateDto(DataTransferObject):
 #########################################################
 
 @dataclass
-class IlpFeatureExtractorDto(DataTransferObject):
+class IlpGaussianSmoothingDto(DataTransferObject):
     ilp_scale: float
-    axis_2d: Optional[Literal["x", "y", "z"]]
-    class_name: Literal[
-        "Gaussian Smoothing",
-        "Laplacian of Gaussian",
-        "Gaussian Gradient Magnitude",
-        "Difference of Gaussians",
-        "Structure Tensor Eigenvalues",
-        "Hessian of Gaussian Eigenvalues"
-    ]
+    axis_2d: Optional[Axis2D]
+    channel_index: int
+
+@dataclass
+class IlpLaplacianOfGaussianDto(DataTransferObject):
+    ilp_scale: float
+    axis_2d: Optional[Axis2D]
+    channel_index: int
+
+@dataclass
+class IlpGaussianGradientMagnitudeDto(DataTransferObject):
+    ilp_scale: float
+    axis_2d: Optional[Axis2D]
+    channel_index: int
+
+@dataclass
+class IlpDifferenceOfGaussiansDto(DataTransferObject):
+    ilp_scale: float
+    axis_2d: Optional[Axis2D]
+    channel_index: int
+
+@dataclass
+class IlpStructureTensorEigenvaluesDto(DataTransferObject):
+    ilp_scale: float
+    axis_2d: Optional[Axis2D]
+    channel_index: int
+
+@dataclass
+class IlpHessianOfGaussianEigenvaluesDto(DataTransferObject):
+    ilp_scale: float
+    axis_2d: Optional[Axis2D]
+    channel_index: int
+
+@dataclass
+class IlpFilterCollectionDto(DataTransferObject):
+    filters: Tuple[IlpFilterDto, ...]
 
 @dataclass
 class FeatureSelectionAppletStateDto(DataTransferObject):
-    feature_extractors: Tuple[IlpFeatureExtractorDto, ...]
+    feature_extractors: IlpFilterCollectionDto
 
 @dataclass
 class SetFeatureExtractorsParamsDto(DataTransferObject):
-    feature_extractors: Tuple[IlpFeatureExtractorDto, ...]
+    feature_extractors: IlpFilterCollectionDto
 
 #################################################################
 
