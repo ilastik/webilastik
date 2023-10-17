@@ -227,7 +227,7 @@ export class SessionManagerWidget{
                 defaultBucketName: startupConfigs.effectiveBucketName,
                 defaultBucketPath: startupConfigs.ebrains_bucket_path,
                 defaultOutputPathPattern: startupConfigs.effectiveOutputPathPattern,
-                confirmExitWhenSesionRunning: startupConfigs.confirm_exit_when_sesion_running
+                confirmExitWhenSessionRunning: startupConfigs.confirm_exit_when_session_running
             })
         })
 
@@ -314,7 +314,7 @@ export class SessionManagerWidget{
                 defaultBucketPath: params.startupConfigs.ebrains_bucket_path,
                 // projectLocation: ..., //loading the project again would clobber the running session
                 defaultOutputPathPattern: params.startupConfigs.effectiveOutputPathPattern,
-                confirmExitWhenSesionRunning: params.startupConfigs.confirm_exit_when_sesion_running
+                confirmExitWhenSessionRunning: params.startupConfigs.confirm_exit_when_session_running
             })
         }
         return sessionResult
@@ -405,14 +405,14 @@ export class SessionManagerWidget{
         defaultBucketName,
         defaultBucketPath,
         defaultOutputPathPattern,
-        confirmExitWhenSesionRunning,
+        confirmExitWhenSessionRunning,
     }: {
         sessionResult: Session,
         projectLocation?: {fs: Filesystem, path: Path,},
         defaultBucketName?: string,
         defaultBucketPath?: Path,
         defaultOutputPathPattern?: ExportPattern,
-        confirmExitWhenSesionRunning: boolean,
+        confirmExitWhenSessionRunning: boolean,
     }){
         (async () => {
             const token = sessionResult.token instanceof Promise ? await sessionResult.token : sessionResult.token;
@@ -454,7 +454,7 @@ export class SessionManagerWidget{
             }
         }, 1000);
         window.removeEventListener("beforeunload", this.onUnload)
-        if(confirmExitWhenSesionRunning){
+        if(confirmExitWhenSessionRunning){
             window.addEventListener("beforeunload", this.onUnload);
         }
         this.enableSessionDismissalControls({enabled: true})

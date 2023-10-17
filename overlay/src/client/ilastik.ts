@@ -79,7 +79,7 @@ export class StartupConfigs{
     ebrains_bucket_path: Path
     clb_collab_id?: string
     output_path_pattern?: ExportPattern
-    confirm_exit_when_sesion_running: boolean
+    confirm_exit_when_session_running: boolean
 
     public constructor(params: {
         project_file_url: Url | undefined,
@@ -94,7 +94,7 @@ export class StartupConfigs{
         this.ebrains_bucket_path = params.ebrains_bucket_path
         this.clb_collab_id = params.clb_collab_id
         this.output_path_pattern = params.output_path_pattern
-        this.confirm_exit_when_sesion_running = params.confirm_exit_when_sesion_running
+        this.confirm_exit_when_session_running = params.confirm_exit_when_sesion_running
     }
 
     public static getDefault(): StartupConfigs{
