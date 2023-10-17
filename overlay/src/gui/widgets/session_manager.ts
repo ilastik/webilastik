@@ -394,6 +394,7 @@ export class SessionManagerWidget{
         this.logMessage(error.message, "ERROR")
         this.enableSessionAccquisitionControls({enabled: true})
         this.session = undefined
+        new ErrorPopupWidget({message: `Could not join session: ${error}`})
     }
 
     private handleSessionSuccess({
