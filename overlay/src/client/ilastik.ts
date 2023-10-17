@@ -87,21 +87,21 @@ export class StartupConfigs{
         ebrains_bucket_path: Path,
         clb_collab_id?: string,
         output_path_pattern?: ExportPattern,
-        confirm_exit_when_sesion_running: boolean,
+        confirm_exit_when_session_running: boolean,
     }){
         this.project_file_url = params.project_file_url
         this.ebrains_bucket_name = params.ebrains_bucket_name
         this.ebrains_bucket_path = params.ebrains_bucket_path
         this.clb_collab_id = params.clb_collab_id
         this.output_path_pattern = params.output_path_pattern
-        this.confirm_exit_when_session_running = params.confirm_exit_when_sesion_running
+        this.confirm_exit_when_session_running = params.confirm_exit_when_session_running
     }
 
     public static getDefault(): StartupConfigs{
         return new StartupConfigs({
             project_file_url: undefined,
             ebrains_bucket_path: Path.root,
-            confirm_exit_when_sesion_running: true,
+            confirm_exit_when_session_running: true,
         })
     }
 
@@ -131,8 +131,8 @@ export class StartupConfigs{
             return outputPathPattern
         }
 
-        const confirm_exit_when_sesion_running__key = "confirm_exit_when_sesion_running";
-        const confirmExitWhenSessionRunningRaw = locationUrlResult.search.get(confirm_exit_when_sesion_running__key)
+        const confirm_exit_when_session_running__key = "confirm_exit_when_session_running";
+        const confirmExitWhenSessionRunningRaw = locationUrlResult.search.get(confirm_exit_when_session_running__key)
         let confirmExitWhenSessionRunning: boolean = true;
         if(confirmExitWhenSessionRunningRaw){
             const parsingResult = parseJson(confirmExitWhenSessionRunningRaw)
@@ -155,7 +155,7 @@ export class StartupConfigs{
             [ebrains_bucket_path_key]: ebrainsBucketPathRaw ? Path.parse(ebrainsBucketPathRaw) : Path.root,
             clb_collab_id: collabId,
             [output_path_pattern]: outputPathPattern,
-            [confirm_exit_when_sesion_running__key]: confirmExitWhenSessionRunning,
+            [confirm_exit_when_session_running__key]: confirmExitWhenSessionRunning,
         })
     }
 
