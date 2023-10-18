@@ -80,6 +80,7 @@ export class StartupConfigs{
     clb_collab_id?: string
     output_path_pattern?: ExportPattern
     confirm_exit_when_session_running: boolean
+    autorejoin_session_id?: string
 
     public constructor(params: {
         project_file_url: Url | undefined,
@@ -88,6 +89,7 @@ export class StartupConfigs{
         clb_collab_id?: string,
         output_path_pattern?: ExportPattern,
         confirm_exit_when_session_running: boolean,
+        autorejoin_session_id?: string,
     }){
         this.project_file_url = params.project_file_url
         this.ebrains_bucket_name = params.ebrains_bucket_name
@@ -95,6 +97,7 @@ export class StartupConfigs{
         this.clb_collab_id = params.clb_collab_id
         this.output_path_pattern = params.output_path_pattern
         this.confirm_exit_when_session_running = params.confirm_exit_when_session_running
+        this.autorejoin_session_id = params.autorejoin_session_id
     }
 
     public static getDefault(): StartupConfigs{
@@ -146,6 +149,8 @@ export class StartupConfigs{
             confirmExitWhenSessionRunning = result
         }
 
+        const autorejoin_session_id__key = "autorejoin_session_id"
+        const autorejoin_session_id = locationUrlResult.search.get(autorejoin_session_id__key)
 
         const collabId = locationUrlResult.search.get("clb-collab-id")
 
@@ -156,6 +161,7 @@ export class StartupConfigs{
             clb_collab_id: collabId,
             [output_path_pattern]: outputPathPattern,
             [confirm_exit_when_session_running__key]: confirmExitWhenSessionRunning,
+            [autorejoin_session_id__key]: autorejoin_session_id,
         })
     }
 

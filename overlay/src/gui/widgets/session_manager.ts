@@ -38,20 +38,17 @@ export class SessionManagerWidget{
     hpcSiteInput: Select<HpcSiteName>;
     private sessionRejoinForm: Form;
     private readonly container: CollapsableWidget;
+    private readonly configs: StartupConfigs;
 
-    public static uiGetUrlConfigs(): StartupConfigs{
-        let startupConfigs = StartupConfigs.tryFromWindowLocation()
-        if(startupConfigs instanceof Error){
-            new ErrorPopupWidget({message: `Could not get startup configs from current URL: ${startupConfigs.message}. Using defaults...`})
-            return StartupConfigs.getDefault()
-        }
-        return startupConfigs
-
-    }
-
-    constructor({parentElement, ilastikUrl, viewer_driver, workflow_container, hpcSiteNames}: {
-        parentElement: HTMLElement, ilastikUrl: Url, viewer_driver: IViewerDriver, workflow_container: HTMLElement, hpcSiteNames: Array<HpcSiteName>
+    constructor({parentElement, ilastikUrl, viewer_driver, workflow_container, hpcSiteNames, configs}: {
+        parentElement: HTMLElement,
+        ilastikUrl: Url,
+        viewer_driver: IViewerDriver,
+        workflow_container: HTMLElement,
+        hpcSiteNames: Array<HpcSiteName>,
+        configs: StartupConfigs,
     }){
+        this.configs = configs
         this.workflowContainer = workflow_container
         this.viewerDriver = viewer_driver
         this.container = new CollapsableWidget({
@@ -208,13 +205,13 @@ export class SessionManagerWidget{
                 return this.handleSessionFailed(sessionResult)
             }
 
-            let startupConfigs = SessionManagerWidget.uiGetUrlConfigs()
-
             let projectLocation: {fs: Filesystem, path: Path} | undefined = undefined;
-            if(startupConfigs.project_file_url){
+            if(this.configs.project_file_url){
                 let projectLocationResult = await PopupWidget.WaitPopup({
                     title: "Interpreting project ilp URL...",
-                    operation: sessionResult.tryGetFsAndPathFromUrl(new GetFileSystemAndPathFromUrlParamsDto({url: startupConfigs.project_file_url.toDto()})),
+                    operation: sessionResult.tryGetFsAndPathFromUrl(new GetFileSystemAndPathFromUrlParamsDto({
+                        url: this.configs.project_file_url.toDto()
+                    })),
                 });
                 if(projectLocationResult instanceof Error){
                     new ErrorPopupWidget({message: `Could not interpret url {FIXME} as a valid location`})
@@ -224,10 +221,10 @@ export class SessionManagerWidget{
             }
             this.handleSessionSuccess({
                 sessionResult, projectLocation,
-                defaultBucketName: startupConfigs.effectiveBucketName,
-                defaultBucketPath: startupConfigs.ebrains_bucket_path,
-                defaultOutputPathPattern: startupConfigs.effectiveOutputPathPattern,
-                confirmExitWhenSessionRunning: startupConfigs.confirm_exit_when_session_running
+                defaultBucketName: this.configs.effectiveBucketName,
+                defaultBucketPath: this.configs.ebrains_bucket_path,
+                defaultOutputPathPattern: this.configs.effectiveOutputPathPattern,
+                confirmExitWhenSessionRunning: this.configs.confirm_exit_when_session_running
             })
         })
 
@@ -264,7 +261,9 @@ export class SessionManagerWidget{
         ]});
     }
 
-    private rejoinSession = async (sessionId: string) => {
+    public rejoinSession = async (sessionId: string) => {
+        this.sessionIdField.value = sessionId
+
         let timeoutMinutes = this.getWaitTimeout()
         if(timeoutMinutes === undefined){
             return
@@ -279,8 +278,7 @@ export class SessionManagerWidget{
             new ErrorPopupWidget({message: `Could not join session ${sessionId} because there's already a sesison runnig`})
             return
         }
-        const startupConfigs = SessionManagerWidget.uiGetUrlConfigs()
-        this.session = this.doRejoinSession({sessionId, timeoutMinutes, ilastikUrl, token,startupConfigs})
+        this.session = this.doRejoinSession({sessionId, timeoutMinutes, ilastikUrl, token})
     }
 
     private doRejoinSession = async (params: {
@@ -288,7 +286,6 @@ export class SessionManagerWidget{
         token: EbrainsAccessTokenDto,
         timeoutMinutes: number,
         ilastikUrl: Url,
-        startupConfigs: StartupConfigs,
     }): Promise<Session | Error> => {
         this.enableSessionAccquisitionControls({enabled: false})
         this.logMessage("Joining session....")
@@ -310,11 +307,11 @@ export class SessionManagerWidget{
             params
             this.handleSessionSuccess({
                 sessionResult,
-                defaultBucketName: params.startupConfigs.effectiveBucketName,
-                defaultBucketPath: params.startupConfigs.ebrains_bucket_path,
+                defaultBucketName: this.configs.effectiveBucketName,
+                defaultBucketPath: this.configs.ebrains_bucket_path,
                 // projectLocation: ..., //loading the project again would clobber the running session
-                defaultOutputPathPattern: params.startupConfigs.effectiveOutputPathPattern,
-                confirmExitWhenSessionRunning: params.startupConfigs.confirm_exit_when_session_running
+                defaultOutputPathPattern: this.configs.effectiveOutputPathPattern,
+                confirmExitWhenSessionRunning: this.configs.confirm_exit_when_session_running
             })
         }
         return sessionResult
@@ -397,6 +394,7 @@ export class SessionManagerWidget{
         this.logMessage(error.message, "ERROR")
         this.enableSessionAccquisitionControls({enabled: true})
         this.session = undefined
+        new ErrorPopupWidget({message: `Could not join session: ${error}`})
     }
 
     private handleSessionSuccess({
