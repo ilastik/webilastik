@@ -229,8 +229,8 @@ export class PredictionsExportWidget extends Applet<PixelClassificationExportApp
         this.element.classList.add("ItkPredictionsExportApplet")
 
         this.exportModeSelector = new TabsWidget({parentElement: this.element, tabBodyWidgets: new Map([
+            ["simple segmentation", this.labelSelectorContainer = new Paragraph({parentElement: this.element})],
             ["pixel probabilities", new Paragraph({parentElement: undefined, innerText: "Exports an image with one float32 channel per class (brush color)"})],
-            ["simple segmentation", this.labelSelectorContainer = new Paragraph({parentElement: this.element})]
         ])})
 
         const datasourceFieldset = createFieldset({parentElement: this.element, legend: "Input Datasets:"})
