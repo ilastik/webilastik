@@ -411,9 +411,9 @@ export class DatasinkConfigWidget{
         this.tabs = new TabsWidget({
             parentElement: params.parentElement,
             tabBodyWidgets: new Map<string, PrecomputedChunksDatasinkConfigWidget | N5DatasinkConfigWidget | DziDatasinkConfigWidget>([
+                ["Deep Zoom", new DziDatasinkConfigWidget({parentElement: undefined})],
                 ["Precomputed Chunks", new PrecomputedChunksDatasinkConfigWidget({parentElement: undefined, disableEncoding: true})],
                 ["N5", new N5DatasinkConfigWidget({parentElement: undefined})],
-                ["Deep Zoom", new DziDatasinkConfigWidget({parentElement: undefined})],
             ])
         })
         this.element = this.tabs.element
