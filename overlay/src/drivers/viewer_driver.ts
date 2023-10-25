@@ -61,19 +61,53 @@ export interface IViewerDriver{
 /**
  * A description of a viewport's offset and geometry relative to the entirety of the display area; analogous to a WebGl viewport
  */
-export interface IViewportGeometry{
-    left: number;
-    bottom: number;
-    width: number;
-    height: number;
+export class ViewportGeometry{
+    public readonly left: number
+    public readonly bottom  : number
+    public readonly width   : number
+    public readonly height  : number
+    constructor(params: {
+        left: number;
+        bottom: number;
+        width: number;
+        height: number;
+    }){
+        this.left = params.left
+        this.bottom = params.bottom
+        this.width = params.width
+        this.height = params.height
+    }
+
+    public equals(other: ViewportGeometry): boolean{
+        return (
+            this.left == other.left &&
+            this.bottom == other.bottom &&
+            this.width == other.width &&
+            this.height == other.height
+        )
+    }
 }
 
 /**
  * Hints on how to inject the overlay div that captures mouse events into the DOM
  */
-export interface IViewportInjectionParams{
-    precedingElement?: HTMLElement;
-    zIndex?: string
+export class ViewportInjectionParams{
+    public readonly precedingElement?: HTMLElement;
+    public readonly zIndex?: string
+    public constructor(params: {
+        precedingElement?: HTMLElement;
+        zIndex?: string
+    }){
+        this.precedingElement = params.precedingElement
+        this.zIndex = params.zIndex
+    }
+
+    public equals(other: ViewportInjectionParams){
+        return (
+            this.precedingElement == other.precedingElement &&
+            this.zIndex == other.zIndex
+        )
+    }
 }
 
 /**
@@ -87,7 +121,7 @@ export interface IViewportInjectionParams{
  * context be shared between them.
  */
 export interface IViewportDriver{
-    getGeometry(): IViewportGeometry;
+    getGeometry(): ViewportGeometry;
 
     getCameraPose(): {position: Vec3<"world">, orientation: Quat<"world">};
 
@@ -102,5 +136,5 @@ export interface IViewportDriver{
      * @param pose.voxel_orientation_uvw - orientation to snap to, in data space
      */
     snapCameraTo?: (pose: {voxel_position_uvw: vec3, orientation_uvw: quat}) => any;
-    getInjectionParams?: () => IViewportInjectionParams
+    getInjectionParams: () => ViewportInjectionParams
 }

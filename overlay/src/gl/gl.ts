@@ -326,6 +326,24 @@ export class ClearConfig{
     }
 }
 
+export class ViewportConfig{
+    public readonly x: GLint; 
+    public readonly y: GLint; 
+    public readonly width: GLint; 
+    public readonly height: GLint; 
+
+    public constructor(params: {x: GLint, y: GLint, width: GLint, height: GLint}){
+         this.x = params.x
+         this.y = params.y
+         this.width = params.width
+         this.height = params.height
+    }
+
+    public use(gl: WebGL2RenderingContext){
+        gl.viewport(this.x, this.y, this.width, this.height)
+    }
+}
+
 export class RenderParams{
     public colorMask: ColorMask
     public depthConfig: DepthConfig
@@ -334,8 +352,10 @@ export class RenderParams{
     public cullConfig: CullConfig
     public blendingConfig: BlendingConfig
     public clearConfig: ClearConfig
+    public viewportConfig?: ViewportConfig
 
     public constructor({
+        viewportConfig=undefined,
         colorMask=new ColorMask({}),
         depthConfig=new DepthConfig({}),
         stencilConfig=new StencilConfig({}),
@@ -344,6 +364,7 @@ export class RenderParams{
         blendingConfig=new BlendingConfig({}),
         clearConfig=new ClearConfig({}),
     }: {
+        viewportConfig?: ViewportConfig,
         colorMask?: ColorMask,
         depthConfig?: DepthConfig,
         stencilConfig?: StencilConfig,
@@ -352,6 +373,7 @@ export class RenderParams{
         blendingConfig?: BlendingConfig,
         clearConfig?: ClearConfig,
     }){
+        this.viewportConfig = viewportConfig
         this.colorMask = colorMask
         this.depthConfig = depthConfig
         this.stencilConfig = stencilConfig
@@ -362,6 +384,13 @@ export class RenderParams{
     }
 
     public use(gl: WebGL2RenderingContext){
+        const viewportConfig = this.viewportConfig || new ViewportConfig({
+            x: 0,
+            y: 0,
+            height: gl.canvas.height,
+            width: gl.canvas.width,
+        });
+        viewportConfig.use(gl);
         this.colorMask.use(gl)
         this.depthConfig.use(gl)
         this.stencilConfig.use(gl)

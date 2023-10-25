@@ -7,6 +7,7 @@ import { Div } from "../gui/widgets/widget";
 import { createElement, getElementContentRect } from "../util/misc";
 import { Mat4, Quat, Vec3 } from "../util/ooglmatrix";
 import { Url } from "../util/parsed_url";
+import { ViewportGeometry, ViewportInjectionParams } from "./viewer_driver";
 
 type NeuroglancerLayout = "4panel" | "xy" | "xy-3d" | "xz" | "xz-3d" | "yz" | "yz-3d";
 
@@ -20,11 +21,15 @@ export class NeuroglancerViewportDriver implements IViewportDriver{
         this.viewer = viewer_driver.viewer
     }
     public getCameraPose = (): {position: Vec3<"world">, orientation: Quat<"world">} => {
-        const orientation_uvw = new Quat<"voxel">(quat.multiply(
-            quat.create(), this.viewer.navigationState.pose.orientation.orientation, this.orientation_offset
-        ))
+        const orientation_uvw = new Quat<"voxel">(
+            quat.multiply(
+                quat.create(), this.viewer.navigationState.pose.orientation.orientation, this.orientation_offset
+            ),
+            "voxel"
+        )
         const position_uvw = new Vec3<"voxel">(
-            vec3.clone(this.viewer.navigationState.pose.position.value)
+            vec3.clone(this.viewer.navigationState.pose.position.value),
+            "voxel"
         )
 
         let uvw_to_w = this.getVoxelToWorldMatrix({voxelSizeInNm: this.viewer_driver.getUnitSize_nm()})
@@ -37,7 +42,7 @@ export class NeuroglancerViewportDriver implements IViewportDriver{
     public getVoxelToWorldMatrix(params: {voxelSizeInNm: vec3}): Mat4<"voxel", "world">{
         const voxelScale = this.viewer_driver.getVoxelScale(params);
         const scaling: vec3 = vec3.mul(vec3.create(), voxelScale, vec3.fromValues(1, -1, -1));
-        return Mat4.fromScaling(scaling)
+        return Mat4.fromScaling(scaling, "voxel", "world")
     }
     public getZoomInWorldUnitsPerPixel(): number{
         return this.viewer.navigationState.zoomFactor.value //FIXME: maybe pick the smallest? idk
@@ -45,14 +50,14 @@ export class NeuroglancerViewportDriver implements IViewportDriver{
     public getGeometry = () => {
         const panelContentRect = getElementContentRect(this.panel)
         const trackedElementRect = getElementContentRect(this.viewer_driver.getTrackedElement())
-        return {
+        return new ViewportGeometry({
             left: panelContentRect.left - trackedElementRect.left,
             bottom: panelContentRect.bottom - trackedElementRect.bottom,
             width: panelContentRect.width,
             height: panelContentRect.height,
-        }
+        })
     }
-    public getInjectionParams = () => ({
+    public getInjectionParams = () => new ViewportInjectionParams({
         precedingElement: this.panel,
         // zIndex: 10
     })
@@ -313,7 +318,7 @@ export class NeuroglancerDriver implements IViewerDriver{
     public snapTo(params: {position_w: Vec3<"world">, orientation_w: Quat<"world">}): void{
         const {position_w, orientation_w} = params;
 
-        const worldToSmallestVoxel = Mat4.fromScaling(vec3.fromValues(1, -1, -1)).inverted() //FIXME?
+        const worldToSmallestVoxel = Mat4.fromScaling(vec3.fromValues(1, -1, -1), "voxel", "world").inverted() //FIXME?
         const viewer_pos = position_w.transformedWith(worldToSmallestVoxel) //viewer position is _not_ in world space
 
         this.viewer.navigationState.pose.position.restoreState([viewer_pos.x, viewer_pos.y, viewer_pos.z])

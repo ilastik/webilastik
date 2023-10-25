@@ -1,97 +1,97 @@
-import { vec3 } from 'gl-matrix'
+import { mat4, vec3 } from 'gl-matrix'
 import { BrushRenderer } from './brush_renderer'
-// import { BrushShaderProgram } from './brush_stroke'
 import { OrthoCamera } from './camera'
-// import { PerspectiveCamera } from './camera'
-import { ClearConfig, RenderParams, ScissorConfig } from '../../../gl/gl'
-import { coverContents, insertAfter, removeElement } from '../../../util/misc'
-import { IViewportDriver } from '../../../drivers/viewer_driver'
+import { ClearConfig, RenderParams, ScissorConfig, ViewportConfig } from '../../../gl/gl'
+import { coverContents, removeElement } from '../../../util/misc'
+import { ViewportGeometry } from '../../../drivers/viewer_driver'
 import { IBrushStrokeHandler, BrushStroke } from './brush_stroke'
 import { Color, FsDataSource } from '../../../client/ilastik'
-import { Quat, Vec3 } from '../../../util/ooglmatrix'
-
+import { Mat4, Quat, Vec3 } from '../../../util/ooglmatrix'
+import { Viewer } from '../../../viewer/viewer'
 
 export class OverlayViewport{
     public readonly gl: WebGL2RenderingContext
     public readonly canvas: HTMLCanvasElement
-    public readonly viewport_driver: IViewportDriver
-    public readonly element: HTMLElement
-    public readonly datasource: FsDataSource
+    public height: GLint
+    public width: GLint
+    public y: GLint
+    public x: GLint
+    public readonly viewport_dev_to_canvas_dev: Mat4<"viewport_device_coords", "canvas_device_coords">
+    canvas_dev_to_viewport_dev: Mat4<"canvas_device_coords", "viewport_device_coords">
+    // private readonly position: Vec3<"canvas_device_coords">;
+    // private readonly scale: Vec3<"canvas_device_coords">;
 
-    public constructor({
-        datasource,
-        viewport_driver,
-        brush_stroke_handler,
-        gl,
-    }: {
+    public constructor(params: {
         datasource: FsDataSource,
-        viewport_driver: IViewportDriver,
         brush_stroke_handler: IBrushStrokeHandler,
         gl: WebGL2RenderingContext,
+        x: GLint,
+        y: GLint,
+        width: GLint,
+        height: GLint,
     }){
-        this.datasource = datasource
-        this.viewport_driver = viewport_driver
-        this.gl = gl
+        this.gl = params.gl
         this.canvas = this.gl.canvas as HTMLCanvasElement
-        this.element = document.createElement("div")
-        this.element.classList.add("OverlayViewport")
 
+        this.x = params.x
+        this.y = params.y
+        this.width = params.width
+        this.height = params.height
 
-        document.body.lastElementChild
-        const injection_params = viewport_driver.getInjectionParams ? viewport_driver.getInjectionParams() : {
-            precedingElement: undefined,
-            zIndex: undefined,
-        }
-        insertAfter({
-            new_element: this.element,
-            reference: injection_params.precedingElement || document.body.lastElementChild as HTMLElement
+        this.viewport_dev_to_canvas_dev = Mat4.fromTranslation({
+            from: "viewport_device_coords",
+            translation: new Vec3(vec3.fromValues(this.x, this.y, 0), "canvas_device_coords"),
         })
-        this.element.style.zIndex = injection_params.zIndex || "auto"
+        this.canvas_dev_to_viewport_dev = this.viewport_dev_to_canvas_dev.inverted()
 
-        if((window as any)["ilastik_debug"]){
-            let colors = ["red", "green", "blue", "orange", "purple", "lime", "olive", "navy"]
-            this.element.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)]
-            this.element.style.filter = "opacity(0.3)"
-        }
+        const viewport_dev_to_ndc = Mat4.fromRotationTranslationScale({
+            from: "viewport_device_coords",
+            rotation: Quat.identity("viewport_device_coords"),
+            translation: new Vec3(
+                vec3.fromValues(this.width / 2, this.height / 2, 0), "viewport_device_coords"
+            ),
+        })
+    }
 
-        this.element.addEventListener("mousedown", (mouseDownEvent: MouseEvent) => {
-            let currentBrushStroke = brush_stroke_handler.handleNewBrushStroke({
-                start_position: this.getMouseVoxelPosition(mouseDownEvent),
-                camera_orientation: Quat.identity<"voxel">()//FIXME!!! viewport_driver.getCameraPose_uvw().orientation_uvw,
+    public makeGlobalToLocalTransform(): Mat4<"canvas_device_coords", "viewport_device_coords">{
+        const local_to_global =
+        return local_to_global.inverted()
+    }
+
+    public makeGlobalToNdcTransform(): Mat4<"canvas_device_coords", "ndc">{
+        const global_to_local = this.makeGlobalToLocalTransform();
+        const global_to_centered_local = global_to_local.mul(
+            Mat4.fromRotationTranslationScale({
+                from: "viewport_device_coords",
+                rotation: Quat.identity("viewport_device_coords"),
+                translation: new Vec3(vec3.fromValues(
+
+                ))
             })
+        )
 
-            let scribbleHandler = (mouseMoveEvent: MouseEvent) => {
-                currentBrushStroke.interpolate_until_point_uvw(this.getMouseVoxelPosition(mouseMoveEvent))
-            }
+        // Mat4.fromScaling(vec3.fromValues())
 
-            let handlerCleanup = () => {
-                this.element.removeEventListener("mousemove", scribbleHandler)
-                document.removeEventListener("mouseup", handlerCleanup)
-                brush_stroke_handler.handleFinishedBrushStroke(currentBrushStroke)
-            }
-            this.element.addEventListener("mousemove", scribbleHandler)
-            document.addEventListener("mouseup", handlerCleanup)
-        })
+
+        const normalizing_matrix = Mat4.fromScaling<"canvas_device_coords", "ndc">( //FIXME! check original impl
+            vec3.fromValues(1 / this.width, 1 / this.height, 1),
+            "canvas_device_coords",
+            "ndc",
+        )
+        mat4.multiply
+
     }
 
-    public setBrushingEnabled(enabled: boolean){
-        if(enabled){
-            this.element.style.pointerEvents = "auto"
-            this.element.classList.add("ItkPencilCursor")
-
-        }else{
-            this.element.style.pointerEvents = "none"
-            this.element.classList.remove("ItkPencilCursor")
-        }
-    }
-
-    public getCamera(): OrthoCamera{
+    public getCamera(params: {
+        zoomInWorldUnitsPerPixel: number,
+        cameraPose_w: {position: Vec3<"world">, orientation: Quat<"world">},
+    }): OrthoCamera{
         // - near and far have to be such that a voxel in any orientation would fit between them;
-        const world_units_per_pixel = this.viewport_driver.getZoomInWorldUnitsPerPixel()
+        const world_units_per_pixel = params.zoomInWorldUnitsPerPixel;
         // const voxel_diagonal_length = vec3.length(mat4.getScaling(vec3.create(), this.viewport_driver.getVoxelToWorldMatrix()))
-        const viewport_width_w = this.element.scrollWidth * world_units_per_pixel;
-        const viewport_height_w = this.element.scrollHeight * world_units_per_pixel;
-        const camera_pose_w = this.viewport_driver.getCameraPose()
+        const viewport_width_w = this.geometry.width * world_units_per_pixel;
+        const viewport_height_w = this.geometry.height * world_units_per_pixel;
+        const camera_pose_w = params.cameraPose_w
         return new OrthoCamera({
             left: -viewport_width_w / 2,
             right: viewport_width_w / 2,
@@ -104,15 +104,23 @@ export class OverlayViewport{
         })
     }
 
-    public getMouseNdcPosition(ev: MouseEvent): Vec3<"ndc">{
+    public getMouseDomElementPosition(params: {canvasMouseEvent: MouseEvent}): Vec3<"dom_element_pixels">{
+        let ev = params.canvasMouseEvent;
+        return new Vec3(vec3.fromValues(ev.offsetX, ev.offsetY, 0), "dom_element_pixels")
+    }
+
+    public getMouseNdcPosition(params: {canvasMouseEvent: MouseEvent}): Vec3<"ndc"> | undefined{
+        let ev = params.canvasMouseEvent
+        let offsetY = ev.offsetY//gl viewport +y points up, but mouse events have +y pointing down
+
         let position_ndc = vec3.fromValues(
-            (ev.offsetX - (this.element.scrollWidth / 2)) / (this.element.scrollWidth / 2),
-           -(ev.offsetY - (this.element.scrollHeight / 2)) / (this.element.scrollHeight / 2), //gl viewport +y points up, but mouse events have +y pointing down
+            (ev.offsetX - (this.geometry.width / 2)) / (this.geometry.width / 2),
+           -(ev.offsetY - (this.geometry.height / 2)) / (this.geometry.height / 2), //gl viewport +y points up, but mouse events have +y pointing down
             0, //Assume slicing plane is in the MIDDLE of clip space
         )
         // console.log(`ev.offsetY: ${ev.offsetY}`)
         // console.log(`ClipPosition: ${vecToString(position_c)}`)
-        return new Vec3(position_ndc)
+        return new Vec3(position_ndc, "ndc")
     }
 
     public getMouseWorldPosition(ev: MouseEvent): Vec3<"world">{
@@ -123,7 +131,7 @@ export class OverlayViewport{
     }
 
     public getMouseVoxelPosition(ev: MouseEvent): Vec3<"voxel">{
-        const world_to_voxel = this.viewport_driver.getVoxelToWorldMatrix({voxelSizeInNm: this.datasource.spatial_resolution}).inverted()
+        const world_to_voxel = this.viewportDriver.getVoxelToWorldMatrix({voxelSizeInNm: this.datasource.spatial_resolution}).inverted()
         let position_w: Vec3<"world"> = this.getMouseWorldPosition(ev)
         let position_voxel = position_w.transformedWith(world_to_voxel)
         // console.log(`DataPosition(nm): ${vecToString(position_voxel)} ======================`)
@@ -131,27 +139,14 @@ export class OverlayViewport{
     }
 
     public render = (brushStrokes: Array<[Color, BrushStroke[]]>, renderer: BrushRenderer) => {
-        const viewport_geometry = this.viewport_driver.getGeometry()
-        coverContents({
-            target: this.canvas,
-            overlay: this.element,
-            offsetLeft: viewport_geometry.left,
-            offsetBottom: viewport_geometry.bottom,
-            height: viewport_geometry.height,
-            width: viewport_geometry.width,
-        })
-        this.gl.viewport(
-            viewport_geometry.left,
-            viewport_geometry.bottom,
-            viewport_geometry.width,
-            viewport_geometry.height
-        ); //FIXME: shuold aspect play a role here?
-
         renderer.render({
             brush_strokes: brushStrokes,
             camera: this.getCamera(),
-            voxelToWorld: this.viewport_driver.getVoxelToWorldMatrix({voxelSizeInNm: this.datasource.spatial_resolution}),
+            voxelToWorld: this.viewportDriver.getVoxelToWorldMatrix({voxelSizeInNm: this.datasource.spatial_resolution}),
             renderParams: new RenderParams({
+                viewportConfig: new ViewportConfig({
+
+                })
                 scissorConfig: new ScissorConfig({
                     x: viewport_geometry.left,
                     y: viewport_geometry.bottom,
@@ -170,9 +165,9 @@ export class OverlayViewport{
     }
 }
 
-export class BrushingOverlay{
+export class BrushingOverlay{asdasd
     public readonly datasource: FsDataSource
-    public readonly trackedElement: HTMLElement
+    public readonly viewer: Viewer
     public readonly element: HTMLCanvasElement
     private readonly brush_stroke_handler: IBrushStrokeHandler
     public readonly gl: WebGL2RenderingContext
@@ -180,21 +175,14 @@ export class BrushingOverlay{
     private viewports: Array<OverlayViewport> = []
     private brushing_enabled: boolean = false
 
-    public constructor({
-        datasource,
-        trackedElement,
-        viewport_drivers,
-        brush_stroke_handler,
-        gl,
-    }: {
+    public constructor(params: {
         datasource: FsDataSource,
-        trackedElement: HTMLElement,
-        viewport_drivers: Array<IViewportDriver>,
+        viewer: Viewer,
         brush_stroke_handler: IBrushStrokeHandler,
         gl: WebGL2RenderingContext
     }){
         this.datasource = datasource
-        this.trackedElement = trackedElement;
+        this.viewer = viewer
         this.brush_stroke_handler = brush_stroke_handler
         this.gl = gl
         this.element = gl.canvas as HTMLCanvasElement;
@@ -203,11 +191,48 @@ export class BrushingOverlay{
             viewport.setBrushingEnabled(this.brushing_enabled)
             return viewport
         })
+
+
+
+        // this.element.addEventListener("mousedown", (mouseDownEvent: MouseEvent) => {
+        //     let currentBrushStroke = brush_stroke_handler.handleNewBrushStroke({
+        //         start_position: this.getMouseVoxelPosition(mouseDownEvent),
+        //         camera_orientation: Quat.identity<"voxel">()//FIXME!!! viewport_driver.getCameraPose_uvw().orientation_uvw,
+        //     })
+
+        //     let scribbleHandler = (mouseMoveEvent: MouseEvent) => {
+        //         currentBrushStroke.interpolate_until_point_uvw(this.getMouseVoxelPosition(mouseMoveEvent))
+        //     }
+
+        //     let handlerCleanup = () => {
+        //         this.element.removeEventListener("mousemove", scribbleHandler)
+        //         document.removeEventListener("mouseup", handlerCleanup)
+        //         brush_stroke_handler.handleFinishedBrushStroke(currentBrushStroke)
+        //     }
+        //     this.element.addEventListener("mousemove", scribbleHandler)
+        //     document.addEventListener("mouseup", handlerCleanup)
+        // })
     }
 
-    public setBrushingEnabled(enabled: boolean){
+    public refresh = () => {
+        let viewportDrivers = this.viewer.getViewportDrivers();
+        this.viewports = viewportDrivers.map((viewport_driver) => {
+            const viewport = new OverlayViewport({datasource, brush_stroke_handler: this.brush_stroke_handler, viewport_driver, gl: this.gl})
+            viewport.setBrushingEnabled(this.brushing_enabled)
+            return viewport
+        })
+    }
+
+    public setBrushingEnabled(enabled: boolean){\
+        if(enabled){
+            this.element.style.pointerEvents = "auto"
+            this.element.classList.add("ItkPencilCursor")
+
+        }else{
+            this.element.style.pointerEvents = "none"
+            this.element.classList.remove("ItkPencilCursor")
+        }
         this.brushing_enabled = enabled
-        this.viewports.forEach(viewport => viewport.setBrushingEnabled(enabled))
     }
 
     public render = (brushStrokes: Array<[Color, BrushStroke[]]>, renderer: BrushRenderer) => {

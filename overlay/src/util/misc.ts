@@ -103,6 +103,17 @@ export function insertAfter({reference, new_element}: {reference: HTMLElement, n
     reference.parentNode.insertBefore(new_element, reference.nextSibling);
 }
 
+export function isDangling(element: HTMLElement): boolean{
+    if(element == document.body){
+        return false
+    }
+    let parent = element.parentElement;
+    if(!parent){
+        return true
+    }
+    return isDangling(parent)
+}
+
 export function createImage({src, parentElement, cssClasses, onClick}:
     {src:string, parentElement:HTMLElement, cssClasses?:Array<string>, onClick?: (event: MouseEvent) => void}
 ): HTMLImageElement{

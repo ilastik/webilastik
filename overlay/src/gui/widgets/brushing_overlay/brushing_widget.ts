@@ -1,4 +1,4 @@
-import { BrushStroke } from "../../.."
+z dsaxZimport { BrushStroke } from "../../.."
 import { Color, Session } from "../../../client/ilastik"
 import { createElement, removeElement } from "../../../util/misc"
 import { CollapsableWidget } from "../collapsable_applet_gui"
@@ -26,6 +26,7 @@ export class BrushingWidget{
     private predictingWidget: PredictingWidget
     private brushStrokeRenderer: BrushelBoxRenderer
     private clearEventListeners: () => void
+    private brushingEnabled: boolean = false
 
     render: () => void
 
@@ -66,20 +67,20 @@ export class BrushingWidget{
         (() => {
             const enableBrushingOnAltDown = (ev: KeyboardEvent) => {
                 if(ev.code == "AltLeft" || ev.code == "AltRight"){
-                    this.overlay?.setBrushingEnabled(true)
+                    this.setBrushingEnabled(true)
                 }
             };
             window.addEventListener("keydown", enableBrushingOnAltDown)
 
             const disableBrushingOnAltUp = (ev: KeyboardEvent) => {
                 if(ev.code == "AltLeft" || ev.code == "AltRight"){
-                    this.overlay?.setBrushingEnabled(false)
+                    this.setBrushingEnabled(false)
                 }
             }
             window.addEventListener("keyup", disableBrushingOnAltUp)
 
             const disableBrushingOnDocumentHidden = () => {
-                this.overlay?.setBrushingEnabled(false)
+                this.setBrushingEnabled(false)
             }
             document.addEventListener("visibilitychange", disableBrushingOnDocumentHidden);
             window.addEventListener("blur", disableBrushingOnDocumentHidden);
@@ -110,6 +111,11 @@ export class BrushingWidget{
         viewer.addDataChangedHandler(this.handleViewerDataDisplayChange)
         viewer.addViewportsChangedHandler(this.handleViewerDataDisplayChange)
         this.handleViewerDataDisplayChange()
+    }
+
+    private setBrushingEnabled(enabled: boolean){
+        this.brushingEnabled = enabled;
+        this.overlay?.setBrushingEnabled(enabled)
     }
 
     private handleViewerDataDisplayChange = async () => {
@@ -143,6 +149,7 @@ export class BrushingWidget{
                 }
             },
         })
+        this.overlay.setBrushingEnabled(this.brushingEnabled)
     }
 
     public destroy(){
