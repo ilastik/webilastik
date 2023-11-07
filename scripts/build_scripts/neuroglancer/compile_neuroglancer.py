@@ -3,7 +3,7 @@
 from pathlib import Path
 import shutil
 from typing import Final
-from scripts.build_scripts import ProjectRoot, get_effective_mtime, run_subprocess
+from scripts.build_scripts import ProjectRoot, force_update_dir, get_effective_mtime, run_subprocess
 from scripts.build_scripts.neuroglancer.fetch_neuroglancer_source import FetchNeuroglancerSource, NeuroglancerSource
 from webilastik.utility.log import Logger
 
@@ -11,31 +11,18 @@ from webilastik.utility.log import Logger
 logger = Logger()
 
 class NeuroglancerDistribution:
-    def __init__(self, *, bundle_path: Path, project_root: ProjectRoot, _private_marker: None) -> None:
+    def __init__(self, *, path: Path, project_root: ProjectRoot, _private_marker: None) -> None:
         super().__init__()
-        self.bundle_path: Final[Path] = bundle_path
-        self.installation_dir = project_root.deb_tree_path / "opt/webilastik/public/nehuba"
-        self.mtime = get_effective_mtime(self.bundle_path)
+        self.path: Final[Path] = path
+        self.mtime = get_effective_mtime(self.path)
 
-    def install(self, use_cache: bool = True):
-        if use_cache and self.is_current():
-            return
-        logger.debug('Copying nehuba to public dir')
-        self.installation_dir.mkdir(parents=True)
-        shutil.copy(self.bundle_path, self.installation_dir)
-
-    def is_current(self) -> bool:
-        target_bundle_path = self.installation_dir / self.bundle_path.name
-        if not target_bundle_path.exists() or self.mtime > get_effective_mtime(target_bundle_path):
-            return False
-        return True
 
 class BuildNeuroglancer:
     def __init__(self, project_root: ProjectRoot, ng_source: NeuroglancerSource) -> None:
         self.project_root: Final[ProjectRoot] = project_root
         self.ng_source: Final[NeuroglancerSource] = ng_source
-        self.dist_path: Final[Path] = self.ng_source.path / "dist/min"
-        self.output_bundle_path: Final[Path] = project_root.build_dir / "neuroglancer.bundle.js"
+        self.ng_build_dir: Final[Path] = self.ng_source.path / "dist/min"
+        self.output_path: Final[Path] = self.project_root.public_dir / "nehuba"
         super().__init__()
 
     def run(self, use_cache: bool = True) -> "NeuroglancerDistribution | Exception":
@@ -47,8 +34,8 @@ class BuildNeuroglancer:
         if isinstance(npm_ci_result, Exception):
             return npm_ci_result
 
-        if self.dist_path.exists():
-            shutil.rmtree(self.dist_path)
+        if self.ng_build_dir.exists():
+            shutil.rmtree(self.ng_build_dir)
         build_result = run_subprocess(
             ["npm", "run", "build-with-ilastik-overlay"],
             env={"ILASTIK_URL": "https://app.ilastik.org/"},
@@ -57,16 +44,14 @@ class BuildNeuroglancer:
         if isinstance(build_result, Exception):
             return build_result
 
-        shutil.move(self.dist_path / "main.bundle.js", self.output_bundle_path)
-        shutil.rmtree(self.dist_path)
-
-        return NeuroglancerDistribution(bundle_path=self.output_bundle_path, project_root=self.project_root, _private_marker=None)
+        force_update_dir(source=self.ng_build_dir, dest=self.output_path, delete_extraneous=True)
+        return NeuroglancerDistribution(path=self.output_path, project_root=self.project_root, _private_marker=None)
 
     def cached(self) -> "NeuroglancerDistribution | None | Exception":
-        if not self.output_bundle_path.exists() or get_effective_mtime(self.ng_source.path) > self.output_bundle_path.stat().st_mtime:
+        if not self.output_path.exists() or get_effective_mtime(self.ng_source.path) > get_effective_mtime(self.output_path):
             return None
         logger.info("Using cached neuroglancer bundle dist")
-        return NeuroglancerDistribution(bundle_path=self.output_bundle_path, project_root=self.project_root, _private_marker=None)
+        return NeuroglancerDistribution(path=self.output_path, project_root=self.project_root, _private_marker=None)
 
     @classmethod
     def execute(cls) -> "NeuroglancerDistribution | Exception":

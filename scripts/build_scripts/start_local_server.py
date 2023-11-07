@@ -2,7 +2,7 @@ import socket
 import os
 import sys
 import subprocess
-from scripts.build_scripts import PackageSourceFile, ProjectRoot
+from scripts.build_scripts import PackageSourceFile, ProjectRoot, run_subprocess
 from scripts.build_scripts.create_deb_tree import CreateDebTree, DebTree
 from webilastik.config import SessionAllocatorServerConfig
 from webilastik.scheduling import SerialExecutor
@@ -28,9 +28,6 @@ class StartLocalServer:
         super().__init__()
 
     def run(self) -> "Exception | None":
-        if os.geteuid() != 0:
-            return Exception("Must run as root")
-
         logger.debug("Ensuring that app.ilastik.org points to localhost")
         if socket.gethostbyname('app.ilastik.org') != "127.0.0.1":
             return Exception("app.ilastik.org does not map to 127.0.0.1")
@@ -40,7 +37,7 @@ class StartLocalServer:
             return Exception("nginx doesn't seem to be running")
 
         logger.debug("Checking that webilastik.conf is installed in nginx's config files")
-        if os.system("nginx -T | grep -q app.ilastik.org") != 0:
+        if os.system("sudo nginx -T | grep -q app.ilastik.org") != 0:
             return Exception("webilastik.conf does not seem to be installed in nginx configs")
 
         # for now this must be via www-data because that's nginx's user, and nginx must
@@ -48,18 +45,23 @@ class StartLocalServer:
         # the ssh happen for the user www-data is one way to do that
         # FIXME: investigate "-oStreamLocalBindMask=0111" in tunnel.py
         logger.debug("Checking that www-data can ssh into itself to create local sessions")
-        _ = subprocess.check_call(["sudo", "-u", "www-data", "-g", "www-data", "ssh" "-oBatchMode=yes" "www-data@localhost", "true"])
+        _ = subprocess.check_call([
+            "sudo", "-u", "www-data", "-g", "www-data", "ssh" "-oBatchMode=yes" "www-data@localhost", "true"
+        ])
 
-        result = self.deb_tree.fake_install(action="install", session_allocator_server_config=self.session_allocator_server_config)
-        if isinstance(result, Exception):
-            return result
-
-        logger.debug(f"Reloading systemd configs")
-        _ = subprocess.check_call(["systemctl", "daemon-reload"])
-        logger.debug(f"Enabling webilastik.service")
-        _ = subprocess.check_call(["systemctl", "enable", "webilastik.service"])
-        logger.debug(f"Restarting webilastik service")
-        _ = subprocess.check_call(["systemctl", "restart", "webilastik.service"])
+        _ = run_subprocess(
+            [
+                "sudo",
+                "-u", "www-data",
+                "-g", "www-data",
+                "python", "-B", "webilastik/server/session_allocator.py",
+            ],
+            env={
+                # FIXME/BUG: aiohttp must be told where certs are when running from packed environment
+                "SSL_CERT_DIR": "/etc/ssl/certs/",
+                "REQUESTS_CA_BUNDLE": "/etc/ssl/certs/ca-certificates.crt",
+            }
+        )
 
 
 if __name__ == "__main__":
@@ -73,13 +75,6 @@ if __name__ == "__main__":
     deb_tree  = CreateDebTree.execute(project_root=project_root, executor=executor)
     if isinstance(deb_tree, Exception):
         raise deb_tree
-
-    if os.geteuid() != 0:
-        print(f"!!!!!!!!!!!!!!!!!!!!!!!!!1 {__loader__.name}")
-        exit(subprocess.check_call(
-            ["sudo", "--preserve-env", sys.executable, "-m", __loader__.name, *sys.argv]
-        ))
-
 
     result = StartLocalServer(
         project_root=project_root, deb_tree=deb_tree, session_allocator_server_config=session_allocator_server_config

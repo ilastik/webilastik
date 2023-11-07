@@ -19,21 +19,21 @@ export function ensureJsonUndefined(value: JsonValue): undefined | MessageParsin
 }
 
 export function ensureJsonBoolean(value: JsonValue): boolean | MessageParsingError {
-  if (typeof (value) !== "boolean") {
+  if (typeof value !== "boolean") {
     return new MessageParsingError(`Expected boolean, found ${JSON.stringify(value)}`);
   }
   return value;
 }
 
 export function ensureJsonNumber(value: JsonValue): number | MessageParsingError {
-  if (typeof (value) !== "number") {
+  if (typeof value !== "number") {
     return new MessageParsingError(`Expected number, found ${JSON.stringify(value)}`);
   }
   return value;
 }
 
 export function ensureJsonString(value: JsonValue): string | MessageParsingError {
-  if (typeof (value) !== "string") {
+  if (typeof value !== "string") {
     return new MessageParsingError(`Expected string, found ${JSON.stringify(value)}`);
   }
   return value;
@@ -4715,5 +4715,195 @@ export class LoginRequiredErrorDto {
   }
   public static fromJsonValue(value: JsonValue): LoginRequiredErrorDto | MessageParsingError {
     return parse_as_LoginRequiredErrorDto(value);
+  }
+}
+
+export function parse_as_EbrainsOidcClientDto(value: JsonValue): EbrainsOidcClientDto | MessageParsingError {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof MessageParsingError) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "EbrainsOidcClientDto") {
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a EbrainsOidcClientDto`);
+  }
+  const temp_client_id = parse_as_str(valueObject.client_id);
+  if (temp_client_id instanceof MessageParsingError) return temp_client_id;
+  const temp_client_secret = parse_as_str(valueObject.client_secret);
+  if (temp_client_secret instanceof MessageParsingError) return temp_client_secret;
+  return new EbrainsOidcClientDto({
+    client_id: temp_client_id,
+    client_secret: temp_client_secret,
+  });
+}
+// Automatically generated via DataTransferObject for EbrainsOidcClientDto
+// Do not edit!
+export class EbrainsOidcClientDto {
+  public client_id: string;
+  public client_secret: string;
+  constructor(_params: {
+    client_id: string;
+    client_secret: string;
+  }) {
+    this.client_id = _params.client_id;
+    this.client_secret = _params.client_secret;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "EbrainsOidcClientDto",
+      client_id: this.client_id,
+      client_secret: this.client_secret,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): EbrainsOidcClientDto | MessageParsingError {
+    return parse_as_EbrainsOidcClientDto(value);
+  }
+}
+
+export function parse_as_SessionAllocatorServerConfigDto(
+  value: JsonValue,
+): SessionAllocatorServerConfigDto | MessageParsingError {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof MessageParsingError) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "SessionAllocatorServerConfigDto") {
+    return new MessageParsingError(
+      `Could not deserialize ${JSON.stringify(valueObject)} as a SessionAllocatorServerConfigDto`,
+    );
+  }
+  const temp_ebrains_oidc_client = parse_as_EbrainsOidcClientDto(valueObject.ebrains_oidc_client);
+  if (temp_ebrains_oidc_client instanceof MessageParsingError) return temp_ebrains_oidc_client;
+  const temp_allow_local_compute_sessions = parse_as_bool(valueObject.allow_local_compute_sessions);
+  if (temp_allow_local_compute_sessions instanceof MessageParsingError) return temp_allow_local_compute_sessions;
+  const temp_b64_fernet_key = parse_as_str(valueObject.b64_fernet_key);
+  if (temp_b64_fernet_key instanceof MessageParsingError) return temp_b64_fernet_key;
+  const temp_external_url = parse_as_UrlDto(valueObject.external_url);
+  if (temp_external_url instanceof MessageParsingError) return temp_external_url;
+  return new SessionAllocatorServerConfigDto({
+    ebrains_oidc_client: temp_ebrains_oidc_client,
+    allow_local_compute_sessions: temp_allow_local_compute_sessions,
+    b64_fernet_key: temp_b64_fernet_key,
+    external_url: temp_external_url,
+  });
+}
+// Automatically generated via DataTransferObject for SessionAllocatorServerConfigDto
+// Do not edit!
+export class SessionAllocatorServerConfigDto {
+  public ebrains_oidc_client: EbrainsOidcClientDto;
+  public allow_local_compute_sessions: boolean;
+  public b64_fernet_key: string;
+  public external_url: UrlDto;
+  constructor(_params: {
+    ebrains_oidc_client: EbrainsOidcClientDto;
+    allow_local_compute_sessions: boolean;
+    b64_fernet_key: string;
+    external_url: UrlDto;
+  }) {
+    this.ebrains_oidc_client = _params.ebrains_oidc_client;
+    this.allow_local_compute_sessions = _params.allow_local_compute_sessions;
+    this.b64_fernet_key = _params.b64_fernet_key;
+    this.external_url = _params.external_url;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "SessionAllocatorServerConfigDto",
+      ebrains_oidc_client: this.ebrains_oidc_client.toJsonValue(),
+      allow_local_compute_sessions: this.allow_local_compute_sessions,
+      b64_fernet_key: this.b64_fernet_key,
+      external_url: this.external_url.toJsonValue(),
+    };
+  }
+  public static fromJsonValue(value: JsonValue): SessionAllocatorServerConfigDto | MessageParsingError {
+    return parse_as_SessionAllocatorServerConfigDto(value);
+  }
+}
+
+export function parse_as_WorkflowConfigDto(value: JsonValue): WorkflowConfigDto | MessageParsingError {
+  const valueObject = ensureJsonObject(value);
+  if (valueObject instanceof MessageParsingError) {
+    return valueObject;
+  }
+  if (valueObject["__class__"] != "WorkflowConfigDto") {
+    return new MessageParsingError(`Could not deserialize ${JSON.stringify(valueObject)} as a WorkflowConfigDto`);
+  }
+  const temp_allow_local_fs = parse_as_bool(valueObject.allow_local_fs);
+  if (temp_allow_local_fs instanceof MessageParsingError) return temp_allow_local_fs;
+  const temp_scratch_dir = parse_as_str(valueObject.scratch_dir);
+  if (temp_scratch_dir instanceof MessageParsingError) return temp_scratch_dir;
+  const temp_ebrains_user_token = parse_as_EbrainsAccessTokenDto(valueObject.ebrains_user_token);
+  if (temp_ebrains_user_token instanceof MessageParsingError) return temp_ebrains_user_token;
+  const temp_max_duration_minutes = parse_as_int(valueObject.max_duration_minutes);
+  if (temp_max_duration_minutes instanceof MessageParsingError) return temp_max_duration_minutes;
+  const temp_listen_socket = parse_as_str(valueObject.listen_socket);
+  if (temp_listen_socket instanceof MessageParsingError) return temp_listen_socket;
+  const temp_session_url = parse_as_UrlDto(valueObject.session_url);
+  if (temp_session_url instanceof MessageParsingError) return temp_session_url;
+  const temp_session_allocator_host = parse_as_str(valueObject.session_allocator_host);
+  if (temp_session_allocator_host instanceof MessageParsingError) return temp_session_allocator_host;
+  const temp_session_allocator_username = parse_as_str(valueObject.session_allocator_username);
+  if (temp_session_allocator_username instanceof MessageParsingError) return temp_session_allocator_username;
+  const temp_session_allocator_socket_path = parse_as_str(valueObject.session_allocator_socket_path);
+  if (temp_session_allocator_socket_path instanceof MessageParsingError) return temp_session_allocator_socket_path;
+  return new WorkflowConfigDto({
+    allow_local_fs: temp_allow_local_fs,
+    scratch_dir: temp_scratch_dir,
+    ebrains_user_token: temp_ebrains_user_token,
+    max_duration_minutes: temp_max_duration_minutes,
+    listen_socket: temp_listen_socket,
+    session_url: temp_session_url,
+    session_allocator_host: temp_session_allocator_host,
+    session_allocator_username: temp_session_allocator_username,
+    session_allocator_socket_path: temp_session_allocator_socket_path,
+  });
+}
+// Automatically generated via DataTransferObject for WorkflowConfigDto
+// Do not edit!
+export class WorkflowConfigDto {
+  public allow_local_fs: boolean;
+  public scratch_dir: string;
+  public ebrains_user_token: EbrainsAccessTokenDto;
+  public max_duration_minutes: number;
+  public listen_socket: string;
+  public session_url: UrlDto;
+  public session_allocator_host: string;
+  public session_allocator_username: string;
+  public session_allocator_socket_path: string;
+  constructor(_params: {
+    allow_local_fs: boolean;
+    scratch_dir: string;
+    ebrains_user_token: EbrainsAccessTokenDto;
+    max_duration_minutes: number;
+    listen_socket: string;
+    session_url: UrlDto;
+    session_allocator_host: string;
+    session_allocator_username: string;
+    session_allocator_socket_path: string;
+  }) {
+    this.allow_local_fs = _params.allow_local_fs;
+    this.scratch_dir = _params.scratch_dir;
+    this.ebrains_user_token = _params.ebrains_user_token;
+    this.max_duration_minutes = _params.max_duration_minutes;
+    this.listen_socket = _params.listen_socket;
+    this.session_url = _params.session_url;
+    this.session_allocator_host = _params.session_allocator_host;
+    this.session_allocator_username = _params.session_allocator_username;
+    this.session_allocator_socket_path = _params.session_allocator_socket_path;
+  }
+  public toJsonValue(): JsonObject {
+    return {
+      "__class__": "WorkflowConfigDto",
+      allow_local_fs: this.allow_local_fs,
+      scratch_dir: this.scratch_dir,
+      ebrains_user_token: this.ebrains_user_token.toJsonValue(),
+      max_duration_minutes: this.max_duration_minutes,
+      listen_socket: this.listen_socket,
+      session_url: this.session_url.toJsonValue(),
+      session_allocator_host: this.session_allocator_host,
+      session_allocator_username: this.session_allocator_username,
+      session_allocator_socket_path: this.session_allocator_socket_path,
+    };
+  }
+  public static fromJsonValue(value: JsonValue): WorkflowConfigDto | MessageParsingError {
+    return parse_as_WorkflowConfigDto(value);
   }
 }

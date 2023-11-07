@@ -10,16 +10,23 @@ from webilastik.utility.url import Url
 
 logger = Logger()
 
+
 class ProjectRoot:
     def __init__(self) -> None:
         self.root_path: Final[Path] = Path(__file__).parent.parent.parent
-        self.build_dir: Final[Path] = self.root_path / "build"
-        self.deb_tree_path = self.build_dir / "deb_tree"
+
         self.environment_file: Final[Path] = self.root_path / "environment.yml"
+        self.webilastik_code_dir: Final[Path] = self.root_path / "webilastik"
+        self.caching_impls_dir: Final[Path] = self.root_path / "caching"
+        self.executor_getter_impls_dir: Final[Path] = self.root_path / "executor_getters"
+        self.public_dir: Final[Path] = self.root_path / "public"
+
+        self.build_dir: Final[Path] = self.root_path / "build"
+        self.overlay_src_dir: Final[Path] = self.root_path / "overlay"
+        self.package_tree_base = self.root_path / "package_tree"
+
         self.web_server_ip = "148.187.149.187"
         self.web_server_user = "ubuntu"
-        self.systemd_unit_config_dir = Path("/etc/systemd/system/webilastik.service.d")
-        self.systemd_unit_install_path = Path("/lib/systemd/system/webilastik.service")
 
         git_raw_version = subprocess.check_output(["git", "describe", "--tags",  "HEAD"], cwd=self.root_path).decode("utf8").strip()
         self.pkg_version: Final[str] = re.sub("^[a-zA-Z]+|-[^-]*$", "", git_raw_version)
@@ -28,31 +35,27 @@ class ProjectRoot:
 
 
 class PackageSourceFile:
-    def __init__(self, *, contents: bytes, target_path: Path) -> None:
+    def __init__(self, *, contents: bytes) -> None:
         self.contents = contents
-        self.target_path = target_path
         super().__init__()
 
-    def install(self, use_cached: bool = True):
-        if self.is_current():
+    def install(self, *, target_path: Path, use_cached: bool = True):
+        if self.is_current(target_path=target_path):
             return
-        self.target_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.target_path, "wb") as f:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(target_path, "wb") as f:
             _ = f.write(self.contents)
 
-    def uninstall(self):
-        self.target_path.unlink(missing_ok=True)
-
-    def is_current(self) -> bool:
-        if not self.target_path.exists():
+    def is_current(self, target_path: Path) -> bool:
+        if not target_path.exists():
             return False
-        with open(self.target_path, "rb") as f:
+        with open(target_path, "rb") as f:
             return f.read() == self.contents
 
 def force_update_dir(*, source: Path, dest: Path, delete_extraneous: bool, exclude_pattern: "str | None" = None):
     if not dest.exists():
         dest.mkdir(parents=True)
-    assert source.is_dir()
+    assert source.is_dir(), f"Path {source} is not a dir!"
     assert dest.is_dir()
     _  = subprocess.check_output([
         "rsync",

@@ -4,7 +4,7 @@ import os
 import json
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import ClassVar, cast
+from typing import ClassVar, Optional, cast
 
 from cryptography.fernet import Fernet
 from webilastik.libebrains.oidc_client import OidcClient
@@ -49,6 +49,18 @@ class SessionAllocatorServerConfig:
             marker=cls._PrivateMarker()
         )
 
+    def updated(self, allow_local_compute_sessions: Optional[bool] = None) -> "SessionAllocatorServerConfig":
+        if allow_local_compute_sessions is None:
+            allow_local_compute_sessions = self.allow_local_compute_sessions
+        return SessionAllocatorServerConfig(
+            ebrains_oidc_client=self.ebrains_oidc_client,
+            allow_local_compute_sessions=allow_local_compute_sessions,
+            fernet=self.fernet,
+            b64_fernet_key=self.b64_fernet_key,
+            external_url=self.external_url,
+            marker=self._PrivateMarker(),
+        )
+
     def to_dto(self) -> SessionAllocatorServerConfigDto:
         return SessionAllocatorServerConfigDto(
             ebrains_oidc_client=self.ebrains_oidc_client.to_dto(),
@@ -70,7 +82,7 @@ class SessionAllocatorServerConfig:
     def from_env(cls) -> "SessionAllocatorServerConfig | ConfigurationException":
         config_raw = os.environ.get(WEBILASTIK_SESSION_ALLOCATOR_SERVER_CONFIG)
         if config_raw is None:
-            return ConfigurationException(f"Could not find configuraiton json in env var {WEBILASTIK_WORKFLOW_CONFIG}")
+            return ConfigurationException(f"Could not find configuration json in env var {WEBILASTIK_WORKFLOW_CONFIG}")
         config_json_result = parse_json(config_raw)
         if isinstance(config_json_result, Exception):
             return ConfigurationException(config_json_result)
@@ -145,7 +157,7 @@ class WorkflowConfig:
     def from_env(cls) -> "WorkflowConfig | ConfigurationException":
         config_raw = os.environ.get(WEBILASTIK_WORKFLOW_CONFIG)
         if config_raw is None:
-            return ConfigurationException(f"Could not find configuraiton json in env var {WEBILASTIK_WORKFLOW_CONFIG}")
+            return ConfigurationException(f"Could not find configuration json in env var {WEBILASTIK_WORKFLOW_CONFIG}")
         config_json_result = parse_json(config_raw)
         if isinstance(config_json_result, Exception):
             return ConfigurationException(config_json_result)

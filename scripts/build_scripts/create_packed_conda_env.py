@@ -1,8 +1,6 @@
 # pyright: strict
 
 from pathlib import Path
-import shutil
-import subprocess
 from typing import Final, Optional
 
 from scripts.build_scripts import ProjectRoot, get_effective_mtime, run_subprocess
@@ -15,29 +13,7 @@ class PackedCondaEnv:
     def __init__(self, *, path: Path, project_root: ProjectRoot, _private_marker: None) -> None:
         self.path: Final[Path] = path
         self.mtime = get_effective_mtime(path)
-        self.installation_dir = project_root.deb_tree_path / "opt/webilastik/conda_env"
         super().__init__()
-
-    def install(self, use_cache: bool = True):
-        if use_cache and self.is_current():
-            logger.info("Packed conda env is already installed")
-            return
-
-        if self.installation_dir.exists():
-            logger.info("Removing old unpacked env")
-            shutil.rmtree(self.installation_dir)
-
-        logger.info("Unpacking conda env")
-        self.installation_dir.mkdir(parents=True, exist_ok=True)
-        _ = subprocess.check_call([
-            "tar", "--touch", "-xzf", str(self.path), "-C", str(self.installation_dir)
-        ])
-
-    def is_current(self) -> bool:
-        if not self.installation_dir.exists():
-            return False
-        return self.mtime <= get_effective_mtime(self.installation_dir)
-
 
 class CreatePackedCondaEnv:
     def __init__(self, project_root: ProjectRoot, conda_env: CondaEnvironment) -> None:

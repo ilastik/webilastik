@@ -29,7 +29,7 @@ class CreateDebPackage:
     ) -> None:
         self.project_root = project_root
         self.deb_tree = deb_tree
-        self.deb_file_output = project_root.build_dir / project_root.pkg_name
+        self.path = project_root.build_dir / project_root.pkg_name
         super().__init__()
 
     def run(self, use_cache: bool = True) -> "DebPackage | Exception":
@@ -57,23 +57,23 @@ class CreateDebPackage:
             return Exception(f"Current revision has not been pushed to origin")
 
         dpkg_deb_result = run_subprocess(
-            ["dpkg-deb", "--build", "-z2", str(self.project_root.deb_tree_path), str(self.deb_file_output)]
+            ["dpkg-deb", "--build", "-z2", str(self.deb_tree.path), str(self.path)]
         )
         if isinstance(dpkg_deb_result, Exception):
             return dpkg_deb_result
 
-        return DebPackage(path=self.deb_file_output, _private_marker=None)
+        return DebPackage(path=self.path, _private_marker=None)
 
     def cached(self) -> "DebPackage | Exception | None":
-        if not self.deb_file_output.exists():
+        if not self.path.exists():
             return None
-        out = DebPackage(path=self.deb_file_output, _private_marker=None)
+        out = DebPackage(path=self.path, _private_marker=None)
         if self.deb_tree.mtime > out.mtime:
             return None
         return out
 
     def clean(self):
-        shutil.rmtree(path=self.project_root.deb_tree_path)
+        shutil.rmtree(path=self.path)
 
     @classmethod
     def execute(cls, project_root: ProjectRoot, executor: Executor) -> "DebPackage | Exception":
