@@ -503,10 +503,10 @@ class LocalJobLauncher(SshJobLauncher):
             session_allocator_username=session_allocator_username,
             session_allocator_socket_path=session_allocator_socket_path,
         )
-        webilastik_source_dir = Path(__file__).parent.parent.parent
         redis_pid_file = f"{working_dir}/redis.pid"
         redis_unix_socket_path = f"{working_dir}/redis.sock"
         conda_env_dir = Path(os.path.realpath(sys.executable)).parent.parent
+        webilastik_source_dir = conda_env_dir.parent
 
         executor_getter_pythonpath = ""
         if self.executor_getter != "default":

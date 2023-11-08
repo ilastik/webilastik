@@ -125,7 +125,9 @@ class CreateDebTree:
             self.project_root.webilastik_code_dir,
             self.project_root.public_dir,
             self.project_root.caching_impls_dir,
+            self.project_root.default_caching_impl_dir,
             self.project_root.executor_getter_impls_dir,
+            self.project_root.default_executor_getter_dir,
         ]
         for source_dir in source_dirs:
             force_update_dir(

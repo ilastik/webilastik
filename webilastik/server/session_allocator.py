@@ -301,7 +301,7 @@ class SessionAllocator:
                 ebrains_user_token=user_token,
                 max_duration_minutes=Minutes(params.session_duration_minutes),
                 session_allocator_host=Hostname("app.ilastik.org"),
-                session_allocator_username=Username(getpass.getuser()),
+                session_allocator_username=Username("www-data"), # this is actually nginx's username
                 session_allocator_socket_path=Path(f"/tmp/to-session-{compute_session_id}"),
                 session_url=self._make_compute_session_url(compute_session_id=compute_session_id),
             )

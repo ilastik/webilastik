@@ -46,34 +46,24 @@ class StartLocalServer:
         # be able to open the socket files that go back to the sessions, and having
         # the ssh happen for the user www-data is one way to do that
         # FIXME: investigate "-oStreamLocalBindMask=0111" in tunnel.py
-        logger.debug("Checking that www-data can ssh into itself to create local sessions")
+        logger.debug("Checking this user can ssh into www-data to create reverse tunnels to local sessions")
+        logger.debug("    If this fails, check www-data is not using nologin in /etc/password and also add this users ssh key to www-data")
         _ = subprocess.check_call([
-            "sudo", "-u", "www-data", "-g", "www-data", "ssh" "-oBatchMode=yes" "www-data@localhost", "true"
+            "ssh", "-oBatchMode=yes", "www-data@localhost", "true",
         ])
-
-        myenv = {
-            # FIXME/BUG: aiohttp must be told where certs are when running from packed environment
-            "SSL_CERT_DIR":  "/etc/ssl/certs/",
-            "REQUESTS_CA_BUNDLE":  "/etc/ssl/certs/ca-certificates.crt",
-            # "PYTHONPATH":  str(self.deb_tree.pythonpath),
-            WEBILASTIK_SESSION_ALLOCATOR_SERVER_CONFIG: json.dumps(self.session_allocator_server_config.to_dto().to_json_value()),
-        }
-        import pprint
-        print("-----------------")
-        pprint.pprint(myenv)
-        print("+++++++++++++++++")
 
         server_process = subprocess.Popen(
             [
-                "sudo",
-                "-E",
-                "-u", "www-data",
-                "-g", "www-data",
                 str(self.deb_tree.python_bin_path),
                 "-B",
-                "-m", "webilastik.server.session_allocator"  #str(self.deb_tree.session_allocator_path),
+                "-m", "webilastik.server.session_allocator",
             ],
-            env=myenv,
+            env={
+                # FIXME/BUG: aiohttp must be told where certs are when running from packed environment
+                "SSL_CERT_DIR":  "/etc/ssl/certs/",
+                "REQUESTS_CA_BUNDLE":  "/etc/ssl/certs/ca-certificates.crt",
+                WEBILASTIK_SESSION_ALLOCATOR_SERVER_CONFIG: json.dumps(self.session_allocator_server_config.to_dto().to_json_value()),
+            },
             cwd=self.deb_tree.pythonpath,
         )
         result = server_process.wait()
