@@ -82,7 +82,7 @@ class SessionAllocatorServerConfig:
     def from_env(cls) -> "SessionAllocatorServerConfig | ConfigurationException":
         config_raw = os.environ.get(WEBILASTIK_SESSION_ALLOCATOR_SERVER_CONFIG)
         if config_raw is None:
-            return ConfigurationException(f"Could not find configuration json in env var {WEBILASTIK_WORKFLOW_CONFIG}")
+            return ConfigurationException(f"Could not find configuration json in env var {WEBILASTIK_SESSION_ALLOCATOR_SERVER_CONFIG}")
         config_json_result = parse_json(config_raw)
         if isinstance(config_json_result, Exception):
             return ConfigurationException(config_json_result)
