@@ -2982,10 +2982,13 @@ export function parse_as_PixelClassificationExportAppletStateDto(
       valueObject.datasource_suggestions,
     );
   if (temp_datasource_suggestions instanceof MessageParsingError) return temp_datasource_suggestions;
+  const temp_upstream_ready = parse_as_bool(valueObject.upstream_ready);
+  if (temp_upstream_ready instanceof MessageParsingError) return temp_upstream_ready;
   return new PixelClassificationExportAppletStateDto({
     jobs: temp_jobs,
     populated_labels: temp_populated_labels,
     datasource_suggestions: temp_datasource_suggestions,
+    upstream_ready: temp_upstream_ready,
   });
 }
 // Automatically generated via DataTransferObject for PixelClassificationExportAppletStateDto
@@ -2998,6 +3001,7 @@ export class PixelClassificationExportAppletStateDto {
   public datasource_suggestions:
     | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
     | undefined;
+  public upstream_ready: boolean;
   constructor(_params: {
     jobs: Array<
       ExportJobDto | OpenDatasinkJobDto | CreateDziPyramidJobDto | ZipDirectoryJobDto | TransferFileJobDto | JobDto
@@ -3006,10 +3010,12 @@ export class PixelClassificationExportAppletStateDto {
     datasource_suggestions:
       | Array<PrecomputedChunksDataSourceDto | N5DataSourceDto | SkimageDataSourceDto | DziLevelDataSourceDto>
       | undefined;
+    upstream_ready: boolean;
   }) {
     this.jobs = _params.jobs;
     this.populated_labels = _params.populated_labels;
     this.datasource_suggestions = _params.datasource_suggestions;
+    this.upstream_ready = _params.upstream_ready;
   }
   public toJsonValue(): JsonObject {
     return {
@@ -3017,6 +3023,7 @@ export class PixelClassificationExportAppletStateDto {
       jobs: this.jobs.map((item) => toJsonValue(item)),
       populated_labels: toJsonValue(this.populated_labels),
       datasource_suggestions: toJsonValue(this.datasource_suggestions),
+      upstream_ready: this.upstream_ready,
     };
   }
   public static fromJsonValue(value: JsonValue): PixelClassificationExportAppletStateDto | MessageParsingError {

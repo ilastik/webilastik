@@ -1,4 +1,5 @@
 import { vec3, mat4, vec4, quat } from "gl-matrix";
+import { MessageParsingError } from "../client/dto";
 import { Url } from "./parsed_url";
 import { JsonValue } from "./serialization";
 
@@ -523,4 +524,12 @@ export async function fetchJson(...params: Parameters<typeof fetch>): Promise<Js
 
 export function assertUnreachable(_x: never): never {
     throw new Error("Didn't expect to get here");
+}
+
+export function parseJson(json: string): JsonValue | MessageParsingError{
+    try{
+        return JSON.parse(json)
+    }catch(e){
+        return new MessageParsingError(`Bad json: ${e}`)
+    }
 }

@@ -1,5 +1,5 @@
 {
-  "include": ["webilastik/", "tests/", "scripts/", "caching/", "executor_getters/", "examples/"],
+  "include": ["webilastik/", "tests/", "scripts/", "global_cache_impls/", "executor_getter_impls/", "scripts", "examples/"],
   "exclude": ["build/"],
   "strict": ["webilastik/datasource", "webilastik/datasink"],
   "typeCheckingMode": "basic",
@@ -11,7 +11,7 @@
   "reportMissingTypeArgument": true,
   "reportMissingTypeStubs": "warning",
   "useLibraryCodeForTypes": true,
-  "extraPaths": ["executor_getters/default/", "caching/redis_cache/", "tests/", "scripts/"],
+  "extraPaths": ["executor_getter_impls/default/", "global_cache_impls/redis_cache/", "tests/", "scripts/"],
   "reportUnusedCallResult": "error",
   "reportUnusedVariable": "warning",
   "pythonVersion": "3.9",

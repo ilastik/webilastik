@@ -1,6 +1,6 @@
 import { vec3 } from "gl-matrix"
 import { DatasetNameComponent, ExportPattern, ExtensionComponent, OutputTypeComponent, TimestampComponent } from "../util/export_pattern"
-import { assertUnreachable, fetchJson, PermissionError, RequestFailure, sleep, UnauthorizedRequestError } from "../util/misc"
+import { assertUnreachable, fetchJson, parseJson, PermissionError, RequestFailure, sleep, UnauthorizedRequestError } from "../util/misc"
 import { Path, Url } from "../util/parsed_url"
 import { DataType, ensureDataType } from "../util/precomputed_chunks"
 import {
@@ -48,6 +48,7 @@ import {
     DziSizeElementDto,
     EbrainsAccessTokenDto,
     MessageParsingError,
+    ensureJsonBoolean,
 } from "./dto"
 
 export type HpcSiteName = ComputeSessionStatusDto["hpc_site"] //FIXME?
@@ -78,26 +79,32 @@ export class StartupConfigs{
     ebrains_bucket_path: Path
     clb_collab_id?: string
     output_path_pattern?: ExportPattern
+    confirm_exit_when_session_running: boolean
+    autorejoin_session_id?: string
 
     public constructor(params: {
         project_file_url: Url | undefined,
         ebrains_bucket_name?: string,
         ebrains_bucket_path: Path,
         clb_collab_id?: string,
-        output_path_pattern?: ExportPattern
+        output_path_pattern?: ExportPattern,
+        confirm_exit_when_session_running: boolean,
+        autorejoin_session_id?: string,
     }){
         this.project_file_url = params.project_file_url
         this.ebrains_bucket_name = params.ebrains_bucket_name
         this.ebrains_bucket_path = params.ebrains_bucket_path
         this.clb_collab_id = params.clb_collab_id
         this.output_path_pattern = params.output_path_pattern
+        this.confirm_exit_when_session_running = params.confirm_exit_when_session_running
+        this.autorejoin_session_id = params.autorejoin_session_id
     }
 
     public static getDefault(): StartupConfigs{
         return new StartupConfigs({
             project_file_url: undefined,
             ebrains_bucket_path: Path.root,
-
+            confirm_exit_when_session_running: true,
         })
     }
 
@@ -127,6 +134,24 @@ export class StartupConfigs{
             return outputPathPattern
         }
 
+        const confirm_exit_when_session_running__key = "confirm_exit_when_session_running";
+        const confirmExitWhenSessionRunningRaw = locationUrlResult.search.get(confirm_exit_when_session_running__key)
+        let confirmExitWhenSessionRunning: boolean = true;
+        if(confirmExitWhenSessionRunningRaw){
+            const parsingResult = parseJson(confirmExitWhenSessionRunningRaw)
+            if(parsingResult instanceof Error){
+                return parsingResult
+            }
+            const result = ensureJsonBoolean(parsingResult)
+            if(result instanceof Error){
+                return result
+            }
+            confirmExitWhenSessionRunning = result
+        }
+
+        const autorejoin_session_id__key = "autorejoin_session_id"
+        const autorejoin_session_id = locationUrlResult.search.get(autorejoin_session_id__key)
+
         const collabId = locationUrlResult.search.get("clb-collab-id")
 
         return new StartupConfigs({
@@ -135,6 +160,8 @@ export class StartupConfigs{
             [ebrains_bucket_path_key]: ebrainsBucketPathRaw ? Path.parse(ebrainsBucketPathRaw) : Path.root,
             clb_collab_id: collabId,
             [output_path_pattern]: outputPathPattern,
+            [confirm_exit_when_session_running__key]: confirmExitWhenSessionRunning,
+            [autorejoin_session_id__key]: autorejoin_session_id,
         })
     }
 

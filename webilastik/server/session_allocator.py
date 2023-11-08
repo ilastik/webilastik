@@ -38,7 +38,9 @@ from webilastik.server.rpc.dto import (
 )
 from webilastik.utility import ComputeNodes, Hostname, NodeHours, Username
 from webilastik.utility.url import Url
+from webilastik.utility.log import Logger
 
+logger = Logger()
 
 def get_requested_url(request: web.Request) -> Url:
     protocol = request.headers['X-Forwarded-Proto'].lower()
@@ -102,6 +104,10 @@ def require_user_token(
     @wraps(endpoint)
     async def wrapper(self: "SessionAllocator", request: web.Request) -> web.Response:
         user_token = await try_get_user_token_from_request(request, http_client_session=self.http_client_session, oidc_client=self.oidc_client)
+        if isinstance(user_token, (CantFetchHbpIamKey, EbrainsCommunicationFailure)):
+            logger.error(f"Ebrains is not responding (properly): {user_token}")
+            # FIXME: maybe a better error than simply RpcError
+            return uncachable_json_response(RpcErrorDto("Could not communicate with Ebrains").to_json_value(), status=500)
         if isinstance(user_token, Exception):
             return uncachable_json_response(LoginRequiredErrorDto().to_json_value(), status=401)
         return await endpoint(self, user_token, request)

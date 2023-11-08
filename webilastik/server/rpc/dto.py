@@ -3088,10 +3088,14 @@ def parse_as_PixelClassificationExportAppletStateDto(
     )
     if isinstance(tmp_datasource_suggestions, MessageParsingError):
         return tmp_datasource_suggestions
+    tmp_upstream_ready = parse_as_bool(value.get("upstream_ready"))
+    if isinstance(tmp_upstream_ready, MessageParsingError):
+        return tmp_upstream_ready
     return PixelClassificationExportAppletStateDto(
         jobs=tmp_jobs,
         populated_labels=tmp_populated_labels,
         datasource_suggestions=tmp_datasource_suggestions,
+        upstream_ready=tmp_upstream_ready,
     )
 
 
@@ -3100,6 +3104,7 @@ class PixelClassificationExportAppletStateDto(DataTransferObject):
     jobs: Tuple[ExportJobDtoUnion, ...]
     populated_labels: Optional[Tuple[LabelHeaderDto, ...]]
     datasource_suggestions: Optional[Tuple[FsDataSourceDto, ...]]
+    upstream_ready: bool
 
     def to_json_value(self) -> JsonObject:
         return {
@@ -3109,6 +3114,7 @@ class PixelClassificationExportAppletStateDto(DataTransferObject):
             "datasource_suggestions": convert_to_json_value(
                 self.datasource_suggestions
             ),
+            "upstream_ready": self.upstream_ready,
         }
 
     @classmethod

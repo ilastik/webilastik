@@ -410,7 +410,8 @@ class WebIlastik:
                 RpcErrorDto(error=str(saving_result)).to_json_value(),
                 status=400, #FIXME?
             )
-        return web.Response(status=200, text=f"Project saved to {fs_result.geturl(file_path)}")
+        # FIXME: this should ideally be a Dto
+        return uncachable_json_response(payload=None, status=200)
 
     async def load_project(self, request: web.Request) -> web.Response:
         payload = await request.json()
@@ -459,7 +460,7 @@ class WebIlastik:
         )
         self.workflow = new_workflow_result
         self._update_clients()
-        return web.Response(status=200)
+        return uncachable_json_response(payload=None, status=200)
 
 if __name__ == '__main__':
     from webilastik.config import WorkflowConfig

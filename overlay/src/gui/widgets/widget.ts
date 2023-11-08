@@ -95,6 +95,9 @@ export abstract class Widget<T extends TagName>{
     public setInnerText(text: string){
         this.element.innerText = text
     }
+    public setTitle(text: string){
+        this.element.title = text
+    }
 }
 
 export class Label extends Widget<"label">{

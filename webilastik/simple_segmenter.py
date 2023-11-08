@@ -52,7 +52,7 @@ class SimpleSegmenterDataSource(DataSource):
             spatial_resolution=upstream_source.spatial_resolution,
         )
 
-    # FIXME: this disables caching, but it seems like caching should be controlled on instanciation
+    # FIXME: this disables caching, but it seems like caching should be controlled on instantiation
     # rather than on class declaration
     def get_tile(self, tile: Interval5D) -> Array5D:
         return self._get_tile(tile)

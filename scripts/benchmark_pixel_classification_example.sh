@@ -8,10 +8,10 @@ PROJECT_DIR="$(realpath $SCRIPT_DIR/..)"
 
 
 PYTHONPATH="$PROJECT_DIR"
-PYTHONPATH="$PYTHONPATH:$PROJECT_DIR/caching/redis_cache/"
-# PYTHONPATH="$PYTHONPATH:$PROJECT_DIR/caching/lru_cache/"
-PYTHONPATH="$PYTHONPATH:$PROJECT_DIR/executor_getters/default/"
-# PYTHONPATH="$PYTHONPATH:$PROJECT_DIR/executor_getters/jusuf/"
+PYTHONPATH="$PYTHONPATH:$PROJECT_DIR/global_cache_impls/redis_cache/"
+# PYTHONPATH="$PYTHONPATH:$PROJECT_DIR/global_cache_impls/lru_cache/"
+PYTHONPATH="$PYTHONPATH:$PROJECT_DIR/executor_getter_impls/default/"
+# PYTHONPATH="$PYTHONPATH:$PROJECT_DIR/executor_getter_impls/jusuf/"
 export PYTHONPATH
 
 

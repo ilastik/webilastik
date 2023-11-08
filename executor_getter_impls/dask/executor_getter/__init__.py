@@ -37,7 +37,7 @@ class DaskExecutorManager(ExecutorManager):
         from dask_mpi import initialize # type: ignore
         _ = initialize()
 
-        from dask.distributed import Client
+        from dask.distributed import Client # pyright: ignore [reportMissingTypeStubs]
         client = Client()  # Connect this local process to remote workers
         return client.get_executor() # pyright: ignore [reportUnknownMemberType]
 
@@ -47,7 +47,7 @@ class ThreadPoolExecutorManager(ExecutorManager):
     def _create_executor(self, max_workers: Optional[int]) -> Executor:
         import multiprocessing
         import os
-        slurm_cpus_per_task = os.environ.get("SLURM_CPUS_PER_TASK") 
+        slurm_cpus_per_task = os.environ.get("SLURM_CPUS_PER_TASK")
         if slurm_cpus_per_task is not None:
             max_workers = int(slurm_cpus_per_task) - 3
         else:

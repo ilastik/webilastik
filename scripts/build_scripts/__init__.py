@@ -17,8 +17,8 @@ class ProjectRoot:
 
         self.environment_file: Final[Path] = self.root_path / "environment.yml"
         self.webilastik_code_dir: Final[Path] = self.root_path / "webilastik"
-        self.caching_impls_dir: Final[Path] = self.root_path / "caching"
-        self.executor_getter_impls_dir: Final[Path] = self.root_path / "executor_getters"
+        self.caching_impls_dir: Final[Path] = self.root_path / "global_cache_impls"
+        self.executor_getter_impls_dir: Final[Path] = self.root_path / "executor_getter_impls"
         self.public_dir: Final[Path] = self.root_path / "public"
 
         self.build_dir: Final[Path] = self.root_path / "build"
