@@ -37,10 +37,10 @@ class DebControlFile(PackageSourceFile):
         )
 
 class WebilastikServiceFile(PackageSourceFile):
-    def __init__(self, *, session_allocator_server_config: SessionAllocatorServerConfig) -> None:
+    def __init__(self, *, project_root: ProjectRoot, session_allocator_server_config: SessionAllocatorServerConfig) -> None:
         super().__init__(
             contents=textwrap.dedent(f"""
-                # generated at {__file__}
+                # generated at {Path(__file__).relative_to(project_root.root_path)}
                 [Unit]
                 Description=Webilastik session allocator server
                 Documentation=https://github.com/ilastik/webilastik
@@ -74,9 +74,20 @@ class WebilastikServiceFile(PackageSourceFile):
         )
 
 class DebTree:
-    def __init__(self, *, path: Path, _private_marker: None) -> None:
+    def __init__(
+        self,
+        *,
+        path: Path,
+        python_bin_path: Path,
+        session_allocator_path: Path,
+        pythonpath: Path,
+        _private_marker: None
+    ) -> None:
         self.path  = path
         self.mtime = get_effective_mtime(self.path)
+        self.pythonpath = pythonpath
+        self.python_bin_path = python_bin_path
+        self.session_allocator_path = session_allocator_path
         super().__init__()
 
 class CreateDebTree:
@@ -92,13 +103,15 @@ class CreateDebTree:
         self.path = project_root.build_dir / "deb_tree"
         self.opt_webilastik = self.path / "opt/webilastik"
         self.unpacked_conda_env = self.opt_webilastik / "conda_env"
-        self.python_bin_path = self.opt_webilastik / "conda_env/bin/python3"
+        self.python_bin_path = self.unpacked_conda_env / "bin/python3"
         self.session_allocator_path = self.opt_webilastik / "webilastik/server/session_allocator.py"
 
         self.packed_conda_env = packed_conda_env
         self.public_dir = public_dir
         self.deb_control_file = DebControlFile(project_root=project_root)
-        self.service_file = WebilastikServiceFile(session_allocator_server_config=session_allocator_server_config)
+        self.service_file = WebilastikServiceFile(
+            project_root=project_root, session_allocator_server_config=session_allocator_server_config
+        )
         super().__init__()
 
     def run(self) -> "DebTree | Exception":
@@ -130,7 +143,13 @@ class CreateDebTree:
             if isinstance(unpack_result, Exception):
                 return Exception(f"Unpacking packed conda env failed: {unpack_result}")
 
-        return DebTree(path=self.path, _private_marker=None)
+        return DebTree(
+            path=self.path,
+            python_bin_path=self.python_bin_path,
+            session_allocator_path=self.session_allocator_path,
+            pythonpath=self.opt_webilastik,
+            _private_marker=None,
+        )
 
     def clean(self):
         shutil.rmtree(path=self.path)

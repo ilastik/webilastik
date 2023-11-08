@@ -1,12 +1,14 @@
+# pyright: strict
+
 import socket
 import os
-import sys
 import subprocess
-from scripts.build_scripts import PackageSourceFile, ProjectRoot, run_subprocess
+import json
+
+from scripts.build_scripts import ProjectRoot
 from scripts.build_scripts.create_deb_tree import CreateDebTree, DebTree
-from webilastik.config import SessionAllocatorServerConfig
+from webilastik.config import WEBILASTIK_SESSION_ALLOCATOR_SERVER_CONFIG, SessionAllocatorServerConfig
 from webilastik.scheduling import SerialExecutor
-from webilastik.server.session_allocator import SessionAllocator
 
 from webilastik.utility.log import Logger
 
@@ -49,19 +51,33 @@ class StartLocalServer:
             "sudo", "-u", "www-data", "-g", "www-data", "ssh" "-oBatchMode=yes" "www-data@localhost", "true"
         ])
 
-        _ = run_subprocess(
+        myenv = {
+            # FIXME/BUG: aiohttp must be told where certs are when running from packed environment
+            "SSL_CERT_DIR":  "/etc/ssl/certs/",
+            "REQUESTS_CA_BUNDLE":  "/etc/ssl/certs/ca-certificates.crt",
+            # "PYTHONPATH":  str(self.deb_tree.pythonpath),
+            WEBILASTIK_SESSION_ALLOCATOR_SERVER_CONFIG: json.dumps(self.session_allocator_server_config.to_dto().to_json_value()),
+        }
+        import pprint
+        print("-----------------")
+        pprint.pprint(myenv)
+        print("+++++++++++++++++")
+
+        server_process = subprocess.Popen(
             [
                 "sudo",
+                "-E",
                 "-u", "www-data",
                 "-g", "www-data",
-                "python", "-B", "webilastik/server/session_allocator.py",
+                str(self.deb_tree.python_bin_path),
+                "-B",
+                "-m", "webilastik.server.session_allocator"  #str(self.deb_tree.session_allocator_path),
             ],
-            env={
-                # FIXME/BUG: aiohttp must be told where certs are when running from packed environment
-                "SSL_CERT_DIR": "/etc/ssl/certs/",
-                "REQUESTS_CA_BUNDLE": "/etc/ssl/certs/ca-certificates.crt",
-            }
+            env=myenv,
+            cwd=self.deb_tree.pythonpath,
         )
+        result = server_process.wait()
+        logger.info(f"Server finished with result {result}")
 
 
 if __name__ == "__main__":
