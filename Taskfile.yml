@@ -92,6 +92,7 @@ tasks:
       - git checkout {{.COMMIT_HASH}}
     status: # FIXME: this doesn't update the ng repo
       - git status > /dev/null 2>&1
+      - test "$(git rev-parse HEAD)" = "$(git rev-parse {{.COMMIT_HASH}})"
 
   install-neuroglancer-dependencies:
     deps: [checkout-neuroglancer]
