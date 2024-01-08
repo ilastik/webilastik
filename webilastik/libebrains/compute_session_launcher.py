@@ -334,6 +334,7 @@ class SshJobLauncher:
         session_url: Url,
         session_allocator_host: Hostname,
         session_allocator_username: Username,
+        session_allocator_ssh_port: int,
         session_allocator_socket_path: Path
     ) -> "str":
         pass
@@ -349,6 +350,7 @@ class SshJobLauncher:
         session_url: Url,
         session_allocator_host: Hostname,
         session_allocator_username: Username,
+        session_allocator_ssh_port: int,
         session_allocator_socket_path: Path
     ) -> "ComputeSession | Exception":
         output_result = await self.do_ssh(
@@ -366,6 +368,7 @@ class SshJobLauncher:
                 session_url=session_url,
                 session_allocator_host=session_allocator_host,
                 session_allocator_username=session_allocator_username,
+                session_allocator_ssh_port=session_allocator_ssh_port,
                 session_allocator_socket_path=session_allocator_socket_path,
             ),
         )
@@ -489,6 +492,7 @@ class LocalJobLauncher(SshJobLauncher):
         session_url: Url,
         session_allocator_host: Hostname,
         session_allocator_username: Username,
+        session_allocator_ssh_port: int,
         session_allocator_socket_path: Path
     ) -> str:
         working_dir = Path(f"/tmp/{compute_session_id}")
@@ -501,6 +505,7 @@ class LocalJobLauncher(SshJobLauncher):
             session_url=session_url,
             session_allocator_host=session_allocator_host,
             session_allocator_username=session_allocator_username,
+            session_allocator_ssh_port=session_allocator_ssh_port,
             session_allocator_socket_path=session_allocator_socket_path,
         )
         webilastik_source_dir = Path(__file__).parent.parent.parent
@@ -580,6 +585,7 @@ class LocalJobLauncher(SshJobLauncher):
         session_url: Url,
         session_allocator_host: Hostname,
         session_allocator_username: Username,
+        session_allocator_ssh_port: int,
         session_allocator_socket_path: Path
     ) -> "ComputeSession | Exception":
         stdin_file = tempfile.TemporaryFile()
@@ -592,6 +598,7 @@ class LocalJobLauncher(SshJobLauncher):
                 session_url=session_url,
                 session_allocator_host=session_allocator_host,
                 session_allocator_username=session_allocator_username,
+                session_allocator_ssh_port=session_allocator_ssh_port,
                 session_allocator_socket_path=session_allocator_socket_path,
             ).encode("utf8")
         )
@@ -671,6 +678,7 @@ class JusufSshJobLauncher(SshJobLauncher):
         session_url: Url,
         session_allocator_host: Hostname,
         session_allocator_username: Username,
+        session_allocator_ssh_port: int,
         session_allocator_socket_path: Path
     ) -> str:
         working_dir = Path(f"$SCRATCH/{compute_session_id}")
@@ -683,6 +691,7 @@ class JusufSshJobLauncher(SshJobLauncher):
             session_url=session_url,
             session_allocator_host=session_allocator_host,
             session_allocator_username=session_allocator_username,
+            session_allocator_ssh_port=session_allocator_ssh_port,
             session_allocator_socket_path=session_allocator_socket_path,
         )
         home="/p/home/jusers/webilastik/jusuf"
@@ -788,6 +797,7 @@ class CscsSshJobLauncher(SshJobLauncher):
         session_url: Url,
         session_allocator_host: Hostname,
         session_allocator_username: Username,
+        session_allocator_ssh_port: int,
         session_allocator_socket_path: Path
     ) -> str:
         working_dir = Path(f"$SCRATCH/{compute_session_id}")
@@ -800,6 +810,7 @@ class CscsSshJobLauncher(SshJobLauncher):
             session_url=session_url,
             session_allocator_host=session_allocator_host,
             session_allocator_username=session_allocator_username,
+            session_allocator_ssh_port=session_allocator_ssh_port,
             session_allocator_socket_path=session_allocator_socket_path,
         )
         home=f"/users/{self.user}"

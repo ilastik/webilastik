@@ -471,6 +471,7 @@ if __name__ == '__main__':
     server_context = ReverseSshTunnel(
         remote_username=workflow_config.session_allocator_username,
         remote_host=workflow_config.session_allocator_host,
+        remote_port=workflow_config.session_allocator_ssh_port,
         remote_unix_socket=workflow_config.session_allocator_socket_path,
         local_unix_socket=workflow_config.listen_socket,
     )

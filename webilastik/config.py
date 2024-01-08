@@ -75,6 +75,7 @@ WEBILASTIK_JOB_LISTEN_SOCKET="WEBILASTIK_JOB_LISTEN_SOCKET"
 WEBILASTIK_JOB_SESSION_URL="WEBILASTIK_JOB_SESSION_URL"
 WEBILASTIK_SESSION_ALLOCATOR_HOST="WEBILASTIK_SESSION_ALLOCATOR_HOST"
 WEBILASTIK_SESSION_ALLOCATOR_USERNAME="WEBILASTIK_SESSION_ALLOCATOR_USERNAME"
+WEBILASTIK_SESSION_ALLOCATOR_SSH_PORT="WEBILASTIK_SESSION_ALLOCATOR_SSH_PORT"
 WEBILASTIK_SESSION_ALLOCATOR_SOCKET_PATH="WEBILASTIK_SESSION_ALLOCATOR_SOCKET_PATH"
 
 class WebilastikConfig(Protocol):
@@ -98,6 +99,7 @@ class SessionAllocatorConfig(WebilastikConfig):
 
         allow_local_compute_sessions: bool,
         session_allocator_b64_fernet_key: str,
+        session_allocator_ssh_port: int,
         external_url: Url
     ) -> None:
         super().__init__()
@@ -105,6 +107,7 @@ class SessionAllocatorConfig(WebilastikConfig):
         self.allow_local_compute_sessions = allow_local_compute_sessions
         self.ebrains_oidc_client = ebrains_oidc_client
         self.session_allocator_b64_fernet_key = session_allocator_b64_fernet_key
+        self.session_allocator_ssh_port = session_allocator_ssh_port
         self.external_url = external_url
 
         try:
@@ -127,6 +130,7 @@ class SessionAllocatorConfig(WebilastikConfig):
 
         allow_local_compute_sessions: Optional[bool] = None,
         session_allocator_b64_fernet_key: Optional[str] = None,
+        session_allocator_ssh_port: Optional[int] = None,
         external_url: Optional[Url] = None
     ) -> "SessionAllocatorConfig":
         ebrains_oidc_client=ebrains_oidc_client if ebrains_oidc_client is not None else OidcClient(
@@ -153,6 +157,10 @@ class SessionAllocatorConfig(WebilastikConfig):
                 name=WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY,
                 help_text="A Fernet key used to encrypt data that is publicly visible in HPCs, like job names",
             ),
+            session_allocator_ssh_port = session_allocator_ssh_port if session_allocator_ssh_port is not None else read_int_env_var(
+                name=WEBILASTIK_SESSION_ALLOCATOR_SSH_PORT,
+                help_text="The port where the session allocator is listening for SSH connections",
+            ),
         )
 
     def to_env_vars(self) -> Sequence[EnvVar]:
@@ -161,6 +169,7 @@ class SessionAllocatorConfig(WebilastikConfig):
             EnvVar(name=EBRAINS_CLIENT_SECRET, value=self.ebrains_oidc_client.client_secret),
             EnvVar(name=WEBILASTIK_ALLOW_LOCAL_COMPUTE_SESSIONS, value=str(self.allow_local_compute_sessions).lower()),
             EnvVar(name=WEBILASTIK_SESSION_ALLOCATOR_FERNET_KEY, value=self.session_allocator_b64_fernet_key),
+            EnvVar(name=WEBILASTIK_SESSION_ALLOCATOR_SSH_PORT, value=str(self.session_allocator_ssh_port)),
             EnvVar(name=WEBILASTIK_EXTERNAL_URL, value=self.external_url.raw),
         ]
 
@@ -180,6 +189,7 @@ class WorkflowConfig(WebilastikConfig):
         #tunnel parameters
         session_allocator_host: Hostname,
         session_allocator_username: Username,
+        session_allocator_ssh_port: int,
         session_allocator_socket_path: Path
     ) -> None:
         super().__init__()
@@ -192,6 +202,7 @@ class WorkflowConfig(WebilastikConfig):
 
         self.session_allocator_host = session_allocator_host
         self.session_allocator_username = session_allocator_username
+        self.session_allocator_ssh_port = session_allocator_ssh_port
         self.session_allocator_socket_path = session_allocator_socket_path
 
     @classmethod
@@ -215,6 +226,7 @@ class WorkflowConfig(WebilastikConfig):
         # tunnel parameters
         session_allocator_host: Optional[Hostname] = None,
         session_allocator_username: Optional[Username] = None,
+        session_allocator_ssh_port: Optional[int] = None,
         session_allocator_socket_path: Optional[Path] = None
     ) -> "WorkflowConfig":
         if ebrains_user_token is None:
@@ -268,6 +280,10 @@ class WorkflowConfig(WebilastikConfig):
                 WEBILASTIK_SESSION_ALLOCATOR_USERNAME,
                 help_text="A existing username on the session allocator, with which an SSH conection can be made"
             )),
+            session_allocator_ssh_port=session_allocator_ssh_port if session_allocator_ssh_port is not None else read_int_env_var(
+                WEBILASTIK_SESSION_ALLOCATOR_SSH_PORT,
+                help_text="The port where the session allocator is listening for SSH connections"
+            ),
             session_allocator_socket_path=session_allocator_socket_path if session_allocator_socket_path is not None else Path(read_str_env_var(
                 WEBILASTIK_SESSION_ALLOCATOR_SOCKET_PATH,
                 help_text="The path where a socket connecting back to the job is to be created"
@@ -285,5 +301,6 @@ class WorkflowConfig(WebilastikConfig):
             EnvVar(name=WEBILASTIK_JOB_SESSION_URL, value=self.session_url.raw),
             EnvVar(name=WEBILASTIK_SESSION_ALLOCATOR_HOST, value=self.session_allocator_host),
             EnvVar(name=WEBILASTIK_SESSION_ALLOCATOR_USERNAME, value=self.session_allocator_username),
+            EnvVar(name=WEBILASTIK_SESSION_ALLOCATOR_SSH_PORT, value=str(self.session_allocator_ssh_port)),
             EnvVar(name=WEBILASTIK_SESSION_ALLOCATOR_SOCKET_PATH, value=str(self.session_allocator_socket_path)),
         ]

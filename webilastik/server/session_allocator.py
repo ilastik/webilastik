@@ -125,8 +125,10 @@ class SessionAllocator:
         external_url: Url,
         oidc_client: OidcClient,
         allow_local_sessions: bool = False,
+        session_allocator_ssh_port: int,
     ):
         self.fernet = fernet
+        self.session_allocator_ssh_port = session_allocator_ssh_port
         self.session_launchers: Dict[HpcSiteName, SshJobLauncher] = {}
         if allow_local_sessions:
             self.session_launchers["LOCAL_PROCESS_POOL"] = LocalJobLauncher(fernet=fernet, executor_getter="default")
@@ -302,6 +304,7 @@ class SessionAllocator:
                 max_duration_minutes=Minutes(params.session_duration_minutes),
                 session_allocator_host=Hostname("app.ilastik.org"),
                 session_allocator_username=Username(getpass.getuser()),
+                session_allocator_ssh_port=self.session_allocator_ssh_port,
                 session_allocator_socket_path=Path(f"/tmp/to-session-{compute_session_id}"),
                 session_url=self._make_compute_session_url(compute_session_id=compute_session_id),
             )
@@ -479,5 +482,6 @@ if __name__ == '__main__':
         fernet=server_config.fernet,
         external_url=server_config.external_url,
         oidc_client=server_config.ebrains_oidc_client,
+        session_allocator_ssh_port=server_config.session_allocator_ssh_port,
         allow_local_sessions=server_config.allow_local_compute_sessions
     ).run(port=5000)

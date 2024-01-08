@@ -14,11 +14,13 @@ class ReverseSshTunnel:
         *,
         remote_username: str,
         remote_host: str,
+        remote_port: int,
         local_unix_socket: Path,
         remote_unix_socket: Path,
     ):
         self.remote_username = remote_username
         self.remote_host = remote_host
+        self.remote_port = remote_port
         self.remote_unix_socket = ("" if remote_unix_socket.anchor else "./") + str(remote_unix_socket)
         self.local_unix_socket = ("" if local_unix_socket.anchor else "./") + str(local_unix_socket)
         self.tunnel_control_socket = self.local_unix_socket + ".control"
@@ -27,7 +29,15 @@ class ReverseSshTunnel:
 
     def _delete_sockets(self):
         result = subprocess.run(
-            ["ssh", "-v", "-oCheckHostIP=no", "-oBatchMode=yes", f"{self.remote_username}@{self.remote_host}", "--", "rm", "-v", self.remote_unix_socket],
+            [
+                "ssh",
+                "-v",
+                "-oCheckHostIP=no",
+                "-oBatchMode=yes",
+                f"-p{self.remote_port}",
+                f"{self.remote_username}@{self.remote_host}",
+                "--",
+                "rm", "-v", self.remote_unix_socket],
         )
         if result.returncode != 0:
             logger.warning(f"Removing socket {self.remote_host}:{self.remote_unix_socket} failed: {result.stderr.decode('utf8')}")
@@ -35,7 +45,17 @@ class ReverseSshTunnel:
 
     def __enter__(self):
         _ = subprocess.run(
-            ["ssh", "-v", "-oCheckHostIP=no", "-oBatchMode=yes", f"{self.remote_username}@{self.remote_host}", "--", "rm", "-fv", self.remote_unix_socket],
+            [
+                "ssh",
+                "-v",
+                "-oCheckHostIP=no",
+                "-oBatchMode=yes",
+                f"-p{self.remote_port}",
+                f"-i{Path.home() / '.ssh/id_ed25519'}",
+                f"{self.remote_username}@{self.remote_host}",
+                "--",
+                "rm", "-fv", self.remote_unix_socket
+            ],
         )
 
         self.tunnel_process = Popen(
