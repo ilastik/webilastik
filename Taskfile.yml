@@ -14,7 +14,7 @@ vars:
   WEBILASTIK_UNIT_INSTALL_PATH: "/lib/systemd/system/webilastik.service"
   WEBILASTIK_DEV_UNIT_CONFIG_DIR: "/etc/systemd/system/webilastik.service.d"
   DEB_PKG_PATH: "{{.BUILD_DIR}}/{{.PKG_NAME}}.deb"
-  REMOTE_PACKAGE_PATH: "/home/ubuntu/{{.PKG_NAME}}.deb"
+  REMOTE_PACKAGE_PATH: "/home/tomaz/{{.PKG_NAME}}.deb"
   NEUROGLANCER_GIT_DIR: "{{.BUILD_DIR}}/neuroglancer"
   NEUROGLANCER_BUILD_PATH: "{{.NEUROGLANCER_GIT_DIR}}/dist/min"
   NEUROGLANCER_BUNDLE_PATH: "{{.NEUROGLANCER_BUILD_PATH}}/main.bundle.js"
@@ -251,7 +251,8 @@ tasks:
           print(
             SessionAllocatorConfig.from_env(
               allow_local_compute_sessions=True,
-              external_url=Url.parse_or_raise('https://app.ilastik.org/')
+              external_url=Url.parse_or_raise('https://app.ilastik.org/'),
+              session_allocator_ssh_port=22,
             ).to_systemd_environment_confs()
           )
           SERVER_CONFIG
@@ -321,16 +322,16 @@ tasks:
       LOCAL_DEB_PACKAGE_HASH:
         sh: sha256sum {{.DEB_PKG_PATH}} | awk '{print $1}'
       REMOTE_DEB_PACKAGE_HASH:
-        sh: ssh ubuntu@148.187.149.187 "sha256sum {{.REMOTE_PACKAGE_PATH}} | awk '{print \$1}' " || echo "nothing"
+        sh: ssh -p7002 -oIdentitiesOnly=yes -i ~/.ssh/id_ed25519 tomaz@134.94.198.170 "sha256sum {{.REMOTE_PACKAGE_PATH}} | awk '{print \$1}' " || echo "nothing"
     # status:
     #   - test {{.REMOTE_DEB_PACKAGE_HASH}} = {{.LOCAL_DEB_PACKAGE_HASH}}
     cmds:
-      - scp {{.DEB_PKG_PATH}} ubuntu@148.187.149.187:{{.REMOTE_PACKAGE_PATH}}
+      - scp -P $WEBILASTIK_SESSION_ALLOCATOR_SSH_PORT {{.DEB_PKG_PATH}} tomaz@134.94.198.170:{{.REMOTE_PACKAGE_PATH}}
 
   deploy-to-webilastik-server:
     deps: [send-deb-package-to-web-server]
     cmds:
-      - ssh ubuntu@148.187.149.187 "sudo apt-get --assume-yes remove webilastik && sudo apt-get --assume-yes install {{.REMOTE_PACKAGE_PATH}}"
+      - ssh -p7002 -oIdentitiesOnly=yes -i ~/.ssh/id_ed25519 tomaz@134.94.198.170 "sudo apt-get --assume-yes install {{.REMOTE_PACKAGE_PATH}}"
 
   deploy:
     deps: [deploy-to-hpcs, deploy-to-webilastik-server]
