@@ -558,10 +558,10 @@ class LocalJobLauncher(SshJobLauncher):
                 exit 1
             fi
 
-            PYTHONPATH="{webilastik_source_dir}"
-            PYTHONPATH+=":{webilastik_source_dir}/ndstructs/"
-            PYTHONPATH+="{executor_getter_pythonpath}"
+            PYTHONPATH="{webilastik_source_dir}/ndstructs/"
+            PYTHONPATH+=":{executor_getter_pythonpath}"
             PYTHONPATH+=":{webilastik_source_dir}/global_cache_impls/redis_cache/"
+            PYTHONPATH+=":{webilastik_source_dir}"
 
             export PYTHONPATH
             export REDIS_UNIX_SOCKET_PATH="{redis_unix_socket_path}"
@@ -762,9 +762,9 @@ class JusufSshJobLauncher(SshJobLauncher):
                 exit 1
             fi
 
-            PYTHONPATH="{webilastik_source_dir}"
-            PYTHONPATH+=":{webilastik_source_dir}/executor_getter_impls/{self.executor_getter}/"
+            PYTHONPATH="{webilastik_source_dir}/executor_getter_impls/{self.executor_getter}/"
             PYTHONPATH+=":{webilastik_source_dir}/global_cache_impls/redis_cache/"
+            PYTHONPATH+=":{webilastik_source_dir}"
 
             export PYTHONPATH
             export REDIS_UNIX_SOCKET_PATH="{redis_unix_socket_path}"
@@ -869,9 +869,9 @@ class CscsSshJobLauncher(SshJobLauncher):
                 exit 1
             fi
 
-            PYTHONPATH="{webilastik_source_dir}"
-            PYTHONPATH+=":{webilastik_source_dir}/executor_getter_impls/cscs/"
+            PYTHONPATH="{webilastik_source_dir}/executor_getter_impls/cscs/"
             PYTHONPATH+=":{webilastik_source_dir}/global_cache_impls/redis_cache/"
+            PYTHONPATH+=":{webilastik_source_dir}"
 
             export PYTHONPATH
             export REDIS_HOST_PORT="$REDIS_IP:{redis_port}"
