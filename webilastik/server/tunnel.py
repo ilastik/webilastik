@@ -62,6 +62,7 @@ class ReverseSshTunnel:
                 "ssh", "-fnNT",
                 "-oCheckHostIP=no",
                 "-oBatchMode=yes",
+                f"-p{self.remote_port}",
                 # "-o", "StreamLocalBindMask=0111",
                 "-M", "-S", self.tunnel_control_socket,
                 "-R", f"{self.remote_unix_socket}:{self.local_unix_socket}",
