@@ -51,7 +51,6 @@ class ReverseSshTunnel:
                 "-oCheckHostIP=no",
                 "-oBatchMode=yes",
                 f"-p{self.remote_port}",
-                f"-i{Path.home() / '.ssh/id_ed25519'}",
                 f"{self.remote_username}@{self.remote_host}",
                 "--",
                 "rm", "-fv", self.remote_unix_socket
