@@ -1,5 +1,5 @@
 import { BucketFs, Filesystem, HttpFs } from "../../client/ilastik";
-import { Path } from "../../util/parsed_url";
+import { Path, Url } from "../../util/parsed_url";
 import { CssClasses } from "../css_classes";
 import { TabsWidget } from "./tabs_widget";
 import { BucketFsInput, HttpFsInput } from "./value_input_widget";
@@ -78,12 +78,14 @@ export class FsInputWidget{
         }
 
         if(params.filesystemChoices.includes("http")){
+            let origin = Url.parse(window.location.origin + "/")
+            let protocol = origin.protocol as "http" | "https";
             filesystemWidgets.push(
                 [
                     "HTTP",
                     new HttpFsInputForm({
                         parentElement: undefined,
-                        value: new HttpFs({protocol: "https", hostname: "app.ilastik.org", path: Path.parse("/public/images")}),
+                        value: new HttpFs({protocol, hostname: origin.hostname, path: Path.parse("/public/images")}),
                     })
                 ],
             )

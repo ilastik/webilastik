@@ -165,7 +165,9 @@ class SessionAllocator:
             status=301,
             headers={
                 "Location": self.oidc_client.create_user_login_url(
-                    redirect_uri=get_requested_url(request).updated_with(path=PurePosixPath("/api/login_successful")),
+                    # redirect_uri must match what is registered in the OIDC here:
+                    # https://wiki.ebrains.eu/bin/view/OIDC?srid=40W8jh7s#/client/webilastik
+                    redirect_uri=Url.parse_or_raise("https://app.ilastik.org/api/login_successful"),
                     scopes=set([Scope.OPENID, Scope.GROUP, Scope.TEAM, Scope.EMAIL, Scope.PROFILE]),
                 ).raw
             }
@@ -180,7 +182,8 @@ class SessionAllocator:
                     <head>
                         <meta charset="UTF-8">
                         <script>
-                            window.opener.postMessage({user_token_js}, "https://app.ilastik.org"); //FIXME: don't hardcode domain
+                            window.opener.postMessage({user_token_js}, "https://app.ilastik.org");
+                            window.opener.postMessage({user_token_js}, "https://ilastik.apps.ebrains.eu");
                             window.close();
                         </script>
                     </head>
