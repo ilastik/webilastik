@@ -1,6 +1,6 @@
 # pyright: strict
 
-from collections import Mapping
+from collections.abc import Mapping
 from typing import Optional, Tuple
 from base64 import b64decode
 import json

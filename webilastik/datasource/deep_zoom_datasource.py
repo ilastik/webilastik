@@ -1,6 +1,6 @@
 # pyright: strict
 
-from collections import Mapping
+from collections.abc import Mapping
 from typing import Dict, Literal, Mapping
 from pathlib import PurePosixPath
 import logging
