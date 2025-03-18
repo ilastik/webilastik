@@ -9,8 +9,8 @@ from datetime import datetime, timezone, timedelta
 import requests
 import aiohttp
 import jwt
-from cryptography.hazmat.backends.openssl.backend import backend as ossl
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
+from cryptography.hazmat.primitives.serialization import load_pem_public_key
 from aiohttp.client import ClientSession
 
 from webilastik.server.rpc.dto import EbrainsAccessTokenHeaderDto, EbrainsAccessTokenPayloadDto, EbrainsAccessTokenDto, HbpIamPublicKeyDto
@@ -119,11 +119,11 @@ class HbpIamPublicKey:
         public_key_pem += "-----END RSA PUBLIC KEY-----\n"
 
         try:
-            key = ossl.load_pem_public_key(data=public_key_pem.encode("utf8"))
+            key = load_pem_public_key(data=public_key_pem.encode("utf8"))
             if not isinstance(key, RSAPublicKey):
                 return CantFetchHbpIamKey(f"Could not decode key as an RSA public key")
-        except Exception:
-            return CantFetchHbpIamKey(f"Could not decode key as an RSA public key")
+        except Exception as e:
+            return CantFetchHbpIamKey(f"Could not decode key as an RSA public key: {e}")
 
         return HbpIamPublicKey(public_key=key)
 
