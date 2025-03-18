@@ -16,7 +16,7 @@ dependencies:
   - typing_extensions
   - aiohttp
   - requests
-  - redis
+  - redis-server
   - redis-py=4.4.2
   - cryptography
   - defusedxml
