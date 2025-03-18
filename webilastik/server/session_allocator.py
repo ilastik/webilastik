@@ -476,7 +476,7 @@ class SessionAllocator:
         )
 
     def run(self, port: int):
-        web.run_app(self.app, port=port) #type: ignore
+        web.run_app(self.app, port=port)
 
 if __name__ == '__main__':
     server_config = SessionAllocatorConfig.get()

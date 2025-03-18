@@ -178,7 +178,7 @@ def get_sample_feature_extractors() -> Sequence[IlpFilter]:
     )
 
 def get_sample_c_cells_pixel_classifier() -> VigraPixelClassifier[IlpFilter]:
-    classifier_result = VigraPixelClassifier.train(
+    classifier_result = VigraPixelClassifier[IlpFilter].train(
         feature_extractors=get_sample_feature_extractors(),
         label_classes=[label.annotations for label in get_sample_c_cells_pixel_annotations()],
     )

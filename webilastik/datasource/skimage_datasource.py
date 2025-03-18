@@ -4,7 +4,7 @@ from pathlib import PurePosixPath
 from typing import Optional, Tuple, Any, cast
 import io
 
-import skimage.io #type: ignore
+import skimage.io
 import numpy as np
 from ndstructs.array5D import Array5D
 from ndstructs.point5D import Interval5D, Point5D, Shape5D

@@ -112,7 +112,8 @@ def ensure_int_tuple(group: h5py.Group, key: str) -> Tuple[int, ...]:
 def ensure_drange(group: h5py.Group, key: str) -> "Tuple[int, int] | Tuple[float, float]":
     dataset = ensure_dataset(group, key)
     if len(dataset.shape) == 2 and (dataset.dtype == np.dtype("int64") or dataset.dtype == np.dtype("float32")):
-        return tuple(dataset[()])
+        # FIXME: can we not disable type ignore here?
+        return tuple(dataset[()]) #type: ignore
     raise IlpParsingError(f"Expected {key} to be a Tuple[Number, Number], found {dataset.dtype} {dataset.shape}")
 
 def ensure_bytes(group: h5py.Group, key: str) -> bytes:

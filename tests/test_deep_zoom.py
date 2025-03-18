@@ -7,7 +7,7 @@ from typing import Any, Tuple, Mapping
 
 from ndstructs.array5D import Array5D
 from ndstructs.point5D import Interval5D, Point5D
-from skimage.transform import resize_local_mean # pyright: ignore [reportMissingTypeStubs, reportUnknownVariableType]
+from skimage.transform import resize_local_mean # pyright: ignore [reportUnknownVariableType]
 from tests import get_sample_c_cells_datasource
 
 from webilastik.datasink.deep_zoom_sink import DziLevelSink

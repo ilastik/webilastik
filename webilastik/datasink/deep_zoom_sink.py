@@ -3,7 +3,7 @@ from pathlib import PurePosixPath
 from typing import List, Literal, Sequence, cast, Tuple
 
 import numpy as np
-from PIL import Image as PilImage
+from PIL import Image as PilImage # pyright: ignore [reportMissingTypeStubs]
 from ndstructs.array5D import Array5D
 
 from webilastik.datasink import FsDataSink, IDataSinkWriter
@@ -29,7 +29,10 @@ class DziLevelWriter(IDataSinkWriter):
         raw_axiskeys = "yxc" if data.shape.c > 1 else "yx"
         out_image = PilImage.fromarray(data.raw(raw_axiskeys).astype(np.uint8)) # type: ignore
         out_file = io.BytesIO()
-        out_image.save(out_file, self._data_sink.dzi_image.Format.replace("jpg", "jpeg"))
+        out_image.save( # pyright: ignore [reportUnknownMemberType]
+            out_file,
+            self._data_sink.dzi_image.Format.replace("jpg", "jpeg")
+        )
         _ = out_file.seek(0)
         contents = out_file.read() # FIXME: read() ?
 

@@ -7,7 +7,7 @@ from webilastik.server.rpc.dto import DziImageElementDto, DziSizeElementDto
 
 from ndstructs.point5D import Interval5D, Shape5D
 from xml.etree import ElementTree
-import defusedxml.ElementTree as DefusedET # type: ignore
+import defusedxml.ElementTree as DefusedET
 ET = cast(ElementTree, DefusedET) # thre are type stubs for ElementTree but not for DefusedET
 
 from webilastik.filesystem import FsFileNotFoundException, FsIoException, IFilesystem

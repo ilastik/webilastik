@@ -193,13 +193,13 @@ class Annotation(ScalarData):
     def to_raw_points(self) -> Tuple[Tuple[int, int, int], ...]:
         return tuple(
             (int(x) + self.location.x, int(y) + self.location.y, int(z) + self.location.z)
-            for x, y, z in zip(*self.raw("xyz").nonzero()) # type: ignore
+            for x, y, z in zip(*self.raw("xyz").nonzero())
         )
 
 
     def to_points(self) -> Iterable[Point5D]:
         # FIXME: annotation should probably not be an Array6D
-        for x, y, z in zip(*self.raw("xyz").nonzero()): # type: ignore
+        for x, y, z in zip(*self.raw("xyz").nonzero()):
             yield Point5D(x=x, y=y, z=z) + self.location
 
     def get_feature_samples(self, feature_extractor: FeatureExtractor) -> FeatureSamples:

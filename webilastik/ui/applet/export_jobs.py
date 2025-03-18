@@ -10,7 +10,7 @@ from zipfile import ZipFile, ZIP_STORED
 from ndstructs.point5D import Interval5D, Point5D
 from ndstructs.array5D import Array5D
 import numpy as np
-from skimage.transform import resize_local_mean #pyright: ignore [reportMissingTypeStubs, reportUnknownVariableType]
+from skimage.transform import resize_local_mean #pyright: ignore [reportUnknownVariableType]
 
 from webilastik.datasource import DataRoi, DataSource
 from webilastik.datasink import DataSink, IDataSinkWriter
@@ -37,7 +37,7 @@ class _ExportTask(Generic[_IN]):
         # print(f"Writing tile {tile}")
         return self.sink_writer.write(tile)
 
-class ExportJob(IteratingJob[Exception]):
+class ExportJob(IteratingJob[DataRoi, Exception]):
     def __init__(
         self,
         *,
@@ -68,7 +68,7 @@ class ExportJob(IteratingJob[Exception]):
             )
 
 
-class DownscaleDatasource(IteratingJob[Exception]):
+class DownscaleDatasource(IteratingJob[Interval5D, Exception]):
     def __init__(
         self,
         *,

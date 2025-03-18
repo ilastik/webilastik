@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 import os
 
-import redis
+import redis # pyright: ignore [reportMissingTypeStubs]
 
 from webilastik.utility import get_env_var_or_exit
 
@@ -39,7 +39,7 @@ def _redis_cache(func: T) -> T: #FIXME: use Callabe[P, OUT] ?
         key  = pickle.dumps(key_tuple)
         raw_value = r.get(key)
         if raw_value is not None:
-            value = pickle.loads(raw_value)
+            value = pickle.loads(raw_value) # pyright: ignore [reportArgumentType]
         else:
             value = func(*args, **kwargs)
             _ = r.set(key, pickle.dumps(value))

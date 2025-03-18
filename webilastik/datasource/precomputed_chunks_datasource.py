@@ -204,7 +204,7 @@ class PrecomputedChunksDataSource(FsDataSource):
         tile_path = self.get_tile_path(tile)
         raw_tile_bytes = self.filesystem.read_file(tile_path)
         if isinstance(raw_tile_bytes, FsFileNotFoundException):
-            logger.warn(f"tile {tile} not found. Returning zeros")
+            logger.warning(f"tile {tile} not found. Returning zeros")
             return Array5D.allocate(interval=tile, dtype=self.dtype, value=0)
         if isinstance(raw_tile_bytes, Exception):
             raise raw_tile_bytes #FIXME: return instead

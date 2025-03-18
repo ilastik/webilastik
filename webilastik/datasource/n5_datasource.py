@@ -27,12 +27,12 @@ class N5Block(Array5D):
         preamble = np.frombuffer(data_bytes, dtype=header_types, count=1)
         header_types.append(
               # dimension 1[,...,n] (uint32 big endian)
-            ("dimensions", str(preamble["num_dims"].item()) + ">u4") # type: ignore
+            ("dimensions", str(preamble["num_dims"].item()) + ">u4")
         )
 
         if preamble["mode"].item() == cls.Modes.VARLENGTH.value:
             # mode == varlength ? number of elements (uint32 big endian)
-            header_types.append(("num_elements", ">u4")) # type: ignore
+            header_types.append(("num_elements", ">u4"))
             raise RuntimeError("Don't know how to handle varlen N5 blocks")
 
         header_dtype = np.dtype(header_types)

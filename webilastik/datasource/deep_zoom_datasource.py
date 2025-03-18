@@ -8,14 +8,13 @@ import io
 import math
 
 import numpy as np
-from PIL import Image as PilImage
+from PIL import Image as PilImage # pyright: ignore [reportMissingTypeStubs]
 from ndstructs.point5D import Point5D, Interval5D
 from ndstructs.array5D import Array5D
 
 from webilastik.datasource import FsDataSource
 from webilastik.datasource.deep_zoom_image import DziImageElement, DziParsingException, GarbledTileException
 from webilastik.filesystem import FsFileNotFoundException, FsIoException, IFilesystem, create_filesystem_from_message
-from webilastik.filesystem import zip_fs
 from webilastik.filesystem.zip_fs import ZipFs
 from webilastik.server.rpc.dto import DziLevelDataSourceDto
 from webilastik.filesystem import FsFileNotFoundException, IFilesystem
@@ -101,8 +100,6 @@ class DziLevelDataSource(FsDataSource):
         if dzip_path.suffix.lower() != ".dzip":
             return None
         zip_fs_result = ZipFs.create(zip_file_fs=filesystem, zip_file_path=dzip_path)
-        if isinstance(zip_fs, FsFileNotFoundException):
-            return None
         if isinstance(zip_fs_result, Exception):
             return zip_fs_result
         dzip_contents = zip_fs_result.list_contents(PurePosixPath("/"))
@@ -136,10 +133,12 @@ class DziLevelDataSource(FsDataSource):
                 return contents_result
             file_like = io.BytesIO(contents_result)
             try:
-                pil_image = PilImage.open(file_like)
+                pil_image = PilImage.open(file_like) # pyright: ignore [reportUnknownMemberType, reportUnknownVariableType]
             except Exception:
                 return GarbledTileException(first_tile_path)
-            num_channels = len(pil_image.getbands())
+            num_channels = len(
+               pil_image.getbands() # pyright: ignore [reportUnknownMemberType, reportUnknownArgumentType]
+           )
             if num_channels not in (1, 3):
                 return GarbledTileException(first_tile_path) #FIXME: better error type?
             break
@@ -179,19 +178,19 @@ class DziLevelDataSource(FsDataSource):
         tile_path = self.dzi_image.get_tile_path(level_path=self.path, tile=tile)
         raw_tile_bytes = self.filesystem.read_file(tile_path)
         if isinstance(raw_tile_bytes, FsFileNotFoundException):
-            logger.warn(f"tile {tile} not found. Returning zeros")
+            logger.warning(f"tile {tile} not found. Returning zeros")
             return Array5D.allocate(interval=tile, dtype=self.dtype, value=0)
         if isinstance(raw_tile_bytes, Exception):
             raise raw_tile_bytes #FIXME: return instead
         file_like = io.BytesIO(raw_tile_bytes)
         try:
-            pil_image = PilImage.open(file_like)
+            pil_image = PilImage.open(file_like) # pyright: ignore [reportUnknownMemberType, reportUnknownVariableType]
         except Exception:
             raise GarbledTileException(tile_path) #FIXME: return instead
-        raw_tile_array = np.array(pil_image)
+        raw_tile_array = np.array(pil_image) # pyright: ignore [reportUnknownArgumentType, reportUnknownVariableType]
 
         return Array5D(
-            raw_tile_array,
+            raw_tile_array, # pyright: ignore [reportUnknownArgumentType]
             axiskeys="yxc"[0:len(raw_tile_array.shape)],
             location=tile.enlarged(radius=Point5D(x=self.dzi_image.Overlap, y=self.dzi_image.Overlap)).clamped(self.interval).start,
         ).cut(interval=tile)

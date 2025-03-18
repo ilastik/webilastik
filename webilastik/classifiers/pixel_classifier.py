@@ -5,7 +5,7 @@ from typing import Any, Final, Iterator, List, Generic, NewType, Sequence, TypeV
 import tempfile
 import os
 import typing
-import PIL
+import PIL # pyright: ignore [reportMissingTypeStubs]
 import io
 from dataclasses import dataclass
 

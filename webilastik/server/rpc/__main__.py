@@ -572,7 +572,7 @@ class VarLenTuple(TupleHint):
 
     @staticmethod
     def is_varlen_tuple(hint: Any) -> bool:
-        return TupleHint.is_tuple_hint(hint) and len(hint.__args__) == 2 and hint.__args__[-1] == ...
+        return TupleHint.is_tuple_hint(hint) and len(hint.__args__) == 2 and hint.__args__[-1] == Ellipsis
 
     def make_py_to_json_expr(self, value_expr: str) -> str:
         return f"tuple({self.element_type.make_py_to_json_expr('item')} for item in {value_expr})"

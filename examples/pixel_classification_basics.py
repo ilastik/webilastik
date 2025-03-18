@@ -3,6 +3,7 @@
 #pyright: strict
 
 import sys
+from typing import Sequence
 from pathlib import PurePosixPath
 project_root_dir = PurePosixPath(__file__).parent.parent
 sys.path.insert(0, project_root_dir.as_posix())
@@ -17,7 +18,7 @@ from webilastik.classifiers.pixel_classifier import VigraPixelClassifier
 from webilastik.datasink.precomputed_chunks_sink import PrecomputedChunksSink
 from webilastik.datasource.precomputed_chunks_info import RawEncoder
 from webilastik.datasource.skimage_datasource import SkimageDataSource
-from webilastik.features.ilp_filter import IlpGaussianSmoothing
+from webilastik.features.ilp_filter import IlpFilter, IlpGaussianSmoothing
 from webilastik.filesystem.os_fs import OsFs
 
 
@@ -29,7 +30,7 @@ data_source = SkimageDataSource(
     path=project_root_dir / "public/images/c_cells_1.png"
 )
 
-feature_extractors = [
+feature_extractors: Sequence[IlpFilter] = [
      #computes in 2D, slicing along the axis_2d. set axis_2d to None to compute in 3D
     IlpGaussianSmoothing(ilp_scale=0.3, axis_2d="z"),
     IlpGaussianSmoothing(ilp_scale=0.7, axis_2d="z"),
@@ -65,7 +66,7 @@ label_classes = [
     ]
 ]
 
-classifier = VigraPixelClassifier.train(
+classifier = VigraPixelClassifier[IlpFilter].train(
     feature_extractors=feature_extractors,
     label_classes=label_classes
 )

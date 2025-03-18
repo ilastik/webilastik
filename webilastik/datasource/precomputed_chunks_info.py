@@ -5,7 +5,7 @@ from pathlib import PurePosixPath
 import io
 
 import numpy as np
-import skimage.io #type: ignore
+import skimage.io
 
 from ndstructs.utils.json_serializable import (
     JsonValue, JsonObject, ensureJsonObject, ensureJsonString, ensureJsonIntTripplet, ensureJsonArray, ensureJsonInt, ensureOptional

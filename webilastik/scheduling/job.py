@@ -157,7 +157,7 @@ class SimpleJob(Job[_OK, _ERR]):
         return future
 
 
-class IteratingJob(Job[None, _ERR]):
+class IteratingJob(Job[None, _ERR], Generic[_IN, _ERR]):
     def __init__(
         self,
         *,

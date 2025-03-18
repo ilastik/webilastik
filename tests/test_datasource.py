@@ -4,12 +4,12 @@ from typing import Optional, Any, Tuple
 import tempfile
 from pathlib import PurePosixPath
 import pickle
-from PIL import Image as PilImage
+from PIL import Image as PilImage # pyright: ignore [reportMissingTypeStubs]
 
 import numpy as np
 import h5py
 import json
-import skimage.io # type: ignore
+import skimage.io
 from ndstructs.point5D import Shape5D, Interval5D, Point5D
 from ndstructs.array5D import Array5D
 from tests import get_sample_c_cells_datasource, get_test_output_bucket_fs
