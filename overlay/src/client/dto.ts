@@ -19,21 +19,21 @@ export function ensureJsonUndefined(value: JsonValue): undefined | MessageParsin
 }
 
 export function ensureJsonBoolean(value: JsonValue): boolean | MessageParsingError {
-  if (typeof (value) !== "boolean") {
+  if (typeof value !== "boolean") {
     return new MessageParsingError(`Expected boolean, found ${JSON.stringify(value)}`);
   }
   return value;
 }
 
 export function ensureJsonNumber(value: JsonValue): number | MessageParsingError {
-  if (typeof (value) !== "number") {
+  if (typeof value !== "number") {
     return new MessageParsingError(`Expected number, found ${JSON.stringify(value)}`);
   }
   return value;
 }
 
 export function ensureJsonString(value: JsonValue): string | MessageParsingError {
-  if (typeof (value) !== "string") {
+  if (typeof value !== "string") {
     return new MessageParsingError(`Expected string, found ${JSON.stringify(value)}`);
   }
   return value;
