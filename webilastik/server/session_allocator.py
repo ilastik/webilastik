@@ -281,12 +281,13 @@ class SessionAllocator:
             # _tunnel_process = subprocess.run(
             #     [
             #         "ssh", "-fnNT",
+            #         "-p7002",
             #         "-oBatchMode=yes",
             #         "-oExitOnForwardFailure=yes",
             #         "-oControlPersist=yes",
             #         "-M", "-S", f"/tmp/session-{compute_session_id}.control",
             #         "-L", f"/tmp/to-session-{compute_session_id}:/tmp/to-session-{compute_session_id}",
-            #         f"www-data@148.187.149.187",
+            #         f"www-data@134.94.198.170",
             #     ],
             # )
             # await asyncio.sleep(1)
@@ -362,9 +363,10 @@ class SessionAllocator:
         # tunnel_exists_check = subprocess.run(
         #     [
         #         "ssh",
+        #         "-p7002",
         #         "-T",
         #         "-oBatchMode=yes",
-        #         f"www-data@148.187.149.187",
+        #         f"www-data@134.94.198.170",
         #         "ls", f"/tmp/to-session-{compute_session_id}"
         #     ],
         # )

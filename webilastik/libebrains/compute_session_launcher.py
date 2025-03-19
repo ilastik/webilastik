@@ -660,9 +660,9 @@ class LocalJobLauncher(SshJobLauncher):
 class JusufSshJobLauncher(SshJobLauncher):
     def __init__(self, fernet: Fernet, executor_getter: Literal["jusuf", "dask"] = "jusuf", branch: Literal["master", "dev"] = "master") -> None:
         super().__init__(
-            user=Username("webilastik"),
+            user=Username("webilastic-quint"),
             hostname=Hostname("jusuf.fz-juelich.de"),
-            account="icei-hbp-2022-0010",
+            account="ebrains-0000003",
             fernet=fernet,
         )
         self.executor_getter: Literal["jusuf", "dask"] = executor_getter
@@ -681,10 +681,11 @@ class JusufSshJobLauncher(SshJobLauncher):
         session_allocator_ssh_port: int,
         session_allocator_socket_path: Path
     ) -> str:
-        working_dir = Path(f"$SCRATCH/{compute_session_id}")
+        scratch_dir = Path(f"/p/scratch/{self.account}")
+        working_dir = scratch_dir / str(compute_session_id)
         job_config = WorkflowConfig(
             allow_local_fs=allow_local_fs,
-            scratch_dir=PurePosixPath(f"/p/scratch/{self.account}"),
+            scratch_dir=PurePosixPath(scratch_dir), #FIXME: why the conversion to PurePosixPath?
             ebrains_user_token=ebrains_user_token,
             max_duration_minutes=max_duration_minutes,
             listen_socket=working_dir / "to-master.sock",
@@ -694,9 +695,9 @@ class JusufSshJobLauncher(SshJobLauncher):
             session_allocator_ssh_port=session_allocator_ssh_port,
             session_allocator_socket_path=session_allocator_socket_path,
         )
-        home="/p/home/jusers/webilastik/jusuf"
+        home = f"/p/project1/{self.account}"
         webilastik_source_dir = f"{working_dir}/webilastik"
-        conda_env_dir = f"{home}/miniconda3/envs/webilastik"
+        conda_env_dir = f"{home}/miniforge3/envs/webilastik"
         python_executable = f"{conda_env_dir}/bin/python"
         redis_pid_file = f"{working_dir}/redis.pid"
         redis_unix_socket_path = f"{working_dir}/redis.sock"
@@ -722,9 +723,9 @@ class JusufSshJobLauncher(SshJobLauncher):
             set -o pipefail
 
             module load git
-            module load Stages/2022
-            module load GCC/11.2.0
-            module load OpenMPI/4.1.2
+            module load Stages/2025
+            module load GCC
+            module load OpenMPI
 
             mkdir {working_dir}
             cd {working_dir}
