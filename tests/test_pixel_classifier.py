@@ -22,15 +22,15 @@ from webilastik.filesystem.os_fs import OsFs
 from ndstructs.point5D import Point5D
 
 def test_pixel_classifier():
-    default_scales = [0.7, 1.0, 1.6, 3.5, 5.0, 10.0]
+    default_scales = [0.3, 0.7, 0.9, 1.0, 1.6, 3.5, 4.0, 5.0, 7.0, 10.0]
 
     feature_extractors: List[IlpFilter] = [
-        *[IlpHessianOfGaussianEigenvalues(ilp_scale=scale, axis_2d="z") for scale in default_scales],
+        # *[IlpHessianOfGaussianEigenvalues(ilp_scale=scale, axis_2d="z") for scale in default_scales],
         *[IlpGaussianSmoothing(ilp_scale=scale, axis_2d="z") for scale in default_scales],
-        *[IlpGaussianGradientMagnitude(ilp_scale=scale, axis_2d="z") for scale in default_scales],
-        *[IlpLaplacianOfGaussian(ilp_scale=scale, axis_2d="z") for scale in default_scales],
-        *[IlpDifferenceOfGaussians(ilp_scale=scale, axis_2d="z") for scale in default_scales],
-        *[IlpStructureTensorEigenvalues(ilp_scale=scale, axis_2d="z") for scale in default_scales],
+        # *[IlpGaussianGradientMagnitude(ilp_scale=scale, axis_2d="z") for scale in default_scales],
+        # *[IlpLaplacianOfGaussian(ilp_scale=scale, axis_2d="z") for scale in default_scales],
+        # *[IlpDifferenceOfGaussians(ilp_scale=scale, axis_2d="z") for scale in default_scales],
+        # *[IlpStructureTensorEigenvalues(ilp_scale=scale, axis_2d="z") for scale in default_scales],
     ]
     labels = tests.get_sample_c_cells_pixel_annotations()
     classifier = VigraPixelClassifier.train(
@@ -44,6 +44,12 @@ def test_pixel_classifier():
     assert isinstance(datasource, FsDataSource)
 
     predictions1 = classifier(datasource.roi)
+    colors = [Color(r=np.uint8(255)), Color(g=np.uint8(255))]
+    for (idx, slc) in enumerate(predictions1.to_z_slice_pngs(class_colors=colors)):
+        f = open(f"/tmp/forests_stuff/bla{idx}.png", "wb")
+        _ = f.write(slc.read())
+        f.close()
+    exit(1)
 
     pixel_classif_group = IlpPixelClassificationGroup(
         classifier=classifier,

@@ -12,6 +12,7 @@ from dataclasses import dataclass
 import numpy as np
 from numpy import ndarray, dtype, float32
 from vigra.learning import RandomForest as VigraRandomForest
+from sklearn.ensemble import RandomForestClassifier as ScikitForest
 
 from ndstructs.array5D import Array5D
 from ndstructs.point5D import Interval5D, Shape5D
@@ -177,15 +178,36 @@ def _train_forest(random_seed: int, num_trees: int, training_data: TrainingData)
     # print(f"Trained in {t_trained - t}s, serialized in {t_serialized - t_trained}")
     return serialized
 
-def _compute_partial_predictions(feature_data: "np.ndarray[Any, np.dtype[np.float32]]", forest: VigraRandomForest) -> "np.ndarray[Any, np.dtype[np.float32]]":
-    return forest.predictProbabilities(feature_data) * forest.treeCount()
+def train_scikit_forest(random_seed: int, num_trees: int, training_data: TrainingData) -> ScikitForest:
+    clf = ScikitForest(random_state=random_seed, n_estimators=num_trees)
+    print(f"Sape of x? {training_data.X.shape}")
+    print(f"Shape of y? {training_data.y.shape}")
+    print(f"Shape of raveled y? {training_data.y.ravel().shape}")
+    clf.fit(training_data.X, training_data.y.ravel())
+
+    from sklearn.tree import export_graphviz
+    for tree in clf.estimators_:
+        for (tree_idx, tree) in enumerate(clf.estimators_):
+            _ = export_graphviz(
+                decision_tree=tree,
+                out_file=f"/tmp/forests_stuff/tree_{random_seed}_{tree_idx}.txt",
+                impurity=False,
+                node_ids=True,
+                precision=17,
+                class_names=[str(idx) for idx in range(training_data.num_classes)],
+            )
+
+    return clf
+
+def _compute_partial_predictions(feature_data: "np.ndarray[Any, np.dtype[np.float32]]", forest: ScikitForest) -> "np.ndarray[Any, np.dtype[np.float32]]":
+    return forest.predict_proba(feature_data) * forest.n_estimators # pyright: ignore
 
 class VigraPixelClassifier(PixelClassifier[FE]):
     def __init__(
         self,
         *,
         feature_extractors: Sequence[FE],
-        forest_h5_bytes: "Sequence[VigraForestH5Bytes]",
+        forests: Sequence[ScikitForest],
         num_input_channels: int,
         num_classes: int,
         minInputShape: Shape5D
@@ -193,9 +215,8 @@ class VigraPixelClassifier(PixelClassifier[FE]):
         super().__init__(
             num_classes=num_classes, feature_extractors=feature_extractors, num_input_channels=num_input_channels
         )
-        self.forest_h5_bytes: Final[Sequence[VigraForestH5Bytes]] = forest_h5_bytes
-        self.forests: Final[Sequence[VigraRandomForest]] = [h5_bytes_to_vigra_forest(forest_bytes) for forest_bytes in forest_h5_bytes]
-        self.num_trees: Final[int] = sum(f.treeCount() for f in self.forests)
+        self.forests: Final[Sequence[ScikitForest]] = forests
+        self.num_trees: Final[int] = sum(f.n_estimators for f in self.forests)
         self.minInputShape = minInputShape
 
     def get_expected_dtype(self, input_dtype: "dtype[Any]") -> "dtype[float32]":
@@ -219,15 +240,15 @@ class VigraPixelClassifier(PixelClassifier[FE]):
 
         executor = get_executor(hint="training", max_workers=num_forests)
         # we're taking the bytes instead of the forest itself because vigra forests are not picklable
-        forests_bytes: Sequence[VigraForestH5Bytes] = list(executor.map(
-            partial(_train_forest, training_data=training_data_result),
+        forests: Sequence[ScikitForest] = list(executor.map(
+            partial(train_scikit_forest, training_data=training_data_result),
             random_seeds,
             trees_per_forest
         ))
 
         return cls(
             feature_extractors=feature_extractors,
-            forest_h5_bytes=forests_bytes,
+            forests=forests,
             num_input_channels=training_data_result.num_input_channels,
             num_classes=training_data_result.num_classes,
             minInputShape=Shape5D(c=training_data_result.num_input_channels)
@@ -267,20 +288,20 @@ class VigraPixelClassifier(PixelClassifier[FE]):
             location=predictions.location,
         )
 
-    def __getstate__(self):
-        return {
-            "feature_extractors": self.feature_extractors,
-            "num_input_channels": self.num_input_channels,
-            "num_classes": self.num_classes,
-            "forest_h5_bytes": self.forest_h5_bytes,
-            "minInputShape": self.minInputShape
-        }
+    # def __getstate__(self):
+    #     return {
+    #         "feature_extractors": self.feature_extractors,
+    #         "num_input_channels": self.num_input_channels,
+    #         "num_classes": self.num_classes,
+    #         "forest_h5_bytes": self.forest_h5_bytes,
+    #         "minInputShape": self.minInputShape
+    #     }
 
-    def __setstate__(self, data):
-        self.__init__(
-            feature_extractors=data["feature_extractors"],
-            forest_h5_bytes=data["forest_h5_bytes"],
-            num_input_channels=data["num_input_channels"],
-            num_classes=data["num_classes"],
-            minInputShape=data["minInputShape"],
-        )
+    # def __setstate__(self, data):
+    #     self.__init__(
+    #         feature_extractors=data["feature_extractors"],
+    #         forest_h5_bytes=data["forest_h5_bytes"],
+    #         num_input_channels=data["num_input_channels"],
+    #         num_classes=data["num_classes"],
+    #         minInputShape=data["minInputShape"],
+    #     )
