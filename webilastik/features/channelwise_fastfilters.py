@@ -85,7 +85,7 @@ class ChannelwiseFastFilter(JsonableFeatureExtractor):
     def is_applicable_to(self, datasource: DataSource) -> bool:
         return datasource.shape >= self.halo * 2
 
-    @global_cache
+    #@global_cache
     def __call__(self, roi: DataRoi) -> FeatureData:
         haloed_roi = roi.enlarged(self.halo)
         source_data = self.preprocessor(haloed_roi)

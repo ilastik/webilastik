@@ -73,7 +73,7 @@ class DataSource(ABC):
     def is_tile(self, tile: Interval5D) -> bool:
         return tile.is_tile(tile_shape=self.tile_shape, full_interval=self.interval, clamped=True)
 
-    @global_cache
+    #@global_cache
     def get_tile(self, tile: Interval5D) -> Array5D:
         return self._get_tile(tile)
 
